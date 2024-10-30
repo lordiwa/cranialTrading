@@ -117,6 +117,7 @@ export default {
       this.search();
     },
     async addCardsFromList(listName, cardList) {
+      this[listName] = []; // Clear the list before adding new cards
       const lines = cardList.split('\n');
       for (const line of lines) {
         const match = line.match(/^(\d+)\s+(.+)$/);

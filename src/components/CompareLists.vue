@@ -18,10 +18,15 @@ export default {
   },
   computed: {
     coincidences() {
-      return this.lookingFor.filter(lookingForCard => {
+      return this.lookingFor.map(lookingForCard => {
         const friendCard = this.friendsList.find(friendCard => friendCard.name === lookingForCard.name);
-        return friendCard && friendCard.amount >= lookingForCard.amount;
-      });
+        if (friendCard) {
+          return {
+            ...lookingForCard,
+            amount: Math.min(lookingForCard.amount, friendCard.amount)
+          };
+        }
+      }).filter(card => card);
     }
   }
 };

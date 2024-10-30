@@ -64,14 +64,19 @@
         <button @click="addCardsFromList('friendsList', friendsListList)">Add Cards</button>
       </div>
     </div>
+    <CompareLists :lookingFor="lookingFor" :friendsList="friendsList" />
   </div>
 </template>
 
 <script>
 import { debounce } from 'lodash';
 import CardService from '../services/CardService';
+import CompareLists from './CompareLists.vue';
 
 export default {
+  components: {
+    CompareLists,
+  },
   data() {
     return {
       query: '',
@@ -111,12 +116,7 @@ export default {
       this.suggestions = [];
       this.search();
     },
-    addCardToList(card, list) {
-      if (!this[list].find(c => c.id === card.id)) {
-        this[list].push({ ...card, amount: 1 });
-      }
-    },
-    async addCardsFromList(list, cardList) {
+    async addCardsFromList(listName, cardList) {
       const lines = cardList.split('\n');
       for (const line of lines) {
         const match = line.match(/^(\d+)\s+(.+)$/);
@@ -127,7 +127,7 @@ export default {
             const response = await CardService.searchCards(name);
             const cardData = response.data.data[0];
             if (cardData) {
-              this[list].push({
+              this[listName].push({
                 name: cardData.name,
                 amount,
                 image_uris: cardData.image_uris,
@@ -140,7 +140,7 @@ export default {
         }
       }
     }
-  },
+  }
 };
 </script>
 
@@ -162,7 +162,7 @@ export default {
 
 .tooltip .tooltiptext {
   visibility: hidden;
-  width: 75px; /* Adjust the width to make the tooltip half the size */
+  width: 75px;
   height: auto;
   background-color: #fff;
   border: 1px solid #ccc;

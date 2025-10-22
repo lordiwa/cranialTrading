@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    * {
+        @apply border-silver-20;
+    }
+
+    html {
+        @apply bg-primary text-silver font-mono;
+    }
+
+    body {
+        @apply m-0 antialiased;
+    }
+
+    input,
+    textarea,
+    select {
+        @apply font-mono;
+    }
+}
+
+@layer utilities {
+    .transition-fast {
+        transition: all 150ms ease-out;
+    }
+
+    .transition-normal {
+        transition: all 300ms ease-in-out;
+    }
+
+    .transition-slow {
+        transition: all 500ms ease-in-out;
+    }
+
+    .no-spinner::-webkit-inner-spin-button,
+    .no-spinner::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .no-spinner {
+        -moz-appearance: textfield;
+    }
+}

@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function: usuario autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper function: es el owner del documento
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Colecciones collection
+    match /colecciones/{userId}/cards/{cardId} {
+      allow read: if isAuth();
+      allow write: if isOwner(userId);
+    }
+
+    // Preferencias collection
+    match /preferencias/{userId}/{preferenceId} {
+      allow read: if isAuth();
+      allow write: if isOwner(userId);
+    }
+
+    // Matches guardados collection
+    match /matches_guardados/{userId}/{matchId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Contactos guardados collection
+    match /contactos_guardados/{userId}/{contactId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

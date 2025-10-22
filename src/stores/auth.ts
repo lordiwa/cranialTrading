@@ -18,18 +18,22 @@ export const useAuthStore = defineStore('auth', () => {
     const toastStore = useToastStore();
 
     const initAuth = () => {
+        console.log('[AUTH] initAuth called');
         onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+            console.log('[AUTH] onAuthStateChanged fired:', firebaseUser?.email);
             if (firebaseUser) {
                 await loadUserData(firebaseUser.uid);
             } else {
                 user.value = null;
             }
             loading.value = false;
+            console.log('[AUTH] loading set to false, user:', user.value?.email);
         });
     };
 
     const loadUserData = async (userId: string) => {
         try {
+            console.log('[AUTH] loadUserData called for userId:', userId);
             const userDoc = await getDoc(doc(db, 'users', userId));
             if (userDoc.exists()) {
                 const data = userDoc.data();
@@ -40,9 +44,47 @@ export const useAuthStore = defineStore('auth', () => {
                     location: data.location,
                     createdAt: data.createdAt.toDate(),
                 };
+                console.log('[AUTH] User data loaded:', user.value.email);
+            } else {
+                console.log('[AUTH] User document does not exist, getting from auth');
+                // Si el documento no existe, crear uno con datos del auth
+                const firebaseUser = auth.currentUser;
+                if (firebaseUser) {
+                    user.value = {
+                        id: userId,
+                        email: firebaseUser.email || '',
+                        username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
+                        location: '',
+                        createdAt: new Date(),
+                    };
+
+                    // Guardar el documento en Firestore para futuras referencias
+                    try {
+                        await setDoc(doc(db, 'users', userId), {
+                            email: user.value.email,
+                            username: user.value.username,
+                            location: user.value.location,
+                            createdAt: new Date(),
+                        });
+                        console.log('[AUTH] User document created in Firestore');
+                    } catch (saveError) {
+                        console.error('[AUTH] Error saving user document:', saveError);
+                    }
+                }
             }
         } catch (error) {
-            console.error('Error loading user data:', error);
+            console.error('[AUTH] Error loading user data:', error);
+            // Incluso si hay error, permitir que el usuario continúe
+            const firebaseUser = auth.currentUser;
+            if (firebaseUser) {
+                user.value = {
+                    id: userId,
+                    email: firebaseUser.email || '',
+                    username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
+                    location: '',
+                    createdAt: new Date(),
+                };
+            }
         }
     };
 
@@ -69,10 +111,18 @@ export const useAuthStore = defineStore('auth', () => {
 
     const login = async (email: string, password: string) => {
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            console.log('[AUTH] login called for:', email);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            console.log('[AUTH] signInWithEmailAndPassword success:', userCredential.user.email);
+
+            // Esperar a que se cargue el usuario completo
+            await loadUserData(userCredential.user.uid);
+            console.log('[AUTH] loadUserData completed, user.value:', user.value?.email);
+
             toastStore.show('Sesión iniciada', 'success');
             return true;
         } catch (error: any) {
+            console.error('[AUTH] login error:', error);
             toastStore.show('Email o contraseña incorrectos', 'error');
             return false;
         }

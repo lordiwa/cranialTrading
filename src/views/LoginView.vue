@@ -1,69 +1,79 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
-import BaseInput from '../components/ui/BaseInput.vue';
-import BaseButton from '../components/ui/BaseButton.vue';
+    import { ref } from 'vue';
+    import { useRouter } from 'vue-router';
+    import { useAuthStore } from '../stores/auth';
+    import BaseInput from '../components/ui/BaseInput.vue';
+    import BaseButton from '../components/ui/BaseButton.vue';
 
-const router = useRouter();
-const authStore = useAuthStore();
+    const router = useRouter();
+    const authStore = useAuthStore();
 
-const email = ref('');
-const password = ref('');
-const loading = ref(false);
+    const email = ref('');
+    const password = ref('');
+    const loading = ref(false);
 
-const handleLogin = async () => {
-  if (!email.value || !password.value) return;
+    const handleLogin = async () => {
+      if (!email.value || !password.value) return;
 
-  loading.value = true;
-  const success = await authStore.login(email.value, password.value);
-  loading.value = false;
+      loading.value = true;
+      try {
+        const success = await authStore.login(email.value, password.value);
+        console.log('authStore.login returned:', success);
 
-  if (success) {
-    router.push('/dashboard');
-  }
-};
-</script>
+        if (success) {
+          console.log('Navigating to dashboard...');
+          await router.push('/dashboard');
+          return;
+        }
 
-<template>
-  <div class="min-h-screen flex items-center justify-center bg-primary px-4">
-    <div class="w-full max-w-md">
-      <h1 class="text-h1 font-bold text-neon text-center mb-8 tracking-wider">CRANIAL</h1>
+        console.warn('Login did not succeed (authStore returned falsy).');
+      } catch (err) {
+        console.error('Login error:', err);
+      } finally {
+        loading.value = false;
+      }
+    };
+    </script>
 
-      <div class="bg-primary border border-silver-30 p-8 shadow-medium">
-        <h2 class="text-h2 font-bold text-silver mb-6">INICIAR SESIÓN</h2>
+    <template>
+      <div class="min-h-screen flex items-center justify-center bg-primary px-4">
+        <div class="w-full max-w-md">
+          <h1 class="text-h1 font-bold text-neon text-center mb-8 tracking-wider">CRANIAL</h1>
 
-        <form @submit.prevent="handleLogin" class="space-y-4">
-          <BaseInput
-              v-model="email"
-              type="email"
-              placeholder="Email"
-          />
+          <div class="bg-primary border border-silver-30 p-8 shadow-medium">
+            <h2 class="text-h2 font-bold text-silver mb-6">INICIAR SESIÓN</h2>
 
-          <BaseInput
-              v-model="password"
-              type="password"
-              placeholder="Contraseña"
-          />
+            <form @submit.prevent="handleLogin" class="space-y-4">
+              <BaseInput
+                  v-model="email"
+                  type="email"
+                  placeholder="Email"
+              />
 
-          <BaseButton
-              type="submit"
-              class="w-full"
-              :disabled="loading || !email || !password"
-          >
-            {{ loading ? 'INGRESANDO...' : 'INGRESAR' }}
-          </BaseButton>
-        </form>
+              <BaseInput
+                  v-model="password"
+                  type="password"
+                  placeholder="Contraseña"
+              />
 
-        <div class="mt-6 text-center">
-          <RouterLink
-              to="/register"
-              class="text-small text-silver hover:text-neon transition-fast"
-          >
-            ¿No tienes cuenta? Registrarse
-          </RouterLink>
+              <BaseButton
+                  type="submit"
+                  class="w-full"
+                  :disabled="loading || !email || !password"
+              >
+                {{ loading ? 'INGRESANDO...' : 'INGRESAR' }}
+              </BaseButton>
+            </form>
+
+            <div class="mt-6 text-center">
+              <RouterLink
+                  to="/register"
+                  class="text-small text-silver hover:text-neon transition-fast"
+              >
+                ¿No tienes cuenta? Registrarse
+              </RouterLink>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-</template>
+    </template>

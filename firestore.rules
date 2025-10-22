@@ -19,28 +19,33 @@ service cloud.firestore {
       allow create: if isAuth() && isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if false;
+
+      // Preferencias subcollection
+      match /preferencias/{preferenceId} {
+        allow read: if isAuth();
+        allow write: if isOwner(userId);
+      }
+
+      // Cards subcollection
+      match /cards/{cardId} {
+        allow read: if isAuth();
+        allow write: if isOwner(userId);
+      }
+
+      // Matches guardados subcollection
+      match /matches_guardados/{matchId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Contactos guardados subcollection
+      match /contactos_guardados/{contactId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
-    // Colecciones collection
-    match /colecciones/{userId}/cards/{cardId} {
-      allow read: if isAuth();
-      allow write: if isOwner(userId);
-    }
-
-    // Preferencias collection
-    match /preferencias/{userId}/{preferenceId} {
-      allow read: if isAuth();
-      allow write: if isOwner(userId);
-    }
-
-    // Matches guardados collection
-    match /matches_guardados/{userId}/{matchId} {
-      allow read, write: if isOwner(userId);
-    }
-
-    // Contactos guardados collection
-    match /contactos_guardados/{userId}/{contactId} {
-      allow read, write: if isOwner(userId);
+    // Conversations collection - PERMISSIVE for now to test
+    match /conversations/{document=**} {
+      allow read, write: if isAuth();
     }
   }
 }

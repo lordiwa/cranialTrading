@@ -1,0 +1,206 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue';
+import BaseModal from '../ui/BaseModal.vue';
+import BaseInput from '../ui/BaseInput.vue';
+import BaseSelect from '../ui/BaseSelect.vue';
+import BaseButton from '../ui/BaseButton.vue';
+import BaseLoader from '../ui/BaseLoader.vue';
+import BaseBadge from '../ui/BaseBadge.vue';
+import { searchCards } from '../../services/scryfall';
+import { ScryfallCard, CardCondition } from '../../types/card';
+import { PreferenceType } from '../../types/preferences';
+
+const props = defineProps<{
+  show: boolean;
+}>();
+
+const emit = defineEmits<{
+  close: [];
+  add: [prefData: any];
+}>();
+
+const searchQuery = ref('');
+const searchResults = ref<ScryfallCard[]>([]);
+const selectedCard = ref<ScryfallCard | null>(null);
+const type = ref<PreferenceType>('BUSCO');
+const quantity = ref(1);
+const condition = ref<CardCondition>('NM');
+const searching = ref(false);
+
+const typeOptions: { value: PreferenceType; label: string; variant: 'busco' | 'cambio' | 'vendo' }[] = [
+  { value: 'BUSCO', label: 'BUSCO', variant: 'busco' },
+  { value: 'CAMBIO', label: 'CAMBIO', variant: 'cambio' },
+  { value: 'VENDO', label: 'VENDO', variant: 'vendo' },
+];
+
+const conditionOptions = [
+  { value: 'M', label: 'M - Mint' },
+  { value: 'NM', label: 'NM - Near Mint' },
+  { value: 'LP', label: 'LP - Light Play' },
+  { value: 'MP', label: 'MP - Moderate Play' },
+  { value: 'HP', label: 'HP - Heavy Play' },
+  { value: 'PO', label: 'PO - Poor' },
+];
+
+let searchTimeout: ReturnType<typeof setTimeout>;
+
+watch(searchQuery, (newQuery) => {
+  clearTimeout(searchTimeout);
+
+  if (newQuery.length < 2) {
+    searchResults.value = [];
+    return;
+  }
+
+  searching.value = true;
+  searchTimeout = setTimeout(async () => {
+    searchResults.value = await searchCards(newQuery);
+    searching.value = false;
+  }, 300);
+});
+
+const selectCard = (card: ScryfallCard) => {
+  selectedCard.value = card;
+  searchResults.value = [];
+  searchQuery.value = '';
+};
+
+const handleAdd = () => {
+  if (!selectedCard.value || quantity.value < 1) return;
+
+  emit('add', {
+    scryfallId: selectedCard.value.id,
+    name: selectedCard.value.name,
+    type: type.value,
+    quantity: quantity.value,
+    condition: condition.value,
+    edition: selectedCard.value.set_name,
+    image: selectedCard.value.image_uris?.normal || '',
+  });
+
+  handleClose();
+};
+
+const handleClose = () => {
+  searchQuery.value = '';
+  searchResults.value = [];
+  selectedCard.value = null;
+  type.value = 'BUSCO';
+  quantity.value = 1;
+  condition.value = 'NM';
+  emit('close');
+};
+</script>
+
+<template>
+  <BaseModal :show="show" title="NUEVA PREFERENCIA" @close="handleClose">
+    <div class="space-y-4">
+      <!-- Search -->
+      <div v-if="!selectedCard">
+        <BaseInput
+            v-model="searchQuery"
+            placeholder="Buscar carta..."
+            type="text"
+        />
+
+        <div v-if="searching" class="mt-4">
+          <BaseLoader size="small" />
+        </div>
+
+        <div v-if="searchResults.length > 0" class="mt-4 max-h-64 overflow-y-auto space-y-2">
+          <div
+              v-for="card in searchResults"
+              :key="card.id"
+              @click="selectCard(card)"
+              class="border border-silver-30 p-3 hover:border-neon transition-fast cursor-pointer"
+          >
+            <div class="flex gap-3">
+              <img
+                  v-if="card.image_uris?.small"
+                  :src="card.image_uris.small"
+                  :alt="card.name"
+                  class="w-12 h-16 object-cover"
+              />
+              <div class="flex-1">
+                <p class="text-small font-bold text-silver">{{ card.name }}</p>
+                <p class="text-tiny text-silver-70">{{ card.set_name }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected Card Form -->
+      <div v-if="selectedCard" class="space-y-4">
+        <div class="border border-silver-30 p-4">
+          <div class="flex gap-4">
+            <img
+                v-if="selectedCard.image_uris?.normal"
+                :src="selectedCard.image_uris.normal"
+                :alt="selectedCard.name"
+                class="w-24 h-32 object-cover"
+            />
+            <div class="flex-1">
+              <p class="text-body font-bold text-silver">{{ selectedCard.name }}</p>
+              <p class="text-small text-silver-70">{{ selectedCard.set_name }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-small text-silver-70 block mb-2">Tipo</label>
+          <div class="flex gap-2">
+            <button
+                v-for="opt in typeOptions"
+                :key="opt.value"
+                @click="type = opt.value"
+                class="flex-1"
+            >
+              <BaseBadge :variant="type === opt.value ? opt.variant : 'cambio'">
+                {{ opt.label }}
+              </BaseBadge>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-small text-silver-70 block mb-2">Cantidad</label>
+            <BaseInput
+                v-model="quantity"
+                type="number"
+                placeholder="1"
+            />
+          </div>
+
+          <div>
+            <label class="text-small text-silver-70 block mb-2">Condición mínima</label>
+            <BaseSelect
+                v-model="condition"
+                :options="conditionOptions"
+            />
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <BaseButton
+              variant="secondary"
+              size="small"
+              @click="selectedCard = null"
+              class="flex-1"
+          >
+            CAMBIAR CARTA
+          </BaseButton>
+          <BaseButton
+              variant="primary"
+              @click="handleAdd"
+              :disabled="quantity < 1"
+              class="flex-1"
+          >
+            CREAR
+          </BaseButton>
+        </div>
+      </div>
+    </div>
+  </BaseModal>
+</template>

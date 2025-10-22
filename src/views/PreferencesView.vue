@@ -1,13 +1,55 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
 import AppContainer from '../components/layout/AppContainer.vue';
+import BaseButton from '../components/ui/BaseButton.vue';
+import BaseLoader from '../components/ui/BaseLoader.vue';
+import PreferenceList from '../components/preferences/PreferenceList.vue';
+import NewPreferenceModal from '../components/preferences/NewPreferenceModal.vue';
+import { usePreferencesStore } from '../stores/preferences';
+import { Preference } from '../types/preferences';
+
+const preferencesStore = usePreferencesStore();
+const showNewModal = ref(false);
+
+onMounted(() => {
+  preferencesStore.loadPreferences();
+});
+
+const handleAdd = (prefData: any) => {
+  preferencesStore.addPreference(prefData);
+  showNewModal.value = false;
+};
+
+const handleEdit = (preference: Preference) => {
+  // Por ahora placeholder
+  console.log('Edit preference:', preference);
+};
+
+const handleDelete = async (prefId: string) => {
+  if (confirm('¿Eliminar esta preferencia?')) {
+    await preferencesStore.deletePreference(prefId);
+  }
+};
 </script>
 
 <template>
   <AppContainer>
     <div>
-      <h1 class="text-h1 font-bold text-silver mb-8">MIS PREFERENCIAS</h1>
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h1 class="text-h1 font-bold text-silver">MIS PREFERENCIAS</h1>
+          <p class="text-small text-silver-70 mt-1">
+            {{ preferencesStore.preferences.length }} activas
+          </p>
+        </div>
+        <BaseButton @click="showNewModal = true">
+          + NUEVA PREFERENCIA
+        </BaseButton>
+      </div>
 
-      <div class="border border-silver-30 p-8 text-center">
+      <BaseLoader v-if="preferencesStore.loading" size="large" />
+
+      <div v-else-if="preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 text-center">
         <p class="text-body text-silver-70">
           No tienes preferencias configuradas.
         </p>
@@ -15,6 +57,19 @@ import AppContainer from '../components/layout/AppContainer.vue';
           Establece qué cartas buscas, cambias o vendes.
         </p>
       </div>
+
+      <PreferenceList
+          v-else
+          :preferences="preferencesStore.preferences"
+          @edit="handleEdit"
+          @delete="handleDelete"
+      />
+
+      <NewPreferenceModal
+          :show="showNewModal"
+          @close="showNewModal = false"
+          @add="handleAdd"
+      />
     </div>
   </AppContainer>
 </template>

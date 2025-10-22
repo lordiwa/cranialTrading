@@ -47,16 +47,41 @@ const router = createRouter({
     ],
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore();
 
-    if (to.meta.requiresAuth && !authStore.user) {
-        next('/login');
-    } else if (to.meta.requiresGuest && authStore.user) {
-        next('/dashboard');
-    } else {
-        next();
+    // Wait for initial auth check to complete
+    while (authStore.loading) {
+        await new Promise<void>((resolve) => {
+            const unwatch = authStore.$subscribe(() => {
+                if (!authStore.loading) {
+                    unwatch();
+                    resolve();
+                }
+            });
+            // Timeout para evitar que se quede esperando
+            setTimeout(() => {
+                try { unwatch(); } catch {}
+                resolve();
+            }, 2000);
+        });
+        if (!authStore.loading) break;
     }
+
+    // Check auth status and route accordingly
+    const isAuthenticated = !!authStore.user;
+    const requiresAuth = to.meta.requiresAuth;
+    const requiresGuest = to.meta.requiresGuest;
+
+    if (requiresAuth && !isAuthenticated) {
+        return next('/login');
+    }
+
+    if (requiresGuest && isAuthenticated) {
+        return next('/dashboard');
+    }
+
+    next();
 });
 
 export default router;

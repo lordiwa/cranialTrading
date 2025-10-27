@@ -8,8 +8,24 @@ import CollectionGrid from '../components/collection/CollectionGrid.vue';
 import AddCardModal from '../components/collection/AddCardModal.vue';
 import EditCardModal from '../components/collection/EditCardModal.vue';
 import { useCollectionStore } from '../stores/collection';
-import { Card } from '../types/card';
+import {Card, CardCondition} from '../types/card';
+import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 
+// Agregar refs
+const showImportModal = ref(false)
+const importing = ref(false)
+
+// Agregar función
+const handleImport = async (
+    deckText: string,
+    condition: CardCondition,
+    includeSideboard: boolean
+) => {
+  importing.value = true
+  await collectionStore.importDeck(deckText, condition, includeSideboard)
+  importing.value = false
+  showImportModal.value = false
+}
 const collectionStore = useCollectionStore();
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -65,9 +81,14 @@ const handleDelete = async (cardId: string) => {
             {{ collectionStore.cards.length }} cartas
           </p>
         </div>
-        <BaseButton @click="showAddModal = true">
-          + AGREGAR CARTA
-        </BaseButton>
+        <div class="flex gap-3">
+          <BaseButton variant="secondary" @click="showImportModal = true">
+            IMPORTAR MAZO
+          </BaseButton>
+          <BaseButton @click="showAddModal = true">
+            + AGREGAR CARTA
+          </BaseButton>
+        </div>
       </div>
 
       <div class="mb-6">
@@ -107,6 +128,12 @@ const handleDelete = async (cardId: string) => {
           :card="editingCard"
           @close="showEditModal = false"
           @save="handleSaveEdit"
+      />
+
+      <ImportDeckModal
+          :show="showImportModal"
+          @close="showImportModal = false"
+          @import="handleImport"
       />
     </div>
   </AppContainer>

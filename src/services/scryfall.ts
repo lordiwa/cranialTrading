@@ -33,3 +33,19 @@ export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
         return null;
     }
 };
+
+export const getCardBySetAndNumber = async (
+    setCode: string,
+    collectorNumber: string
+): Promise<ScryfallCard | null> => {
+    try {
+        const response = await fetch(
+            `${SCRYFALL_API}/cards/${setCode.toLowerCase()}/${collectorNumber}`
+        )
+        if (!response.ok) return null
+        return await response.json()
+    } catch (error) {
+        console.error('Scryfall get card by set error:', error)
+        return null
+    }
+}

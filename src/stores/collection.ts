@@ -5,6 +5,8 @@ import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { Card, CardCondition } from '../types/card';
+import { getCardBySetAndNumber } from '../services/scryfall'
+import { parseMoxfieldDeck } from '../utils/deckParser'
 
 export const useCollectionStore = defineStore('collection', () => {
     const cards = ref<Card[]>([]);
@@ -92,6 +94,77 @@ export const useCollectionStore = defineStore('collection', () => {
             toastStore.show('Error al eliminar carta', 'error');
         }
     };
+    const importDeck = async (
+        deckText: string,
+        condition: CardCondition = 'NM',
+        includeSideboard: boolean = false
+    ) => {
+        if (!authStore.user) return { success: 0, failed: 0, errors: [] as string[] }
+
+        try {
+            const parsed = parseMoxfieldDeck(deckText)
+            const cardsToImport = includeSideboard
+                ? [...parsed.mainboard, ...parsed.sideboard]
+                : parsed.mainboard
+
+            if (cardsToImport.length === 0) {
+                toastStore.show('No se detectaron cartas', 'error')
+                return { success: 0, failed: 0, errors: [] }
+            }
+
+            if (cardsToImport.length > 500) {
+                toastStore.show('Máximo 500 cartas por importación', 'error')
+                return { success: 0, failed: 0, errors: [] }
+            }
+
+            let success = 0
+            let failed = 0
+            const errors: string[] = []
+
+            for (const parsedCard of cardsToImport) {
+                await new Promise(resolve => setTimeout(resolve, 100)) // Rate limit
+
+                const card = await getCardBySetAndNumber(
+                    parsedCard.setCode,
+                    parsedCard.collectorNumber
+                )
+
+                if (!card) {
+                    failed++
+                    errors.push(`${parsedCard.name} (${parsedCard.setCode} ${parsedCard.collectorNumber})`)
+                    continue
+                }
+
+                const price = parseFloat(card.prices.usd || '0')
+
+                await addCard({
+                    scryfallId: card.id,
+                    name: card.name,
+                    edition: card.set_name,
+                    quantity: parsedCard.quantity,
+                    condition,
+                    foil: false,
+                    price,
+                    image: card.image_uris?.normal || '',
+                })
+
+                success++
+            }
+
+            if (success > 0) {
+                toastStore.show(`${success} cartas importadas`, 'success')
+            }
+            if (failed > 0) {
+                toastStore.show(`${failed} cartas no encontradas`, 'error')
+            }
+
+            return { success, failed, errors }
+        } catch (error) {
+            console.error('Error importing deck:', error)
+            toastStore.show('Error al importar mazo', 'error')
+            return { success: 0, failed: 0, errors: [] }
+        }
+    }
 
     return {
         cards,
@@ -100,5 +173,6 @@ export const useCollectionStore = defineStore('collection', () => {
         addCard,
         updateCard,
         deleteCard,
+        importDeck
     };
 });

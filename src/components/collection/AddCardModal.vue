@@ -73,6 +73,7 @@ const handleAdd = () => {
     foil: foil.value,
     price,
     image: selectedCard.value.image_uris?.normal || '',
+    status: 'collection', // Por defecto solo guardar
   });
 
   handleClose();
@@ -90,7 +91,7 @@ const handleClose = () => {
 </script>
 
 <template>
-  <BaseModal :show="show" title="AGREGAR CARTA" @close="handleClose">
+  <BaseModal :show="show" title="AGREGAR CARTA A MI COLECCIÓN" @close="handleClose">
     <div class="space-y-4">
       <!-- Search -->
       <div v-if="!selectedCard">
@@ -178,6 +179,12 @@ const handleClose = () => {
             />
             <span>Foil</span>
           </label>
+        </div>
+
+        <div class="bg-primary-dark border border-silver-30 p-3">
+          <p class="text-tiny text-silver-70">
+            💡 La carta se agregará a tu colección. Luego podrás elegir si venderla o cambiarla haciendo click en ella.
+          </p>
         </div>
 
         <div class="flex gap-3">

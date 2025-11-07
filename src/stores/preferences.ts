@@ -32,9 +32,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             console.log('[PREFERENCES] Loaded', preferences.value.length, 'preferences');
         } catch (error: any) {
             console.error('[PREFERENCES] Error loading preferences:', error.code, error.message);
-            // Si hay error de permisos o colección no existe, mostrar lista vacía
             preferences.value = [];
-            // Solo mostrar toast si es un error diferente de permission-denied
             if (error.code !== 'permission-denied') {
                 toastStore.show('Error al cargar preferencias', 'error');
             }
@@ -99,6 +97,50 @@ export const usePreferencesStore = defineStore('preferences', () => {
         }
     };
 
+    const deletePreferenceByCard = async (scryfallId: string, edition: string) => {
+        if (!authStore.user) return;
+
+        try {
+            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias');
+            const snapshot = await getDocs(prefRef);
+
+            for (const docSnap of snapshot.docs) {
+                const pref = docSnap.data();
+                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO')) {
+                    await deleteDoc(doc(db, 'users', authStore.user.id, 'preferencias', docSnap.id));
+                }
+            }
+
+            await loadPreferences();
+        } catch (error) {
+            console.error('Error deleting preference by card:', error);
+        }
+    };
+
+    const updatePreferenceType = async (scryfallId: string, edition: string, newType: 'VENDO' | 'CAMBIO') => {
+        if (!authStore.user) return;
+
+        try {
+            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias');
+            const snapshot = await getDocs(prefRef);
+
+            for (const docSnap of snapshot.docs) {
+                const pref = docSnap.data();
+                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO')) {
+                    await updateDoc(doc(db, 'users', authStore.user.id, 'preferencias', docSnap.id), {
+                        type: newType,
+                    });
+                }
+            }
+
+            await loadPreferences();
+            toastStore.show('Preferencia actualizada', 'success');
+        } catch (error) {
+            console.error('Error updating preference type:', error);
+            toastStore.show('Error al actualizar preferencia', 'error');
+        }
+    };
+
     return {
         preferences,
         loading,
@@ -106,5 +148,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         addPreference,
         updatePreference,
         deletePreference,
+        deletePreferenceByCard,
+        updatePreferenceType,
     };
 });

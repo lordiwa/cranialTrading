@@ -1,4 +1,4 @@
-import {CardCondition} from "@/types/card";
+import {CardCondition} from "./card";
 
 export interface MatchCard {
     cardId: string;

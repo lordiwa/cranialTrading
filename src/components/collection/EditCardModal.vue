@@ -23,7 +23,7 @@ const form = ref({
   price: 0,
 });
 
-const conditions: CardCondition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
+const conditions: CardCondition[] = ['NM', 'LP', 'MP', 'HP'];
 
 watch(() => props.card, (newCard) => {
   if (newCard) {

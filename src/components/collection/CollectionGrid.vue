@@ -7,6 +7,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
+  click: [card: Card];
   edit: [card: Card];
   delete: [cardId: string];
 }>();
@@ -18,6 +19,7 @@ const emit = defineEmits<{
         v-for="card in cards"
         :key="card.id"
         :card="card"
+        @click="emit('click', $event)"
         @edit="emit('edit', $event)"
         @delete="emit('delete', $event)"
     />

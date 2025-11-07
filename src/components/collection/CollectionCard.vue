@@ -8,18 +8,34 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  click: [card: Card];
   edit: [card: Card];
   delete: [cardId: string];
 }>();
 
 const showActions = ref(false);
+
+const handleCardClick = () => {
+  emit('click', props.card);
+};
+
+const handleEdit = (e: Event) => {
+  e.stopPropagation();
+  emit('edit', props.card);
+};
+
+const handleDelete = (e: Event) => {
+  e.stopPropagation();
+  emit('delete', props.card.id);
+};
 </script>
 
 <template>
   <div
-      class="bg-primary border border-silver-20 p-4 hover:border-neon-40 transition-normal"
+      class="bg-primary border border-silver-20 p-4 hover:border-neon-40 transition-normal cursor-pointer"
       @mouseenter="showActions = true"
       @mouseleave="showActions = false"
+      @click="handleCardClick"
   >
     <img
         v-if="card.image"
@@ -32,22 +48,22 @@ const showActions = ref(false);
       <p class="text-small font-bold text-silver">{{ card.name }}</p>
       <p class="text-tiny text-silver-70 mt-1">{{ card.edition }}</p>
 
-      <div class="flex items-center gap-2 mt-2 text-tiny text-silver-70">
-        <span>Qty: {{ card.quantity }}</span>
-        <span>|</span>
-        <span>{{ card.condition }}</span>
-        <span v-if="card.foil" class="text-neon">| FOIL</span>
+      <div class="flex items-center gap-2 mt-2">
+        <span class="text-body font-bold text-neon">x{{ card.quantity }}</span>
+        <span class="text-tiny text-silver-70">|</span>
+        <span class="text-tiny text-silver-70">{{ card.condition }}</span>
+        <span v-if="card.foil" class="text-tiny text-neon">| FOIL</span>
       </div>
 
       <p class="text-small font-bold text-neon mt-2">${{ card.price.toFixed(2) }}</p>
     </div>
 
     <Transition name="fade">
-      <div v-if="showActions" class="flex gap-2 mt-3">
+      <div v-if="showActions" class="flex gap-2 mt-3" @click.stop>
         <BaseButton
             variant="secondary"
             size="small"
-            @click="emit('edit', card)"
+            @click="handleEdit"
             class="flex-1"
         >
           EDITAR
@@ -55,7 +71,7 @@ const showActions = ref(false);
         <BaseButton
             variant="danger"
             size="small"
-            @click="emit('delete', card.id)"
+            @click="handleDelete"
             class="flex-1"
         >
           ELIMINAR

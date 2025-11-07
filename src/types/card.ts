@@ -1,4 +1,5 @@
 export type CardCondition = 'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO';
+export type CardStatus = 'collection' | 'sell' | 'trade';
 
 export interface Card {
     id: string;
@@ -10,6 +11,7 @@ export interface Card {
     foil: boolean;
     price: number;
     image: string;
+    status: CardStatus;
     updatedAt: Date;
 }
 

@@ -7,11 +7,13 @@ import BaseButton from '../ui/BaseButton.vue';
 import BaseLoader from '../ui/BaseLoader.vue';
 import BaseBadge from '../ui/BaseBadge.vue';
 import { searchCards } from '../../services/scryfall';
-import { ScryfallCard, CardCondition } from '../../types/card';
+import { ScryfallCard, CardCondition, Card } from '../../types/card';
 import { PreferenceType } from '../../types/preferences';
 
 const props = defineProps<{
   show: boolean;
+  preSelectedCard?: Card | null;
+  defaultType?: PreferenceType;
 }>();
 
 const emit = defineEmits<{
@@ -43,6 +45,34 @@ const conditionOptions = [
 ];
 
 let searchTimeout: ReturnType<typeof setTimeout>;
+
+// Watch for pre-selected card
+watch(() => props.preSelectedCard, (card) => {
+  if (card) {
+    // Convert Card to ScryfallCard format
+    selectedCard.value = {
+      id: card.scryfallId,
+      name: card.name,
+      set_name: card.edition,
+      set: '',
+      collector_number: '',
+      image_uris: {
+        normal: card.image,
+        small: card.image,
+      },
+      prices: {
+        usd: card.price.toString(),
+      },
+    };
+  }
+}, { immediate: true });
+
+// Watch for default type
+watch(() => props.defaultType, (defaultType) => {
+  if (defaultType) {
+    type.value = defaultType;
+  }
+}, { immediate: true });
 
 watch(searchQuery, (newQuery) => {
   clearTimeout(searchTimeout);
@@ -85,7 +115,7 @@ const handleClose = () => {
   searchQuery.value = '';
   searchResults.value = [];
   selectedCard.value = null;
-  type.value = 'BUSCO';
+  type.value = props.defaultType || 'BUSCO';
   quantity.value = 1;
   condition.value = 'NM';
   emit('close');
@@ -197,7 +227,7 @@ const handleClose = () => {
               :disabled="quantity < 1"
               class="flex-1"
           >
-            CREAR
+            ACTUALIZAR
           </BaseButton>
         </div>
       </div>

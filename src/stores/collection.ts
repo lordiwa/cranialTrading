@@ -22,11 +22,15 @@ export const useCollectionStore = defineStore('collection', () => {
             const colRef = collection(db, 'users', authStore.user.id, 'cards');
             const snapshot = await getDocs(colRef);
 
-            cards.value = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-            } as Card));
+            cards.value = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    status: data.status || 'collection',
+                    updatedAt: data.updatedAt?.toDate() || new Date(),
+                } as Card;
+            });
         } catch (error) {
             console.error('Error loading collection:', error);
             toastStore.show('Error al cargar colección', 'error');
@@ -44,6 +48,7 @@ export const useCollectionStore = defineStore('collection', () => {
         foil: boolean;
         price: number;
         image: string;
+        status: 'collection' | 'sell' | 'trade';
     }) => {
         if (!authStore.user) return;
 
@@ -94,12 +99,19 @@ export const useCollectionStore = defineStore('collection', () => {
             toastStore.show('Error al eliminar carta', 'error');
         }
     };
-    const importDeck = async (
+
+    const processDeckImport = async (
         deckText: string,
         condition: CardCondition = 'NM',
-        includeSideboard: boolean = false
+        includeSideboard: boolean = false,
+        onProgress?: (current: number, total: number) => void
     ) => {
-        if (!authStore.user) return { success: 0, failed: 0, errors: [] as string[] }
+        if (!authStore.user) return {
+            success: 0,
+            failed: 0,
+            errors: [] as string[],
+            processedCards: [] as any[]
+        }
 
         try {
             const parsed = parseMoxfieldDeck(deckText)
@@ -109,60 +121,127 @@ export const useCollectionStore = defineStore('collection', () => {
 
             if (cardsToImport.length === 0) {
                 toastStore.show('No se detectaron cartas', 'error')
-                return { success: 0, failed: 0, errors: [] }
+                return { success: 0, failed: 0, errors: [], processedCards: [] }
             }
 
             if (cardsToImport.length > 500) {
                 toastStore.show('Máximo 500 cartas por importación', 'error')
-                return { success: 0, failed: 0, errors: [] }
+                return { success: 0, failed: 0, errors: [], processedCards: [] }
             }
 
             let success = 0
             let failed = 0
             const errors: string[] = []
+            const processedCards: any[] = []
+            const total = cardsToImport.length
 
-            for (const parsedCard of cardsToImport) {
-                await new Promise(resolve => setTimeout(resolve, 100)) // Rate limit
+            for (let i = 0; i < cardsToImport.length; i++) {
+                const parsedCard = cardsToImport[i]
 
-                const card = await getCardBySetAndNumber(
-                    parsedCard.setCode,
-                    parsedCard.collectorNumber
-                )
+                await new Promise(resolve => setTimeout(resolve, 75))
+
+                let card = null
+                let retries = 0
+
+                while (retries < 3 && !card) {
+                    try {
+                        card = await getCardBySetAndNumber(
+                            parsedCard.setCode,
+                            parsedCard.collectorNumber
+                        )
+                        break
+                    } catch (error: any) {
+                        if (error.status === 429 && retries < 2) {
+                            await new Promise(resolve => setTimeout(resolve, 500))
+                            retries++
+                        } else {
+                            break
+                        }
+                    }
+                }
 
                 if (!card) {
                     failed++
                     errors.push(`${parsedCard.name} (${parsedCard.setCode} ${parsedCard.collectorNumber})`)
-                    continue
+                } else {
+                    const price = parseFloat(card.prices.usd || '0')
+                    processedCards.push({
+                        scryfallId: card.id,
+                        name: card.name,
+                        edition: card.set_name,
+                        quantity: parsedCard.quantity,
+                        condition,
+                        foil: false,
+                        price,
+                        image: card.image_uris?.normal || '',
+                        status: 'collection',
+                    })
+                    success++
                 }
 
-                const price = parseFloat(card.prices.usd || '0')
-
-                await addCard({
-                    scryfallId: card.id,
-                    name: card.name,
-                    edition: card.set_name,
-                    quantity: parsedCard.quantity,
-                    condition,
-                    foil: false,
-                    price,
-                    image: card.image_uris?.normal || '',
-                })
-
-                success++
+                if (onProgress) {
+                    onProgress(i + 1, total)
+                }
             }
 
-            if (success > 0) {
-                toastStore.show(`${success} cartas importadas`, 'success')
-            }
-            if (failed > 0) {
-                toastStore.show(`${failed} cartas no encontradas`, 'error')
-            }
-
-            return { success, failed, errors }
+            return { success, failed, errors, processedCards }
         } catch (error) {
-            console.error('Error importing deck:', error)
-            toastStore.show('Error al importar mazo', 'error')
-            return { success: 0, failed: 0, errors: [] }
+            console.error('Error processing deck import:', error)
+            toastStore.show('Error al procesar mazo', 'error')
+            return { success: 0, failed: 0, errors: [], processedCards: [] }
+        }
+    }
+
+    const confirmImport = async (cardsToImport: any[]) => {
+        if (!authStore.user || cardsToImport.length === 0) return false
+
+        try {
+            const colRef = collection(db, 'users', authStore.user.id, 'cards')
+            const snapshot = await getDocs(colRef)
+            const existingCards = new Map<string, any>()
+
+            snapshot.docs.forEach(doc => {
+                const card = doc.data()
+                const key = `${card.scryfallId}_${card.condition}_${card.foil}_${card.status || 'collection'}`
+                existingCards.set(key, { id: doc.id, ...card })
+            })
+
+            const consolidatedCards = new Map<string, any>()
+
+            for (const cardData of cardsToImport) {
+                const key = `${cardData.scryfallId}_${cardData.condition}_${cardData.foil}_${cardData.status}`
+
+                if (consolidatedCards.has(key)) {
+                    const existing = consolidatedCards.get(key)
+                    existing.quantity += cardData.quantity
+                } else {
+                    consolidatedCards.set(key, { ...cardData })
+                }
+            }
+
+            for (const [key, cardData] of consolidatedCards.entries()) {
+                if (existingCards.has(key)) {
+                    const existing = existingCards.get(key)
+                    const cardRef = doc(db, 'users', authStore.user.id, 'cards', existing.id)
+                    await updateDoc(cardRef, {
+                        quantity: existing.quantity + cardData.quantity,
+                        updatedAt: new Date(),
+                    })
+                } else {
+                    await addDoc(colRef, {
+                        ...cardData,
+                        updatedAt: new Date(),
+                    })
+                }
+            }
+
+            await loadCollection()
+            toastStore.show(`${cardsToImport.length} cartas procesadas`, 'success')
+            return true
+        } catch (error) {
+            console.error('Error confirming import:', error)
+            toastStore.show('Error al guardar cartas', 'error')
+            return false
         }
     }
 
@@ -173,6 +252,7 @@ export const useCollectionStore = defineStore('collection', () => {
         addCard,
         updateCard,
         deleteCard,
-        importDeck
+        processDeckImport,
+        confirmImport
     };
 });

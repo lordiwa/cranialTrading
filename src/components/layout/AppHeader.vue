@@ -14,7 +14,7 @@ const handleLogout = async () => {
 <template>
   <header class="bg-primary h-15 border-b border-silver-20 px-6 flex items-center justify-between">
     <div class="flex items-center gap-8">
-      <h1 class="text-h3 font-bold text-neon tracking-wider">CRANIAL</h1>
+      <h1 class="text-h3 font-bold text-neon tracking-wider">CRANIAL TRADING</h1>
 
       <nav class="flex gap-6">
         <RouterLink
@@ -36,7 +36,7 @@ const handleLogout = async () => {
             class="text-body text-silver hover:text-neon transition-fast"
             active-class="text-neon"
         >
-          Mis Preferencias
+          Busco
         </RouterLink>
         <RouterLink
             to="/saved-matches"

@@ -30,17 +30,17 @@ const formatDate = (date: Date) => {
 </script>
 
 <template>
-  <div class="bg-primary border border-silver-30 p-5">
+  <div class="bg-primary border border-silver-30 p-4 md:p-5">
     <div class="flex items-start justify-between mb-3">
       <BaseBadge :variant="getVariant(preference.type)">
         {{ preference.type }}
       </BaseBadge>
     </div>
 
-    <p class="text-body font-bold text-silver">{{ preference.name }}</p>
+    <p class="text-small md:text-body font-bold text-silver">{{ preference.name }}</p>
     <p class="text-tiny text-silver-70 mt-1">{{ preference.edition }}</p>
 
-    <div class="mt-2 text-small text-silver-70">
+    <div class="mt-2 text-tiny md:text-small text-silver-70">
       <span>{{ preference.quantity }}x</span>
       <span class="mx-2">|</span>
       <span>{{ preference.condition }} o mejor</span>
@@ -50,16 +50,16 @@ const formatDate = (date: Date) => {
       Agregada: {{ formatDate(preference.createdAt) }}
     </p>
 
-    <p class="text-small text-silver-50 mt-2">
+    <p class="text-tiny md:text-small text-silver-50 mt-2">
       Coincidencias: <span class="text-neon">0</span>
     </p>
 
-    <div class="flex gap-2 mt-4">
+    <div class="flex flex-col md:flex-row gap-2 mt-4">
       <BaseButton
           variant="secondary"
           size="small"
           @click="emit('edit', preference)"
-          class="flex-1"
+          class="flex-1 w-full"
       >
         EDITAR
       </BaseButton>
@@ -67,7 +67,7 @@ const formatDate = (date: Date) => {
           variant="danger"
           size="small"
           @click="emit('delete', preference.id)"
-          class="flex-1"
+          class="flex-1 w-full"
       >
         ELIMINAR
       </BaseButton>

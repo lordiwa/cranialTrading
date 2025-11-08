@@ -33,11 +33,11 @@ const handleInput = (event: Event) => {
         :disabled="disabled"
         @input="handleInput"
         :class="[
-        'w-full bg-primary border px-4 py-3 text-body text-silver placeholder:text-silver-50 transition-fast focus:outline-none',
+        'w-full bg-primary border px-3 md:px-4 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 transition-fast focus:outline-none',
         error ? 'border-2 border-rust' : 'border-silver focus:border-2 focus:border-neon',
         type === 'number' ? 'no-spinner' : '',
       ]"
     />
-    <p v-if="error" class="mt-1 text-small text-rust">{{ error }}</p>
+    <p v-if="error" class="mt-1 text-tiny md:text-small text-rust">{{ error }}</p>
   </div>
 </template>

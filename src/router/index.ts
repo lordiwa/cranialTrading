@@ -38,12 +38,6 @@ const router = createRouter({
             component: () => import('../views/PreferencesView.vue'),
             meta: { requiresAuth: true },
         },
-        {
-            path: '/saved-matches',
-            name: 'savedMatches',
-            component: () => import('../views/SavedMatchesView.vue'),
-            meta: { requiresAuth: true },
-        },
     ],
 });
 

@@ -35,48 +35,50 @@ const handleCloseChat = () => {
 <template>
   <AppContainer>
     <div>
-      <h1 class="text-h1 font-bold text-silver mb-2">MIS MATCHES GUARDADOS</h1>
-      <p class="text-body text-silver-70 mb-8">
-        {{ savedMatchesStore.savedMatches.length }} matches
+      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MIS MATCHES</h1>
+      <p class="text-small md:text-body text-silver-70 mb-6 md:mb-8">
+        {{ savedMatchesStore.savedMatches.length }} matches guardados
       </p>
 
       <BaseLoader v-if="savedMatchesStore.loading" size="large" />
 
-      <div v-else-if="savedMatchesStore.savedMatches.length === 0" class="border border-silver-30 p-8 text-center">
-        <p class="text-body text-silver-70">
+      <div v-else-if="savedMatchesStore.savedMatches.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
+        <p class="text-small md:text-body text-silver-70">
           No tienes matches guardados.
         </p>
-        <p class="text-small text-silver-50 mt-2">
+        <p class="text-tiny md:text-small text-silver-50 mt-2">
           Los matches que marques como "ME INTERESA" aparecerán aquí.
         </p>
       </div>
 
-      <div v-else class="space-y-4">
-        <div v-for="match in savedMatchesStore.savedMatches" :key="match.docId" class="bg-primary border border-silver-30 p-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <p class="text-body font-bold text-silver">{{ match.otherUsername }}</p>
-              <p class="text-small text-silver-70" v-if="match.type === 'VENDO'">
-                Quiere: {{ match.otherPreference?.name }} ({{ match.otherPreference?.edition }})
+      <div v-else class="space-y-3 md:space-y-4">
+        <div v-for="match in savedMatchesStore.savedMatches" :key="match.docId" class="bg-primary border border-silver-30 p-4 md:p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+            <div class="flex-1">
+              <p class="text-small md:text-body font-bold text-silver">{{ match.otherUsername }}</p>
+              <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
+                Quiere: {{ match.otherPreference?.name }}
               </p>
-              <p class="text-small text-silver-70" v-else>
-                Tiene: {{ match.otherCard?.name }} ({{ match.otherCard?.edition }})
+              <p class="text-tiny md:text-small text-silver-70 mt-1" v-else>
+                Tiene: {{ match.otherCard?.name }}
               </p>
               <p class="text-tiny text-silver-50 mt-2">
                 Guardado: {{ new Date(match.savedAt).toLocaleDateString() }}
               </p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
               <BaseButton
-                size="small"
-                @click="handleContact(match.otherUserId, match.otherUsername)"
+                  size="small"
+                  @click="handleContact(match.otherUserId, match.otherUsername)"
+                  class="w-full md:w-auto"
               >
                 CONTACTAR
               </BaseButton>
               <BaseButton
-                size="small"
-                variant="secondary"
-                @click="handleDelete(match.docId)"
+                  size="small"
+                  variant="secondary"
+                  @click="handleDelete(match.docId)"
+                  class="w-full md:w-auto"
               >
                 ELIMINAR
               </BaseButton>

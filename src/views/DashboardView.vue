@@ -25,7 +25,6 @@ const handleViewDetails = (match: SimpleMatch) => {
 const handleContact = () => {
   if (selectedMatch.value) {
     console.log('Contact user:', selectedMatch.value.otherUserId);
-    // Aquí se puede implementar lógica de contacto (email, chat, etc)
     alert(`Contactando a ${selectedMatch.value.otherUsername}...`);
     showDetailModal.value = false;
   }
@@ -35,37 +34,38 @@ const handleContact = () => {
 <template>
   <AppContainer>
     <div>
-      <h1 class="text-h1 font-bold text-silver mb-2">MATCHES DISPONIBLES</h1>
-      <p class="text-body text-silver-70 mb-8">
+      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MATCHES</h1>
+      <p class="text-small md:text-body text-silver-70 mb-6 md:mb-8">
         Bienvenido, {{ authStore.user?.username }}
       </p>
 
       <BaseLoader v-if="matchesStore.loading" size="large" />
 
-      <div v-else-if="matchesStore.matches.length === 0" class="border border-silver-30 p-8 text-center">
-        <p class="text-body text-silver-70">
+      <div v-else-if="matchesStore.matches.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
+        <p class="text-small md:text-body text-silver-70">
           No hay matches disponibles aún.
         </p>
-        <p class="text-small text-silver-50 mt-2">
+        <p class="text-tiny md:text-small text-silver-50 mt-2">
           Agrega cartas a tu colección y establece preferencias para comenzar.
         </p>
       </div>
 
-      <div v-else class="space-y-4">
-        <div v-for="match in matchesStore.matches" :key="match.id" class="bg-primary border border-silver-30 p-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <p class="text-body font-bold text-silver">{{ match.otherUsername }}</p>
-              <p class="text-small text-silver-70" v-if="match.type === 'VENDO'">
-                Quiere: {{ match.otherPreference?.name }} ({{ match.otherPreference?.edition }})
+      <div v-else class="space-y-3 md:space-y-4">
+        <div v-for="match in matchesStore.matches" :key="match.id" class="bg-primary border border-silver-30 p-4 md:p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+            <div class="flex-1">
+              <p class="text-small md:text-body font-bold text-silver">{{ match.otherUsername }}</p>
+              <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
+                Quiere: {{ match.otherPreference?.name }}
               </p>
-              <p class="text-small text-silver-70" v-else>
-                Tiene: {{ match.otherCard?.name }} ({{ match.otherCard?.edition }})
+              <p class="text-tiny md:text-small text-silver-70 mt-1" v-else>
+                Tiene: {{ match.otherCard?.name }}
               </p>
             </div>
             <BaseButton
-              size="small"
-              @click="handleViewDetails(match)"
+                size="small"
+                @click="handleViewDetails(match)"
+                class="w-full md:w-auto"
             >
               VER DETALLES
             </BaseButton>

@@ -198,32 +198,32 @@ const handleCancelImport = () => {
 <template>
   <AppContainer>
     <div>
-      <div class="flex items-center justify-between mb-8">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 class="text-h1 font-bold text-silver">MI COLECCIÓN</h1>
-          <p class="text-small text-silver-70 mt-1">
+          <h1 class="text-h2 md:text-h1 font-bold text-silver">MI COLECCIÓN</h1>
+          <p class="text-tiny md:text-small text-silver-70 mt-1">
             {{ collectionStore.cards.length }} cartas físicas
           </p>
         </div>
-        <div class="flex gap-3">
-          <BaseButton variant="secondary" @click="showImportModal = true">
-            IMPORTAR MAZO
+        <div class="flex flex-col md:flex-row gap-2 md:gap-3">
+          <BaseButton variant="secondary" size="small" @click="showImportModal = true" class="w-full md:w-auto">
+            IMPORTAR
           </BaseButton>
-          <BaseButton @click="showAddModal = true">
-            + AGREGAR CARTA
+          <BaseButton size="small" @click="showAddModal = true" class="w-full md:w-auto">
+            + AGREGAR
           </BaseButton>
         </div>
       </div>
 
       <!-- Status filter pills -->
-      <div class="flex gap-2 mb-6">
+      <div class="flex flex-wrap gap-2 mb-4 md:mb-6">
         <button
             @click="statusFilter = 'all'"
             :class="[
-              'px-3 py-2 text-tiny font-bold transition-fast',
+              'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
               statusFilter === 'all'
                 ? 'bg-neon-10 text-neon border border-neon'
-                : 'bg-primary border border-silver-30 text-silver-70 hover:text-silver'
+                : 'bg-primary border border-silver-30 text-silver-70'
             ]"
         >
           TODAS ({{ collectionStore.cards.length }})
@@ -231,39 +231,39 @@ const handleCancelImport = () => {
         <button
             @click="statusFilter = 'collection'"
             :class="[
-              'px-3 py-2 text-tiny font-bold transition-fast',
+              'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
               statusFilter === 'collection'
                 ? 'bg-neon-10 text-neon border border-neon'
-                : 'bg-primary border border-silver-30 text-silver-70 hover:text-silver'
+                : 'bg-primary border border-silver-30 text-silver-70'
             ]"
         >
-          SOLO COLECCIÓN ({{ collectionCount }})
+          COLECCIÓN ({{ collectionCount }})
         </button>
         <button
             @click="statusFilter = 'sell'"
             :class="[
-              'px-3 py-2 text-tiny font-bold transition-fast',
+              'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
               statusFilter === 'sell'
                 ? 'bg-neon-10 text-neon border border-neon'
-                : 'bg-primary border border-silver-30 text-silver-70 hover:text-silver'
+                : 'bg-primary border border-silver-30 text-silver-70'
             ]"
         >
-          EN VENTA ({{ sellCount }})
+          VENTA ({{ sellCount }})
         </button>
         <button
             @click="statusFilter = 'trade'"
             :class="[
-              'px-3 py-2 text-tiny font-bold transition-fast',
+              'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
               statusFilter === 'trade'
                 ? 'bg-neon-10 text-neon border border-neon'
-                : 'bg-primary border border-silver-30 text-silver-70 hover:text-silver'
+                : 'bg-primary border border-silver-30 text-silver-70'
             ]"
         >
-          PARA CAMBIO ({{ tradeCount }})
+          CAMBIO ({{ tradeCount }})
         </button>
       </div>
 
-      <div class="mb-6">
+      <div class="mb-4 md:mb-6">
         <BaseInput
             v-model="filterQuery"
             placeholder="Filtrar por nombre o edición..."
@@ -273,11 +273,11 @@ const handleCancelImport = () => {
 
       <BaseLoader v-if="collectionStore.loading" size="large" />
 
-      <div v-else-if="filteredCards.length === 0" class="border border-silver-30 p-8 text-center">
-        <p class="text-body text-silver-70">
+      <div v-else-if="filteredCards.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
+        <p class="text-small md:text-body text-silver-70">
           {{ statusFilter === 'all' ? 'Colección vacía.' : 'No hay cartas con este estado.' }}
         </p>
-        <p class="text-small text-silver-50 mt-2">
+        <p class="text-tiny md:text-small text-silver-50 mt-2">
           Agrega tu primera carta para comenzar.
         </p>
       </div>

@@ -11,11 +11,11 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
 });
 
-const baseClasses = 'font-bold transition-fast cursor-pointer';
+const baseClasses = 'font-bold transition-fast cursor-pointer min-h-[44px] flex items-center justify-center';
 
 const sizeClasses = {
-  normal: 'px-6 py-3 text-body',
-  small: 'px-3 py-2 text-small',
+  normal: 'px-5 md:px-6 py-3 text-small md:text-body',
+  small: 'px-3 md:px-4 py-2.5 text-tiny md:text-small',
 };
 
 const variantClasses = {

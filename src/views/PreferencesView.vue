@@ -21,7 +21,6 @@ const handleAdd = (prefData: any) => {
 };
 
 const handleEdit = (preference: Preference) => {
-  // Por ahora placeholder
   console.log('Edit preference:', preference);
 };
 
@@ -35,25 +34,25 @@ const handleDelete = async (prefId: string) => {
 <template>
   <AppContainer>
     <div>
-      <div class="flex items-center justify-between mb-8">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 class="text-h1 font-bold text-silver">MIS PREFERENCIAS</h1>
-          <p class="text-small text-silver-70 mt-1">
+          <h1 class="text-h2 md:text-h1 font-bold text-silver">BUSCO</h1>
+          <p class="text-tiny md:text-small text-silver-70 mt-1">
             {{ preferencesStore.preferences.length }} activas
           </p>
         </div>
-        <BaseButton @click="showNewModal = true">
-          + NUEVA PREFERENCIA
+        <BaseButton size="small" @click="showNewModal = true" class="w-full md:w-auto">
+          + NUEVA
         </BaseButton>
       </div>
 
       <BaseLoader v-if="preferencesStore.loading" size="large" />
 
-      <div v-else-if="preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 text-center">
-        <p class="text-body text-silver-70">
+      <div v-else-if="preferencesStore.preferences.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
+        <p class="text-small md:text-body text-silver-70">
           No tienes preferencias configuradas.
         </p>
-        <p class="text-small text-silver-50 mt-2">
+        <p class="text-tiny md:text-small text-silver-50 mt-2">
           Establece qué cartas buscas, cambias o vendes.
         </p>
       </div>

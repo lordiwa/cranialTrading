@@ -19,10 +19,15 @@ const closeMenu = () => {
 </script>
 
 <template>
-  <header class="bg-primary border-b border-silver-20 px-4 md:px-6">
-    <div class="h-14 md:h-15 flex items-center justify-between">
-      <!-- Logo -->
-      <h1 class="text-body md:text-h3 font-bold text-neon tracking-wider">CRANIAL</h1>
+  <header class="bg-primary h-15 border-b border-silver-20 px-6 flex items-center justify-between">
+    <div class="flex items-center gap-8">
+      <div class="flex items-center gap-3">
+        <img
+            src="/cranial-trading-logo-color.png"
+            alt="Cranial Trading Logo"
+            class="h-10 w-10"
+        />
+      </div>
 
       <!-- Desktop Nav -->
       <nav class="hidden md:flex gap-6">

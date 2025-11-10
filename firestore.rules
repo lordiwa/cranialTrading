@@ -15,7 +15,8 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      allow read: if isAuth();
+      // Allow reading basic user doc for public profiles and authenticated users
+      allow read: if isAuth() || true; // allow public read of user docs (consider restricting sensitive fields)
       allow create: if isAuth() && isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if false;
@@ -28,7 +29,8 @@ service cloud.firestore {
 
       // Cards subcollection
       match /cards/{cardId} {
-        allow read: if isAuth();
+        // Allow read if the card is marked public, otherwise require auth (owner or authenticated user depending on privacy policy)
+        allow read: if resource.data.public == true || isAuth();
         allow write: if isOwner(userId);
       }
 

@@ -79,7 +79,12 @@ const getVisualFor = (match: SimpleMatch) => {
             <div class="flex-1">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-small md:text-body font-bold text-silver">{{ match.otherUsername }}</p>
+                  <router-link
+                    :to="{ name: 'userProfile', params: { userId: match.otherUserId } }"
+                    class="text-small md:text-body font-bold text-silver hover:underline"
+                  >
+                    {{ match.otherUsername }}
+                  </router-link>
                   <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
                     Quiere: {{ match.otherPreference?.name }}
                   </p>

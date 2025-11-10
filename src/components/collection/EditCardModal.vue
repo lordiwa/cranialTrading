@@ -21,6 +21,7 @@ const form = ref({
   condition: 'NM' as CardCondition,
   foil: false,
   price: 0,
+  public: false,
 });
 
 const conditions: CardCondition[] = ['NM', 'LP', 'MP', 'HP'];
@@ -32,6 +33,7 @@ watch(() => props.card, (newCard) => {
       condition: newCard.condition,
       foil: newCard.foil,
       price: newCard.price,
+      public: newCard.public || false,
     };
   }
 }, { deep: true });
@@ -91,6 +93,16 @@ const handleSave = () => {
           <label for="foil" class="text-small text-silver">FOIL</label>
         </div>
 
+        <div class="flex items-center gap-3">
+          <input
+              v-model="form.public"
+              type="checkbox"
+              id="public"
+              class="w-4 h-4"
+          />
+          <label for="public" class="text-small text-silver">Visible en mi perfil público</label>
+        </div>
+
         <div class="flex gap-3 mt-6">
           <BaseButton
               variant="secondary"
@@ -110,4 +122,3 @@ const handleSave = () => {
     </div>
   </BaseModal>
 </template>
-

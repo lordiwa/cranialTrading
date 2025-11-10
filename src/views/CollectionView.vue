@@ -113,18 +113,21 @@ const handleCardClick = (card: Card) => {
   showStatusModal.value = true;
 };
 
-const handleUpdateStatus = async (newStatus: CardStatus) => {
+const handleUpdateStatus = async (newStatus: CardStatus, isPublic: boolean) => {
   if (!selectedCard.value) return;
 
   const oldStatus = selectedCard.value.status;
 
-  // Update card status
-  await collectionStore.updateCard(selectedCard.value.id, { status: newStatus });
+  // Update card status and public flag together
+  await collectionStore.updateCard(selectedCard.value.id, { status: newStatus, public: isPublic });
+
+  // Update local selectedCard copy to reflect changes for preference logic
+  const updatedCard = { ...selectedCard.value, status: newStatus, public: isPublic };
 
   // Handle preference creation/deletion
   if (oldStatus !== 'collection' && newStatus === 'collection') {
     // Removed from sell/trade/busco -> delete preference
-    await preferencesStore.deletePreferenceByCard(selectedCard.value.scryfallId, selectedCard.value.edition);
+    await preferencesStore.deletePreferenceByCard(updatedCard.scryfallId, updatedCard.edition);
   } else if (oldStatus === 'collection' && newStatus !== 'collection') {
     // Added to sell/trade/busco -> create preference
     let prefType: any;
@@ -133,13 +136,13 @@ const handleUpdateStatus = async (newStatus: CardStatus) => {
     else if (newStatus === 'busco') prefType = 'BUSCO';
     else prefType = 'VENDO';
     await preferencesStore.addPreference({
-      scryfallId: selectedCard.value.scryfallId,
-      name: selectedCard.value.name,
+      scryfallId: updatedCard.scryfallId,
+      name: updatedCard.name,
       type: prefType,
-      quantity: selectedCard.value.quantity,
-      condition: selectedCard.value.condition,
-      edition: selectedCard.value.edition,
-      image: selectedCard.value.image,
+      quantity: updatedCard.quantity,
+      condition: updatedCard.condition,
+      edition: updatedCard.edition,
+      image: updatedCard.image,
     });
   } else if (oldStatus !== 'collection' && newStatus !== 'collection' && oldStatus !== newStatus) {
     // Changed between sell/trade/busco -> update preference type
@@ -149,8 +152,8 @@ const handleUpdateStatus = async (newStatus: CardStatus) => {
     else if (newStatus === 'busco') newType = 'BUSCO';
     else newType = 'VENDO';
     await preferencesStore.updatePreferenceType(
-        selectedCard.value.scryfallId,
-        selectedCard.value.edition,
+        updatedCard.scryfallId,
+        updatedCard.edition,
         newType
     );
   }

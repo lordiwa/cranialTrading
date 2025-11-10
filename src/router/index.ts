@@ -38,6 +38,12 @@ const router = createRouter({
             component: () => import('../views/SavedMatchesView.vue'),
             meta: { requiresAuth: true },
         },
+        {
+            path: '/user/:userId',
+            name: 'userProfile',
+            component: () => import('../views/UserProfileView.vue'),
+            // public profile - no requiresAuth
+        },
     ],
 });
 

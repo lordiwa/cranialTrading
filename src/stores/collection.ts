@@ -61,6 +61,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     ...data,
                     status: data.status || 'collection',
                     deckName: data.deckName || undefined,
+                    public: data.public || false,
                     updatedAt: data.updatedAt?.toDate() || new Date(),
                 } as Card;
             });
@@ -82,6 +83,7 @@ export const useCollectionStore = defineStore('collection', () => {
         image: string;
         status: 'collection' | 'sell' | 'trade';
         deckName?: string;
+        public?: boolean;
     }) => {
         if (!authStore.user) return;
 
@@ -91,6 +93,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 ...cardData,
                 // normalize deckName: never send undefined to Firestore; generate one if missing
                 deckName: cardData.deckName ?? generateRandomDeckName(),
+                public: cardData.public ?? false,
                 updatedAt: new Date(),
             });
             await addDoc(colRef, payload);
@@ -215,6 +218,7 @@ export const useCollectionStore = defineStore('collection', () => {
                         status: 'collection',
                         // use the same deck name for the whole import
                         deckName: importDeckName,
+                        public: false,
                     })
                     success++
                 }
@@ -312,6 +316,7 @@ export const useCollectionStore = defineStore('collection', () => {
                         status: 'collection',
                         // use the import's deck name for all cards
                         deckName: importDeckNameDirect,
+                        public: false,
                     })
                     success++
                 }
@@ -368,6 +373,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     const cardRef = doc(db, 'users', authStore.user.id, 'cards', existing.id)
                     const payload = sanitizeForFirestore({
                         quantity: existing.quantity + cardData.quantity,
+                        public: existing.public ?? false,
                         updatedAt: new Date(),
                     })
                     await updateDoc(cardRef, payload)
@@ -377,12 +383,13 @@ export const useCollectionStore = defineStore('collection', () => {
                         ...cardData,
                         // already normalized; ensure explicit batch name
                         deckName: batchDeckName,
-                         updatedAt: new Date(),
-                     })
+                        public: cardData.public ?? false,
+                        updatedAt: new Date(),
+                    })
 
                     await addDoc(colRef, writePayload)
-                 }
-             }
+                }
+            }
 
             await loadCollection()
             toastStore.show(`${normalizedCards.length} cartas procesadas`, 'success')

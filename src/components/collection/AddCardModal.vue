@@ -24,12 +24,13 @@ const selectedCard = ref<ScryfallCard | null>(null);
 const quantity = ref(1);
 const condition = ref<CardCondition>('NM');
 const foil = ref(false);
-const searching = ref(false);
-
 // NEW: optional deck name input for manual add
 const deckNameInput = ref('');
+// NEW: optional public flag for the card (visible on public profile)
+const isPublic = ref(false);
+// track search in-progress state
+const searching = ref(false);
 
-// Prefill deck name when modal opens or when defaultDeckName changes
 watch(() => props.show, (val) => {
   if (val) {
     deckNameInput.value = props.defaultDeckName ?? '';
@@ -87,7 +88,7 @@ const handleAdd = () => {
   emit('add', {
     scryfallId: selectedCard.value.id,
     name: selectedCard.value.name,
-    edition: selectedCard.value.set_name,
+    edition: selectedCard.set_name,
     quantity: quantity.value,
     condition: condition.value,
     foil: foil.value,
@@ -95,6 +96,7 @@ const handleAdd = () => {
     image: selectedCard.value.image_uris?.normal || '',
     status: 'collection', // Por defecto solo guardar
     deckName: deckNameToSend,
+    public: isPublic.value,
   });
 
   handleClose();
@@ -108,6 +110,7 @@ const handleClose = () => {
   condition.value = 'NM';
   foil.value = false;
   deckNameInput.value = '';
+  isPublic.value = false;
   emit('close');
 };
 </script>
@@ -211,6 +214,18 @@ const handleClose = () => {
               placeholder="Nombre del mazo"
               type="text"
             />
+        </div>
+
+        <!-- NEW: Public checkbox -->
+        <div>
+          <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
+            <input
+                v-model="isPublic"
+                type="checkbox"
+                class="w-4 h-4"
+            />
+            <span>Visible en mi perfil público</span>
+          </label>
         </div>
 
         <div class="bg-primary-dark border border-silver-30 p-3">

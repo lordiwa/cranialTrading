@@ -5,11 +5,13 @@ import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
 import { useSavedMatchesStore } from '../stores/savedMatches';
+import { useRouter } from 'vue-router';
 
 const savedMatchesStore = useSavedMatchesStore();
 const showChat = ref(false);
 const selectedUserId = ref('');
 const selectedUsername = ref('');
+const router = useRouter();
 
 onMounted(() => {
   savedMatchesStore.loadSavedMatches();
@@ -29,6 +31,11 @@ const handleContact = (userId: string, username: string) => {
 
 const handleCloseChat = () => {
   showChat.value = false;
+};
+
+const viewProfile = (id: string) => {
+  if (!id) return;
+  router.push({ name: 'userProfile', params: { userId: id } });
 };
 
 const getVisualFor = (match: any) => {
@@ -104,6 +111,14 @@ const getVisualFor = (match: any) => {
               <BaseButton
                   size="small"
                   variant="secondary"
+                  @click="() => viewProfile(match.otherUserId)"
+                  class="w-full md:w-auto"
+              >
+                VER PERFIL
+              </BaseButton>
+              <BaseButton
+                  size="small"
+                  variant="danger"
                   @click="handleDelete(match.docId)"
                   class="w-full md:w-auto"
               >

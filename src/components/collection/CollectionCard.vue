@@ -39,15 +39,33 @@ const handleDelete = (e: Event) => {
   e.stopPropagation();
   emit('delete', props.card.id);
 };
+
+// icon classes for public flag
+const publicIconClass = computed(() => {
+  return props.card.public ? 'text-neon' : 'text-silver-50 opacity-60 line-through';
+});
 </script>
 
 <template>
   <div
-      :class="['bg-primary p-3 md:p-4 hover:border-neon-40 transition-normal cursor-pointer', 'border', statusBorderClass]"
+      :class="['relative bg-primary p-3 md:p-4 hover:border-neon-40 transition-normal cursor-pointer', 'border', statusBorderClass]"
       @mouseenter="showActions = true"
       @mouseleave="showActions = false"
       @click="handleCardClick"
   >
+    <!-- Public / Private icon -->
+    <div class="absolute top-2 right-2" :title="props.card.public ? 'Pública' : 'Privada'">
+      <svg v-if="props.card.public" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" :class="publicIconClass">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="12" cy="12" r="3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" :class="publicIconClass">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="12" cy="12" r="3" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+        <line x1="3" y1="3" x2="21" y2="21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+
     <img
         v-if="card.image"
         :src="card.image"

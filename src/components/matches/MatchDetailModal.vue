@@ -81,7 +81,9 @@ const getVisualFor = (obj: any) => {
         <!-- Usuario -->
         <div>
           <p class="text-small font-bold text-silver-70 mb-2">USUARIO</p>
-          <p class="text-body text-silver">{{ match.otherUsername }}</p>
+          <router-link :to="{ name: 'userProfile', params: { userId: match.otherUserId } }" class="text-body text-silver hover:underline">
+            {{ match.otherUsername }}
+          </router-link>
           <p v-if="match.otherLocation" class="text-small text-silver-50 mt-1">
             📍 {{ match.otherLocation }}
           </p>

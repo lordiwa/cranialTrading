@@ -14,6 +14,8 @@ export interface Card {
     image: string;
     status: CardStatus;
     deckName?: string;  // NUEVO: nombre del mazo/lista
+    // whether this card is visible on the user's public profile
+    public?: boolean;
     updatedAt: Date;
 }
 

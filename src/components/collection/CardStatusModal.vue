@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import BaseBadge from '../ui/BaseBadge.vue';
@@ -12,17 +12,31 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  updateStatus: [status: CardStatus];
+  updateStatus: [status: CardStatus, isPublic: boolean];
 }>();
 
 const selectedStatus = ref<CardStatus>('collection');
+const isPublic = ref(false);
+
+// Initialize selectedStatus and isPublic when a card is passed in
+watch(
+  () => props.card,
+  (c) => {
+    if (c) {
+      selectedStatus.value = (c.status as CardStatus) || 'collection';
+      isPublic.value = !!c.public;
+    }
+  },
+  { immediate: true }
+);
 
 const handleConfirm = () => {
-  emit('updateStatus', selectedStatus.value);
+  emit('updateStatus', selectedStatus.value, isPublic.value);
 };
 
 const handleClose = () => {
   selectedStatus.value = 'collection';
+  isPublic.value = false;
   emit('close');
 };
 </script>
@@ -132,6 +146,14 @@ const handleClose = () => {
             <BaseBadge variant="cambio">CAMBIO</BaseBadge>
           </div>
         </button>
+      </div>
+
+      <!-- Public toggle -->
+      <div class="pt-2">
+        <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
+          <input v-model="isPublic" type="checkbox" class="w-4 h-4" />
+          <span>Visible en mi perfil público</span>
+        </label>
       </div>
 
       <!-- Actions -->

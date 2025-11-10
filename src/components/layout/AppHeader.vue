@@ -57,6 +57,12 @@ const closeMenu = () => {
       <!-- Desktop User -->
       <div class="hidden md:flex items-center gap-4">
         <span class="text-small text-silver-70">@{{ authStore.user?.username }}</span>
+        <RouterLink
+            to="/settings"
+            class="text-small text-silver hover:text-neon transition-fast"
+        >
+          ⚙️
+        </RouterLink>
         <button
             @click="handleLogout"
             class="text-small text-silver hover:text-rust transition-fast"
@@ -107,6 +113,13 @@ const closeMenu = () => {
 
           <div class="border-t border-silver-20 mt-2 pt-2 px-4">
             <p class="text-small text-silver-70 mb-2">@{{ authStore.user?.username }}</p>
+            <RouterLink
+                to="/settings"
+                @click="closeMenu"
+                class="block text-small text-silver hover:text-neon transition-fast mb-3"
+            >
+              ⚙️ Configuración
+            </RouterLink>
             <button
                 @click="handleLogout"
                 class="text-body text-rust hover:text-rust transition-fast"

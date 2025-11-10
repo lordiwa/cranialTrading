@@ -190,7 +190,8 @@ const handleImport = async (
     deckText: string,
     condition: CardCondition,
     includeSideboard: boolean,
-    deckName?: string
+    deckName?: string,
+    makePublic: boolean = false
 ) => {
   showImportModal.value = false;
   showProgressToast.value = true;
@@ -226,7 +227,7 @@ const handleImport = async (
       return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
     })();
 
-    const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+    const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName, public: makePublic }));
 
     await collectionStore.confirmImport(normalized);
     await collectionStore.loadCollection();
@@ -241,7 +242,8 @@ const handleImport = async (
 const handleImportDirect = async (
     cards: any[],
     deckName: string,
-    condition: CardCondition
+    condition: CardCondition,
+    makePublic: boolean = false
 ) => {
   showImportModal.value = false;
   showProgressToast.value = true;
@@ -276,7 +278,7 @@ const handleImportDirect = async (
       return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
     })();
 
-    const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+    const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName, public: makePublic }));
 
     await collectionStore.confirmImport(normalized);
     await collectionStore.loadCollection();

@@ -16,8 +16,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'import', deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string): void
-  (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition): void
+  (e: 'import', deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string, makePublic?: boolean): void
+  (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition, makePublic?: boolean): void
 }>()
 
 const inputText = ref('')
@@ -29,6 +29,8 @@ const isLink = ref(false)
 
 // NEW: deck name input (optional). Prefill with preview.name when available
 const deckNameInput = ref('')
+// option to make all imported cards public
+const makeAllPublic = ref(false)
 
 watch(preview, (p) => {
   if (p?.name) deckNameInput.value = p.name
@@ -122,10 +124,10 @@ const handleImport = async () => {
     if (!deck) return
 
     const cards = moxfieldToCardList(deck, includeSideboard.value)
-    emit('importDirect', cards, nameToSend, condition.value)
+    emit('importDirect', cards, nameToSend, condition.value, makeAllPublic.value)
   } else {
     // Importación desde texto
-    emit('import', inputText.value, condition.value, includeSideboard.value, nameToSend)
+    emit('import', inputText.value, condition.value, includeSideboard.value, nameToSend, makeAllPublic.value)
   }
 }
 
@@ -201,6 +203,14 @@ const handleClose = () => {
       <div v-if="preview" class="">
         <label class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
         <BaseInput v-model="deckNameInput" placeholder="Dejar vacío para generar un nombre aleatorio" />
+      </div>
+
+      <!-- NEW: Make all imported cards public? -->
+      <div v-if="preview" class="pt-2">
+        <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
+          <input v-model="makeAllPublic" type="checkbox" class="w-4 h-4" />
+          <span>Hacer todas estas cartas públicas</span>
+        </label>
       </div>
 
       <BaseButton

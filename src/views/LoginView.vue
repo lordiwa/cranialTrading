@@ -72,10 +72,17 @@ const handleLogin = async () => {
           </BaseButton>
         </form>
 
-        <div class="mt-6 text-center">
+        <div class="mt-6 space-y-3 text-center">
+          <RouterLink
+              to="/forgot-password"
+              class="block text-small text-silver-70 hover:text-neon transition-fast"
+          >
+            ¿Olvidaste tu contraseña?
+          </RouterLink>
+          <div class="text-silver-50 text-tiny">o</div>
           <RouterLink
               to="/register"
-              class="text-small text-silver hover:text-neon transition-fast"
+              class="block text-small text-silver hover:text-neon transition-fast"
           >
             ¿No tienes cuenta? Registrarse
           </RouterLink>

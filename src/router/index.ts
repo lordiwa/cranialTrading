@@ -21,6 +21,18 @@ const router = createRouter({
             meta: { requiresGuest: true },
         },
         {
+            path: '/forgot-password',
+            name: 'forgotPassword',
+            component: () => import('../views/ForgotPasswordView.vue'),
+            meta: { requiresGuest: true },
+        },
+        {
+            path: '/reset-password',
+            name: 'resetPassword',
+            component: () => import('../views/ResetPasswordView.vue'),
+            meta: { requiresGuest: true },
+        },
+        {
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../views/DashboardView.vue'),
@@ -39,10 +51,15 @@ const router = createRouter({
             meta: { requiresAuth: true },
         },
         {
+            path: '/settings',
+            name: 'settings',
+            component: () => import('../views/SettingsView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
             path: '/user/:userId',
             name: 'userProfile',
             component: () => import('../views/UserProfileView.vue'),
-            // public profile - no requiresAuth
         },
     ],
 });
@@ -50,7 +67,6 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore();
 
-    // Wait for initial auth check to complete
     while (authStore.loading) {
         await new Promise<void>((resolve) => {
             const unwatch = authStore.$subscribe(() => {
@@ -59,7 +75,6 @@ router.beforeEach(async (to, from, next) => {
                     resolve();
                 }
             });
-            // Timeout para evitar que se quede esperando
             setTimeout(() => {
                 try { unwatch(); } catch {}
                 resolve();
@@ -68,7 +83,6 @@ router.beforeEach(async (to, from, next) => {
         if (!authStore.loading) break;
     }
 
-    // Check auth status and route accordingly
     const isAuthenticated = !!authStore.user;
     const requiresAuth = to.meta.requiresAuth;
     const requiresGuest = to.meta.requiresGuest;

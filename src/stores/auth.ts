@@ -5,6 +5,10 @@ import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
+    sendPasswordResetEmail,
+    confirmPasswordReset,
+    updatePassword,
+    sendEmailVerification,
     User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -15,14 +19,17 @@ import { useToastStore } from './toast';
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
+    const emailVerified = ref(false);
     const toastStore = useToastStore();
 
     const initAuth = () => {
         onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
             if (firebaseUser) {
+                emailVerified.value = firebaseUser.emailVerified;
                 await loadUserData(firebaseUser.uid);
             } else {
                 user.value = null;
+                emailVerified.value = false;
             }
             loading.value = false;
         });
@@ -41,7 +48,6 @@ export const useAuthStore = defineStore('auth', () => {
                     createdAt: data.createdAt.toDate(),
                 };
             } else {
-                // Si el documento no existe, crear uno con datos del auth
                 const firebaseUser = auth.currentUser;
                 if (firebaseUser) {
                     user.value = {
@@ -52,7 +58,6 @@ export const useAuthStore = defineStore('auth', () => {
                         createdAt: new Date(),
                     };
 
-                    // Guardar el documento en Firestore para futuras referencias
                     try {
                         await setDoc(doc(db, 'users', userId), {
                             email: user.value.email,
@@ -67,7 +72,6 @@ export const useAuthStore = defineStore('auth', () => {
             }
         } catch (error) {
             toastStore.show('Error al cargar datos de usuario', 'error');
-            // Incluso si hay error, permitir que el usuario continúe
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
                 user.value = {
@@ -93,8 +97,9 @@ export const useAuthStore = defineStore('auth', () => {
                 createdAt: new Date(),
             });
 
+            await sendEmailVerification(userCredential.user);
             await loadUserData(userId);
-            toastStore.show('Cuenta creada exitosamente', 'success');
+            toastStore.show('Cuenta creada. Verifica tu email', 'success');
             return true;
         } catch (error: any) {
             toastStore.show(error.message || 'Error al registrar', 'error');
@@ -105,11 +110,14 @@ export const useAuthStore = defineStore('auth', () => {
     const login = async (email: string, password: string) => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-
-            // Esperar a que se cargue el usuario completo
             await loadUserData(userCredential.user.uid);
+            emailVerified.value = userCredential.user.emailVerified;
 
-            toastStore.show('Sesión iniciada', 'success');
+            if (!userCredential.user.emailVerified) {
+                toastStore.show('Por favor verifica tu email', 'info');
+            } else {
+                toastStore.show('Sesión iniciada', 'success');
+            }
             return true;
         } catch (error: any) {
             toastStore.show('Email o contraseña incorrectos', 'error');
@@ -121,18 +129,113 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             await signOut(auth);
             user.value = null;
+            emailVerified.value = false;
             toastStore.show('Sesión cerrada', 'success');
         } catch (error: any) {
             toastStore.show('Error al cerrar sesión', 'error');
         }
     };
 
+    const sendResetPasswordEmail = async (email: string) => {
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toastStore.show('Email de recuperación enviado', 'success');
+            return true;
+        } catch (error: any) {
+            if (error.code === 'auth/user-not-found') {
+                toastStore.show('Email no registrado', 'error');
+            } else {
+                toastStore.show('Error al enviar email', 'error');
+            }
+            return false;
+        }
+    };
+
+    const resetPassword = async (code: string, newPassword: string) => {
+        try {
+            await confirmPasswordReset(auth, code, newPassword);
+            toastStore.show('Contraseña restablecida', 'success');
+            return true;
+        } catch (error: any) {
+            if (error.code === 'auth/invalid-action-code') {
+                toastStore.show('Enlace expirado o inválido', 'error');
+            } else if (error.code === 'auth/weak-password') {
+                toastStore.show('Contraseña débil', 'error');
+            } else {
+                toastStore.show('Error al restablecer', 'error');
+            }
+            return false;
+        }
+    };
+
+    const changePassword = async (currentPassword: string, newPassword: string) => {
+        try {
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser || !firebaseUser.email) {
+                toastStore.show('Usuario no autenticado', 'error');
+                return false;
+            }
+
+            const { signInWithEmailAndPassword } = await import('firebase/auth');
+            await signInWithEmailAndPassword(auth, firebaseUser.email, currentPassword);
+            await updatePassword(firebaseUser, newPassword);
+            toastStore.show('Contraseña actualizada', 'success');
+            return true;
+        } catch (error: any) {
+            if (error.code === 'auth/wrong-password') {
+                toastStore.show('Contraseña actual incorrecta', 'error');
+            } else if (error.code === 'auth/weak-password') {
+                toastStore.show('Contraseña nueva débil', 'error');
+            } else {
+                toastStore.show('Error al cambiar contraseña', 'error');
+            }
+            return false;
+        }
+    };
+
+    const sendVerificationEmail = async () => {
+        try {
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) {
+                toastStore.show('Usuario no autenticado', 'error');
+                return false;
+            }
+
+            await sendEmailVerification(firebaseUser);
+            toastStore.show('Email de verificación enviado', 'success');
+            return true;
+        } catch (error: any) {
+            toastStore.show('Error al enviar email', 'error');
+            return false;
+        }
+    };
+
+    const checkEmailVerification = async () => {
+        try {
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) return false;
+
+            await firebaseUser.reload();
+            emailVerified.value = firebaseUser.emailVerified;
+            return firebaseUser.emailVerified;
+        } catch (error) {
+            toastStore.show('Error al verificar email', 'error');
+            return false;
+        }
+    };
+
     return {
         user,
         loading,
+        emailVerified,
         initAuth,
         register,
         login,
         logout,
+        sendResetPasswordEmail,
+        resetPassword,
+        changePassword,
+        sendVerificationEmail,
+        checkEmailVerification,
     };
 });

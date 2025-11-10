@@ -274,17 +274,30 @@ const handleConfirmImport = async () => {
   console.debug('[VIEW] handleConfirmImport batchName:', batchName);
   const normalized = importResult.value.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
 
+  // Close the modal immediately so the UI doesn't stay blocked
+  showResultModal.value = false;
+
+  // Show progress toast while we perform the writes
+  showProgressToast.value = true;
+  importProgress.value = { current: 0, total: normalized.length };
+
   const success = await collectionStore.confirmImport(normalized);
+
+  // Hide progress toast
+  showProgressToast.value = false;
+  importProgress.value = { current: 0, total: 0 };
+
+  // Reset import result in any case so modal won't reopen with old data
+  importResult.value = {
+    success: 0,
+    failed: 0,
+    total: 0,
+    errors: [],
+    processedCards: []
+  };
+
   if (success) {
     await collectionStore.loadCollection();
-    showResultModal.value = false;
-    importResult.value = {
-      success: 0,
-      failed: 0,
-      total: 0,
-      errors: [],
-      processedCards: []
-    };
   }
 };
 
@@ -297,6 +310,18 @@ const handleCancelImport = () => {
     errors: [],
     processedCards: []
   };
+};
+
+// NEW: delete a deck (all cards with the same deckName)
+const handleDeleteDeck = async () => {
+  if (deckFilter.value === 'all') return;
+  const confirmed = confirm(`Eliminar mazo "${deckFilter.value}"? Esta acción borrará todas las cartas de ese mazo.`);
+  if (!confirmed) return;
+
+  const ok = await collectionStore.deleteDeck(deckFilter.value);
+  if (ok) {
+    deckFilter.value = 'all';
+  }
 };
 </script>
 
@@ -371,15 +396,26 @@ const handleCancelImport = () => {
       <!-- Deck filter -->
       <div v-if="uniqueDecks.length > 0" class="mb-4 md:mb-6">
         <label class="text-small text-silver-70 block mb-2">Filtrar por mazo</label>
-        <select
-            v-model="deckFilter"
-            class="w-full bg-primary border border-silver px-3 py-2.5 text-small text-silver transition-fast focus:outline-none focus:border-2 focus:border-neon cursor-pointer"
-        >
-          <option value="all">Todos los mazos</option>
-          <option v-for="deck in uniqueDecks" :key="deck" :value="deck">
-            {{ deck }}
-          </option>
-        </select>
+        <div class="flex gap-2 items-center">
+          <select
+              v-model="deckFilter"
+              class="flex-1 bg-primary border border-silver px-3 py-2.5 text-small text-silver transition-fast focus:outline-none focus:border-2 focus:border-neon cursor-pointer"
+          >
+            <option value="all">Todos los mazos</option>
+            <option v-for="deck in uniqueDecks" :key="deck" :value="deck">
+              {{ deck }}
+            </option>
+          </select>
+
+          <!-- NEW: Delete deck button -->
+          <button
+              v-if="deckFilter !== 'all'"
+              @click="handleDeleteDeck"
+              class="px-3 py-2 bg-rust text-white text-small rounded-md hover:opacity-90"
+          >
+            Eliminar mazo
+          </button>
+        </div>
       </div>
 
       <div class="mb-4 md:mb-6">
@@ -412,6 +448,7 @@ const handleCancelImport = () => {
       <!-- Modals -->
       <AddCardModal
           :show="showAddModal"
+          :defaultDeckName="deckFilter !== 'all' ? deckFilter : undefined"
           @close="showAddModal = false"
           @add="handleAdd"
       />

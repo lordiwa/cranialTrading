@@ -10,6 +10,7 @@ import { ScryfallCard, CardCondition } from '../../types/card';
 
 const props = defineProps<{
   show: boolean;
+  defaultDeckName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -27,6 +28,19 @@ const searching = ref(false);
 
 // NEW: optional deck name input for manual add
 const deckNameInput = ref('');
+
+// Prefill deck name when modal opens or when defaultDeckName changes
+watch(() => props.show, (val) => {
+  if (val) {
+    deckNameInput.value = props.defaultDeckName ?? '';
+  }
+});
+
+watch(() => props.defaultDeckName, (val) => {
+  if (props.show && val) {
+    deckNameInput.value = val;
+  }
+});
 
 const conditionOptions = [
   { value: 'M', label: 'M - Mint' },
@@ -67,8 +81,8 @@ const handleAdd = () => {
       ? parseFloat(selectedCard.value.prices.usd_foil || '0')
       : parseFloat(selectedCard.value.prices.usd || '0');
 
-  // normalize deckName: trim and send undefined if empty so store generates random name
-  const deckNameToSend = deckNameInput.value?.trim() || undefined;
+  // normalize deckName: prefer user input, fallback to prop default, otherwise undefined
+  const deckNameToSend = deckNameInput.value?.trim() || props.defaultDeckName || undefined;
 
   emit('add', {
     scryfallId: selectedCard.value.id,

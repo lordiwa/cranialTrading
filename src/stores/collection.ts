@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
@@ -405,6 +405,32 @@ export const useCollectionStore = defineStore('collection', () => {
         }
     }
 
+    // Delete all cards that belong to a deck (by deckName)
+    const deleteDeck = async (deckName: string) => {
+        if (!authStore.user || !deckName) return false;
+
+        try {
+            const colRef = collection(db, 'users', authStore.user.id, 'cards');
+            const q = query(colRef, where('deckName', '==', deckName));
+            const snapshot = await getDocs(q);
+
+            const batchDeletes: Promise<any>[] = [];
+            snapshot.docs.forEach(d => {
+                const cardRef = doc(db, 'users', authStore.user.id, 'cards', d.id);
+                batchDeletes.push(deleteDoc(cardRef));
+            });
+
+            await Promise.all(batchDeletes);
+            await loadCollection();
+            toastStore.show(`Mazo "${deckName}" eliminado`, 'success');
+            return true;
+        } catch (error) {
+            console.error('Error deleting deck:', error);
+            toastStore.show('Error al eliminar mazo', 'error');
+            return false;
+        }
+    }
+
     return {
         cards,
         loading,
@@ -415,5 +441,6 @@ export const useCollectionStore = defineStore('collection', () => {
         processDeckImport,
         processDirectImport,
         confirmImport
+       ,deleteDeck
     };
 });

@@ -27,6 +27,7 @@ const editingCard = ref<Card | null>(null);
 const selectedCard = ref<Card | null>(null);
 const filterQuery = ref('');
 const statusFilter = ref<'all' | CardStatus>('all');
+const deckFilter = ref<string>('all');
 
 // Import state
 const importProgress = ref({ current: 0, total: 0 });
@@ -42,6 +43,16 @@ onMounted(() => {
   collectionStore.loadCollection();
 });
 
+const uniqueDecks = computed(() => {
+  const decks = new Set<string>();
+  collectionStore.cards.forEach(card => {
+    if (card.deckName) {
+      decks.add(card.deckName);
+    }
+  });
+  return Array.from(decks).sort();
+});
+
 const filteredCards = computed(() => {
   let cards = collectionStore.cards;
 
@@ -50,12 +61,18 @@ const filteredCards = computed(() => {
     cards = cards.filter(card => card.status === statusFilter.value);
   }
 
+  // Filter by deck
+  if (deckFilter.value !== 'all') {
+    cards = cards.filter(card => card.deckName === deckFilter.value);
+  }
+
   // Filter by search query
   if (filterQuery.value) {
     const query = filterQuery.value.toLowerCase();
     cards = cards.filter(card =>
         card.name.toLowerCase().includes(query) ||
-        card.edition.toLowerCase().includes(query)
+        card.edition.toLowerCase().includes(query) ||
+        (card.deckName && card.deckName.toLowerCase().includes(query))
     );
   }
 
@@ -135,7 +152,8 @@ const handleDelete = async (cardId: string) => {
 const handleImport = async (
     deckText: string,
     condition: CardCondition,
-    includeSideboard: boolean
+    includeSideboard: boolean,
+    deckName?: string
 ) => {
   showImportModal.value = false;
   showProgressToast.value = true;
@@ -145,6 +163,7 @@ const handleImport = async (
       deckText,
       condition,
       includeSideboard,
+      deckName,
       (current, total) => {
         importProgress.value = { current, total };
       }
@@ -158,7 +177,75 @@ const handleImport = async (
   };
 
   if (result.failed === 0 && result.success > 0) {
-    await collectionStore.confirmImport(result.processedCards);
+    // Normalize batch deck name here to ensure same name for all cards
+    const batchName = deckName ?? (result.processedCards[0]?.deckName) ?? (() => {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+      return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
+    })();
+
+    console.debug('[VIEW] Normalizing batchName for import:', batchName);
+    const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+    console.debug('[VIEW] sample normalized payload:', normalized[0]);
+
+    await collectionStore.confirmImport(normalized);
+    await collectionStore.loadCollection();
+    return;
+  }
+
+  if (result.failed > 0) {
+    showResultModal.value = true;
+  }
+};
+
+const handleImportDirect = async (
+    cards: any[],
+    deckName: string,
+    condition: CardCondition
+) => {
+  showImportModal.value = false;
+  showProgressToast.value = true;
+  importProgress.value = { current: 0, total: 0 };
+
+  const result = await collectionStore.processDirectImport(
+      cards,
+      deckName,
+      condition,
+      (current, total) => {
+        importProgress.value = { current, total };
+      }
+  );
+
+  showProgressToast.value = false;
+
+  importResult.value = {
+    ...result,
+    total: result.success + result.failed
+  };
+
+  if (result.failed === 0 && result.success > 0) {
+    // Normalize batch deck name here as well
+    const batchName = deckName ?? (result.processedCards[0]?.deckName) ?? (() => {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+      return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
+    })();
+
+    console.debug('[VIEW] Normalizing batchName for direct import:', batchName);
+    const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+    console.debug('[VIEW] sample normalized payload (direct):', normalized[0]);
+
+    await collectionStore.confirmImport(normalized);
     await collectionStore.loadCollection();
     return;
   }
@@ -169,7 +256,25 @@ const handleImport = async (
 };
 
 const handleConfirmImport = async () => {
-  const success = await collectionStore.confirmImport(importResult.value.processedCards);
+  // Ensure the importResult processedCards all share a single batch name before confirming
+  if (!importResult.value.processedCards || importResult.value.processedCards.length === 0) return;
+
+  const existingFirst = importResult.value.processedCards[0]?.deckName;
+  const batchName = existingFirst ?? (() => {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+    return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
+  })();
+
+  console.debug('[VIEW] handleConfirmImport batchName:', batchName);
+  const normalized = importResult.value.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+
+  const success = await collectionStore.confirmImport(normalized);
   if (success) {
     await collectionStore.loadCollection();
     showResultModal.value = false;
@@ -263,10 +368,24 @@ const handleCancelImport = () => {
         </button>
       </div>
 
+      <!-- Deck filter -->
+      <div v-if="uniqueDecks.length > 0" class="mb-4 md:mb-6">
+        <label class="text-small text-silver-70 block mb-2">Filtrar por mazo</label>
+        <select
+            v-model="deckFilter"
+            class="w-full bg-primary border border-silver px-3 py-2.5 text-small text-silver transition-fast focus:outline-none focus:border-2 focus:border-neon cursor-pointer"
+        >
+          <option value="all">Todos los mazos</option>
+          <option v-for="deck in uniqueDecks" :key="deck" :value="deck">
+            {{ deck }}
+          </option>
+        </select>
+      </div>
+
       <div class="mb-4 md:mb-6">
         <BaseInput
             v-model="filterQuery"
-            placeholder="Filtrar por nombre o edición..."
+            placeholder="Filtrar por nombre, edición o mazo..."
             type="text"
         />
       </div>
@@ -275,7 +394,7 @@ const handleCancelImport = () => {
 
       <div v-else-if="filteredCards.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
         <p class="text-small md:text-body text-silver-70">
-          {{ statusFilter === 'all' ? 'Colección vacía.' : 'No hay cartas con este estado.' }}
+          {{ statusFilter === 'all' && deckFilter === 'all' ? 'Colección vacía.' : 'No hay cartas con estos filtros.' }}
         </p>
         <p class="text-tiny md:text-small text-silver-50 mt-2">
           Agrega tu primera carta para comenzar.
@@ -315,6 +434,7 @@ const handleCancelImport = () => {
           :show="showImportModal"
           @close="showImportModal = false"
           @import="handleImport"
+          @import-direct="handleImportDirect"
       />
 
       <ImportResultModal

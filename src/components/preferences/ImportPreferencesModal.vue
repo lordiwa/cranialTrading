@@ -1,11 +1,10 @@
-<!-- src/components/collection/ImportDeckModal.vue -->
+<!-- src/components/preferences/ImportPreferencesModal.vue -->
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
-import BaseInput from '../ui/BaseInput.vue'
 import { CardCondition } from '../../types/card'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 import { parseMoxfieldDeck } from '../../utils/deckParser'
@@ -15,9 +14,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'import', deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string): void
-  (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition): void
+  close: []
+  import: [deckText: string, condition: CardCondition, includeSideboard: boolean]
+  importDirect: [cards: any[], condition: CardCondition]
 }>()
 
 const inputText = ref('')
@@ -26,13 +25,6 @@ const includeSideboard = ref(false)
 const parsing = ref(false)
 const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string } | null>(null)
 const isLink = ref(false)
-
-// NEW: deck name input (optional). Prefill with preview.name when available
-const deckNameInput = ref('')
-
-watch(preview, (p) => {
-  if (p?.name) deckNameInput.value = p.name
-})
 
 const conditionOptions = [
   { value: 'M', label: 'M - Mint' },
@@ -70,8 +62,6 @@ const handleParse = async () => {
       sideboard,
       name: deck.name,
     }
-    // prefill deck name
-    deckNameInput.value = deck.name || ''
   } else {
     // Es texto normal
     isLink.value = false
@@ -103,16 +93,12 @@ const handleParse = async () => {
       mainboard,
       sideboard,
     }
-    // do not overwrite user's deckNameInput when parsing text
   }
 
   parsing.value = false
 }
 
 const handleImport = async () => {
-  // normalize deck name: trim and emit undefined if empty
-  const nameToSend = deckNameInput.value?.trim() || undefined
-
   if (isLink.value) {
     // Importación desde API de Moxfield
     const deckId = extractDeckId(inputText.value)
@@ -122,10 +108,10 @@ const handleImport = async () => {
     if (!deck) return
 
     const cards = moxfieldToCardList(deck, includeSideboard.value)
-    emit('importDirect', cards, nameToSend, condition.value)
+    emit('importDirect', cards, condition.value)
   } else {
     // Importación desde texto
-    emit('import', inputText.value, condition.value, includeSideboard.value, nameToSend)
+    emit('import', inputText.value, condition.value, includeSideboard.value)
   }
 }
 
@@ -135,13 +121,12 @@ const handleClose = () => {
   includeSideboard.value = false
   condition.value = 'NM'
   isLink.value = false
-  deckNameInput.value = ''
   emit('close')
 }
 </script>
 
 <template>
-  <BaseModal :show="show" title="IMPORTAR MAZO" @close="handleClose">
+  <BaseModal :show="show" title="IMPORTAR COMO BUSCO" @close="handleClose">
     <div class="space-y-4">
       <div>
         <label class="text-small text-silver-70 block mb-2">
@@ -179,7 +164,7 @@ const handleClose = () => {
       </div>
 
       <div v-if="preview">
-        <label class="text-small text-silver-70 block mb-2">Condición por defecto</label>
+        <label class="text-small text-silver-70 block mb-2">Condición mínima deseada</label>
         <BaseSelect
             v-model="condition"
             :options="conditionOptions"
@@ -197,10 +182,10 @@ const handleClose = () => {
         </label>
       </div>
 
-      <!-- NEW: Deck name input (optional) -->
-      <div v-if="preview" class="">
-        <label class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
-        <BaseInput v-model="deckNameInput" placeholder="Dejar vacío para generar un nombre aleatorio" />
+      <div v-if="preview" class="bg-primary-dark border border-silver-30 p-3">
+        <p class="text-tiny text-silver-70">
+          💡 Se crearán {{ includeSideboard ? preview.total : preview.mainboard }} preferencias BUSCO automáticamente.
+        </p>
       </div>
 
       <BaseButton
@@ -208,7 +193,7 @@ const handleClose = () => {
           @click="handleImport"
           class="w-full"
       >
-        IMPORTAR {{ includeSideboard ? preview.total : preview.mainboard }} CARTAS
+        IMPORTAR {{ includeSideboard ? preview.total : preview.mainboard }} COMO BUSCO
       </BaseButton>
     </div>
   </BaseModal>

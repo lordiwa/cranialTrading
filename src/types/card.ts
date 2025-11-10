@@ -1,3 +1,4 @@
+// src/types/card.ts
 export type CardCondition = 'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO';
 export type CardStatus = 'collection' | 'sell' | 'trade';
 
@@ -12,6 +13,7 @@ export interface Card {
     price: number;
     image: string;
     status: CardStatus;
+    deckName?: string;  // NUEVO: nombre del mazo/lista
     updatedAt: Date;
 }
 

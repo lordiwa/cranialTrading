@@ -8,6 +8,38 @@ import { Card, CardCondition } from '../types/card';
 import { getCardBySetAndNumber } from '../services/scryfall'
 import { parseMoxfieldDeck } from '../utils/deckParser'
 
+// Helper: remove undefined fields recursively so Firestore won't reject documents
+function sanitizeForFirestore(obj: any): any {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
+    const out: any = {};
+    for (const [k, v] of Object.entries(obj as any)) {
+        if (v === undefined) continue;
+        // leave Dates and Firestore Timestamps untouched
+        if (v instanceof Date) {
+            out[k] = v;
+        } else if (v === null || typeof v !== 'object') {
+            out[k] = v;
+        } else {
+            out[k] = sanitizeForFirestore(v);
+        }
+    }
+    return out;
+}
+
+// Helper: generate a compact randomized deck name when none was provided
+function generateRandomDeckName(): string {
+    // Format: DeckName_YYMMDD_HHMM_<5char>
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+    return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
+}
+
 export const useCollectionStore = defineStore('collection', () => {
     const cards = ref<Card[]>([]);
     const loading = ref(false);
@@ -28,6 +60,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     id: doc.id,
                     ...data,
                     status: data.status || 'collection',
+                    deckName: data.deckName || undefined,
                     updatedAt: data.updatedAt?.toDate() || new Date(),
                 } as Card;
             });
@@ -49,15 +82,19 @@ export const useCollectionStore = defineStore('collection', () => {
         price: number;
         image: string;
         status: 'collection' | 'sell' | 'trade';
+        deckName?: string;
     }) => {
         if (!authStore.user) return;
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards');
-            await addDoc(colRef, {
+            const payload = sanitizeForFirestore({
                 ...cardData,
+                // normalize deckName: never send undefined to Firestore; generate one if missing
+                deckName: cardData.deckName ?? generateRandomDeckName(),
                 updatedAt: new Date(),
             });
+            await addDoc(colRef, payload);
 
             await loadCollection();
             toastStore.show('Carta agregada', 'success');
@@ -72,10 +109,11 @@ export const useCollectionStore = defineStore('collection', () => {
 
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId);
-            await updateDoc(cardRef, {
+            const payload = sanitizeForFirestore({
                 ...updates,
                 updatedAt: new Date(),
             });
+            await updateDoc(cardRef, payload);
 
             await loadCollection();
             toastStore.show('Carta actualizada', 'success');
@@ -104,6 +142,7 @@ export const useCollectionStore = defineStore('collection', () => {
         deckText: string,
         condition: CardCondition = 'NM',
         includeSideboard: boolean = false,
+        deckName?: string,
         onProgress?: (current: number, total: number) => void
     ) => {
         if (!authStore.user) return {
@@ -118,6 +157,10 @@ export const useCollectionStore = defineStore('collection', () => {
             const cardsToImport = includeSideboard
                 ? [...parsed.mainboard, ...parsed.sideboard]
                 : parsed.mainboard
+
+            // generate one deck name for the whole import (if none provided)
+            const importDeckName = deckName ?? generateRandomDeckName()
+            console.debug('[COLLECTION] processDeckImport importDeckName:', importDeckName)
 
             if (cardsToImport.length === 0) {
                 toastStore.show('No se detectaron cartas', 'error')
@@ -175,6 +218,8 @@ export const useCollectionStore = defineStore('collection', () => {
                         price,
                         image: card.image_uris?.normal || '',
                         status: 'collection',
+                        // use the same deck name for the whole import
+                        deckName: importDeckName,
                     })
                     success++
                 }
@@ -192,6 +237,105 @@ export const useCollectionStore = defineStore('collection', () => {
         }
     }
 
+    const processDirectImport = async (
+        cards: Array<{
+            quantity: number
+            name: string
+            setCode: string
+            collectorNumber: string
+            scryfallId: string
+        }>,
+        deckName: string,
+        condition: CardCondition = 'NM',
+        onProgress?: (current: number, total: number) => void
+    ) => {
+        if (!authStore.user) return {
+            success: 0,
+            failed: 0,
+            errors: [] as string[],
+            processedCards: [] as any[]
+        }
+
+        try {
+            if (cards.length === 0) {
+                toastStore.show('No se detectaron cartas', 'error')
+                return { success: 0, failed: 0, errors: [], processedCards: [] }
+            }
+
+            if (cards.length > 500) {
+                toastStore.show('Máximo 500 cartas por importación', 'error')
+                return { success: 0, failed: 0, errors: [], processedCards: [] }
+            }
+
+            // ensure the whole direct import uses the same deck name
+            const importDeckNameDirect = deckName ?? generateRandomDeckName()
+            console.debug('[COLLECTION] processDirectImport importDeckNameDirect:', importDeckNameDirect)
+
+            let success = 0
+            let failed = 0
+            const errors: string[] = []
+            const processedCards: any[] = []
+            const total = cards.length
+
+            for (let i = 0; i < cards.length; i++) {
+                const cardData = cards[i]
+
+                await new Promise(resolve => setTimeout(resolve, 75))
+
+                let card = null
+                let retries = 0
+
+                while (retries < 3 && !card) {
+                    try {
+                        card = await getCardBySetAndNumber(
+                            cardData.setCode,
+                            cardData.collectorNumber
+                        )
+                        break
+                    } catch (error: any) {
+                        if (error.status === 429 && retries < 2) {
+                            await new Promise(resolve => setTimeout(resolve, 500))
+                            retries++
+                        } else {
+                            break
+                        }
+                    }
+                }
+
+                if (!card) {
+                    failed++
+                    errors.push(`${cardData.name} (${cardData.setCode} ${cardData.collectorNumber})`)
+                } else {
+                    const price = parseFloat(card.prices.usd || '0')
+                    processedCards.push({
+                        scryfallId: card.id,
+                        name: card.name,
+                        edition: card.set_name,
+                        quantity: cardData.quantity,
+                        condition,
+                        foil: false,
+                        price,
+                        image: card.image_uris?.normal || '',
+                        status: 'collection',
+                        // use the import's deck name for all cards
+                        deckName: importDeckNameDirect,
+                    })
+                    success++
+                }
+
+                if (onProgress) {
+                    onProgress(i + 1, total)
+                }
+            }
+
+            return { success, failed, errors, processedCards }
+        } catch (error) {
+            console.error('Error processing direct import:', error)
+            toastStore.show('Error al procesar mazo', 'error')
+            return { success: 0, failed: 0, errors: [], processedCards: [] }
+        }
+    }
+
     const confirmImport = async (cardsToImport: any[]) => {
         if (!authStore.user || cardsToImport.length === 0) return false
 
@@ -202,14 +346,21 @@ export const useCollectionStore = defineStore('collection', () => {
 
             snapshot.docs.forEach(doc => {
                 const card = doc.data()
-                const key = `${card.scryfallId}_${card.condition}_${card.foil}_${card.status || 'collection'}`
+                const key = `${card.scryfallId}_${card.condition}_${card.foil}_${card.status || 'collection'}_${card.deckName || ''}`
                 existingCards.set(key, { id: doc.id, ...card })
             })
 
+            // --- normalize: ensure entire batch uses the same deck name ---
+            const firstProvidedName = cardsToImport.find(c => c.deckName)?.deckName
+            const batchDeckName = firstProvidedName ?? generateRandomDeckName()
+            // assign batchDeckName to any card that lacks a deckName
+            // FORCE: assign the same batchDeckName to every incoming card (override any provided names)
+            const normalizedCards = cardsToImport.map(c => ({ ...c, deckName: batchDeckName }))
+
             const consolidatedCards = new Map<string, any>()
 
-            for (const cardData of cardsToImport) {
-                const key = `${cardData.scryfallId}_${cardData.condition}_${cardData.foil}_${cardData.status}`
+            for (const cardData of normalizedCards) {
+                const key = `${cardData.scryfallId}_${cardData.condition}_${cardData.foil}_${cardData.status}_${cardData.deckName}`
 
                 if (consolidatedCards.has(key)) {
                     const existing = consolidatedCards.get(key)
@@ -223,20 +374,29 @@ export const useCollectionStore = defineStore('collection', () => {
                 if (existingCards.has(key)) {
                     const existing = existingCards.get(key)
                     const cardRef = doc(db, 'users', authStore.user.id, 'cards', existing.id)
-                    await updateDoc(cardRef, {
+                    const payload = sanitizeForFirestore({
                         quantity: existing.quantity + cardData.quantity,
                         updatedAt: new Date(),
                     })
+                    await updateDoc(cardRef, payload)
                 } else {
-                    await addDoc(colRef, {
+                    // ensure deckName is explicit and use the batchDeckName if somehow missing
+                    const writePayload = sanitizeForFirestore({
                         ...cardData,
-                        updatedAt: new Date(),
-                    })
+                        // already normalized; ensure explicit batch name
+                        deckName: batchDeckName,
+                         updatedAt: new Date(),
+                     })
+
+                    // debug log to help trace invalid payloads
+                    console.debug('[COLLECTION] Adding card payload:', writePayload)
+
+                    await addDoc(colRef, writePayload)
                 }
             }
 
             await loadCollection()
-            toastStore.show(`${cardsToImport.length} cartas procesadas`, 'success')
+            toastStore.show(`${normalizedCards.length} cartas procesadas`, 'success')
             return true
         } catch (error) {
             console.error('Error confirming import:', error)
@@ -253,6 +413,7 @@ export const useCollectionStore = defineStore('collection', () => {
         updateCard,
         deleteCard,
         processDeckImport,
+        processDirectImport,
         confirmImport
     };
 });

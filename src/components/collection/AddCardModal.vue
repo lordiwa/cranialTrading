@@ -25,6 +25,9 @@ const condition = ref<CardCondition>('NM');
 const foil = ref(false);
 const searching = ref(false);
 
+// NEW: optional deck name input for manual add
+const deckNameInput = ref('');
+
 const conditionOptions = [
   { value: 'M', label: 'M - Mint' },
   { value: 'NM', label: 'NM - Near Mint' },
@@ -64,6 +67,9 @@ const handleAdd = () => {
       ? parseFloat(selectedCard.value.prices.usd_foil || '0')
       : parseFloat(selectedCard.value.prices.usd || '0');
 
+  // normalize deckName: trim and send undefined if empty so store generates random name
+  const deckNameToSend = deckNameInput.value?.trim() || undefined;
+
   emit('add', {
     scryfallId: selectedCard.value.id,
     name: selectedCard.value.name,
@@ -74,6 +80,7 @@ const handleAdd = () => {
     price,
     image: selectedCard.value.image_uris?.normal || '',
     status: 'collection', // Por defecto solo guardar
+    deckName: deckNameToSend,
   });
 
   handleClose();
@@ -86,6 +93,7 @@ const handleClose = () => {
   quantity.value = 1;
   condition.value = 'NM';
   foil.value = false;
+  deckNameInput.value = '';
   emit('close');
 };
 </script>
@@ -179,6 +187,16 @@ const handleClose = () => {
             />
             <span>Foil</span>
           </label>
+        </div>
+
+        <!-- NEW: Deck name input -->
+        <div>
+          <label class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
+          <BaseInput
+              v-model="deckNameInput"
+              placeholder="Nombre del mazo"
+              type="text"
+            />
         </div>
 
         <div class="bg-primary-dark border border-silver-30 p-3">

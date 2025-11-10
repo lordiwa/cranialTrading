@@ -2,11 +2,13 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toastStore = useToastStore();
 
 const email = ref('');
 const password = ref('');
@@ -18,17 +20,15 @@ const handleLogin = async () => {
   loading.value = true;
   try {
     const success = await authStore.login(email.value, password.value);
-    console.log('authStore.login returned:', success);
 
     if (success) {
-      console.log('Navigating to dashboard...');
       await router.push('/dashboard');
       return;
     }
 
-    console.warn('Login did not succeed (authStore returned falsy).');
+    toastStore.show('Credenciales inválidas', 'error');
   } catch (err) {
-    console.error('Login error:', err);
+    toastStore.show('Error al iniciar sesión', 'error');
   } finally {
     loading.value = false;
   }

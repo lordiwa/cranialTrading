@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
 import { useMessagesStore } from '../../stores/messages';
 import { useAuthStore } from '../../stores/auth';
+import { useToastStore } from '../../stores/toast';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import BaseInput from '../ui/BaseInput.vue';
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 
 const messagesStore = useMessagesStore();
 const authStore = useAuthStore();
+const toastStore = useToastStore();
 const messageInput = ref('');
 const isSending = ref(false);
 const conversationId = ref('');
@@ -32,18 +34,14 @@ const sortedMessages = computed(() => {
 
 const handleOpenChat = async () => {
   if (!authStore.user) {
-    console.log('[CHAT] No user, skipping chat open');
     return;
   }
 
-  console.log('[CHAT] Opening chat with:', props.otherUserId);
-
   // Crear o obtener conversación
   const convId = await messagesStore.createConversation(props.otherUserId, props.otherUsername);
-  console.log('[CHAT] Conversation ID:', convId);
 
   if (!convId) {
-    console.error('[CHAT] Failed to create/get conversation');
+    toastStore.show('No se pudo crear la conversación', 'error');
     return;
   }
 
@@ -54,17 +52,9 @@ const handleOpenChat = async () => {
 };
 
 const handleSendMessage = async () => {
-  if (!messageInput.value.trim()) {
-    console.log('[CHAT] Empty message');
-    return;
-  }
+  if (!messageInput.value.trim()) return;
+  if (!conversationId.value) return;
 
-  if (!conversationId.value) {
-    console.log('[CHAT] No conversation ID');
-    return;
-  }
-
-  console.log('[CHAT] Sending message...');
   isSending.value = true;
 
   const success = await messagesStore.sendMessage(
@@ -73,7 +63,7 @@ const handleSendMessage = async () => {
     messageInput.value
   );
 
-  console.log('[CHAT] Send result:', success);
+  // send result handled by success boolean
 
   if (success) {
     messageInput.value = '';

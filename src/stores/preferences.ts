@@ -17,7 +17,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
     const loadPreferences = async () => {
         if (!authStore.user) {
-            console.log('[PREFERENCES] No user, skipping load');
             return;
         }
 
@@ -32,17 +31,16 @@ export const usePreferencesStore = defineStore('preferences', () => {
                 createdAt: doc.data().createdAt?.toDate() || new Date(),
             } as Preference));
 
-            console.log('[PREFERENCES] Loaded', preferences.value.length, 'preferences');
+            // preferences loaded
         } catch (error: any) {
-            console.error('[PREFERENCES] Error loading preferences:', error.code, error.message);
-            preferences.value = [];
-            if (error.code !== 'permission-denied') {
-                toastStore.show('Error al cargar preferencias', 'error');
-            }
-        } finally {
-            loading.value = false;
-        }
-    };
+             preferences.value = [];
+             if (error.code !== 'permission-denied') {
+                 toastStore.show('Error al cargar preferencias', 'error');
+             }
+         } finally {
+             loading.value = false;
+         }
+     };
 
     const addPreference = async (prefData: {
         scryfallId: string;
@@ -65,7 +63,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
             await loadPreferences();
             toastStore.show('Preferencia creada', 'success');
         } catch (error) {
-            console.error('Error adding preference:', error);
             toastStore.show('Error al crear preferencia', 'error');
         }
     };
@@ -80,7 +77,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
             await loadPreferences();
             toastStore.show('Preferencia actualizada', 'success');
         } catch (error) {
-            console.error('Error updating preference:', error);
             toastStore.show('Error al actualizar preferencia', 'error');
         }
     };
@@ -95,7 +91,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
             preferences.value = preferences.value.filter(p => p.id !== prefId);
             toastStore.show('Preferencia eliminada', 'success');
         } catch (error) {
-            console.error('Error deleting preference:', error);
             toastStore.show('Error al eliminar preferencia', 'error');
         }
     };
@@ -116,7 +111,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             await loadPreferences();
         } catch (error) {
-            console.error('Error deleting preference by card:', error);
+            // ignore
         }
     };
 
@@ -139,7 +134,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
             await loadPreferences();
             toastStore.show('Preferencia actualizada', 'success');
         } catch (error) {
-            console.error('Error updating preference type:', error);
             toastStore.show('Error al actualizar preferencia', 'error');
         }
     };
@@ -227,7 +221,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             return { success, failed, errors, processedPreferences }
         } catch (error) {
-            console.error('Error processing deck import:', error)
             toastStore.show('Error al procesar mazo', 'error')
             return { success: 0, failed: 0, errors: [], processedPreferences: [] }
         }
@@ -316,7 +309,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             return { success, failed, errors, processedPreferences }
         } catch (error) {
-            console.error('Error processing direct import:', error)
             toastStore.show('Error al procesar mazo', 'error')
             return { success: 0, failed: 0, errors: [], processedPreferences: [] }
         }
@@ -354,7 +346,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
             toastStore.show(`${consolidatedPrefs.size} preferencias creadas`, 'success')
             return true
         } catch (error) {
-            console.error('Error confirming import:', error)
             toastStore.show('Error al guardar preferencias', 'error')
             return false
         }
@@ -374,4 +365,3 @@ export const usePreferencesStore = defineStore('preferences', () => {
         confirmImport,
     };
 });
-

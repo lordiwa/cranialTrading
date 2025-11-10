@@ -65,7 +65,6 @@ export const useCollectionStore = defineStore('collection', () => {
                 } as Card;
             });
         } catch (error) {
-            console.error('Error loading collection:', error);
             toastStore.show('Error al cargar colección', 'error');
         } finally {
             loading.value = false;
@@ -99,7 +98,6 @@ export const useCollectionStore = defineStore('collection', () => {
             await loadCollection();
             toastStore.show('Carta agregada', 'success');
         } catch (error) {
-            console.error('Error adding card:', error);
             toastStore.show('Error al agregar carta', 'error');
         }
     };
@@ -118,7 +116,6 @@ export const useCollectionStore = defineStore('collection', () => {
             await loadCollection();
             toastStore.show('Carta actualizada', 'success');
         } catch (error) {
-            console.error('Error updating card:', error);
             toastStore.show('Error al actualizar carta', 'error');
         }
     };
@@ -133,7 +130,6 @@ export const useCollectionStore = defineStore('collection', () => {
             cards.value = cards.value.filter(c => c.id !== cardId);
             toastStore.show('Carta eliminada', 'success');
         } catch (error) {
-            console.error('Error deleting card:', error);
             toastStore.show('Error al eliminar carta', 'error');
         }
     };
@@ -160,7 +156,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
             // generate one deck name for the whole import (if none provided)
             const importDeckName = deckName ?? generateRandomDeckName()
-            console.debug('[COLLECTION] processDeckImport importDeckName:', importDeckName)
 
             if (cardsToImport.length === 0) {
                 toastStore.show('No se detectaron cartas', 'error')
@@ -231,7 +226,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
             return { success, failed, errors, processedCards }
         } catch (error) {
-            console.error('Error processing deck import:', error)
             toastStore.show('Error al procesar mazo', 'error')
             return { success: 0, failed: 0, errors: [], processedCards: [] }
         }
@@ -269,7 +263,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
             // ensure the whole direct import uses the same deck name
             const importDeckNameDirect = deckName ?? generateRandomDeckName()
-            console.debug('[COLLECTION] processDirectImport importDeckNameDirect:', importDeckNameDirect)
 
             let success = 0
             let failed = 0
@@ -330,7 +323,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
             return { success, failed, errors, processedCards }
         } catch (error) {
-            console.error('Error processing direct import:', error)
             toastStore.show('Error al procesar mazo', 'error')
             return { success: 0, failed: 0, errors: [], processedCards: [] }
         }
@@ -388,18 +380,14 @@ export const useCollectionStore = defineStore('collection', () => {
                          updatedAt: new Date(),
                      })
 
-                    // debug log to help trace invalid payloads
-                    console.debug('[COLLECTION] Adding card payload:', writePayload)
-
                     await addDoc(colRef, writePayload)
-                }
-            }
+                 }
+             }
 
             await loadCollection()
             toastStore.show(`${normalizedCards.length} cartas procesadas`, 'success')
             return true
         } catch (error) {
-            console.error('Error confirming import:', error)
             toastStore.show('Error al guardar cartas', 'error')
             return false
         }
@@ -425,7 +413,6 @@ export const useCollectionStore = defineStore('collection', () => {
             toastStore.show(`Mazo "${deckName}" eliminado`, 'success');
             return true;
         } catch (error) {
-            console.error('Error deleting deck:', error);
             toastStore.show('Error al eliminar mazo', 'error');
             return false;
         }

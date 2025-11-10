@@ -38,7 +38,7 @@ export const fetchMoxfieldDeck = async (deckId: string): Promise<MoxfieldDeck | 
         if (!response.ok) return null;
         return await response.json();
     } catch (error) {
-        console.error('Error fetching Moxfield deck:', error);
+        // silent on errors
         return null;
     }
 }

@@ -26,16 +26,12 @@ export const useMessagesStore = defineStore('messages', () => {
         const conversationId = getConversationId(authStore.user.id, otherUserId);
 
         try {
-            console.log('[MESSAGES] Intentando crear/obtener conversación:', conversationId);
-
-            // Intentar obtener el documento existente
+            // Get or create conversation document
             const conversationRef = doc(db, 'conversations', conversationId);
             const conversationDoc = await getDoc(conversationRef);
 
             if (!conversationDoc.exists()) {
-                console.log('[MESSAGES] Conversación no existe, creando nueva...');
-
-                // Crear nueva conversación usando setDoc con el ID específico
+                // Create new conversation using setDoc with the specific ID
                 await setDoc(conversationRef, {
                     id: conversationId,
                     participantIds: [authStore.user.id, otherUserId],
@@ -45,14 +41,10 @@ export const useMessagesStore = defineStore('messages', () => {
                     },
                     createdAt: Timestamp.now(),
                 });
-                console.log('[MESSAGES] Conversación creada exitosamente:', conversationId);
-            } else {
-                console.log('[MESSAGES] Conversación ya existe:', conversationId);
             }
 
             return conversationId;
         } catch (error) {
-            console.error('[MESSAGES] Error creating conversation:', error);
             toastStore.show('Error al crear conversación', 'error');
             return '';
         }
@@ -61,12 +53,11 @@ export const useMessagesStore = defineStore('messages', () => {
     // Enviar mensaje
     const sendMessage = async (conversationId: string, otherUserId: string, content: string): Promise<boolean> => {
         if (!authStore.user || !content.trim()) {
-            console.log('[MESSAGES] No user or empty content');
             return false;
         }
 
         try {
-            console.log('[MESSAGES] Enviando mensaje a conversación:', conversationId);
+            // sending message
             const messagesRef = collection(db, 'conversations', conversationId, 'messages');
 
             // Generar ID único para el mensaje
@@ -82,10 +73,8 @@ export const useMessagesStore = defineStore('messages', () => {
             };
 
             await setDoc(newMessageRef, newMessage);
-            console.log('[MESSAGES] Mensaje enviado exitosamente:', newMessageRef.id);
             return true;
         } catch (error) {
-            console.error('[MESSAGES] Error sending message:', error);
             toastStore.show('Error al enviar mensaje', 'error');
             return false;
         }
@@ -114,25 +103,24 @@ export const useMessagesStore = defineStore('messages', () => {
                 })
                 .filter(conv => conv.participantIds.includes(authStore.user!.id));
 
-            console.log('[MESSAGES] Loaded', conversations.value.length, 'conversations');
+            // conversations loaded
         } catch (error) {
-            console.error('[MESSAGES] Error loading conversations:', error);
-        } finally {
-            loading.value = false;
-        }
-    };
+            toastStore.show('Error al cargar conversaciones', 'error');
+         } finally {
+             loading.value = false;
+         }
+     };
 
     // Cargar mensajes de una conversación en tiempo real
     const loadConversationMessages = (conversationId: string) => {
         if (!authStore.user) {
-            console.log('[MESSAGES] No user, skipping message loading');
             return;
         }
 
         // Desuscribirse del listener anterior si existe
         if (unsubscribe) unsubscribe();
 
-        console.log('[MESSAGES] Cargando mensajes para:', conversationId);
+        // start listening messages
         const messagesRef = collection(db, 'conversations', conversationId, 'messages');
 
         unsubscribe = onSnapshot(
@@ -153,10 +141,10 @@ export const useMessagesStore = defineStore('messages', () => {
                     })
                     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-                console.log('[MESSAGES] Loaded', currentMessages.value.length, 'messages');
+                // messages loaded
             },
-            (error) => {
-                console.error('[MESSAGES] Error listening to messages:', error);
+            (_err) => {
+                toastStore.show('Error al escuchar mensajes', 'error');
             }
         );
     };
@@ -164,7 +152,6 @@ export const useMessagesStore = defineStore('messages', () => {
     // Detener de escuchar mensajes
     const stopListeningMessages = () => {
         if (unsubscribe) {
-            console.log('[MESSAGES] Stopping message listener');
             unsubscribe();
             unsubscribe = null;
         }

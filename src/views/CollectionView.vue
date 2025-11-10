@@ -223,9 +223,7 @@ const handleImport = async (
       return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
     })();
 
-    console.debug('[VIEW] Normalizing batchName for import:', batchName);
     const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
-    console.debug('[VIEW] sample normalized payload:', normalized[0]);
 
     await collectionStore.confirmImport(normalized);
     await collectionStore.loadCollection();
@@ -275,9 +273,7 @@ const handleImportDirect = async (
       return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
     })();
 
-    console.debug('[VIEW] Normalizing batchName for direct import:', batchName);
     const normalized = result.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
-    console.debug('[VIEW] sample normalized payload (direct):', normalized[0]);
 
     await collectionStore.confirmImport(normalized);
     await collectionStore.loadCollection();
@@ -305,8 +301,8 @@ const handleConfirmImport = async () => {
     return `DeckName${yy}${mm}${dd}${hh}${min}_${rand}`;
   })();
 
-  console.debug('[VIEW] handleConfirmImport batchName:', batchName);
-  const normalized = importResult.value.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+  // handleConfirmImport: normalized batch name computed
+   const normalized = importResult.value.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
 
   // Close the modal immediately so the UI doesn't stay blocked
   showResultModal.value = false;

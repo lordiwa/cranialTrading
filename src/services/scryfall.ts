@@ -35,7 +35,7 @@ export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
         const data = await response.json();
         return data.data || [];
     } catch (error) {
-        console.error('Scryfall search error:', error);
+        // silent on errors
         return [];
     }
 };
@@ -46,7 +46,7 @@ export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
         if (!response.ok) return null;
         return await response.json();
     } catch (error) {
-        console.error('Scryfall get card error:', error);
+        // silent on errors
         return null;
     }
 };
@@ -62,7 +62,7 @@ export const getCardBySetAndNumber = async (
         if (!response.ok) return null
         return await response.json()
     } catch (error) {
-        console.error('Scryfall get card by set error:', error)
+        // silent on errors
         return null
     }
 }

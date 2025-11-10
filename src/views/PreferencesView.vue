@@ -38,7 +38,7 @@ const handleAdd = (prefData: any) => {
 };
 
 const handleEdit = (preference: Preference) => {
-  console.log('Edit preference:', preference);
+  // edit preference handler (UI to implement)
 };
 
 const handleDelete = async (prefId: string) => {

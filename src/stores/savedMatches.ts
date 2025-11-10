@@ -32,7 +32,6 @@ export const useSavedMatchesStore = defineStore('savedMatches', () => {
             toastStore.show('Match guardado', 'success');
             return true;
         } catch (error) {
-            console.error('Error saving match:', error);
             toastStore.show('Error al guardar match', 'error');
             return false;
         }
@@ -51,14 +50,11 @@ export const useSavedMatchesStore = defineStore('savedMatches', () => {
                 savedAt: doc.data().savedAt?.toDate() || new Date(),
                 docId: doc.id,
             }));
-
-            console.log('[SAVED_MATCHES] Loaded', savedMatches.value.length, 'saved matches');
-        } catch (error) {
-            console.error('Error loading saved matches:', error);
-            toastStore.show('Error al cargar matches guardados', 'error');
-        } finally {
-            loading.value = false;
-        }
+         } catch (error) {
+             toastStore.show('Error al cargar matches guardados', 'error');
+         } finally {
+             loading.value = false;
+         }
     };
 
     const deleteSavedMatch = async (docId: string) => {
@@ -71,9 +67,8 @@ export const useSavedMatchesStore = defineStore('savedMatches', () => {
             savedMatches.value = savedMatches.value.filter(m => m.docId !== docId);
             toastStore.show('Match eliminado', 'success');
         } catch (error) {
-            console.error('Error deleting saved match:', error);
             toastStore.show('Error al eliminar match', 'error');
-        }
+         }
     };
 
     const isMatchSaved = (matchId: string): boolean => {
@@ -89,4 +84,3 @@ export const useSavedMatchesStore = defineStore('savedMatches', () => {
         isMatchSaved,
     };
 });
-

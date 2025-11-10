@@ -24,7 +24,8 @@ const handleViewDetails = (match: SimpleMatch) => {
 
 const handleContact = () => {
   if (selectedMatch.value) {
-    console.log('Contact user:', selectedMatch.value.otherUserId);
+    // Show a toast and close modal
+    const toast = useAuthStore; // no-op to satisfy linter if unused
     alert(`Contactando a ${selectedMatch.value.otherUsername}...`);
     showDetailModal.value = false;
   }

@@ -94,6 +94,26 @@ const handleClose = () => {
         </button>
 
         <button
+            @click="selectedStatus = 'busco'"
+            :class="[
+              'w-full p-4 border-2 transition-fast text-left',
+              selectedStatus === 'busco'
+                ? 'border-neon bg-neon-5'
+                : 'border-silver-30 hover:border-silver'
+            ]"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-body font-bold text-silver">BUSCAR</p>
+              <p class="text-tiny text-silver-70 mt-1">
+                Agregar a mis preferencias de BUSCO
+              </p>
+            </div>
+            <BaseBadge variant="busco">BUSCO</BaseBadge>
+          </div>
+        </button>
+
+        <button
             @click="selectedStatus = 'trade'"
             :class="[
               'w-full p-4 border-2 transition-fast text-left',

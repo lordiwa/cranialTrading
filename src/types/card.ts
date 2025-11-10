@@ -1,6 +1,6 @@
 // src/types/card.ts
 export type CardCondition = 'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO';
-export type CardStatus = 'collection' | 'sell' | 'trade';
+export type CardStatus = 'collection' | 'sell' | 'trade' | 'busco';
 
 export interface Card {
     id: string;

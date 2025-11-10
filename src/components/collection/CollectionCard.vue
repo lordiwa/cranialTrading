@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Card } from '../../types/card';
 import BaseButton from '../ui/BaseButton.vue';
+import BaseBadge from '../ui/BaseBadge.vue';
 
 const props = defineProps<{
   card: Card;
 }>();
+
+// compute a border class that matches the badge text color
+const statusBorderClass = computed(() => {
+  const s = props.card.status;
+  if (s === 'sell') return 'border-rust';
+  if (s === 'trade') return 'border-silver';
+  if (s === 'busco') return 'border-neon';
+  // default / collection
+  return 'border-silver-20';
+});
 
 const emit = defineEmits<{
   click: [card: Card];
@@ -32,7 +43,7 @@ const handleDelete = (e: Event) => {
 
 <template>
   <div
-      class="bg-primary border border-silver-20 p-3 md:p-4 hover:border-neon-40 transition-normal cursor-pointer"
+      :class="['bg-primary p-3 md:p-4 hover:border-neon-40 transition-normal cursor-pointer', 'border', statusBorderClass]"
       @mouseenter="showActions = true"
       @mouseleave="showActions = false"
       @click="handleCardClick"
@@ -55,7 +66,14 @@ const handleDelete = (e: Event) => {
         <span v-if="card.foil" class="text-neon">| FOIL</span>
       </div>
 
-      <p class="text-small font-bold text-neon mt-2">${{ card.price.toFixed(2) }}</p>
+      <div class="flex items-center justify-between mt-2">
+        <p class="text-small font-bold text-neon">${{ card.price.toFixed(2) }}</p>
+        <div>
+          <BaseBadge :variant="card.status === 'sell' ? 'vendo' : card.status === 'trade' ? 'cambio' : card.status === 'busco' ? 'busco' : 'solo'">
+            {{ card.status === 'sell' ? 'VENDO' : card.status === 'trade' ? 'CAMBIO' : card.status === 'busco' ? 'BUSCO' : 'COLECCIÓN' }}
+          </BaseBadge>
+        </div>
+      </div>
     </div>
 
     <Transition name="fade">

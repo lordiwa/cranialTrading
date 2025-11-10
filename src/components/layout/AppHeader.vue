@@ -46,13 +46,6 @@ const closeMenu = () => {
           Colección
         </RouterLink>
         <RouterLink
-            to="/preferences"
-            class="text-body text-silver hover:text-neon transition-fast"
-            active-class="text-neon"
-        >
-          Busco
-        </RouterLink>
-        <RouterLink
             to="/saved-matches"
             class="text-body text-silver hover:text-neon transition-fast"
             active-class="text-neon"
@@ -102,14 +95,6 @@ const closeMenu = () => {
               active-class="text-neon bg-neon-5"
           >
             Mi Colección
-          </RouterLink>
-          <RouterLink
-              to="/preferences"
-              @click="closeMenu"
-              class="px-4 py-3 text-body text-silver hover:text-neon hover:bg-silver-5 transition-fast"
-              active-class="text-neon bg-neon-5"
-          >
-            Busco
           </RouterLink>
           <RouterLink
               to="/saved-matches"

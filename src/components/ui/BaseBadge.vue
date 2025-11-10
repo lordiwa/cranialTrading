@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-  variant?: 'busco' | 'cambio' | 'vendo' | 'success';
+  variant?: 'busco' | 'cambio' | 'vendo' | 'success' | 'solo';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -12,6 +12,7 @@ const variantClasses = {
   cambio: 'border border-silver text-silver',
   vendo: 'border border-rust text-rust',
   success: 'border border-neon bg-neon-5 text-neon',
+  solo: 'border border-silver text-silver-70',
 };
 </script>
 

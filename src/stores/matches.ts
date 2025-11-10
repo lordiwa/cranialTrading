@@ -40,13 +40,58 @@ export const useMatchesStore = defineStore('matches', () => {
 
             const foundMatches: SimpleMatch[] = [];
 
-            // Get current user's preferences
+            // Get current user's preferences (from preferences collection)
             const myPrefsRef = collection(db, 'users', authStore.user.id, 'preferencias');
             const myPrefsSnapshot = await getDocs(myPrefsRef);
 
             // Get current user's cards
             const myCardsRef = collection(db, 'users', authStore.user.id, 'cards');
             const myCardsSnapshot = await getDocs(myCardsRef);
+
+            // Build a deduplicated map of my preferences merging actual preferences and synthetic ones from cards with status 'busco'
+            // Key by scryfallId when available, otherwise by normalized name|edition. Explicit preferences (from 'preferencias' collection) win.
+            const myPrefMap = new Map<string, any>();
+            const makeKey = (p: any) => {
+                if (p.scryfallId) return `s:${String(p.scryfallId)}`;
+                const name = String(p.name || '').trim().toLowerCase();
+                const edition = String(p.edition || '').trim().toLowerCase();
+                return `n:${name}|${edition}`;
+            };
+
+            // Add explicit preferences first
+            myPrefsSnapshot.forEach(p => {
+                const data = p.data();
+                const key = makeKey(data);
+                myPrefMap.set(key, { ...data, id: p.id, _fromCard: false });
+            });
+
+            // Add synthetic BUSCO prefs from my cards only if they don't duplicate an explicit pref
+            myCardsSnapshot.forEach(cardDoc => {
+                const card = cardDoc.data();
+                if (card.status === 'busco') {
+                    const synthetic = {
+                        id: `card_${cardDoc.id}`,
+                        scryfallId: card.scryfallId,
+                        name: card.name,
+                        type: 'BUSCO',
+                        quantity: card.quantity || 1,
+                        condition: card.condition,
+                        edition: card.edition,
+                        image: card.image || '',
+                        _fromCard: true,
+                        _cardId: cardDoc.id,
+                    };
+                    const key = makeKey(synthetic);
+                    if (!myPrefMap.has(key)) {
+                        myPrefMap.set(key, synthetic);
+                    } else {
+                        // If there is an explicit pref, prefer it; otherwise keep existing
+                        // (no-op)
+                    }
+                }
+            });
+
+            const myPreferences = Array.from(myPrefMap.values());
 
             // For each user
             for (const userDoc of usersSnapshot.docs) {
@@ -64,123 +109,125 @@ export const useMatchesStore = defineStore('matches', () => {
                     const otherCardsRef = collection(db, 'users', otherUserId, 'cards');
                     const otherCardsSnapshot = await getDocs(otherCardsRef);
 
+                    // Convert snapshots to arrays for easier iteration
+                    const otherPreferences: any[] = [];
+                    otherPrefsSnapshot.forEach(p => otherPreferences.push({ ...p.data(), id: p.id }));
+
+                    const otherCards: any[] = [];
+                    otherCardsSnapshot.forEach(c => otherCards.push({ ...c.data(), id: c.id }));
+
+                    const myCards: any[] = [];
+                    myCardsSnapshot.forEach(c => myCards.push({ ...c.data(), id: c.id }));
+
                     // MATCH TYPE 1: Other user BUSCO/CAMBIO my physical cards
-                    otherPrefsSnapshot.forEach(prefDoc => {
-                        const preference = prefDoc.data();
+                    for (const preference of otherPreferences) {
                         if (preference.type === 'BUSCO' || preference.type === 'CAMBIO') {
-                            myCardsSnapshot.forEach(cardDoc => {
-                                const card = cardDoc.data();
+                            for (const card of myCards) {
                                 if (card.name?.toLowerCase() === preference.name?.toLowerCase()) {
                                     foundMatches.push({
-                                        id: `${authStore.user!.id}_${otherUserId}_${cardDoc.id}_${prefDoc.id}_sell`,
+                                        id: `${authStore.user!.id}_${otherUserId}_${card.id}_${preference.id}_sell`,
                                         type: 'VENDO',
-                                        myCard: { ...card, id: cardDoc.id },
+                                        myCard: { ...card },
                                         otherUserId,
-                                        otherUsername: otherUserData.username || 'Usuario',
-                                        otherLocation: otherUserData.location,
-                                        otherPreference: { ...preference, id: prefDoc.id },
+                                        otherUsername: (otherUserData as any).username || 'Usuario',
+                                        otherLocation: (otherUserData as any).location,
+                                        otherPreference: { ...preference },
                                         createdAt: new Date(),
                                     });
-                                    console.log('[MATCHES] Match found - User', otherUserData.username, 'wants:', preference.name);
+                                    console.log('[MATCHES] Match found - User', (otherUserData as any).username, 'wants:', preference.name);
                                 }
-                            });
+                            }
                         }
-                    });
+                    }
 
                     // MATCH TYPE 2: I BUSCO/CAMBIO other user's physical cards
-                    myPrefsSnapshot.forEach(prefDoc => {
-                        const preference = prefDoc.data();
+                    for (const preference of myPreferences) {
                         if (preference.type === 'BUSCO' || preference.type === 'CAMBIO') {
-                            otherCardsSnapshot.forEach(cardDoc => {
-                                const card = cardDoc.data();
+                            for (const card of otherCards) {
                                 if (card.name?.toLowerCase() === preference.name?.toLowerCase()) {
                                     foundMatches.push({
-                                        id: `${authStore.user!.id}_${otherUserId}_${cardDoc.id}_${prefDoc.id}_buy`,
+                                        id: `${authStore.user!.id}_${otherUserId}_${card.id}_${preference.id}_buy`,
                                         type: 'BUSCO',
-                                        otherCard: { ...card, id: cardDoc.id },
+                                        otherCard: { ...card },
                                         otherUserId,
-                                        otherUsername: otherUserData.username || 'Usuario',
-                                        otherLocation: otherUserData.location,
-                                        myPreference: { ...preference, id: prefDoc.id },
+                                        otherUsername: (otherUserData as any).username || 'Usuario',
+                                        otherLocation: (otherUserData as any).location,
+                                        myPreference: { ...preference },
                                         createdAt: new Date(),
                                     });
-                                    console.log('[MATCHES] Match found - User', otherUserData.username, 'has:', card.name);
+                                    console.log('[MATCHES] Match found - User', (otherUserData as any).username, 'has:', card.name);
                                 }
-                            });
+                            }
                         }
-                    });
+                    }
 
                     // MATCH TYPE 3: My VENDO preference matches other user's BUSCO preference
-                    myPrefsSnapshot.forEach(myPrefDoc => {
-                        const myPreference = myPrefDoc.data();
+                    for (const myPreference of myPreferences) {
                         if (myPreference.type === 'VENDO') {
-                            otherPrefsSnapshot.forEach(otherPrefDoc => {
-                                const otherPreference = otherPrefDoc.data();
+                            for (const otherPreference of otherPreferences) {
                                 if (otherPreference.type === 'BUSCO') {
                                     if (myPreference.name?.toLowerCase() === otherPreference.name?.toLowerCase()) {
                                         // Find my physical card
                                         let myCard = null;
-                                        myCardsSnapshot.forEach(cardDoc => {
-                                            const card = cardDoc.data();
+                                        for (const card of myCards) {
                                             if (card.scryfallId === myPreference.scryfallId) {
-                                                myCard = { ...card, id: cardDoc.id };
+                                                myCard = { ...card };
+                                                break;
                                             }
-                                        });
+                                        }
 
                                         if (myCard) {
                                             foundMatches.push({
-                                                id: `${authStore.user!.id}_${otherUserId}_${myPrefDoc.id}_${otherPrefDoc.id}_vendo_busco`,
+                                                id: `${authStore.user!.id}_${otherUserId}_${myPreference.id}_${otherPreference.id}_vendo_busco`,
                                                 type: 'VENDO',
                                                 myCard,
                                                 otherUserId,
-                                                otherUsername: otherUserData.username || 'Usuario',
-                                                otherLocation: otherUserData.location,
-                                                otherPreference: { ...otherPreference, id: otherPrefDoc.id },
+                                                otherUsername: (otherUserData as any).username || 'Usuario',
+                                                otherLocation: (otherUserData as any).location,
+                                                otherPreference: { ...otherPreference },
                                                 createdAt: new Date(),
                                             });
-                                            console.log('[MATCHES] Match found (VENDO-BUSCO) - User', otherUserData.username, 'wants:', otherPreference.name);
+                                            console.log('[MATCHES] Match found (VENDO-BUSCO) - User', (otherUserData as any).username, 'wants:', otherPreference.name);
                                         }
                                     }
                                 }
-                            });
+                            }
                         }
-                    });
+                    }
 
                     // MATCH TYPE 4: My BUSCO preference matches other user's VENDO preference
-                    myPrefsSnapshot.forEach(myPrefDoc => {
-                        const myPreference = myPrefDoc.data();
+                    for (const myPreference of myPreferences) {
                         if (myPreference.type === 'BUSCO') {
-                            otherPrefsSnapshot.forEach(otherPrefDoc => {
-                                const otherPreference = otherPrefDoc.data();
+                            for (const otherPreference of otherPreferences) {
                                 if (otherPreference.type === 'VENDO') {
                                     if (myPreference.name?.toLowerCase() === otherPreference.name?.toLowerCase()) {
                                         // Find other user's physical card
                                         let otherCard = null;
-                                        otherCardsSnapshot.forEach(cardDoc => {
-                                            const card = cardDoc.data();
+                                        for (const card of otherCards) {
                                             if (card.scryfallId === otherPreference.scryfallId) {
-                                                otherCard = { ...card, id: cardDoc.id };
+                                                otherCard = { ...card };
+                                                break;
                                             }
-                                        });
+                                        }
 
                                         if (otherCard) {
                                             foundMatches.push({
-                                                id: `${authStore.user!.id}_${otherUserId}_${myPrefDoc.id}_${otherPrefDoc.id}_busco_vendo`,
+                                                id: `${authStore.user!.id}_${otherUserId}_${myPreference.id}_${otherPreference.id}_busco_vendo`,
                                                 type: 'BUSCO',
                                                 otherCard,
                                                 otherUserId,
-                                                otherUsername: otherUserData.username || 'Usuario',
-                                                otherLocation: otherUserData.location,
-                                                myPreference: { ...myPreference, id: myPrefDoc.id },
+                                                otherUsername: (otherUserData as any).username || 'Usuario',
+                                                otherLocation: (otherUserData as any).location,
+                                                myPreference: { ...myPreference },
                                                 createdAt: new Date(),
                                             });
-                                            console.log('[MATCHES] Match found (BUSCO-VENDO) - User', otherUserData.username, 'has:', otherCard.name);
+                                            console.log('[MATCHES] Match found (BUSCO-VENDO) - User', (otherUserData as any).username, 'has:', otherCard.name);
                                         }
                                     }
                                 }
-                            });
+                            }
                         }
-                    });
+                    }
 
                 } catch (userError) {
                     console.log('[MATCHES] Error processing user', otherUserId, ':', userError);

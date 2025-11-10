@@ -30,6 +30,25 @@ const handleContact = (userId: string, username: string) => {
 const handleCloseChat = () => {
   showChat.value = false;
 };
+
+const getVisualFor = (match: any) => {
+  const obj = match.otherCard || match.otherPreference || match.myCard || match.myPreference;
+  if (!obj) return { border: 'border-silver-30', label: '' };
+  if (obj.type) {
+    const t = String(obj.type).toUpperCase();
+    if (t === 'VENDO') return { border: 'border-rust', label: 'VENDO' };
+    if (t === 'CAMBIO') return { border: 'border-silver', label: 'CAMBIO' };
+    if (t === 'BUSCO') return { border: 'border-neon', label: 'BUSCO' };
+  }
+  if (obj.status) {
+    const s = String(obj.status).toLowerCase();
+    if (s === 'sell') return { border: 'border-rust', label: 'VENDO' };
+    if (s === 'trade') return { border: 'border-silver', label: 'CAMBIO' };
+    if (s === 'busco') return { border: 'border-neon', label: 'BUSCO' };
+    if (s === 'collection') return { border: 'border-silver-20', label: 'COLECCIÓN' };
+  }
+  return { border: 'border-silver-30', label: '' };
+};
 </script>
 
 <template>
@@ -53,18 +72,26 @@ const handleCloseChat = () => {
 
       <div v-else class="space-y-3 md:space-y-4">
         <div v-for="match in savedMatchesStore.savedMatches" :key="match.docId" class="bg-primary border border-silver-30 p-4 md:p-6">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+          <div :class="['flex items-center gap-4', 'border', getVisualFor(match).border]">
+            <img v-if="match.otherCard?.image || match.myCard?.image" :src="match.otherCard?.image || match.myCard?.image" :alt="match.otherCard?.name || match.myCard?.name || 'card'" class="w-20 h-24 object-cover rounded" />
             <div class="flex-1">
-              <p class="text-small md:text-body font-bold text-silver">{{ match.otherUsername }}</p>
-              <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
-                Quiere: {{ match.otherPreference?.name }}
-              </p>
-              <p class="text-tiny md:text-small text-silver-70 mt-1" v-else>
-                Tiene: {{ match.otherCard?.name }}
-              </p>
-              <p class="text-tiny text-silver-50 mt-2">
-                Guardado: {{ new Date(match.savedAt).toLocaleDateString() }}
-              </p>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-small md:text-body font-bold text-silver">{{ match.otherUsername }}</p>
+                  <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
+                    Quiere: {{ match.otherPreference?.name }}
+                  </p>
+                  <p class="text-tiny md:text-small text-silver-70 mt-1" v-else>
+                    Tiene: {{ match.otherCard?.name }}
+                  </p>
+                  <p class="text-tiny text-silver-50 mt-2">
+                    Guardado: {{ new Date(match.savedAt).toLocaleDateString() }}
+                  </p>
+                </div>
+                <div>
+                  <span class="block text-tiny text-silver-70 mr-2">{{ getVisualFor(match).label }}</span>
+                </div>
+              </div>
             </div>
             <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
               <BaseButton

@@ -82,6 +82,31 @@ const filteredCards = computed(() => {
 const collectionCount = computed(() => collectionStore.cards.filter(c => c.status === 'collection').length);
 const sellCount = computed(() => collectionStore.cards.filter(c => c.status === 'sell').length);
 const tradeCount = computed(() => collectionStore.cards.filter(c => c.status === 'trade').length);
+const buscoCount = computed(() => collectionStore.cards.filter(c => c.status === 'busco').length);
+
+// Totals (counts are number of card entries)
+const totalCardCount = computed(() => collectionStore.cards.length);
+const collectionCardCount = computed(() => collectionStore.cards.filter(c => c.status === 'collection').length);
+const remainderCount = computed(() => totalCardCount.value - (collectionCardCount.value + buscoCount.value));
+
+
+// Costs: deck total (for selected deck if any, otherwise overall) and busco cost (filtered by deck if selected)
+const deckTotalCost = computed(() => {
+  const cards = deckFilter.value !== 'all'
+    ? collectionStore.cards.filter(c => c.deckName === deckFilter.value)
+    : collectionStore.cards;
+  return cards.reduce((sum, c) => sum + ((c.price || 0) * (c.quantity || 0)), 0);
+});
+
+const buscoTotalCost = computed(() => {
+  const cards = deckFilter.value !== 'all'
+    ? collectionStore.cards.filter(c => c.deckName === deckFilter.value && c.status === 'busco')
+    : collectionStore.cards.filter(c => c.status === 'busco');
+  return cards.reduce((sum, c) => sum + ((c.price || 0) * (c.quantity || 0)), 0);
+});
+
+const deckTotalCostFormatted = computed(() => deckTotalCost.value ? deckTotalCost.value.toFixed(2) : '0.00');
+const buscoTotalCostFormatted = computed(() => buscoTotalCost.value ? buscoTotalCost.value.toFixed(2) : '0.00');
 
 const handleCardClick = (card: Card) => {
   selectedCard.value = card;
@@ -98,11 +123,15 @@ const handleUpdateStatus = async (newStatus: CardStatus) => {
 
   // Handle preference creation/deletion
   if (oldStatus !== 'collection' && newStatus === 'collection') {
-    // Removed from sell/trade -> delete preference
+    // Removed from sell/trade/busco -> delete preference
     await preferencesStore.deletePreferenceByCard(selectedCard.value.scryfallId, selectedCard.value.edition);
   } else if (oldStatus === 'collection' && newStatus !== 'collection') {
-    // Added to sell/trade -> create preference
-    const prefType = newStatus === 'sell' ? 'VENDO' : 'CAMBIO';
+    // Added to sell/trade/busco -> create preference
+    let prefType: any;
+    if (newStatus === 'sell') prefType = 'VENDO';
+    else if (newStatus === 'trade') prefType = 'CAMBIO';
+    else if (newStatus === 'busco') prefType = 'BUSCO';
+    else prefType = 'VENDO';
     await preferencesStore.addPreference({
       scryfallId: selectedCard.value.scryfallId,
       name: selectedCard.value.name,
@@ -113,11 +142,16 @@ const handleUpdateStatus = async (newStatus: CardStatus) => {
       image: selectedCard.value.image,
     });
   } else if (oldStatus !== 'collection' && newStatus !== 'collection' && oldStatus !== newStatus) {
-    // Changed between sell/trade -> update preference type
+    // Changed between sell/trade/busco -> update preference type
+    let newType: any;
+    if (newStatus === 'sell') newType = 'VENDO';
+    else if (newStatus === 'trade') newType = 'CAMBIO';
+    else if (newStatus === 'busco') newType = 'BUSCO';
+    else newType = 'VENDO';
     await preferencesStore.updatePreferenceType(
         selectedCard.value.scryfallId,
         selectedCard.value.edition,
-        newStatus === 'sell' ? 'VENDO' : 'CAMBIO'
+        newType
     );
   }
 
@@ -391,6 +425,17 @@ const handleDeleteDeck = async () => {
         >
           CAMBIO ({{ tradeCount }})
         </button>
+        <button
+            @click="statusFilter = 'busco'"
+            :class="[
+              'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
+              statusFilter === 'busco'
+                ? 'bg-neon-10 text-neon border border-neon'
+                : 'bg-primary border border-silver-30 text-silver-70'
+            ]"
+        >
+          BUSCO ({{ buscoCount }})
+        </button>
       </div>
 
       <!-- Deck filter -->
@@ -424,6 +469,36 @@ const handleDeleteDeck = async () => {
             placeholder="Filtrar por nombre, edición o mazo..."
             type="text"
         />
+      </div>
+
+      <!-- NEW: Stats bar -->
+      <div v-if="collectionStore.cards.length > 0" class="bg-primary p-4 rounded-lg mb-4 md:mb-6 border border-silver-30">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
+          <div>
+            <div class="text-small text-silver-70">Total Cartas</div>
+            <div class="text-h5 font-bold text-silver">{{ totalCardCount }}</div>
+          </div>
+          <div>
+            <div class="text-small text-silver-70">En Colección</div>
+            <div class="text-h5 font-bold text-silver">{{ collectionCardCount }}</div>
+          </div>
+          <div>
+            <div class="text-small text-silver-70">Busco</div>
+            <div class="text-h5 font-bold text-silver">{{ buscoCount }}</div>
+          </div>
+          <div>
+            <div class="text-small text-silver-70">Resto</div>
+            <div class="text-h5 font-bold text-silver">{{ remainderCount }}</div>
+          </div>
+          <div>
+            <div class="text-small text-silver-70">Costo Total (Mazo)</div>
+            <div class="text-h5 font-bold text-silver">${{ deckTotalCostFormatted }}</div>
+          </div>
+          <div>
+            <div class="text-small text-silver-70">Costo Busco</div>
+            <div class="text-h5 font-bold text-silver">${{ buscoTotalCostFormatted }}</div>
+          </div>
+        </div>
       </div>
 
       <BaseLoader v-if="collectionStore.loading" size="large" />

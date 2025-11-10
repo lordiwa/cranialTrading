@@ -109,7 +109,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             for (const docSnap of snapshot.docs) {
                 const pref = docSnap.data();
-                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO')) {
+                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO' || pref.type === 'BUSCO')) {
                     await deleteDoc(doc(db, 'users', authStore.user.id, 'preferencias', docSnap.id));
                 }
             }
@@ -120,7 +120,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         }
     };
 
-    const updatePreferenceType = async (scryfallId: string, edition: string, newType: 'VENDO' | 'CAMBIO') => {
+    const updatePreferenceType = async (scryfallId: string, edition: string, newType: 'VENDO' | 'CAMBIO' | 'BUSCO') => {
         if (!authStore.user) return;
 
         try {
@@ -129,7 +129,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             for (const docSnap of snapshot.docs) {
                 const pref = docSnap.data();
-                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO')) {
+                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO' || pref.type === 'BUSCO')) {
                     await updateDoc(doc(db, 'users', authStore.user.id, 'preferencias', docSnap.id), {
                         type: newType,
                     });
@@ -374,3 +374,4 @@ export const usePreferencesStore = defineStore('preferences', () => {
         confirmImport,
     };
 });
+

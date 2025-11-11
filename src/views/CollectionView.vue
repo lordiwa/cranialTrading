@@ -525,6 +525,7 @@ const handleDeleteDeck = async () => {
       <AddCardModal
           :show="showAddModal"
           :defaultDeckName="deckFilter !== 'all' ? deckFilter : undefined"
+          :defaultStatus="statusFilter !== 'all' ? statusFilter : 'collection'"
           @close="showAddModal = false"
           @add="handleAdd"
       />

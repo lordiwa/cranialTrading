@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseInput from '../ui/BaseInput.vue';
 import BaseSelect from '../ui/BaseSelect.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import BaseLoader from '../ui/BaseLoader.vue';
+import BaseBadge from '../ui/BaseBadge.vue';
 import { searchCards } from '../../services/scryfall';
-import { ScryfallCard, CardCondition } from '../../types/card';
+import { ScryfallCard, CardCondition, CardStatus } from '../../types/card';
 
 const props = defineProps<{
   show: boolean;
   defaultDeckName?: string;
+  defaultStatus?: CardStatus;
 }>();
 
 const emit = defineEmits<{
@@ -24,22 +26,27 @@ const selectedCard = ref<ScryfallCard | null>(null);
 const quantity = ref(1);
 const condition = ref<CardCondition>('NM');
 const foil = ref(false);
-// NEW: optional deck name input for manual add
 const deckNameInput = ref('');
-// NEW: optional public flag for the card (visible on public profile)
 const isPublic = ref(false);
-// track search in-progress state
 const searching = ref(false);
+const status = ref<CardStatus>('collection');
 
 watch(() => props.show, (val) => {
   if (val) {
     deckNameInput.value = props.defaultDeckName ?? '';
+    status.value = props.defaultStatus ?? 'collection';
   }
 });
 
 watch(() => props.defaultDeckName, (val) => {
   if (props.show && val) {
     deckNameInput.value = val;
+  }
+});
+
+watch(() => props.defaultStatus, (val) => {
+  if (props.show && val) {
+    status.value = val;
   }
 });
 
@@ -51,6 +58,36 @@ const conditionOptions = [
   { value: 'HP', label: 'HP - Heavy Play' },
   { value: 'PO', label: 'PO - Poor' },
 ];
+
+const getStatusLabel = (s: CardStatus) => {
+  if (s === 'sell') return 'VENDO';
+  if (s === 'trade') return 'CAMBIO';
+  if (s === 'busco') return 'BUSCO';
+  return 'COLECCIÓN';
+};
+
+const getStatusBadgeVariant = (s: CardStatus) => {
+  if (s === 'sell') return 'vendo';
+  if (s === 'trade') return 'cambio';
+  if (s === 'busco') return 'busco';
+  return 'solo';
+};
+
+const statusBannerText = computed(() => {
+  if (status.value === 'collection') {
+    return null;
+  }
+  if (status.value === 'sell') {
+    return 'Se agregará como VENDO';
+  }
+  if (status.value === 'trade') {
+    return 'Se agregará como CAMBIO';
+  }
+  if (status.value === 'busco') {
+    return 'Se agregará como BUSCO';
+  }
+  return null;
+});
 
 let searchTimeout: ReturnType<typeof setTimeout>;
 
@@ -82,19 +119,18 @@ const handleAdd = () => {
       ? parseFloat(selectedCard.value.prices.usd_foil || '0')
       : parseFloat(selectedCard.value.prices.usd || '0');
 
-  // normalize deckName: prefer user input, fallback to prop default, otherwise undefined
   const deckNameToSend = deckNameInput.value?.trim() || props.defaultDeckName || undefined;
 
   emit('add', {
     scryfallId: selectedCard.value.id,
     name: selectedCard.value.name,
-    edition: selectedCard.set_name,
+    edition: selectedCard.value.set_name,
     quantity: quantity.value,
     condition: condition.value,
     foil: foil.value,
     price,
     image: selectedCard.value.image_uris?.normal || '',
-    status: 'collection', // Por defecto solo guardar
+    status: status.value,
     deckName: deckNameToSend,
     public: isPublic.value,
   });
@@ -111,6 +147,7 @@ const handleClose = () => {
   foil.value = false;
   deckNameInput.value = '';
   isPublic.value = false;
+  status.value = 'collection';
   emit('close');
 };
 </script>
@@ -118,6 +155,21 @@ const handleClose = () => {
 <template>
   <BaseModal :show="show" title="AGREGAR CARTA A MI COLECCIÓN" @close="handleClose">
     <div class="space-y-4">
+      <!-- Deck warning banner -->
+      <div v-if="props.defaultDeckName" class="bg-neon-5 border border-neon p-3 rounded">
+        <p class="text-tiny font-bold text-neon">
+          📌 Se agregará al mazo: <span class="text-silver">{{ props.defaultDeckName }}</span>
+        </p>
+      </div>
+
+      <!-- Status warning banner -->
+      <div v-if="statusBannerText" class="bg-neon-5 border border-neon p-3 rounded flex items-center gap-2">
+        <p class="text-tiny font-bold text-neon">📌 {{ statusBannerText }}</p>
+        <BaseBadge :variant="getStatusBadgeVariant(status)">
+          {{ getStatusLabel(status) }}
+        </BaseBadge>
+      </div>
+
       <!-- Search -->
       <div v-if="!selectedCard">
         <BaseInput
@@ -206,17 +258,17 @@ const handleClose = () => {
           </label>
         </div>
 
-        <!-- NEW: Deck name input -->
+        <!-- Deck name input -->
         <div>
           <label class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
           <BaseInput
               v-model="deckNameInput"
               placeholder="Nombre del mazo"
               type="text"
-            />
+          />
         </div>
 
-        <!-- NEW: Public checkbox -->
+        <!-- Public checkbox -->
         <div>
           <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
             <input

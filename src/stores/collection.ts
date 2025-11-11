@@ -81,7 +81,7 @@ export const useCollectionStore = defineStore('collection', () => {
         foil: boolean;
         price: number;
         image: string;
-        status: 'collection' | 'sell' | 'trade';
+        status: 'collection' | 'sell' | 'trade' | 'busco';
         deckName?: string;
         public?: boolean;
     }) => {
@@ -89,17 +89,35 @@ export const useCollectionStore = defineStore('collection', () => {
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards');
+            const finalDeckName = cardData.deckName ?? generateRandomDeckName();
             const payload = sanitizeForFirestore({
                 ...cardData,
-                // normalize deckName: never send undefined to Firestore; generate one if missing
-                deckName: cardData.deckName ?? generateRandomDeckName(),
+                deckName: finalDeckName,
                 public: cardData.public ?? false,
                 updatedAt: new Date(),
             });
             await addDoc(colRef, payload);
 
             await loadCollection();
-            toastStore.show('Carta agregada', 'success');
+
+            // Toast específico - mostrar status y mazo
+            const statusLabel =
+                cardData.status === 'sell' ? 'VENDO' :
+                    cardData.status === 'trade' ? 'CAMBIO' :
+                        cardData.status === 'busco' ? 'BUSCO' :
+                            'Colección';
+
+            let toastMsg = `Carta agregada`;
+
+            if (cardData.status !== 'collection') {
+                toastMsg += ` como ${statusLabel}`;
+            }
+
+            if (cardData.deckName) {
+                toastMsg += ` al mazo "${finalDeckName}"`;
+            }
+
+            toastStore.show(toastMsg, 'success');
         } catch (error) {
             toastStore.show('Error al agregar carta', 'error');
         }

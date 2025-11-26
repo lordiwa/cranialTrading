@@ -1,121 +1,212 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
-import BaseButton from '../components/ui/BaseButton.vue';
+import MatchTabsContainer from '../components/matches/MatchTabsContainer.vue';
+import MatchCard from '../components/matches/MatchCard.vue';
 import MatchDetailModal from '../components/matches/MatchDetailModal.vue';
+import ChatModal from '../components/chat/ChatModal.vue';
 import { useAuthStore } from '../stores/auth';
-import { useMatchesStore } from '../stores/matches';
-import { SimpleMatch } from '../stores/matches';
+import { useMatchesStore, type SimpleMatch } from '../stores/matches';
 
 const authStore = useAuthStore();
 const matchesStore = useMatchesStore();
+
+const activeTab = ref<'new' | 'saved' | 'deleted'>('new');
 const selectedMatch = ref<SimpleMatch | null>(null);
 const showDetailModal = ref(false);
+const showChat = ref(false);
+const selectedUserId = ref('');
+const selectedUsername = ref('');
 
-onMounted(() => {
-  matchesStore.findMatches();
+onMounted(async () => {
+  await matchesStore.loadAllMatches();
 });
+
+// Tabs configuration
+const tabs = computed(() => [
+  {
+    id: 'new' as const,
+    label: 'NUEVOS',
+    icon: '🔴',
+    count: matchesStore.newMatches.length,
+  },
+  {
+    id: 'saved' as const,
+    label: 'MIS MATCHES',
+    icon: '💾',
+    count: matchesStore.savedMatches.length,
+  },
+  {
+    id: 'deleted' as const,
+    label: 'ELIMINADOS',
+    icon: '🗑️',
+    count: matchesStore.deletedMatches.length,
+  },
+]);
+
+// Get current tab matches
+const currentMatches = computed(() => {
+  switch (activeTab.value) {
+    case 'new': return matchesStore.newMatches;
+    case 'saved': return matchesStore.savedMatches;
+    case 'deleted': return matchesStore.deletedMatches;
+  }
+});
+
+// Header text by tab
+const tabTitle = computed(() => {
+  switch (activeTab.value) {
+    case 'new': return 'NUEVOS MATCHES';
+    case 'saved': return 'MIS MATCHES GUARDADOS';
+    case 'deleted': return 'MATCHES ELIMINADOS';
+  }
+});
+
+const tabDescription = computed(() => {
+  switch (activeTab.value) {
+    case 'new': return 'Matches que no has gestionado. Se borran automáticamente en 15 días.';
+    case 'saved': return 'Matches a los que marcaste como "Me interesa". Contacta para negociar.';
+    case 'deleted': return 'Matches que eliminaste. Se borran permanentemente en 15 días.';
+  }
+});
+
+// Handlers
+const handleTabChange = (tabId: 'new' | 'saved' | 'deleted') => {
+  activeTab.value = tabId;
+};
+
+const handleSaveMatch = async (match: SimpleMatch) => {
+  await matchesStore.saveMatch(match);
+};
+
+const handleDiscardMatch = async (matchId: string, tab: 'new' | 'saved') => {
+  const confirmed = tab === 'new'
+      ? confirm('¿Eliminar este match? Se borrará en 15 días.')
+      : confirm('¿Eliminar este match de tus guardados? Se borrará en 15 días.');
+
+  if (confirmed) {
+    await matchesStore.discardMatch(matchId, tab);
+  }
+};
+
+const handleContactMatch = (match: SimpleMatch) => {
+  selectedUserId.value = match.otherUserId;
+  selectedUsername.value = match.otherUsername;
+  showChat.value = true;
+};
+
+const handleCompleteMatch = async (matchId: string) => {
+  const confirmed = confirm('¿Marcar este match como completado? Se eliminará de tu lista.');
+  if (confirmed) {
+    await matchesStore.completeMatch(matchId);
+  }
+};
+
+const handleRecoverMatch = async (matchId: string) => {
+  const confirmed = confirm('¿Recuperar este match a tu lista de nuevos?');
+  if (confirmed) {
+    await matchesStore.recoverMatch(matchId);
+  }
+};
+
+const handlePermanentDelete = async (matchId: string) => {
+  const confirmed = confirm('⚠️ ¿Eliminar permanentemente? Esta acción no se puede deshacer.');
+  if (confirmed) {
+    await matchesStore.permanentDelete(matchId);
+  }
+};
 
 const handleViewDetails = (match: SimpleMatch) => {
   selectedMatch.value = match;
   showDetailModal.value = true;
 };
 
-const handleContact = () => {
-  if (selectedMatch.value) {
-    // Show a toast and close modal
-    const toast = useAuthStore; // no-op to satisfy linter if unused
-    alert(`Contactando a ${selectedMatch.value.otherUsername}...`);
-    showDetailModal.value = false;
-  }
+const handleCloseChat = () => {
+  showChat.value = false;
 };
 
-// helper for visuals (reuse logic consistent with MatchDetailModal)
-const getVisualFor = (match: SimpleMatch) => {
-  // decide which object to inspect: otherCard / otherPreference / myCard / myPreference
-  const obj = match.otherCard || match.otherPreference || match.myCard || match.myPreference;
-  if (!obj) return { border: 'border-silver-30', label: '' };
-  if (obj.type) {
-    const t = String(obj.type).toUpperCase();
-    if (t === 'VENDO') return { border: 'border-rust', label: 'VENDO' };
-    if (t === 'CAMBIO') return { border: 'border-silver', label: 'CAMBIO' };
-    if (t === 'BUSCO') return { border: 'border-neon', label: 'BUSCO' };
-  }
-  if (obj.status) {
-    const s = String(obj.status).toLowerCase();
-    if (s === 'sell') return { border: 'border-rust', label: 'VENDO' };
-    if (s === 'trade') return { border: 'border-silver', label: 'CAMBIO' };
-    if (s === 'busco') return { border: 'border-neon', label: 'BUSCO' };
-    if (s === 'collection') return { border: 'border-silver-20', label: 'COLECCIÓN' };
-  }
-  return { border: 'border-silver-30', label: '' };
-};
+const unseenCount = computed(() => matchesStore.getUnseenCount());
 </script>
 
 <template>
   <AppContainer>
     <div>
-      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MATCHES</h1>
-      <p class="text-small md:text-body text-silver-70 mb-6 md:mb-8">
-        Bienvenido, {{ authStore.user?.username }}
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-h2 md:text-h1 font-bold text-silver">MATCHES</h1>
+        <div v-if="unseenCount > 0" class="flex items-center gap-2 px-3 py-2 bg-rust-5 border border-rust">
+          <span class="w-2 h-2 bg-rust rounded-full animate-pulse"></span>
+          <span class="text-tiny text-rust font-bold">{{ unseenCount }} nuevo{{ unseenCount !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+
+      <p class="text-small md:text-body text-silver-70 mb-6">
+        {{ tabDescription }}
       </p>
 
+      <!-- Tabs -->
+      <MatchTabsContainer :tabs="tabs" @tab-change="handleTabChange" />
+
+      <!-- Content -->
       <BaseLoader v-if="matchesStore.loading" size="large" />
 
-      <div v-else-if="matchesStore.matches.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
+      <div v-else-if="currentMatches.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
         <p class="text-small md:text-body text-silver-70">
-          No hay matches disponibles aún.
+          <span v-if="activeTab === 'new'">No hay matches nuevos por el momento.</span>
+          <span v-else-if="activeTab === 'saved'">No tienes matches guardados.</span>
+          <span v-else>No hay matches eliminados.</span>
         </p>
         <p class="text-tiny md:text-small text-silver-50 mt-2">
-          Agrega cartas a tu colección y establece preferencias para comenzar.
+          <span v-if="activeTab === 'new'">Agrega cartas a tu colección y establece preferencias para generar matches.</span>
+          <span v-else-if="activeTab === 'saved'">Marca matches como "Me interesa" para guardarlos aquí.</span>
+          <span v-else>Los matches que elimines aparecerán aquí durante 15 días.</span>
         </p>
       </div>
 
       <div v-else class="space-y-3 md:space-y-4">
-        <div v-for="match in matchesStore.matches" :key="match.id" class="bg-primary border border-silver-30 p-4 md:p-6">
-          <div :class="['flex items-center gap-4', 'border', getVisualFor(match).border]">
-            <img v-if="match.otherCard?.image || match.myCard?.image" :src="match.otherCard?.image || match.myCard?.image" :alt="match.otherCard?.name || match.myCard?.name || 'card'" class="w-20 h-24 object-cover rounded" />
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <router-link
-                    :to="{ name: 'userProfile', params: { userId: match.otherUserId } }"
-                    class="text-small md:text-body font-bold text-silver hover:underline"
-                  >
-                    {{ match.otherUsername }}
-                  </router-link>
-                  <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
-                    Quiere: {{ match.otherPreference?.name }}
-                  </p>
-                  <p class="text-tiny md:text-small text-silver-70 mt-1" v-else>
-                    Tiene: {{ match.otherCard?.name }}
-                  </p>
-                </div>
-                <div>
-                  <span class="block text-tiny text-silver-70 mr-2">{{ getVisualFor(match).label }}</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <BaseButton
-                  size="small"
-                  @click="handleViewDetails(match)"
-                  class="w-full md:w-auto"
-              >
-                VER DETALLES
-              </BaseButton>
-            </div>
-          </div>
-         </div>
-       </div>
+        <MatchCard
+            v-for="match in currentMatches"
+            :key="match.docId || match.id"
+            :match="match"
+            :tab="activeTab"
+            @save="handleSaveMatch"
+            @discard="handleDiscardMatch"
+            @contact="handleContactMatch"
+            @complete="handleCompleteMatch"
+            @recover="handleRecoverMatch"
+            @delete="handlePermanentDelete"
+        />
+      </div>
 
+      <!-- Modals -->
       <MatchDetailModal
           :show="showDetailModal"
           :match="selectedMatch"
           @close="showDetailModal = false"
-          @contact="handleContact"
+      />
+
+      <ChatModal
+          :show="showChat"
+          :other-user-id="selectedUserId"
+          :other-username="selectedUsername"
+          @close="handleCloseChat"
       />
     </div>
   </AppContainer>
 </template>
+
+<style scoped>
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+</style>

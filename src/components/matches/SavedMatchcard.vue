@@ -36,37 +36,61 @@
 
     <!-- Action Buttons -->
     <div class="flex gap-sm md:gap-md flex-wrap">
-      <!-- Contactar Button -->
-      <button
-          @click="handleContactar"
-          class="btn-primary px-lg py-md text-small font-bold transition-fast"
-      >
-        CONTACTAR
-      </button>
+      <!-- NUEVOS Tab -->
+      <template v-if="tab === 'new'">
+        <button
+            @click="$emit('save', match)"
+            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
+        >
+          ✓ ME INTERESA
+        </button>
+        <button
+            @click="$emit('discard', match.id, 'new')"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
+        >
+          ✕ IGNORAR
+        </button>
+      </template>
 
-      <!-- Ver Perfil Button -->
-      <button
-          @click="$emit('ver-perfil')"
-          class="btn-secondary px-lg py-md text-small font-bold transition-fast"
-      >
-        VER PERFIL
-      </button>
+      <!-- SAVED Tab (MIS MATCHES) -->
+      <template v-if="tab === 'saved'">
+        <button
+            @click="handleContactar"
+            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
+        >
+          💬 CONTACTAR
+        </button>
 
-      <!-- Marcar Completado Button -->
-      <button
-          @click="$emit('marcar-completado', match.id)"
-          class="btn-secondary px-lg py-md text-small font-bold transition-fast"
-      >
-        COMPLETADO
-      </button>
+        <button
+            @click="$emit('marcar-completado', match.id)"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
+        >
+          ✓ COMPLETADO
+        </button>
 
-      <!-- Eliminar Button -->
-      <button
-          @click="$emit('descartar', match.id)"
-          class="btn-danger px-lg py-md text-small font-bold transition-fast"
-      >
-        ELIMINAR
-      </button>
+        <button
+            @click="$emit('descartar', match.id)"
+            class="btn-danger px-lg py-md text-small font-bold transition-fast"
+        >
+          ✕ ELIMINAR
+        </button>
+      </template>
+
+      <!-- DELETED Tab -->
+      <template v-if="tab === 'deleted'">
+        <button
+            @click="$emit('recover', match.id)"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
+        >
+          ↩️ RECUPERAR
+        </button>
+        <button
+            @click="$emit('delete', match.id)"
+            class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1"
+        >
+          🗑️ ELIMINAR
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -86,15 +110,19 @@ interface Match {
 
 interface Props {
   match: Match
+  tab: 'new' | 'saved' | 'deleted'
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
+  save: [match: Match]
+  discard: [matchId: string, tab: 'new']
   contactar: [contact: { username: string; email: string; location: string }]
-  'ver-perfil': []
   'marcar-completado': [matchId: string]
   descartar: [matchId: string]
+  recover: [matchId: string]
+  delete: [matchId: string]
 }>()
 
 const formattedDate = computed(() => {

@@ -1,151 +1,145 @@
 <template>
-  <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40 transition-normal">
-    <!-- Header -->
+  <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40">
+    <!-- Header with Username and Location -->
     <div class="flex justify-between items-start mb-md">
       <div>
-        <h3 class="text-h5 text-silver font-bold">{{ match.otherUsername }}</h3>
-        <p class="text-tiny text-silver-70 mt-xs">{{ match.otherLocation }}</p>
+        <h3 class="text-h3 text-silver font-bold">{{ match.username }}</h3>
+        <p class="text-small text-silver-70">📍 {{ match.location || 'Ubicación no disponible' }}</p>
       </div>
-      <div v-if="match.compatibility" class="text-right">
-        <p class="text-h5 text-neon font-bold">{{ match.compatibility }}%</p>
-        <p class="text-tiny text-silver-50">compatibilidad</p>
-      </div>
+      <span class="text-tiny text-silver-50">{{ formattedDate }}</span>
     </div>
 
-    <!-- Divider -->
     <div class="border-b border-silver-20 mb-md"></div>
 
-    <!-- Cards Section -->
+    <!-- Cards Section with Compact Images -->
     <div class="grid grid-cols-2 gap-md mb-md">
-      <!-- Tu Lado / You Offer -->
+      <!-- What They Want (Tu oferta) -->
       <div>
-        <p class="text-tiny font-bold text-silver mb-sm uppercase tracking-wide">Tú Ofreces</p>
+        <p class="text-tiny font-bold text-silver mb-sm">QUEREMOS:</p>
         <div class="space-y-xs">
-          <div v-for="card in yourCards" :key="card" class="text-tiny text-silver flex items-start gap-xs">
-            <span class="text-neon">•</span>
-            <span>{{ card }}</span>
+          <div v-if="theyWant && theyWant.length > 0">
+            <div v-for="card in theyWant" :key="`want-${card.name}`">
+              <!-- Card Image - 25% size -->
+              <div v-if="card.image" class="mb-xs w-1/4">
+                <img
+                    :src="card.image"
+                    :alt="card.name"
+                    class="w-full h-auto border border-silver-20 object-cover aspect-[3/4]"
+                />
+              </div>
+              <!-- Card Info -->
+              <p class="text-tiny text-silver font-medium">{{ card.name }}</p>
+              <p class="text-tiny text-silver-70">x{{ card.quantity }} | {{ card.condition }}</p>
+            </div>
           </div>
+          <div v-else class="text-small text-silver-50">N/A</div>
         </div>
       </div>
 
-      <!-- Su Lado / They Offer -->
+      <!-- What We Offer (Su oferta) -->
       <div>
-        <p class="text-tiny font-bold text-silver mb-sm uppercase tracking-wide">Recibes</p>
+        <p class="text-tiny font-bold text-silver mb-sm">OFRECEN:</p>
         <div class="space-y-xs">
-          <div v-for="card in theirCards" :key="card" class="text-tiny text-silver flex items-start gap-xs">
-            <span class="text-neon">•</span>
-            <span>{{ card }}</span>
+          <div v-if="weOffer && weOffer.length > 0">
+            <div v-for="card in weOffer" :key="`offer-${card.name}`">
+              <!-- Card Image - 25% size -->
+              <div v-if="card.image" class="mb-xs w-1/4">
+                <img
+                    :src="card.image"
+                    :alt="card.name"
+                    class="w-full h-auto border border-silver-20 object-cover aspect-[3/4]"
+                />
+              </div>
+              <!-- Card Info -->
+              <p class="text-tiny text-silver font-medium">{{ card.name }}</p>
+              <p class="text-tiny text-silver-70">x{{ card.quantity }} | {{ card.condition }}</p>
+            </div>
           </div>
+          <div v-else class="text-small text-silver-50">N/A</div>
         </div>
       </div>
     </div>
-
-    <!-- Values Section (if available) -->
-    <div v-if="match.yourValue !== undefined && match.theirValue !== undefined" class="grid grid-cols-2 gap-md mb-md">
-      <div class="bg-primary border border-silver-20 p-sm">
-        <p class="text-tiny text-silver-70 mb-xs">TU VALOR</p>
-        <p class="text-h5 text-neon font-bold">${{ match.yourValue }}</p>
-      </div>
-      <div class="bg-primary border border-silver-20 p-sm">
-        <p class="text-tiny text-silver-70 mb-xs">SU VALOR</p>
-        <p class="text-h5 text-neon font-bold">${{ match.theirValue }}</p>
-      </div>
-    </div>
-
-    <!-- Match Info -->
-    <div v-if="match.compatibility" class="mb-md">
-      <p class="text-tiny text-silver-50 text-center">
-        {{ match.compatibility }}% de compatibilidad
-      </p>
-    </div>
-
-    <!-- Divider -->
-    <div class="border-b border-silver-20 mb-md"></div>
 
     <!-- Action Buttons -->
-    <div class="flex gap-sm flex-wrap">
-      <!-- NUEVOS Tab Actions -->
+    <div class="flex gap-sm md:gap-md flex-wrap">
+      <!-- NUEVOS Tab -->
       <template v-if="tab === 'new'">
         <button
             @click="$emit('save', match)"
-            class="btn-primary flex-1 py-md text-tiny font-bold transition-fast"
+            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
         >
           ✓ ME INTERESA
         </button>
         <button
             @click="$emit('discard', match.id, 'new')"
-            class="btn-secondary flex-1 py-md text-tiny font-bold transition-fast"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
         >
           ✕ IGNORAR
         </button>
       </template>
 
-      <!-- SAVED Tab Actions -->
+      <!-- SAVED Tab (MIS MATCHES) -->
       <template v-if="tab === 'saved'">
         <button
-            @click="$emit('contact', match)"
-            class="btn-primary flex-1 py-md text-tiny font-bold transition-fast"
+            @click="$emit('contactar', { username: match.username, email: match.email, location: match.location })"
+            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
         >
           💬 CONTACTAR
         </button>
+
         <button
-            @click="$emit('complete', match.id)"
-            class="btn-secondary flex-1 py-md text-tiny font-bold transition-fast"
+            @click="$emit('marcar-completado', match.id)"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
         >
           ✓ COMPLETADO
         </button>
+
         <button
-            @click="$emit('discard', match.id, 'saved')"
-            class="btn-danger py-md px-md text-tiny font-bold transition-fast"
+            @click="$emit('descartar', match.id)"
+            class="btn-danger px-lg py-md text-small font-bold transition-fast"
         >
-          ✕
+          ✕ ELIMINAR
         </button>
       </template>
 
-      <!-- DELETED Tab Actions -->
+      <!-- DELETED Tab -->
       <template v-if="tab === 'deleted'">
         <button
             @click="$emit('recover', match.id)"
-            class="btn-secondary flex-1 py-md text-tiny font-bold transition-fast"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
         >
           ↩️ RECUPERAR
         </button>
         <button
             @click="$emit('delete', match.id)"
-            class="btn-danger flex-1 py-md text-tiny font-bold transition-fast"
+            class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1"
         >
           🗑️ ELIMINAR
         </button>
       </template>
     </div>
-
-    <!-- Info Message -->
-    <p class="text-tiny text-silver-50 text-center mt-md">
-      <span v-if="tab === 'new'">Guardado: {{ formatDate(match.createdAt) }}</span>
-      <span v-else-if="tab === 'saved'">Guardado: {{ formatDate(match.savedAt) }}</span>
-      <span v-else>Eliminado: {{ formatDate(match.deletedAt) }}</span>
-    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 
+interface Card {
+  name: string
+  quantity?: number
+  condition?: string
+  image?: string | null
+  [key: string]: any
+}
+
 interface Match {
   id: string
-  docId?: string
-  otherUserId: string
-  otherUsername: string
-  otherLocation: string
-  type: 'BUSCO' | 'CAMBIO' | 'VENDO'
-  compatibility?: number
-  yourCards?: string[]
-  theirCards?: string[]
-  yourValue?: number
-  theirValue?: number
-  createdAt?: any
-  savedAt?: any
-  deletedAt?: any
+  username: string
+  location?: string
+  email?: string
+  myCard?: Card | null
+  otherPreference?: Card | null
+  [key: string]: any
 }
 
 interface Props {
@@ -157,28 +151,73 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   save: [match: Match]
-  discard: [matchId: string, tab: 'new' | 'saved']
-  contact: [match: Match]
-  complete: [matchId: string]
+  discard: [matchId: string, tab: 'new']
+  contactar: [contact: { username: string; email?: string; location?: string }]
+  'marcar-completado': [matchId: string]
+  descartar: [matchId: string]
   recover: [matchId: string]
   delete: [matchId: string]
 }>()
 
-const yourCards = computed(() => {
-  return props.match.yourCards || []
+// Lo que ELLOS QUIEREN (nuestra oferta)
+const theyWant = computed(() => {
+  const cards: Card[] = []
+
+  // Si nosotros ofrecemos una carta (myCard)
+  if (props.match.myCard) {
+    const card = {
+      name: props.match.myCard.name || 'Carta desconocida',
+      quantity: props.match.myCard.quantity || 1,
+      condition: props.match.myCard.condition || 'M',
+      image: props.match.myCard.image || null
+    }
+    console.log('theyWant card:', card)
+    cards.push(card)
+  }
+
+  return cards.length > 0 ? cards : null
 })
 
-const theirCards = computed(() => {
-  return props.match.theirCards || []
+// Lo que NOSOTROS QUEREMOS (su oferta)
+const weOffer = computed(() => {
+  const cards: Card[] = []
+
+  // Si ellos ofrecen una preferencia (otherPreference)
+  if (props.match.otherPreference) {
+    const card = {
+      name: props.match.otherPreference.name || 'Carta desconocida',
+      quantity: props.match.otherPreference.quantity || 1,
+      condition: props.match.otherPreference.condition || 'M',
+      image: props.match.otherPreference.image || null
+    }
+    console.log('weOffer card:', card)
+    cards.push(card)
+  }
+
+  return cards.length > 0 ? cards : null
 })
 
-const formatDate = (date: any) => {
-  if (!date) return 'N/A'
-  if (typeof date === 'string') return date
-  if (date.toDate) return date.toDate().toLocaleDateString('es-AR')
-  if (date instanceof Date) return date.toLocaleDateString('es-AR')
-  return 'N/A'
-}
+const formattedDate = computed(() => {
+  if (!props.match.createdAt) return 'reciente'
+
+  try {
+    const now = new Date()
+    const created = typeof props.match.createdAt === 'string'
+        ? new Date(props.match.createdAt)
+        : props.match.createdAt instanceof Date
+            ? props.match.createdAt
+            : props.match.createdAt?.toDate?.() || new Date()
+
+    const diff = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (diff === 0) return 'hoy'
+    if (diff === 1) return 'ayer'
+    if (diff < 0) return 'reciente'
+    return `hace ${diff}d`
+  } catch (e) {
+    return 'reciente'
+  }
+})
 </script>
 
 <style scoped>

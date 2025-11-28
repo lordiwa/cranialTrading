@@ -1,189 +1,121 @@
-<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import AppContainer from '../components/layout/AppContainer.vue';
-import BaseLoader from '../components/ui/BaseLoader.vue';
-import MatchTabsContainer from '../components/matches/MatchTabsContainer.vue';
-import MatchCard from '../components/matches/MatchCard.vue';
-import MatchDetailModal from '../components/matches/MatchDetailModal.vue';
-import ChatModal from '../components/chat/ChatModal.vue';
-import { useAuthStore } from '../stores/auth';
-import { useMatchesStore, type SimpleMatch } from '../stores/matches';
-
-const authStore = useAuthStore();
-const matchesStore = useMatchesStore();
-
-const activeTab = ref<'new' | 'saved' | 'deleted'>('new');
-const selectedMatch = ref<SimpleMatch | null>(null);
-const showDetailModal = ref(false);
-const showChat = ref(false);
-const selectedUserId = ref('');
-const selectedUsername = ref('');
-
-onMounted(async () => {
-  await matchesStore.loadAllMatches();
-});
-
-// Tabs configuration
-const tabs = computed(() => [
-  {
-    id: 'new' as const,
-    label: 'NUEVOS',
-    icon: '🔴',
-    count: matchesStore.newMatches.length,
-  },
-  {
-    id: 'saved' as const,
-    label: 'MIS MATCHES',
-    icon: '💾',
-    count: matchesStore.savedMatches.length,
-  },
-  {
-    id: 'deleted' as const,
-    label: 'ELIMINADOS',
-    icon: '🗑️',
-    count: matchesStore.deletedMatches.length,
-  },
-]);
-
-// Get current tab matches
-const currentMatches = computed(() => {
-  switch (activeTab.value) {
-    case 'new': return matchesStore.newMatches;
-    case 'saved': return matchesStore.savedMatches;
-    case 'deleted': return matchesStore.deletedMatches;
-  }
-});
-
-// Header text by tab
-const tabTitle = computed(() => {
-  switch (activeTab.value) {
-    case 'new': return 'NUEVOS MATCHES';
-    case 'saved': return 'MIS MATCHES GUARDADOS';
-    case 'deleted': return 'MATCHES ELIMINADOS';
-  }
-});
-
-const tabDescription = computed(() => {
-  switch (activeTab.value) {
-    case 'new': return 'Matches que no has gestionado. Se borran automáticamente en 15 días.';
-    case 'saved': return 'Matches a los que marcaste como "Me interesa". Contacta para negociar.';
-    case 'deleted': return 'Matches que eliminaste. Se borran permanentemente en 15 días.';
-  }
-});
-
-// Handlers
-const handleTabChange = (tabId: 'new' | 'saved' | 'deleted') => {
-  activeTab.value = tabId;
-};
-
-const handleSaveMatch = async (match: SimpleMatch) => {
-  await matchesStore.saveMatch(match);
-};
-
-const handleDiscardMatch = async (matchId: string, tab: 'new' | 'saved') => {
-  const confirmed = tab === 'new'
-      ? confirm('¿Eliminar este match? Se borrará en 15 días.')
-      : confirm('¿Eliminar este match de tus guardados? Se borrará en 15 días.');
-
-  if (confirmed) {
-    await matchesStore.discardMatch(matchId, tab);
-  }
-};
-
-const handleContactMatch = (match: SimpleMatch) => {
-  selectedUserId.value = match.otherUserId;
-  selectedUsername.value = match.otherUsername;
-  showChat.value = true;
-};
-
-const handleCompleteMatch = async (matchId: string) => {
-  const confirmed = confirm('¿Marcar este match como completado? Se eliminará de tu lista.');
-  if (confirmed) {
-    await matchesStore.completeMatch(matchId);
-  }
-};
-
-const handleRecoverMatch = async (matchId: string) => {
-  const confirmed = confirm('¿Recuperar este match a tu lista de nuevos?');
-  if (confirmed) {
-    await matchesStore.recoverMatch(matchId);
-  }
-};
-
-const handlePermanentDelete = async (matchId: string) => {
-  const confirmed = confirm('⚠️ ¿Eliminar permanentemente? Esta acción no se puede deshacer.');
-  if (confirmed) {
-    await matchesStore.permanentDelete(matchId);
-  }
-};
-
-const handleViewDetails = (match: SimpleMatch) => {
-  selectedMatch.value = match;
-  showDetailModal.value = true;
-};
-
-const handleCloseChat = () => {
-  showChat.value = false;
-};
-
-const unseenCount = computed(() => matchesStore.getUnseenCount());
-</script>
-
 <template>
   <AppContainer>
     <div>
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-md md:gap-lg mb-lg md:mb-xl">
-        <!-- CHANGE: gap-4 → gap-md, mb-6 md:mb-8 → mb-lg md:mb-xl -->
-        <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver">MATCHES</h1>
-          <p class="text-small md:text-body text-silver-70 mt-sm">
-            <!-- ADDED: mt-sm for spacing after title -->
-            {{ tabDescription }}
-          </p>
+      <!-- Header -->
+      <div class="mb-lg md:mb-xl">
+        <h1 class="text-h2 md:text-h1 font-bold text-silver">MATCHES</h1>
+        <p class="text-small md:text-body text-silver-70 mt-sm">
+          {{ totalMatches }} matches
+        </p>
+      </div>
+
+      <!-- Tabs Navigation -->
+      <div class="flex gap-lg mb-xl border-b border-silver-20">
+        <button
+            @click="activeTab = 'nuevos'"
+            :class="[
+              'pb-md border-b-2 transition-fast',
+              activeTab === 'nuevos' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
+            ]"
+        >
+          <span class="flex items-center gap-sm">
+            🔴 NUEVOS
+            <span class="text-tiny">{{ matchesStore.newMatches.length }}</span>
+          </span>
+        </button>
+        <button
+            @click="activeTab = 'saved'"
+            :class="[
+              'pb-md border-b-2 transition-fast',
+              activeTab === 'saved' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
+            ]"
+        >
+          <span class="flex items-center gap-sm">
+            ⭐ MIS MATCHES
+            <span class="text-tiny">{{ matchesStore.savedMatches.length }}</span>
+          </span>
+        </button>
+        <button
+            @click="activeTab = 'deleted'"
+            :class="[
+              'pb-md border-b-2 transition-fast',
+              activeTab === 'deleted' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
+            ]"
+        >
+          <span class="flex items-center gap-sm">
+            🗑️ ELIMINADOS
+            <span class="text-tiny">{{ matchesStore.deletedMatches.length }}</span>
+          </span>
+        </button>
+      </div>
+
+      <!-- Tab Content - NUEVOS -->
+      <div v-if="activeTab === 'nuevos'">
+        <div v-if="matchesStore.newMatches.length === 0" class="text-center py-xl">
+          <p class="text-body text-silver-70">No tienes matches nuevos</p>
+        </div>
+        <div v-else class="space-y-md">
+          <MatchCard
+              v-for="match in matchesStore.newMatches"
+              :key="match.id || match.docId"
+              :match="normalizeMatch(match)"
+              :tab="'new'"
+              @save="handleSaveMatch"
+              @discard="handleDiscardMatch"
+              @contactar="handleContactar"
+              @marcar-completado="handleCompleteMatch"
+              @descartar="handleDiscardMatch"
+              @recover="handleRecoverMatch"
+              @delete="handlePermanentDelete"
+          />
         </div>
       </div>
 
-      <!-- Tabs -->
-      <MatchTabsContainer :tabs="tabs" @tab-change="handleTabChange" />
-
-      <!-- Content -->
-      <BaseLoader v-if="matchesStore.loading" size="large" />
-
-      <div v-else-if="currentMatches.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
-        <p class="text-small md:text-body text-silver-70">
-          <span v-if="activeTab === 'new'">No hay matches nuevos por el momento.</span>
-          <span v-else-if="activeTab === 'saved'">No tienes matches guardados.</span>
-          <span v-else>No hay matches eliminados.</span>
-        </p>
-        <p class="text-tiny md:text-small text-silver-50 mt-2">
-          <span v-if="activeTab === 'new'">Agrega cartas a tu colección y establece preferencias para generar matches.</span>
-          <span v-else-if="activeTab === 'saved'">Marca matches como "Me interesa" para guardarlos aquí.</span>
-          <span v-else>Los matches que elimines aparecerán aquí durante 15 días.</span>
-        </p>
+      <!-- Tab Content - SAVED (MIS MATCHES) -->
+      <div v-if="activeTab === 'saved'">
+        <div v-if="matchesStore.savedMatches.length === 0" class="text-center py-xl">
+          <p class="text-body text-silver-70">No tienes matches guardados</p>
+        </div>
+        <div v-else class="space-y-md">
+          <MatchCard
+              v-for="match in matchesStore.savedMatches"
+              :key="match.id || match.docId"
+              :match="normalizeMatch(match)"
+              :tab="'saved'"
+              @save="handleSaveMatch"
+              @discard="handleDiscardMatch"
+              @contactar="handleContactar"
+              @marcar-completado="handleCompleteMatch"
+              @descartar="handleDiscardMatch"
+              @recover="handleRecoverMatch"
+              @delete="handlePermanentDelete"
+          />
+        </div>
       </div>
 
-      <div v-else class="space-y-3 md:space-y-4">
-        <MatchCard
-            v-for="match in currentMatches"
-            :key="match.docId || match.id"
-            :match="match"
-            :tab="activeTab"
-            @save="handleSaveMatch"
-            @discard="handleDiscardMatch"
-            @contact="handleContactMatch"
-            @complete="handleCompleteMatch"
-            @recover="handleRecoverMatch"
-            @delete="handlePermanentDelete"
-        />
+      <!-- Tab Content - DELETED -->
+      <div v-if="activeTab === 'deleted'">
+        <div v-if="matchesStore.deletedMatches.length === 0" class="text-center py-xl">
+          <p class="text-body text-silver-70">No tienes matches eliminados</p>
+        </div>
+        <div v-else class="space-y-md">
+          <MatchCard
+              v-for="match in matchesStore.deletedMatches"
+              :key="match.id || match.docId"
+              :match="normalizeMatch(match)"
+              :tab="'deleted'"
+              @save="handleSaveMatch"
+              @discard="handleDiscardMatch"
+              @contactar="handleContactar"
+              @marcar-completado="handleCompleteMatch"
+              @descartar="handleDiscardMatch"
+              @recover="handleRecoverMatch"
+              @delete="handlePermanentDelete"
+          />
+        </div>
       </div>
 
-      <!-- Modals -->
-      <MatchDetailModal
-          :show="showDetailModal"
-          :match="selectedMatch"
-          @close="showDetailModal = false"
-      />
-
+      <!-- Chat Modal -->
       <ChatModal
           :show="showChat"
           :other-user-id="selectedUserId"
@@ -194,17 +126,90 @@ const unseenCount = computed(() => matchesStore.getUnseenCount());
   </AppContainer>
 </template>
 
-<style scoped>
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import AppContainer from '../components/layout/AppContainer.vue'
+import MatchCard from '../components/matches/MatchCard.vue'
+import ChatModal from '../components/chat/ChatModal.vue'
+import { useMatchesStore } from '../stores/matches'
+
+const matchesStore = useMatchesStore()
+const activeTab = ref<'nuevos' | 'saved' | 'deleted'>('saved')
+const showChat = ref(false)
+const selectedUserId = ref('')
+const selectedUsername = ref('')
+
+// Cargar matches al montar
+onMounted(async () => {
+  await matchesStore.loadAllMatches()
+})
+
+const totalMatches = computed(() => {
+  return matchesStore.newMatches.length + matchesStore.savedMatches.length + matchesStore.deletedMatches.length
+})
+
+// Normalizar match: asegurar que tenga propiedades requeridas
+const normalizeMatch = (match: any) => {
+  return {
+    id: match.docId || match.id,
+    username: match.otherUsername || 'Usuario',
+    location: match.otherLocation || '',
+    email: match.otherEmail || '',
+    myCard: match.myCard || null,
+    otherPreference: match.otherPreference || null,
+    createdAt: match.createdAt,
+    ...match // Incluir todos los otros campos por si acaso
   }
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+// Event Handlers
+const handleSaveMatch = async (match: any) => {
+  const originalMatch = matchesStore.newMatches.find(m => (m.docId || m.id) === (match.id || match.docId))
+  if (originalMatch) {
+    await matchesStore.saveMatch(originalMatch)
+  }
 }
+
+const handleDiscardMatch = async (matchId: string, tab?: 'new' | 'saved') => {
+  const tabToUse = tab || (activeTab.value === 'nuevos' ? 'new' : 'saved')
+  const confirmed = confirm('¿Eliminar este match? Se borrará en 15 días.')
+  if (confirmed) {
+    await matchesStore.discardMatch(matchId, tabToUse as 'new' | 'saved')
+  }
+}
+
+const handleContactar = (contact: any) => {
+  selectedUserId.value = matchesStore.savedMatches.find(m => m.otherUsername === contact.username)?.otherUserId || ''
+  selectedUsername.value = contact.username
+  showChat.value = true
+}
+
+const handleCompleteMatch = async (matchId: string) => {
+  const confirmed = confirm('¿Marcar este match como completado?')
+  if (confirmed) {
+    await matchesStore.completeMatch(matchId)
+  }
+}
+
+const handleRecoverMatch = async (matchId: string) => {
+  const confirmed = confirm('¿Recuperar este match?')
+  if (confirmed) {
+    await matchesStore.recoverMatch(matchId)
+  }
+}
+
+const handlePermanentDelete = async (matchId: string) => {
+  const confirmed = confirm('⚠️ ¿Eliminar permanentemente?')
+  if (confirmed) {
+    await matchesStore.permanentDelete(matchId)
+  }
+}
+
+const handleCloseChat = () => {
+  showChat.value = false
+}
+</script>
+
+<style scoped>
+/* All styles in global style.css */
 </style>

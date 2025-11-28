@@ -48,72 +48,36 @@ const publicIconClass = computed(() => {
 
 <template>
   <div
-      :class="['relative bg-primary p-3 md:p-4 hover:border-neon-40 transition-normal cursor-pointer', 'border', statusBorderClass]"
-      @mouseenter="showActions = true"
-      @mouseleave="showActions = false"
-      @click="handleCardClick"
+      :class="[
+        'relative bg-primary p-md md:p-lg hover:border-neon-40 transition-normal cursor-pointer',
+        'border',
+        statusBorderClass
+      ]"
   >
-    <!-- Public / Private icon -->
-    <div class="absolute top-2 right-2" :title="props.card.public ? 'Pública' : 'Privada'">
-      <svg v-if="props.card.public" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" :class="publicIconClass">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-        <circle cx="12" cy="12" r="3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" :class="publicIconClass">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-        <circle cx="12" cy="12" r="3" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-        <line x1="3" y1="3" x2="21" y2="21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </div>
-
     <img
         v-if="card.image"
         :src="card.image"
         :alt="card.name"
-        class="w-full aspect-[3/4] object-cover mb-2 md:mb-3"
+        class="w-full aspect-[3/4] object-cover mb-sm md:mb-md"
     />
 
     <div>
       <p class="text-tiny md:text-small font-bold text-silver line-clamp-2">{{ card.name }}</p>
-      <p class="text-tiny text-silver-70 mt-1 line-clamp-1">{{ card.edition }}</p>
+      <p class="text-tiny text-silver-70 mt-xs line-clamp-1">{{ card.edition }}</p>
+      <!-- CHANGE: mt-1 → mt-xs (4px) -->
 
-      <div class="flex items-center gap-2 mt-2 text-tiny md:text-small">
+      <div class="flex items-center gap-sm mt-sm text-tiny md:text-small">
+        <!-- CHANGE: gap-2 → gap-sm, mt-2 → mt-sm -->
         <span class="font-bold text-neon">x{{ card.quantity }}</span>
         <span class="text-silver-70">|</span>
         <span class="text-silver-70">{{ card.condition }}</span>
-        <span v-if="card.foil" class="text-neon">| FOIL</span>
       </div>
 
-      <div class="flex items-center justify-between mt-2">
+      <div class="flex items-center justify-between mt-sm">
+        <!-- CHANGE: mt-2 → mt-sm -->
         <p class="text-small font-bold text-neon">${{ card.price.toFixed(2) }}</p>
-        <div>
-          <BaseBadge :variant="card.status === 'sell' ? 'vendo' : card.status === 'trade' ? 'cambio' : card.status === 'busco' ? 'busco' : 'solo'">
-            {{ card.status === 'sell' ? 'VENDO' : card.status === 'trade' ? 'CAMBIO' : card.status === 'busco' ? 'BUSCO' : 'COLECCIÓN' }}
-          </BaseBadge>
-        </div>
       </div>
     </div>
-
-    <Transition name="fade">
-      <div v-if="showActions" class="flex flex-col md:flex-row gap-2 mt-3" @click.stop>
-        <BaseButton
-            variant="secondary"
-            size="small"
-            @click="handleEdit"
-            class="flex-1 w-full"
-        >
-          EDITAR
-        </BaseButton>
-        <BaseButton
-            variant="danger"
-            size="small"
-            @click="handleDelete"
-            class="flex-1 w-full"
-        >
-          ELIMINAR
-        </BaseButton>
-      </div>
-    </Transition>
   </div>
 </template>
 

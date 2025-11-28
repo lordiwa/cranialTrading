@@ -1,227 +1,186 @@
-<script setup lang="ts">
-import { computed } from 'vue';
-import { SimpleMatch } from '../../stores/matches';
-import MatchCountdownBadge from './MatchCountdownBadge.vue';
-import BaseButton from '../ui/BaseButton.vue';
-import BaseBadge from '../ui/BaseBadge.vue';
-
-const props = defineProps<{
-  match: SimpleMatch;
-  tab: 'new' | 'saved' | 'deleted';
-}>();
-
-const emit = defineEmits<{
-  'save': [match: SimpleMatch];
-  'discard': [matchId: string, tab: 'new' | 'saved'];
-  'contact': [];
-  'complete': [matchId: string];
-  'recover': [matchId: string];
-  'delete': [matchId: string];
-}>();
-
-// Determinar borde izquierdo según estado
-const borderLeftClass = computed(() => {
-  if (props.tab === 'new') return 'border-l-4 border-l-rust';
-  if (props.tab === 'saved') return 'border-l-4 border-l-silver';
-  return 'border-l-4 border-l-silver-30';
-});
-
-// Color de fondo sutil según estado
-const bgClass = computed(() => {
-  if (props.tab === 'new') return 'bg-rust-5';
-  return 'bg-primary';
-});
-
-// Helper para obtener visuals (tipo de preferencia/status)
-const getVisualFor = (obj: any) => {
-  if (!obj) return { badge: 'solo', label: 'COLECCIÓN' };
-
-  if (obj.type) {
-    const t = String(obj.type).toUpperCase();
-    if (t === 'VENDO') return { badge: 'vendo', label: 'VENDO' };
-    if (t === 'CAMBIO') return { badge: 'cambio', label: 'CAMBIO' };
-    if (t === 'BUSCO') return { badge: 'busco', label: 'BUSCO' };
-  }
-
-  if (obj.status) {
-    const s = String(obj.status).toLowerCase();
-    if (s === 'sell') return { badge: 'vendo', label: 'VENDO' };
-    if (s === 'trade') return { badge: 'cambio', label: 'CAMBIO' };
-    if (s === 'busco') return { badge: 'busco', label: 'BUSCO' };
-    if (s === 'collection') return { badge: 'solo', label: 'COLECCIÓN' };
-  }
-
-  return { badge: 'solo', label: 'COLECCIÓN' };
-};
-
-// Determinar objeto a mostrar (card o preferencia)
-const displayObject = computed(() => {
-  if (props.match.type === 'VENDO') {
-    return { card: props.match.myCard, pref: props.match.otherPreference };
-  } else {
-    return { card: props.match.otherCard, pref: props.match.myPreference };
-  }
-});
-
-// Es match nuevo (< 24 horas)
-const isNewMatch = computed(() => {
-  if (!props.match.createdAt) return false;
-  const now = new Date();
-  const created = props.match.createdAt instanceof Date
-      ? props.match.createdAt
-      : new Date(props.match.createdAt);
-  const diff = now.getTime() - created.getTime();
-  return diff < 24 * 60 * 60 * 1000;
-});
-
-// Determinar qué mostrar (imagen + nombre)
-const displayCard = computed(() => {
-  return displayObject.value.card || displayObject.value.pref;
-});
-
-const displayImage = computed(() => {
-  return displayCard.value?.image || '';
-});
-
-const displayName = computed(() => {
-  return displayCard.value?.name || 'Sin nombre';
-});
-</script>
-
 <template>
-  <div :class="['bg-primary border border-silver-30 p-4 md:p-5 transition-normal', borderLeftClass, bgClass]">
-    <!-- Header: Usuario + Info -->
-    <div class="flex items-start justify-between gap-3 mb-3">
-      <div class="flex-1">
-        <router-link
-            :to="{ name: 'userProfile', params: { userId: match.otherUserId } }"
-            class="text-small md:text-body font-bold text-silver hover:text-neon transition-fast"
-        >
-          {{ match.otherUsername }}
-        </router-link>
-        <p v-if="match.otherLocation" class="text-tiny text-silver-70">
-          📍 {{ match.otherLocation }}
-        </p>
+  <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40 transition-normal">
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-md">
+      <div>
+        <h3 class="text-h5 text-silver font-bold">{{ match.otherUsername }}</h3>
+        <p class="text-tiny text-silver-70 mt-xs">{{ match.otherLocation }}</p>
       </div>
-
-      <!-- Badge NUEVO + Countdown -->
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <MatchCountdownBadge
-            :created-at="match.createdAt"
-            :life-expires-at="match.lifeExpiresAt"
-            :is-new="tab === 'new' && isNewMatch"
-        />
+      <div v-if="match.compatibility" class="text-right">
+        <p class="text-h5 text-neon font-bold">{{ match.compatibility }}%</p>
+        <p class="text-tiny text-silver-50">compatibilidad</p>
       </div>
     </div>
 
-    <!-- Card preview -->
-    <div v-if="displayCard" class="border border-silver-30 p-3 md:p-4 mb-3 flex gap-3">
-      <img
-          v-if="displayImage"
-          :src="displayImage"
-          :alt="displayName"
-          class="w-16 h-20 md:w-20 md:h-24 object-cover flex-shrink-0"
-      />
-      <div class="flex-1 min-w-0">
-        <p class="text-small md:text-body font-bold text-silver line-clamp-2">
-          {{ displayName }}
-        </p>
-        <p class="text-tiny text-silver-70 mt-1">
-          {{ displayCard.edition }}
-        </p>
+    <!-- Divider -->
+    <div class="border-b border-silver-20 mb-md"></div>
 
-        <div class="flex items-center gap-2 mt-2 flex-wrap">
-          <span class="text-tiny font-bold text-neon">x{{ displayCard.quantity }}</span>
-          <span class="text-silver-70">|</span>
-          <span class="text-tiny text-silver-70">{{ displayCard.condition }}</span>
-          <BaseBadge :variant="getVisualFor(displayCard).badge">
-            {{ getVisualFor(displayCard).label }}
-          </BaseBadge>
+    <!-- Cards Section -->
+    <div class="grid grid-cols-2 gap-md mb-md">
+      <!-- Tu Lado / You Offer -->
+      <div>
+        <p class="text-tiny font-bold text-silver mb-sm uppercase tracking-wide">Tú Ofreces</p>
+        <div class="space-y-xs">
+          <div v-for="card in yourCards" :key="card" class="text-tiny text-silver flex items-start gap-xs">
+            <span class="text-neon">•</span>
+            <span>{{ card }}</span>
+          </div>
         </div>
+      </div>
 
-        <p v-if="displayCard.price" class="text-tiny text-neon mt-2 font-bold">
-          ${{ parseFloat(displayCard.price).toFixed(2) }}
-        </p>
+      <!-- Su Lado / They Offer -->
+      <div>
+        <p class="text-tiny font-bold text-silver mb-sm uppercase tracking-wide">Recibes</p>
+        <div class="space-y-xs">
+          <div v-for="card in theirCards" :key="card" class="text-tiny text-silver flex items-start gap-xs">
+            <span class="text-neon">•</span>
+            <span>{{ card }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Descripción del tipo de match -->
-    <p class="text-tiny text-silver-50 mb-4 px-0.5">
-      <span v-if="match.type === 'VENDO'">
-        💰 Este usuario quiere tu {{ match.myCard?.name || 'carta' }}
-      </span>
-      <span v-else>
-        🔍 Buscas {{ match.myPreference?.name || 'esta carta' }} que tiene este usuario
-      </span>
-    </p>
+    <!-- Values Section (if available) -->
+    <div v-if="match.yourValue !== undefined && match.theirValue !== undefined" class="grid grid-cols-2 gap-md mb-md">
+      <div class="bg-primary border border-silver-20 p-sm">
+        <p class="text-tiny text-silver-70 mb-xs">TU VALOR</p>
+        <p class="text-h5 text-neon font-bold">${{ match.yourValue }}</p>
+      </div>
+      <div class="bg-primary border border-silver-20 p-sm">
+        <p class="text-tiny text-silver-70 mb-xs">SU VALOR</p>
+        <p class="text-h5 text-neon font-bold">${{ match.theirValue }}</p>
+      </div>
+    </div>
 
-    <!-- Botones según tab -->
-    <div class="flex flex-col md:flex-row gap-2">
-      <!-- TAB: NUEVOS -->
+    <!-- Match Info -->
+    <div v-if="match.compatibility" class="mb-md">
+      <p class="text-tiny text-silver-50 text-center">
+        {{ match.compatibility }}% de compatibilidad
+      </p>
+    </div>
+
+    <!-- Divider -->
+    <div class="border-b border-silver-20 mb-md"></div>
+
+    <!-- Action Buttons -->
+    <div class="flex gap-sm flex-wrap">
+      <!-- NUEVOS Tab Actions -->
       <template v-if="tab === 'new'">
-        <BaseButton
-            variant="secondary"
-            size="small"
-            @click="emit('discard', match.docId || '', 'new')"
-            class="flex-1"
+        <button
+            @click="$emit('save', match)"
+            class="btn-primary flex-1 py-md text-tiny font-bold transition-fast"
         >
-          ELIMINAR
-        </BaseButton>
-        <BaseButton
-            size="small"
-            @click="emit('save', match)"
-            class="flex-1"
+          ✓ ME INTERESA
+        </button>
+        <button
+            @click="$emit('discard', match.id, 'new')"
+            class="btn-secondary flex-1 py-md text-tiny font-bold transition-fast"
         >
-          ME INTERESA
-        </BaseButton>
+          ✕ IGNORAR
+        </button>
       </template>
 
-      <!-- TAB: MIS MATCHES -->
+      <!-- SAVED Tab Actions -->
       <template v-if="tab === 'saved'">
-        <BaseButton
-            size="small"
-            @click="emit('contact')"
-            class="flex-1"
+        <button
+            @click="$emit('contact', match)"
+            class="btn-primary flex-1 py-md text-tiny font-bold transition-fast"
         >
-          CONTACTAR
-        </BaseButton>
-        <BaseButton
-            variant="secondary"
-            size="small"
-            @click="emit('complete', match.docId || '')"
-            class="flex-1"
+          💬 CONTACTAR
+        </button>
+        <button
+            @click="$emit('complete', match.id)"
+            class="btn-secondary flex-1 py-md text-tiny font-bold transition-fast"
         >
-          COMPLETADO
-        </BaseButton>
-        <BaseButton
-            variant="danger"
-            size="small"
-            @click="emit('discard', match.docId || '', 'saved')"
-            class="flex-1"
+          ✓ COMPLETADO
+        </button>
+        <button
+            @click="$emit('discard', match.id, 'saved')"
+            class="btn-danger py-md px-md text-tiny font-bold transition-fast"
         >
-          ELIMINAR
-        </BaseButton>
+          ✕
+        </button>
       </template>
 
-      <!-- TAB: ELIMINADOS -->
+      <!-- DELETED Tab Actions -->
       <template v-if="tab === 'deleted'">
-        <BaseButton
-            variant="secondary"
-            size="small"
-            @click="emit('recover', match.docId || '')"
-            class="flex-1"
+        <button
+            @click="$emit('recover', match.id)"
+            class="btn-secondary flex-1 py-md text-tiny font-bold transition-fast"
         >
-          RECUPERAR
-        </BaseButton>
-        <BaseButton
-            variant="danger"
-            size="small"
-            @click="emit('delete', match.docId || '')"
-            class="flex-1"
+          ↩️ RECUPERAR
+        </button>
+        <button
+            @click="$emit('delete', match.id)"
+            class="btn-danger flex-1 py-md text-tiny font-bold transition-fast"
         >
-          ELIMINAR
-        </BaseButton>
+          🗑️ ELIMINAR
+        </button>
       </template>
     </div>
+
+    <!-- Info Message -->
+    <p class="text-tiny text-silver-50 text-center mt-md">
+      <span v-if="tab === 'new'">Guardado: {{ formatDate(match.createdAt) }}</span>
+      <span v-else-if="tab === 'saved'">Guardado: {{ formatDate(match.savedAt) }}</span>
+      <span v-else>Eliminado: {{ formatDate(match.deletedAt) }}</span>
+    </p>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+
+interface Match {
+  id: string
+  docId?: string
+  otherUserId: string
+  otherUsername: string
+  otherLocation: string
+  type: 'BUSCO' | 'CAMBIO' | 'VENDO'
+  compatibility?: number
+  yourCards?: string[]
+  theirCards?: string[]
+  yourValue?: number
+  theirValue?: number
+  createdAt?: any
+  savedAt?: any
+  deletedAt?: any
+}
+
+interface Props {
+  match: Match
+  tab: 'new' | 'saved' | 'deleted'
+}
+
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  save: [match: Match]
+  discard: [matchId: string, tab: 'new' | 'saved']
+  contact: [match: Match]
+  complete: [matchId: string]
+  recover: [matchId: string]
+  delete: [matchId: string]
+}>()
+
+const yourCards = computed(() => {
+  return props.match.yourCards || []
+})
+
+const theirCards = computed(() => {
+  return props.match.theirCards || []
+})
+
+const formatDate = (date: any) => {
+  if (!date) return 'N/A'
+  if (typeof date === 'string') return date
+  if (date.toDate) return date.toDate().toLocaleDateString('es-AR')
+  if (date instanceof Date) return date.toLocaleDateString('es-AR')
+  return 'N/A'
+}
+</script>
+
+<style scoped>
+/* All styles in global style.css */
+</style>

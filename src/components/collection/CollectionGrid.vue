@@ -14,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-md md:gap-lg">
     <CollectionCard
         v-for="card in cards"
         :key="card.id"

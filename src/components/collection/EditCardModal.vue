@@ -103,10 +103,10 @@ const handleSave = () => {
     <div class="w-full max-w-md">
       <h2 class="text-h2 font-bold text-silver mb-6">EDITAR CARTA</h2>
 
-      <div v-if="!editingCard" class="space-y-4">
+      <div v-if="!editingCard" class="space-y-md">
         <!-- Card preview -->
-        <div class="border border-silver-30 p-4">
-          <div class="flex gap-4">
+        <div class="border border-silver-30 p-lg">
+          <div class="flex gap-lg">
             <img
                 v-if="form.image"
                 :src="form.image"
@@ -134,7 +134,7 @@ const handleSave = () => {
           CAMBIAR CARTA / EDICIÓN
         </BaseButton>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-lg">
           <div>
             <label class="text-small font-bold text-silver mb-2 block">Cantidad</label>
             <BaseInput
@@ -165,7 +165,7 @@ const handleSave = () => {
           />
         </div>
 
-        <div class="space-y-2">
+        <div class="space-y-xs">
           <label class="flex items-center gap-3 text-small text-silver cursor-pointer">
             <input
                 v-model="form.foil"
@@ -185,7 +185,7 @@ const handleSave = () => {
           </label>
         </div>
 
-        <div class="flex gap-3 mt-6">
+        <div class="flex gap-md mt-6">
           <BaseButton
               variant="secondary"
               class="flex-1"
@@ -203,7 +203,7 @@ const handleSave = () => {
       </div>
 
       <!-- Card selection -->
-      <div v-else class="space-y-4">
+      <div v-else class="space-y-md">
         <BaseInput
             v-model="searchQuery"
             placeholder="Buscar nueva carta..."
@@ -214,14 +214,14 @@ const handleSave = () => {
           <BaseLoader size="small" />
         </div>
 
-        <div v-if="searchResults.length > 0" class="max-h-64 overflow-y-auto space-y-2">
+        <div v-if="searchResults.length > 0" class="max-h-64 overflow-y-auto space-y-xs">
           <div
               v-for="card in searchResults"
               :key="card.id"
               @click="selectCard(card)"
-              class="border border-silver-30 p-3 hover:border-neon transition-fast cursor-pointer"
+              class="border border-silver-30 p-sm hover:border-neon transition-fast cursor-pointer"
           >
-            <div class="flex gap-3">
+            <div class="flex gap-md">
               <img
                   v-if="card.image_uris?.small"
                   :src="card.image_uris.small"
@@ -239,7 +239,7 @@ const handleSave = () => {
           </div>
         </div>
 
-        <div class="flex gap-3">
+        <div class="flex gap-md">
           <BaseButton
               variant="secondary"
               class="flex-1"

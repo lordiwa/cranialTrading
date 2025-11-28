@@ -46,7 +46,7 @@ const handleSendReset = async () => {
         </div>
       </div>
 
-      <div v-else class="bg-primary border border-silver-30 p-8 space-y-6">
+      <div v-else class="bg-primary border border-silver-30 p-8 space-y-lg">
         <p class="text-small text-silver-70">
           Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
         </p>

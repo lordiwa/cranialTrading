@@ -1,51 +1,56 @@
-<script setup lang="ts">
-import { ref } from 'vue';
-
-interface Tab {
-  id: 'new' | 'saved' | 'deleted';
-  label: string;
-  icon: string;
-  count: number;
-}
-
-const props = defineProps<{
-  tabs: Tab[];
-}>();
-
-const emit = defineEmits<{
-  'tab-change': [tabId: 'new' | 'saved' | 'deleted'];
-}>();
-
-const activeTab = ref<'new' | 'saved' | 'deleted'>('new');
-
-const handleTabClick = (tabId: 'new' | 'saved' | 'deleted') => {
-  activeTab.value = tabId;
-  emit('tab-change', tabId);
-};
-</script>
-
 <template>
-  <div class="border-b border-silver-20 mb-6">
-    <div class="flex gap-1 md:gap-2">
+  <div class="w-full">
+    <!-- Tabs Navigation -->
+    <div class="flex gap-sm md:gap-md mb-lg md:mb-xl border-b border-silver-20 overflow-x-auto">
       <button
           v-for="tab in tabs"
           :key="tab.id"
-          @click="handleTabClick(tab.id)"
+          @click="handleTabChange(tab.id)"
           :class="[
-            'px-4 md:px-6 py-3 text-small font-bold transition-fast border-b-2 whitespace-nowrap',
-            activeTab === tab.id
-              ? 'border-b-neon text-neon'
-              : 'border-b-transparent text-silver-70 hover:text-silver'
-          ]"
+          'pb-md border-b-2 transition-fast whitespace-nowrap font-bold text-small md:text-body flex items-center gap-sm',
+          modelValue === tab.id
+            ? 'border-neon text-neon'
+            : 'border-transparent text-silver-70 hover:text-silver'
+        ]"
       >
-        <span class="mr-2">{{ tab.icon }}</span>
+        <span>{{ tab.icon }}</span>
         <span>{{ tab.label }}</span>
-        <span class="ml-2 inline-block px-2 py-1 text-tiny font-bold" :class="[
-          activeTab === tab.id ? 'bg-neon-10 text-neon' : 'bg-silver-10 text-silver-50'
-        ]">
+        <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-none">
           {{ tab.count }}
         </span>
       </button>
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+interface Tab {
+  id: 'new' | 'saved' | 'deleted'
+  label: string
+  icon: string
+  count: number
+}
+
+interface Props {
+  tabs: Tab[]
+  modelValue?: 'new' | 'saved' | 'deleted'
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: 'new'
+})
+
+const emit = defineEmits<{
+  'tab-change': [tabId: 'new' | 'saved' | 'deleted']
+  'update:modelValue': [tabId: 'new' | 'saved' | 'deleted']
+}>()
+
+const handleTabChange = (tabId: 'new' | 'saved' | 'deleted') => {
+  emit('tab-change', tabId)
+  emit('update:modelValue', tabId)
+}
+</script>
+
+<style scoped>
+/* All styles in global style.css */
+</style>

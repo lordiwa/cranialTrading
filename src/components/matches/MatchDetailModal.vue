@@ -77,7 +77,7 @@ const getVisualFor = (obj: any) => {
     <div v-if="match" class="w-full max-w-md">
       <h2 class="text-h2 font-bold text-silver mb-6">DETALLES DEL MATCH</h2>
 
-      <div class="space-y-6">
+      <div class="space-y-lg">
         <!-- Usuario -->
         <div>
           <p class="text-small font-bold text-silver-70 mb-2">USUARIO</p>
@@ -92,7 +92,7 @@ const getVisualFor = (obj: any) => {
         <!-- Si es VENDO (otro user quiere mis cartas) -->
         <div v-if="match.type === 'VENDO'">
           <p class="text-small font-bold text-silver-70 mb-2">TÚ TIENES</p>
-          <div v-if="match.myCard" :class="['bg-primary-dark p-4 rounded', getVisualFor(match.myCard).border]">
+          <div v-if="match.myCard" :class="['bg-primary-dark p-md rounded', getVisualFor(match.myCard).border]">
             <div class="flex gap-4">
               <img v-if="match.myCard.image" :src="match.myCard.image" class="w-20 h-24 object-cover rounded" />
               <div class="flex-1">
@@ -113,7 +113,7 @@ const getVisualFor = (obj: any) => {
           </div>
 
           <p class="text-small font-bold text-silver-70 mt-4 mb-2">QUIERE</p>
-          <div v-if="match.otherPreference" :class="['bg-primary-dark p-4 rounded', getVisualFor(match.otherPreference).border]">
+          <div v-if="match.otherPreference" :class="['bg-primary-dark p-md rounded', getVisualFor(match.otherPreference).border]">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-body font-bold text-silver">{{ match.otherPreference.name }}</p>
@@ -131,7 +131,7 @@ const getVisualFor = (obj: any) => {
         <!-- Si es BUSCO (otro user tiene mis preferencias) -->
         <div v-else>
           <p class="text-small font-bold text-silver-70 mb-2">TÚ BUSCAS</p>
-          <div v-if="match.myPreference" class="bg-primary-dark p-4 rounded border border-silver-30">
+          <div v-if="match.myPreference" class="bg-primary-dark p-md rounded border border-silver-30">
             <p class="text-body font-bold text-silver">{{ match.myPreference.name }}</p>
             <p class="text-small text-silver-70 mt-1">{{ match.myPreference.edition }}</p>
             <div class="flex gap-4 mt-3 text-tiny text-silver-50">
@@ -141,7 +141,7 @@ const getVisualFor = (obj: any) => {
           </div>
 
           <p class="text-small font-bold text-silver-70 mt-4 mb-2">TIENE</p>
-          <div v-if="match.otherCard" :class="['bg-primary-dark p-4 rounded', getVisualFor(match.otherCard).border]">
+          <div v-if="match.otherCard" :class="['bg-primary-dark p-md rounded', getVisualFor(match.otherCard).border]">
             <div class="flex gap-4">
               <img v-if="match.otherCard.image" :src="match.otherCard.image" class="w-20 h-24 object-cover rounded" />
               <div class="flex-1">

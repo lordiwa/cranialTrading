@@ -30,7 +30,7 @@ const formatDate = (date: Date) => {
 </script>
 
 <template>
-  <div class="bg-primary border border-silver-30 p-4 md:p-5">
+  <div class="bg-primary border border-silver-30 p-md md:p-5">
     <div class="flex items-start justify-between mb-3">
       <BaseBadge :variant="getVariant(preference.type)">
         {{ preference.type }}

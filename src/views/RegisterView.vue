@@ -70,8 +70,8 @@ onMounted(() => {
       <div v-if="registered" class="bg-primary border border-silver-30 p-8">
         <h2 class="text-h2 font-bold text-silver mb-6">VERIFICA TU EMAIL</h2>
 
-        <div class="space-y-6">
-          <div class="bg-primary-dark border border-silver-30 p-4">
+        <div class="space-y-lg">
+          <div class="bg-primary-dark border border-silver-30 p-md">
             <p class="text-small text-silver-70">
               Te hemos enviado un email a <span class="text-neon font-bold">{{ email }}</span>
             </p>
@@ -80,7 +80,7 @@ onMounted(() => {
             </p>
           </div>
 
-          <div class="space-y-3">
+          <div class="space-y-sm">
             <BaseButton
                 @click="handleCheckVerification"
                 :disabled="checkingVerification"
@@ -114,7 +114,7 @@ onMounted(() => {
       <div v-else class="bg-primary border border-silver-30 p-8">
         <h2 class="text-h2 font-bold text-silver mb-6">REGISTRARSE</h2>
 
-        <form @submit.prevent="handleRegister" class="space-y-4">
+        <form @submit.prevent="handleRegister" class="space-y-md">
           <BaseInput
               v-model="email"
               type="email"

@@ -104,7 +104,7 @@ onUnmounted(() => {
   <BaseModal :show="show" @close="handleClose">
     <div class="w-full max-w-md h-96 flex flex-col bg-primary-dark rounded">
       <!-- Header -->
-      <div class="p-4 border-b border-silver-30 flex items-center justify-between">
+      <div class="p-md border-b border-silver-30 flex items-center justify-between">
         <div>
           <p class="text-body font-bold text-silver">{{ otherUsername }}</p>
           <p class="text-tiny text-silver-50">En línea</p>
@@ -115,7 +115,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Messages -->
-      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-md space-y-sm">
         <BaseLoader v-if="messagesStore.loading" size="small" />
 
         <div v-if="sortedMessages.length === 0 && !messagesStore.loading" class="text-center py-8">
@@ -141,7 +141,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Input -->
-      <div class="p-4 border-t border-silver-30 flex gap-2">
+      <div class="p-md border-t border-silver-30 flex gap-2">
         <BaseInput
             v-model="messageInput"
             placeholder="Escribe un mensaje..."

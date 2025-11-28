@@ -20,9 +20,9 @@ const successRate = Math.round((props.success / props.total) * 100);
 
 <template>
   <BaseModal :show="show" title="RESULTADOS DE IMPORTACIÓN" @close="emit('cancel')">
-    <div class="space-y-4">
+    <div class="space-y-md">
       <!-- Resumen -->
-      <div class="border border-silver-30 p-4">
+      <div class="border border-silver-30 p-md">
         <div class="grid grid-cols-3 gap-4 text-center">
           <div>
             <p class="text-tiny text-silver-70">TOTAL</p>
@@ -48,7 +48,7 @@ const successRate = Math.round((props.success / props.total) * 100);
       <!-- Cartas no encontradas -->
       <div v-if="errors.length > 0">
         <p class="text-small font-bold text-silver-70 mb-2">CARTAS NO ENCONTRADAS</p>
-        <div class="border border-rust p-4 max-h-48 overflow-y-auto bg-primary-dark">
+        <div class="border border-rust p-md max-h-48 overflow-y-auto bg-primary-dark">
           <ul class="space-y-1">
             <li v-for="(error, index) in errors" :key="index" class="text-tiny text-rust">
               • {{ error }}
@@ -58,7 +58,7 @@ const successRate = Math.round((props.success / props.total) * 100);
       </div>
 
       <!-- Mensaje -->
-      <div class="border border-silver-30 p-4 bg-primary-dark">
+      <div class="border border-silver-30 p-md bg-primary-dark">
         <p class="text-small text-silver">
           ¿Deseas agregar las <span class="text-neon font-bold">{{ success }} cartas correctas</span> a tu colección?
         </p>

@@ -7,9 +7,6 @@ import {
     deleteDoc,
     doc,
     updateDoc,
-    query,
-    where,
-    Timestamp
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
@@ -39,6 +36,60 @@ const getExpirationDate = () => {
     return date;
 };
 
+/**
+ * Factory: Create a clean, serializable match payload
+ * Extracts only the fields we need from ANY match source
+ */
+function createCleanMatchPayload(match: SimpleMatch, overrides: any = {}) {
+    // Helper to extract card fields
+    const cleanCard = (card: any) => {
+        if (!card) return null;
+        return {
+            scryfallId: card.scryfallId || '',
+            name: card.name || '',
+            edition: card.edition || '',
+            quantity: card.quantity || 0,
+            condition: card.condition || 'NM',
+            foil: card.foil || false,
+            price: typeof card.price === 'number' ? card.price : 0,
+            image: card.image || '',
+            status: card.status || 'collection',
+        };
+    };
+
+    // Helper to extract preference fields
+    const cleanPref = (pref: any) => {
+        if (!pref) return null;
+        return {
+            scryfallId: pref.scryfallId || '',
+            name: pref.name || '',
+            type: pref.type || 'BUSCO',
+            quantity: pref.quantity || 0,
+            condition: pref.condition || 'NM',
+            edition: pref.edition || '',
+            image: pref.image || '',
+        };
+    };
+
+    const payload: any = {
+        id: match.id || '',
+        type: match.type || 'BUSCO',
+        otherUserId: match.otherUserId || '',
+        otherUsername: match.otherUsername || '',
+        otherLocation: match.otherLocation || '',
+        status: match.status || 'nuevo',
+        createdAt: match.createdAt instanceof Date ? match.createdAt : new Date(),
+        lifeExpiresAt: match.lifeExpiresAt instanceof Date ? match.lifeExpiresAt : new Date(),
+        myCard: cleanCard(match.myCard),
+        otherCard: cleanCard(match.otherCard),
+        myPreference: cleanPref(match.myPreference),
+        otherPreference: cleanPref(match.otherPreference),
+    };
+
+    // Apply overrides
+    return { ...payload, ...overrides };
+}
+
 export const useMatchesStore = defineStore('matches', () => {
     const newMatches = ref<SimpleMatch[]>([]);
     const savedMatches = ref<SimpleMatch[]>([]);
@@ -46,6 +97,56 @@ export const useMatchesStore = defineStore('matches', () => {
     const loading = ref(false);
     const authStore = useAuthStore();
     const toastStore = useToastStore();
+
+    /**
+     * Helper to safely convert any value to a Date
+     */
+    const toDate = (value: any): Date => {
+        if (!value) return new Date();
+        if (value instanceof Date) return value;
+        if (typeof value.toDate === 'function') return value.toDate(); // Firestore Timestamp
+        if (typeof value === 'number') return new Date(value); // Unix timestamp
+        if (typeof value === 'string') return new Date(value); // ISO string
+        return new Date(); // fallback
+    };
+
+    /**
+     * Helper to calculate expiration date (createdAt + 15 days)
+     */
+    const calculateExpirationDate = (createdAt: Date): Date => {
+        const date = new Date(createdAt);
+        date.setDate(date.getDate() + MATCH_LIFETIME_DAYS);
+        return date;
+    };
+
+    /**
+     * Convert Firestore document data to a clean SimpleMatch object
+     */
+    const parseFirestoreMatch = (docId: string, data: any): SimpleMatch => {
+        const createdAt = toDate(data.createdAt);
+
+        // If lifeExpiresAt is missing or invalid, calculate from createdAt + 15 days
+        let lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
+        if (!lifeExpiresAt || isNaN(lifeExpiresAt.getTime())) {
+            lifeExpiresAt = calculateExpirationDate(createdAt);
+        }
+
+        return {
+            id: data.id || '',
+            type: data.type || 'BUSCO',
+            otherUserId: data.otherUserId || '',
+            otherUsername: data.otherUsername || '',
+            otherLocation: data.otherLocation,
+            myCard: data.myCard,
+            otherCard: data.otherCard,
+            myPreference: data.myPreference,
+            otherPreference: data.otherPreference,
+            createdAt: createdAt,
+            status: data.status,
+            lifeExpiresAt: lifeExpiresAt,
+            docId: docId,
+        };
+    };
 
     /**
      * Carga matches de las 3 colecciones y limpia expirados
@@ -65,30 +166,11 @@ export const useMatchesStore = defineStore('matches', () => {
                 getDocs(collection(db, 'users', authStore.user.id, 'matches_eliminados')),
             ]);
 
-            newMatches.value = newDocs.docs.map(doc => ({
-                ...doc.data() as SimpleMatch,
-                docId: doc.id,
-                createdAt: doc.data().createdAt?.toDate() || new Date(),
-                lifeExpiresAt: doc.data().lifeExpiresAt?.toDate(),
-                status: 'nuevo',
-            }));
-
-            savedMatches.value = savedDocs.docs.map(doc => ({
-                ...doc.data() as SimpleMatch,
-                docId: doc.id,
-                createdAt: doc.data().createdAt?.toDate() || new Date(),
-                lifeExpiresAt: doc.data().lifeExpiresAt?.toDate(),
-                status: 'activo',
-            }));
-
-            deletedMatches.value = deletedDocs.docs.map(doc => ({
-                ...doc.data() as SimpleMatch,
-                docId: doc.id,
-                createdAt: doc.data().createdAt?.toDate() || new Date(),
-                lifeExpiresAt: doc.data().lifeExpiresAt?.toDate(),
-                status: 'eliminado',
-            }));
-        } catch (error) {
+            newMatches.value = newDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            savedMatches.value = savedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            deletedMatches.value = deletedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+        } catch (error: any) {
+            console.error('loadAllMatches error:', error);
             toastStore.show('Error al cargar matches', 'error');
         } finally {
             loading.value = false;
@@ -109,17 +191,23 @@ export const useMatchesStore = defineStore('matches', () => {
                 const colRef = collection(db, 'users', authStore.user.id, colName);
                 const snapshot = await getDocs(colRef);
 
-                for (const doc of snapshot.docs) {
-                    const data = doc.data();
-                    const expiresAt = data.lifeExpiresAt?.toDate();
+                for (const docSnap of snapshot.docs) {
+                    const data = docSnap.data();
+                    let expiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
 
-                    if (expiresAt && expiresAt <= now) {
-                        await deleteDoc(doc.ref);
+                    // If no lifeExpiresAt, calculate from createdAt
+                    if (!expiresAt || isNaN(expiresAt.getTime())) {
+                        const createdAt = toDate(data.createdAt);
+                        expiresAt = calculateExpirationDate(createdAt);
+                    }
+
+                    if (expiresAt && expiresAt <= now && !isNaN(expiresAt.getTime())) {
+                        await deleteDoc(docSnap.ref);
                     }
                 }
             }
         } catch (error) {
-            // silent fail on cleanup
+            // silent fail
         }
     };
 
@@ -131,42 +219,32 @@ export const useMatchesStore = defineStore('matches', () => {
 
         try {
             const matchesRef = collection(db, 'users', authStore.user.id, 'matches_guardados');
-
-            const payload = {
-                ...match,
+            const payload = createCleanMatchPayload(match, {
                 status: 'activo',
                 savedAt: new Date(),
                 lifeExpiresAt: getExpirationDate(),
-                docId: undefined,
-            };
+            });
 
             const docRef = await addDoc(matchesRef, payload);
 
             // Eliminar de matches_nuevos si existe
             if (match.docId) {
                 try {
-                    const newRef = doc(db, 'users', authStore.user.id, 'matches_nuevos', match.docId);
-                    await deleteDoc(newRef);
+                    await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', match.docId));
                 } catch {
-                    // silently ignore if doesn't exist
+                    // silently ignore
                 }
             }
 
-            // Notificar al otro usuario
-            await notifyOtherUser(match, 'INTERESADO');
-
             // Actualizar state local
             newMatches.value = newMatches.value.filter(m => m.docId !== match.docId);
-            savedMatches.value.push({
-                ...match,
-                docId: docRef.id,
-                status: 'activo',
-            });
+            savedMatches.value.push({ ...match, docId: docRef.id, status: 'activo' });
 
             toastStore.show('Match guardado ✓', 'success');
             return true;
-        } catch (error) {
-            toastStore.show('Error al guardar match', 'error');
+        } catch (error: any) {
+            console.error('saveMatch error:', error);
+            toastStore.show('Error al guardar match: ' + error.message, 'error');
             return false;
         }
     };
@@ -183,68 +261,62 @@ export const useMatchesStore = defineStore('matches', () => {
                 ? newMatches.value.find(m => m.docId === matchId)
                 : savedMatches.value.find(m => m.docId === matchId);
 
-            if (!match) return false;
+            if (!match) {
+                toastStore.show('Match no encontrado', 'error');
+                return false;
+            }
 
-            // Agregar a eliminados
-            const deletedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados');
-            const payload = {
-                ...match,
+            // Create clean payload for eliminados
+            const payload = createCleanMatchPayload(match, {
                 status: 'eliminado',
                 eliminatedAt: new Date(),
                 lifeExpiresAt: getExpirationDate(),
-                docId: undefined,
-            };
+            });
 
+            // Add to eliminados
+            const deletedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados');
             const docRef = await addDoc(deletedRef, payload);
 
-            // Eliminar de origen
-            const sourceRef = doc(db, 'users', authStore.user.id, source, matchId);
-            await deleteDoc(sourceRef);
+            // Delete from source
+            await deleteDoc(doc(db, 'users', authStore.user.id, source, matchId));
 
-            // Actualizar state local
+            // Update local state
             if (tab === 'new') {
                 newMatches.value = newMatches.value.filter(m => m.docId !== matchId);
             } else {
                 savedMatches.value = savedMatches.value.filter(m => m.docId !== matchId);
             }
-
-            deletedMatches.value.push({
-                ...match,
-                docId: docRef.id,
-                status: 'eliminado',
-            });
+            deletedMatches.value.push({ ...match, docId: docRef.id, status: 'eliminado' });
 
             toastStore.show('Match eliminado. Se borrará en 15 días', 'info');
             return true;
-        } catch (error) {
-            toastStore.show('Error al eliminar match', 'error');
+        } catch (error: any) {
+            console.error('discardMatch error:', error);
+            toastStore.show('Error al eliminar match: ' + error.message, 'error');
             return false;
         }
     };
 
     /**
-     * Completar match - lo elimina de guardados (transacción con colección)
+     * Completar match - lo elimina de guardados
      */
     const completeMatch = async (matchId: string) => {
         if (!authStore.user) return false;
 
         try {
-            const matchRef = doc(db, 'users', authStore.user.id, 'matches_guardados', matchId);
-            await deleteDoc(matchRef);
-
-            // Actualizar state local
+            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_guardados', matchId));
             savedMatches.value = savedMatches.value.filter(m => m.docId !== matchId);
-
             toastStore.show('Match completado ✓', 'success');
             return true;
-        } catch (error) {
-            toastStore.show('Error al completar match', 'error');
+        } catch (error: any) {
+            console.error('completeMatch error:', error);
+            toastStore.show('Error al completar match: ' + error.message, 'error');
             return false;
         }
     };
 
     /**
-     * Recuperar match - mueve de eliminados a nuevos con countdown reseteado
+     * Recuperar match - mueve de eliminados a nuevos
      */
     const recoverMatch = async (matchId: string) => {
         if (!authStore.user) return false;
@@ -253,92 +325,75 @@ export const useMatchesStore = defineStore('matches', () => {
             const match = deletedMatches.value.find(m => m.docId === matchId);
             if (!match) return false;
 
-            // Agregar a matches_nuevos
-            const newRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
-            const payload = {
-                ...match,
+            const payload = createCleanMatchPayload(match, {
                 status: 'nuevo',
                 createdAt: new Date(),
                 lifeExpiresAt: getExpirationDate(),
-                docId: undefined,
-            };
+            });
 
+            const newRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
             const docRef = await addDoc(newRef, payload);
 
-            // Eliminar de eliminados
-            const deletedRef = doc(db, 'users', authStore.user.id, 'matches_eliminados', matchId);
-            await deleteDoc(deletedRef);
+            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', matchId));
 
-            // Actualizar state local
             deletedMatches.value = deletedMatches.value.filter(m => m.docId !== matchId);
-            newMatches.value.push({
-                ...match,
-                docId: docRef.id,
-                status: 'nuevo',
-            });
+            newMatches.value.push({ ...match, docId: docRef.id, status: 'nuevo' });
 
             toastStore.show('Match recuperado', 'success');
             return true;
-        } catch (error) {
-            toastStore.show('Error al recuperar match', 'error');
+        } catch (error: any) {
+            console.error('recoverMatch error:', error);
+            toastStore.show('Error al recuperar match: ' + error.message, 'error');
             return false;
         }
     };
 
     /**
-     * Eliminar permanentemente - borra de eliminados
+     * Eliminar permanentemente
      */
     const permanentDelete = async (matchId: string) => {
         if (!authStore.user) return false;
 
         try {
-            const deletedRef = doc(db, 'users', authStore.user.id, 'matches_eliminados', matchId);
-            await deleteDoc(deletedRef);
-
+            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', matchId));
             deletedMatches.value = deletedMatches.value.filter(m => m.docId !== matchId);
-
             toastStore.show('Eliminado permanentemente', 'success');
             return true;
-        } catch (error) {
-            toastStore.show('Error al eliminar', 'error');
+        } catch (error: any) {
+            console.error('permanentDelete error:', error);
+            toastStore.show('Error al eliminar: ' + error.message, 'error');
             return false;
         }
     };
 
     /**
-     * Marca match como "visto" (solo para nuevos)
+     * Marca match como "visto"
      */
     const markAsSeen = async (matchId: string) => {
         if (!authStore.user) return;
 
         try {
-            const matchRef = doc(db, 'users', authStore.user.id, 'matches_nuevos', matchId);
-            await updateDoc(matchRef, { status: 'visto' });
+            await updateDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', matchId), {
+                status: 'visto',
+            });
 
-            // Actualizar state local
             const match = newMatches.value.find(m => m.docId === matchId);
-            if (match) {
-                match.status = 'visto';
-            }
+            if (match) match.status = 'visto';
         } catch (error) {
             // silent fail
         }
     };
 
     /**
-     * Notificar al otro usuario que alguien le interesa
+     * Notificar al otro usuario
      */
     const notifyOtherUser = async (match: SimpleMatch, notificationType: 'INTERESADO' | 'MATCH_COMPLETADO') => {
         if (!authStore.user) return;
 
         try {
-            // Crear synthetic match en matches_nuevos del otro usuario
             if (notificationType === 'INTERESADO') {
                 const recipientRef = collection(db, 'users', match.otherUserId, 'matches_nuevos');
-
-                // Crear inverso del match
-                const inverseMatch = {
-                    ...match,
+                const payload = createCleanMatchPayload(match, {
                     id: `${match.otherUserId}_${authStore.user.id}_${match.id}`,
                     otherUserId: authStore.user.id,
                     otherUsername: authStore.user.username,
@@ -346,20 +401,16 @@ export const useMatchesStore = defineStore('matches', () => {
                     status: 'nuevo',
                     createdAt: new Date(),
                     lifeExpiresAt: getExpirationDate(),
-                    // swap cards/preferences if needed
                     _notificationOf: match.id,
-                };
+                });
 
-                await addDoc(recipientRef, inverseMatch);
+                await addDoc(recipientRef, payload);
             }
         } catch (error) {
-            // silent fail - no afecta flujo principal
+            // silent fail
         }
     };
 
-    /**
-     * Helper: obtener total de matches por tab
-     */
     const getTotalByTab = (tab: 'new' | 'saved' | 'deleted') => {
         switch (tab) {
             case 'new': return newMatches.value.length;
@@ -368,9 +419,6 @@ export const useMatchesStore = defineStore('matches', () => {
         }
     };
 
-    /**
-     * Helper: obtener matches nuevos sin leer (últimas 24h)
-     */
     const getUnseenCount = () => {
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);

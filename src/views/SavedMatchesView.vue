@@ -1,141 +1,186 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import AppContainer from '../components/layout/AppContainer.vue';
-import BaseLoader from '../components/ui/BaseLoader.vue';
-import BaseButton from '../components/ui/BaseButton.vue';
-import ChatModal from '../components/chat/ChatModal.vue';
-import { useSavedMatchesStore } from '../stores/savedMatches';
-import { useRouter } from 'vue-router';
-
-const savedMatchesStore = useSavedMatchesStore();
-const showChat = ref(false);
-const selectedUserId = ref('');
-const selectedUsername = ref('');
-const router = useRouter();
-
-onMounted(() => {
-  savedMatchesStore.loadSavedMatches();
-});
-
-const handleDelete = async (docId: string) => {
-  if (confirm('¿Eliminar este match de tus guardados?')) {
-    await savedMatchesStore.deleteSavedMatch(docId);
-  }
-};
-
-const handleContact = (userId: string, username: string) => {
-  selectedUserId.value = userId;
-  selectedUsername.value = username;
-  showChat.value = true;
-};
-
-const handleCloseChat = () => {
-  showChat.value = false;
-};
-
-const viewProfile = (id: string) => {
-  if (!id) return;
-  router.push({ name: 'userProfile', params: { userId: id } });
-};
-
-const getVisualFor = (match: any) => {
-  const obj = match.otherCard || match.otherPreference || match.myCard || match.myPreference;
-  if (!obj) return { border: 'border-silver-30', label: '' };
-  if (obj.type) {
-    const t = String(obj.type).toUpperCase();
-    if (t === 'VENDO') return { border: 'border-rust', label: 'VENDO' };
-    if (t === 'CAMBIO') return { border: 'border-silver', label: 'CAMBIO' };
-    if (t === 'BUSCO') return { border: 'border-neon', label: 'BUSCO' };
-  }
-  if (obj.status) {
-    const s = String(obj.status).toLowerCase();
-    if (s === 'sell') return { border: 'border-rust', label: 'VENDO' };
-    if (s === 'trade') return { border: 'border-silver', label: 'CAMBIO' };
-    if (s === 'busco') return { border: 'border-neon', label: 'BUSCO' };
-    if (s === 'collection') return { border: 'border-silver-20', label: 'COLECCIÓN' };
-  }
-  return { border: 'border-silver-30', label: '' };
-};
-</script>
-
 <template>
-  <AppContainer>
+  <div class="min-h-screen bg-primary p-md md:p-lg">
+    <!-- Header -->
+    <div class="mb-lg md:mb-xl">
+      <h1 class="text-h1 text-silver mb-sm">MIS MATCHES</h1>
+      <p class="text-body text-silver-70">{{ matches.length }} matches guardados</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-lg mb-xl border-b border-silver-20">
+      <button
+          @click="activeTab = 'nuevos'"
+          :class="[
+          'pb-md border-b-2 transition-fast',
+          activeTab === 'nuevos' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
+        ]"
+      >
+        <span class="flex items-center gap-sm">
+          🔴 NUEVOS
+          <span class="text-tiny">{{ newMatches.length }}</span>
+        </span>
+      </button>
+      <button
+          @click="activeTab = 'saved'"
+          :class="[
+          'pb-md border-b-2 transition-fast',
+          activeTab === 'saved' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
+        ]"
+      >
+        <span class="flex items-center gap-sm">
+          ⭐ MIS MATCHES
+          <span class="text-tiny">{{ savedMatches.length }}</span>
+        </span>
+      </button>
+      <button
+          @click="activeTab = 'ignored'"
+          :class="[
+          'pb-md border-b-2 transition-fast',
+          activeTab === 'ignored' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
+        ]"
+      >
+        <span class="flex items-center gap-sm">
+          🗑️ ELIMINADOS
+          <span class="text-tiny">{{ ignoredMatches.length }}</span>
+        </span>
+      </button>
+    </div>
+
+    <!-- Tab Content -->
     <div>
-      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MIS MATCHES</h1>
-      <p class="text-small md:text-body text-silver-70 mb-6 md:mb-8">
-        {{ savedMatchesStore.savedMatches.length }} matches guardados
-      </p>
-
-      <BaseLoader v-if="savedMatchesStore.loading" size="large" />
-
-      <div v-else-if="savedMatchesStore.savedMatches.length === 0" class="border border-silver-30 p-6 md:p-8 text-center">
-        <p class="text-small md:text-body text-silver-70">
-          No tienes matches guardados.
-        </p>
-        <p class="text-tiny md:text-small text-silver-50 mt-2">
-          Los matches que marques como "ME INTERESA" aparecerán aquí.
-        </p>
-      </div>
-
-      <div v-else class="space-y-3 md:space-y-4">
-        <div v-for="match in savedMatchesStore.savedMatches" :key="match.docId" class="bg-primary border border-silver-30 p-4 md:p-6">
-          <div :class="['flex items-center gap-4', 'border', getVisualFor(match).border]">
-            <img v-if="match.otherCard?.image || match.myCard?.image" :src="match.otherCard?.image || match.myCard?.image" :alt="match.otherCard?.name || match.myCard?.name || 'card'" class="w-20 h-24 object-cover rounded" />
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-small md:text-body font-bold text-silver">{{ match.otherUsername }}</p>
-                  <p class="text-tiny md:text-small text-silver-70 mt-1" v-if="match.type === 'VENDO'">
-                    Quiere: {{ match.otherPreference?.name }}
-                  </p>
-                  <p class="text-tiny md:text-small text-silver-70 mt-1" v-else>
-                    Tiene: {{ match.otherCard?.name }}
-                  </p>
-                  <p class="text-tiny text-silver-50 mt-2">
-                    Guardado: {{ new Date(match.savedAt).toLocaleDateString() }}
-                  </p>
-                </div>
-                <div>
-                  <span class="block text-tiny text-silver-70 mr-2">{{ getVisualFor(match).label }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-              <BaseButton
-                  size="small"
-                  @click="handleContact(match.otherUserId, match.otherUsername)"
-                  class="w-full md:w-auto"
-              >
-                CONTACTAR
-              </BaseButton>
-              <BaseButton
-                  size="small"
-                  variant="secondary"
-                  @click="() => viewProfile(match.otherUserId)"
-                  class="w-full md:w-auto"
-              >
-                VER PERFIL
-              </BaseButton>
-              <BaseButton
-                  size="small"
-                  variant="danger"
-                  @click="handleDelete(match.docId)"
-                  class="w-full md:w-auto"
-              >
-                ELIMINAR
-              </BaseButton>
-            </div>
-          </div>
+      <!-- Nuevos Tab -->
+      <div v-if="activeTab === 'nuevos'">
+        <div v-if="newMatches.length === 0" class="text-center py-xl">
+          <p class="text-body text-silver-70">No tienes matches nuevos</p>
+        </div>
+        <div v-else class="space-y-md">
+          <SavedMatchCard
+              v-for="match in newMatches"
+              :key="match.id"
+              :match="match"
+              @contactar="openContactModal"
+              @marcar-completado="markCompleted"
+              @descartar="discardMatch"
+          />
         </div>
       </div>
 
-      <!-- Chat Modal -->
-      <ChatModal
-          :show="showChat"
-          :other-user-id="selectedUserId"
-          :other-username="selectedUsername"
-          @close="handleCloseChat"
-      />
+      <!-- Saved Tab (MIS MATCHES) -->
+      <div v-if="activeTab === 'saved'">
+        <div v-if="savedMatches.length === 0" class="text-center py-xl">
+          <p class="text-body text-silver-70">No tienes matches guardados</p>
+        </div>
+        <div v-else class="space-y-md">
+          <SavedMatchCard
+              v-for="match in savedMatches"
+              :key="match.id"
+              :match="match"
+              @contactar="openContactModal"
+              @marcar-completado="markCompleted"
+              @descartar="discardMatch"
+          />
+        </div>
+      </div>
+
+      <!-- Ignored Tab -->
+      <div v-if="activeTab === 'ignored'">
+        <div v-if="ignoredMatches.length === 0" class="text-center py-xl">
+          <p class="text-body text-silver-70">No tienes matches eliminados</p>
+        </div>
+        <div v-else class="space-y-md">
+          <SavedMatchCard
+              v-for="match in ignoredMatches"
+              :key="match.id"
+              :match="match"
+              @contactar="openContactModal"
+              @marcar-completado="markCompleted"
+              @descartar="discardMatch"
+          />
+        </div>
+      </div>
     </div>
-  </AppContainer>
+
+    <!-- Contact Modal -->
+    <ContactModal
+        v-if="showContactModal"
+        :contact="selectedContact"
+        @close="closeContactModal"
+    />
+  </div>
 </template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import SavedMatchCard from '@/components/matches/SavedMatchCard.vue'
+import ContactModal from '@/components/modals/ContactModal.vue'
+
+interface Match {
+  id: string
+  userId: string
+  username: string
+  cardsOffering: string[]
+  cardsReceiving: string[]
+  email: string
+  location: string
+  status: 'new' | 'saved' | 'ignored'
+  createdAt: Date
+}
+
+interface Contact {
+  username: string
+  email: string
+  location: string
+}
+
+const activeTab = ref<'nuevos' | 'saved' | 'ignored'>('saved')
+const showContactModal = ref(false)
+const selectedContact = ref<Contact | null>(null)
+
+// Mock data - replace with actual Firestore data
+const matches = ref<Match[]>([
+  {
+    id: '1',
+    userId: 'user123',
+    username: 'srparca',
+    cardsOffering: ['Wooded Foothills'],
+    cardsReceiving: ['Black Lotus', 'Mox Pearl'],
+    email: 'srparca@example.com',
+    location: 'Buenos Aires, Argentina',
+    status: 'saved',
+    createdAt: new Date('2025-11-27')
+  },
+  // Add more matches as needed
+])
+
+const newMatches = computed(() => matches.value.filter(m => m.status === 'new'))
+const savedMatches = computed(() => matches.value.filter(m => m.status === 'saved'))
+const ignoredMatches = computed(() => matches.value.filter(m => m.status === 'ignored'))
+
+const openContactModal = (contact: Contact) => {
+  selectedContact.value = contact
+  showContactModal.value = true
+}
+
+const closeContactModal = () => {
+  showContactModal.value = false
+  selectedContact.value = null
+}
+
+const markCompleted = (matchId: string) => {
+  const match = matches.value.find(m => m.id === matchId)
+  if (match) {
+    match.status = 'saved'
+  }
+}
+
+const discardMatch = (matchId: string) => {
+  const match = matches.value.find(m => m.id === matchId)
+  if (match) {
+    match.status = 'ignored'
+  }
+}
+</script>
+
+<style scoped>
+/* All styles in global style.css */
+</style>

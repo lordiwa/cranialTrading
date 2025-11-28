@@ -121,7 +121,7 @@ const handleLogout = async () => {
           </BaseButton>
         </div>
 
-        <div v-if="showChangeForm" class="space-y-4">
+        <div v-if="showChangeForm" class="space-y-md">
           <BaseInput
               v-model="currentPassword"
               type="password"
@@ -173,7 +173,7 @@ const handleLogout = async () => {
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
         <h2 class="text-body font-bold text-silver mb-4">INFORMACIÓN DE CUENTA</h2>
 
-        <div class="space-y-3 text-small">
+        <div class="space-y-sm text-small">
           <div>
             <p class="text-silver-70">Username</p>
             <p class="text-silver font-bold">{{ authStore.user?.username }}</p>

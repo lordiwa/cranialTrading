@@ -43,9 +43,9 @@ const handleClose = () => {
 
 <template>
   <BaseModal :show="show" title="¿QUÉ QUIERES HACER CON ESTA CARTA?" @close="handleClose">
-    <div v-if="card" class="space-y-6">
+    <div v-if="card" class="space-y-lg">
       <!-- Card preview -->
-      <div class="border border-silver-30 p-4 flex gap-4">
+      <div class="border border-silver-30 p-md flex gap-4">
         <img
             v-if="card.image"
             :src="card.image"
@@ -64,13 +64,13 @@ const handleClose = () => {
       </div>
 
       <!-- Status options -->
-      <div class="space-y-3">
+      <div class="space-y-sm">
         <p class="text-small text-silver-70">Selecciona una opción:</p>
 
         <button
             @click="selectedStatus = 'collection'"
             :class="[
-              'w-full p-4 border-2 transition-fast text-left',
+              'w-full p-md border-2 transition-fast text-left',
               selectedStatus === 'collection'
                 ? 'border-neon bg-neon-5'
                 : 'border-silver-30 hover:border-silver'
@@ -90,7 +90,7 @@ const handleClose = () => {
         <button
             @click="selectedStatus = 'sell'"
             :class="[
-              'w-full p-4 border-2 transition-fast text-left',
+              'w-full p-md border-2 transition-fast text-left',
               selectedStatus === 'sell'
                 ? 'border-neon bg-neon-5'
                 : 'border-silver-30 hover:border-silver'
@@ -110,7 +110,7 @@ const handleClose = () => {
         <button
             @click="selectedStatus = 'busco'"
             :class="[
-              'w-full p-4 border-2 transition-fast text-left',
+              'w-full p-md border-2 transition-fast text-left',
               selectedStatus === 'busco'
                 ? 'border-neon bg-neon-5'
                 : 'border-silver-30 hover:border-silver'
@@ -130,7 +130,7 @@ const handleClose = () => {
         <button
             @click="selectedStatus = 'trade'"
             :class="[
-              'w-full p-4 border-2 transition-fast text-left',
+              'w-full p-md border-2 transition-fast text-left',
               selectedStatus === 'trade'
                 ? 'border-neon bg-neon-5'
                 : 'border-silver-30 hover:border-silver'

@@ -25,7 +25,7 @@ const closeModal = () => {
           class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 px-4"
           @click.self="closeModal"
       >
-        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 md:p-8 transition-normal max-h-[90vh] overflow-y-auto">
+        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-lg transition-normal max-h-[90vh] overflow-y-auto">
           <button
               @click="closeModal"
               class="absolute top-3 right-3 md:top-4 md:right-4 text-silver hover:text-neon transition-fast p-2"

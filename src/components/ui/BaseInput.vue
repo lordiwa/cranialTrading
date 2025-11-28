@@ -33,8 +33,8 @@ const handleInput = (event: Event) => {
         :disabled="disabled"
         @input="handleInput"
         :class="[
-        'w-full bg-primary border px-3 md:px-4 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 transition-fast focus:outline-none',
-        error ? 'border-2 border-rust' : 'border-silver focus:border-2 focus:border-neon',
+        'input-base',  // NEW: Use the global utility class!
+        error ? 'error' : 'border-silver focus:border-2 focus:border-neon',  // CLEANER
         type === 'number' ? 'no-spinner' : '',
       ]"
     />

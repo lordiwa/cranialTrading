@@ -154,16 +154,16 @@ const handleClose = () => {
 
 <template>
   <BaseModal :show="show" title="AGREGAR CARTA A MI COLECCIÓN" @close="handleClose">
-    <div class="space-y-4">
+    <div class="space-y-md">
       <!-- Deck warning banner -->
-      <div v-if="props.defaultDeckName" class="bg-neon-5 border border-neon p-3 rounded">
+      <div v-if="props.defaultDeckName" class="bg-neon-5 border border-neon p-md rounded">
         <p class="text-tiny font-bold text-neon">
           📌 Se agregará al mazo: <span class="text-silver">{{ props.defaultDeckName }}</span>
         </p>
       </div>
 
       <!-- Status warning banner -->
-      <div v-if="statusBannerText" class="bg-neon-5 border border-neon p-3 rounded flex items-center gap-2">
+      <div v-if="statusBannerText" class="bg-neon-5 border border-neon p-md rounded flex items-center gap-2">
         <p class="text-tiny font-bold text-neon">📌 {{ statusBannerText }}</p>
         <BaseBadge :variant="getStatusBadgeVariant(status)">
           {{ getStatusLabel(status) }}
@@ -182,14 +182,14 @@ const handleClose = () => {
           <BaseLoader size="small" />
         </div>
 
-        <div v-if="searchResults.length > 0" class="mt-4 max-h-64 overflow-y-auto space-y-2">
+        <div v-if="searchResults.length > 0" class="mt-4 max-h-64 overflow-y-auto space-y-xs">
           <div
               v-for="card in searchResults"
               :key="card.id"
               @click="selectCard(card)"
-              class="border border-silver-30 p-3 hover:border-neon transition-fast cursor-pointer"
+              class="border border-silver-30 p-md hover:border-neon transition-fast cursor-pointer"
           >
-            <div class="flex gap-3">
+            <div class="flex gap-md">
               <img
                   v-if="card.image_uris?.small"
                   :src="card.image_uris.small"
@@ -212,9 +212,9 @@ const handleClose = () => {
       </div>
 
       <!-- Selected Card Form -->
-      <div v-if="selectedCard" class="space-y-4">
-        <div class="border border-silver-30 p-4">
-          <div class="flex gap-4">
+      <div v-if="selectedCard" class="space-y-md">
+        <div class="border border-silver-30 p-lg">
+          <div class="flex gap-lg">
             <img
                 v-if="selectedCard.image_uris?.normal"
                 :src="selectedCard.image_uris.normal"
@@ -228,7 +228,7 @@ const handleClose = () => {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-lg">
           <div>
             <label class="text-small text-silver-70 block mb-2">Cantidad</label>
             <BaseInput
@@ -280,13 +280,13 @@ const handleClose = () => {
           </label>
         </div>
 
-        <div class="bg-primary-dark border border-silver-30 p-3">
+        <div class="bg-primary-dark border border-silver-30 p-md">
           <p class="text-tiny text-silver-70">
             💡 La carta se agregará a tu colección. Luego podrás elegir si venderla o cambiarla haciendo click en ella.
           </p>
         </div>
 
-        <div class="flex gap-3">
+        <div class="flex gap-md">
           <BaseButton
               variant="secondary"
               size="small"

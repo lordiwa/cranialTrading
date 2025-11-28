@@ -14,7 +14,7 @@ const percentage = computed(() => {
 </script>
 
 <template>
-  <div class="fixed bottom-4 right-4 z-[100] bg-primary border-2 border-neon px-5 py-4 shadow-glow-strong min-w-[320px]">
+  <div class="fixed bottom-4 right-4 z-[100] bg-primary border-2 border-neon px-md py-md shadow-glow-strong min-w-[320px]">
     <div class="flex items-center gap-3 mb-3">
       <div class="w-4 h-4 border-2 border-neon border-t-transparent rounded-full animate-spin"></div>
       <span class="text-small text-neon font-bold">IMPORTANDO MAZO</span>

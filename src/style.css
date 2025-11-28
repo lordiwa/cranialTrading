@@ -7,6 +7,7 @@
 @layer base {
     * {
         @apply border-silver-20;
+        border-radius: 0px !important;
     }
 
     html {
@@ -15,12 +16,153 @@
 
     body {
         @apply m-0 antialiased;
+        background-color: #000000;
+        color: #EEEEEE;
     }
 
     input,
     textarea,
     select {
         @apply font-mono;
+        border-radius: 0px !important;
+    }
+
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: rgba(238, 238, 238, 0.2);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(238, 238, 238, 0.4);
+    }
+}
+
+@layer components {
+    .btn-base {
+        @apply font-bold cursor-pointer min-h-[44px] flex items-center justify-center border;
+        border-radius: 0px;
+        transition: all 150ms ease-out;
+    }
+
+    .btn-primary {
+        @apply btn-base border-2 border-neon text-neon;
+        background-color: transparent;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        @apply bg-neon-10;
+    }
+
+    .btn-primary:active:not(:disabled) {
+        @apply bg-neon-10;
+    }
+
+    .btn-primary:disabled {
+        @apply border-2 border-silver-50 text-silver-50 cursor-not-allowed;
+    }
+
+    .btn-secondary {
+        @apply btn-base border-silver text-silver;
+        border-width: 1px;
+        background-color: transparent;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        @apply border-2 bg-silver-5;
+    }
+
+    .btn-secondary:active:not(:disabled) {
+        @apply bg-silver-10;
+    }
+
+    .btn-secondary:disabled {
+        @apply border-silver-50 text-silver-50 cursor-not-allowed;
+    }
+
+    .btn-danger {
+        @apply btn-base border-rust text-rust;
+        border-width: 1px;
+        background-color: transparent;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+        @apply border-2 bg-rust-5;
+    }
+
+    .btn-danger:active:not(:disabled) {
+        @apply bg-rust-5;
+    }
+
+    .btn-danger:disabled {
+        @apply border-silver-50 text-silver-50 cursor-not-allowed;
+    }
+
+    .input-base {
+        @apply w-full bg-primary border px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-mono;
+        border-color: #EEEEEE;
+        transition: all 150ms ease-out;
+    }
+
+    .input-base:focus {
+        @apply border-2 border-neon;
+    }
+
+    .input-base:disabled {
+        @apply opacity-50 cursor-not-allowed;
+    }
+
+    .input-base.error {
+        @apply border-2 border-rust;
+    }
+
+    .card-base {
+        @apply bg-primary border;
+        border-color: rgba(238, 238, 238, 0.3);
+        border-radius: 0px;
+    }
+
+    .card-base:hover {
+        transition: all 300ms ease-in-out;
+    }
+
+    .badge-busco {
+        @apply border border-neon text-neon text-tiny font-medium px-2 py-1;
+        background-color: transparent;
+    }
+
+    .badge-cambio {
+        @apply border border-silver text-silver text-tiny font-medium px-2 py-1;
+        background-color: transparent;
+    }
+
+    .badge-vendo {
+        @apply border border-rust text-rust text-tiny font-medium px-2 py-1;
+        background-color: transparent;
+    }
+
+    .badge-success {
+        @apply border border-neon text-neon text-tiny font-medium px-2 py-1;
+        background-color: rgba(204, 255, 0, 0.05);
+    }
+
+    .modal-overlay {
+        @apply fixed inset-0 z-50 flex items-center justify-center;
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    .modal-content {
+        @apply relative bg-primary border shadow-strong max-w-md w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto;
+        border-color: rgba(238, 238, 238, 0.5);
+        border-radius: 0px;
+        transition: all 300ms ease-in-out;
     }
 }
 
@@ -45,5 +187,99 @@
 
     .no-spinner {
         -moz-appearance: textfield;
+    }
+
+    .border-none {
+        border: none !important;
+    }
+
+    .gap-xs { gap: 4px; }
+    .gap-sm { gap: 8px; }
+    .gap-md { gap: 16px; }
+    .gap-lg { gap: 24px; }
+    .gap-xl { gap: 32px; }
+
+    .px-xs { padding-left: 4px; padding-right: 4px; }
+    .px-sm { padding-left: 8px; padding-right: 8px; }
+    .px-md { padding-left: 16px; padding-right: 16px; }
+    .px-lg { padding-left: 24px; padding-right: 24px; }
+
+    .py-xs { padding-top: 4px; padding-bottom: 4px; }
+    .py-sm { padding-top: 8px; padding-bottom: 8px; }
+    .py-md { padding-top: 16px; padding-bottom: 16px; }
+    .py-lg { padding-top: 24px; padding-bottom: 24px; }
+
+    .line-clamp-1 {
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .focus-visible {
+        outline: 2px solid #CCFF00;
+        outline-offset: 2px;
+    }
+}
+
+@media (max-width: 768px) {
+    .h1 {
+        @apply text-h2;
+    }
+
+    .text-body {
+        @apply text-small;
+    }
+
+    .text-small {
+        @apply text-tiny;
+    }
+
+    .px-lg {
+        @apply px-md;
+    }
+
+    .py-lg {
+        @apply py-md;
     }
 }

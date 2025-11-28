@@ -60,7 +60,7 @@ const handleReset = async () => {
         </RouterLink>
       </div>
 
-      <div v-else class="bg-primary border border-silver-30 p-8 space-y-4">
+      <div v-else class="bg-primary border border-silver-30 p-8 space-y-md">
         <BaseInput
             v-model="password"
             type="password"

@@ -14,10 +14,11 @@ const props = withDefaults(defineProps<Props>(), {
 const baseClasses = 'font-bold transition-fast cursor-pointer min-h-[44px] flex items-center justify-center';
 
 const sizeClasses = {
-  normal: 'px-5 md:px-6 py-3 text-small md:text-body',
-  small: 'px-3 md:px-4 py-2.5 text-tiny md:text-small',
+  normal: 'px-lg md:px-lg py-md text-small md:text-body',  // CHANGE: px-md → px-lg, py-md → py-md
+  small: 'px-md md:px-4 py-2.5 text-tiny md:text-small',  // CHANGE: px-3 → px-md
 };
 
+// No changes to variantClasses - neon is already #CCFF00!
 const variantClasses = {
   primary: props.disabled
       ? 'border-2 border-silver-50 text-silver-50 cursor-not-allowed'

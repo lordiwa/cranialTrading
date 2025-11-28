@@ -132,18 +132,16 @@ const unseenCount = computed(() => matchesStore.getUnseenCount());
 <template>
   <AppContainer>
     <div>
-      <!-- Header -->
-      <div class="flex items-center justify-between mb-2">
-        <h1 class="text-h2 md:text-h1 font-bold text-silver">MATCHES</h1>
-        <div v-if="unseenCount > 0" class="flex items-center gap-2 px-3 py-2 bg-rust-5 border border-rust">
-          <span class="w-2 h-2 bg-rust rounded-full animate-pulse"></span>
-          <span class="text-tiny text-rust font-bold">{{ unseenCount }} nuevo{{ unseenCount !== 1 ? 's' : '' }}</span>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-md md:gap-lg mb-lg md:mb-xl">
+        <!-- CHANGE: gap-4 → gap-md, mb-6 md:mb-8 → mb-lg md:mb-xl -->
+        <div>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver">MATCHES</h1>
+          <p class="text-small md:text-body text-silver-70 mt-sm">
+            <!-- ADDED: mt-sm for spacing after title -->
+            {{ tabDescription }}
+          </p>
         </div>
       </div>
-
-      <p class="text-small md:text-body text-silver-70 mb-6">
-        {{ tabDescription }}
-      </p>
 
       <!-- Tabs -->
       <MatchTabsContainer :tabs="tabs" @tab-change="handleTabChange" />

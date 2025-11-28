@@ -23,8 +23,7 @@ service cloud.firestore {
 
       // Preferencias subcollection
       match /preferencias/{preferenceId} {
-        allow read: if isAuth();
-        allow write: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
 
       // Cards subcollection
@@ -34,8 +33,18 @@ service cloud.firestore {
         allow write: if isOwner(userId);
       }
 
+      // Matches nuevos subcollection
+      match /matches_nuevos/{matchId} {
+        allow read, write: if isOwner(userId);
+      }
+
       // Matches guardados subcollection
       match /matches_guardados/{matchId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Matches eliminados subcollection
+      match /matches_eliminados/{matchId} {
         allow read, write: if isOwner(userId);
       }
 

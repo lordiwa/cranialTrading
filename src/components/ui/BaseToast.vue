@@ -33,7 +33,7 @@ const getColor = (type: ToastType) => {
             v-for="toast in toastStore.toasts"
             :key="toast.id"
             :class="[
-            'bg-primary border-2 px-5 py-4 shadow-glow-strong flex items-center gap-2',
+            'bg-primary border-2 px-md py-md shadow-glow-strong flex items-center gap-2',
             getColor(toast.type),
           ]"
         >

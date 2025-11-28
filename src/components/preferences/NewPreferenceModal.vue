@@ -124,7 +124,7 @@ const handleClose = () => {
 
 <template>
   <BaseModal :show="show" title="NUEVA PREFERENCIA" @close="handleClose">
-    <div class="space-y-4">
+    <div class="space-y-md">
       <!-- Search -->
       <div v-if="!selectedCard">
         <BaseInput
@@ -137,12 +137,12 @@ const handleClose = () => {
           <BaseLoader size="small" />
         </div>
 
-        <div v-if="searchResults.length > 0" class="mt-4 max-h-64 overflow-y-auto space-y-2">
+        <div v-if="searchResults.length > 0" class="mt-4 max-h-64 overflow-y-auto space-y-xs">
           <div
               v-for="card in searchResults"
               :key="card.id"
               @click="selectCard(card)"
-              class="border border-silver-30 p-3 hover:border-neon transition-fast cursor-pointer"
+              class="border border-silver-30 p-sm hover:border-neon transition-fast cursor-pointer"
           >
             <div class="flex gap-3">
               <img
@@ -161,8 +161,8 @@ const handleClose = () => {
       </div>
 
       <!-- Selected Card Form -->
-      <div v-if="selectedCard" class="space-y-4">
-        <div class="border border-silver-30 p-4">
+      <div v-if="selectedCard" class="space-y-md">
+        <div class="border border-silver-30 p-md">
           <div class="flex gap-4">
             <img
                 v-if="selectedCard.image_uris?.normal"

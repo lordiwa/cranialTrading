@@ -19,9 +19,9 @@ const closeMenu = () => {
 </script>
 
 <template>
-  <header class="bg-primary h-15 border-b border-silver-20 px-6 flex items-center justify-between">
-    <div class="flex items-center gap-8">
-      <div class="flex items-center gap-3">
+  <header class="bg-primary h-15 border-b border-silver-20 px-lg flex items-center justify-between">
+    <div class="flex items-center gap-lg">
+      <div class="flex items-center gap-sm">
         <img
             src="/cranial-trading-logo-color.png"
             alt="Cranial Trading Logo"
@@ -30,7 +30,8 @@ const closeMenu = () => {
       </div>
 
       <!-- Desktop Nav -->
-      <nav class="hidden md:flex gap-6">
+      <nav class="hidden md:flex gap-lg">
+        <!-- CHANGE: gap-6 → gap-lg -->
         <RouterLink
             to="/dashboard"
             class="text-body text-silver hover:text-neon transition-fast"
@@ -55,7 +56,8 @@ const closeMenu = () => {
       </nav>
 
       <!-- Desktop User -->
-      <div class="hidden md:flex items-center gap-4">
+      <div class="hidden md:flex items-center gap-md">
+        <!-- CHANGE: gap-4 → gap-md -->
         <span class="text-small text-silver-70">@{{ authStore.user?.username }}</span>
         <RouterLink
             to="/settings"

@@ -144,7 +144,7 @@ const handleClose = () => {
 
 <template>
   <BaseModal :show="show" title="IMPORTAR MAZO" @close="handleClose">
-    <div class="space-y-4">
+    <div class="space-y-md">
       <div>
         <label class="text-small text-silver-70 block mb-2">
           Link de Moxfield o texto del mazo
@@ -152,7 +152,7 @@ const handleClose = () => {
         <textarea
             v-model="inputText"
             placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;..."
-            class="w-full bg-primary border border-silver px-4 py-3 text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-mono"
+            class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-mono"
             rows="8"
             @input="preview = null"
         />
@@ -168,7 +168,7 @@ const handleClose = () => {
         {{ parsing ? 'ANALIZANDO...' : 'ANALIZAR' }}
       </BaseButton>
 
-      <div v-if="preview" class="border border-silver-30 p-4 space-y-2">
+      <div v-if="preview" class="border border-silver-30 p-md space-y-xs">
         <p v-if="preview.name" class="text-body font-bold text-neon mb-3">
           {{ preview.name }}
         </p>

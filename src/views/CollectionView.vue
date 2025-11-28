@@ -473,7 +473,7 @@ const handleDeleteDeck = async () => {
       </div>
 
       <!-- NEW: Stats bar -->
-      <div v-if="collectionStore.cards.length > 0" class="bg-primary p-4 rounded-lg mb-4 md:mb-6 border border-silver-30">
+      <div v-if="collectionStore.cards.length > 0" class="bg-primary p-md rounded-lg mb-4 md:mb-6 border border-silver-30">
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
           <div>
             <div class="text-small text-silver-70">Total Cartas</div>

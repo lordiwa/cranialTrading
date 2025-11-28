@@ -50,7 +50,7 @@ const handleLogin = async () => {
       <div class="bg-primary border border-silver-30 p-8 shadow-medium">
         <h2 class="text-h2 font-bold text-silver mb-6">INICIAR SESIÓN</h2>
 
-        <form @submit.prevent="handleLogin" class="space-y-4">
+        <form @submit.prevent="handleLogin" class="space-y-md">
           <BaseInput
               v-model="email"
               type="email"
@@ -72,7 +72,7 @@ const handleLogin = async () => {
           </BaseButton>
         </form>
 
-        <div class="mt-6 space-y-3 text-center">
+        <div class="mt-6 space-y-sm text-center">
           <RouterLink
               to="/forgot-password"
               class="block text-small text-silver-70 hover:text-neon transition-fast"

@@ -2,9 +2,28 @@
   <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40">
     <!-- Header with Username and Location -->
     <div class="flex justify-between items-start mb-md">
-      <div>
-        <h3 class="text-h3 text-silver font-bold">{{ match.username }}</h3>
-        <p class="text-small text-silver-70">📍 {{ match.location }}</p>
+      <div class="flex-1">
+        <!-- Username link with hover preview -->
+        <div
+            @mouseenter="showProfileHover = true"
+            @mouseleave="showProfileHover = false"
+            class="relative"
+        >
+          <RouterLink
+              :to="{ name: 'userProfile', params: { username: match.username } }"
+              class="text-h3 text-silver font-bold hover:text-neon transition-fast"
+          >
+            @{{ match.username }}
+          </RouterLink>
+          <UserProfileHoverCard
+              :username="match.username"
+              :show="showProfileHover"
+          />
+        </div>
+
+        <p class="text-small text-silver-70 mt-sm">
+          📍 {{ match.location || 'Ubicación no disponible' }}
+        </p>
       </div>
       <span class="text-tiny text-silver-50">Guardado: {{ formattedDate }}</span>
     </div>
@@ -96,7 +115,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
 
 interface Match {
   id: string
@@ -124,6 +144,8 @@ const emit = defineEmits<{
   recover: [matchId: string]
   delete: [matchId: string]
 }>()
+
+const showProfileHover = ref(false)
 
 const formattedDate = computed(() => {
   const now = new Date()

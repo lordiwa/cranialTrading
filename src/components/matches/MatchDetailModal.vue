@@ -6,6 +6,7 @@ import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import ChatModal from '../chat/ChatModal.vue';
 import BaseBadge from '../ui/BaseBadge.vue';
+import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 const savedMatchesStore = useSavedMatchesStore();
 const isSaving = ref(false);
 const showChat = ref(false);
+const showHoverCard = ref(false);
 
 const isMatchSaved = computed(() => {
   return props.match ? savedMatchesStore.isMatchSaved(props.match.id) : false;
@@ -33,7 +35,6 @@ const handleSaveMatch = async () => {
   isSaving.value = false;
 
   if (success) {
-    // Opcional: cerrar el modal después de guardar
     setTimeout(() => {
       emit('close');
     }, 500);
@@ -78,15 +79,28 @@ const getVisualFor = (obj: any) => {
       <h2 class="text-h2 font-bold text-silver mb-6">DETALLES DEL MATCH</h2>
 
       <div class="space-y-lg">
-        <!-- Usuario -->
-        <div>
+        <!-- Usuario con hover preview -->
+        <div
+            @mouseenter="showHoverCard = true"
+            @mouseleave="showHoverCard = false"
+            class="relative"
+        >
           <p class="text-small font-bold text-silver-70 mb-2">USUARIO</p>
-          <router-link :to="{ name: 'userProfile', params: { userId: match.otherUserId } }" class="text-body text-silver hover:underline">
-            {{ match.otherUsername }}
-          </router-link>
+          <RouterLink
+              :to="{ name: 'userProfile', params: { username: match.otherUsername } }"
+              class="text-body text-neon hover:text-silver-70 transition-fast font-bold"
+          >
+            @{{ match.otherUsername }}
+          </RouterLink>
           <p v-if="match.otherLocation" class="text-small text-silver-50 mt-1">
             📍 {{ match.otherLocation }}
           </p>
+
+          <!-- Hover preview card -->
+          <UserProfileHoverCard
+              :username="match.otherUsername"
+              :show="showHoverCard"
+          />
         </div>
 
         <!-- Si es VENDO (otro user quiere mis cartas) -->
@@ -97,8 +111,19 @@ const getVisualFor = (obj: any) => {
               <img v-if="match.myCard.image" :src="match.myCard.image" class="w-20 h-24 object-cover rounded" />
               <div class="flex-1">
                 <div class="flex items-center justify-between">
-                  <p class="text-body font-bold" :class="getVisualFor(match.myCard).badge === 'busco' ? 'text-neon' : getVisualFor(match.myCard).badge === 'vendo' ? 'text-rust' : 'text-silver'">{{ match.myCard.name }}</p>
-                  <BaseBadge :variant="getVisualFor(match.myCard).badge">{{ getVisualFor(match.myCard).label }}</BaseBadge>
+                  <p
+                      class="text-body font-bold"
+                      :class="getVisualFor(match.myCard).badge === 'busco'
+                        ? 'text-neon'
+                        : getVisualFor(match.myCard).badge === 'vendo'
+                          ? 'text-rust'
+                          : 'text-silver'"
+                  >
+                    {{ match.myCard.name }}
+                  </p>
+                  <BaseBadge :variant="getVisualFor(match.myCard).badge">
+                    {{ getVisualFor(match.myCard).label }}
+                  </BaseBadge>
                 </div>
                 <p class="text-small text-silver-70 mt-1">{{ match.myCard.edition }}</p>
                 <div class="flex gap-4 mt-3 text-tiny text-silver-50">
@@ -123,7 +148,9 @@ const getVisualFor = (obj: any) => {
                   <span>Cond: {{ match.otherPreference.condition }}</span>
                 </div>
               </div>
-              <BaseBadge :variant="getVisualFor(match.otherPreference).badge">{{ getVisualFor(match.otherPreference).label }}</BaseBadge>
+              <BaseBadge :variant="getVisualFor(match.otherPreference).badge">
+                {{ getVisualFor(match.otherPreference).label }}
+              </BaseBadge>
             </div>
           </div>
         </div>
@@ -147,7 +174,9 @@ const getVisualFor = (obj: any) => {
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <p class="text-body font-bold text-neon">{{ match.otherCard.name }}</p>
-                  <BaseBadge :variant="getVisualFor(match.otherCard).badge">{{ getVisualFor(match.otherCard).label }}</BaseBadge>
+                  <BaseBadge :variant="getVisualFor(match.otherCard).badge">
+                    {{ getVisualFor(match.otherCard).label }}
+                  </BaseBadge>
                 </div>
                 <p class="text-small text-silver-70 mt-1">{{ match.otherCard.edition }}</p>
                 <div class="flex gap-4 mt-3 text-tiny text-silver-50">

@@ -13,12 +13,31 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
 
+    // Helper function: username is unique (no other user has this username)
+    function usernameIsUnique(username) {
+      return !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username
+        || query(/databases/$(database)/documents/users)
+          .where('username', '==', username)
+          .stream().length() == 0;
+    }
+
     // Users collection
     match /users/{userId} {
-      // Allow reading basic user doc for public profiles and authenticated users
-      allow read: if isAuth() || true; // allow public read of user docs (consider restricting sensitive fields)
-      allow create: if isAuth() && isOwner(userId);
-      allow update: if isOwner(userId);
+      // Allow reading basic user doc for public profiles
+      allow read: if isAuth() || true;
+
+      // Allow create with username validation
+      allow create: if isAuth() && isOwner(userId)
+        && request.resource.data.username is string
+        && request.resource.data.username.size() > 0
+        && usernameIsUnique(request.resource.data.username);
+
+      // Allow update with username uniqueness check
+      allow update: if isOwner(userId)
+        && (!('username' in request.resource.data)
+          || usernameIsUnique(request.resource.data.username));
+
       allow delete: if false;
 
       // Preferencias subcollection
@@ -28,7 +47,6 @@ service cloud.firestore {
 
       // Cards subcollection
       match /cards/{cardId} {
-        // Allow read if the card is marked public, otherwise require auth (owner or authenticated user depending on privacy policy)
         allow read: if resource.data.public == true || isAuth();
         allow write: if isOwner(userId);
       }
@@ -54,7 +72,7 @@ service cloud.firestore {
       }
     }
 
-    // Conversations collection - PERMISSIVE for now to test
+    // Conversations collection
     match /conversations/{document=**} {
       allow read, write: if isAuth();
     }

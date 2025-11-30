@@ -2,10 +2,12 @@
 import { ref } from 'vue';
 import { useAuthStore } from '../../stores/auth';
 import { useRouter } from 'vue-router';
+import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
 
 const authStore = useAuthStore();
 const router = useRouter();
 const mobileMenuOpen = ref(false);
+const showProfileHover = ref(false);
 
 const handleLogout = async () => {
   await authStore.logout();
@@ -31,7 +33,6 @@ const closeMenu = () => {
 
       <!-- Desktop Nav -->
       <nav class="hidden md:flex gap-lg">
-        <!-- CHANGE: gap-6 → gap-lg -->
         <RouterLink
             to="/dashboard"
             class="text-body text-silver hover:text-neon transition-fast"
@@ -57,8 +58,24 @@ const closeMenu = () => {
 
       <!-- Desktop User -->
       <div class="hidden md:flex items-center gap-md">
-        <!-- CHANGE: gap-4 → gap-md -->
-        <span class="text-small text-silver-70">@{{ authStore.user?.username }}</span>
+        <!-- Username link with hover preview -->
+        <div
+            @mouseenter="showProfileHover = true"
+            @mouseleave="showProfileHover = false"
+            class="relative"
+        >
+          <RouterLink
+              :to="{ name: 'userProfile', params: { username: authStore.user?.username } }"
+              class="text-small text-silver hover:text-neon transition-fast font-bold"
+          >
+            @{{ authStore.user?.username }}
+          </RouterLink>
+          <UserProfileHoverCard
+              :username="authStore.user?.username || ''"
+              :show="showProfileHover"
+          />
+        </div>
+
         <RouterLink
             to="/settings"
             class="text-small text-silver hover:text-neon transition-fast"
@@ -114,7 +131,13 @@ const closeMenu = () => {
           </RouterLink>
 
           <div class="border-t border-silver-20 mt-2 pt-2 px-4">
-            <p class="text-small text-silver-70 mb-2">@{{ authStore.user?.username }}</p>
+            <RouterLink
+                :to="{ name: 'userProfile', params: { username: authStore.user?.username } }"
+                @click="closeMenu"
+                class="block text-body text-neon font-bold py-3 hover:text-silver transition-fast"
+            >
+              @{{ authStore.user?.username }}
+            </RouterLink>
             <RouterLink
                 to="/settings"
                 @click="closeMenu"

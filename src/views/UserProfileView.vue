@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { collection, getDocs, query, where, limit, startAfter } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { useToastStore } from '../stores/toast';
+import { useAuthStore } from '../stores/auth';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import CollectionGrid from '../components/collection/CollectionGrid.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
-import { doc, getDoc, collection, getDocs, query, where, limit, startAfter } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import { useToastStore } from '../stores/toast';
 
 const route = useRoute();
 const toastStore = useToastStore();
+const authStore = useAuthStore();
 
-const userId = ref<string | null>(route.params.userId as string || null);
+// State refs
+const username = ref<string>(route.params.username as string || '');
+const userId = ref<string | null>(null);
 const userInfo = ref<{ username?: string; location?: string } | null>(null);
 const cards = ref<any[]>([]);
 const loading = ref(false);
 const loadingMore = ref(false);
+const userNotFound = ref(false);
 const pageSize = 24;
 const lastDoc = ref<any | null>(null);
 const hasMore = ref(true);
@@ -25,26 +30,64 @@ const showChat = ref(false);
 const selectedUserId = ref('');
 const selectedUsername = ref('');
 
-watch(() => route.params.userId, (v) => {
-  userId.value = v as string;
+// Computed properties
+const isOwnProfile = computed(() => {
+  return authStore.user?.id === userId.value;
+});
+
+// Watchers
+watch(() => route.params.username, (v) => {
+  username.value = v as string;
   loadProfile();
 });
 
+// Methods
 const loadProfile = async () => {
-  if (!userId.value) return;
-  // reset pagination
-  cards.value = [];
-  lastDoc.value = null;
-  hasMore.value = true;
-  await loadNextPage();
+  if (!username.value) return;
+
+  loading.value = true;
+  userNotFound.value = false;
+
+  try {
+    // Query users collection to find userId by username
+    const usersCol = collection(db, 'users');
+    const q = query(usersCol, where('username', '==', username.value), limit(1));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      userNotFound.value = true;
+      loading.value = false;
+      return;
+    }
+
+    const userData = snapshot.docs[0].data();
+    userId.value = snapshot.docs[0].id;
+    userInfo.value = userData as any;
+
+    // Reset pagination
+    cards.value = [];
+    lastDoc.value = null;
+    hasMore.value = true;
+
+    // Load first page of public cards
+    await loadNextPage();
+  } catch (err) {
+    console.error('Error loading profile:', err);
+    toastStore.show('Error al cargar perfil', 'error');
+    userNotFound.value = true;
+  } finally {
+    loading.value = false;
+  }
 };
 
 const loadNextPage = async () => {
   if (!userId.value || !hasMore.value) return;
+
   loadingMore.value = true;
   try {
     const cardsCol = collection(db, 'users', userId.value, 'cards');
     let q = query(cardsCol, where('public', '==', true), limit(pageSize));
+
     if (lastDoc.value) {
       q = query(cardsCol, where('public', '==', true), startAfter(lastDoc.value), limit(pageSize));
     }
@@ -59,33 +102,12 @@ const loadNextPage = async () => {
 
     hasMore.value = snapshot.docs.length === pageSize;
   } catch (err) {
+    console.error('Error loading cards:', err);
     toastStore.show('Error al cargar cartas del perfil', 'error');
   } finally {
     loadingMore.value = false;
   }
 };
-
-const loadBasicUser = async () => {
-  if (!userId.value) return;
-  loading.value = true;
-  try {
-    const userDoc = await getDoc(doc(db, 'users', userId.value));
-    if (userDoc.exists()) {
-      userInfo.value = userDoc.data() as any;
-    } else {
-      userInfo.value = { username: 'Usuario', location: '' };
-    }
-  } catch (err) {
-    toastStore.show('Error al cargar perfil', 'error');
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(async () => {
-  await loadBasicUser();
-  await loadProfile();
-});
 
 const handleContact = (id: string, username: string) => {
   selectedUserId.value = id;
@@ -96,46 +118,85 @@ const handleContact = (id: string, username: string) => {
 const handleCloseChat = () => {
   showChat.value = false;
 };
+
+// Initialize on mount
+onMounted(() => {
+  loadProfile();
+});
 </script>
 
 <template>
   <AppContainer>
-    <div>
-      <div class="flex items-center justify-between mb-6">
+    <!-- User not found state -->
+    <div v-if="userNotFound" class="flex flex-col items-center justify-center min-h-[50vh] text-center">
+      <h2 class="text-h2 font-bold text-rust mb-4">404 - Usuario no encontrado</h2>
+      <p class="text-body text-silver-70 mb-8 max-w-md">
+        @{{ username }} no existe o su perfil es privado.
+      </p>
+      <RouterLink to="/dashboard">
+        <BaseButton>VOLVER AL DASHBOARD</BaseButton>
+      </RouterLink>
+    </div>
+
+    <!-- Profile content -->
+    <div v-else>
+      <!-- Profile header -->
+      <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-8 border-b border-silver-20">
         <div>
-          <h1 class="text-h2 font-bold text-silver">Perfil público</h1>
-          <p class="text-small text-silver-70 mt-1">{{ userInfo?.username }}</p>
-          <p class="text-tiny text-silver-50">{{ userInfo?.location }}</p>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">
+            @{{ userInfo?.username }}
+          </h1>
+          <p class="text-body text-silver-70 flex items-center gap-2">
+            📍 {{ userInfo?.location || 'Ubicación no disponida' }}
+          </p>
         </div>
-        <div>
-          <BaseButton size="small" @click="handleContact(userId, userInfo?.username || '')">Contactar</BaseButton>
-        </div>
-      </div>
 
-      <BaseLoader v-if="loading" size="large" />
-
-      <div v-else>
-        <h2 class="text-h5 text-silver font-bold mb-3">Colección pública</h2>
-        <p class="text-small text-silver-70 mb-4">{{ cards.length }} cartas</p>
-
-        <CollectionGrid :cards="cards" />
-
-        <div class="mt-4 text-center" v-if="hasMore">
-          <BaseButton :disabled="loadingMore" @click="loadNextPage">
-            {{ loadingMore ? 'CARGANDO...' : 'CARGAR MÁS' }}
+        <!-- Contact button (only if not own profile) -->
+        <div v-if="!isOwnProfile" class="flex gap-3">
+          <BaseButton
+              size="small"
+              @click="handleContact(userId!, userInfo?.username || '')"
+          >
+            💬 CONTACTAR
           </BaseButton>
         </div>
+      </div>
 
-        <div v-if="!loading && cards.length === 0" class="border border-silver-30 p-6 text-center mt-4">
-          <p class="text-small text-silver-70">Este usuario no tiene cartas públicas en su colección.</p>
+      <!-- Loading state -->
+      <BaseLoader v-if="loading" size="large" />
+
+      <!-- Empty state -->
+      <div v-else-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
+        <p class="text-body text-silver-70">
+          Este usuario no tiene cartas públicas en su colección.
+        </p>
+      </div>
+
+      <!-- Public collection -->
+      <div v-else>
+        <h2 class="text-h3 font-bold text-silver mb-6">
+          Colección pública
+          <span class="text-small text-silver-70 font-normal ml-2">({{ cards.length }} cartas)</span>
+        </h2>
+
+        <div class="space-y-8">
+          <CollectionGrid :cards="cards" />
+
+          <!-- Load more button -->
+          <div v-if="hasMore" class="text-center">
+            <BaseButton :disabled="loadingMore" @click="loadNextPage">
+              {{ loadingMore ? 'CARGANDO...' : 'CARGAR MÁS' }}
+            </BaseButton>
+          </div>
         </div>
       </div>
 
+      <!-- Chat Modal -->
       <ChatModal
-        :show="showChat"
-        :other-user-id="selectedUserId"
-        :other-username="selectedUsername"
-        @close="handleCloseChat"
+          :show="showChat"
+          :other-user-id="selectedUserId"
+          :other-username="selectedUsername"
+          @close="handleCloseChat"
       />
     </div>
   </AppContainer>

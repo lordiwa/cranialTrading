@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
 
 const authStore = useAuthStore();
+const router = useRouter();
 const mobileMenuOpen = ref(false);
 const showProfileHover = ref(false);
-const isLoggingOut = ref(false);
 
 const handleLogout = async () => {
+  await router. ('/login');
   await authStore.logout();
 };
 
@@ -53,22 +55,21 @@ const closeMenu = () => {
         </RouterLink>
       </nav>
 
-      <!-- Desktop User -->
-      <div class="hidden md:flex items-center gap-md">
-        <!-- Username link with hover preview -->
+      <!-- Desktop User - SOLO si hay usuario -->
+      <div v-if="authStore.user" class="hidden md:flex items-center gap-md">
         <div
             @mouseenter="showProfileHover = true"
             @mouseleave="showProfileHover = false"
             class="relative"
         >
           <RouterLink
-              :to="{ name: 'userProfile', params: { username: authStore.user?.username } }"
+              :to="{ name: 'userProfile', params: { username: authStore.user.username } }"
               class="text-small text-silver hover:text-neon transition-fast font-bold"
           >
-            @{{ authStore.user?.username }}
+            @{{ authStore.user.username }}
           </RouterLink>
           <UserProfileHoverCard
-              :username="authStore.user?.username || ''"
+              :username="authStore.user.username"
               :show="showProfileHover"
           />
         </div>
@@ -81,10 +82,9 @@ const closeMenu = () => {
         </RouterLink>
         <button
             @click="handleLogout"
-            :disabled="isLoggingOut"
-            class="text-small text-silver hover:text-rust transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            class="text-small text-silver hover:text-rust transition-fast"
         >
-          {{ isLoggingOut ? 'Saliendo...' : 'Salir' }}
+          Salir
         </button>
       </div>
 
@@ -99,9 +99,9 @@ const closeMenu = () => {
       </button>
     </div>
 
-    <!-- Mobile Menu -->
+    <!-- Mobile Menu - SOLO si hay usuario -->
     <Transition name="slide">
-      <div v-if="mobileMenuOpen" class="md:hidden border-t border-silver-20">
+      <div v-if="mobileMenuOpen && authStore.user" class="md:hidden border-t border-silver-20">
         <nav class="flex flex-col py-4">
           <RouterLink
               to="/dashboard"
@@ -130,11 +130,11 @@ const closeMenu = () => {
 
           <div class="border-t border-silver-20 mt-2 pt-2 px-4">
             <RouterLink
-                :to="{ name: 'userProfile', params: { username: authStore.user?.username } }"
+                :to="{ name: 'userProfile', params: { username: authStore.user.username } }"
                 @click="closeMenu"
                 class="block text-body text-neon font-bold py-3 hover:text-silver transition-fast"
             >
-              @{{ authStore.user?.username }}
+              @{{ authStore.user.username }}
             </RouterLink>
             <RouterLink
                 to="/settings"
@@ -145,10 +145,9 @@ const closeMenu = () => {
             </RouterLink>
             <button
                 @click="handleLogout"
-                :disabled="isLoggingOut"
-                class="text-body text-rust hover:text-rust transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+                class="text-body text-rust hover:text-rust transition-fast"
             >
-              {{ isLoggingOut ? 'Saliendo...' : 'Cerrar Sesión' }}
+              Cerrar Sesión
             </button>
           </div>
         </nav>

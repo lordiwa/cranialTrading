@@ -15,17 +15,18 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User } from '../types/user';
 import { useToastStore } from './toast';
-import { useRouter } from 'vue-router';
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
     const emailVerified = ref(false);
+    const isLoggingOut = ref(false);
     const toastStore = useToastStore();
-    const router = useRouter();
 
     const initAuth = () => {
         onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+            if (isLoggingOut.value) return;
+
             if (firebaseUser) {
                 emailVerified.value = firebaseUser.emailVerified;
                 await loadUserData(firebaseUser.uid);
@@ -129,13 +130,20 @@ export const useAuthStore = defineStore('auth', () => {
 
     const logout = async () => {
         try {
+            isLoggingOut.value = true;
             await signOut(auth);
-            await router.replace('/login');
             user.value = null;
             emailVerified.value = false;
             toastStore.show('Sesión cerrada', 'success');
+            setTimeout(() => {
+                isLoggingOut.value = false;
+            }, 500);
+            return true;
         } catch (error: any) {
+            console.error('Logout error:', error);
             toastStore.show('Error al cerrar sesión', 'error');
+            isLoggingOut.value = false;
+            return false;
         }
     };
 
@@ -231,6 +239,7 @@ export const useAuthStore = defineStore('auth', () => {
         user,
         loading,
         emailVerified,
+        isLoggingOut,
         initAuth,
         register,
         login,

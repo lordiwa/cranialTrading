@@ -26,6 +26,7 @@ const emit = defineEmits<{
 
 const showActions = ref(false);
 
+// ✅ AGREGADO: Handler para click en la card
 const handleCardClick = () => {
   emit('click', props.card);
 };
@@ -47,7 +48,9 @@ const publicIconClass = computed(() => {
 </script>
 
 <template>
+  <!-- ✅ AGREGADO: @click="handleCardClick" en el contenedor principal -->
   <div
+      @click="handleCardClick"
       :class="[
         'relative bg-primary p-md md:p-lg hover:border-neon-40 transition-normal cursor-pointer',
         'border',
@@ -64,17 +67,14 @@ const publicIconClass = computed(() => {
     <div>
       <p class="text-tiny md:text-small font-bold text-silver line-clamp-2">{{ card.name }}</p>
       <p class="text-tiny text-silver-70 mt-xs line-clamp-1">{{ card.edition }}</p>
-      <!-- CHANGE: mt-1 → mt-xs (4px) -->
 
       <div class="flex items-center gap-sm mt-sm text-tiny md:text-small">
-        <!-- CHANGE: gap-2 → gap-sm, mt-2 → mt-sm -->
         <span class="font-bold text-neon">x{{ card.quantity }}</span>
         <span class="text-silver-70">|</span>
         <span class="text-silver-70">{{ card.condition }}</span>
       </div>
 
       <div class="flex items-center justify-between mt-sm">
-        <!-- CHANGE: mt-2 → mt-sm -->
         <p class="text-small font-bold text-neon">${{ card.price.toFixed(2) }}</p>
       </div>
     </div>

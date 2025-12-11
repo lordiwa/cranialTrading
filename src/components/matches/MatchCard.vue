@@ -1,9 +1,9 @@
 <template>
   <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40">
-    <!-- Header with Username and Location -->
+    <!-- Header con Username y Location -->
     <div class="flex justify-between items-start mb-md">
       <div class="flex-1">
-        <!-- Username link with hover preview -->
+        <!-- Username link con hover preview -->
         <div
             @mouseenter="showProfileHover = true"
             @mouseleave="showProfileHover = false"
@@ -30,6 +30,22 @@
 
     <div class="border-b border-silver-20 mb-md"></div>
 
+    <!-- NUEVO: Compatibilidad y detalles de precio (si existen) -->
+    <div v-if="match.compatibility !== undefined" class="mb-md p-sm bg-primary-dark border border-silver-20">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-tiny text-silver-70">Compatibilidad</p>
+          <p class="text-h5 font-bold text-neon">{{ match.compatibility }}%</p>
+        </div>
+        <div v-if="match.valueDifference !== undefined" class="text-right">
+          <p class="text-tiny text-silver-70">Diferencia de valor</p>
+          <p :class="['text-h5 font-bold', getValueDifferenceColor(match.valueDifference)]">
+            {{ formatValueDifference(match.valueDifference) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Cards Section with Compact Images -->
     <div class="grid grid-cols-2 gap-md mb-md">
       <!-- What They Want (Tu oferta) -->
@@ -49,6 +65,10 @@
               <!-- Card Info -->
               <p class="text-tiny text-silver font-medium">{{ card.name }}</p>
               <p class="text-tiny text-silver-70">x{{ card.quantity }} | {{ card.condition }}</p>
+              <!-- NUEVO: Mostrar precio si disponible -->
+              <p v-if="card.price" class="text-tiny text-neon font-bold">
+                {{ formatMoney(card.price * card.quantity) }}
+              </p>
             </div>
           </div>
           <div v-else class="text-small text-silver-50">N/A</div>
@@ -72,9 +92,27 @@
               <!-- Card Info -->
               <p class="text-tiny text-silver font-medium">{{ card.name }}</p>
               <p class="text-tiny text-silver-70">x{{ card.quantity }} | {{ card.condition }}</p>
+              <!-- NUEVO: Mostrar precio si disponible -->
+              <p v-if="card.price" class="text-tiny text-neon font-bold">
+                {{ formatMoney(card.price * card.quantity) }}
+              </p>
             </div>
           </div>
           <div v-else class="text-small text-silver-50">N/A</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NUEVO: Totales de valor (si existen) -->
+    <div v-if="match.myTotalValue !== undefined && match.theirTotalValue !== undefined" class="mb-md p-sm bg-primary-dark border border-silver-20">
+      <div class="grid grid-cols-2 gap-md text-center">
+        <div>
+          <p class="text-tiny text-silver-70">Tu valor</p>
+          <p class="text-small font-bold text-silver">{{ formatMoney(match.myTotalValue) }}</p>
+        </div>
+        <div>
+          <p class="text-tiny text-silver-70">Su valor</p>
+          <p class="text-small font-bold text-silver">{{ formatMoney(match.theirTotalValue) }}</p>
         </div>
       </div>
     </div>
@@ -149,6 +187,7 @@ interface Card {
   quantity?: number
   condition?: string
   image?: string | null
+  price?: number
   [key: string]: any
 }
 
@@ -159,6 +198,10 @@ interface Match {
   email?: string
   myCard?: Card | null
   otherPreference?: Card | null
+  myTotalValue?: number
+  theirTotalValue?: number
+  valueDifference?: number
+  compatibility?: number
   [key: string]: any
 }
 
@@ -191,7 +234,8 @@ const theyWant = computed(() => {
       name: props.match.myCard.name || 'Carta desconocida',
       quantity: props.match.myCard.quantity || 1,
       condition: props.match.myCard.condition || 'M',
-      image: props.match.myCard.image || null
+      image: props.match.myCard.image || null,
+      price: props.match.myCard.price,
     }
     cards.push(card)
   }
@@ -209,7 +253,8 @@ const weOffer = computed(() => {
       name: props.match.otherPreference.name || 'Carta desconocida',
       quantity: props.match.otherPreference.quantity || 1,
       condition: props.match.otherPreference.condition || 'M',
-      image: props.match.otherPreference.image || null
+      image: props.match.otherPreference.image || null,
+      price: props.match.otherPreference.price,
     }
     cards.push(card)
   }
@@ -238,6 +283,21 @@ const formattedDate = computed(() => {
     return 'reciente'
   }
 })
+
+// NUEVO: Funciones para mostrar precio
+const formatMoney = (value: number): string => `$${value.toFixed(2)}`
+
+const getValueDifferenceColor = (diff: number): string => {
+  if (diff > 0) return 'text-neon' // A mi favor
+  if (diff < 0) return 'text-rust' // A su favor
+  return 'text-silver' // Igualado
+}
+
+const formatValueDifference = (diff: number): string => {
+  if (diff === 0) return 'Igual'
+  if (diff > 0) return `+${formatMoney(diff)} favor`
+  return `${formatMoney(Math.abs(diff))} su favor`
+}
 </script>
 
 <style scoped>

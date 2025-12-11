@@ -1,215 +1,217 @@
 <template>
   <AppContainer>
     <div>
-      <!-- Header -->
-      <div class="mb-lg md:mb-xl">
-        <h1 class="text-h2 md:text-h1 font-bold text-silver">MATCHES</h1>
-        <p class="text-small md:text-body text-silver-70 mt-sm">
-          {{ totalMatches }} matches
-        </p>
+      <div class="mb-lg">
+        <h1 class="text-h2 font-bold text-silver">MATCHES</h1>
+        <p class="text-small text-silver-70 mt-sm">{{ calculatedMatches.length }} matches encontrados</p>
       </div>
 
-      <!-- Tabs Navigation -->
-      <div class="flex gap-lg mb-xl border-b border-silver-20">
-        <button
-            @click="activeTab = 'nuevos'"
-            :class="[
-              'pb-md border-b-2 transition-fast',
-              activeTab === 'nuevos' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
-            ]"
+      <div v-if="loading" class="text-center py-xl">
+        <BaseLoader />
+        <p class="text-body text-silver-70 mt-4">Buscando matches...</p>
+      </div>
+
+      <div v-else-if="calculatedMatches.length === 0" class="text-center py-xl">
+        <p class="text-body text-silver-70">No hay matches disponibles</p>
+      </div>
+
+      <div v-else class="space-y-md">
+        <div
+            v-for="match in calculatedMatches"
+            :key="match.id"
+            class="bg-primary border border-silver-30 p-lg"
         >
-          <span class="flex items-center gap-sm">
-            🔴 NUEVOS
-            <span class="text-tiny">{{ matchesStore.newMatches.length }}</span>
-          </span>
-        </button>
-        <button
-            @click="activeTab = 'saved'"
-            :class="[
-              'pb-md border-b-2 transition-fast',
-              activeTab === 'saved' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
-            ]"
-        >
-          <span class="flex items-center gap-sm">
-            ⭐ MIS MATCHES
-            <span class="text-tiny">{{ matchesStore.savedMatches.length }}</span>
-          </span>
-        </button>
-        <button
-            @click="activeTab = 'deleted'"
-            :class="[
-              'pb-md border-b-2 transition-fast',
-              activeTab === 'deleted' ? 'border-neon text-neon' : 'border-transparent text-silver-70 hover:text-silver'
-            ]"
-        >
-          <span class="flex items-center gap-sm">
-            🗑️ ELIMINADOS
-            <span class="text-tiny">{{ matchesStore.deletedMatches.length }}</span>
-          </span>
-        </button>
-      </div>
+          <div class="flex justify-between items-start mb-md">
+            <div>
+              <p class="text-h3 font-bold text-silver">{{ match.otherUsername }}</p>
+              <p class="text-small text-silver-70">{{ match.otherLocation }}</p>
+            </div>
+            <p class="text-h3 font-bold text-neon">{{ match.compatibility }}%</p>
+          </div>
 
-      <!-- Tab Content - NUEVOS -->
-      <div v-if="activeTab === 'nuevos'">
-        <div v-if="matchesStore.newMatches.length === 0" class="text-center py-xl">
-          <p class="text-body text-silver-70">No tienes matches nuevos</p>
-        </div>
-        <div v-else class="space-y-md">
-          <MatchCard
-              v-for="match in matchesStore.newMatches"
-              :key="match.id || match.docId"
-              :match="normalizeMatch(match)"
-              :tab="'new'"
-              @save="handleSaveMatch"
-              @discard="handleDiscardMatch"
-              @contactar="handleContactar"
-              @marcar-completado="handleCompleteMatch"
-              @descartar="handleDiscardMatch"
-              @recover="handleRecoverMatch"
-              @delete="handlePermanentDelete"
-          />
+          <div class="grid grid-cols-2 gap-lg mb-lg">
+            <div>
+              <p class="text-small text-silver-70 mb-2">TÚ OFRECES</p>
+              <div class="text-small text-silver">
+                <div v-for="card in match.myCardsInfo" :key="card.id">
+                  {{ card.name }} x{{ card.quantity }}
+                </div>
+                <p class="text-neon font-bold mt-2">${{ match.myTotalValue.toFixed(2) }}</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-small text-silver-70 mb-2">RECIBES</p>
+              <div class="text-small text-silver">
+                <div v-for="card in match.theirCardsInfo" :key="card.id">
+                  {{ card.name }} x{{ card.quantity }}
+                </div>
+                <p class="text-neon font-bold mt-2">${{ match.theirTotalValue.toFixed(2) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-small text-silver-70 mb-md">
+            Diferencia:
+            <span :class="match.valueDifference > 0 ? 'text-neon' : 'text-silver-70'">
+              ${{ Math.abs(match.valueDifference).toFixed(2) }}
+            </span>
+          </p>
+
+          <div class="flex gap-md">
+            <BaseButton @click="handleSaveMatch(match.id)">ME INTERESA</BaseButton>
+            <BaseButton variant="secondary" @click="handleDiscardMatch(match.id)">IGNORAR</BaseButton>
+          </div>
         </div>
       </div>
-
-      <!-- Tab Content - SAVED (MIS MATCHES) -->
-      <div v-if="activeTab === 'saved'">
-        <div v-if="matchesStore.savedMatches.length === 0" class="text-center py-xl">
-          <p class="text-body text-silver-70">No tienes matches guardados</p>
-        </div>
-        <div v-else class="space-y-md">
-          <MatchCard
-              v-for="match in matchesStore.savedMatches"
-              :key="match.id || match.docId"
-              :match="normalizeMatch(match)"
-              :tab="'saved'"
-              @save="handleSaveMatch"
-              @discard="handleDiscardMatch"
-              @contactar="handleContactar"
-              @marcar-completado="handleCompleteMatch"
-              @descartar="handleDiscardMatch"
-              @recover="handleRecoverMatch"
-              @delete="handlePermanentDelete"
-          />
-        </div>
-      </div>
-
-      <!-- Tab Content - DELETED -->
-      <div v-if="activeTab === 'deleted'">
-        <div v-if="matchesStore.deletedMatches.length === 0" class="text-center py-xl">
-          <p class="text-body text-silver-70">No tienes matches eliminados</p>
-        </div>
-        <div v-else class="space-y-md">
-          <MatchCard
-              v-for="match in matchesStore.deletedMatches"
-              :key="match.id || match.docId"
-              :match="normalizeMatch(match)"
-              :tab="'deleted'"
-              @save="handleSaveMatch"
-              @discard="handleDiscardMatch"
-              @contactar="handleContactar"
-              @marcar-completado="handleCompleteMatch"
-              @descartar="handleDiscardMatch"
-              @recover="handleRecoverMatch"
-              @delete="handlePermanentDelete"
-          />
-        </div>
-      </div>
-
-      <!-- Chat Modal -->
-      <ChatModal
-          :show="showChat"
-          :other-user-id="selectedUserId"
-          :other-username="selectedUsername"
-          @close="handleCloseChat"
-      />
     </div>
   </AppContainer>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import AppContainer from '../components/layout/AppContainer.vue'
-import MatchCard from '../components/matches/MatchCard.vue'
-import ChatModal from '../components/chat/ChatModal.vue'
-import { useMatchesStore } from '../stores/matches'
+import BaseLoader from '../components/ui/BaseLoader.vue'
+import BaseButton from '../components/ui/BaseButton.vue'
+import { useCollectionStore } from '../stores/collection'
+import { usePreferencesStore } from '../stores/preferences'
+import { useAuthStore } from '../stores/auth'
+import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '../services/firebase'
 
-const matchesStore = useMatchesStore()
-const activeTab = ref<'nuevos' | 'saved' | 'deleted'>('saved')
-const showChat = ref(false)
-const selectedUserId = ref('')
-const selectedUsername = ref('')
+const collectionStore = useCollectionStore()
+const preferencesStore = usePreferencesStore()
+const authStore = useAuthStore()
+const priceMatching = usePriceMatchingStore()
 
-// Cargar matches al montar
+const loading = ref(false)
+const calculatedMatches = ref<any[]>([])
+
 onMounted(async () => {
-  await matchesStore.loadAllMatches()
+  await collectionStore.loadCollection()
+  await preferencesStore.loadPreferences()
+  await calculateMatches()
 })
 
-const totalMatches = computed(() => {
-  return matchesStore.newMatches.length + matchesStore.savedMatches.length + matchesStore.deletedMatches.length
-})
+const calculateMatches = async () => {
+  if (!authStore.user) return
 
-// Normalizar match: asegurar que tenga propiedades requeridas
-const normalizeMatch = (match: any) => {
-  return {
-    id: match.docId || match.id,
-    username: match.otherUsername || 'Usuario',
-    location: match.otherLocation || '',
-    email: match.otherEmail || '',
-    myCard: match.myCard || null,
-    otherPreference: match.otherPreference || null,
-    createdAt: match.createdAt,
-    ...match // Incluir todos los otros campos por si acaso
+  loading.value = true
+  calculatedMatches.value = []
+
+  try {
+    const myCards = collectionStore.cards
+    const myPrefs = preferencesStore.preferences
+
+    console.log('🔍 Starting match calculation...')
+    console.log('My cards:', myCards.length)
+    console.log('My preferences:', myPrefs.length)
+
+    if (myPrefs.length === 0) {
+      loading.value = false
+      return
+    }
+
+    const usersRef = collection(db, 'users')
+    const usersSnapshot = await getDocs(usersRef)
+    const foundMatches: any[] = []
+
+    console.log('Total users found:', usersSnapshot.docs.length)
+
+    for (const userDoc of usersSnapshot.docs) {
+      if (userDoc.id === authStore.user.id) continue
+
+      try {
+        const otherUserId = userDoc.id
+        const otherUserData = userDoc.data()
+
+        console.log(`\n📊 Checking user: ${otherUserData.username}`)
+
+        const theirCardsRef = collection(db, 'users', otherUserId, 'cards')
+        const theirCardsSnapshot = await getDocs(theirCardsRef)
+        const theirCards = theirCardsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as any[]
+
+        const theirPrefsRef = collection(db, 'users', otherUserId, 'preferencias')
+        const theirPrefsSnapshot = await getDocs(theirPrefsRef)
+        const theirPreferences = theirPrefsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as any[]
+
+        console.log(`  Their cards: ${theirCards.length}, Their prefs: ${theirPreferences.length}`)
+
+        // DEBUG: mostrar cartas de srparca
+        if (otherUserData.username === 'srparca') {
+          console.log('  [SRPARCA CARDS DETAIL]:')
+          theirCards.forEach(c => {
+            if (c.name.includes('Phlage')) {
+              console.log(`    ${c.name} - status: ${c.status}, price: $${c.price}, qty: ${c.quantity}`)
+            }
+          })
+          console.log('  [SRPARCA PREFS]:', theirPreferences.map(p => p.name))
+          console.log('  [MY PREFS - busco]:', myPrefs.map(p => p.name))
+        }
+
+        // INTENTAR MATCH BIDIRECCIONAL PRIMERO
+        let matchDetails = priceMatching.calculateBidirectionalMatch(
+            myCards,
+            myPrefs,
+            theirCards,
+            theirPreferences
+        )
+
+        // SI NO HAY BIDIRECCIONAL, INTENTAR UNIDIRECCIONAL
+        if (!matchDetails) {
+          matchDetails = priceMatching.calculateUnidirectionalMatch(
+              myCards,
+              myPrefs,
+              theirCards,
+              theirPreferences
+          )
+        }
+
+        if (matchDetails) {
+          console.log(`  ✅ MATCH FOUND! Compatibility: ${matchDetails.compatibility}%`)
+          foundMatches.push({
+            id: `${authStore.user.id}_${otherUserId}_${Date.now()}`,
+            otherUserId,
+            otherUsername: otherUserData.username,
+            otherLocation: otherUserData.location || 'Unknown',
+            otherEmail: otherUserData.email,
+            myCardsInfo: matchDetails.myCardsInfo,
+            theirCardsInfo: matchDetails.theirCardsInfo,
+            myTotalValue: matchDetails.myTotalValue,
+            theirTotalValue: matchDetails.theirTotalValue,
+            valueDifference: matchDetails.valueDifference,
+            compatibility: matchDetails.compatibility,
+          })
+        } else {
+          console.log(`  ❌ No match`)
+        }
+      } catch (err) {
+        console.error(`Error processing user ${userDoc.id}:`, err)
+      }
+    }
+
+    console.log(`\n✅ Total matches found: ${foundMatches.length}`)
+    calculatedMatches.value = foundMatches.sort((a, b) => b.compatibility - a.compatibility)
+  } catch (error) {
+    console.error('Error calculating matches:', error)
+  } finally {
+    loading.value = false
   }
 }
 
-// Event Handlers
-const handleSaveMatch = async (match: any) => {
-  const originalMatch = matchesStore.newMatches.find(m => (m.docId || m.id) === (match.id || match.docId))
-  if (originalMatch) {
-    await matchesStore.saveMatch(originalMatch)
-  }
+const handleSaveMatch = (matchId: string) => {
+  console.log('Save match:', matchId)
+  // TODO: Guardar en store de matches
 }
 
-const handleDiscardMatch = async (matchId: string, tab?: 'new' | 'saved') => {
-  const tabToUse = tab || (activeTab.value === 'nuevos' ? 'new' : 'saved')
-  const confirmed = confirm('¿Eliminar este match? Se borrará en 15 días.')
-  if (confirmed) {
-    await matchesStore.discardMatch(matchId, tabToUse as 'new' | 'saved')
-  }
-}
-
-const handleContactar = (contact: any) => {
-  selectedUserId.value = matchesStore.savedMatches.find(m => m.otherUsername === contact.username)?.otherUserId || ''
-  selectedUsername.value = contact.username
-  showChat.value = true
-}
-
-const handleCompleteMatch = async (matchId: string) => {
-  const confirmed = confirm('¿Marcar este match como completado?')
-  if (confirmed) {
-    await matchesStore.completeMatch(matchId)
-  }
-}
-
-const handleRecoverMatch = async (matchId: string) => {
-  const confirmed = confirm('¿Recuperar este match?')
-  if (confirmed) {
-    await matchesStore.recoverMatch(matchId)
-  }
-}
-
-const handlePermanentDelete = async (matchId: string) => {
-  const confirmed = confirm('⚠️ ¿Eliminar permanentemente?')
-  if (confirmed) {
-    await matchesStore.permanentDelete(matchId)
-  }
-}
-
-const handleCloseChat = () => {
-  showChat.value = false
+const handleDiscardMatch = (matchId: string) => {
+  calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
 }
 </script>
-
-<style scoped>
-/* All styles in global style.css */
-</style>

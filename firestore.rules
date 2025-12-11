@@ -1,80 +1,50 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function: usuario autenticado
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    // Helper function: es el owner del documento
-    function isOwner(userId) {
-      return isAuth() && request.auth.uid == userId;
-    }
-
-    // Helper function: username is unique (no other user has this username)
-    function usernameIsUnique(username) {
-      return !exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username
-        || query(/databases/$(database)/documents/users)
-          .where('username', '==', username)
-          .stream().length() == 0;
-    }
-
-    // Users collection
+    // ==================== USERS ====================
     match /users/{userId} {
-      // Allow reading basic user doc for public profiles
-      allow read: if isAuth() || true;
+      // Cualquier usuario autenticado puede leer datos públicos de otros usuarios
+      allow read: if request.auth != null;
 
-      // Allow create with username validation
-      allow create: if isAuth() && isOwner(userId)
-        && request.resource.data.username is string
-        && request.resource.data.username.size() > 0
-        && usernameIsUnique(request.resource.data.username);
+      // Solo el dueño puede escribir su propio perfil
+      allow write: if request.auth.uid == userId;
 
-      // Allow update with username uniqueness check
-      allow update: if isOwner(userId)
-        && (!('username' in request.resource.data)
-          || usernameIsUnique(request.resource.data.username));
-
-      allow delete: if false;
-
-      // Preferencias subcollection
-      match /preferencias/{preferenceId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // Cards subcollection
+      // ==================== CARDS (sub-collection) ====================
       match /cards/{cardId} {
-        allow read: if resource.data.public == true || isAuth();
-        allow write: if isOwner(userId);
+        // Cualquier usuario autenticado puede LEER cartas de cualquiera
+        allow read: if request.auth != null;
+
+        // Solo el dueño puede escribir sus propias cartas
+        allow write: if request.auth.uid == userId;
       }
 
-      // Matches nuevos subcollection
-      match /matches_nuevos/{matchId} {
-        allow read, write: if isOwner(userId);
+      // ==================== PREFERENCIAS (sub-collection) ====================
+      match /preferencias/{preferenceId} {
+        // Cualquier usuario autenticado puede LEER preferencias de cualquiera
+        allow read: if request.auth != null;
+
+        // Solo el dueño puede escribir sus propias preferencias
+        allow write: if request.auth.uid == userId;
       }
 
-      // Matches guardados subcollection
-      match /matches_guardados/{matchId} {
-        allow read, write: if isOwner(userId);
+      // ==================== MATCHES (sub-collection) ====================
+      match /matches/{matchId} {
+        // Solo el dueño puede leer sus matches
+        allow read: if request.auth.uid == userId;
+
+        // Solo el dueño puede escribir sus matches
+        allow write: if request.auth.uid == userId;
       }
 
-      // Matches eliminados subcollection
-      match /matches_eliminados/{matchId} {
-        allow read, write: if isOwner(userId);
-      }
+      // ==================== CONTACTS (sub-collection) ====================
+      match /contacts/{contactId} {
+        // Solo el dueño puede leer sus contactos guardados
+        allow read: if request.auth.uid == userId;
 
-      // Contactos guardados subcollection
-      match /contactos_guardados/{contactId} {
-        allow read, write: if isOwner(userId);
+        // Solo el dueño puede escribir sus contactos
+        allow write: if request.auth.uid == userId;
       }
-    }
-
-    // Conversations collection
-    match /conversations/{document=**} {
-      allow read, write: if isAuth();
     }
   }
 }

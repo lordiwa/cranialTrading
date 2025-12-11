@@ -1,354 +1,116 @@
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import { useAuthStore } from './auth';
-import { useToastStore } from './toast';
-import { Preference, PreferenceType } from '../types/preferences';
-import { CardCondition } from '../types/card';
-import { getCardBySetAndNumber } from '../services/scryfall';
-import { parseMoxfieldDeck } from '../utils/deckParser';
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { db } from '../services/firebase'
+import { Preference } from '../types/preferences'
 
 export const usePreferencesStore = defineStore('preferences', () => {
-    const preferences = ref<Preference[]>([]);
-    const loading = ref(false);
-    const authStore = useAuthStore();
-    const toastStore = useToastStore();
+    const authStore = useAuthStore()
+    const _preferences = ref<Preference[]>([])
+    const loading = ref(false)
 
+    const preferences = computed(() => _preferences.value)
+
+    /**
+     * CARGAR preferencias desde Firestore
+     * Ruta: users/{userId}/preferencias/{preferenceId}
+     */
     const loadPreferences = async () => {
-        if (!authStore.user) {
-            return;
+        if (!authStore.user?.id) {
+            console.warn('⚠️ No user logged in')
+            return
         }
 
-        loading.value = true;
+        loading.value = true
         try {
-            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias');
-            const snapshot = await getDocs(prefRef);
+            const prefsRef = collection(db, 'users', authStore.user.id, 'preferencias')
+            const snapshot = await getDocs(prefsRef)
 
-            preferences.value = snapshot.docs.map(doc => ({
+            _preferences.value = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate() || new Date(),
-            } as Preference));
+            })) as Preference[]
 
-            // preferences loaded
-        } catch (error: any) {
-             preferences.value = [];
-             if (error.code !== 'permission-denied') {
-                 toastStore.show('Error al cargar preferencias', 'error');
-             }
-         } finally {
-             loading.value = false;
-         }
-     };
+            console.log(`✅ Loaded ${_preferences.value.length} preferences for user ${authStore.user.id}`)
 
-    const addPreference = async (prefData: {
-        scryfallId: string;
-        name: string;
-        type: PreferenceType;
-        quantity: number;
-        condition: string;
-        edition: string;
-        image: string;
-    }) => {
-        if (!authStore.user) return;
+        } catch (error) {
+            console.error('❌ Error loading preferences:', error)
+            _preferences.value = []
+        } finally {
+            loading.value = false
+        }
+    }
+
+    /**
+     * AGREGAR una preferencia
+     */
+    const addPreference = async (prefData: Omit<Preference, 'id'>) => {
+        if (!authStore.user?.id) throw new Error('No user logged in')
 
         try {
-            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias');
-            await addDoc(prefRef, {
+            const prefsRef = collection(db, 'users', authStore.user.id, 'preferencias')
+            const docRef = await addDoc(prefsRef, {
                 ...prefData,
-                createdAt: new Date(),
-            });
+                createdAt: new Date().toISOString(),
+            })
 
-            await loadPreferences();
-            toastStore.show('Preferencia creada', 'success');
+            const newPref = { id: docRef.id, ...prefData } as Preference
+            _preferences.value.push(newPref)
+
+            console.log('✅ Preference added:', prefData.name)
+            return newPref
         } catch (error) {
-            toastStore.show('Error al crear preferencia', 'error');
+            console.error('❌ Error adding preference:', error)
+            throw error
         }
-    };
+    }
 
+    /**
+     * ACTUALIZAR una preferencia
+     */
     const updatePreference = async (prefId: string, updates: Partial<Preference>) => {
-        if (!authStore.user) return;
+        if (!authStore.user?.id) throw new Error('No user logged in')
 
         try {
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', prefId);
-            await updateDoc(prefRef, updates);
+            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', prefId)
+            await updateDoc(prefRef, updates)
 
-            await loadPreferences();
-            toastStore.show('Preferencia actualizada', 'success');
+            const index = _preferences.value.findIndex(p => p.id === prefId)
+            if (index >= 0) {
+                _preferences.value[index] = { ..._preferences.value[index], ...updates }
+            }
+
+            console.log('✅ Preference updated:', prefId)
         } catch (error) {
-            toastStore.show('Error al actualizar preferencia', 'error');
+            console.error('❌ Error updating preference:', error)
+            throw error
         }
-    };
+    }
 
+    /**
+     * ELIMINAR una preferencia
+     */
     const deletePreference = async (prefId: string) => {
-        if (!authStore.user) return;
+        if (!authStore.user?.id) throw new Error('No user logged in')
 
         try {
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', prefId);
-            await deleteDoc(prefRef);
+            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', prefId)
+            await deleteDoc(prefRef)
 
-            preferences.value = preferences.value.filter(p => p.id !== prefId);
-            toastStore.show('Preferencia eliminada', 'success');
+            _preferences.value = _preferences.value.filter(p => p.id !== prefId)
+            console.log('✅ Preference deleted:', prefId)
         } catch (error) {
-            toastStore.show('Error al eliminar preferencia', 'error');
-        }
-    };
-
-    const deletePreferenceByCard = async (scryfallId: string, edition: string) => {
-        if (!authStore.user) return;
-
-        try {
-            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias');
-            const snapshot = await getDocs(prefRef);
-
-            for (const docSnap of snapshot.docs) {
-                const pref = docSnap.data();
-                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO' || pref.type === 'BUSCO')) {
-                    await deleteDoc(doc(db, 'users', authStore.user.id, 'preferencias', docSnap.id));
-                }
-            }
-
-            await loadPreferences();
-        } catch (error) {
-            // ignore
-        }
-    };
-
-    const updatePreferenceType = async (scryfallId: string, edition: string, newType: 'VENDO' | 'CAMBIO' | 'BUSCO') => {
-        if (!authStore.user) return;
-
-        try {
-            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias');
-            const snapshot = await getDocs(prefRef);
-
-            for (const docSnap of snapshot.docs) {
-                const pref = docSnap.data();
-                if (pref.scryfallId === scryfallId && pref.edition === edition && (pref.type === 'VENDO' || pref.type === 'CAMBIO' || pref.type === 'BUSCO')) {
-                    await updateDoc(doc(db, 'users', authStore.user.id, 'preferencias', docSnap.id), {
-                        type: newType,
-                    });
-                }
-            }
-
-            await loadPreferences();
-            toastStore.show('Preferencia actualizada', 'success');
-        } catch (error) {
-            toastStore.show('Error al actualizar preferencia', 'error');
-        }
-    };
-
-    const processDeckImport = async (
-        deckText: string,
-        condition: CardCondition = 'NM',
-        includeSideboard: boolean = false,
-        onProgress?: (current: number, total: number) => void
-    ) => {
-        if (!authStore.user) return {
-            success: 0,
-            failed: 0,
-            errors: [] as string[],
-            processedPreferences: [] as any[]
-        }
-
-        try {
-            const parsed = parseMoxfieldDeck(deckText)
-            const cardsToImport = includeSideboard
-                ? [...parsed.mainboard, ...parsed.sideboard]
-                : parsed.mainboard
-
-            if (cardsToImport.length === 0) {
-                toastStore.show('No se detectaron cartas', 'error')
-                return { success: 0, failed: 0, errors: [], processedPreferences: [] }
-            }
-
-            if (cardsToImport.length > 500) {
-                toastStore.show('Máximo 500 cartas por importación', 'error')
-                return { success: 0, failed: 0, errors: [], processedPreferences: [] }
-            }
-
-            let success = 0
-            let failed = 0
-            const errors: string[] = []
-            const processedPreferences: any[] = []
-            const total = cardsToImport.length
-
-            for (let i = 0; i < cardsToImport.length; i++) {
-                const parsedCard = cardsToImport[i]
-
-                await new Promise(resolve => setTimeout(resolve, 75))
-
-                let card = null
-                let retries = 0
-
-                while (retries < 3 && !card) {
-                    try {
-                        card = await getCardBySetAndNumber(
-                            parsedCard.setCode,
-                            parsedCard.collectorNumber
-                        )
-                        break
-                    } catch (error: any) {
-                        if (error.status === 429 && retries < 2) {
-                            await new Promise(resolve => setTimeout(resolve, 500))
-                            retries++
-                        } else {
-                            break
-                        }
-                    }
-                }
-
-                if (!card) {
-                    failed++
-                    errors.push(`${parsedCard.name} (${parsedCard.setCode} ${parsedCard.collectorNumber})`)
-                } else {
-                    processedPreferences.push({
-                        scryfallId: card.id,
-                        name: card.name,
-                        type: 'BUSCO',
-                        quantity: parsedCard.quantity,
-                        condition,
-                        edition: card.set_name,
-                        image: card.image_uris?.normal || '',
-                    })
-                    success++
-                }
-
-                if (onProgress) {
-                    onProgress(i + 1, total)
-                }
-            }
-
-            return { success, failed, errors, processedPreferences }
-        } catch (error) {
-            toastStore.show('Error al procesar mazo', 'error')
-            return { success: 0, failed: 0, errors: [], processedPreferences: [] }
+            console.error('❌ Error deleting preference:', error)
+            throw error
         }
     }
 
-    const processDirectImport = async (
-        cards: Array<{
-            quantity: number
-            name: string
-            setCode: string
-            collectorNumber: string
-            scryfallId: string
-        }>,
-        condition: CardCondition = 'NM',
-        onProgress?: (current: number, total: number) => void
-    ) => {
-        if (!authStore.user) return {
-            success: 0,
-            failed: 0,
-            errors: [] as string[],
-            processedPreferences: [] as any[]
-        }
-
-        try {
-            if (cards.length === 0) {
-                toastStore.show('No se detectaron cartas', 'error')
-                return { success: 0, failed: 0, errors: [], processedPreferences: [] }
-            }
-
-            if (cards.length > 500) {
-                toastStore.show('Máximo 500 cartas por importación', 'error')
-                return { success: 0, failed: 0, errors: [], processedPreferences: [] }
-            }
-
-            let success = 0
-            let failed = 0
-            const errors: string[] = []
-            const processedPreferences: any[] = []
-            const total = cards.length
-
-            for (let i = 0; i < cards.length; i++) {
-                const cardData = cards[i]
-
-                await new Promise(resolve => setTimeout(resolve, 75))
-
-                let card = null
-                let retries = 0
-
-                while (retries < 3 && !card) {
-                    try {
-                        card = await getCardBySetAndNumber(
-                            cardData.setCode,
-                            cardData.collectorNumber
-                        )
-                        break
-                    } catch (error: any) {
-                        if (error.status === 429 && retries < 2) {
-                            await new Promise(resolve => setTimeout(resolve, 500))
-                            retries++
-                        } else {
-                            break
-                        }
-                    }
-                }
-
-                if (!card) {
-                    failed++
-                    errors.push(`${cardData.name} (${cardData.setCode} ${cardData.collectorNumber})`)
-                } else {
-                    processedPreferences.push({
-                        scryfallId: card.id,
-                        name: card.name,
-                        type: 'BUSCO',
-                        quantity: cardData.quantity,
-                        condition,
-                        edition: card.set_name,
-                        image: card.image_uris?.normal || '',
-                    })
-                    success++
-                }
-
-                if (onProgress) {
-                    onProgress(i + 1, total)
-                }
-            }
-
-            return { success, failed, errors, processedPreferences }
-        } catch (error) {
-            toastStore.show('Error al procesar mazo', 'error')
-            return { success: 0, failed: 0, errors: [], processedPreferences: [] }
-        }
-    }
-
-    const confirmImport = async (preferencesToImport: any[]) => {
-        if (!authStore.user || preferencesToImport.length === 0) return false
-
-        try {
-            const prefRef = collection(db, 'users', authStore.user.id, 'preferencias')
-
-            // Consolidate duplicates
-            const consolidatedPrefs = new Map<string, any>()
-
-            for (const prefData of preferencesToImport) {
-                const key = `${prefData.scryfallId}_${prefData.edition}`
-
-                if (consolidatedPrefs.has(key)) {
-                    const existing = consolidatedPrefs.get(key)
-                    existing.quantity += prefData.quantity
-                } else {
-                    consolidatedPrefs.set(key, { ...prefData })
-                }
-            }
-
-            // Add all consolidated preferences
-            for (const prefData of consolidatedPrefs.values()) {
-                await addDoc(prefRef, {
-                    ...prefData,
-                    createdAt: new Date(),
-                })
-            }
-
-            await loadPreferences()
-            toastStore.show(`${consolidatedPrefs.size} preferencias creadas`, 'success')
-            return true
-        } catch (error) {
-            toastStore.show('Error al guardar preferencias', 'error')
-            return false
-        }
+    /**
+     * LIMPIAR estado local (logout)
+     */
+    const clear = () => {
+        _preferences.value = []
     }
 
     return {
@@ -358,10 +120,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
         addPreference,
         updatePreference,
         deletePreference,
-        deletePreferenceByCard,
-        updatePreferenceType,
-        processDeckImport,
-        processDirectImport,
-        confirmImport,
-    };
-});
+        clear,
+    }
+})

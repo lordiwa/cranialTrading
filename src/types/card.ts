@@ -1,6 +1,6 @@
 // src/types/card.ts
 export type CardCondition = 'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO';
-export type CardStatus = 'collection' | 'sell' | 'trade' | 'busco';
+export type CardStatus = 'collection' | 'sale' | 'trade' | 'wishlist';
 
 export interface Card {
     id: string;
@@ -13,7 +13,7 @@ export interface Card {
     price: number;
     image: string;
     status: CardStatus;
-    deckName?: string;  // NUEVO: nombre del mazo/lista
+    deckName?: string;  // nombre del mazo/lista
     // whether this card is visible on the user's public profile
     public?: boolean;
     updatedAt: Date;

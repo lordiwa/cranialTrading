@@ -8,13 +8,13 @@ const props = defineProps<{
   card: Card;
 }>();
 
-// compute a border class that matches the badge text color
+// ✅ CORREGIDO: Usar 'sale' en lugar de 'sell', 'trade' en lugar de 'trade', 'wishlist' en lugar de 'busco'
 const statusBorderClass = computed(() => {
   const s = props.card.status;
-  if (s === 'sell') return 'border-rust';
-  if (s === 'trade') return 'border-silver';
-  if (s === 'busco') return 'border-neon';
-  // default / collection
+  if (s === 'sale') return 'border-rust';      // Rojo óxido para VENTA
+  if (s === 'trade') return 'border-silver';   // Plata para CAMBIO
+  if (s === 'wishlist') return 'border-neon';  // Neon lime para BUSCO
+  // default / collection - gris claro
   return 'border-silver-20';
 });
 
@@ -48,12 +48,12 @@ const publicIconClass = computed(() => {
 </script>
 
 <template>
-  <!-- ✅ AGREGADO: @click="handleCardClick" en el contenedor principal -->
+  <!-- ✅ AGREGADO: @click="handleCardClick" en el contenedor principal + :class dinámico para border -->
   <div
       @click="handleCardClick"
       :class="[
         'relative bg-primary p-md md:p-lg hover:border-neon-40 transition-normal cursor-pointer',
-        'border',
+        'border-2',  // ✅ AGREGADO: border-2 para visibilidad
         statusBorderClass
       ]"
   >

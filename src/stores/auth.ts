@@ -15,12 +15,14 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User } from '../types/user';
 import { useToastStore } from './toast';
+import { useRouter } from 'vue-router';
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
     const emailVerified = ref(false);
     const toastStore = useToastStore();
+    const router = useRouter();
 
     const initAuth = () => {
         onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -128,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
     const logout = async () => {
         try {
             await signOut(auth);
+            await router.replace('/login');
             user.value = null;
             emailVerified.value = false;
             toastStore.show('Sesión cerrada', 'success');

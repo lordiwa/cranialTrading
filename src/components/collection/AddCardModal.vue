@@ -1,6 +1,6 @@
 <template>
   <BaseModal
-      :open="open"
+      :show="show"
       title="AGREGAR CARTA"
       @close="handleClose"
   >
@@ -105,6 +105,18 @@
           </label>
         </div>
 
+        <!-- STATUS (NUEVO: selector de categoría) -->
+        <div class="form-group">
+          <label>ESTADO</label>
+          <BaseSelect v-model="status">
+            <option value="collection">Colección</option>
+            <option value="sale">Venta</option>
+            <option value="trade">Cambio</option>
+            <option value="wishlist">Busco</option>
+          </BaseSelect>
+          <p class="helper-text">Categoría de la carta en tu colección</p>
+        </div>
+
         <!-- MAZO (NUEVO) -->
         <div class="form-group">
           <label>MAZO (opcional)</label>
@@ -158,7 +170,10 @@ interface Card {
 }
 
 const props = defineProps<{
-  open: boolean
+  show: boolean
+  // ✅ NUEVO: Props opcionales para valores por defecto
+  defaultStatus?: 'collection' | 'sale' | 'trade' | 'wishlist'
+  defaultDeckName?: string
 }>()
 
 const emit = defineEmits<{
@@ -179,7 +194,27 @@ const selectedCard = ref<Card | null>(null)
 const quantity = ref(1)
 const condition = ref<'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO'>('NM')
 const foil = ref(false)
-const deckName = ref('') // ✅ NUEVO - Con valor por defecto
+const status = ref<'collection' | 'sale' | 'trade' | 'wishlist'>('collection') // ✅ NUEVO
+const deckName = ref('') // ✅ NUEVO
+
+// ✅ WATCHER: Solo actualiza defaults cuando el modal ABRE
+watch(() => props.show, (isOpen) => {
+  if (isOpen) {
+    // Al abrir: aplicar los defaults del tab activo
+    if (props.defaultStatus) {
+      status.value = props.defaultStatus
+    } else {
+      status.value = 'collection'
+    }
+
+    if (props.defaultDeckName) {
+      deckName.value = props.defaultDeckName
+    } else {
+      deckName.value = ''
+    }
+  }
+  // Cuando cierra (isOpen = false): no hacer nada, los valores se mantienen
+}, { immediate: false })
 
 // Buscar con debounce
 const searchTimeout = ref<NodeJS.Timeout | null>(null)
@@ -204,7 +239,7 @@ const handleSearch = async () => {
       searchResults.value = results
     } catch (error) {
       console.error('❌ Error searching:', error)
-      toastStore.addToast('Error buscando cartas', 'error')
+      toastStore.show('Error buscando cartas', 'error')
       searchResults.value = []
     } finally {
       searching.value = false
@@ -226,13 +261,13 @@ const clearSelection = () => {
   quantity.value = 1
   condition.value = 'NM'
   foil.value = false
-  deckName.value = ''
+  // NO resetear status ni deckName - se heredan del tab activo
 }
 
 // Agregar carta
 const handleAddCard = async () => {
   if (!selectedCard.value || !quantity.value || quantity.value < 1) {
-    toastStore.addToast('Completa todos los campos', 'error')
+    toastStore.show('Completa todos los campos', 'error')
     return
   }
 
@@ -247,8 +282,8 @@ const handleAddCard = async () => {
       condition: condition.value,
       foil: foil.value,
       price: selectedCard.value.price,
-      status: 'collection' as const,
-      deckName: deckName.value || 'default', // ✅ IMPORTANTE: Valor por defecto si está vacío
+      status: status.value, // ✅ USAR el status seleccionado
+      deckName: deckName.value || 'default', // ✅ USAR el deckName seleccionado
       type: selectedCard.value.type,
       rarity: selectedCard.value.rarity,
     }
@@ -257,13 +292,13 @@ const handleAddCard = async () => {
 
     await collectionStore.addCard(cardData)
 
-    toastStore.addToast(`✅ ${selectedCard.value.name} agregada`, 'success')
+    toastStore.show(`✅ ${selectedCard.value.name} agregada`, 'success')
 
     emit('added', cardData)
     handleClose()
   } catch (error) {
     console.error('❌ Error adding card:', error)
-    toastStore.addToast('Error agregando carta', 'error')
+    toastStore.show('Error agregando carta', 'error')
   }
 }
 
@@ -272,6 +307,7 @@ const handleClose = () => {
   searchQuery.value = ''
   searchResults.value = []
   clearSelection()
+  // NO resetear status ni deckName - se mantienen para el siguiente uso
   emit('close')
 }
 </script>

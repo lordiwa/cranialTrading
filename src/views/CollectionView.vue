@@ -174,7 +174,8 @@ const handleUpdateStatus = async (newStatus: CardStatus, isPublic: boolean) => {
 };
 
 const handleAdd = (cardData: any) => {
-  collectionStore.addCard(cardData);
+  // ✅ CORRECCIÓN: El modal ya agregó la carta en handleAddCard()
+  // Solo cerramos el modal aquí (el cierre ya ocurre en handleClose del modal, pero esto es redundante y seguro)
   showAddModal.value = false;
 };
 
@@ -537,12 +538,13 @@ const handleDeleteDeck = async () => {
       />
 
       <!-- Modals -->
+      <!-- ✅ CORREGIDO: :show en lugar de :open + default-status y default-deck-name -->
       <AddCardModal
           :show="showAddModal"
-          :defaultDeckName="deckFilter !== 'all' ? deckFilter : undefined"
-          :defaultStatus="statusFilter !== 'all' ? statusFilter : 'collection'"
+          :default-status="statusFilter !== 'all' ? (statusFilter as any) : 'collection'"
+          :default-deck-name="deckFilter !== 'all' ? deckFilter : undefined"
           @close="showAddModal = false"
-          @add="handleAdd"
+          @added="handleAdd"
       />
 
       <EditCardModal

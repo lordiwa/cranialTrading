@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useAuthStore } from '../../stores/auth';
-import { useRouter } from 'vue-router';
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
 
 const authStore = useAuthStore();
-const router = useRouter();
 const mobileMenuOpen = ref(false);
 const showProfileHover = ref(false);
+const isLoggingOut = ref(false);
 
 const handleLogout = async () => {
   await authStore.logout();
-  router.push('/login');
-  mobileMenuOpen.value = false;
 };
 
 const closeMenu = () => {
@@ -84,9 +81,10 @@ const closeMenu = () => {
         </RouterLink>
         <button
             @click="handleLogout"
-            class="text-small text-silver hover:text-rust transition-fast"
+            :disabled="isLoggingOut"
+            class="text-small text-silver hover:text-rust transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Salir
+          {{ isLoggingOut ? 'Saliendo...' : 'Salir' }}
         </button>
       </div>
 
@@ -147,9 +145,10 @@ const closeMenu = () => {
             </RouterLink>
             <button
                 @click="handleLogout"
-                class="text-body text-rust hover:text-rust transition-fast"
+                :disabled="isLoggingOut"
+                class="text-body text-rust hover:text-rust transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cerrar Sesión
+              {{ isLoggingOut ? 'Saliendo...' : 'Cerrar Sesión' }}
             </button>
           </div>
         </nav>

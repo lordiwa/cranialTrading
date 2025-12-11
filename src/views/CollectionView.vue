@@ -79,62 +79,72 @@ const filteredCards = computed(() => {
   return cards;
 });
 
+// ✅ CORRECCIÓN: Usar 'sale' en lugar de 'sell'
 const collectionCount = computed(() => collectionStore.cards.filter(c => c.status === 'collection').length);
-const sellCount = computed(() => collectionStore.cards.filter(c => c.status === 'sell').length);
+const saleCount = computed(() => collectionStore.cards.filter(c => c.status === 'sale').length);
 const tradeCount = computed(() => collectionStore.cards.filter(c => c.status === 'trade').length);
-const buscoCount = computed(() => collectionStore.cards.filter(c => c.status === 'busco').length);
+const wishlistCount = computed(() => collectionStore.cards.filter(c => c.status === 'wishlist').length);
 
 // Totals (counts are number of card entries)
 const totalCardCount = computed(() => collectionStore.cards.length);
 const collectionCardCount = computed(() => collectionStore.cards.filter(c => c.status === 'collection').length);
-const remainderCount = computed(() => totalCardCount.value - (collectionCardCount.value + buscoCount.value));
+const remainderCount = computed(() => totalCardCount.value - (collectionCardCount.value + wishlistCount.value));
 
-
-// Costs: deck total (for selected deck if any, otherwise overall) and busco cost (filtered by deck if selected)
+// Costs: deck total (for selected deck if any, otherwise overall) and wishlist cost (filtered by deck if selected)
+// ✅ CORRECCIÓN: Usar 'wishlist' en lugar de 'busco'
 const deckTotalCost = computed(() => {
   const cards = deckFilter.value !== 'all'
-    ? collectionStore.cards.filter(c => c.deckName === deckFilter.value)
-    : collectionStore.cards;
+      ? collectionStore.cards.filter(c => c.deckName === deckFilter.value)
+      : collectionStore.cards;
   return cards.reduce((sum, c) => sum + ((c.price || 0) * (c.quantity || 0)), 0);
 });
 
-const buscoTotalCost = computed(() => {
+const wishlistTotalCost = computed(() => {
   const cards = deckFilter.value !== 'all'
-    ? collectionStore.cards.filter(c => c.deckName === deckFilter.value && c.status === 'busco')
-    : collectionStore.cards.filter(c => c.status === 'busco');
+      ? collectionStore.cards.filter(c => c.deckName === deckFilter.value && c.status === 'wishlist')
+      : collectionStore.cards.filter(c => c.status === 'wishlist');
   return cards.reduce((sum, c) => sum + ((c.price || 0) * (c.quantity || 0)), 0);
 });
 
 const deckTotalCostFormatted = computed(() => deckTotalCost.value ? deckTotalCost.value.toFixed(2) : '0.00');
-const buscoTotalCostFormatted = computed(() => buscoTotalCost.value ? buscoTotalCost.value.toFixed(2) : '0.00');
+const wishlistTotalCostFormatted = computed(() => wishlistTotalCost.value ? wishlistTotalCost.value.toFixed(2) : '0.00');
 
 const handleCardClick = (card: Card) => {
   selectedCard.value = card;
   showStatusModal.value = true;
 };
 
+// ✅ FUNCIÓN CORREGIDA: handleUpdateStatus con sale/trade/wishlist
 const handleUpdateStatus = async (newStatus: CardStatus, isPublic: boolean) => {
   if (!selectedCard.value) return;
 
   const oldStatus = selectedCard.value.status;
 
   // Update card status and public flag together
-  await collectionStore.updateCard(selectedCard.value.id, { status: newStatus, public: isPublic });
+  await collectionStore.updateCard(selectedCard.value.id, {
+    status: newStatus,
+    public: isPublic
+  });
 
   // Update local selectedCard copy to reflect changes for preference logic
-  const updatedCard = { ...selectedCard.value, status: newStatus, public: isPublic };
+  const updatedCard = {
+    ...selectedCard.value,
+    status: newStatus,
+    public: isPublic
+  };
 
   // Handle preference creation/deletion
   if (oldStatus !== 'collection' && newStatus === 'collection') {
-    // Removed from sell/trade/busco -> delete preference
+    // Removed from sale/trade/wishlist -> delete preference
     await preferencesStore.deletePreferenceByCard(updatedCard.scryfallId, updatedCard.edition);
   } else if (oldStatus === 'collection' && newStatus !== 'collection') {
-    // Added to sell/trade/busco -> create preference
+    // Added to sale/trade/wishlist -> create preference
     let prefType: any;
-    if (newStatus === 'sell') prefType = 'VENDO';
+    if (newStatus === 'sale') prefType = 'VENDO';
     else if (newStatus === 'trade') prefType = 'CAMBIO';
-    else if (newStatus === 'busco') prefType = 'BUSCO';
+    else if (newStatus === 'wishlist') prefType = 'BUSCO';
     else prefType = 'VENDO';
+
     await preferencesStore.addPreference({
       scryfallId: updatedCard.scryfallId,
       name: updatedCard.name,
@@ -145,12 +155,13 @@ const handleUpdateStatus = async (newStatus: CardStatus, isPublic: boolean) => {
       image: updatedCard.image,
     });
   } else if (oldStatus !== 'collection' && newStatus !== 'collection' && oldStatus !== newStatus) {
-    // Changed between sell/trade/busco -> update preference type
+    // Changed between sale/trade/wishlist -> update preference type
     let newType: any;
-    if (newStatus === 'sell') newType = 'VENDO';
+    if (newStatus === 'sale') newType = 'VENDO';
     else if (newStatus === 'trade') newType = 'CAMBIO';
-    else if (newStatus === 'busco') newType = 'BUSCO';
+    else if (newStatus === 'wishlist') newType = 'BUSCO';
     else newType = 'VENDO';
+
     await preferencesStore.updatePreferenceType(
         updatedCard.scryfallId,
         updatedCard.edition,
@@ -181,9 +192,9 @@ const handleSaveEdit = async (updates: Partial<Card>) => {
 };
 
 const handleDelete = async (cardId: string) => {
-  if (confirm('¿Eliminar esta carta?')) {
-    await collectionStore.deleteCard(cardId);
-  }
+  await collectionStore.deleteCard(cardId);
+  showStatusModal.value = false;
+  selectedCard.value = null;
 };
 
 const handleImport = async (
@@ -307,7 +318,7 @@ const handleConfirmImport = async () => {
   })();
 
   // handleConfirmImport: normalized batch name computed
-   const normalized = importResult.value.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
+  const normalized = importResult.value.processedCards.map((c: any) => ({ ...c, deckName: batchName }));
 
   // Close the modal immediately so the UI doesn't stay blocked
   showResultModal.value = false;
@@ -347,7 +358,7 @@ const handleCancelImport = () => {
   };
 };
 
-// NEW: delete a deck (all cards with the same deckName)
+// Delete a deck (all cards with the same deckName)
 const handleDeleteDeck = async () => {
   if (deckFilter.value === 'all') return;
   const confirmed = confirm(`Eliminar mazo "${deckFilter.value}"? Esta acción borrará todas las cartas de ese mazo.`);
@@ -404,16 +415,17 @@ const handleDeleteDeck = async () => {
         >
           COLECCIÓN ({{ collectionCount }})
         </button>
+        <!-- ✅ CORRECCIÓN: Cambiar 'sell' a 'sale' -->
         <button
-            @click="statusFilter = 'sell'"
+            @click="statusFilter = 'sale'"
             :class="[
               'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
-              statusFilter === 'sell'
+              statusFilter === 'sale'
                 ? 'bg-neon-10 text-neon border border-neon'
                 : 'bg-primary border border-silver-30 text-silver-70'
             ]"
         >
-          VENTA ({{ sellCount }})
+          VENTA ({{ saleCount }})
         </button>
         <button
             @click="statusFilter = 'trade'"
@@ -426,16 +438,17 @@ const handleDeleteDeck = async () => {
         >
           CAMBIO ({{ tradeCount }})
         </button>
+        <!-- ✅ CORRECCIÓN: Cambiar 'busco' a 'wishlist' -->
         <button
-            @click="statusFilter = 'busco'"
+            @click="statusFilter = 'wishlist'"
             :class="[
               'px-3 py-2 text-tiny font-bold transition-fast flex-shrink-0',
-              statusFilter === 'busco'
+              statusFilter === 'wishlist'
                 ? 'bg-neon-10 text-neon border border-neon'
                 : 'bg-primary border border-silver-30 text-silver-70'
             ]"
         >
-          BUSCO ({{ buscoCount }})
+          BUSCO ({{ wishlistCount }})
         </button>
       </div>
 
@@ -453,7 +466,7 @@ const handleDeleteDeck = async () => {
             </option>
           </select>
 
-          <!-- NEW: Delete deck button -->
+          <!-- Delete deck button -->
           <button
               v-if="deckFilter !== 'all'"
               @click="handleDeleteDeck"
@@ -472,7 +485,7 @@ const handleDeleteDeck = async () => {
         />
       </div>
 
-      <!-- NEW: Stats bar -->
+      <!-- Stats bar -->
       <div v-if="collectionStore.cards.length > 0" class="bg-primary p-md rounded-lg mb-4 md:mb-6 border border-silver-30">
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
           <div>
@@ -483,9 +496,10 @@ const handleDeleteDeck = async () => {
             <div class="text-small text-silver-70">En Colección</div>
             <div class="text-h5 font-bold text-silver">{{ collectionCardCount }}</div>
           </div>
+          <!-- ✅ CORRECCIÓN: Usar 'wishlist' en lugar de 'busco' -->
           <div>
             <div class="text-small text-silver-70">Busco</div>
-            <div class="text-h5 font-bold text-silver">{{ buscoCount }}</div>
+            <div class="text-h5 font-bold text-silver">{{ wishlistCount }}</div>
           </div>
           <div>
             <div class="text-small text-silver-70">Resto</div>
@@ -495,9 +509,10 @@ const handleDeleteDeck = async () => {
             <div class="text-small text-silver-70">Costo Total (Mazo)</div>
             <div class="text-h5 font-bold text-silver">${{ deckTotalCostFormatted }}</div>
           </div>
+          <!-- ✅ CORRECCIÓN: Usar 'wishlist' en lugar de 'busco' -->
           <div>
             <div class="text-small text-silver-70">Costo Busco</div>
-            <div class="text-h5 font-bold text-silver">${{ buscoTotalCostFormatted }}</div>
+            <div class="text-h5 font-bold text-silver">${{ wishlistTotalCostFormatted }}</div>
           </div>
         </div>
       </div>
@@ -542,6 +557,7 @@ const handleDeleteDeck = async () => {
           :card="selectedCard"
           @close="showStatusModal = false"
           @update-status="handleUpdateStatus"
+          @delete="handleDelete"
       />
 
       <ImportDeckModal

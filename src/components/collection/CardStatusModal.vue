@@ -13,25 +13,42 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   updateStatus: [status: CardStatus, isPublic: boolean];
+  delete: [cardId: string];
 }>();
 
 const selectedStatus = ref<CardStatus>('collection');
 const isPublic = ref(false);
 
-// Initialize selectedStatus and isPublic when a card is passed in
 watch(
-  () => props.card,
-  (c) => {
-    if (c) {
-      selectedStatus.value = (c.status as CardStatus) || 'collection';
-      isPublic.value = !!c.public;
-    }
-  },
-  { immediate: true }
+    () => props.card,
+    (c) => {
+      if (c) {
+        selectedStatus.value = (c.status as CardStatus) || 'collection';
+        isPublic.value = !!c.public;
+      }
+    },
+    { immediate: true }
 );
 
 const handleConfirm = () => {
   emit('updateStatus', selectedStatus.value, isPublic.value);
+};
+
+const handleDelete = () => {
+  if (!props.card) {
+    console.error('❌ No card found in props');
+    return;
+  }
+
+  console.log('🗑️ DELETE CLICKED for card:', props.card.name, 'ID:', props.card.id);
+
+  const confirmed = confirm(`Delete "${props.card.name}"?`);
+  if (confirmed) {
+    console.log('✅ Confirmed delete. Emitting delete event with ID:', props.card.id);
+    emit('delete', props.card.id);
+  } else {
+    console.log('❌ User cancelled delete');
+  }
 };
 
 const handleClose = () => {
@@ -42,7 +59,7 @@ const handleClose = () => {
 </script>
 
 <template>
-  <BaseModal :show="show" title="¿QUÉ QUIERES HACER CON ESTA CARTA?" @close="handleClose">
+  <BaseModal :show="show" title="WHAT DO YOU WANT TO DO WITH THIS CARD?" @close="handleClose">
     <div v-if="card" class="space-y-lg">
       <!-- Card preview -->
       <div class="border border-silver-30 p-md flex gap-4">
@@ -65,7 +82,7 @@ const handleClose = () => {
 
       <!-- Status options -->
       <div class="space-y-sm">
-        <p class="text-small text-silver-70">Selecciona una opción:</p>
+        <p class="text-small text-silver-70">Select an option:</p>
 
         <button
             @click="selectedStatus = 'collection'"
@@ -78,52 +95,32 @@ const handleClose = () => {
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-body font-bold text-silver">SOLO COLECCIÓN</p>
+              <p class="text-body font-bold text-silver">COLLECTION ONLY</p>
               <p class="text-tiny text-silver-70 mt-1">
-                Guardar en mi colección, no comerciar
+                Keep in collection, do not trade
               </p>
             </div>
-            <BaseBadge variant="cambio">GUARDAR</BaseBadge>
+            <BaseBadge variant="cambio">KEEP</BaseBadge>
           </div>
         </button>
 
         <button
-            @click="selectedStatus = 'sell'"
+            @click="selectedStatus = 'sale'"
             :class="[
               'w-full p-md border-2 transition-fast text-left',
-              selectedStatus === 'sell'
+              selectedStatus === 'sale'
                 ? 'border-neon bg-neon-5'
                 : 'border-silver-30 hover:border-silver'
             ]"
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-body font-bold text-silver">VENDER</p>
+              <p class="text-body font-bold text-silver">SELL</p>
               <p class="text-tiny text-silver-70 mt-1">
-                Crear preferencia automática de VENTA
+                Create automatic SALE preference
               </p>
             </div>
-            <BaseBadge variant="vendo">VENDO</BaseBadge>
-          </div>
-        </button>
-
-        <button
-            @click="selectedStatus = 'busco'"
-            :class="[
-              'w-full p-md border-2 transition-fast text-left',
-              selectedStatus === 'busco'
-                ? 'border-neon bg-neon-5'
-                : 'border-silver-30 hover:border-silver'
-            ]"
-        >
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-body font-bold text-silver">BUSCAR</p>
-              <p class="text-tiny text-silver-70 mt-1">
-                Agregar a mis preferencias de BUSCO
-              </p>
-            </div>
-            <BaseBadge variant="busco">BUSCO</BaseBadge>
+            <BaseBadge variant="vendo">SALE</BaseBadge>
           </div>
         </button>
 
@@ -138,12 +135,32 @@ const handleClose = () => {
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-body font-bold text-silver">CAMBIAR</p>
+              <p class="text-body font-bold text-silver">TRADE</p>
               <p class="text-tiny text-silver-70 mt-1">
-                Crear preferencia automática de CAMBIO
+                Create automatic TRADE preference
               </p>
             </div>
-            <BaseBadge variant="cambio">CAMBIO</BaseBadge>
+            <BaseBadge variant="cambio">TRADE</BaseBadge>
+          </div>
+        </button>
+
+        <button
+            @click="selectedStatus = 'wishlist'"
+            :class="[
+              'w-full p-md border-2 transition-fast text-left',
+              selectedStatus === 'wishlist'
+                ? 'border-neon bg-neon-5'
+                : 'border-silver-30 hover:border-silver'
+            ]"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-body font-bold text-silver">SEARCH</p>
+              <p class="text-tiny text-silver-70 mt-1">
+                Add to my SEARCH preferences
+              </p>
+            </div>
+            <BaseBadge variant="busco">SEARCH</BaseBadge>
           </div>
         </button>
       </div>
@@ -152,24 +169,35 @@ const handleClose = () => {
       <div class="pt-2">
         <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
           <input v-model="isPublic" type="checkbox" class="w-4 h-4" />
-          <span>Visible en mi perfil público</span>
+          <span>Visible on my public profile</span>
         </label>
       </div>
 
       <!-- Actions -->
-      <div class="flex gap-3 pt-4 border-t border-silver-20">
+      <div class="flex flex-col gap-3 pt-4 border-t border-silver-20">
+        <div class="flex gap-3">
+          <BaseButton
+              variant="secondary"
+              class="flex-1"
+              @click="handleClose"
+          >
+            CANCEL
+          </BaseButton>
+          <BaseButton
+              class="flex-1"
+              @click="handleConfirm"
+          >
+            CONFIRM
+          </BaseButton>
+        </div>
+
+        <!-- DELETE BUTTON - RED -->
         <BaseButton
-            variant="secondary"
-            class="flex-1"
-            @click="handleClose"
+            variant="danger"
+            class="w-full"
+            @click="handleDelete"
         >
-          CANCELAR
-        </BaseButton>
-        <BaseButton
-            class="flex-1"
-            @click="handleConfirm"
-        >
-          CONFIRMAR
+          🗑️ DELETE CARD
         </BaseButton>
       </div>
     </div>

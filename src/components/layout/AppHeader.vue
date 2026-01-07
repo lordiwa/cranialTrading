@@ -10,7 +10,7 @@ const mobileMenuOpen = ref(false);
 const showProfileHover = ref(false);
 
 const handleLogout = async () => {
-  await router. ('/login');
+  await router.push('/login');
   await authStore.logout();
 };
 

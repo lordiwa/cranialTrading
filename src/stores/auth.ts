@@ -135,6 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
             user.value = null;
             emailVerified.value = false;
             toastStore.show('Sesión cerrada', 'success');
+            window.location.reload();
             setTimeout(() => {
                 isLoggingOut.value = false;
             }, 500);

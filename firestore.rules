@@ -1,48 +1,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ==================== USERS ====================
     match /users/{userId} {
-      // Cualquier usuario autenticado puede leer datos públicos de otros usuarios
       allow read: if request.auth != null;
-
-      // Solo el dueño puede escribir su propio perfil
       allow write: if request.auth.uid == userId;
 
-      // ==================== CARDS (sub-collection) ====================
       match /cards/{cardId} {
-        // Cualquier usuario autenticado puede LEER cartas de cualquiera
         allow read: if request.auth != null;
-
-        // Solo el dueño puede escribir sus propias cartas
         allow write: if request.auth.uid == userId;
       }
 
-      // ==================== PREFERENCIAS (sub-collection) ====================
       match /preferencias/{preferenceId} {
-        // Cualquier usuario autenticado puede LEER preferencias de cualquiera
         allow read: if request.auth != null;
-
-        // Solo el dueño puede escribir sus propias preferencias
         allow write: if request.auth.uid == userId;
       }
 
-      // ==================== MATCHES (sub-collection) ====================
-      match /matches/{matchId} {
-        // Solo el dueño puede leer sus matches
-        allow read: if request.auth.uid == userId;
-
-        // Solo el dueño puede escribir sus matches
-        allow write: if request.auth.uid == userId;
+      match /matches_nuevos/{matchId} {
+        allow read, write: if request.auth.uid == userId;
       }
 
-      // ==================== CONTACTS (sub-collection) ====================
+      match /matches_guardados/{matchId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      match /matches_eliminados/{matchId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
       match /contacts/{contactId} {
-        // Solo el dueño puede leer sus contactos guardados
         allow read: if request.auth.uid == userId;
-
-        // Solo el dueño puede escribir sus contactos
         allow write: if request.auth.uid == userId;
       }
     }

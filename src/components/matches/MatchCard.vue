@@ -1,305 +1,200 @@
 <template>
-  <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40">
-    <!-- Header con Username y Location -->
-    <div class="flex justify-between items-start mb-md">
-      <div class="flex-1">
-        <!-- Username link con hover preview -->
-        <div
-            @mouseenter="showProfileHover = true"
-            @mouseleave="showProfileHover = false"
-            class="relative"
-        >
+  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300">
+    <!-- Header: Match Title + Compatibility -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div>
+        <h3 class="text-h3 text-silver font-bold">
+          MATCH #{{ matchIndex }} - COMPATIBILIDAD:
+          <span class="text-neon">{{ match.compatibility }}%</span>
+        </h3>
+        <p class="text-small text-silver-70 mt-1">
+          Con
           <RouterLink
-              :to="{ name: 'userProfile', params: { username: match.username } }"
-              class="text-h3 text-silver font-bold hover:text-neon transition-fast"
+              :to="{ name: 'userProfile', params: { username: match.otherUsername } }"
+              class="text-neon hover:underline font-bold"
           >
-            @{{ match.username }}
+            @{{ match.otherUsername }}
           </RouterLink>
-          <UserProfileHoverCard
-              :username="match.username"
-              :show="showProfileHover"
-          />
-        </div>
-
-        <p class="text-small text-silver-70 mt-sm">
-          📍 {{ match.location || 'Ubicación no disponible' }}
+          • 📍 {{ match.otherLocation }}
         </p>
       </div>
-      <span class="text-tiny text-silver-50">{{ formattedDate }}</span>
     </div>
 
-    <div class="border-b border-silver-20 mb-md"></div>
+    <!-- Divider -->
+    <div class="border-t border-silver-20 my-6"></div>
 
-    <!-- NUEVO: Compatibilidad y detalles de precio (si existen) -->
-    <div v-if="match.compatibility !== undefined" class="mb-md p-sm bg-primary-dark border border-silver-20">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-tiny text-silver-70">Compatibilidad</p>
-          <p class="text-h5 font-bold text-neon">{{ match.compatibility }}%</p>
-        </div>
-        <div v-if="match.valueDifference !== undefined" class="text-right">
-          <p class="text-tiny text-silver-70">Diferencia de valor</p>
-          <p :class="['text-h5 font-bold', getValueDifferenceColor(match.valueDifference)]">
-            {{ formatValueDifference(match.valueDifference) }}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Cards Section with Compact Images -->
-    <div class="grid grid-cols-2 gap-md mb-md">
-      <!-- What They Want (Tu oferta) -->
+    <!-- Match Content Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+      <!-- TÚ OFRECES -->
       <div>
-        <p class="text-tiny font-bold text-silver mb-sm">QUEREMOS:</p>
-        <div class="space-y-xs">
-          <div v-if="theyWant && theyWant.length > 0">
-            <div v-for="card in theyWant" :key="`want-${card.name}`">
-              <!-- Card Image - 25% size -->
-              <div v-if="card.image" class="mb-xs w-1/4">
-                <img
-                    :src="card.image"
-                    :alt="card.name"
-                    class="w-full h-auto border border-silver-20 object-cover aspect-[3/4]"
-                />
-              </div>
-              <!-- Card Info -->
-              <p class="text-tiny text-silver font-medium">{{ card.name }}</p>
-              <p class="text-tiny text-silver-70">x{{ card.quantity }} | {{ card.condition }}</p>
-              <!-- NUEVO: Mostrar precio si disponible -->
-              <p v-if="card.price" class="text-tiny text-neon font-bold">
-                {{ formatMoney(card.price * card.quantity) }}
-              </p>
+        <h4 class="text-small font-bold text-silver-70 uppercase mb-4">Tú Ofreces</h4>
+        <div class="space-y-2">
+          <div v-if="match.myCards && match.myCards.length > 0">
+            <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded-sm">
+              <p class="text-body font-bold text-silver">{{ card.name }}</p>
+              <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
+              <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
             </div>
           </div>
-          <div v-else class="text-small text-silver-50">N/A</div>
+          <div v-else class="text-small text-silver-50 italic">
+            Sin cartas específicas (regalando valor)
+          </div>
         </div>
+        <p class="text-h3 text-neon font-bold mt-4">${{ match.myTotalValue?.toFixed(2) || '0.00' }}</p>
+        <p class="text-tiny text-silver-70">Valor total</p>
       </div>
 
-      <!-- What We Offer (Su oferta) -->
+      <!-- RECIBES -->
       <div>
-        <p class="text-tiny font-bold text-silver mb-sm">OFRECEN:</p>
-        <div class="space-y-xs">
-          <div v-if="weOffer && weOffer.length > 0">
-            <div v-for="card in weOffer" :key="`offer-${card.name}`">
-              <!-- Card Image - 25% size -->
-              <div v-if="card.image" class="mb-xs w-1/4">
-                <img
-                    :src="card.image"
-                    :alt="card.name"
-                    class="w-full h-auto border border-silver-20 object-cover aspect-[3/4]"
-                />
-              </div>
-              <!-- Card Info -->
-              <p class="text-tiny text-silver font-medium">{{ card.name }}</p>
-              <p class="text-tiny text-silver-70">x{{ card.quantity }} | {{ card.condition }}</p>
-              <!-- NUEVO: Mostrar precio si disponible -->
-              <p v-if="card.price" class="text-tiny text-neon font-bold">
-                {{ formatMoney(card.price * card.quantity) }}
-              </p>
+        <h4 class="text-small font-bold text-silver-70 uppercase mb-4">Recibes</h4>
+        <div class="space-y-2">
+          <div v-if="match.otherCards && match.otherCards.length > 0">
+            <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded-sm">
+              <p class="text-body font-bold text-silver">{{ card.name }}</p>
+              <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
+              <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
             </div>
           </div>
-          <div v-else class="text-small text-silver-50">N/A</div>
+          <div v-else class="text-small text-silver-50 italic">
+            Sin cartas específicas (regalando valor)
+          </div>
         </div>
+        <p class="text-h3 text-neon font-bold mt-4">${{ match.theirTotalValue?.toFixed(2) || '0.00' }}</p>
+        <p class="text-tiny text-silver-70">Valor total</p>
       </div>
     </div>
 
-    <!-- NUEVO: Totales de valor (si existen) -->
-    <div v-if="match.myTotalValue !== undefined && match.theirTotalValue !== undefined" class="mb-md p-sm bg-primary-dark border border-silver-20">
-      <div class="grid grid-cols-2 gap-md text-center">
+    <!-- Price Difference -->
+    <div class="bg-silver-5 border border-silver-20 p-4 mb-6">
+      <div class="flex justify-between items-center">
+        <p class="text-small text-silver-70">Diferencia de precio:</p>
+        <p :class="[
+          'text-h3 font-bold',
+          match.valueDifference >= 0 ? 'text-neon' : 'text-silver-50'
+        ]">
+          {{ match.valueDifference >= 0 ? '+' : '' }}${{ Math.abs(match.valueDifference).toFixed(2) }}
+        </p>
+      </div>
+      <p class="text-tiny text-silver-70 mt-2">
+        {{ match.valueDifference >= 0 ? 'Tú recibes ventaja' : 'El otro recibe ventaja' }}
+      </p>
+    </div>
+
+    <!-- Match Type Badge -->
+    <div class="flex gap-2 mb-6">
+      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-block bg-neon-10 border border-neon px-3 py-1">
+        <p class="text-tiny font-bold text-neon">✓ BIDIRECCIONAL</p>
+      </span>
+      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1">
+        <p class="text-tiny font-bold text-silver-70">→ UNIDIRECCIONAL</p>
+      </span>
+    </div>
+
+    <!-- Divider -->
+    <div class="border-t border-silver-20 my-6"></div>
+
+    <!-- Actions -->
+    <div class="flex flex-col md:flex-row gap-3">
+      <BaseButton
+          class="flex-1"
+          @click="handleSaveMatch"
+          :disabled="saving"
+      >
+        {{ saving ? '⏳ GUARDANDO...' : '💾 ME INTERESA' }}
+      </BaseButton>
+      <BaseButton
+          variant="secondary"
+          class="flex-1"
+          @click="handleDiscard"
+      >
+        ✕ IGNORAR
+      </BaseButton>
+      <BaseButton
+          variant="secondary"
+          class="flex-1"
+          @click="copyEmailToClipboard"
+      >
+        📧 COPIAR EMAIL
+      </BaseButton>
+    </div>
+
+    <!-- Modal de Contacto -->
+    <BaseModal
+        :show="showContactModal"
+        title="CONTACTO"
+        @close="showContactModal = false"
+    >
+      <div class="space-y-3 mb-6">
         <div>
-          <p class="text-tiny text-silver-70">Tu valor</p>
-          <p class="text-small font-bold text-silver">{{ formatMoney(match.myTotalValue) }}</p>
+          <p class="text-tiny text-silver-70 uppercase">Usuario</p>
+          <p class="text-body font-bold text-silver">@{{ match.otherUsername }}</p>
         </div>
         <div>
-          <p class="text-tiny text-silver-70">Su valor</p>
-          <p class="text-small font-bold text-silver">{{ formatMoney(match.theirTotalValue) }}</p>
+          <p class="text-tiny text-silver-70 uppercase">Ubicación</p>
+          <p class="text-body text-silver">📍 {{ match.otherLocation }}</p>
+        </div>
+        <div>
+          <p class="text-tiny text-silver-70 uppercase">Email</p>
+          <p class="text-body text-silver">{{ match.otherEmail }}</p>
         </div>
       </div>
-    </div>
 
-    <!-- Action Buttons -->
-    <div class="flex gap-sm md:gap-md flex-wrap">
-      <!-- NUEVOS Tab -->
-      <template v-if="tab === 'new'">
-        <button
-            @click="$emit('save', match)"
-            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
-        >
-          ✓ ME INTERESA
-        </button>
-        <button
-            @click="$emit('discard', match.id, 'new')"
-            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
-        >
-          ✕ IGNORAR
-        </button>
-      </template>
-
-      <!-- SAVED Tab (MIS MATCHES) -->
-      <template v-if="tab === 'saved'">
-        <button
-            @click="$emit('contactar', { username: match.username, email: match.email, location: match.location })"
-            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
-        >
-          💬 CONTACTAR
-        </button>
-
-        <button
-            @click="$emit('marcar-completado', match.id)"
-            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
-        >
-          ✓ COMPLETADO
-        </button>
-
-        <button
-            @click="$emit('descartar', match.id)"
-            class="btn-danger px-lg py-md text-small font-bold transition-fast"
-        >
-          ✕ ELIMINAR
-        </button>
-      </template>
-
-      <!-- DELETED Tab -->
-      <template v-if="tab === 'deleted'">
-        <button
-            @click="$emit('recover', match.id)"
-            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
-        >
-          ↩️ RECUPERAR
-        </button>
-        <button
-            @click="$emit('delete', match.id)"
-            class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1"
-        >
-          🗑️ ELIMINAR
-        </button>
-      </template>
-    </div>
+      <div class="flex gap-2 pt-4">
+        <BaseButton class="flex-1" @click="copyEmailToClipboard">
+          📧 COPIAR EMAIL
+        </BaseButton>
+        <BaseButton variant="secondary" class="flex-1" @click="showContactModal = false">
+          CERRAR
+        </BaseButton>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
-
-interface Card {
-  name: string
-  quantity?: number
-  condition?: string
-  image?: string | null
-  price?: number
-  [key: string]: any
-}
-
-interface Match {
-  id: string
-  username: string
-  location?: string
-  email?: string
-  myCard?: Card | null
-  otherPreference?: Card | null
-  myTotalValue?: number
-  theirTotalValue?: number
-  valueDifference?: number
-  compatibility?: number
-  [key: string]: any
-}
+import { ref } from 'vue'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseModal from '../ui/BaseModal.vue'
 
 interface Props {
-  match: Match
-  tab: 'new' | 'saved' | 'deleted'
+  match: any
+  matchIndex?: number
+  tab?: string
 }
 
-const props = defineProps<Props>()
-
-const emit = defineEmits<{
-  save: [match: Match]
-  discard: [matchId: string, tab: 'new']
-  contactar: [contact: { username: string; email?: string; location?: string }]
-  'marcar-completado': [matchId: string]
-  descartar: [matchId: string]
-  recover: [matchId: string]
-  delete: [matchId: string]
-}>()
-
-const showProfileHover = ref(false)
-
-// Lo que ELLOS QUIEREN (nuestra oferta)
-const theyWant = computed(() => {
-  const cards: Card[] = []
-
-  // Si nosotros ofrecemos una carta (myCard)
-  if (props.match.myCard) {
-    const card = {
-      name: props.match.myCard.name || 'Carta desconocida',
-      quantity: props.match.myCard.quantity || 1,
-      condition: props.match.myCard.condition || 'M',
-      image: props.match.myCard.image || null,
-      price: props.match.myCard.price,
-    }
-    cards.push(card)
-  }
-
-  return cards.length > 0 ? cards : null
+const props = withDefaults(defineProps<Props>(), {
+  matchIndex: 0,
+  tab: 'new'
 })
 
-// Lo que NOSOTROS QUEREMOS (su oferta)
-const weOffer = computed(() => {
-  const cards: Card[] = []
+const emit = defineEmits(['save', 'discard'])
 
-  // Si ellos ofrecen una preferencia (otherPreference)
-  if (props.match.otherPreference) {
-    const card = {
-      name: props.match.otherPreference.name || 'Carta desconocida',
-      quantity: props.match.otherPreference.quantity || 1,
-      condition: props.match.otherPreference.condition || 'M',
-      image: props.match.otherPreference.image || null,
-      price: props.match.otherPreference.price,
-    }
-    cards.push(card)
-  }
+const saving = ref(false)
+const showContactModal = ref(false)
 
-  return cards.length > 0 ? cards : null
-})
-
-const formattedDate = computed(() => {
-  if (!props.match.createdAt) return 'reciente'
-
+const handleSaveMatch = async () => {
+  saving.value = true
   try {
-    const now = new Date()
-    const created = typeof props.match.createdAt === 'string'
-        ? new Date(props.match.createdAt)
-        : props.match.createdAt instanceof Date
-            ? props.match.createdAt
-            : props.match.createdAt?.toDate?.() || new Date()
-
-    const diff = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-
-    if (diff === 0) return 'hoy'
-    if (diff === 1) return 'ayer'
-    if (diff < 0) return 'reciente'
-    return `hace ${diff}d`
-  } catch (e) {
-    return 'reciente'
+    emit('save', props.match)
+  } finally {
+    saving.value = false
   }
-})
-
-// NUEVO: Funciones para mostrar precio
-const formatMoney = (value: number): string => `$${value.toFixed(2)}`
-
-const getValueDifferenceColor = (diff: number): string => {
-  if (diff > 0) return 'text-neon' // A mi favor
-  if (diff < 0) return 'text-rust' // A su favor
-  return 'text-silver' // Igualado
 }
 
-const formatValueDifference = (diff: number): string => {
-  if (diff === 0) return 'Igual'
-  if (diff > 0) return `+${formatMoney(diff)} favor`
-  return `${formatMoney(Math.abs(diff))} su favor`
+const handleDiscard = () => {
+  emit('discard', props.match.id)
+}
+
+const copyEmailToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(props.match.otherEmail)
+    alert('✅ Email copiado: ' + props.match.otherEmail)
+  } catch (err) {
+    alert('❌ Error al copiar email')
+  }
 }
 </script>
 
 <style scoped>
-/* All styles in global style.css */
+/* Los estilos se aplican directamente con clases Tailwind en el template */
 </style>

@@ -16,23 +16,31 @@ export interface MatchCalculation {
     valueDifference: number
     compatibility: number
     isValid: boolean
+    matchType: 'bidirectional' | 'unidirectional'
 }
 
 export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
+    /**
+     * Calcular compatibilidad basada en diferencia de precio
+     * 100% = exacta, 90% = ~$10 de diferencia, etc
+     */
     const calculateCompatibility = (myValue: number, theirValue: number): number => {
         if (myValue === 0 && theirValue === 0) return 100
-        if (myValue === 0 || theirValue === 0) return 0
+        if (myValue === 0 || theirValue === 0) return 50
 
         const maxValue = Math.max(myValue, theirValue)
         const minValue = Math.min(myValue, theirValue)
         const diff = (maxValue - minValue) / maxValue
 
-        return Math.max(0, 100 - Math.round(diff * 100))
+        return Math.max(0, Math.round((1 - diff) * 100))
     }
 
+    /**
+     * Validar que el match esté dentro de la tolerancia de precio (±10%)
+     */
     const isValidMatch = (myValue: number, theirValue: number): boolean => {
-        if (myValue === 0 || theirValue === 0) return false
+        if (myValue === 0 || theirValue === 0) return true
 
         const maxValue = Math.max(myValue, theirValue)
         const minValue = Math.min(myValue, theirValue)
@@ -42,7 +50,8 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
     }
 
     /**
-     * MATCH BIDIRECCIONAL: Yo tengo lo que él busca + Él tiene lo que yo busco
+     * MATCH BIDIRECCIONAL:
+     * Yo tengo lo que él BUSCA AND él tiene lo que yo BUSCO
      */
     const calculateBidirectionalMatch = (
         myCards: Card[],
@@ -53,23 +62,34 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
         const myOffering: Card[] = []
         let myValue = 0
 
-        // Mi oferta: cartas que él busca (excluir preferencias guardadas)
+        // Mi oferta: cartas que ELLOS BUSCAN (solo BUSCO)
         for (const myCard of myCards) {
             if (myCard.status === 'wishlist') continue
-            if (theirPreferences.some(p => p.scryfallId === myCard.scryfallId)) {
+
+            const matchingPref = theirPreferences.find(p =>
+                p.name && p.name.toLowerCase() === myCard.name?.toLowerCase() &&
+                p.type === 'BUSCO'
+            )
+
+            if (matchingPref) {
                 myOffering.push(myCard)
                 myValue += (myCard.price || 0) * (myCard.quantity || 1)
             }
         }
 
-        // Su oferta: cartas que yo busco (excluir preferencias)
+        // Su oferta: cartas que YO BUSCO (solo BUSCO)
         const theirOffering: Card[] = []
         let theirValue = 0
 
         for (const myPref of myPreferences) {
+            if (myPref.type !== 'BUSCO') continue
+
             const matching = theirCards.filter(
-                c => c.scryfallId === myPref.scryfallId && c.status !== 'wishlist'
+                c => c.name && c.name.toLowerCase() === (myPref.name || '').toLowerCase() &&
+                    c.status !== 'wishlist' &&
+                    c.quantity > 0
             )
+
             for (const card of matching) {
                 theirOffering.push(card)
                 theirValue += (card.price || 0) * (card.quantity || 1)
@@ -81,6 +101,11 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             return null
         }
 
+        // Validar precio
+        if (!isValidMatch(myValue, theirValue)) {
+            return null
+        }
+
         return {
             myCardIds: myOffering.map(c => c.id),
             myCardsInfo: myOffering,
@@ -93,76 +118,86 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             valueDifference: myValue - theirValue,
             compatibility: calculateCompatibility(myValue, theirValue),
             isValid: true,
+            matchType: 'bidirectional',
         }
     }
 
     /**
-     * MATCH UNIDIRECCIONAL: O yo tengo lo que él busca, O él tiene lo que yo busco
+     * MATCH UNIDIRECCIONAL - SIMPLIFICADO:
+     * Yo tengo lo que él BUSCA
+     * O él tiene (en colección) lo que yo BUSCO/CAMBIO/VENDO
+     *
+     * NO importa el tipo de preferencia del otro usuario
+     * Solo importa si EXISTE la carta en su colección
      */
     const calculateUnidirectionalMatch = (
         myCards: Card[],
         myPreferences: Preference[],
         theirCards: Card[],
-        theirPreferences: Preference[],
-        debugName?: string
+        theirPreferences: Preference[]
     ): MatchCalculation | null => {
-        const myOffering: Card[] = []
-        let myValue = 0
+        try {
+            const myOffering: Card[] = []
+            let myValue = 0
 
-        // Mi oferta: cartas que él busca (excluir preferencias guardadas)
-        for (const myCard of myCards) {
-            if (myCard.status === 'wishlist') continue
-            if (theirPreferences.some(p => p.scryfallId === myCard.scryfallId)) {
-                myOffering.push(myCard)
-                myValue += (myCard.price || 0) * (myCard.quantity || 1)
+            // Mi oferta: cartas que ELLOS BUSCAN (solo BUSCO)
+            for (const myCard of myCards) {
+                if (myCard.status === 'wishlist' || !myCard.name) continue
+
+                const matchingPref = theirPreferences.find(p =>
+                    p.name && p.name.toLowerCase() === myCard.name.toLowerCase() &&
+                    p.type === 'BUSCO'
+                )
+
+                if (matchingPref) {
+                    myOffering.push(myCard)
+                    myValue += (myCard.price || 0) * (myCard.quantity || 1)
+                }
             }
-        }
 
-        // Su oferta: cartas que yo busco (excluir preferencias)
-        const theirOffering: Card[] = []
-        let theirValue = 0
+            // Su oferta: cartas que YO BUSCO/CAMBIO/VENDO (cualquier tipo)
+            const theirOffering: Card[] = []
+            let theirValue = 0
 
-        for (const myPref of myPreferences) {
-            const matching = theirCards.filter(
-                c => c.scryfallId === myPref.scryfallId && c.status !== 'wishlist'
-            )
-            for (const card of matching) {
-                theirOffering.push(card)
-                theirValue += (card.price || 0) * (card.quantity || 1)
+            for (const myPref of myPreferences) {
+                if (!myPref.name) continue
+
+                // Buscar si él tiene esa carta en colección (cualquier estado excepto wishlist)
+                const matching = theirCards.filter(
+                    c => c.name &&
+                        c.name.toLowerCase() === myPref.name.toLowerCase() &&
+                        c.status !== 'wishlist' &&
+                        c.quantity > 0
+                )
+
+                for (const card of matching) {
+                    theirOffering.push(card)
+                    theirValue += (card.price || 0) * (card.quantity || 1)
+                }
             }
-        }
 
-        if (debugName === 'srparca') {
-            console.log(`  [UNIDIRECTIONAL DEBUG]`)
-            console.log(`    Their preferences:`, theirPreferences.map(p => p.name))
-            console.log(`    Their prefs scryfallIds:`, theirPreferences.map(p => p.scryfallId))
-            console.log(`    My cards (todas):`, myCards.map(c => ({ name: c.name, scryfallId: c.scryfallId, status: c.status })))
-            console.log(`    My offering (cartas que buscan ellos):`, myOffering.map(c => `${c.name}($${c.price})`))
-            console.log(`    My preferences:`, myPreferences.map(p => p.name))
-            console.log(`    Their cards (todas):`, theirCards.map(c => ({ name: c.name, scryfallId: c.scryfallId, status: c.status })))
-            console.log(`    Their offering (cartas que busco yo):`, theirOffering.map(c => `${c.name}($${c.price})`))
-        }
+            // UNIDIRECCIONAL: al menos UN lado debe tener cartas
+            if (myOffering.length === 0 && theirOffering.length === 0) {
+                return null
+            }
 
-        // UNIDIRECCIONAL: al menos UN lado debe tener cartas
-        if (myOffering.length === 0 && theirOffering.length === 0) {
-            if (debugName === 'srparca') console.log(`    ❌ NO MATCH: Ambos sin cartas`)
+            return {
+                myCardIds: myOffering.map(c => c.id),
+                myCardsInfo: myOffering,
+                myTotalValue: myValue,
+
+                theirCardIds: theirOffering.map(c => c.id),
+                theirCardsInfo: theirOffering,
+                theirTotalValue: theirValue,
+
+                valueDifference: myValue - theirValue,
+                compatibility: calculateCompatibility(myValue, theirValue),
+                isValid: true,
+                matchType: 'unidirectional',
+            }
+        } catch (error) {
+            console.error('Error en calculateUnidirectionalMatch:', error)
             return null
-        }
-
-        if (debugName === 'srparca') console.log(`    ✅ MATCH ENCONTRADO`)
-
-        return {
-            myCardIds: myOffering.map(c => c.id),
-            myCardsInfo: myOffering,
-            myTotalValue: myValue,
-
-            theirCardIds: theirOffering.map(c => c.id),
-            theirCardsInfo: theirOffering,
-            theirTotalValue: theirValue,
-
-            valueDifference: myValue - theirValue,
-            compatibility: calculateCompatibility(myValue, theirValue),
-            isValid: true,
         }
     }
 

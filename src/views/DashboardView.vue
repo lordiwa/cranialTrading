@@ -1,163 +1,197 @@
 <template>
   <AppContainer>
     <div>
-      <div class="mb-lg">
-        <h1 class="text-h2 font-bold text-silver">MATCHES</h1>
-        <p class="text-small text-silver-70 mt-sm">{{ calculatedMatches.length }} matches encontrados</p>
+      <!-- Header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MATCHES</h1>
+          <p class="text-small md:text-body text-silver-70">
+            {{ calculatedMatches.length }} matches encontrados
+          </p>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-2">
+          <BaseButton
+              variant="secondary"
+              size="small"
+              @click="recalculateMatches"
+              :disabled="loading || (collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0)"
+              class="w-full md:w-auto"
+          >
+            {{ loading ? 'CALCULANDO...' : '🔄 RECALCULAR' }}
+          </BaseButton>
+          <BaseButton
+              size="small"
+              @click="$router.push('/saved-matches')"
+              class="w-full md:w-auto"
+          >
+            ⭐ MIS MATCHES
+          </BaseButton>
+        </div>
       </div>
 
-      <div v-if="loading" class="text-center py-xl">
-        <BaseLoader />
-        <p class="text-body text-silver-70 mt-4">Buscando matches...</p>
+      <!-- Progress bar -->
+      <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-small text-neon font-bold">CALCULANDO MATCHES</p>
+          <p class="text-tiny text-silver-70">{{ progressCurrent }} / {{ progressTotal }}</p>
+        </div>
+        <div class="w-full h-2 bg-silver-20">
+          <div
+              class="h-full bg-neon transition-all duration-300"
+              :style="{ width: `${(progressCurrent / progressTotal) * 100}%` }"
+          ></div>
+        </div>
       </div>
 
-      <div v-else-if="calculatedMatches.length === 0" class="text-center py-xl">
-        <p class="text-body text-silver-70">No hay matches disponibles</p>
+      <!-- Loading state -->
+      <div v-if="loading && progressTotal === 0" class="text-center py-16">
+        <BaseLoader size="large" />
+        <p class="text-body text-silver-70 mt-4">Cargando datos...</p>
       </div>
 
+      <!-- No data warning -->
+      <div v-else-if="collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
+        <p class="text-h3 text-silver-70 mb-2">⚠️ No tienes cartas ni preferencias</p>
+        <p class="text-body text-silver-50 mb-6">
+          Agrega cartas a tu colección o crea una preferencia para encontrar matches automáticamente.
+        </p>
+        <RouterLink to="/collection">
+          <BaseButton>VER MI COLECCIÓN</BaseButton>
+        </RouterLink>
+      </div>
+
+      <!-- No matches state -->
+      <div v-else-if="calculatedMatches.length === 0 && !loading" class="border border-silver-30 p-8 md:p-12 text-center">
+        <p class="text-h3 text-silver-70 mb-2">📭 No hay matches disponibles</p>
+        <p class="text-body text-silver-50">
+          Hay {{ totalUsers }} usuarios en la plataforma. Cuando alguien tenga cartas que buscas o busque las tuyas, aparecerá aquí.
+        </p>
+      </div>
+
+      <!-- Matches grid -->
       <div v-else class="space-y-md">
-        <div
+        <MatchCard
             v-for="match in calculatedMatches"
             :key="match.id"
-            class="bg-primary border border-silver-30 p-lg"
-        >
-          <div class="flex justify-between items-start mb-md">
-            <div>
-              <p class="text-h3 font-bold text-silver">{{ match.otherUsername }}</p>
-              <p class="text-small text-silver-70">{{ match.otherLocation }}</p>
-            </div>
-            <p class="text-h3 font-bold text-neon">{{ match.compatibility }}%</p>
-          </div>
-
-          <div class="grid grid-cols-2 gap-lg mb-lg">
-            <div>
-              <p class="text-small text-silver-70 mb-2">TÚ OFRECES</p>
-              <div class="text-small text-silver">
-                <div v-for="card in match.myCardsInfo" :key="card.id">
-                  {{ card.name }} x{{ card.quantity }}
-                </div>
-                <p class="text-neon font-bold mt-2">${{ match.myTotalValue.toFixed(2) }}</p>
-              </div>
-            </div>
-
-            <div>
-              <p class="text-small text-silver-70 mb-2">RECIBES</p>
-              <div class="text-small text-silver">
-                <div v-for="card in match.theirCardsInfo" :key="card.id">
-                  {{ card.name }} x{{ card.quantity }}
-                </div>
-                <p class="text-neon font-bold mt-2">${{ match.theirTotalValue.toFixed(2) }}</p>
-              </div>
-            </div>
-          </div>
-
-          <p class="text-small text-silver-70 mb-md">
-            Diferencia:
-            <span :class="match.valueDifference > 0 ? 'text-neon' : 'text-silver-70'">
-              ${{ Math.abs(match.valueDifference).toFixed(2) }}
-            </span>
-          </p>
-
-          <div class="flex gap-md">
-            <BaseButton @click="handleSaveMatch(match.id)">ME INTERESA</BaseButton>
-            <BaseButton variant="secondary" @click="handleDiscardMatch(match.id)">IGNORAR</BaseButton>
-          </div>
-        </div>
+            :match="match"
+            tab="new"
+            @save="handleSaveMatch"
+            @discard="handleDiscardMatch"
+        />
       </div>
     </div>
   </AppContainer>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
+import MatchCard from '../components/matches/MatchCard.vue'
 import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
+import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, addDoc } from 'firebase/firestore'
 import { db } from '../services/firebase'
 
 const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
+const matchesStore = useMatchesStore()
 const priceMatching = usePriceMatchingStore()
 
 const loading = ref(false)
 const calculatedMatches = ref<any[]>([])
+const progressCurrent = ref(0)
+const progressTotal = ref(0)
+const totalUsers = ref(0)
 
 onMounted(async () => {
-  await collectionStore.loadCollection()
-  await preferencesStore.loadPreferences()
-  await calculateMatches()
+  if (!authStore.user) return
+
+  loading.value = true
+  try {
+    // Cargar datos del usuario
+    await Promise.all([
+      collectionStore.loadCollection(),
+      preferencesStore.loadPreferences(),
+    ])
+
+    // Contar usuarios totales
+    const usersRef = collection(db, 'users')
+    const usersSnapshot = await getDocs(usersRef)
+    totalUsers.value = usersSnapshot.docs.length - 1 // Excluir al usuario actual
+
+    // ✅ CORREGIDO: Calcular matches si tiene CARTAS O PREFERENCIAS
+    // Antes: Solo si tenía preferencias
+    // Ahora: Si tiene cartas (para VENDER) O preferencias (para BUSCAR)
+    if (collectionStore.cards.length > 0 || preferencesStore.preferences.length > 0) {
+      await calculateMatches()
+    }
+  } finally {
+    loading.value = false
+  }
 })
 
+/**
+ * CAMBIO 2: Calcular matches y persistir en Firestore
+ */
 const calculateMatches = async () => {
   if (!authStore.user) return
 
   loading.value = true
+  progressCurrent.value = 0
+  progressTotal.value = 0
   calculatedMatches.value = []
 
   try {
     const myCards = collectionStore.cards
     const myPrefs = preferencesStore.preferences
-
-    console.log('🔍 Starting match calculation...')
-    console.log('My cards:', myCards.length)
-    console.log('My preferences:', myPrefs.length)
-
-    if (myPrefs.length === 0) {
-      loading.value = false
-      return
-    }
+    const foundMatches: any[] = []
 
     const usersRef = collection(db, 'users')
     const usersSnapshot = await getDocs(usersRef)
-    const foundMatches: any[] = []
+    const totalUsersCount = usersSnapshot.docs.length
 
-    console.log('Total users found:', usersSnapshot.docs.length)
+    console.log('🔍 Iniciando cálculo de matches...')
+    console.log(`Mis cartas: ${myCards.length}, Mis preferencias: ${myPrefs.length}`)
 
     for (const userDoc of usersSnapshot.docs) {
+      progressCurrent.value++
+      progressTotal.value = totalUsersCount
+
       if (userDoc.id === authStore.user.id) continue
 
       try {
         const otherUserId = userDoc.id
         const otherUserData = userDoc.data()
 
-        console.log(`\n📊 Checking user: ${otherUserData.username}`)
+        // Cargar cartas y preferencias del otro usuario
+        const [theirCardsSnapshot, theirPrefsSnapshot] = await Promise.all([
+          getDocs(collection(db, 'users', otherUserId, 'cards')),
+          getDocs(collection(db, 'users', otherUserId, 'preferencias')),
+        ])
 
-        const theirCardsRef = collection(db, 'users', otherUserId, 'cards')
-        const theirCardsSnapshot = await getDocs(theirCardsRef)
         const theirCards = theirCardsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         })) as any[]
 
-        const theirPrefsRef = collection(db, 'users', otherUserId, 'preferencias')
-        const theirPrefsSnapshot = await getDocs(theirPrefsRef)
         const theirPreferences = theirPrefsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         })) as any[]
 
-        console.log(`  Their cards: ${theirCards.length}, Their prefs: ${theirPreferences.length}`)
-
-        // DEBUG: mostrar cartas de srparca
-        if (otherUserData.username === 'srparca') {
-          console.log('  [SRPARCA CARDS DETAIL]:')
-          theirCards.forEach(c => {
-            if (c.name.includes('Phlage')) {
-              console.log(`    ${c.name} - status: ${c.status}, price: $${c.price}, qty: ${c.quantity}`)
-            }
-          })
-          console.log('  [SRPARCA PREFS]:', theirPreferences.map(p => p.name))
-          console.log('  [MY PREFS - busco]:', myPrefs.map(p => p.name))
+        if (theirCards.length === 0 && theirPreferences.length === 0) {
+          continue
         }
 
         // INTENTAR MATCH BIDIRECCIONAL PRIMERO
-        let matchDetails = priceMatching.calculateBidirectionalMatch(
+        let matchCalc = priceMatching.calculateBidirectionalMatch(
             myCards,
             myPrefs,
             theirCards,
@@ -165,8 +199,8 @@ const calculateMatches = async () => {
         )
 
         // SI NO HAY BIDIRECCIONAL, INTENTAR UNIDIRECCIONAL
-        if (!matchDetails) {
-          matchDetails = priceMatching.calculateUnidirectionalMatch(
+        if (!matchCalc) {
+          matchCalc = priceMatching.calculateUnidirectionalMatch(
               myCards,
               myPrefs,
               theirCards,
@@ -174,44 +208,118 @@ const calculateMatches = async () => {
           )
         }
 
-        if (matchDetails) {
-          console.log(`  ✅ MATCH FOUND! Compatibility: ${matchDetails.compatibility}%`)
-          foundMatches.push({
+        if (matchCalc && matchCalc.isValid) {
+          const match = {
             id: `${authStore.user.id}_${otherUserId}_${Date.now()}`,
             otherUserId,
             otherUsername: otherUserData.username,
             otherLocation: otherUserData.location || 'Unknown',
             otherEmail: otherUserData.email,
-            myCardsInfo: matchDetails.myCardsInfo,
-            theirCardsInfo: matchDetails.theirCardsInfo,
-            myTotalValue: matchDetails.myTotalValue,
-            theirTotalValue: matchDetails.theirTotalValue,
-            valueDifference: matchDetails.valueDifference,
-            compatibility: matchDetails.compatibility,
-          })
-        } else {
-          console.log(`  ❌ No match`)
+            myCards: matchCalc.myCardsInfo || [],  // ✅ TODAS las cartas, no solo la primera
+            otherCards: matchCalc.theirCardsInfo || [],  // ✅ TODAS las cartas, no solo la primera
+            myTotalValue: matchCalc.myTotalValue,
+            theirTotalValue: matchCalc.theirTotalValue,
+            valueDifference: matchCalc.valueDifference,
+            compatibility: matchCalc.compatibility,
+            type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' : 'UNIDIRECTIONAL',
+            createdAt: new Date(),
+            lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          }
+
+          foundMatches.push(match)
+          console.log(`✅ Match encontrado con ${otherUserData.username}: ${matchCalc.compatibility}%`)
         }
       } catch (err) {
-        console.error(`Error processing user ${userDoc.id}:`, err)
+        console.error(`Error procesando usuario ${userDoc.id}:`, err)
       }
     }
 
-    console.log(`\n✅ Total matches found: ${foundMatches.length}`)
-    calculatedMatches.value = foundMatches.sort((a, b) => b.compatibility - a.compatibility)
+    // Ordenar por compatibilidad descendente
+    foundMatches.sort((a, b) => b.compatibility - a.compatibility)
+    calculatedMatches.value = foundMatches
+
+    // CAMBIO 3: Persistir matches en Firestore (matches_nuevos)
+    if (foundMatches.length > 0) {
+      await saveMatchesToFirebase(foundMatches)
+    }
+
+    console.log(`✅ Total de matches encontrados: ${foundMatches.length}`)
   } catch (error) {
-    console.error('Error calculating matches:', error)
+    console.error('Error calculando matches:', error)
   } finally {
     loading.value = false
+    progressCurrent.value = 0
+    progressTotal.value = 0
   }
 }
 
-const handleSaveMatch = (matchId: string) => {
-  console.log('Save match:', matchId)
-  // TODO: Guardar en store de matches
+/**
+ * CAMBIO 3: Guardar matches en Firestore
+ */
+const saveMatchesToFirebase = async (matches: any[]) => {
+  if (!authStore.user) return
+
+  try {
+    const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
+
+    for (const match of matches) {
+      await addDoc(matchesRef, {
+        id: match.id,
+        otherUserId: match.otherUserId,
+        otherUsername: match.otherUsername,
+        otherLocation: match.otherLocation,
+        otherEmail: match.otherEmail,
+        myCard: match.myCard,
+        otherCard: match.otherCard,
+        myPreference: match.myPreference,
+        otherPreference: match.otherPreference,
+        myTotalValue: match.myTotalValue,
+        theirTotalValue: match.theirTotalValue,
+        valueDifference: match.valueDifference,
+        compatibility: match.compatibility,
+        type: match.type,
+        status: 'nuevo',
+        createdAt: match.createdAt,
+        lifeExpiresAt: match.lifeExpiresAt,
+      })
+    }
+
+    console.log(`💾 ${matches.length} matches guardados en Firestore`)
+  } catch (err) {
+    console.error('Error guardando matches:', err)
+  }
+}
+
+/**
+ * CAMBIO 3: Integrar con matches.ts store
+ */
+const handleSaveMatch = async (match: any) => {
+  // Convertir match a formato SimpleMatch del store
+  const matchToSave = {
+    id: match.id,
+    type: match.type === 'VENDO' ? 'VENDO' : 'BUSCO',
+    otherUserId: match.otherUserId,
+    otherUsername: match.otherUsername,
+    otherLocation: match.otherLocation,
+    myCard: match.myCard,
+    otherCard: match.otherCard,
+    myPreference: match.myPreference,
+    otherPreference: match.otherPreference,
+    createdAt: match.createdAt,
+    status: 'nuevo',
+  }
+
+  await matchesStore.saveMatch(matchToSave)
+
+  // Remover del dashboard
+  calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== match.id)
 }
 
 const handleDiscardMatch = (matchId: string) => {
   calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
+}
+
+const recalculateMatches = async () => {
+  await calculateMatches()
 }
 </script>

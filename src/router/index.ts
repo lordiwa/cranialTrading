@@ -9,6 +9,12 @@ const router = createRouter({
             redirect: '/dashboard',
         },
         {
+            path: '/contacts',
+            name: 'contacts',
+            component: () => import('../views/SavedContactsView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
             path: '/login',
             name: 'login',
             component: () => import('../views/LoginView.vue'),

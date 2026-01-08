@@ -30,7 +30,7 @@
         <h4 class="text-small font-bold text-silver-70 uppercase mb-4">Tú Ofreces</h4>
         <div class="space-y-2">
           <div v-if="match.myCards && match.myCards.length > 0">
-            <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded-sm">
+            <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
               <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
@@ -49,7 +49,7 @@
         <h4 class="text-small font-bold text-silver-70 uppercase mb-4">Recibes</h4>
         <div class="space-y-2">
           <div v-if="match.otherCards && match.otherCards.length > 0">
-            <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded-sm">
+            <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
               <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
@@ -112,9 +112,9 @@
       <BaseButton
           variant="secondary"
           class="flex-1"
-          @click="copyEmailToClipboard"
+          @click="showContactModal = true"
       >
-        📧 COPIAR EMAIL
+        👤 CONTACTO
       </BaseButton>
     </div>
 
@@ -133,17 +133,37 @@
           <p class="text-tiny text-silver-70 uppercase">Ubicación</p>
           <p class="text-body text-silver">📍 {{ match.otherLocation }}</p>
         </div>
-        <div>
+        <div v-if="match.otherEmail">
           <p class="text-tiny text-silver-70 uppercase">Email</p>
           <p class="text-body text-silver">{{ match.otherEmail }}</p>
         </div>
+        <div v-else>
+          <p class="text-tiny text-silver-70 uppercase">Email</p>
+          <p class="text-body text-silver-50 italic">No disponible</p>
+        </div>
       </div>
 
-      <div class="flex gap-2 pt-4">
-        <BaseButton class="flex-1" @click="copyEmailToClipboard">
+      <div class="flex flex-col gap-2 pt-4">
+        <BaseButton
+            v-if="match.otherEmail"
+            class="w-full"
+            @click="copyEmailToClipboard"
+        >
           📧 COPIAR EMAIL
         </BaseButton>
-        <BaseButton variant="secondary" class="flex-1" @click="showContactModal = false">
+        <BaseButton
+            v-if="match.otherEmail"
+            variant="secondary"
+            class="w-full"
+            @click="onSaveContact"
+        >
+          ⭐ GUARDAR CONTACTO
+        </BaseButton>
+        <BaseButton
+            variant="secondary"
+            class="w-full"
+            @click="showContactModal = false"
+        >
           CERRAR
         </BaseButton>
       </div>
@@ -155,6 +175,8 @@
 import { ref } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
+import { useContactsStore } from '../../stores/contacts'
+import { useToastStore } from '../../stores/toast'
 
 interface Props {
   match: any
@@ -171,6 +193,8 @@ const emit = defineEmits(['save', 'discard'])
 
 const saving = ref(false)
 const showContactModal = ref(false)
+const contactsStore = useContactsStore()
+const toastStore = useToastStore()
 
 const handleSaveMatch = async () => {
   saving.value = true
@@ -186,11 +210,61 @@ const handleDiscard = () => {
 }
 
 const copyEmailToClipboard = async () => {
+  if (!props.match.otherEmail) {
+    toastStore.show('Email no disponible', 'error')
+    return
+  }
+
   try {
     await navigator.clipboard.writeText(props.match.otherEmail)
-    alert('✅ Email copiado: ' + props.match.otherEmail)
+    toastStore.show('✓ Email copiado', 'success')
   } catch (err) {
-    alert('❌ Error al copiar email')
+    toastStore.show('Error al copiar email', 'error')
+  }
+}
+
+const onSaveContact = async () => {
+  try {
+    // Validate email exists
+    if (!props.match.otherEmail) {
+      toastStore.show('Email no disponible para este contacto', 'error')
+      return
+    }
+
+    // Extract otherUserId from match.id format: userId_otherUserId_timestamp
+    let otherUserId = ''
+
+    if (props.match.otherUserId) {
+      // If match object has otherUserId directly, use it
+      otherUserId = props.match.otherUserId
+    } else if (props.match.id) {
+      // Otherwise extract from match.id
+      const parts = props.match.id.split('_')
+      if (parts.length >= 2) {
+        otherUserId = parts[1] // Second part is otherUserId
+      }
+    }
+
+    if (!otherUserId) {
+      toastStore.show('Error: No se pudo obtener el ID del usuario', 'error')
+      return
+    }
+
+    // Call saveContact with proper SavedContact object
+    // Note: SavedContact interface expects these exact fields, no savedAt
+    await contactsStore.saveContact({
+      userId: otherUserId,
+      username: props.match.otherUsername,
+      email: props.match.otherEmail,
+      location: props.match.otherLocation || 'Ubicación no disponible',
+    })
+
+    toastStore.show('✓ Contacto guardado: @' + props.match.otherUsername, 'success')
+    showContactModal.value = false
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error al guardar contacto'
+    toastStore.show('❌ ' + message, 'error')
+    console.error('Error saving contact:', error)
   }
 }
 </script>

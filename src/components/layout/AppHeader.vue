@@ -53,6 +53,13 @@ const closeMenu = () => {
         >
           Matches
         </RouterLink>
+        <RouterLink
+            to="/contacts"
+            class="text-body text-silver hover:text-neon transition-fast"
+            active-class="text-neon"
+        >
+          Contactos
+        </RouterLink>
       </nav>
 
       <!-- Desktop User - SOLO si hay usuario -->
@@ -126,6 +133,14 @@ const closeMenu = () => {
               active-class="text-neon bg-neon-5"
           >
             Mis Matches
+          </RouterLink>
+          <RouterLink
+              to="/contacts"
+              @click="closeMenu"
+              class="px-4 py-3 text-body text-silver hover:text-neon hover:bg-silver-5 transition-fast"
+              active-class="text-neon bg-neon-5"
+          >
+            Mis Contactos
           </RouterLink>
 
           <div class="border-t border-silver-20 mt-2 pt-2 px-4">

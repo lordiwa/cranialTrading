@@ -9,12 +9,9 @@
         </h3>
         <p class="text-small text-silver-70 mt-1">
           Con
-          <RouterLink
-              :to="{ name: 'userProfile', params: { username: match.otherUsername } }"
-              class="text-neon hover:underline font-bold"
-          >
+          <span class="text-neon hover:underline font-bold">
             @{{ match.otherUsername }}
-          </RouterLink>
+          </span>
           • 📍 {{ match.otherLocation }}
         </p>
       </div>
@@ -93,81 +90,137 @@
     <!-- Divider -->
     <div class="border-t border-silver-20 my-6"></div>
 
-    <!-- Actions -->
+    <!-- Actions - DIFERENCIADAS POR TAB -->
     <div class="flex flex-col md:flex-row gap-3">
-      <BaseButton
-          class="flex-1"
-          @click="handleSaveMatch"
-          :disabled="saving"
-      >
-        {{ saving ? '⏳ GUARDANDO...' : '💾 ME INTERESA' }}
-      </BaseButton>
-      <BaseButton
-          variant="secondary"
-          class="flex-1"
-          @click="handleDiscard"
-      >
-        ✕ IGNORAR
-      </BaseButton>
-      <BaseButton
-          variant="secondary"
-          class="flex-1"
-          @click="showContactModal = true"
-      >
-        👤 CONTACTO
-      </BaseButton>
+      <!-- TAB: NEW (nuevos matches) -->
+      <template v-if="tab === 'new'">
+        <BaseButton
+            class="flex-1"
+            @click="handleSaveMatch"
+            :disabled="saving"
+        >
+          {{ saving ? '⏳ GUARDANDO...' : '💾 ME INTERESA' }}
+        </BaseButton>
+        <BaseButton
+            variant="secondary"
+            class="flex-1"
+            @click="handleDiscard"
+        >
+          ✕ IGNORAR
+        </BaseButton>
+        <BaseButton
+            variant="secondary"
+            class="flex-1"
+            @click="showContactModal = true"
+        >
+          👤 CONTACTO
+        </BaseButton>
+      </template>
+
+      <!-- TAB: SAVED (mis matches guardados) -->
+      <template v-else-if="tab === 'saved'">
+        <BaseButton
+            class="flex-1"
+            @click="showContactModal = true"
+        >
+          👤 CONTACTO
+        </BaseButton>
+        <BaseButton
+            variant="secondary"
+            class="flex-1"
+            @click="handleMarcarCompletado"
+        >
+          ✓ COMPLETADO
+        </BaseButton>
+        <BaseButton
+            variant="danger"
+            class="flex-1"
+            @click="handleDiscard"
+        >
+          ✕ ELIMINAR
+        </BaseButton>
+      </template>
+
+      <!-- TAB: DELETED (matches eliminados) -->
+      <template v-else-if="tab === 'deleted'">
+        <BaseButton
+            variant="secondary"
+            class="flex-1"
+            @click="handleRecuperar"
+        >
+          ↩️ RECUPERAR
+        </BaseButton>
+        <BaseButton
+            variant="danger"
+            class="flex-1"
+            @click="handleDeletePermanent"
+        >
+          🗑️ ELIMINAR
+        </BaseButton>
+      </template>
     </div>
 
     <!-- Modal de Contacto -->
     <BaseModal
         :show="showContactModal"
-        title="CONTACTO"
+        title="VER CONTACTO"
         @close="showContactModal = false"
     >
-      <div class="space-y-3 mb-6">
+      <div class="space-y-4 mb-6">
+        <!-- Usuario -->
         <div>
-          <p class="text-tiny text-silver-70 uppercase">Usuario</p>
+          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Usuario</p>
           <p class="text-body font-bold text-silver">@{{ match.otherUsername }}</p>
         </div>
+
+        <!-- Ubicación -->
         <div>
-          <p class="text-tiny text-silver-70 uppercase">Ubicación</p>
+          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Ubicación</p>
           <p class="text-body text-silver">📍 {{ match.otherLocation }}</p>
         </div>
-        <div v-if="match.otherEmail">
-          <p class="text-tiny text-silver-70 uppercase">Email</p>
+
+        <!-- Email -->
+        <div>
+          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Email</p>
           <p class="text-body text-silver">{{ match.otherEmail }}</p>
-        </div>
-        <div v-else>
-          <p class="text-tiny text-silver-70 uppercase">Email</p>
-          <p class="text-body text-silver-50 italic">No disponible</p>
         </div>
       </div>
 
+      <!-- Divider -->
+      <div class="border-t border-silver-20 my-4"></div>
+
+      <!-- Acciones de Contacto -->
       <div class="flex flex-col gap-2 pt-4">
+        <!-- Botón: Copiar Email -->
         <BaseButton
-            v-if="match.otherEmail"
+            variant="secondary"
             class="w-full"
             @click="copyEmailToClipboard"
         >
           📧 COPIAR EMAIL
         </BaseButton>
+
+        <!-- Botón: Guardar Contacto -->
         <BaseButton
-            v-if="match.otherEmail"
             variant="secondary"
             class="w-full"
-            @click="onSaveContact"
+            @click="handleSaveContact"
+            :disabled="contactSaving"
         >
-          ⭐ GUARDAR CONTACTO
+          {{ contactSaving ? '⏳ GUARDANDO...' : '⭐ GUARDAR CONTACTO' }}
         </BaseButton>
+
+        <!-- Botón: Cerrar -->
         <BaseButton
             variant="secondary"
             class="w-full"
             @click="showContactModal = false"
         >
-          CERRAR
+          ✕ CERRAR
         </BaseButton>
       </div>
     </BaseModal>
+
   </div>
 </template>
 
@@ -181,7 +234,7 @@ import { useToastStore } from '../../stores/toast'
 interface Props {
   match: any
   matchIndex?: number
-  tab?: string
+  tab?: 'new' | 'saved' | 'deleted'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -193,9 +246,11 @@ const emit = defineEmits(['save', 'discard'])
 
 const saving = ref(false)
 const showContactModal = ref(false)
+const contactSaving = ref(false)
 const contactsStore = useContactsStore()
 const toastStore = useToastStore()
 
+// TAB: NEW - Guardar match
 const handleSaveMatch = async () => {
   saving.value = true
   try {
@@ -205,16 +260,28 @@ const handleSaveMatch = async () => {
   }
 }
 
+// TAB: NEW/SAVED/DELETED - Descartar match
 const handleDiscard = () => {
-  emit('discard', props.match.id)
+  emit('discard', props.match.id || props.match.docId)
 }
 
-const copyEmailToClipboard = async () => {
-  if (!props.match.otherEmail) {
-    toastStore.show('Email no disponible', 'error')
-    return
-  }
+// TAB: SAVED - Marcar como completado
+const handleMarcarCompletado = () => {
+  emit('discard', props.match.id || props.match.docId)
+}
 
+// TAB: DELETED - Recuperar match
+const handleRecuperar = () => {
+  emit('save', props.match)
+}
+
+// TAB: DELETED - Eliminar permanentemente
+const handleDeletePermanent = () => {
+  emit('discard', props.match.id || props.match.docId)
+}
+
+// CONTACTO - Copiar email
+const copyEmailToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(props.match.otherEmail)
     toastStore.show('✓ Email copiado', 'success')
@@ -223,40 +290,22 @@ const copyEmailToClipboard = async () => {
   }
 }
 
-const onSaveContact = async () => {
+// CONTACTO - Guardar contacto
+const handleSaveContact = async () => {
+  contactSaving.value = true
   try {
-    // Validate email exists
-    if (!props.match.otherEmail) {
-      toastStore.show('Email no disponible para este contacto', 'error')
-      return
-    }
-
-    // Extract otherUserId from match.id format: userId_otherUserId_timestamp
-    let otherUserId = ''
-
-    if (props.match.otherUserId) {
-      // If match object has otherUserId directly, use it
-      otherUserId = props.match.otherUserId
-    } else if (props.match.id) {
-      // Otherwise extract from match.id
-      const parts = props.match.id.split('_')
-      if (parts.length >= 2) {
-        otherUserId = parts[1] // Second part is otherUserId
-      }
-    }
+    const otherUserId = props.match.otherUserId
 
     if (!otherUserId) {
       toastStore.show('Error: No se pudo obtener el ID del usuario', 'error')
       return
     }
 
-    // Call saveContact with proper SavedContact object
-    // Note: SavedContact interface expects these exact fields, no savedAt
     await contactsStore.saveContact({
       userId: otherUserId,
       username: props.match.otherUsername,
       email: props.match.otherEmail,
-      location: props.match.otherLocation || 'Ubicación no disponible',
+      location: props.match.otherLocation || 'Unknown',
     })
 
     toastStore.show('✓ Contacto guardado: @' + props.match.otherUsername, 'success')
@@ -265,6 +314,8 @@ const onSaveContact = async () => {
     const message = error instanceof Error ? error.message : 'Error al guardar contacto'
     toastStore.show('❌ ' + message, 'error')
     console.error('Error saving contact:', error)
+  } finally {
+    contactSaving.value = false
   }
 }
 </script>

@@ -1,25 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMatchesStore } from '../stores/matches'
+import { useContactsStore } from '../stores/contacts'
+import { db } from '../services/firebase'
+import { doc, getDoc } from 'firebase/firestore'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
-import MatchTabsContainer from '../components/matches/MatchTabsContainer.vue'
-import ChatModal from '../components/chat/ChatModal.vue'
 
 const matchesStore = useMatchesStore()
+const contactsStore = useContactsStore()
 
 // State
 const activeTab = ref<'new' | 'saved' | 'deleted'>('new')
-const showChatModal = ref(false)
-const selectedUserId = ref('')
-const selectedUsername = ref('')
+const matchesWithEmails = ref<any[]>([])
+const loading = ref(false)
 
 // ✅ DATOS REALES desde store
 const newMatches = computed(() => matchesStore.newMatches)
 const savedMatches = computed(() => matchesStore.savedMatches)
 const deletedMatches = computed(() => matchesStore.deletedMatches)
-const loading = computed(() => matchesStore.loading)
 
 // Tabs configuration
 const tabs = computed(() => [
@@ -47,66 +47,75 @@ const tabs = computed(() => [
 const currentMatches = computed(() => {
   switch (activeTab.value) {
     case 'new': return newMatches.value
-    case 'saved': return savedMatches.value
+    case 'saved': return matchesWithEmails.value
     case 'deleted': return deletedMatches.value
     default: return []
   }
 })
 
+// ✅ CARGAR EMAILS para matches guardados
+const loadSavedMatchesWithEmails = async () => {
+  loading.value = true
+  try {
+    const matchesWithData = await Promise.all(
+        savedMatches.value.map(async (match) => {
+          try {
+            // Obtener email del usuario desde Firestore
+            const userRef = doc(db, 'users', match.otherUserId)
+            const userSnap = await getDoc(userRef)
+
+            if (userSnap.exists()) {
+              const userData = userSnap.data()
+              return {
+                ...match,
+                otherEmail: userData.email || '',
+              }
+            }
+          } catch (err) {
+            console.error(`Error cargando email para ${match.otherUserId}:`, err)
+          }
+
+          return {
+            ...match,
+            otherEmail: '',
+          }
+        })
+    )
+
+    matchesWithEmails.value = matchesWithData
+  } finally {
+    loading.value = false
+  }
+}
+
 // ✅ ACCIONES REALES conectadas al store
 const handleSaveMatch = async (match: any) => {
   await matchesStore.saveMatch(match)
+  // Recargar emails después de guardar
+  await loadSavedMatchesWithEmails()
 }
 
-const handleDiscardMatch = async (matchId: string, tab: 'new') => {
+const handleDiscardMatch = async (matchId: string) => {
+  const tab = activeTab.value === 'new' ? 'new' : 'saved'
   await matchesStore.discardMatch(matchId, tab)
-}
-
-const handleContactar = (contact: { username: string; email?: string; location?: string }) => {
-  // Extract userId from match (asumiendo que está en otherUserId)
-  const match = currentMatches.value.find(m => m.otherUsername === contact.username)
-  if (match) {
-    selectedUserId.value = match.otherUserId
-    selectedUsername.value = contact.username
-    showChatModal.value = true
-  }
-}
-
-const handleMarcarCompletado = async (matchId: string) => {
-  const confirmed = confirm('¿Marcar este match como completado? Se eliminará permanentemente.')
-  if (confirmed) {
-    await matchesStore.completeMatch(matchId)
-  }
-}
-
-const handleDescartar = async (matchId: string) => {
-  await matchesStore.discardMatch(matchId, 'saved')
-}
-
-const handleRecuperar = async (matchId: string) => {
-  await matchesStore.recoverMatch(matchId)
-}
-
-const handleDeletePermanent = async (matchId: string) => {
-  const confirmed = confirm('¿Eliminar permanentemente este match? Esta acción no se puede deshacer.')
-  if (confirmed) {
-    await matchesStore.permanentDelete(matchId)
-  }
+  // Recargar emails después de descartar
+  await loadSavedMatchesWithEmails()
 }
 
 const handleTabChange = (tabId: 'new' | 'saved' | 'deleted') => {
   activeTab.value = tabId
 }
 
-const closeChatModal = () => {
-  showChatModal.value = false
-  selectedUserId.value = ''
-  selectedUsername.value = ''
-}
-
 // ✅ CARGAR DATOS AL MONTAR
 onMounted(async () => {
   await matchesStore.loadAllMatches()
+  await contactsStore.loadSavedContacts()
+  await loadSavedMatchesWithEmails()
+})
+
+onUnmounted(() => {
+  matchesStore.cleanExpiredMatches()
+  contactsStore.stopListeningContacts()
 })
 </script>
 
@@ -122,11 +131,25 @@ onMounted(async () => {
       </div>
 
       <!-- Tabs -->
-      <MatchTabsContainer
-          v-model="activeTab"
-          :tabs="tabs"
-          @tab-change="handleTabChange"
-      />
+      <div class="flex gap-sm md:gap-md mb-lg md:mb-xl border-b border-silver-20 overflow-x-auto">
+        <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            @click="handleTabChange(tab.id)"
+            :class="[
+            'pb-md border-b-2 transition-fast whitespace-nowrap font-bold text-small md:text-body flex items-center gap-sm',
+            activeTab === tab.id
+              ? 'border-neon text-neon'
+              : 'border-transparent text-silver-70 hover:text-silver'
+          ]"
+        >
+          <span>{{ tab.icon }}</span>
+          <span>{{ tab.label }}</span>
+          <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold">
+            {{ tab.count }}
+          </span>
+        </button>
+      </div>
 
       <!-- Loading state -->
       <div v-if="loading" class="flex justify-center items-center py-xl">
@@ -147,30 +170,18 @@ onMounted(async () => {
         </p>
       </div>
 
-      <!-- Matches list -->
+      <!-- Matches list - ✅ REUTILIZA MatchCard.vue -->
       <div v-else class="space-y-md">
         <MatchCard
             v-for="match in currentMatches"
             :key="match.docId || match.id"
             :match="match"
+            :match-index="currentMatches.indexOf(match) + 1"
             :tab="activeTab"
             @save="handleSaveMatch"
             @discard="handleDiscardMatch"
-            @contactar="handleContactar"
-            @marcar-completado="handleMarcarCompletado"
-            @descartar="handleDescartar"
-            @recover="handleRecuperar"
-            @delete="handleDeletePermanent"
         />
       </div>
-
-      <!-- Chat Modal -->
-      <ChatModal
-          :show="showChatModal"
-          :other-user-id="selectedUserId"
-          :other-username="selectedUsername"
-          @close="closeChatModal"
-      />
     </div>
   </AppContainer>
 </template>

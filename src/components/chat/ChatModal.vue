@@ -21,34 +21,49 @@ const emit = defineEmits<{
 const messagesStore = useMessagesStore();
 const authStore = useAuthStore();
 const toastStore = useToastStore();
+
+// State
 const messageInput = ref('');
 const isSending = ref(false);
 const conversationId = ref('');
 const messagesContainer = ref<HTMLDivElement>();
 
+// ✅ FIX 1: Guardar conversationId para NO recalcular cada vez que show cambia
+const isConversationReady = ref(false);
+
 const sortedMessages = computed(() => {
   return messagesStore.currentMessages.sort((a, b) =>
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 });
 
-const handleOpenChat = async () => {
-  if (!authStore.user) {
+// ✅ FIX 2: CAMBIO - Inicializar conversación UNA SOLA VEZ (no en watch)
+const initializeConversation = async () => {
+  if (!authStore.user || !props.otherUserId || conversationId.value) {
+    // Ya inicializada o datos incompletos
     return;
   }
 
-  // Crear o obtener conversación
-  const convId = await messagesStore.createConversation(props.otherUserId, props.otherUsername);
+  try {
+    const convId = await messagesStore.createConversation(
+        props.otherUserId,
+        props.otherUsername
+    );
 
-  if (!convId) {
-    toastStore.show('No se pudo crear la conversación', 'error');
-    return;
+    if (!convId) {
+      toastStore.show('No se pudo crear la conversación', 'error');
+      return;
+    }
+
+    conversationId.value = convId;
+    isConversationReady.value = true;
+
+    // Cargar mensajes con listener
+    messagesStore.loadConversationMessages(convId);
+  } catch (error) {
+    console.error('Error inicializando conversación:', error);
+    toastStore.show('Error al inicializar chat', 'error');
   }
-
-  conversationId.value = convId;
-
-  // Cargar mensajes
-  messagesStore.loadConversationMessages(convId);
 };
 
 const handleSendMessage = async () => {
@@ -58,15 +73,13 @@ const handleSendMessage = async () => {
   isSending.value = true;
 
   const success = await messagesStore.sendMessage(
-    conversationId.value,
-    props.otherUserId,
-    messageInput.value
+      conversationId.value,
+      props.otherUserId,
+      messageInput.value
   );
 
-  // send result handled by success boolean
-
   if (success) {
-    messageInput.value = '';
+    messageInput.value = ''; // ✅ FIX 5: Limpiar input después de enviar
     // Scroll al último mensaje
     await nextTick();
     if (messagesContainer.value) {
@@ -85,35 +98,50 @@ const handleKeyPress = (event: KeyboardEvent) => {
 };
 
 const handleClose = () => {
+  // ✅ FIX 3: Cleanup al cerrar
   messagesStore.stopListeningMessages();
+
+  // ✅ FIX 5: Resetear estado local
+  messageInput.value = '';
+  conversationId.value = '';
+  isConversationReady.value = false;
+  messagesStore.currentMessages = [];
+
   emit('close');
 };
 
-watch(() => props.show, (newVal) => {
-  if (newVal) {
-    handleOpenChat();
-  }
-});
+// ✅ FIX 2: watch simplificado - solo abre si show es true y aún no inicializado
+watch(
+    () => props.show,
+    async (newVal) => {
+      if (newVal && !isConversationReady.value) {
+        await initializeConversation();
+      }
+    },
+    { immediate: true }
+);
 
+// ✅ FIX 3: Cleanup en unmount para evitar memory leak
 onUnmounted(() => {
   messagesStore.stopListeningMessages();
 });
+
+// ✅ Auto-scroll cuando llegan nuevos mensajes
+watch(
+    () => sortedMessages.value.length,
+    async () => {
+      await nextTick();
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      }
+    }
+);
 </script>
 
 <template>
-  <BaseModal :show="show" @close="handleClose">
-    <div class="w-full max-w-md h-96 flex flex-col bg-primary-dark rounded">
-      <!-- Header -->
-      <div class="p-md border-b border-silver-30 flex items-center justify-between">
-        <div>
-          <p class="text-body font-bold text-silver">{{ otherUsername }}</p>
-          <p class="text-tiny text-silver-50">En línea</p>
-        </div>
-        <button @click="handleClose" class="text-silver-70 hover:text-silver text-xl">
-          ✕
-        </button>
-      </div>
-
+  <!-- ✅ FIX 4: Pasar otherUsername como :title - BaseModal agrega una sola X -->
+  <BaseModal :show="show" :title="`Chat con @${otherUsername}`" @close="handleClose">
+    <div class="w-full max-w-md h-96 flex flex-col">
       <!-- Messages -->
       <div ref="messagesContainer" class="flex-1 overflow-y-auto p-md space-y-sm">
         <BaseLoader v-if="messagesStore.loading" size="small" />
@@ -131,7 +159,7 @@ onUnmounted(() => {
           <div :class="{
             'bg-neon text-primary': message.senderId === authStore.user?.id,
             'bg-silver-30 text-silver': message.senderId !== authStore.user?.id,
-          }" class="max-w-xs px-4 py-2 rounded-lg">
+          }" class="max-w-xs px-4 py-2">
             <p class="text-small break-words">{{ message.content }}</p>
             <p class="text-tiny mt-1 opacity-70">
               {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
@@ -140,20 +168,23 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Divider -->
+      <div class="border-t border-silver-30 my-md"></div>
+
       <!-- Input -->
-      <div class="p-md border-t border-silver-30 flex gap-2">
+      <div class="flex gap-2">
         <BaseInput
             v-model="messageInput"
             placeholder="Escribe un mensaje..."
             @keypress="handleKeyPress"
-            :disabled="isSending"
+            :disabled="isSending || !isConversationReady"
         />
         <BaseButton
             size="small"
             :disabled="!messageInput.trim() || isSending || !conversationId"
             @click="handleSendMessage"
         >
-          {{ isSending ? '...' : 'ENVIAR' }}
+          {{ isSending ? '...' : '✓' }}
         </BaseButton>
       </div>
     </div>

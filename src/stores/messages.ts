@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { collection, getDocs, doc, onSnapshot, Timestamp, setDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, onSnapshot, Timestamp, setDoc, getDoc, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
@@ -14,24 +14,38 @@ export const useMessagesStore = defineStore('messages', () => {
     const toastStore = useToastStore();
     let unsubscribe: (() => void) | null = null;
 
-    // Generar ID de conversación consistente entre dos usuarios
+    /**
+     * Generar ID de conversación consistente entre dos usuarios
+     * Ej: "user1_user2" (siempre ordenados alfabéticamente)
+     */
     const getConversationId = (userId1: string, userId2: string): string => {
         return [userId1, userId2].sort().join('_');
     };
 
-    // Crear o obtener una conversación
+    /**
+     * Crear o obtener una conversación existente
+     * @returns conversationId o empty string si falla
+     */
     const createConversation = async (otherUserId: string, otherUsername: string): Promise<string> => {
-        if (!authStore.user) return '';
+        if (!authStore.user?.id) {
+            console.error('❌ No authenticated user');
+            return '';
+        }
+
+        // ✅ Validación: evitar conversación con sí mismo
+        if (authStore.user.id === otherUserId) {
+            toastStore.show('No puedes conversar contigo mismo', 'error');
+            return '';
+        }
 
         const conversationId = getConversationId(authStore.user.id, otherUserId);
 
         try {
-            // Get or create conversation document
             const conversationRef = doc(db, 'conversations', conversationId);
             const conversationDoc = await getDoc(conversationRef);
 
             if (!conversationDoc.exists()) {
-                // Create new conversation using setDoc with the specific ID
+                // Crear nueva conversación
                 await setDoc(conversationRef, {
                     id: conversationId,
                     participantIds: [authStore.user.id, otherUserId],
@@ -40,27 +54,39 @@ export const useMessagesStore = defineStore('messages', () => {
                         [otherUserId]: otherUsername,
                     },
                     createdAt: Timestamp.now(),
+                    lastMessage: '',
+                    lastMessageTime: Timestamp.now(),
                 });
+
+                console.log(`✅ Conversación creada: ${conversationId}`);
+            } else {
+                console.log(`✅ Conversación existe: ${conversationId}`);
             }
 
             return conversationId;
         } catch (error) {
+            console.error('❌ Error creando conversación:', error);
             toastStore.show('Error al crear conversación', 'error');
             return '';
         }
     };
 
-    // Enviar mensaje
+    /**
+     * Enviar mensaje en una conversación
+     */
     const sendMessage = async (conversationId: string, otherUserId: string, content: string): Promise<boolean> => {
-        if (!authStore.user || !content.trim()) {
+        if (!authStore.user?.id) {
+            console.error('❌ No authenticated user');
+            return false;
+        }
+
+        if (!content.trim()) {
+            console.warn('⚠️ Empty message');
             return false;
         }
 
         try {
-            // sending message
             const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-
-            // Generar ID único para el mensaje
             const newMessageRef = doc(messagesRef);
 
             const newMessage = {
@@ -73,21 +99,37 @@ export const useMessagesStore = defineStore('messages', () => {
             };
 
             await setDoc(newMessageRef, newMessage);
+
+            // ✅ Actualizar lastMessage en conversación
+            const conversationRef = doc(db, 'conversations', conversationId);
+            await setDoc(conversationRef, {
+                lastMessage: content.trim(),
+                lastMessageTime: Timestamp.now(),
+            }, { merge: true });
+
+            console.log(`✅ Mensaje enviado`);
             return true;
         } catch (error) {
+            console.error('❌ Error enviando mensaje:', error);
             toastStore.show('Error al enviar mensaje', 'error');
             return false;
         }
     };
 
-    // Cargar conversaciones del usuario
+    /**
+     * Cargar todas las conversaciones del usuario autenticado
+     */
     const loadConversations = async () => {
-        if (!authStore.user) return;
+        if (!authStore.user?.id) {
+            console.warn('⚠️ No user to load conversations');
+            return;
+        }
 
         loading.value = true;
         try {
             const conversationsRef = collection(db, 'conversations');
-            const snapshot = await getDocs(conversationsRef);
+            const q = query(conversationsRef, where('participantIds', 'array-contains', authStore.user.id));
+            const snapshot = await getDocs(q);
 
             conversations.value = snapshot.docs
                 .map(doc => {
@@ -96,31 +138,40 @@ export const useMessagesStore = defineStore('messages', () => {
                         id: data.id,
                         participantIds: data.participantIds || [],
                         participantNames: data.participantNames || {},
-                        lastMessage: data.lastMessage,
-                        lastMessageTime: data.lastMessageTime?.toDate(),
-                        unreadCount: 0,
+                        lastMessage: data.lastMessage || '',
+                        lastMessageTime: data.lastMessageTime?.toDate() || new Date(),
+                        unreadCount: 0, // TODO: implementar contador de no leídos
                     } as Conversation;
                 })
-                .filter(conv => conv.participantIds.includes(authStore.user!.id));
+                .sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
 
-            // conversations loaded
+            console.log(`✅ ${conversations.value.length} conversaciones cargadas`);
         } catch (error) {
+            console.error('❌ Error cargando conversaciones:', error);
             toastStore.show('Error al cargar conversaciones', 'error');
-         } finally {
-             loading.value = false;
-         }
-     };
+        } finally {
+            loading.value = false;
+        }
+    };
 
-    // Cargar mensajes de una conversación en tiempo real
+    /**
+     * Cargar mensajes de una conversación con listener en tiempo real
+     * ✅ FIX: Detiene listener anterior si existe
+     */
     const loadConversationMessages = (conversationId: string) => {
-        if (!authStore.user) {
+        if (!authStore.user?.id) {
+            console.error('❌ No authenticated user');
             return;
         }
 
         // Desuscribirse del listener anterior si existe
-        if (unsubscribe) unsubscribe();
+        if (unsubscribe) {
+            console.log('🔴 Deteniendo listener anterior');
+            unsubscribe();
+            unsubscribe = null;
+        }
 
-        // start listening messages
+        loading.value = true;
         const messagesRef = collection(db, 'conversations', conversationId, 'messages');
 
         unsubscribe = onSnapshot(
@@ -141,20 +192,28 @@ export const useMessagesStore = defineStore('messages', () => {
                     })
                     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-                // messages loaded
+                console.log(`✅ ${currentMessages.value.length} mensajes cargados`);
+                loading.value = false;
             },
-            (_err) => {
+            (error) => {
+                console.error('❌ Error en listener de mensajes:', error);
                 toastStore.show('Error al escuchar mensajes', 'error');
+                loading.value = false;
             }
         );
     };
 
-    // Detener de escuchar mensajes
+    /**
+     * Detener de escuchar mensajes y limpiar recursos
+     * ✅ FIX: Necesario en unmount para evitar memory leaks
+     */
     const stopListeningMessages = () => {
         if (unsubscribe) {
+            console.log('🔴 Deteniendo listener de mensajes');
             unsubscribe();
             unsubscribe = null;
         }
+        currentMessages.value = [];
     };
 
     return {

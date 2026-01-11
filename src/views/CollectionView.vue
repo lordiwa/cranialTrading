@@ -170,13 +170,31 @@ const handleSearch = () => {
   isSearching.value = true
   searchTimeout = setTimeout(async () => {
     try {
-      const nameQuery = `"${searchQuery.value.trim()}"`
+      const nameQuery = `${searchQuery.value.trim()}`
       const filterQuery = buildScryfallQuery()
       const fullQuery = filterQuery ? `${nameQuery} ${filterQuery}` : nameQuery
 
       console.log('🔍 Búsqueda Scryfall:', fullQuery)
       const results = await searchCards(fullQuery)
-      searchResults.value = results.slice(0, 10)
+      let filtered = results.filter(card => {
+        const price = card.prices?.usd
+        return price && parseFloat(price) > 0
+      })
+
+      // Si no hay resultados con precio, mostrar todos
+      if (filtered.length === 0) {
+        filtered = results
+      }
+
+      // Priorizar coincidencias exactas del nombre
+      const searchTerm = searchQuery.value.trim().toLowerCase()
+      filtered.sort((a, b) => {
+        const aMatch = a.name.toLowerCase() === searchTerm ? 0 : 1
+        const bMatch = b.name.toLowerCase() === searchTerm ? 0 : 1
+        return aMatch - bMatch
+      })
+
+      searchResults.value = filtered
     } catch (err) {
       console.error('Error buscando:', err)
       toastStore.show('Error en la búsqueda', 'error')
@@ -425,26 +443,24 @@ watch(() => filters.value, () => {
             />
 
             <!-- Resultados Scryfall -->
-            <div v-if="isSearching" class="space-y-2">
+            <div v-if="searchResults.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div v-for="card in searchResults" :key="card.id"
                    @click="handleSelectCard(card)"
-                   class="flex gap-3 p-3 bg-primary-dark border border-silver-20 hover:border-neon cursor-pointer transition-fast">
+                   class="bg-primary-dark border border-silver-20 hover:border-neon cursor-pointer transition-fast p-3">
                 <img
-                    v-if="card.image_uris?.small"
-                    :src="card.image_uris.small"
+                    v-if="card.image_uris?.normal"
+                    :src="card.image_uris.normal"
                     :alt="card.name"
-                    class="w-16 h-24 object-cover border border-silver-20 flex-shrink-0"
+                    class="w-full aspect-[3/4] object-cover border border-silver-20 mb-2"
                 />
-                <div class="flex-1">
-                  <p class="text-small font-bold text-silver">{{ card.name }}</p>
-                  <p class="text-tiny text-silver-70">{{ card.set_name }}</p>
-                  <p class="text-tiny text-neon font-bold mt-2">${{ card.prices?.usd || 'N/A' }}</p>
-                </div>
+                <p class="text-small font-bold text-silver truncate">{{ card.name }}</p>
+                <p class="text-tiny text-silver-70">{{ card.set_name }}</p>
+                <p class="text-tiny text-neon font-bold mt-2">{{ card.prices?.usd ? `$${card.prices.usd}` : 'No existen registros de precio' }}</p>
               </div>
+            </div>
 
-              <div v-if="searching" class="p-6 text-center">
-                <BaseLoader size="small" />
-              </div>
+            <div v-if="searching" class="p-6 text-center">
+              <BaseLoader size="small" />
             </div>
 
             <div v-if="isSearching && searchResults.length === 0 && !searching && searchQuery.length >= 2" class="text-center py-6">

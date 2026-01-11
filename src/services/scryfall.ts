@@ -1,88 +1,88 @@
-/**
- * Servicio de integración con Scryfall API
- * https://scryfall.com/docs/api
- */
-
 const SCRYFALL_API = 'https://api.scryfall.com'
 
 export interface ScryfallCard {
     id: string
     name: string
+    set: string
     set_name: string
-    prices: {
-        usd: string | null
-        usd_foil: string | null
-    }
+    collector_number: string
+    rarity: string
+    type_line: string
+    mana_cost?: string
+    cmc?: number
+    power?: string
+    toughness?: string
     image_uris?: {
-        normal: string
-        small: string
+        small?: string
+        normal?: string
+        large?: string
+        png?: string
+        art_crop?: string
+        border_crop?: string
     }
-    card_faces?: Array<{
-        image_uris: {
-            normal: string
-        }
-    }>
+    prices?: {
+        usd?: string
+        usd_foil?: string
+        eur?: string
+        tix?: string
+    }
 }
 
 /**
- * Buscar cartas en Scryfall con mejor filtrado
+ * Búsqueda por nombre O query Scryfall compleja
+ *
+ * Ejemplos:
+ * - searchCards('Black Lotus') → busca exacto
+ * - searchCards('"Teferi" c:u') → Teferi azul
+ * - searchCards('"Teferi" (c:u OR c:w)') → Teferi azul o blanco
  */
 export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
     try {
-        const encodedQuery = encodeURIComponent(query)
+        if (!query || query.trim().length === 0) return []
+
+        const trimmedQuery = query.trim()
+
+        // Si es una query compleja (contiene : o OR), usar directamente
+        // Si no, es un nombre simple - envolverlo en comillas
+        const finalQuery = trimmedQuery.includes(':') || trimmedQuery.includes('OR')
+            ? trimmedQuery
+            : `"${trimmedQuery}"`
+
+        const encodedQuery = encodeURIComponent(finalQuery)
+
+        console.log(`🔍 Query enviada a Scryfall: ${finalQuery}`)
+
         const response = await fetch(
             `${SCRYFALL_API}/cards/search?q=${encodedQuery}&unique=prints&order=released&dir=desc`
         )
 
         if (!response.ok) {
+            if (response.status === 404) {
+                console.warn(`⚠️ No se encontraron cartas: ${finalQuery}`)
+                return []
+            }
             throw new Error(`Scryfall API error: ${response.status}`)
         }
 
         const data = await response.json()
-        let results = data.data || []
-
-        // ✅ FILTRAR: Solo devolver cartas que coincidan bien con la búsqueda
-        const queryLower = query.toLowerCase().trim()
-
-        results = results.filter((card: ScryfallCard) => {
-            const nameLower = card.name.toLowerCase()
-
-            // Prioridad 1: Coincidencia exacta
-            if (nameLower === queryLower) return true
-
-            // Prioridad 2: Comienza con la búsqueda
-            if (nameLower.startsWith(queryLower)) return true
-
-            // Prioridad 3: Contiene la palabra completa (no substring)
-            const words = queryLower.split(/\s+/)
-            const allWordsMatch = words.every(word =>
-                nameLower.includes(word)
-            )
-            if (allWordsMatch && words.length > 1) return true
-
-            // Prioridad 4: La búsqueda es palabra exacta al inicio
-            if (nameLower.split(' ')[0] === queryLower.split(' ')[0]) return true
-
-            return false
-        })
-
-        // Limitar a 10 resultados máximo
-        return results.slice(0, 10)
+        const results = data.data || []
+        console.log(`✅ ${results.length} cartas encontradas`)
+        return results
     } catch (error) {
         console.error('Error en searchCards:', error)
-        throw error
+        return []
     }
 }
 
 /**
- * Obtener carta por ID de Scryfall
+ * Obtener carta por ID
  */
-export const getCardById = async (cardId: string): Promise<ScryfallCard | null> => {
+export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
     try {
-        const response = await fetch(`${SCRYFALL_API}/cards/${cardId}`)
+        const response = await fetch(`${SCRYFALL_API}/cards/${id}`)
 
         if (!response.ok) {
-            return null
+            throw new Error(`Scryfall API error: ${response.status}`)
         }
 
         return await response.json()
@@ -93,42 +93,9 @@ export const getCardById = async (cardId: string): Promise<ScryfallCard | null> 
 }
 
 /**
- * Autocomplete de cartas (rápido)
- */
-export const getSuggestions = async (query: string): Promise<string[]> => {
-    try {
-        const encodedQuery = encodeURIComponent(query)
-        const response = await fetch(
-            `${SCRYFALL_API}/cards/autocomplete?q=${encodedQuery}`
-        )
-
-        if (!response.ok) {
-            return []
-        }
-
-        const data = await response.json()
-        return data.data || []
-    } catch (error) {
-        console.error('Error en getSuggestions:', error)
-        return []
-    }
-}
-
-/**
- * Validar que una carta existe en Scryfall
- */
-export const validateCard = async (name: string): Promise<boolean> => {
-    try {
-        const suggestions = await getSuggestions(name)
-        return suggestions.length > 0
-    } catch {
-        return false
-    }
-}
-
-/**
- * Búsqueda avanzada con filtros
- * Ejemplo: searchAdvanced("type:creature color:blue")
+ * Búsqueda avanzada con query string de Scryfall
+ * Ejemplo: searchAdvanced('type:creature color:blue')
+ * ✅ MEJORADO: Manejo mejor de errores y rate limiting
  */
 export const searchAdvanced = async (
     query: string,
@@ -142,21 +109,40 @@ export const searchAdvanced = async (
     }
 ): Promise<ScryfallCard[]> => {
     try {
+        // Validar query no vacía
+        if (!query || query.trim().length === 0) {
+            console.warn('⚠️ Query vacía')
+            return []
+        }
+
         const params = new URLSearchParams()
-        params.append('q', query)
+        params.append('q', query.trim())
         params.append('unique', options?.unique || 'prints')
         if (options?.order) params.append('order', options.order)
         if (options?.dir) params.append('dir', options.dir)
         if (options?.page) params.append('page', options.page.toString())
 
+        console.log(`🔍 Buscando con query: ${query}`)
+
         const response = await fetch(`${SCRYFALL_API}/cards/search?${params.toString()}`)
 
         if (!response.ok) {
+            if (response.status === 429) {
+                console.warn('⚠️ Rate limit alcanzado, esperando...')
+                await new Promise(resolve => setTimeout(resolve, 1000))
+                return searchAdvanced(query, options) // Reintentar
+            }
+            if (response.status === 404) {
+                console.warn('⚠️ No se encontraron cartas con estos filtros')
+                return []
+            }
             throw new Error(`Scryfall API error: ${response.status}`)
         }
 
         const data = await response.json()
-        return data.data || []
+        const results = data.data || []
+        console.log(`✅ ${results.length} cartas encontradas`)
+        return results
     } catch (error) {
         console.error('Error en searchAdvanced:', error)
         return []
@@ -164,16 +150,210 @@ export const searchAdvanced = async (
 }
 
 /**
- * Obtener precio de una carta
+ * Búsqueda de cartas por múltiples criterios
+ * ✅ NUEVO: Búsqueda con validación y manejo avanzado
  */
-export const getCardPrice = async (cardId: string): Promise<number | null> => {
-    try {
-        const card = await getCardById(cardId)
-        if (card?.prices?.usd) {
-            return parseFloat(card.prices.usd)
-        }
-        return null
-    } catch {
-        return null
+export const searchByMultipleCriteria = async (
+    name?: string,
+    type?: string,
+    color?: string,
+    set?: string
+): Promise<ScryfallCard[]> => {
+    const parts: string[] = []
+
+    if (name?.trim()) {
+        parts.push(`"${name.trim()}"`)
     }
+    if (type?.trim()) {
+        parts.push(`t:${type}`)
+    }
+    if (color?.trim()) {
+        parts.push(`c:${color}`)
+    }
+    if (set?.trim()) {
+        parts.push(`e:${set}`)
+    }
+
+    if (parts.length === 0) {
+        return []
+    }
+
+    return searchAdvanced(parts.join(' '), {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener sugerencias de cartas (autocomplete)
+ * ✅ MEJORADO: Mejor parseo de resultados
+ */
+export const getCardSuggestions = async (query: string): Promise<string[]> => {
+    try {
+        if (!query || query.trim().length < 2) {
+            return []
+        }
+
+        const encodedQuery = encodeURIComponent(query.trim())
+        const response = await fetch(
+            `${SCRYFALL_API}/cards/autocomplete?q=${encodedQuery}`
+        )
+
+        if (!response.ok) {
+            return []
+        }
+
+        const data = await response.json()
+        return data.data || []
+    } catch (error) {
+        console.error('Error en getCardSuggestions:', error)
+        return []
+    }
+}
+
+/**
+ * Obtener cartas por color
+ * ✅ NUEVO: Filtro específico por color
+ */
+export const getCardsByColor = async (color: string): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`c:${color}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por tipo
+ * ✅ NUEVO: Filtro específico por tipo
+ */
+export const getCardsByType = async (type: string): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`t:${type}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por set/edición
+ * ✅ NUEVO: Filtro específico por set
+ */
+export const getCardsBySet = async (setCode: string): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`e:${setCode}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas dentro de rango de precio
+ * ✅ NUEVO: Filtro por precio
+ */
+export const getCardsByPrice = async (
+    minPrice: number,
+    maxPrice: number
+): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`usd>=${minPrice} usd<=${maxPrice}`, {
+        unique: 'prints',
+        order: 'usd',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por palabra clave
+ * ✅ NUEVO: Filtro por habilidad
+ */
+export const getCardsByKeyword = async (keyword: string): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`kw:${keyword}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por rango de mana value
+ * ✅ NUEVO: Filtro por mana cost
+ */
+export const getCardsByManaValue = async (
+    min: number,
+    max: number
+): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`mv>=${min} mv<=${max}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por rarity
+ * ✅ NUEVO: Filtro por rareza
+ */
+export const getCardsByRarity = async (rarity: string): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`r:${rarity}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por formato legal
+ * ✅ NUEVO: Filtro por formato
+ */
+export const getCardsByFormat = async (format: string): Promise<ScryfallCard[]> => {
+    return searchAdvanced(`f:${format}`, {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas foil
+ * ✅ NUEVO: Filtro para foil
+ */
+export const getFoilCards = async (): Promise<ScryfallCard[]> => {
+    return searchAdvanced('is:foil', {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas full art
+ * ✅ NUEVO: Filtro para full art
+ */
+export const getFullArtCards = async (): Promise<ScryfallCard[]> => {
+    return searchAdvanced('is:full', {
+        unique: 'prints',
+        order: 'released',
+        dir: 'desc',
+    })
+}
+
+/**
+ * Obtener cartas por power/toughness
+ * ✅ NUEVO: Filtro por poder/resistencia
+ */
+export const getCardsByPowerToughness = async (
+    minPower: number,
+    maxPower: number,
+    minToughness: number,
+    maxToughness: number
+): Promise<ScryfallCard[]> => {
+    return searchAdvanced(
+        `pow>=${minPower} pow<=${maxPower} tou>=${minToughness} tou<=${maxToughness}`,
+        {
+            unique: 'prints',
+            order: 'released',
+            dir: 'desc',
+        }
+    )
 }

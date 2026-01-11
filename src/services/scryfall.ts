@@ -20,6 +20,18 @@ export interface ScryfallCard {
         art_crop?: string
         border_crop?: string
     }
+    // ✅ NUEVO: Soporte para cartas de dos caras (split cards)
+    card_faces?: Array<{
+        name: string
+        image_uris?: {
+            small?: string
+            normal?: string
+            large?: string
+            png?: string
+            art_crop?: string
+            border_crop?: string
+        }
+    }>
     prices?: {
         usd?: string
         usd_foil?: string

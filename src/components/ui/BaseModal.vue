@@ -2,10 +2,12 @@
 interface Props {
   show: boolean;
   title?: string;
+  closeOnClickOutside?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   title: '',
+  closeOnClickOutside: true,
 });
 
 const emit = defineEmits<{
@@ -15,6 +17,12 @@ const emit = defineEmits<{
 const closeModal = () => {
   emit('close');
 };
+
+const handleOverlayClick = () => {
+  if (props.closeOnClickOutside) {
+    closeModal();
+  }
+};
 </script>
 
 <template>
@@ -23,9 +31,9 @@ const closeModal = () => {
       <div
           v-if="show"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 px-4"
-          @click.self="closeModal"
+          @click.self="handleOverlayClick"
       >
-        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-lg transition-normal max-h-[90vh] overflow-y-auto">
+        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-2xl w-full p-lg transition-normal max-h-[90vh] overflow-y-auto">
           <button
               @click="closeModal"
               class="absolute top-3 right-3 md:top-4 md:right-4 text-silver hover:text-neon transition-fast p-2"

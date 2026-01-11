@@ -118,6 +118,17 @@ const wishlistTotalCost = computed(() => {
 
 // ========== MÉTODOS ==========
 
+// ✅ NUEVO: Función para obtener imagen correcta (incluyendo split cards)
+const getCardImage = (card: any): string => {
+  // Split cards (ej: "Valakut Awakening // Valakut Stoneforge")
+  if (card.card_faces && card.card_faces.length > 0) {
+    // Tomar la primera cara (front)
+    return card.card_faces[0].image_uris?.normal || ''
+  }
+  // Cartas normales
+  return card.image_uris?.normal || ''
+}
+
 // Construir query Scryfall
 const buildScryfallQuery = (): string => {
   const parts: string[] = []
@@ -448,8 +459,8 @@ watch(() => filters.value, () => {
                    @click="handleSelectCard(card)"
                    class="bg-primary-dark border border-silver-20 hover:border-neon cursor-pointer transition-fast p-3">
                 <img
-                    v-if="card.image_uris?.normal"
-                    :src="card.image_uris.normal"
+                    v-if="getCardImage(card)"
+                    :src="getCardImage(card)"
                     :alt="card.name"
                     class="w-full aspect-[3/4] object-cover border border-silver-20 mb-2"
                 />

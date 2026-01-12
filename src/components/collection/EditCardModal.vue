@@ -1,42 +1,67 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { Card, CardCondition, ScryfallCard } from '../../types/card';
-import { searchCards } from '../../services/scryfall';
-import BaseModal from '../ui/BaseModal.vue';
-import BaseInput from '../ui/BaseInput.vue';
-import BaseSelect from '../ui/BaseSelect.vue';
-import BaseButton from '../ui/BaseButton.vue';
-import BaseLoader from '../ui/BaseLoader.vue';
+import { ref, watch } from 'vue'
+import { useToastStore } from '../../stores/toast'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import BaseModal from '../ui/BaseModal.vue'
+import type { Card, CardStatus } from '../../types/card'
 
 const props = defineProps<{
-  show: boolean;
-  card: Card | null;
-}>();
+  show: boolean
+  card: Card | null
+}>()
 
 const emit = defineEmits<{
-  close: [];
-  save: [updates: Partial<Card>];
-}>();
+  close: []
+  save: [card: Card]
+}>()
 
-const form = ref({
+const toastStore = useToastStore()
+
+const form = ref<Partial<Card>>({
   quantity: 1,
-  condition: 'NM' as CardCondition,
+  condition: 'NM',
   foil: false,
-  price: 0,
-  public: false,
-  scryfallId: '',
-  name: '',
-  edition: '',
-  image: '',
-});
+})
 
-const conditions: CardCondition[] = ['M', 'NM', 'LP', 'MP', 'HP', 'PO'];
-const searchQuery = ref('');
-const searchResults = ref<ScryfallCard[]>([]);
-const searching = ref(false);
-const editingCard = ref(false);
+const isLoading = ref(false)
 
-let searchTimeout: ReturnType<typeof setTimeout>;
+const conditionOptions = [
+  { value: 'M', label: 'Mint (M)' },
+  { value: 'NM', label: 'Near Mint (NM)' },
+  { value: 'LP', label: 'Light Play (LP)' },
+  { value: 'MP', label: 'Moderate Play (MP)' },
+  { value: 'HP', label: 'Heavy Play (HP)' },
+  { value: 'PO', label: 'Poor (PO)' },
+]
+
+const handleSave = async () => {
+  if (!props.card) return
+
+  if ((form.value.quantity as number) < 1 || (form.value.quantity as number) > 4) {
+    toastStore.showToast('Cantidad debe ser 1-4', 'error')
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    const updatedCard: Card = {
+      ...props.card,
+      quantity: form.value.quantity as number,
+      condition: form.value.condition as string,
+      foil: form.value.foil as boolean,
+    }
+
+    emit('save', updatedCard)
+  } catch (err) {
+    toastStore.showToast('Error guardando cambios', 'error')
+    console.error(err)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 watch(() => props.card, (newCard) => {
   if (newCard) {
@@ -44,210 +69,78 @@ watch(() => props.card, (newCard) => {
       quantity: newCard.quantity,
       condition: newCard.condition,
       foil: newCard.foil,
-      price: newCard.price,
-      public: newCard.public || false,
-      scryfallId: newCard.scryfallId,
-      name: newCard.name,
-      edition: newCard.edition,
-      image: newCard.image,
-    };
-    editingCard.value = false;
-    searchQuery.value = '';
-    searchResults.value = [];
+    }
   }
-}, { deep: true });
-
-watch(searchQuery, (newQuery) => {
-  clearTimeout(searchTimeout);
-
-  if (newQuery.length < 2) {
-    searchResults.value = [];
-    return;
-  }
-
-  searching.value = true;
-  searchTimeout = setTimeout(async () => {
-    searchResults.value = await searchCards(newQuery);
-    searching.value = false;
-  }, 300);
-});
-
-const selectCard = (card: ScryfallCard) => {
-  form.value.scryfallId = card.id;
-  form.value.name = card.name;
-  form.value.edition = card.set_name;
-  form.value.image = card.image_uris?.normal || '';
-  form.value.price = parseFloat(card.prices.usd || '0');
-  searchQuery.value = '';
-  searchResults.value = [];
-  editingCard.value = false;
-};
-
-const handleSave = () => {
-  emit('save', {
-    quantity: form.value.quantity,
-    condition: form.value.condition,
-    foil: form.value.foil,
-    price: form.value.price,
-    public: form.value.public,
-    scryfallId: form.value.scryfallId,
-    name: form.value.name,
-    edition: form.value.edition,
-    image: form.value.image,
-  });
-};
+}, { deep: true })
 </script>
 
 <template>
   <BaseModal :show="show" @close="emit('close')">
-    <div class="w-full max-w-md">
-      <h2 class="text-h2 font-bold text-silver mb-6">EDITAR CARTA</h2>
+    <div class="space-y-6 w-full max-w-xl">
+      <!-- Title -->
+      <div>
+        <h2 class="text-h2 font-bold text-silver mb-1">EDITAR CARTA</h2>
+        <p class="text-small text-silver-70">Modifica los detalles de tu carta</p>
+      </div>
 
-      <div v-if="!editingCard" class="space-y-md">
-        <!-- Card preview -->
-        <div class="border border-silver-30 p-lg">
-          <div class="flex gap-lg">
-            <img
-                v-if="form.image"
-                :src="form.image"
-                :alt="form.name"
-                class="w-20 h-28 object-cover"
-            />
-            <div class="flex-1">
-              <p class="text-body font-bold text-silver">{{ form.name }}</p>
-              <p class="text-small text-silver-70 mt-1">{{ form.edition }}</p>
-              <div class="flex items-center gap-2 mt-2">
-                <span class="text-small font-bold text-neon">x{{ form.quantity }}</span>
-                <span v-if="form.foil" class="text-tiny text-neon">FOIL</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- Card Info -->
+      <div v-if="card" class="bg-secondary border border-silver-30 p-4 space-y-2">
+        <p class="font-bold text-silver text-h3">{{ card.name }}</p>
+        <p class="text-small text-silver-70">{{ card.edition }}</p>
+        <p class="text-small text-neon">Condición actual: {{ card.condition }}</p>
+      </div>
 
-        <!-- Edit button -->
-        <BaseButton
-            variant="secondary"
-            size="small"
-            @click="editingCard = true"
-            class="w-full"
-        >
-          CAMBIAR CARTA / EDICIÓN
-        </BaseButton>
-
-        <div class="grid grid-cols-2 gap-lg">
+      <!-- Form -->
+      <div class="space-y-4">
+        <!-- Quantity & Condition -->
+        <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="text-small font-bold text-silver mb-2 block">Cantidad</label>
+            <label class="text-small text-silver-70 block mb-2">Cantidad</label>
             <BaseInput
                 v-model.number="form.quantity"
                 type="number"
                 min="1"
-                placeholder="1"
+                max="4"
             />
           </div>
 
           <div>
-            <label class="text-small font-bold text-silver mb-2 block">Condición</label>
+            <label class="text-small text-silver-70 block mb-2">Condición</label>
             <BaseSelect
                 v-model="form.condition"
-                :options="conditions.map(c => ({ value: c, label: c }))"
+                :options="conditionOptions"
             />
           </div>
         </div>
 
-        <div>
-          <label class="text-small font-bold text-silver mb-2 block">Precio</label>
-          <BaseInput
-              v-model.number="form.price"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
+        <!-- Foil Checkbox -->
+        <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
+          <input
+              v-model="form.foil"
+              type="checkbox"
+              class="w-4 h-4 cursor-pointer"
           />
-        </div>
-
-        <div class="space-y-xs">
-          <label class="flex items-center gap-3 text-small text-silver cursor-pointer">
-            <input
-                v-model="form.foil"
-                type="checkbox"
-                class="w-4 h-4"
-            />
-            <span>FOIL</span>
-          </label>
-
-          <label class="flex items-center gap-3 text-small text-silver cursor-pointer">
-            <input
-                v-model="form.public"
-                type="checkbox"
-                class="w-4 h-4"
-            />
-            <span>Visible en mi perfil público</span>
-          </label>
-        </div>
-
-        <div class="flex gap-md mt-6">
-          <BaseButton
-              variant="secondary"
-              class="flex-1"
-              @click="emit('close')"
-          >
-            CANCELAR
-          </BaseButton>
-          <BaseButton
-              class="flex-1"
-              @click="handleSave"
-          >
-            GUARDAR
-          </BaseButton>
-        </div>
+          <span class="text-small text-silver">Foil</span>
+        </label>
       </div>
 
-      <!-- Card selection -->
-      <div v-else class="space-y-md">
-        <BaseInput
-            v-model="searchQuery"
-            placeholder="Buscar nueva carta..."
-            type="text"
-        />
-
-        <div v-if="searching" class="mt-4">
-          <BaseLoader size="small" />
-        </div>
-
-        <div v-if="searchResults.length > 0" class="max-h-64 overflow-y-auto space-y-xs">
-          <div
-              v-for="card in searchResults"
-              :key="card.id"
-              @click="selectCard(card)"
-              class="border border-silver-30 p-sm hover:border-neon transition-fast cursor-pointer"
-          >
-            <div class="flex gap-md">
-              <img
-                  v-if="card.image_uris?.small"
-                  :src="card.image_uris.small"
-                  :alt="card.name"
-                  class="w-12 h-16 object-cover"
-              />
-              <div class="flex-1">
-                <p class="text-small font-bold text-silver">{{ card.name }}</p>
-                <p class="text-tiny text-silver-70">{{ card.set_name }}</p>
-                <p class="text-tiny text-neon mt-1">
-                  ${{ card.prices.usd || 'N/A' }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex gap-md">
-          <BaseButton
-              variant="secondary"
-              class="flex-1"
-              @click="editingCard = false"
-          >
-            ATRÁS
-          </BaseButton>
-        </div>
+      <!-- Actions -->
+      <div class="flex gap-3 pt-4 border-t border-silver-20">
+        <BaseButton
+            class="flex-1"
+            :disabled="isLoading"
+            @click="handleSave"
+        >
+          {{ isLoading ? '⏳ GUARDANDO...' : '✓ GUARDAR' }}
+        </BaseButton>
+        <BaseButton
+            variant="secondary"
+            class="flex-1"
+            :disabled="isLoading"
+            @click="emit('close')"
+        >
+          CANCELAR
+        </BaseButton>
       </div>
     </div>
   </BaseModal>

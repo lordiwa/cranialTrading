@@ -2,92 +2,67 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ═══════════════════════════════════════════════════════════════════
-    // USUARIOS - Datos base del usuario
-    // ═══════════════════════════════════════════════════════════════════
+    // Permitir lectura pública de usuarios (perfiles públicos)
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth.uid == userId;
 
-      // Cartas en colección del usuario
+      // ✅ Colección de mazos del usuario: users/{userId}/decks/{deckId}
+      match /decks/{deckId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Colección de cartas del usuario
       match /cards/{cardId} {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
 
-      // Preferencias de intercambio
-      match /preferencias/{preferenceId} {
+      // Colección de preferencias del usuario
+      match /preferences/{preferenceId} {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
 
-      // Matches nuevos (detectados automáticamente)
-      match /matches_nuevos/{matchId} {
-        allow read, write: if request.auth.uid == userId;
+      // Colección de matches guardados
+      match /savedMatches/{matchId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
       }
 
-      // Matches guardados (usuario interesado)
-      match /matches_guardados/{matchId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      // Matches eliminados (en período de 15 días antes de borrar)
-      match /matches_eliminados/{matchId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      // ✅ NUEVO: Contactos guardados (Caso 7)
-      match /contactos_guardados/{contactId} {
-        allow read, write: if request.auth.uid == userId;
+      // Colección de contactos guardados
+      match /savedContacts/{contactId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // CONVERSACIONES - Chat entre dos usuarios
-    // ═══════════════════════════════════════════════════════════════════
-    match /conversations/{conversationId} {
-      // ✅ FIX: Validación mejorada - verificar que usuario es participante
-      allow read: if request.auth != null &&
-                     resource.data.participantIds != null &&
-                     request.auth.uid in resource.data.participantIds;
-
-      allow write: if request.auth != null &&
-                      resource.data.participantIds != null &&
-                      request.auth.uid in resource.data.participantIds;
-
-      // ✅ FIX: Crear nueva conversación - solo si eres uno de los participantes
-      allow create: if request.auth != null &&
-                       request.resource.data.participantIds != null &&
-                       request.auth.uid in request.resource.data.participantIds &&
-                       request.resource.data.participantIds.size() == 2;
-
-      // Mensajes dentro de conversación
-      match /messages/{messageId} {
-        // ✅ FIX: Leer solo si eres participante de la conversación
-        allow read: if request.auth != null &&
-                       get(/databases/$(database)/documents/conversations/$(conversationId))
-                         .data.participantIds.hasAny([request.auth.uid]);
-
-        // ✅ FIX: Escribir solo si eres el remitente
-        allow create: if request.auth != null &&
-                         request.resource.data.senderId == request.auth.uid &&
-                         get(/databases/$(database)/documents/conversations/$(conversationId))
-                           .data.participantIds.hasAny([request.auth.uid]);
-
-        // Solo puedes actualizar tus propios mensajes (marcar como leído)
-        allow update: if request.auth != null &&
-                         resource.data.senderId == request.auth.uid;
-
-        // No permitir eliminar mensajes
-        allow delete: if false;
-      }
+    // Legacy colecciones (mantener compatibilidad con datos anteriores)
+    match /colecciones/{userId}/cards/{cardId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // FALLBACK - Denegar todo lo demás
-    // ═══════════════════════════════════════════════════════════════════
+    match /preferencias/{userId}/{preferenceId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
+    match /matches_guardados/{userId}/{matchId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
+    match /contactos_guardados/{userId}/{contactId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
+    // Denegar todo lo demás por defecto
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+

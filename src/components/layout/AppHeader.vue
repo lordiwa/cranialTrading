@@ -1,189 +1,135 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../../stores/auth';
-import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
 
-const authStore = useAuthStore();
-const router = useRouter();
-const mobileMenuOpen = ref(false);
-const showProfileHover = ref(false);
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+const isAuthenticated = computed(() => !!authStore.user)
+
+const navigationLinks = [
+  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/collection', label: 'Colección', icon: '📚' },
+  { path: '/decks', label: 'Mazos', icon: '🎴' },  // ✅ NUEVO: Enlace a Decks
+  { path: '/saved-matches', label: 'Matches', icon: '🔗' },
+  { path: '/messages', label: 'Mensajes', icon: '💬' },
+]
+
+const isActive = (path: string) => {
+  return route.path.startsWith(path)
+}
 
 const handleLogout = async () => {
-  await router.push('/login');
-  await authStore.logout();
-};
+  await authStore.logout()
+  router.push('/login')
+}
 
-const closeMenu = () => {
-  mobileMenuOpen.value = false;
-};
+const handleNavigate = (path: string) => {
+  router.push(path)
+}
 </script>
 
 <template>
-  <header class="bg-primary h-15 border-b border-silver-20 px-lg flex items-center justify-between">
-    <div class="flex items-center gap-lg">
-      <div class="flex items-center gap-sm">
-        <img
-            src="/cranial-trading-logo-color.png"
-            alt="Cranial Trading Logo"
-            class="h-10 w-10"
-        />
-      </div>
+  <header class="bg-primary border-b border-silver-20 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16 md:h-20">
+        <!-- Logo -->
+        <router-link to="/dashboard" class="flex items-center gap-2 flex-shrink-0">
+          <div class="text-h3 font-bold text-neon">⚙️</div>
+          <span class="hidden sm:inline text-h3 font-bold text-neon">CRANIAL</span>
+        </router-link>
 
-      <!-- Desktop Nav -->
-      <nav class="hidden md:flex gap-lg">
-        <RouterLink
-            to="/dashboard"
-            class="text-body text-silver hover:text-neon transition-fast"
-            active-class="text-neon"
-        >
-          Dashboard
-        </RouterLink>
-        <RouterLink
-            to="/collection"
-            class="text-body text-silver hover:text-neon transition-fast"
-            active-class="text-neon"
-        >
-          Colección
-        </RouterLink>
-        <RouterLink
-            to="/saved-matches"
-            class="text-body text-silver hover:text-neon transition-fast"
-            active-class="text-neon"
-        >
-          Matches
-        </RouterLink>
-        <RouterLink
-            to="/contacts"
-            class="text-body text-silver hover:text-neon transition-fast"
-            active-class="text-neon"
-        >
-          Contactos
-        </RouterLink>
-      </nav>
-
-      <!-- Desktop User - SOLO si hay usuario -->
-      <div v-if="authStore.user" class="hidden md:flex items-center gap-md">
-        <div
-            @mouseenter="showProfileHover = true"
-            @mouseleave="showProfileHover = false"
-            class="relative"
-        >
-          <RouterLink
-              :to="{ name: 'userProfile', params: { username: authStore.user.username } }"
-              class="text-small text-silver hover:text-neon transition-fast font-bold"
+        <!-- Navigation Links (Desktop) -->
+        <nav v-if="isAuthenticated" class="hidden md:flex items-center gap-1">
+          <router-link
+              v-for="link in navigationLinks"
+              :key="link.path"
+              :to="link.path"
+              :class="[
+                'px-4 py-2 text-small font-bold transition-fast rounded-sm',
+                isActive(link.path)
+                  ? 'bg-neon-10 border-b-2 border-neon text-neon'
+                  : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
+              ]"
           >
-            @{{ authStore.user.username }}
-          </RouterLink>
-          <UserProfileHoverCard
-              :username="authStore.user.username"
-              :show="showProfileHover"
-          />
-        </div>
+            <span class="inline-block mr-1">{{ link.icon }}</span>
+            {{ link.label }}
+          </router-link>
+        </nav>
 
-        <RouterLink
-            to="/settings"
-            class="text-small text-silver hover:text-neon transition-fast"
-        >
-          ⚙️
-        </RouterLink>
-        <button
-            @click="handleLogout"
-            class="text-small text-silver hover:text-rust transition-fast"
-        >
-          Salir
-        </button>
-      </div>
+        <!-- Right side: User & Settings -->
+        <div class="flex items-center gap-2 md:gap-4">
+          <!-- Mobile Menu Button -->
+          <button
+              v-if="isAuthenticated"
+              class="md:hidden px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
+              @click="$emit('toggle-menu')"
+          >
+            ☰
+          </button>
 
-      <!-- Mobile Hamburger -->
-      <button
-          @click="mobileMenuOpen = !mobileMenuOpen"
-          class="md:hidden p-2 text-silver hover:text-neon transition-fast"
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Mobile Menu - SOLO si hay usuario -->
-    <Transition name="slide">
-      <div v-if="mobileMenuOpen && authStore.user" class="md:hidden border-t border-silver-20">
-        <nav class="flex flex-col py-4">
-          <RouterLink
-              to="/dashboard"
-              @click="closeMenu"
-              class="px-4 py-3 text-body text-silver hover:text-neon hover:bg-silver-5 transition-fast"
-              active-class="text-neon bg-neon-5"
-          >
-            Dashboard
-          </RouterLink>
-          <RouterLink
-              to="/collection"
-              @click="closeMenu"
-              class="px-4 py-3 text-body text-silver hover:text-neon hover:bg-silver-5 transition-fast"
-              active-class="text-neon bg-neon-5"
-          >
-            Mi Colección
-          </RouterLink>
-          <RouterLink
-              to="/saved-matches"
-              @click="closeMenu"
-              class="px-4 py-3 text-body text-silver hover:text-neon hover:bg-silver-5 transition-fast"
-              active-class="text-neon bg-neon-5"
-          >
-            Mis Matches
-          </RouterLink>
-          <RouterLink
-              to="/contacts"
-              @click="closeMenu"
-              class="px-4 py-3 text-body text-silver hover:text-neon hover:bg-silver-5 transition-fast"
-              active-class="text-neon bg-neon-5"
-          >
-            Mis Contactos
-          </RouterLink>
-
-          <div class="border-t border-silver-20 mt-2 pt-2 px-4">
-            <RouterLink
-                :to="{ name: 'userProfile', params: { username: authStore.user.username } }"
-                @click="closeMenu"
-                class="block text-body text-neon font-bold py-3 hover:text-silver transition-fast"
-            >
-              @{{ authStore.user.username }}
-            </RouterLink>
-            <RouterLink
+          <!-- User Menu -->
+          <div v-if="isAuthenticated" class="flex items-center gap-2">
+            <router-link
                 to="/settings"
-                @click="closeMenu"
-                class="block text-small text-silver hover:text-neon transition-fast mb-3"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
+                title="Configuración"
             >
-              ⚙️ Configuración
-            </RouterLink>
+              ⚙️
+            </router-link>
             <button
                 @click="handleLogout"
-                class="text-body text-rust hover:text-rust transition-fast"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-ruby hover:text-ruby transition-fast"
+                title="Cerrar sesión"
             >
-              Cerrar Sesión
+              🚪
             </button>
           </div>
-        </nav>
+
+          <!-- Auth Links (Logged out) -->
+          <div v-else class="flex items-center gap-2">
+            <router-link
+                to="/login"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
+            >
+              Iniciar
+            </router-link>
+            <router-link
+                to="/register"
+                class="px-3 py-2 bg-neon text-primary font-bold hover:bg-neon-90 transition-fast"
+            >
+              Registrar
+            </router-link>
+          </div>
+        </div>
       </div>
-    </Transition>
+
+      <!-- Mobile Navigation Menu -->
+      <nav v-if="isAuthenticated" class="md:hidden border-t border-silver-20 pb-2">
+        <router-link
+            v-for="link in navigationLinks"
+            :key="link.path"
+            :to="link.path"
+            :class="[
+              'block px-4 py-2 text-small font-bold transition-fast',
+              isActive(link.path)
+                ? 'bg-neon-10 border-l-2 border-neon text-neon'
+                : 'text-silver-70 hover:text-silver'
+            ]"
+        >
+          <span class="inline-block mr-2">{{ link.icon }}</span>
+          {{ link.label }}
+        </router-link>
+      </nav>
+    </div>
   </header>
 </template>
 
 <style scoped>
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 200ms ease-out;
-}
-
-.slide-enter-from {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.slide-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
+/* Smooth transitions para links activos */
+.router-link-exact-active {
+  @apply text-neon;
 }
 </style>

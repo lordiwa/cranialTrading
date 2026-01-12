@@ -68,6 +68,31 @@ const router = createRouter({
             component: () => import('../views/SettingsView.vue'),
             meta: { requiresAuth: true },
         },
+        // ⭐ NUEVAS RUTAS DE DECKS
+        {
+            path: '/decks',
+            name: 'decks',
+            component: () => import('../views/DecksView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/decks/new',
+            name: 'newDeck',
+            component: () => import('../views/DeckEditorView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/decks/:deckId',
+            name: 'deckDetail',
+            component: () => import('../views/DeckDetailView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/decks/:deckId/edit',
+            name: 'deckEdit',
+            component: () => import('../views/DeckEditorView.vue'),
+            meta: { requiresAuth: true },
+        },
         {
             path: '/@:username',
             name: 'userProfile',

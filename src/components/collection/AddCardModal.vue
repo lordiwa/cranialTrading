@@ -1,44 +1,42 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
-import BaseModal from '../ui/BaseModal.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
-import BaseButton from '../ui/BaseButton.vue'
+import { ref, watch } from 'vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
-import { useAuthStore } from '../../stores/auth'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import BaseModal from '../ui/BaseModal.vue'
+import type { CardStatus } from '../../types/card'
 
-interface Props {
+const props = defineProps<{
   show: boolean
-  card?: any
-}
+  scryfallCard: any | null
+}>()
 
-const props = defineProps<Props>()
-const emit = defineEmits(['close', 'card-added'])
+const emit = defineEmits<{
+  close: []
+  added: []
+}>()
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
-const authStore = useAuthStore()
 
-const loading = ref(false)
-
-const form = reactive({
+const form = ref({
   quantity: 1,
-  condition: 'NM',
+  condition: 'NM' as const,
   foil: false,
-  status: 'collection',
-  deckName: '',
+  status: 'collection' as CardStatus,
 })
 
-// ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
-const cardFaceIndex = ref(0)
+const isLoading = ref(false)
 
 const conditionOptions = [
-  { value: 'M', label: 'M - Mint' },
-  { value: 'NM', label: 'NM - Near Mint' },
-  { value: 'LP', label: 'LP - Light Play' },
-  { value: 'MP', label: 'MP - Moderate Play' },
-  { value: 'HP', label: 'HP - Heavy Play' },
-  { value: 'PO', label: 'PO - Poor' },
+  { value: 'M', label: 'Mint (M)' },
+  { value: 'NM', label: 'Near Mint (NM)' },
+  { value: 'LP', label: 'Light Play (LP)' },
+  { value: 'MP', label: 'Moderate Play (MP)' },
+  { value: 'HP', label: 'Heavy Play (HP)' },
+  { value: 'PO', label: 'Poor (PO)' },
 ]
 
 // ✅ NUEVO: Función para obtener imagen correcta de split cards
@@ -149,115 +147,112 @@ const handleClose = () => {
   cardFaceIndex.value = 0
   emit('close')
 }
+
+watch(() => props.show, (newVal) => {
+  if (!newVal) {
+    resetForm()
+  }
+})
 </script>
 
 <template>
-  <BaseModal :show="show" @close="handleClose" :close-on-click-outside="false">
-    <div class="space-y-4">
-      <!-- Título -->
-      <h2 class="text-xl font-bold text-[#EEEEEE]">AGREGAR CARTA</h2>
+  <BaseModal :show="show" @close="emit('close')">
+    <div class="space-y-6 w-full max-w-xl">
+      <!-- Title -->
+      <div>
+        <h2 class="text-h2 font-bold text-silver mb-1">AGREGAR A COLECCIÓN</h2>
+        <p class="text-small text-silver-70">Configura los detalles de esta carta</p>
+      </div>
 
-      <!-- Datos de la carta -->
-      <div v-if="card" class="border border-[#EEEEEE]/30 p-4 space-y-4">
-        <!-- Imagen (grande) y Formulario lado a lado -->
-        <div class="flex gap-6">
-          <!-- IZQUIERDA: Imagen grande -->
-          <div class="flex flex-col items-center gap-4">
+      <!-- Card Preview -->
+      <div v-if="scryfallCard" class="bg-secondary border border-silver-30 p-4 space-y-4">
+        <div class="flex gap-4">
+          <!-- Image -->
+          <div class="flex-shrink-0">
             <img
-                v-if="currentCardImage"
-                :src="currentCardImage"
-                :alt="currentCardName"
-                class="w-64 h-96 object-cover border border-[#EEEEEE]/20"
+                v-if="scryfallCard.image_uris?.small"
+                :src="scryfallCard.image_uris.small"
+                :alt="scryfallCard.name"
+                class="w-24 h-32 object-cover border border-silver-30"
             />
-
-            <!-- Info bajo la imagen -->
-            <div class="text-center w-full">
-              <!-- Nombre + Botón toggle en fila -->
-              <div class="flex items-center justify-center gap-2 mb-2">
-                <p class="font-bold text-[#EEEEEE] text-sm">{{ currentCardName }}</p>
-
-                <!-- ✅ Botón toggle JUNTO AL NOMBRE - Icono de flechas rotando -->
-                <button
-                    v-if="isSplitCard"
-                    @click="toggleCardFace"
-                    class="p-1 hover:bg-[#CCFF00]/20 transition-fast"
-                    title="Ver otro lado"
-                >
-                  <svg class="w-4 h-4 text-[#CCFF00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
-                  </svg>
-                </button>
-              </div>
-
-              <p class="text-xs text-[#EEEEEE]/70">{{ card.set_name }}</p>
-              <p class="text-lg text-[#CCFF00] font-bold mt-2">${{ card.prices?.usd || '0.00' }}</p>
+            <div v-else class="w-24 h-32 bg-primary border border-silver-30 flex items-center justify-center">
+              <span class="text-tiny text-silver-50">No image</span>
             </div>
           </div>
 
-          <!-- DERECHA: Formulario -->
-          <div class="flex-1 space-y-4">
-            <!-- Cantidad -->
-            <div>
-              <label class="text-sm text-[#EEEEEE]">Cantidad</label>
-              <input
-                  v-model.number="form.quantity"
-                  type="number"
-                  min="1"
-                  class="w-full mt-1 bg-[#000000] border border-[#EEEEEE] text-[#EEEEEE] px-3 py-2"
-              />
-            </div>
-
-            <!-- Condición -->
-            <div>
-              <label class="text-sm text-[#EEEEEE]">Condición</label>
-              <BaseSelect
-                  v-model="form.condition"
-                  :options="conditionOptions"
-                  class="mt-1"
-              />
-            </div>
-
-            <!-- Foil -->
-            <div class="flex items-center gap-2">
-              <input
-                  v-model="form.foil"
-                  type="checkbox"
-                  id="foil"
-                  class="w-4 h-4"
-              />
-              <label for="foil" class="text-sm text-[#EEEEEE]">Foil</label>
-            </div>
-
-            <!-- Estado -->
-            <div>
-              <label class="text-sm text-[#EEEEEE]">Estado</label>
-              <BaseSelect
-                  v-model="form.status"
-                  :options="statusOptions"
-                  class="mt-1"
-              />
-            </div>
-
-            <!-- Deck (opcional) -->
-            <div>
-              <label class="text-sm text-[#EEEEEE]">Asignar a Deck</label>
-              <BaseSelect
-                  v-model="form.deckName"
-                  :options="deckOptions"
-                  class="mt-1"
-              />
-            </div>
+          <!-- Card Info -->
+          <div class="flex-1 space-y-2">
+            <p class="font-bold text-silver text-h3">{{ scryfallCard.name }}</p>
+            <p class="text-small text-silver-70">{{ scryfallCard.set.toUpperCase() }}</p>
+            <p class="text-body font-bold text-neon">
+              ${{ scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd).toFixed(2) : 'N/A' }}
+            </p>
+            <p class="text-tiny text-silver-70 pt-2">
+              {{ scryfallCard.type_line }}
+            </p>
           </div>
         </div>
       </div>
 
-      <!-- Botones -->
-      <div class="flex gap-2 justify-end pt-4 border-t border-[#EEEEEE]/20">
-        <BaseButton variant="secondary" @click="handleClose">
-          CANCELAR
+      <!-- Form -->
+      <div class="space-y-4">
+        <!-- Quantity & Condition -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-small text-silver-70 block mb-2">Cantidad</label>
+            <BaseInput
+                v-model.number="form.quantity"
+                type="number"
+                min="1"
+                max="4"
+            />
+          </div>
+
+          <div>
+            <label class="text-small text-silver-70 block mb-2">Condición</label>
+            <BaseSelect
+                v-model="form.condition"
+                :options="conditionOptions"
+            />
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div>
+          <label class="text-small text-silver-70 block mb-2">Estado</label>
+          <BaseSelect
+              v-model="form.status"
+              :options="statusOptions"
+          />
+        </div>
+
+        <!-- Foil Checkbox -->
+        <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
+          <input
+              v-model="form.foil"
+              type="checkbox"
+              class="w-4 h-4 cursor-pointer"
+          />
+          <span class="text-small text-silver">Foil</span>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-3 pt-4 border-t border-silver-20">
+        <BaseButton
+            class="flex-1"
+            :disabled="isLoading"
+            @click="handleAdd"
+        >
+          {{ isLoading ? '⏳ GUARDANDO...' : '✓ AGREGAR CARTA' }}
         </BaseButton>
-        <BaseButton @click="handleAddCard" :disabled="loading">
-          {{ loading ? 'GUARDANDO...' : 'AGREGAR' }}
+        <BaseButton
+            variant="secondary"
+            class="flex-1"
+            :disabled="isLoading"
+            @click="emit('close')"
+        >
+          CANCELAR
         </BaseButton>
       </div>
     </div>

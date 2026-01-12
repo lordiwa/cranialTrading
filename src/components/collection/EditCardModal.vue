@@ -75,7 +75,7 @@ watch(() => props.card, (newCard) => {
 </script>
 
 <template>
-  <BaseModal :show="show" @close="emit('close')">
+  <BaseModal :show="show" :closeOnClickOutside="false" @close="emit('close')">
     <div class="space-y-6 w-full max-w-xl">
       <!-- Title -->
       <div>

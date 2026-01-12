@@ -66,6 +66,18 @@ const wishlistCount = computed(() =>
     collectionCards.value.filter(c => c.status === 'wishlist').length
 )
 
+// ✅ NUEVO: Función para traducir status a español
+const getStatusLabel = (status: string): string => {
+  const labels: Record<string, string> = {
+    'all': 'TODAS',
+    'collection': 'COLECCIÓN',
+    'sale': 'VENTA',
+    'trade': 'CAMBIO',
+    'wishlist': 'DESEADO',
+  }
+  return labels[status] || status.toUpperCase()
+}
+
 // Decks únicos
 const uniqueDecks = computed(() => {
   const decks = new Set<string>()
@@ -293,7 +305,7 @@ onMounted(async () => {
                 : 'border-2 border-silver-30 text-silver-70 hover:border-silver-50'
             ]"
         >
-          {{ status === 'all' ? 'TODAS' : status.toUpperCase() }}
+          {{ getStatusLabel(status) }}
           <span class="ml-1 text-neon">{{ count }}</span>
         </button>
       </div>

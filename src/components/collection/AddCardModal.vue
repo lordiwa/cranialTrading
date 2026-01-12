@@ -1,42 +1,44 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, reactive, computed } from 'vue'
+import BaseModal from '../ui/BaseModal.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import BaseButton from '../ui/BaseButton.vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
-import BaseButton from '../ui/BaseButton.vue'
-import BaseInput from '../ui/BaseInput.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
-import BaseModal from '../ui/BaseModal.vue'
-import type { CardStatus } from '../../types/card'
+import { useAuthStore } from '../../stores/auth'
 
-const props = defineProps<{
+interface Props {
   show: boolean
-  scryfallCard: any | null
-}>()
+  scryfallCard?: any
+}
 
-const emit = defineEmits<{
-  close: []
-  added: []
-}>()
+const props = defineProps<Props>()
+const emit = defineEmits(['close', 'added'])
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
+const authStore = useAuthStore()
 
-const form = ref({
+const loading = ref(false)
+
+const form = reactive({
   quantity: 1,
-  condition: 'NM' as const,
+  condition: 'NM',
   foil: false,
-  status: 'collection' as CardStatus,
+  status: 'collection',
+  deckName: '',
 })
 
-const isLoading = ref(false)
+// ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
+const cardFaceIndex = ref(0)
 
 const conditionOptions = [
-  { value: 'M', label: 'Mint (M)' },
-  { value: 'NM', label: 'Near Mint (NM)' },
-  { value: 'LP', label: 'Light Play (LP)' },
-  { value: 'MP', label: 'Moderate Play (MP)' },
-  { value: 'HP', label: 'Heavy Play (HP)' },
-  { value: 'PO', label: 'Poor (PO)' },
+  { value: 'M', label: 'M - Mint' },
+  { value: 'NM', label: 'NM - Near Mint' },
+  { value: 'LP', label: 'LP - Light Play' },
+  { value: 'MP', label: 'MP - Moderate Play' },
+  { value: 'HP', label: 'HP - Heavy Play' },
+  { value: 'PO', label: 'PO - Poor' },
 ]
 
 // ✅ NUEVO: Función para obtener imagen correcta de split cards
@@ -49,25 +51,25 @@ const getCardImage = (card: any): string => {
 
 // ✅ NUEVO: Verificar si es split card
 const isSplitCard = computed(() => {
-  return props.card?.card_faces && props.card.card_faces.length > 1
+  return props.scryfallCard?.card_faces && props.scryfallCard.card_faces.length > 1
 })
 
 // ✅ NUEVO: Obtener imagen actual según el lado
 const currentCardImage = computed(() => {
-  if (!props.card) return ''
-  if (props.card.card_faces && props.card.card_faces[cardFaceIndex.value]) {
-    return props.card.card_faces[cardFaceIndex.value].image_uris?.normal || ''
+  if (!props.scryfallCard) return ''
+  if (props.scryfallCard.card_faces && props.scryfallCard.card_faces[cardFaceIndex.value]) {
+    return props.scryfallCard.card_faces[cardFaceIndex.value].image_uris?.normal || ''
   }
-  return getCardImage(props.card)
+  return getCardImage(props.scryfallCard)
 })
 
 // ✅ NUEVO: Obtener nombre del lado actual
 const currentCardName = computed(() => {
-  if (!props.card) return ''
-  if (props.card.card_faces && props.card.card_faces[cardFaceIndex.value]) {
-    return props.card.card_faces[cardFaceIndex.value].name
+  if (!props.scryfallCard) return ''
+  if (props.scryfallCard.card_faces && props.scryfallCard.card_faces[cardFaceIndex.value]) {
+    return props.scryfallCard.card_faces[cardFaceIndex.value].name
   }
-  return props.card.name
+  return props.scryfallCard.name
 })
 
 // ✅ NUEVO: Toggle entre lados
@@ -93,42 +95,39 @@ const deckOptions = [
 ]
 
 const handleAddCard = async () => {
-  if (!props.card || !authStore.user) return
+  if (!props.scryfallCard || !authStore.user) return
 
   loading.value = true
   try {
     // ✅ CORREGIDO: Guardar el nombre del lado actual (para split cards)
     const cardName = isSplitCard.value
-        ? props.card.card_faces[cardFaceIndex.value].name
-        : props.card.name
+        ? props.scryfallCard.card_faces[cardFaceIndex.value].name
+        : props.scryfallCard.name
 
     const imageToSave = currentCardImage.value || ''
 
-    // 🔴 DEBUG: Ver qué se está guardando
-    console.log('🔴 GUARDANDO CARTA:', {
+    console.log('✅ GUARDANDO CARTA:', {
       name: cardName,
       image: imageToSave,
       isSplitCard: isSplitCard.value,
       cardFaceIndex: cardFaceIndex.value,
-      currentCardImage: currentCardImage.value,
-      card_faces: props.card?.card_faces?.length
     })
 
     await collectionStore.addCard({
-      scryfallId: props.card.id,
+      scryfallId: props.scryfallCard.id,
       name: cardName,
-      edition: props.card.set_name,
+      edition: props.scryfallCard.set_name,
       quantity: form.quantity,
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: parseFloat(props.card.prices?.usd || '0'),
+      price: parseFloat(props.scryfallCard.prices?.usd || '0'),
       image: imageToSave,
       deckName: form.deckName || null,
     })
 
-    toastStore.show(`✓ ${props.card.name} agregada`, 'success')
-    emit('card-added')
+    toastStore.show(`✓ ${props.scryfallCard.name} agregada`, 'success')
+    emit('added')
     handleClose()
   } catch (err) {
     console.error('Error agregando carta:', err)
@@ -147,112 +146,120 @@ const handleClose = () => {
   cardFaceIndex.value = 0
   emit('close')
 }
-
-watch(() => props.show, (newVal) => {
-  if (!newVal) {
-    resetForm()
-  }
-})
 </script>
 
 <template>
-  <BaseModal :show="show" @close="emit('close')">
-    <div class="space-y-6 w-full max-w-xl">
-      <!-- Title -->
-      <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">AGREGAR A COLECCIÓN</h2>
-        <p class="text-small text-silver-70">Configura los detalles de esta carta</p>
-      </div>
+  <BaseModal :show="show" @close="handleClose" :close-on-click-outside="false">
+    <div class="space-y-4">
+      <!-- Título -->
+      <h2 class="text-xl font-bold text-[#EEEEEE]">AGREGAR CARTA</h2>
 
-      <!-- Card Preview -->
-      <div v-if="scryfallCard" class="bg-secondary border border-silver-30 p-4 space-y-4">
-        <div class="flex gap-4">
-          <!-- Image -->
-          <div class="flex-shrink-0">
-            <img
-                v-if="scryfallCard.image_uris?.small"
-                :src="scryfallCard.image_uris.small"
-                :alt="scryfallCard.name"
-                class="w-24 h-32 object-cover border border-silver-30"
-            />
-            <div v-else class="w-24 h-32 bg-primary border border-silver-30 flex items-center justify-center">
-              <span class="text-tiny text-silver-50">No image</span>
+      <!-- Datos de la carta -->
+      <div v-if="scryfallCard" class="border border-[#EEEEEE]/30 p-4 space-y-4">
+        <!-- Imagen (grande) y Formulario lado a lado -->
+        <div class="flex gap-6">
+          <!-- IZQUIERDA: Imagen grande -->
+          <div class="flex flex-col items-center gap-4">
+            <!-- Imagen con botón toggle encima para split cards -->
+            <div class="relative">
+              <img
+                  v-if="currentCardImage"
+                  :src="currentCardImage"
+                  :alt="currentCardName"
+                  class="w-64 h-96 object-cover border border-[#EEEEEE]/20"
+              />
+              <div v-else class="w-64 h-96 bg-[#333333] border border-[#EEEEEE]/20 flex items-center justify-center">
+                <span class="text-[#EEEEEE]/50">Sin imagen</span>
+              </div>
+
+              <!-- ✅ Botón toggle flotante en esquina (SOLO para split cards) -->
+              <button
+                  v-if="isSplitCard"
+                  @click="toggleCardFace"
+                  class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#CCFF00] p-2 hover:bg-[#CCFF00]/20 transition-all"
+                  :title="`Ver lado ${cardFaceIndex === 0 ? 2 : 1}`"
+              >
+                <svg class="w-5 h-5 text-[#CCFF00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Info bajo la imagen -->
+            <div class="text-center w-full">
+              <p class="font-bold text-[#EEEEEE]">{{ currentCardName }}</p>
+              <p v-if="isSplitCard" class="text-xs text-[#CCFF00] mt-1">
+                Lado {{ cardFaceIndex + 1 }} de {{ scryfallCard.card_faces.length }}
+              </p>
+              <p class="text-xs text-[#EEEEEE]/70 mt-2">{{ scryfallCard.set_name }}</p>
+              <p class="text-lg text-[#CCFF00] font-bold mt-2">${{ scryfallCard.prices?.usd || '0.00' }}</p>
             </div>
           </div>
 
-          <!-- Card Info -->
-          <div class="flex-1 space-y-2">
-            <p class="font-bold text-silver text-h3">{{ scryfallCard.name }}</p>
-            <p class="text-small text-silver-70">{{ scryfallCard.set.toUpperCase() }}</p>
-            <p class="text-body font-bold text-neon">
-              ${{ scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd).toFixed(2) : 'N/A' }}
-            </p>
-            <p class="text-tiny text-silver-70 pt-2">
-              {{ scryfallCard.type_line }}
-            </p>
+          <!-- DERECHA: Formulario -->
+          <div class="flex-1 space-y-4">
+            <!-- Cantidad -->
+            <div>
+              <label class="text-sm text-[#EEEEEE]">Cantidad</label>
+              <input
+                  v-model.number="form.quantity"
+                  type="number"
+                  min="1"
+                  class="w-full mt-1 bg-[#000000] border border-[#EEEEEE] text-[#EEEEEE] px-3 py-2"
+              />
+            </div>
+
+            <!-- Condición -->
+            <div>
+              <label class="text-sm text-[#EEEEEE]">Condición</label>
+              <BaseSelect
+                  v-model="form.condition"
+                  :options="conditionOptions"
+                  class="mt-1"
+              />
+            </div>
+
+            <!-- Foil -->
+            <div class="flex items-center gap-2">
+              <input
+                  v-model="form.foil"
+                  type="checkbox"
+                  id="foil"
+                  class="w-4 h-4"
+              />
+              <label for="foil" class="text-sm text-[#EEEEEE]">Foil</label>
+            </div>
+
+            <!-- Estado -->
+            <div>
+              <label class="text-sm text-[#EEEEEE]">Estado</label>
+              <BaseSelect
+                  v-model="form.status"
+                  :options="statusOptions"
+                  class="mt-1"
+              />
+            </div>
+
+            <!-- Deck (opcional) -->
+            <div>
+              <label class="text-sm text-[#EEEEEE]">Asignar a Deck</label>
+              <BaseSelect
+                  v-model="form.deckName"
+                  :options="deckOptions"
+                  class="mt-1"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Form -->
-      <div class="space-y-4">
-        <!-- Quantity & Condition -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="text-small text-silver-70 block mb-2">Cantidad</label>
-            <BaseInput
-                v-model.number="form.quantity"
-                type="number"
-                min="1"
-                max="4"
-            />
-          </div>
-
-          <div>
-            <label class="text-small text-silver-70 block mb-2">Condición</label>
-            <BaseSelect
-                v-model="form.condition"
-                :options="conditionOptions"
-            />
-          </div>
-        </div>
-
-        <!-- Status -->
-        <div>
-          <label class="text-small text-silver-70 block mb-2">Estado</label>
-          <BaseSelect
-              v-model="form.status"
-              :options="statusOptions"
-          />
-        </div>
-
-        <!-- Foil Checkbox -->
-        <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
-          <input
-              v-model="form.foil"
-              type="checkbox"
-              class="w-4 h-4 cursor-pointer"
-          />
-          <span class="text-small text-silver">Foil</span>
-        </label>
-      </div>
-
-      <!-- Actions -->
-      <div class="flex gap-3 pt-4 border-t border-silver-20">
-        <BaseButton
-            class="flex-1"
-            :disabled="isLoading"
-            @click="handleAdd"
-        >
-          {{ isLoading ? '⏳ GUARDANDO...' : '✓ AGREGAR CARTA' }}
-        </BaseButton>
-        <BaseButton
-            variant="secondary"
-            class="flex-1"
-            :disabled="isLoading"
-            @click="emit('close')"
-        >
+      <!-- Botones -->
+      <div class="flex gap-2 justify-end pt-4 border-t border-[#EEEEEE]/20">
+        <BaseButton variant="secondary" @click="handleClose">
           CANCELAR
+        </BaseButton>
+        <BaseButton @click="handleAddCard" :disabled="loading">
+          {{ loading ? 'GUARDANDO...' : 'AGREGAR' }}
         </BaseButton>
       </div>
     </div>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import type { Card } from '../../types/card'
 
-defineProps<{
+const props = defineProps<{
   cards: Card[]
 }>()
 
@@ -10,6 +11,48 @@ const emit = defineEmits<{
   edit: [card: Card]
   delete: [card: Card]
 }>()
+
+// ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
+const cardFaceIndex = ref<Record<string, number>>({})
+
+const getCardImage = (card: Card): string => {
+  // ✅ CORREGIDO: Intentar obtener imagen de card_faces PRIMERO
+  if (card.image && typeof card.image === 'string') {
+    try {
+      const parsed = JSON.parse(card.image)
+      if (parsed.card_faces && parsed.card_faces.length > 0) {
+        // Si es split card guardado como JSON
+        return parsed.card_faces[cardFaceIndex.value[card.id] || 0]?.image_uris?.normal || parsed.card_faces[0]?.image_uris?.normal || ''
+      }
+    } catch (e) {
+      // Si no es JSON, usar como URL normal
+      return card.image
+    }
+  }
+  return card.image || ''
+}
+
+// ✅ NUEVO: Detectar split cards
+const isSplitCard = (card: Card): boolean => {
+  if (card.image && typeof card.image === 'string') {
+    try {
+      const parsed = JSON.parse(card.image)
+      return parsed.card_faces && parsed.card_faces.length > 1
+    } catch (e) {
+      return false
+    }
+  }
+  return false
+}
+
+// ✅ NUEVO: Toggle entre lados de split card
+const toggleCardFace = (cardId: string, isSplit: boolean) => {
+  if (!isSplit) return
+
+  const currentIndex = cardFaceIndex.value[cardId] || 0
+  const newIndex = currentIndex === 0 ? 1 : 0
+  cardFaceIndex.value[cardId] = newIndex
+}
 
 const getStatusColor = (status: string) => {
   const colors = {
@@ -45,8 +88,8 @@ const getStatusIcon = (status: string) => {
           @click="emit('cardClick', card)"
       >
         <img
-            v-if="card.image"
-            :src="card.image"
+            v-if="getCardImage(card)"
+            :src="getCardImage(card)"
             :alt="card.name"
             loading="lazy"
             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
@@ -54,6 +97,16 @@ const getStatusIcon = (status: string) => {
         <div v-else class="w-full h-full flex items-center justify-center bg-primary">
           <span class="text-tiny text-silver-50">No image</span>
         </div>
+
+        <!-- ✅ NUEVO: Toggle button para split cards -->
+        <button
+            v-if="isSplitCard(card)"
+            @click.stop="toggleCardFace(card.id, true)"
+            class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
+            title="Click para ver el otro lado"
+        >
+          ↔️
+        </button>
 
         <!-- Status Badge (Overlay) -->
         <div class="absolute top-2 right-2 bg-secondary border border-silver-30 px-2 py-1">

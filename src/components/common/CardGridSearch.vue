@@ -29,10 +29,61 @@ const searchResults = ref<any[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
+const cardFaceIndex = ref<Record<string, number>>({})
+
+// ✅ NUEVO: Función para obtener el precio de una carta
+const getCardPrice = (card: any): number | null => {
+  if (card.prices?.usd) {
+    const price = parseFloat(card.prices.usd)
+    return isNaN(price) ? null : price
+  }
+  return null
+}
+
+// ✅ NUEVO: Filtrar y ordenar cartas por precio
+const sortedAndFilteredResults = computed(() => {
+  const cardsWithPrice = searchResults.value.filter(card => {
+    const price = getCardPrice(card)
+    return price !== null && price > 0
+  })
+
+  const cardsWithoutPrice = searchResults.value.filter(card => {
+    const price = getCardPrice(card)
+    return price === null || price === 0
+  })
+
+  // Si hay cartas con precio válido, mostrar solo esas
+  // Si no, mostrar todas (incluyendo sin precio)
+  return cardsWithPrice.length > 0 ? cardsWithPrice : searchResults.value
+})
+
 // Computed para limitar resultados
 const displayResults = computed(() =>
-    searchResults.value.slice(0, props.maxResults)
+    sortedAndFilteredResults.value.slice(0, props.maxResults)
 )
+
+// ✅ NUEVO: Detectar split cards
+const isSplitCard = (card: any): boolean => {
+  return card.card_faces && card.card_faces.length > 1
+}
+
+// ✅ NUEVO: Obtener imagen correcta según split card
+const getCardImage = (card: any): string => {
+  if (isSplitCard(card)) {
+    const faceIndex = cardFaceIndex.value[card.id] || 0
+    return card.card_faces[faceIndex]?.image_uris?.small || card.card_faces[0]?.image_uris?.small || ''
+  }
+  // Carta normal
+  return card.image_uris?.small || ''
+}
+
+// ✅ NUEVO: Toggle entre lados de split card
+const toggleCardFace = (cardId: string) => {
+  const currentIndex = cardFaceIndex.value[cardId] || 0
+  const newIndex = currentIndex === 0 ? 1 : 0
+  cardFaceIndex.value[cardId] = newIndex
+}
 
 // Debounced search function
 const performSearch = debounce(async () => {
@@ -67,10 +118,12 @@ defineExpose({
   resetSearch: () => {
     searchQuery.value = ''
     searchResults.value = []
+    cardFaceIndex.value = {}
   },
   getSelectedQuery: () => searchQuery.value,
   setResults: (results: any[]) => {
     searchResults.value = results
+    cardFaceIndex.value = {}
     emit('searchChanged', searchQuery.value, results)
   },
   setLoading: (isLoading: boolean) => {
@@ -133,8 +186,8 @@ defineExpose({
       <div v-else class="space-y-4">
         <p class="text-tiny text-silver-70">
           {{ displayResults.length }}
-          <span v-if="displayResults.length < searchResults.length">
-            de {{ searchResults.length }}
+          <span v-if="displayResults.length < sortedAndFilteredResults.length">
+            de {{ sortedAndFilteredResults.length }}
           </span>
           resultados
         </p>
@@ -149,8 +202,8 @@ defineExpose({
             <!-- Card Image Container -->
             <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150">
               <img
-                  v-if="card.image_uris?.small"
-                  :src="card.image_uris.small"
+                  v-if="getCardImage(card)"
+                  :src="getCardImage(card)"
                   :alt="card.name"
                   loading="lazy"
                   class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
@@ -158,6 +211,16 @@ defineExpose({
               <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
                 No image
               </div>
+
+              <!-- ✅ NUEVO: Toggle button para split cards -->
+              <button
+                  v-if="isSplitCard(card)"
+                  @click.stop="toggleCardFace(card.id)"
+                  class="absolute top-1 left-1 bg-primary border border-neon px-1 py-0.5 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
+                  title="Click para ver el otro lado"
+              >
+                ↔️
+              </button>
             </div>
 
             <!-- Card Info -->

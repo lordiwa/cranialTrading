@@ -297,7 +297,7 @@ const handleSaveMatch = async (match: any) => {
   // Convertir match a formato SimpleMatch del store
   const matchToSave = {
     id: match.id,
-    type: match.type === 'VENDO' ? 'VENDO' : 'BUSCO',
+    type: (match.type === 'VENDO' ? 'VENDO' : 'BUSCO') as 'VENDO' | 'BUSCO',
     otherUserId: match.otherUserId,
     otherUsername: match.otherUsername,
     otherLocation: match.otherLocation,
@@ -306,7 +306,7 @@ const handleSaveMatch = async (match: any) => {
     myPreference: match.myPreference,
     otherPreference: match.otherPreference,
     createdAt: match.createdAt,
-    status: 'nuevo',
+    status: 'nuevo' as const,
   }
 
   await matchesStore.saveMatch(matchToSave)

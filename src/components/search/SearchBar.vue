@@ -14,10 +14,11 @@ const loading = ref(false)
 const showSuggestions = ref(false)
 
 // Obtener sugerencias mientras escribes
-const handleInput = async (value: string) => {
-  searchQuery.value = value
+const handleInput = async (value: string | number) => {
+  const strValue = String(value)
+  searchQuery.value = strValue
 
-  if (value.length < 2) {
+  if (strValue.length < 2) {
     suggestions.value = []
     showSuggestions.value = false
     return
@@ -25,7 +26,7 @@ const handleInput = async (value: string) => {
 
   loading.value = true
   try {
-    const results = await getCardSuggestions(value)
+    const results = await getCardSuggestions(strValue)
     suggestions.value = results.slice(0, 10) // Top 10
     showSuggestions.value = true
   } catch (err) {
@@ -85,8 +86,8 @@ const selectCard = (card: any) => {
       <div class="flex gap-2">
         <div class="flex-1 relative">
           <BaseInput
-              :value="searchQuery"
-              @input="handleInput"
+              :model-value="searchQuery"
+              @update:model-value="handleInput"
               @keyup.enter="handleSearch"
               placeholder="Busca una carta (ej: Black Lotus, Counterspell...)"
               type="text"

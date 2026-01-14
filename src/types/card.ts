@@ -15,6 +15,7 @@ export interface Card {
     image: string;
     status: CardStatus;
     public?: boolean;           // Visible on user's public profile
+    deckName?: string | null;   // Legacy field for deck association
     createdAt?: Date;
     updatedAt: Date;
 }
@@ -34,25 +35,5 @@ export interface CardWithAllocation extends Card {
     allocations: DeckAllocation[];  // Which decks use this card
 }
 
-// Scryfall API card response
-export interface ScryfallCard {
-    id: string;
-    name: string;
-    set_name: string;
-    set: string;
-    collector_number: string;
-    image_uris?: {
-        normal: string;
-        small: string;
-    };
-    card_faces?: Array<{
-        image_uris?: {
-            normal: string;
-            small: string;
-        };
-    }>;
-    prices: {
-        usd?: string;
-        usd_foil?: string;
-    };
-}
+// Scryfall API card response - re-export from service
+export type { ScryfallCard } from '../services/scryfall'

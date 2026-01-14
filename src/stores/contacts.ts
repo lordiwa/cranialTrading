@@ -21,7 +21,7 @@ export const useContactsStore = defineStore('contacts', () => {
     const toastStore = useToastStore()
     let unsubscribe: (() => void) | null = null
 
-    const saveContact = async (contact: Omit<Contact, 'id'>) => {
+    const saveContact = async (contact: Omit<Contact, 'id' | 'savedAt'>) => {
         if (!authStore.user?.id) return false
 
         try {
@@ -34,6 +34,7 @@ export const useContactsStore = defineStore('contacts', () => {
             contacts.value.push({
                 id: docRef.id,
                 ...contact,
+                savedAt: new Date(),
             })
 
             toastStore.show('✓ Contacto guardado', 'success')

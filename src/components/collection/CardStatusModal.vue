@@ -25,12 +25,12 @@ const statusOptions = [
   { value: 'wishlist', label: 'Deseado' },
 ]
 
-const statusColors = {
+const statusColors: Record<CardStatus, 'success' | 'warning' | 'info' | 'error'> = {
   collection: 'success',
   sale: 'warning',
   trade: 'info',
   wishlist: 'error',
-} as const
+}
 
 const getStatusIcon = (status: CardStatus) => {
   const icons = {

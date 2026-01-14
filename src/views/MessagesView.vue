@@ -30,8 +30,8 @@ const filteredConversations = computed(() => {
   });
 });
 
-const getOtherParticipantInfo = (conv: any) => {
-  const entry = Object.entries(conv.participantNames).find(
+const getOtherParticipantInfo = (conv: any): { username: string; userId: string } => {
+  const entry = Object.entries(conv.participantNames as Record<string, string>).find(
       ([id]) => id !== authStore.user?.id
   );
   return {

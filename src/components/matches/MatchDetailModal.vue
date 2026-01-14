@@ -50,7 +50,9 @@ const handleCloseChat = () => {
 };
 
 // Helper: derive badge variant and border class from preference or card
-const getVisualFor = (obj: any) => {
+type BadgeVariant = 'busco' | 'cambio' | 'vendo' | 'success' | 'solo' | 'deseado' | 'error' | 'info' | 'warning';
+
+const getVisualFor = (obj: any): { badge: BadgeVariant; border: string; label: string } => {
   // obj may be a card (with status) or a preference (with type)
   if (!obj) return { badge: 'solo', border: 'border-silver-30', label: 'COLECCIÓN' };
 

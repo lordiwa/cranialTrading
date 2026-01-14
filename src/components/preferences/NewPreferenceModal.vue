@@ -56,6 +56,8 @@ watch(() => props.preSelectedCard, (card) => {
       set_name: card.edition,
       set: '',
       collector_number: '',
+      rarity: '',
+      type_line: '',
       image_uris: {
         normal: card.image,
         small: card.image,
@@ -63,7 +65,7 @@ watch(() => props.preSelectedCard, (card) => {
       prices: {
         usd: card.price.toString(),
       },
-    };
+    } as ScryfallCard;
   }
 }, { immediate: true });
 

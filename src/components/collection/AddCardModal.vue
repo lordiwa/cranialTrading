@@ -7,6 +7,7 @@ import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
 import { searchCards } from '../../services/scryfall'
+import type { CardCondition, CardStatus } from '../../types/card'
 
 interface Props {
   show: boolean
@@ -54,7 +55,13 @@ const handlePrintChange = (scryfallId: string) => {
   }
 }
 
-const form = reactive({
+const form = reactive<{
+  quantity: number
+  condition: CardCondition
+  foil: boolean
+  status: CardStatus
+  deckName: string
+}>({
   quantity: 1,
   condition: 'NM',
   foil: false,

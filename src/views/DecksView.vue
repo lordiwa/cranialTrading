@@ -313,9 +313,19 @@ const handleImportDirect = async (
       addedAt: new Date(),
     }
 
-    // Agregar al mainboard del deck
+    // Agregar al wishlist del deck (se convertirá a allocation cuando se guarde en colección)
     if (deckId) {
-      await decksStore.addCardToMainboard(deckId, cardData)
+      await decksStore.addToWishlist(deckId, {
+        scryfallId: cardData.scryfallId,
+        name: cardData.name,
+        edition: cardData.edition,
+        quantity: cardData.quantity,
+        isInSideboard: cardData.isInSideboard,
+        price: cardData.price,
+        image: cardData.image,
+        condition: cardData.condition,
+        foil: cardData.foil,
+      })
     }
 
     // Agregar a colección

@@ -117,7 +117,7 @@ const getStatusIcon = (status: string) => {
             class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
             title="Click para ver el otro lado"
         >
-          <->
+          &#8596;
         </button>
 
         <!-- Status Badge (Overlay) -->

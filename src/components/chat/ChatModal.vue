@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
+import { ref, onUnmounted, computed, nextTick, watch } from 'vue';
 import { useMessagesStore } from '../../stores/messages';
 import { useAuthStore } from '../../stores/auth';
 import { useToastStore } from '../../stores/toast';
@@ -32,7 +32,7 @@ const messagesContainer = ref<HTMLDivElement>();
 const isConversationReady = ref(false);
 
 const sortedMessages = computed(() => {
-  return messagesStore.currentMessages.sort((a, b) =>
+  return [...messagesStore.currentMessages].sort((a, b) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 });

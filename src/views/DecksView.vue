@@ -459,7 +459,7 @@ onMounted(async () => {
           :show="showImportModal"
           @close="showImportModal = false"
           @import="handleImport"
-          @importDirect="handleImportDirect"
+          @import-direct="handleImportDirect"
       />
     </div>
   </AppContainer>

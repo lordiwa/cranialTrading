@@ -53,7 +53,7 @@ const publicIconClass = computed(() => {
       @click="handleCardClick"
       :class="[
         'relative bg-primary p-md md:p-lg hover:border-neon-40 transition-normal cursor-pointer',
-        'border-2',  // ✅ AGREGADO: border-2 para visibilidad
+        'border-2', // ✅ AGREGADO: border-2 para visibilidad
         statusBorderClass
       ]"
   >

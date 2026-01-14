@@ -118,7 +118,7 @@ router.beforeEach(async (to, from, next) => {
                 }
             });
             setTimeout(() => {
-                try { unwatch(); } catch {}
+                try { unwatch(); } catch { /* ignore */ }
                 resolve();
             }, 2000);
         });

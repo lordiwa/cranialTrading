@@ -171,7 +171,7 @@ const handleClose = () => {
 </script>
 
 <template>
-  <BaseModal :show="show" :closeOnClickOutside="false" @close="handleClose">
+  <BaseModal :show="show" :close-on-click-outside="false" @close="handleClose">
     <div class="space-y-6 w-full max-w-xl">
       <!-- Title -->
       <div>

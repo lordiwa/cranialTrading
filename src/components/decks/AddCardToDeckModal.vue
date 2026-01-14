@@ -56,7 +56,7 @@ const addMode = ref<'collection' | 'wishlist' | 'new'>('wishlist')
 const selectedCollectionCard = ref<any>(null)
 
 // Debounced search
-let searchTimeout: NodeJS.Timeout
+let searchTimeout: ReturnType<typeof setTimeout>
 const handleSearchInput = (query: string) => {
   searchQuery.value = query
   clearTimeout(searchTimeout)

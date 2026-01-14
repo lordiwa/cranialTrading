@@ -28,7 +28,7 @@ const filters = reactive<FilterOptions>({
 // ✅ NUEVO: Sugerencias de nombres
 const suggestions = ref<string[]>([])
 const showSuggestions = ref(false)
-let suggestionTimeout: NodeJS.Timeout
+let suggestionTimeout: ReturnType<typeof setTimeout>
 
 const handleNameInput = async (value: string) => {
   filters.name = value

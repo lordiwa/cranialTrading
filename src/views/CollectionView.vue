@@ -456,7 +456,7 @@ onMounted(async () => {
         :show="showStatusModal"
         :card="selectedCard"
         @close="showStatusModal = false"
-        @updateStatus="handleUpdateStatus"
+        @update-status="handleUpdateStatus"
     />
 
     <!-- Manage Decks Modal -->

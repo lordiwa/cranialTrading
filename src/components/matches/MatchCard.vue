@@ -220,8 +220,7 @@
         </BaseButton>
       </div>
     </BaseModal>
-
-  </div>
+</div>
 </template>
 
 <script setup lang="ts">

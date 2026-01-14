@@ -25,6 +25,13 @@ import type {
     DisplayDeckCard,
 } from '../types/deck'
 
+// Helper to remove undefined values from objects (Firebase doesn't accept undefined)
+const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
+    return Object.fromEntries(
+        Object.entries(obj).filter(([_, v]) => v !== undefined)
+    ) as T
+}
+
 export const useDecksStore = defineStore('decks', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -294,6 +301,14 @@ export const useDecksStore = defineStore('decks', () => {
                 stats: data.stats || calculateEmptyStats(),
             }
 
+            // Also add/update in decks array so allocateCardToDeck can find it
+            const existingIndex = decks.value.findIndex(d => d.id === deckId)
+            if (existingIndex >= 0) {
+                decks.value[existingIndex] = deck
+            } else {
+                decks.value.push(deck)
+            }
+
             currentDeck.value = { ...deck }
             return deck
         } catch (error) {
@@ -464,13 +479,13 @@ export const useDecksStore = defineStore('decks', () => {
                 if (existingAlloc) {
                     existingAlloc.quantity += toAllocate
                 } else {
-                    deck.allocations.push({
+                    deck.allocations.push(removeUndefined({
                         cardId,
                         quantity: toAllocate,
                         isInSideboard,
                         notes,
                         addedAt: new Date(),
-                    })
+                    }))
                 }
             }
 
@@ -486,19 +501,19 @@ export const useDecksStore = defineStore('decks', () => {
                 if (existingWishlist) {
                     existingWishlist.quantity += toWishlist
                 } else {
-                    deck.wishlist.push({
+                    deck.wishlist.push(removeUndefined({
                         scryfallId: card.scryfallId,
                         name: card.name,
                         edition: card.edition,
                         quantity: toWishlist,
                         isInSideboard,
-                        price: card.price,
-                        image: card.image,
+                        price: card.price ?? 0,
+                        image: card.image ?? '',
                         condition: card.condition,
                         foil: card.foil,
                         notes,
                         addedAt: new Date(),
-                    })
+                    }))
                 }
             }
 
@@ -568,10 +583,10 @@ export const useDecksStore = defineStore('decks', () => {
             if (existing) {
                 existing.quantity += cardData.quantity
             } else {
-                deck.wishlist.push({
+                deck.wishlist.push(removeUndefined({
                     ...cardData,
                     addedAt: new Date(),
-                })
+                }))
             }
 
             // Recalculate stats
@@ -795,19 +810,19 @@ export const useDecksStore = defineStore('decks', () => {
             if (existingWishlist) {
                 existingWishlist.quantity += toConvert
             } else {
-                deck.wishlist.push({
+                deck.wishlist.push(removeUndefined({
                     scryfallId: card.scryfallId,
                     name: card.name,
                     edition: card.edition,
                     quantity: toConvert,
                     isInSideboard: alloc.isInSideboard,
-                    price: card.price,
-                    image: card.image,
+                    price: card.price ?? 0,
+                    image: card.image ?? '',
                     condition: card.condition,
                     foil: card.foil,
                     notes: alloc.notes,
                     addedAt: new Date(),
-                })
+                }))
             }
 
             // Remove allocation if quantity is 0
@@ -854,19 +869,19 @@ export const useDecksStore = defineStore('decks', () => {
             // Add to wishlist
             if (!deck.wishlist) deck.wishlist = []
             for (const alloc of allocsToConvert) {
-                deck.wishlist.push({
+                deck.wishlist.push(removeUndefined({
                     scryfallId: deletedCard.scryfallId,
                     name: deletedCard.name,
                     edition: deletedCard.edition,
                     quantity: alloc.quantity,
                     isInSideboard: alloc.isInSideboard,
-                    price: deletedCard.price,
-                    image: deletedCard.image,
+                    price: deletedCard.price ?? 0,
+                    image: deletedCard.image ?? '',
                     condition: deletedCard.condition,
                     foil: deletedCard.foil,
                     notes: alloc.notes,
                     addedAt: new Date(),
-                })
+                }))
             }
 
             // Recalculate stats

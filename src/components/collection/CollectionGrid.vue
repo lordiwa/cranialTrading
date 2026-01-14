@@ -11,6 +11,7 @@ const emit = defineEmits<{
   cardClick: [card: Card]
   edit: [card: Card]
   delete: [card: Card]
+  manageDecks: [card: Card]
 }>()
 
 const { getTotalAllocated, getAvailableQuantity, getAllocationsForCard } = useCardAllocation()
@@ -176,7 +177,14 @@ const getStatusIcon = (status: string) => {
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex gap-2 mt-3">
+      <div class="flex gap-1 mt-3">
+        <button
+            @click="emit('manageDecks', card)"
+            class="flex-1 px-2 py-1 bg-blue-10 border border-blue-400 text-blue-400 text-tiny font-bold hover:bg-blue-20 transition-150"
+            title="Asignar a mazos"
+        >
+          MAZOS
+        </button>
         <button
             @click="emit('edit', card)"
             class="flex-1 px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150"
@@ -209,5 +217,11 @@ const getStatusIcon = (status: string) => {
 }
 .bg-rust-20 {
   background-color: rgba(183, 65, 14, 0.2);
+}
+.bg-blue-10 {
+  background-color: rgba(96, 165, 250, 0.1);
+}
+.bg-blue-20 {
+  background-color: rgba(96, 165, 250, 0.2);
 }
 </style>

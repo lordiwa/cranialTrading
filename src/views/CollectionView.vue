@@ -8,6 +8,7 @@ import CardGridSearch from '../components/common/CardGridSearch.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import EditCardModal from '../components/collection/EditCardModal.vue'
 import CardStatusModal from '../components/collection/CardStatusModal.vue'
+import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import CollectionGrid from '../components/collection/CollectionGrid.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
@@ -35,6 +36,7 @@ const viewMode = ref<'grid' | 'search'>('grid')
 const showAddCardModal = ref(false)
 const showEditModal = ref(false)
 const showStatusModal = ref(false)
+const showManageDecksModal = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
@@ -161,6 +163,12 @@ const handleCardClick = (card: Card) => {
 const handleEdit = (card: Card) => {
   editingCard.value = card
   showEditModal.value = true
+}
+
+// Gestionar mazos
+const handleManageDecks = (card: Card) => {
+  selectedCard.value = card
+  showManageDecksModal.value = true
 }
 
 // Eliminar existente
@@ -406,6 +414,7 @@ onMounted(async () => {
             @card-click="handleCardClick"
             @edit="handleEdit"
             @delete="handleDelete"
+            @manage-decks="handleManageDecks"
         />
       </div>
 
@@ -448,6 +457,13 @@ onMounted(async () => {
         :card="selectedCard"
         @close="showStatusModal = false"
         @updateStatus="handleUpdateStatus"
+    />
+
+    <!-- Manage Decks Modal -->
+    <ManageDecksModal
+        :show="showManageDecksModal"
+        :card="selectedCard"
+        @close="showManageDecksModal = false; selectedCard = null"
     />
   </AppContainer>
 </template>

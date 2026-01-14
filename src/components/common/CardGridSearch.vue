@@ -89,6 +89,8 @@ const toggleCardFace = (cardId: string) => {
 const performSearch = debounce(async () => {
   if (!searchQuery.value.trim()) {
     searchResults.value = []
+    loading.value = false
+    error.value = null
     emit('searchChanged', '', [])
     return
   }
@@ -96,15 +98,8 @@ const performSearch = debounce(async () => {
   loading.value = true
   error.value = null
 
-  try {
-    // ✅ Emitir evento en lugar de llamar callback
-    emit('search', searchQuery.value)
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error en la búsqueda'
-    searchResults.value = []
-  } finally {
-    loading.value = false
-  }
+  // Emit search event - parent will call setResults() and setLoading(false)
+  emit('search', searchQuery.value)
 }, 300)
 
 const handleCardClick = (card: any) => {

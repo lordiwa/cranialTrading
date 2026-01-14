@@ -1,12 +1,91 @@
+import type { CardCondition } from './card'
+
 export type DeckFormat = 'vintage' | 'modern' | 'commander' | 'standard' | 'custom'
 
+// ============================================================================
+// NEW: Allocation-based types (Collection as single source of truth)
+// ============================================================================
+
+// Lightweight reference to a collection card
+export interface DeckCardAllocation {
+    cardId: string              // Reference to Card.id in collection
+    quantity: number            // How many copies allocated to this deck
+    isInSideboard: boolean
+    notes?: string
+    addedAt: Date
+}
+
+// Card needed but not yet owned
+export interface DeckWishlistItem {
+    scryfallId: string          // Scryfall ID for identification
+    name: string
+    edition: string
+    quantity: number            // How many needed
+    isInSideboard: boolean
+    price: number
+    image: string
+    condition: CardCondition    // Desired condition
+    foil: boolean               // Desired foil status
+    notes?: string
+    addedAt: Date
+}
+
+// Hydrated deck card for UI display (owned cards)
+export interface HydratedDeckCard {
+    // From Card (collection)
+    cardId: string
+    scryfallId: string
+    name: string
+    edition: string
+    condition: CardCondition
+    foil: boolean
+    price: number
+    image: string
+
+    // From DeckCardAllocation
+    allocatedQuantity: number
+    isInSideboard: boolean
+    notes?: string
+    addedAt: Date
+
+    // Computed
+    isWishlist: false
+    availableInCollection: number
+    totalInCollection: number
+}
+
+// Hydrated wishlist card for UI display
+export interface HydratedWishlistCard {
+    scryfallId: string
+    name: string
+    edition: string
+    condition: CardCondition
+    foil: boolean
+    price: number
+    image: string
+    requestedQuantity: number
+    isInSideboard: boolean
+    notes?: string
+    addedAt: Date
+
+    isWishlist: true
+}
+
+// Union type for displaying deck cards (both owned and wishlist)
+export type DisplayDeckCard = HydratedDeckCard | HydratedWishlistCard
+
+// ============================================================================
+// LEGACY: Keep for backward compatibility during migration
+// ============================================================================
+
+/** @deprecated Use DeckCardAllocation instead */
 export interface DeckCard {
     id: string
     scryfallId: string
     name: string
     edition: string
     quantity: number
-    condition: 'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO'
+    condition: CardCondition
     foil: boolean
     isInSideboard: boolean
     price: number
@@ -15,12 +94,18 @@ export interface DeckCard {
     addedAt: Date
 }
 
+// ============================================================================
+// Deck structure
+// ============================================================================
+
 export interface DeckStats {
-    totalCards: number
-    sideboardCards: number
-    avgPrice: number  // ✅ CAMBIÉ: era avgCardPrice
+    totalCards: number          // All cards (owned + wishlist)
+    sideboardCards: number      // Sideboard count
+    ownedCards: number          // Cards from collection
+    wishlistCards: number       // Cards not yet owned
+    avgPrice: number
     totalPrice: number
-    completionPercentage: number
+    completionPercentage: number // ownedCards / totalCards * 100
 }
 
 export interface Deck {
@@ -30,8 +115,15 @@ export interface Deck {
     format: DeckFormat
     description: string
     colors: string[]
-    mainboard: DeckCard[]
-    sideboard: DeckCard[]
+
+    // NEW: Reference-based storage
+    allocations: DeckCardAllocation[]
+    wishlist: DeckWishlistItem[]
+
+    // LEGACY: Keep for migration, will be removed
+    mainboard?: DeckCard[]
+    sideboard?: DeckCard[]
+
     thumbnail: string
     createdAt: Date
     updatedAt: Date
@@ -39,7 +131,7 @@ export interface Deck {
     stats: DeckStats
 }
 
-// Para crear un nuevo deck (sin ID, userId, etc)
+// For creating a new deck
 export interface CreateDeckInput {
     name: string
     format: DeckFormat

@@ -2,23 +2,39 @@
 export type CardCondition = 'M' | 'NM' | 'LP' | 'MP' | 'HP' | 'PO';
 export type CardStatus = 'collection' | 'sale' | 'trade' | 'wishlist';
 
+// Card in collection - Single Source of Truth
 export interface Card {
     id: string;
     scryfallId: string;
     name: string;
     edition: string;
-    quantity: number;
+    quantity: number;           // Total copies owned
     condition: CardCondition;
     foil: boolean;
     price: number;
     image: string;
     status: CardStatus;
-    deckName?: string;  // nombre del mazo/lista
-    // whether this card is visible on the user's public profile
-    public?: boolean;
+    public?: boolean;           // Visible on user's public profile
+    createdAt?: Date;
     updatedAt: Date;
 }
 
+// Allocation info for a card (which decks use it)
+export interface DeckAllocation {
+    deckId: string;
+    deckName: string;
+    quantity: number;
+    isInSideboard: boolean;
+}
+
+// Card with computed allocation data (for UI display)
+export interface CardWithAllocation extends Card {
+    allocatedQuantity: number;      // Sum of all deck allocations
+    availableQuantity: number;      // quantity - allocatedQuantity
+    allocations: DeckAllocation[];  // Which decks use this card
+}
+
+// Scryfall API card response
 export interface ScryfallCard {
     id: string;
     name: string;
@@ -29,6 +45,12 @@ export interface ScryfallCard {
         normal: string;
         small: string;
     };
+    card_faces?: Array<{
+        image_uris?: {
+            normal: string;
+            small: string;
+        };
+    }>;
     prices: {
         usd?: string;
         usd_foil?: string;

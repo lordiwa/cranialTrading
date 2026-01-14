@@ -15,9 +15,16 @@ import BaseSelect from '../components/ui/BaseSelect.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
 import { Card, CardStatus } from '../types/card'
+import { useDecksStore } from '../stores/decks'
+import { useSearchStore } from '../stores/search'
+import { useCardAllocation } from '../composables/useCardAllocation'
+import FilterPanel from '../components/search/FilterPanel.vue'
 
 const collectionStore = useCollectionStore()
+const decksStore = useDecksStore()
+const searchStore = useSearchStore()
 const toastStore = useToastStore()
+const { getAllocationsForCard } = useCardAllocation()
 
 // ========== STATE ==========
 
@@ -78,14 +85,8 @@ const getStatusLabel = (status: string): string => {
   return labels[status] || status.toUpperCase()
 }
 
-// Decks únicos
-const uniqueDecks = computed(() => {
-  const decks = new Set<string>()
-  collectionCards.value.forEach(card => {
-    if (card.deckId) decks.add(card.deckId)
-  })
-  return Array.from(decks)
-})
+// Decks del store de decks
+const decksList = computed(() => decksStore.decks)
 
 // Filtrados según criterios
 const filteredCards = computed(() => {
@@ -96,9 +97,12 @@ const filteredCards = computed(() => {
     cards = cards.filter(c => c.status === statusFilter.value)
   }
 
-  // Filtro por deck
+  // Filtro por deck (usando allocaciones)
   if (deckFilter.value !== 'all') {
-    cards = cards.filter(c => c.deckId === deckFilter.value)
+    cards = cards.filter(c => {
+      const allocations = getAllocationsForCard(c.id)
+      return allocations.some(a => a.deckId === deckFilter.value)
+    })
   }
 
   // Filtro por búsqueda (nombre)
@@ -135,7 +139,7 @@ const handleSearchScryfall = async (query: string) => {
   } catch (err) {
     scryfallError.value = err instanceof Error ? err.message : 'Error en la búsqueda'
     cardGridSearchRef.value?.setError(scryfallError.value)
-    toastStore.showToast('Error buscando carta', 'error')
+    toastStore.show('Error buscando carta', 'error')
   } finally {
     isSearchingScryfall.value = false
   }
@@ -161,25 +165,45 @@ const handleEdit = (card: Card) => {
 
 // Eliminar existente
 const handleDelete = async (card: Card) => {
-  if (!confirm(`¿Eliminar "${card.name}" de tu colección?`)) return
+  // Check if card has allocations in decks
+  const allocations = getAllocationsForCard(card.id)
+  const hasAllocations = allocations.length > 0
+
+  const message = hasAllocations
+    ? `¿Eliminar "${card.name}" de tu colección?\n\nEsta carta está asignada en ${allocations.length} mazo(s). Se moverá a wishlist en esos mazos.`
+    : `¿Eliminar "${card.name}" de tu colección?`
+
+  if (!confirm(message)) return
 
   try {
+    // Convert allocations to wishlist BEFORE deleting the card
+    if (hasAllocations) {
+      await decksStore.convertAllocationsToWishlist(card)
+    }
+
     await collectionStore.deleteCard(card.id)
-    toastStore.showToast(`✓ "${card.name}" eliminada`, 'success')
+    toastStore.show(`✓ "${card.name}" eliminada`, 'success')
   } catch (err) {
-    toastStore.showToast('Error eliminando carta', 'error')
+    toastStore.show('Error eliminando carta', 'error')
   }
 }
 
 // Guardar cambios en edición
 const handleSaveEdit = async (updatedCard: Card) => {
   try {
+    // Check if quantity is being reduced and needs allocation adjustment
+    const currentCard = collectionStore.getCardById(updatedCard.id)
+    if (currentCard && updatedCard.quantity < currentCard.quantity) {
+      // Reduce allocations if quantity is being lowered
+      await decksStore.reduceAllocationsForCard(currentCard, updatedCard.quantity)
+    }
+
     await collectionStore.updateCard(updatedCard.id, updatedCard)
-    toastStore.showToast(`✓ "${updatedCard.name}" actualizada`, 'success')
+    toastStore.show(`✓ "${updatedCard.name}" actualizada`, 'success')
     showEditModal.value = false
     editingCard.value = null
   } catch (err) {
-    toastStore.showToast('Error actualizando carta', 'error')
+    toastStore.show('Error actualizando carta', 'error')
   }
 }
 
@@ -187,11 +211,11 @@ const handleSaveEdit = async (updatedCard: Card) => {
 const handleUpdateStatus = async (cardId: string, newStatus: CardStatus) => {
   try {
     await collectionStore.updateCard(cardId, { status: newStatus } as any)
-    toastStore.showToast('✓ Status actualizado', 'success')
+    toastStore.show('✓ Status actualizado', 'success')
     showStatusModal.value = false
     selectedCard.value = null
   } catch (err) {
-    toastStore.showToast('Error actualizando status', 'error')
+    toastStore.show('Error actualizando status', 'error')
   }
 }
 
@@ -206,10 +230,10 @@ const handleDeleteDeck = async () => {
     for (const card of cardsInDeck) {
       await collectionStore.deleteCard(card.id)
     }
-    toastStore.showToast('✓ Deck eliminado', 'success')
+    toastStore.show('✓ Deck eliminado', 'success')
     deckFilter.value = 'all'
   } catch (err) {
-    toastStore.showToast('Error eliminando deck', 'error')
+    toastStore.show('Error eliminando deck', 'error')
   }
 }
 
@@ -217,9 +241,12 @@ const handleDeleteDeck = async () => {
 
 onMounted(async () => {
   try {
-    await collectionStore.loadCollection()
+    await Promise.all([
+      collectionStore.loadCollection(),
+      decksStore.loadDecks()
+    ])
   } catch (err) {
-    toastStore.showToast('Error cargando colección', 'error')
+    toastStore.show('Error cargando datos', 'error')
   }
 })
 </script>
@@ -260,32 +287,52 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ========== SEARCH MODE ========== -->
-    <template v-if="viewMode === 'search'">
-      <CardGridSearch
-          ref="cardGridSearchRef"
-          title="BUSCAR CARTA PARA AGREGAR"
-          subtitle="Escribe el nombre de la carta que deseas agregar a tu colección"
-          placeholder="Ej: Black Lotus, Ragavan, Counterspell..."
-          :max-results="12"
-          :show-price="true"
-          @search="handleSearchScryfall"
-          @cardSelected="handleCardSelected"
-      >
-        <template #footer="{ results }">
-          <BaseButton
-              class="w-full"
-              variant="secondary"
-              @click="viewMode = 'grid'"
-          >
-            VOLVER A COLECCIÓN
-          </BaseButton>
-        </template>
-      </CardGridSearch>
-    </template>
+    <!-- ========== LAYOUT PRINCIPAL ========== -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <!-- Panel de filtros avanzados (siempre visible) -->
+      <div class="lg:col-span-1">
+        <FilterPanel />
+      </div>
 
-    <!-- ========== GRID MODE ========== -->
-    <template v-else>
+      <!-- Contenido principal -->
+      <div class="lg:col-span-3">
+        <!-- Resultados de búsqueda Scryfall (cuando hay resultados) -->
+        <div v-if="searchStore.hasResults" class="space-y-4">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-h3 font-bold text-neon">RESULTADOS DE BÚSQUEDA</h2>
+              <p class="text-small text-silver-70">
+                {{ searchStore.totalResults }} cartas encontradas - Click para agregar
+              </p>
+            </div>
+            <BaseButton size="small" variant="secondary" @click="searchStore.clearSearch()">
+              VER MI COLECCIÓN
+            </BaseButton>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div
+                v-for="card in searchStore.results"
+                :key="card.id"
+                @click="handleCardSelected(card)"
+                class="cursor-pointer group"
+            >
+              <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150">
+                <img
+                    v-if="card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal"
+                    :src="card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal"
+                    :alt="card.name"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-300"
+                />
+              </div>
+              <p class="text-tiny text-silver mt-2 truncate group-hover:text-neon">{{ card.name }}</p>
+              <p class="text-tiny text-neon font-bold">${{ card.prices?.usd || 'N/A' }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vista de colección (cuando NO hay resultados de búsqueda) -->
+        <div v-else>
       <!-- Status Tabs -->
       <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
         <button
@@ -324,7 +371,7 @@ onMounted(async () => {
             v-model="deckFilter"
             :options="[
               { value: 'all', label: 'Todos los decks' },
-              ...uniqueDecks.map(deck => ({ value: deck, label: deck }))
+              ...decksList.map(deck => ({ value: deck.name, label: deck.name }))
             ]"
         />
 
@@ -369,7 +416,9 @@ onMounted(async () => {
           <p class="text-tiny text-silver-70 mt-1">Agrega cartas desde la pestaña "+ AGREGAR"</p>
         </div>
       </div>
-    </template>
+        </div>
+      </div>
+    </div>
 
     <!-- ========== MODALS ========== -->
 

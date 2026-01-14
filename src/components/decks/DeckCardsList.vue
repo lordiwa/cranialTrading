@@ -1,24 +1,58 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DeckCard } from '../../types/deck'
+import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../../types/deck'
+import BaseBadge from '../ui/BaseBadge.vue'
 
 const props = defineProps<{
-  cards: DeckCard[]
+  cards: DisplayDeckCard[]
   deckId: string
   title: string
 }>()
 
 const emit = defineEmits<{
-  edit: [cardId: string]
-  remove: [cardId: string]
+  edit: [card: DisplayDeckCard]
+  remove: [card: DisplayDeckCard]
 }>()
 
+// Type guard for wishlist cards
+const isWishlistCard = (card: DisplayDeckCard): card is HydratedWishlistCard => {
+  return card.isWishlist === true
+}
+
+// Helper to get quantity from either type
+const getQuantity = (card: DisplayDeckCard): number => {
+  if (isWishlistCard(card)) {
+    return card.requestedQuantity
+  }
+  return (card as HydratedDeckCard).allocatedQuantity
+}
+
+// Helper to get card key for v-for
+const getCardKey = (card: DisplayDeckCard, index: number): string => {
+  if (isWishlistCard(card)) {
+    return `wish-${card.scryfallId}-${index}`
+  }
+  return `own-${(card as HydratedDeckCard).cardId}`
+}
+
 const totalPrice = computed(() => {
-  return props.cards.reduce((sum, card) => sum + card.price * card.quantity, 0)
+  return props.cards.reduce((sum, card) => sum + card.price * getQuantity(card), 0)
 })
 
 const totalCards = computed(() => {
-  return props.cards.reduce((sum, card) => sum + card.quantity, 0)
+  return props.cards.reduce((sum, card) => sum + getQuantity(card), 0)
+})
+
+const ownedCards = computed(() => {
+  return props.cards
+      .filter(c => !c.isWishlist)
+      .reduce((sum, c) => sum + getQuantity(c), 0)
+})
+
+const wishlistCards = computed(() => {
+  return props.cards
+      .filter(c => c.isWishlist)
+      .reduce((sum, c) => sum + getQuantity(c), 0)
 })
 </script>
 
@@ -35,12 +69,14 @@ const totalCards = computed(() => {
         <p class="text-h3 font-bold text-silver">{{ totalCards }}</p>
       </div>
       <div class="bg-secondary border border-silver-30 p-3">
-        <p class="text-tiny text-silver-70">COSTO PROMEDIO</p>
-        <p class="text-h3 font-bold text-silver">${{ (totalPrice / (totalCards || 1)).toFixed(2) }}</p>
+        <p class="text-tiny text-silver-70">EN COLECCIÓN</p>
+        <p class="text-h3 font-bold text-neon">{{ ownedCards }}</p>
       </div>
       <div class="bg-secondary border border-silver-30 p-3">
-        <p class="text-tiny text-silver-70">COSTO TOTAL</p>
-        <p class="text-h3 font-bold text-neon">${{ totalPrice.toFixed(2) }}</p>
+        <p class="text-tiny text-silver-70">WISHLIST</p>
+        <p class="text-h3 font-bold" :class="wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
+          {{ wishlistCards }}
+        </p>
       </div>
     </div>
 
@@ -56,7 +92,7 @@ const totalCards = computed(() => {
         <div class="col-span-1">QTY</div>
         <div class="col-span-5">CARTA</div>
         <div class="col-span-2">EDICIÓN</div>
-        <div class="col-span-1">CONDICIÓN</div>
+        <div class="col-span-1">ESTADO</div>
         <div class="col-span-2">PRECIO</div>
         <div class="col-span-1">ACCIONES</div>
       </div>
@@ -64,47 +100,68 @@ const totalCards = computed(() => {
       <!-- Cards -->
       <div class="divide-y divide-silver-20">
         <div
-            v-for="card in cards"
-            :key="card.id"
+            v-for="(card, index) in cards"
+            :key="getCardKey(card, index)"
             class="p-3 md:p-4 hover:bg-secondary-40 transition-150"
+            :class="{ 'bg-amber-5 border-l-2 border-amber': card.isWishlist }"
         >
           <!-- Mobile layout -->
           <div class="md:hidden space-y-2">
             <div class="flex justify-between items-start">
               <div class="flex-1">
-                <p class="font-bold text-silver">{{ card.quantity }}x {{ card.name }}</p>
+                <div class="flex items-center gap-2">
+                  <p class="font-bold text-silver">{{ getQuantity(card) }}x {{ card.name }}</p>
+                  <BaseBadge v-if="card.isWishlist" variant="deseado" class="text-tiny">
+                    WISHLIST
+                  </BaseBadge>
+                </div>
                 <p class="text-tiny text-silver-70">{{ card.edition }}</p>
               </div>
-              <p class="text-neon font-bold">${{ (card.price * card.quantity).toFixed(2) }}</p>
+              <p class="text-neon font-bold">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
             </div>
-            <div class="flex gap-2 text-tiny">
+            <div class="flex flex-wrap gap-2 text-tiny">
               <span class="px-2 py-1 bg-secondary border border-silver-30 text-silver-70">
                 {{ card.condition }}
               </span>
               <span v-if="card.foil" class="px-2 py-1 bg-neon-10 border border-neon text-neon">
                 FOIL
               </span>
+              <span v-if="!card.isWishlist" class="px-2 py-1 bg-secondary border border-silver-30 text-silver-50">
+                {{ (card as any).availableInCollection }} disp.
+              </span>
               <button
-                  @click="emit('edit', card.id)"
+                  @click="emit('edit', card)"
                   class="px-2 py-1 border border-silver-30 text-silver hover:text-neon transition-150"
               >
                 EDITAR
               </button>
               <button
-                  @click="emit('remove', card.id)"
+                  @click="emit('remove', card)"
                   class="px-2 py-1 border border-silver-30 text-silver-70 hover:text-ruby transition-150"
               >
-                BORRAR
+                QUITAR
               </button>
             </div>
           </div>
 
           <!-- Desktop layout -->
           <div class="hidden md:grid grid-cols-12 gap-2 items-center">
-            <div class="col-span-1 font-bold text-neon">{{ card.quantity }}</div>
+            <div class="col-span-1 font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">
+              {{ getQuantity(card) }}
+            </div>
             <div class="col-span-5">
-              <p class="font-bold text-silver truncate">{{ card.name }}</p>
-              <p class="text-tiny text-silver-70">{{ card.scryfallId }}</p>
+              <div class="flex items-center gap-2">
+                <p class="font-bold text-silver truncate">{{ card.name }}</p>
+                <BaseBadge v-if="card.isWishlist" variant="deseado" class="text-tiny flex-shrink-0">
+                  WISHLIST
+                </BaseBadge>
+                <BaseBadge v-if="card.foil" variant="cambio" class="text-tiny flex-shrink-0">
+                  FOIL
+                </BaseBadge>
+              </div>
+              <p v-if="!card.isWishlist" class="text-tiny text-silver-50">
+                {{ (card as any).totalInCollection }} en colección ({{ (card as any).availableInCollection }} disp.)
+              </p>
             </div>
             <div class="col-span-2 text-small text-silver-70">{{ card.edition }}</div>
             <div class="col-span-1">
@@ -113,19 +170,23 @@ const totalCards = computed(() => {
               </span>
             </div>
             <div class="col-span-2">
-              <p class="text-small text-silver">{{ card.price.toFixed(2) }}</p>
-              <p class="text-tiny text-neon font-bold">${{ (card.price * card.quantity).toFixed(2) }}</p>
+              <p class="text-small text-silver">${{ card.price.toFixed(2) }} c/u</p>
+              <p class="text-tiny font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">
+                ${{ (card.price * getQuantity(card)).toFixed(2) }}
+              </p>
             </div>
             <div class="col-span-1 flex gap-1">
               <button
-                  @click="emit('edit', card.id)"
+                  @click="emit('edit', card)"
                   class="px-2 py-1 text-tiny border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150"
+                  title="Editar"
               >
                 ✏️
               </button>
               <button
-                  @click="emit('remove', card.id)"
+                  @click="emit('remove', card)"
                   class="px-2 py-1 text-tiny border border-silver-30 text-silver-70 hover:border-ruby hover:text-ruby transition-150"
+                  title="Quitar del deck"
               >
                 ✕
               </button>
@@ -134,5 +195,23 @@ const totalCards = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- Legend -->
+    <div class="flex gap-4 text-tiny text-silver-50">
+      <div class="flex items-center gap-1">
+        <span class="w-3 h-3 bg-neon"></span>
+        <span>En colección</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <span class="w-3 h-3 bg-amber"></span>
+        <span>Wishlist (necesitas comprar)</span>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.bg-amber-5 {
+  background-color: rgba(245, 158, 11, 0.05);
+}
+</style>

@@ -54,11 +54,13 @@ export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
 
         const trimmedQuery = query.trim()
 
-        // Si es una query compleja (contiene : o OR), usar directamente
+        // Si es una query compleja (contiene : o OR o ! o ya tiene comillas), usar directamente
         // Si no, es un nombre simple - envolverlo en comillas
-        const finalQuery = trimmedQuery.includes(':') || trimmedQuery.includes('OR')
-            ? trimmedQuery
-            : `"${trimmedQuery}"`
+        const isComplexQuery = trimmedQuery.includes(':') ||
+                               trimmedQuery.includes('OR') ||
+                               trimmedQuery.startsWith('!') ||
+                               trimmedQuery.startsWith('"')
+        const finalQuery = isComplexQuery ? trimmedQuery : `"${trimmedQuery}"`
 
         const encodedQuery = encodeURIComponent(finalQuery)
 

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
+import { searchCards } from '../../services/scryfall'
 
 interface Props {
   show: boolean
@@ -20,6 +21,38 @@ const toastStore = useToastStore()
 const authStore = useAuthStore()
 
 const loading = ref(false)
+
+// Prints disponibles
+const availablePrints = ref<any[]>([])
+const selectedPrint = ref<any>(null)
+const loadingPrints = ref(false)
+
+// Cargar todos los prints cuando cambia la carta
+watch(() => props.scryfallCard, async (card) => {
+  if (card) {
+    selectedPrint.value = card
+    loadingPrints.value = true
+    try {
+      const results = await searchCards(`!"${card.name}"`)
+      availablePrints.value = results
+    } catch (err) {
+      availablePrints.value = [card]
+    } finally {
+      loadingPrints.value = false
+    }
+  } else {
+    availablePrints.value = []
+    selectedPrint.value = null
+  }
+}, { immediate: true })
+
+// Cambiar el print seleccionado
+const handlePrintChange = (scryfallId: string) => {
+  const newPrint = availablePrints.value.find(p => p.id === scryfallId)
+  if (newPrint) {
+    selectedPrint.value = newPrint
+  }
+}
 
 const form = reactive({
   quantity: 1,
@@ -51,25 +84,25 @@ const getCardImage = (card: any): string => {
 
 // ✅ NUEVO: Verificar si es split card
 const isSplitCard = computed(() => {
-  return props.scryfallCard?.card_faces && props.scryfallCard.card_faces.length > 1
+  return selectedPrint.value?.card_faces && selectedPrint.value.card_faces.length > 1
 })
 
 // ✅ NUEVO: Obtener imagen actual según el lado
 const currentCardImage = computed(() => {
-  if (!props.scryfallCard) return ''
-  if (props.scryfallCard.card_faces && props.scryfallCard.card_faces[cardFaceIndex.value]) {
-    return props.scryfallCard.card_faces[cardFaceIndex.value].image_uris?.normal || ''
+  if (!selectedPrint.value) return ''
+  if (selectedPrint.value.card_faces && selectedPrint.value.card_faces[cardFaceIndex.value]) {
+    return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
   }
-  return getCardImage(props.scryfallCard)
+  return getCardImage(selectedPrint.value)
 })
 
 // ✅ NUEVO: Obtener nombre del lado actual
 const currentCardName = computed(() => {
-  if (!props.scryfallCard) return ''
-  if (props.scryfallCard.card_faces && props.scryfallCard.card_faces[cardFaceIndex.value]) {
-    return props.scryfallCard.card_faces[cardFaceIndex.value].name
+  if (!selectedPrint.value) return ''
+  if (selectedPrint.value.card_faces && selectedPrint.value.card_faces[cardFaceIndex.value]) {
+    return selectedPrint.value.card_faces[cardFaceIndex.value].name
   }
-  return props.scryfallCard.name
+  return selectedPrint.value.name
 })
 
 // ✅ NUEVO: Toggle entre lados
@@ -95,14 +128,14 @@ const deckOptions = [
 ]
 
 const handleAddCard = async () => {
-  if (!props.scryfallCard || !authStore.user) return
+  if (!selectedPrint.value || !authStore.user) return
 
   loading.value = true
   try {
     // ✅ CORREGIDO: Guardar el nombre del lado actual (para split cards)
     const cardName = isSplitCard.value
-        ? props.scryfallCard.card_faces[cardFaceIndex.value].name
-        : props.scryfallCard.name
+        ? selectedPrint.value.card_faces[cardFaceIndex.value].name
+        : selectedPrint.value.name
 
     const imageToSave = currentCardImage.value || ''
 
@@ -111,22 +144,23 @@ const handleAddCard = async () => {
       image: imageToSave,
       isSplitCard: isSplitCard.value,
       cardFaceIndex: cardFaceIndex.value,
+      edition: selectedPrint.value.set_name,
     })
 
     await collectionStore.addCard({
-      scryfallId: props.scryfallCard.id,
+      scryfallId: selectedPrint.value.id,
       name: cardName,
-      edition: props.scryfallCard.set_name,
+      edition: selectedPrint.value.set_name,
       quantity: form.quantity,
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: parseFloat(props.scryfallCard.prices?.usd || '0'),
+      price: parseFloat(selectedPrint.value.prices?.usd || '0'),
       image: imageToSave,
       deckName: form.deckName || null,
     })
 
-    toastStore.show(`✓ ${props.scryfallCard.name} agregada`, 'success')
+    toastStore.show(`✓ ${selectedPrint.value.name} agregada`, 'success')
     emit('added')
     handleClose()
   } catch (err) {
@@ -144,6 +178,8 @@ const handleClose = () => {
   form.status = 'collection'
   form.deckName = ''
   cardFaceIndex.value = 0
+  availablePrints.value = []
+  selectedPrint.value = null
   emit('close')
 }
 </script>
@@ -155,7 +191,7 @@ const handleClose = () => {
       <h2 class="text-xl font-bold text-[#EEEEEE]">AGREGAR CARTA</h2>
 
       <!-- Datos de la carta -->
-      <div v-if="scryfallCard" class="border border-[#EEEEEE]/30 p-4 space-y-4">
+      <div v-if="selectedPrint" class="border border-[#EEEEEE]/30 p-4 space-y-4">
         <!-- Imagen (grande) y Formulario lado a lado -->
         <div class="flex gap-6">
           <!-- IZQUIERDA: Imagen grande -->
@@ -189,10 +225,30 @@ const handleClose = () => {
             <div class="text-center w-full">
               <p class="font-bold text-[#EEEEEE]">{{ currentCardName }}</p>
               <p v-if="isSplitCard" class="text-xs text-[#CCFF00] mt-1">
-                Lado {{ cardFaceIndex + 1 }} de {{ scryfallCard.card_faces.length }}
+                Lado {{ cardFaceIndex + 1 }} de {{ selectedPrint?.card_faces?.length }}
               </p>
-              <p class="text-xs text-[#EEEEEE]/70 mt-2">{{ scryfallCard.set_name }}</p>
-              <p class="text-lg text-[#CCFF00] font-bold mt-2">${{ scryfallCard.prices?.usd || '0.00' }}</p>
+              <p class="text-lg text-[#CCFF00] font-bold mt-2">${{ selectedPrint?.prices?.usd || '0.00' }}</p>
+
+              <!-- Print Selector -->
+              <div v-if="availablePrints.length > 1" class="mt-3">
+                <label class="text-xs text-[#EEEEEE]/70 block mb-1">Edición / Print</label>
+                <select
+                    :value="selectedPrint?.id"
+                    @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
+                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#CCFF00]"
+                >
+                  <option
+                      v-for="print in availablePrints"
+                      :key="print.id"
+                      :value="print.id"
+                  >
+                    {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+                  </option>
+                </select>
+                <p class="text-xs text-[#EEEEEE]/50 mt-1">{{ availablePrints.length }} prints disponibles</p>
+              </div>
+              <p v-else-if="loadingPrints" class="text-xs text-[#EEEEEE]/50 mt-2">Cargando prints...</p>
+              <p v-else class="text-xs text-[#EEEEEE]/70 mt-2">{{ selectedPrint?.set_name }}</p>
             </div>
           </div>
 

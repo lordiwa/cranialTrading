@@ -2,17 +2,26 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
+import { useCollectionStore } from '../stores/collection'
+import { useToastStore } from '../stores/toast'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
-import DeckCard from '../components/decks/DeckCard.vue'
+import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
+import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
+import { CardCondition } from '../types/card'
+import { searchCards, getCardById } from '../services/scryfall'
+import type { DeckCard } from '../types/deck'
 
 const router = useRouter()
 const decksStore = useDecksStore()
+const collectionStore = useCollectionStore()
+const toastStore = useToastStore()
 
 const showCreateModal = ref(false)
+const showImportModal = ref(false)
 const searchQuery = ref('')
 const filterFormat = ref<'all' | string>('all')
 
@@ -44,16 +53,82 @@ const formats = computed(() => {
 })
 
 const handleCreateDeck = async (deckData: any) => {
-  const deckId = await decksStore.createDeck(deckData)
+  const { deckList, ...deckInfo } = deckData
+
+  const deckId = await decksStore.createDeck(deckInfo)
   if (deckId) {
+    // Si hay una lista de cartas, importarla
+    if (deckList) {
+      toastStore.show('Importando cartas...', 'info')
+
+      const lines = deckList.split('\n').filter((l: string) => l.trim())
+      const collectionCards: any[] = []
+      let inSideboard = false
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+
+        if (trimmed.toLowerCase().includes('sideboard')) {
+          inSideboard = true
+          continue
+        }
+
+        const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+\d+)?$/i)
+        if (!match) continue
+
+        const quantity = parseInt(match[1])
+        const cardName = match[2].trim()
+        const setCode = match[3] || undefined
+
+        // Buscar en Scryfall
+        const scryfallData = await fetchCardFromScryfall(cardName, setCode)
+
+        // Agregar a colección primero
+        collectionCards.push({
+          scryfallId: scryfallData?.scryfallId || '',
+          name: cardName,
+          edition: scryfallData?.edition || setCode || 'Unknown',
+          quantity,
+          condition: 'NM' as CardCondition,
+          foil: false,
+          price: scryfallData?.price || 0,
+          image: scryfallData?.image || '',
+          status: 'collection',
+          isInSideboard: inSideboard,
+        })
+      }
+
+      // Guardar en colección primero
+      if (collectionCards.length > 0) {
+        await collectionStore.confirmImport(collectionCards)
+
+        // Recargar colección para obtener los IDs
+        await collectionStore.loadCollection()
+
+        // Ahora asignar al deck usando allocations
+        for (const cardData of collectionCards) {
+          // Buscar la carta en la colección por scryfallId
+          const collectionCard = collectionStore.cards.find(
+            c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+          )
+          if (collectionCard) {
+            await decksStore.allocateCardToDeck(
+              deckId,
+              collectionCard.id,
+              cardData.quantity,
+              cardData.isInSideboard
+            )
+          }
+        }
+
+        toastStore.show(`${collectionCards.length} cartas importadas`, 'success')
+      }
+    }
+
     showCreateModal.value = false
-    // Redirigir al editor
     await router.push(`/decks/${deckId}/edit`)
   }
-}
-
-const handleViewDeck = (deckId: string) => {
-  router.push(`/decks/${deckId}`)
 }
 
 const handleEditDeck = (deckId: string) => {
@@ -63,6 +138,205 @@ const handleEditDeck = (deckId: string) => {
 const handleDeleteDeck = async (deckId: string) => {
   if (confirm('¿Eliminar este deck? Esta acción no se puede deshacer.')) {
     await decksStore.deleteDeck(deckId)
+  }
+}
+
+// Helper: Buscar carta en Scryfall y obtener datos completos
+const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
+  try {
+    // Buscar por nombre (y set si está disponible)
+    const query = setCode ? `"${cardName}" e:${setCode}` : `"${cardName}"`
+    const results = await searchCards(query)
+    if (results.length > 0) {
+      const card = results[0]
+      // Obtener imagen (considerar split cards)
+      let image = card.image_uris?.normal || ''
+      if (!image && card.card_faces && card.card_faces.length > 0) {
+        image = card.card_faces[0]?.image_uris?.normal || ''
+      }
+      return {
+        scryfallId: card.id,
+        image,
+        price: card.prices?.usd ? parseFloat(card.prices.usd) : 0,
+        edition: card.set.toUpperCase(),
+      }
+    }
+  } catch (e) {
+    console.warn(`No se pudo obtener datos de Scryfall para: ${cardName}`)
+  }
+  return null
+}
+
+// Importar desde texto (lista de cartas)
+const handleImport = async (
+  deckText: string,
+  condition: CardCondition,
+  includeSideboard: boolean,
+  deckName?: string,
+  makePublic?: boolean
+) => {
+  const finalDeckName = deckName || `Deck${Date.now()}`
+  toastStore.show('Importando cartas...', 'info')
+
+  // Parsear el texto
+  const lines = deckText.split('\n').filter(l => l.trim())
+  const collectionCards: any[] = []
+  let inSideboard = false
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    if (trimmed.toLowerCase().includes('sideboard')) {
+      inSideboard = true
+      continue
+    }
+
+    const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+\d+)?$/i)
+    if (!match) continue
+
+    const quantity = parseInt(match[1])
+    const cardName = match[2].trim()
+    const setCode = match[3] || undefined
+
+    // Skip sideboard if not included
+    if (inSideboard && !includeSideboard) continue
+
+    // Buscar en Scryfall para obtener imagen y datos
+    const scryfallData = await fetchCardFromScryfall(cardName, setCode)
+
+    // Agregar a colección
+    collectionCards.push({
+      scryfallId: scryfallData?.scryfallId || '',
+      name: cardName,
+      edition: scryfallData?.edition || setCode || 'Unknown',
+      quantity,
+      condition,
+      foil: false,
+      price: scryfallData?.price || 0,
+      image: scryfallData?.image || '',
+      status: 'collection',
+      public: makePublic || false,
+      isInSideboard: inSideboard,
+    })
+  }
+
+  // 1. Crear el deck
+  const deckId = await decksStore.createDeck({
+    name: finalDeckName,
+    format: 'custom',
+    description: '',
+    colors: [],
+  })
+
+  // 2. Agregar cartas a la colección primero
+  if (collectionCards.length > 0) {
+    await collectionStore.confirmImport(collectionCards)
+
+    // Recargar colección para obtener los IDs
+    await collectionStore.loadCollection()
+
+    // 3. Asignar al deck usando allocations
+    if (deckId) {
+      for (const cardData of collectionCards) {
+        const collectionCard = collectionStore.cards.find(
+          c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+        )
+        if (collectionCard) {
+          await decksStore.allocateCardToDeck(
+            deckId,
+            collectionCard.id,
+            cardData.quantity,
+            cardData.isInSideboard
+          )
+        }
+      }
+    }
+  }
+
+  toastStore.show(`Deck "${finalDeckName}" importado con ${collectionCards.length} cartas`, 'success')
+  showImportModal.value = false
+
+  if (deckId) {
+    await router.push(`/decks/${deckId}/edit`)
+  }
+}
+
+// Importar directamente desde Moxfield API
+const handleImportDirect = async (
+  cards: any[],
+  deckName: string | undefined,
+  condition: CardCondition,
+  makePublic?: boolean
+) => {
+  const finalDeckName = deckName || `Deck${Date.now()}`
+  toastStore.show('Importando cartas desde Moxfield...', 'info')
+
+  // 1. Crear el deck
+  const deckId = await decksStore.createDeck({
+    name: finalDeckName,
+    format: 'custom',
+    description: '',
+    colors: [],
+  })
+
+  const collectionCards: any[] = []
+
+  // 2. Procesar cada carta
+  for (const card of cards) {
+    // Obtener imagen desde Scryfall usando el scryfallId
+    let image = ''
+    let price = 0
+
+    if (card.scryfallId) {
+      const scryfallCard = await getCardById(card.scryfallId)
+      if (scryfallCard) {
+        image = scryfallCard.image_uris?.normal || ''
+        if (!image && scryfallCard.card_faces && scryfallCard.card_faces.length > 0) {
+          image = scryfallCard.card_faces[0]?.image_uris?.normal || ''
+        }
+        price = scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd) : 0
+      }
+    }
+
+    const cardData: DeckCard = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      scryfallId: card.scryfallId || '',
+      name: card.name,
+      edition: card.setCode || 'Unknown',
+      quantity: card.quantity,
+      condition,
+      foil: false,
+      price,
+      image,
+      isInSideboard: false,
+      addedAt: new Date(),
+    }
+
+    // Agregar al mainboard del deck
+    if (deckId) {
+      await decksStore.addCardToMainboard(deckId, cardData)
+    }
+
+    // Agregar a colección
+    collectionCards.push({
+      ...cardData,
+      status: 'collection',
+      deckName: finalDeckName,
+      public: makePublic || false,
+    })
+  }
+
+  // 3. Guardar en colección
+  if (collectionCards.length > 0) {
+    await collectionStore.confirmImport(collectionCards)
+  }
+
+  toastStore.show(`Deck "${finalDeckName}" importado con ${cards.length} cartas`, 'success')
+  showImportModal.value = false
+
+  if (deckId) {
+    await router.push(`/decks/${deckId}/edit`)
   }
 }
 
@@ -82,13 +356,23 @@ onMounted(async () => {
             {{ decksStore.totalDecks }} mazos creados
           </p>
         </div>
-        <BaseButton
-            size="small"
-            @click="showCreateModal = true"
-            class="w-full md:w-auto"
-        >
-          + NUEVO MAZO
-        </BaseButton>
+        <div class="flex gap-2 w-full md:w-auto">
+          <BaseButton
+              size="small"
+              @click="showCreateModal = true"
+              class="flex-1 md:flex-none"
+          >
+            + NUEVO MAZO
+          </BaseButton>
+          <BaseButton
+              size="small"
+              variant="secondary"
+              @click="showImportModal = true"
+              class="flex-1 md:flex-none"
+          >
+            IMPORTAR
+          </BaseButton>
+        </div>
       </div>
 
       <!-- Filtros -->
@@ -154,11 +438,10 @@ onMounted(async () => {
 
       <!-- Grid de mazos -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        <DeckCard
+        <DeckCardComponent
             v-for="deck in filteredDecks"
             :key="deck.id"
             :deck="deck"
-            @view="handleViewDeck"
             @edit="handleEditDeck"
             @delete="handleDeleteDeck"
         />
@@ -169,6 +452,14 @@ onMounted(async () => {
           :show="showCreateModal"
           @close="showCreateModal = false"
           @create="handleCreateDeck"
+      />
+
+      <!-- Modal importar mazo -->
+      <ImportDeckModal
+          :show="showImportModal"
+          @close="showImportModal = false"
+          @import="handleImport"
+          @importDirect="handleImportDirect"
       />
     </div>
   </AppContainer>

@@ -8,7 +8,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  view: [deckId: string]
   edit: [deckId: string]
   delete: [deckId: string]
 }>()
@@ -32,22 +31,23 @@ const completionPercent = computed(() => {
 <template>
   <div class="bg-primary border border-silver-30 hover:border-neon-40 transition-300 overflow-hidden">
     <!-- Thumbnail -->
-    <div v-if="deck.thumbnail" class="relative w-full h-40 bg-secondary overflow-hidden group">
+    <div
+        v-if="deck.thumbnail"
+        class="relative w-full h-40 bg-secondary overflow-hidden group cursor-pointer"
+        @click="emit('edit', deck.id)"
+    >
       <img :src="deck.thumbnail" :alt="deck.name" class="w-full h-full object-cover group-hover:scale-105 transition-300" />
       <div class="absolute inset-0 bg-black-80 opacity-0 group-hover:opacity-100 transition-300 flex items-center justify-center">
-        <button
-            @click="emit('view', deck.id)"
-            class="px-4 py-2 bg-neon text-primary font-bold text-small hover:bg-neon-90 transition-150"
-        >
-          VER MAZO
-        </button>
+        <span class="px-4 py-2 bg-neon text-primary font-bold text-small">
+          EDITAR MAZO
+        </span>
       </div>
     </div>
 
     <!-- Placeholder thumbnail -->
     <div v-else class="w-full h-40 bg-secondary border-b border-silver-30 flex items-center justify-center">
       <div class="text-center">
-        <p class="text-h3 font-bold text-silver-50">{{ deck.mainboard.length }}</p>
+        <p class="text-h3 font-bold text-silver-50">{{ deck.stats.totalCards }}</p>
         <p class="text-tiny text-silver-70">cartas</p>
       </div>
     </div>
@@ -99,14 +99,8 @@ const completionPercent = computed(() => {
       <!-- Buttons -->
       <div class="flex gap-2">
         <button
-            @click="emit('view', deck.id)"
-            class="flex-1 px-3 py-2 border-2 border-neon text-neon font-bold text-tiny hover:bg-neon-10 transition-150"
-        >
-          VER
-        </button>
-        <button
             @click="emit('edit', deck.id)"
-            class="flex-1 px-3 py-2 border border-silver text-silver font-bold text-tiny hover:border-neon hover:text-neon transition-150"
+            class="flex-1 px-3 py-2 border-2 border-neon text-neon font-bold text-tiny hover:bg-neon-10 transition-150"
         >
           EDITAR
         </button>

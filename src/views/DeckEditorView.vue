@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
+import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -9,14 +10,19 @@ import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
 import DeckCardsList from '../components/decks/DeckCardsList.vue'
 import AddCardToDeckModal from '../components/decks/AddCardToDeckModal.vue'
+import EditDeckCardModal from '../components/decks/EditDeckCardModal.vue'
+import type { DisplayDeckCard, HydratedDeckCard } from '../types/deck'
 
 const router = useRouter()
 const route = useRoute()
 const decksStore = useDecksStore()
+const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 
 const loading = ref(false)
 const showAddCardModal = ref(false)
+const showEditCardModal = ref(false)
+const editingCard = ref<DisplayDeckCard | null>(null)
 const activeTab = ref<'mainboard' | 'sideboard'>('mainboard')
 
 const deckId = route.params.deckId as string
@@ -24,33 +30,192 @@ const isNewDeck = !deckId || deckId === 'new'
 
 const deck = computed(() => decksStore.currentDeck)
 
-const handleAddCard = async (cardData: any) => {
-  if (activeTab.value === 'mainboard') {
-    await decksStore.addCardToMainboard(deckId, cardData)
-  } else {
-    await decksStore.addCardToSideboard(deckId, cardData)
+// Hydrated cards for display
+const allCards = computed(() => {
+  if (!deck.value) return []
+  return decksStore.hydrateDeckCards(deck.value, collectionStore.cards)
+})
+
+const mainboardCards = computed(() =>
+    allCards.value.filter(c => !c.isInSideboard)
+)
+
+const sideboardCards = computed(() =>
+    allCards.value.filter(c => c.isInSideboard)
+)
+
+// Type guard and helper to get quantity from either type
+const getCardQuantity = (card: DisplayDeckCard): number => {
+  if (card.isWishlist === true) {
+    return card.requestedQuantity
   }
-  showAddCardModal.value = false
-  toastStore.show(`Carta agregada al ${activeTab.value}`, 'success')
+  return (card as HydratedDeckCard).allocatedQuantity
 }
 
-const handleRemoveCard = async (cardId: string) => {
-  if (confirm('¿Eliminar esta carta del deck?')) {
-    await decksStore.removeCard(deckId, cardId, activeTab.value === 'sideboard')
-    toastStore.show('Carta eliminada', 'success')
+// Stats
+const mainboardCount = computed(() =>
+    mainboardCards.value.reduce((sum, c) => sum + getCardQuantity(c), 0)
+)
+
+const sideboardCount = computed(() =>
+    sideboardCards.value.reduce((sum, c) => sum + getCardQuantity(c), 0)
+)
+
+const completionPercent = computed(() =>
+    deck.value?.stats.completionPercentage.toFixed(0) || '100'
+)
+
+/**
+ * Handle adding a card from the modal
+ * The modal now handles the logic of checking collection and allocating
+ */
+const handleAddCard = async (cardData: {
+  cardId?: string        // If from collection
+  scryfallId: string
+  name: string
+  edition: string
+  quantity: number
+  condition: string
+  foil: boolean
+  price: number
+  image: string
+  addToCollection: boolean
+}) => {
+  const isInSideboard = activeTab.value === 'sideboard'
+
+  if (cardData.cardId) {
+    // Card exists in collection - allocate it
+    const result = await decksStore.allocateCardToDeck(
+        deckId,
+        cardData.cardId,
+        cardData.quantity,
+        isInSideboard
+    )
+
+    if (result.allocated > 0 || result.wishlisted > 0) {
+      showAddCardModal.value = false
+      toastStore.show(`Carta agregada al ${activeTab.value}`, 'success')
+    }
+  } else if (cardData.addToCollection) {
+    // Add to collection first, then allocate
+    const newCardId = await collectionStore.addCard({
+      scryfallId: cardData.scryfallId,
+      name: cardData.name,
+      edition: cardData.edition,
+      quantity: cardData.quantity,
+      condition: cardData.condition as any,
+      foil: cardData.foil,
+      price: cardData.price,
+      image: cardData.image,
+      status: 'collection',
+    })
+
+    if (newCardId) {
+      await decksStore.allocateCardToDeck(
+          deckId,
+          newCardId,
+          cardData.quantity,
+          isInSideboard
+      )
+      showAddCardModal.value = false
+      toastStore.show(`Carta agregada a colección y ${activeTab.value}`, 'success')
+    }
+  } else {
+    // Add directly to wishlist (not in collection)
+    await decksStore.addToWishlist(deckId, {
+      scryfallId: cardData.scryfallId,
+      name: cardData.name,
+      edition: cardData.edition,
+      quantity: cardData.quantity,
+      isInSideboard,
+      price: cardData.price,
+      image: cardData.image,
+      condition: cardData.condition as any,
+      foil: cardData.foil,
+    })
+    showAddCardModal.value = false
+    toastStore.show(`Carta agregada a wishlist del ${activeTab.value}`, 'info')
   }
+}
+
+/**
+ * Handle removing a card from the deck
+ */
+const handleRemoveCard = async (card: DisplayDeckCard) => {
+  const cardName = card.name
+  if (!confirm(`¿Eliminar "${cardName}" del deck?`)) return
+
+  if (card.isWishlist) {
+    // Remove from wishlist
+    await decksStore.removeFromWishlist(
+        deckId,
+        card.scryfallId,
+        card.edition,
+        card.condition,
+        card.foil,
+        card.isInSideboard
+    )
+  } else {
+    // Deallocate from deck (card stays in collection)
+    const ownedCard = card as HydratedDeckCard
+    await decksStore.deallocateCard(deckId, ownedCard.cardId, ownedCard.isInSideboard)
+  }
+
+  toastStore.show('Carta eliminada del deck', 'success')
+}
+
+/**
+ * Handle editing a card
+ */
+const handleEditCard = (card: DisplayDeckCard) => {
+  editingCard.value = card
+  showEditCardModal.value = true
+}
+
+/**
+ * Handle saving edited card
+ * For owned cards, this edits the collection card (syncs everywhere)
+ * For wishlist cards, this updates the wishlist item
+ */
+const handleSaveEditedCard = async (updatedData: any) => {
+  if (!editingCard.value) return
+
+  if (!editingCard.value.isWishlist) {
+    // Update collection card - changes reflect automatically in deck
+    const hydratedCard = editingCard.value as HydratedDeckCard
+    await collectionStore.updateCard(hydratedCard.cardId, {
+      scryfallId: updatedData.scryfallId,
+      edition: updatedData.edition,
+      condition: updatedData.condition,
+      foil: updatedData.foil,
+      price: updatedData.price,
+      image: updatedData.image,
+    })
+
+    // Update allocation quantity if changed
+    if (updatedData.quantity !== hydratedCard.allocatedQuantity) {
+      await decksStore.updateAllocation(
+          deckId,
+          hydratedCard.cardId,
+          hydratedCard.isInSideboard,
+          updatedData.quantity
+      )
+    }
+  }
+
+  showEditCardModal.value = false
+  editingCard.value = null
+  toastStore.show('Carta actualizada', 'success')
 }
 
 const handleSave = async () => {
-  // El deck se guarda automáticamente con cada cambio
-  // Pero podemos añadir validaciones
   if (!deck.value?.name.trim()) {
     toastStore.show('El nombre del deck es requerido', 'error')
     return
   }
 
-  toastStore.show('Deck actualizado', 'success')
-  await router.push(`/decks/${deckId}`)
+  toastStore.show('Deck guardado', 'success')
+  await router.push('/decks')
 }
 
 const handleBack = () => {
@@ -58,11 +223,16 @@ const handleBack = () => {
 }
 
 onMounted(async () => {
+  loading.value = true
+
+  // Load collection first (needed for hydration)
+  await collectionStore.loadCollection()
+
   if (!isNewDeck) {
-    loading.value = true
     await decksStore.loadDeck(deckId)
-    loading.value = false
   }
+
+  loading.value = false
 })
 </script>
 
@@ -78,6 +248,17 @@ onMounted(async () => {
         <div class="flex-1">
           <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">EDITOR: {{ deck.name }}</h1>
           <p class="text-small text-silver-70">{{ deck.description }}</p>
+
+          <!-- Completion indicator -->
+          <div class="flex items-center gap-2 mt-2">
+            <div class="w-32 h-2 bg-secondary border border-silver-30 overflow-hidden">
+              <div
+                  class="h-full bg-neon transition-300"
+                  :style="{ width: `${completionPercent}%` }"
+              />
+            </div>
+            <span class="text-tiny text-silver-70">{{ completionPercent }}% completo</span>
+          </div>
         </div>
 
         <div class="flex flex-col gap-2">
@@ -86,21 +267,37 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Formato y colores -->
+      <!-- Stats -->
       <div class="bg-secondary border border-silver-30 p-4 md:p-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p class="text-tiny text-silver-70 mb-2">FORMATO</p>
-            <p class="text-h3 font-bold text-silver uppercase">{{ deck.format }}</p>
+            <p class="text-tiny text-silver-70 mb-1">FORMATO</p>
+            <p class="text-body font-bold text-silver uppercase">{{ deck.format }}</p>
           </div>
           <div>
-            <p class="text-tiny text-silver-70 mb-2">COLORES</p>
-            <div class="flex gap-2">
-              <span v-if="deck.colors.length === 0" class="text-small text-silver-70">Ninguno</span>
-              <BaseBadge v-for="color in deck.colors" :key="color" variant="cambio">
-                {{ color }}
-              </BaseBadge>
-            </div>
+            <p class="text-tiny text-silver-70 mb-1">CARTAS</p>
+            <p class="text-body font-bold text-neon">{{ deck.stats.totalCards }}</p>
+          </div>
+          <div>
+            <p class="text-tiny text-silver-70 mb-1">EN COLECCIÓN</p>
+            <p class="text-body font-bold text-neon">{{ deck.stats.ownedCards }}</p>
+          </div>
+          <div>
+            <p class="text-tiny text-silver-70 mb-1">WISHLIST</p>
+            <p class="text-body font-bold" :class="deck.stats.wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
+              {{ deck.stats.wishlistCards }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Colors -->
+        <div class="mt-4 pt-4 border-t border-silver-20">
+          <p class="text-tiny text-silver-70 mb-2">COLORES</p>
+          <div class="flex gap-2">
+            <span v-if="deck.colors.length === 0" class="text-small text-silver-70">Sin colores definidos</span>
+            <BaseBadge v-for="color in deck.colors" :key="color" variant="cambio">
+              {{ color }}
+            </BaseBadge>
           </div>
         </div>
       </div>
@@ -116,7 +313,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          MAINBOARD ({{ deck.mainboard.length }})
+          MAINBOARD ({{ mainboardCount }})
         </button>
         <button
             @click="activeTab = 'sideboard'"
@@ -127,7 +324,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          SIDEBOARD ({{ deck.sideboard.length }})
+          SIDEBOARD ({{ sideboardCount }})
         </button>
       </div>
 
@@ -142,17 +339,29 @@ onMounted(async () => {
 
       <!-- Cards list -->
       <DeckCardsList
-          :cards="activeTab === 'mainboard' ? deck.mainboard : deck.sideboard"
+          :cards="activeTab === 'mainboard' ? mainboardCards : sideboardCards"
           :deck-id="deckId"
           :title="activeTab === 'mainboard' ? 'MAINBOARD' : 'SIDEBOARD'"
+          @edit="handleEditCard"
           @remove="handleRemoveCard"
       />
 
       <!-- Add card modal -->
       <AddCardToDeckModal
           :show="showAddCardModal"
+          :deck-id="deckId"
+          :is-sideboard="activeTab === 'sideboard'"
           @close="showAddCardModal = false"
           @add="handleAddCard"
+      />
+
+      <!-- Edit card modal -->
+      <EditDeckCardModal
+          :show="showEditCardModal"
+          :card="editingCard"
+          :deck-id="deckId"
+          @close="showEditCardModal = false; editingCard = null"
+          @save="handleSaveEditedCard"
       />
     </div>
 

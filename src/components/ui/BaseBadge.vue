@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-  variant?: 'busco' | 'cambio' | 'vendo' | 'success' | 'solo';
+  variant?: 'busco' | 'cambio' | 'vendo' | 'success' | 'solo' | 'deseado';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -13,6 +13,7 @@ const variantClasses = {
   vendo: 'border border-rust text-rust',
   success: 'border border-neon bg-neon-5 text-neon',
   solo: 'border border-silver text-silver-70',
+  deseado: 'border border-amber bg-amber-5 text-amber',
 };
 </script>
 
@@ -26,3 +27,12 @@ const variantClasses = {
     <slot />
   </span>
 </template>
+
+<style scoped>
+.bg-amber-5 {
+  background-color: rgba(245, 158, 11, 0.05);
+}
+.bg-neon-5 {
+  background-color: rgba(0, 255, 136, 0.05);
+}
+</style>

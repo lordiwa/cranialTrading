@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useCardAllocation } from '../../composables/useCardAllocation'
 import type { Card } from '../../types/card'
 
 const props = defineProps<{
@@ -12,27 +13,25 @@ const emit = defineEmits<{
   delete: [card: Card]
 }>()
 
-// ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
+const { getTotalAllocated, getAvailableQuantity, getAllocationsForCard } = useCardAllocation()
+
+// Estado para controlar qué lado mostrar en split cards
 const cardFaceIndex = ref<Record<string, number>>({})
 
 const getCardImage = (card: Card): string => {
-  // ✅ CORREGIDO: Intentar obtener imagen de card_faces PRIMERO
   if (card.image && typeof card.image === 'string') {
     try {
       const parsed = JSON.parse(card.image)
       if (parsed.card_faces && parsed.card_faces.length > 0) {
-        // Si es split card guardado como JSON
         return parsed.card_faces[cardFaceIndex.value[card.id] || 0]?.image_uris?.normal || parsed.card_faces[0]?.image_uris?.normal || ''
       }
     } catch (e) {
-      // Si no es JSON, usar como URL normal
       return card.image
     }
   }
   return card.image || ''
 }
 
-// ✅ NUEVO: Detectar split cards
 const isSplitCard = (card: Card): boolean => {
   if (card.image && typeof card.image === 'string') {
     try {
@@ -45,13 +44,24 @@ const isSplitCard = (card: Card): boolean => {
   return false
 }
 
-// ✅ NUEVO: Toggle entre lados de split card
 const toggleCardFace = (cardId: string, isSplit: boolean) => {
   if (!isSplit) return
-
   const currentIndex = cardFaceIndex.value[cardId] || 0
   const newIndex = currentIndex === 0 ? 1 : 0
   cardFaceIndex.value[cardId] = newIndex
+}
+
+// Get allocation info for a card
+const getCardAllocationInfo = (card: Card) => {
+  const allocated = getTotalAllocated(card.id)
+  const available = getAvailableQuantity(card.id)
+  const allocations = getAllocationsForCard(card.id)
+  return { allocated, available, allocations }
+}
+
+// Check if card is used in any deck
+const isCardAllocated = (card: Card): boolean => {
+  return getTotalAllocated(card.id) > 0
 }
 
 const getStatusColor = (status: string) => {
@@ -67,11 +77,11 @@ const getStatusColor = (status: string) => {
 const getStatusIcon = (status: string) => {
   const icons = {
     collection: '✓',
-    sale: '💰',
-    trade: '🔄',
-    wishlist: '⭐',
+    sale: '$',
+    trade: '~',
+    wishlist: '*',
   }
-  return icons[status as keyof typeof icons] || '•'
+  return icons[status as keyof typeof icons] || '-'
 }
 </script>
 
@@ -85,6 +95,7 @@ const getStatusIcon = (status: string) => {
       <!-- Card Image Container -->
       <div
           class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all"
+          :class="{ 'border-neon-30': isCardAllocated(card) }"
           @click="emit('cardClick', card)"
       >
         <img
@@ -98,14 +109,14 @@ const getStatusIcon = (status: string) => {
           <span class="text-tiny text-silver-50">No image</span>
         </div>
 
-        <!-- ✅ NUEVO: Toggle button para split cards -->
+        <!-- Toggle button para split cards -->
         <button
             v-if="isSplitCard(card)"
             @click.stop="toggleCardFace(card.id, true)"
             class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
             title="Click para ver el otro lado"
         >
-          ↔️
+          <->
         </button>
 
         <!-- Status Badge (Overlay) -->
@@ -115,9 +126,28 @@ const getStatusIcon = (status: string) => {
           </p>
         </div>
 
-        <!-- Qty Badge (Bottom Left) -->
+        <!-- Qty Badge (Bottom Left) - Shows allocated info -->
         <div class="absolute bottom-2 left-2 bg-secondary border border-silver-30 px-2 py-1">
-          <p class="text-tiny font-bold text-neon">x{{ card.quantity }}</p>
+          <template v-if="isCardAllocated(card)">
+            <p class="text-tiny font-bold">
+              <span class="text-neon">{{ getCardAllocationInfo(card).available }}</span>
+              <span class="text-silver-50">/{{ card.quantity }}</span>
+            </p>
+          </template>
+          <template v-else>
+            <p class="text-tiny font-bold text-neon">x{{ card.quantity }}</p>
+          </template>
+        </div>
+
+        <!-- Deck indicator (Bottom Right) -->
+        <div
+            v-if="isCardAllocated(card)"
+            class="absolute bottom-2 right-2 bg-neon-10 border border-neon px-2 py-1"
+            :title="`En ${getCardAllocationInfo(card).allocations.length} mazo(s)`"
+        >
+          <p class="text-tiny font-bold text-neon">
+            {{ getCardAllocationInfo(card).allocations.length }} deck{{ getCardAllocationInfo(card).allocations.length > 1 ? 's' : '' }}
+          </p>
         </div>
       </div>
 
@@ -130,8 +160,13 @@ const getStatusIcon = (status: string) => {
 
         <!-- Edition & Condition -->
         <p class="text-tiny text-silver-70">
-          {{ card.edition }} • {{ card.condition }}
-          <span v-if="card.foil" class="text-neon">✦</span>
+          {{ card.edition }} - {{ card.condition }}
+          <span v-if="card.foil" class="text-neon">FOIL</span>
+        </p>
+
+        <!-- Allocation summary if used in decks -->
+        <p v-if="isCardAllocated(card)" class="text-tiny text-silver-50">
+          {{ getCardAllocationInfo(card).allocated }} en mazos, {{ getCardAllocationInfo(card).available }} disp.
         </p>
 
         <!-- Price -->
@@ -146,13 +181,13 @@ const getStatusIcon = (status: string) => {
             @click="emit('edit', card)"
             class="flex-1 px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150"
         >
-          ✏️
+          EDITAR
         </button>
         <button
             @click="emit('delete', card)"
             class="flex-1 px-2 py-1 bg-rust-10 border border-rust text-rust text-tiny font-bold hover:bg-rust-20 transition-150"
         >
-          🗑️
+          BORRAR
         </button>
       </div>
     </div>
@@ -160,16 +195,19 @@ const getStatusIcon = (status: string) => {
 </template>
 
 <style scoped>
-/* Responsive grid sizes */
-@media (max-width: 768px) {
-  /* Already 2 columns via grid-cols-2 */
+.border-neon-30 {
+  border-color: rgba(0, 255, 136, 0.3);
 }
-
-@media (min-width: 768px) {
-  /* 3 columns for tablet */
+.bg-neon-10 {
+  background-color: rgba(0, 255, 136, 0.1);
 }
-
-@media (min-width: 1024px) {
-  /* 5 columns for desktop */
+.bg-neon-20 {
+  background-color: rgba(0, 255, 136, 0.2);
+}
+.bg-rust-10 {
+  background-color: rgba(183, 65, 14, 0.1);
+}
+.bg-rust-20 {
+  background-color: rgba(183, 65, 14, 0.2);
 }
 </style>

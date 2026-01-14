@@ -22,6 +22,37 @@ const deckId = route.params.deckId as string
 
 const deck = computed(() => decksStore.currentDeck)
 
+// Hydrated cards for display
+const allCards = computed(() => {
+  if (!deck.value) return []
+  return decksStore.hydrateDeckCards(deck.value, collectionStore.cards)
+})
+
+const mainboardCards = computed(() =>
+    allCards.value.filter(c => !c.isInSideboard)
+)
+
+const sideboardCards = computed(() =>
+    allCards.value.filter(c => c.isInSideboard)
+)
+
+// Type guard and helper to get quantity from either type
+const getCardQuantity = (card: typeof allCards.value[number]): number => {
+  if (card.isWishlist === true) {
+    return card.requestedQuantity
+  }
+  return (card as any).allocatedQuantity
+}
+
+// Card counts
+const mainboardCount = computed(() =>
+    mainboardCards.value.reduce((sum, c) => sum + getCardQuantity(c), 0)
+)
+
+const sideboardCount = computed(() =>
+    sideboardCards.value.reduce((sum, c) => sum + getCardQuantity(c), 0)
+)
+
 const formatLabel = computed(() => {
   const labels: Record<string, string> = {
     vintage: 'VINTAGE',
@@ -43,8 +74,8 @@ const handleBack = () => {
 
 onMounted(async () => {
   loading.value = true
-  await decksStore.loadDeck(deckId)
   await collectionStore.loadCollection()
+  await decksStore.loadDeck(deckId)
   loading.value = false
 })
 </script>
@@ -82,12 +113,14 @@ onMounted(async () => {
           <p class="text-h3 font-bold text-neon">{{ deck.stats.totalCards }}</p>
         </div>
         <div class="bg-primary border border-silver-30 p-4">
-          <p class="text-tiny text-silver-70">MAINBOARD</p>
-          <p class="text-h3 font-bold text-silver">{{ deck.mainboard.length }}</p>
+          <p class="text-tiny text-silver-70">EN COLECCIÓN</p>
+          <p class="text-h3 font-bold text-neon">{{ deck.stats.ownedCards }}</p>
         </div>
         <div class="bg-primary border border-silver-30 p-4">
-          <p class="text-tiny text-silver-70">SIDEBOARD</p>
-          <p class="text-h3 font-bold text-silver">{{ deck.sideboard.length }}</p>
+          <p class="text-tiny text-silver-70">WISHLIST</p>
+          <p class="text-h3 font-bold" :class="deck.stats.wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
+            {{ deck.stats.wishlistCards }}
+          </p>
         </div>
         <div class="bg-primary border border-silver-30 p-4">
           <p class="text-tiny text-silver-70">COSTO TOTAL</p>
@@ -106,7 +139,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          MAINBOARD ({{ deck.mainboard.length }})
+          MAINBOARD ({{ mainboardCount }})
         </button>
         <button
             @click="activeTab = 'sideboard'"
@@ -117,7 +150,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          SIDEBOARD ({{ deck.sideboard.length }})
+          SIDEBOARD ({{ sideboardCount }})
         </button>
         <button
             @click="activeTab = 'stats'"
@@ -137,7 +170,7 @@ onMounted(async () => {
         <!-- Mainboard -->
         <DeckCardsList
             v-if="activeTab === 'mainboard'"
-            :cards="deck.mainboard"
+            :cards="mainboardCards"
             :deck-id="deckId"
             title="MAINBOARD"
         />
@@ -145,7 +178,7 @@ onMounted(async () => {
         <!-- Sideboard -->
         <DeckCardsList
             v-else-if="activeTab === 'sideboard'"
-            :cards="deck.sideboard"
+            :cards="sideboardCards"
             :deck-id="deckId"
             title="SIDEBOARD"
         />

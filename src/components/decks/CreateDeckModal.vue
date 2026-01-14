@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  create: [data: CreateDeckInput]
+  create: [data: CreateDeckInput & { deckList?: string }]
 }>()
 
 const form = ref<CreateDeckInput>({
@@ -20,6 +20,38 @@ const form = ref<CreateDeckInput>({
   format: 'custom',
   description: '',
   colors: [],
+})
+
+// Lista de cartas para importar (opcional)
+const deckList = ref('')
+
+// Preview de la lista
+const deckListPreview = computed(() => {
+  if (!deckList.value.trim()) return null
+
+  const lines = deckList.value.split('\n').filter(l => l.trim())
+  let mainboard = 0
+  let sideboard = 0
+  let inSideboard = false
+
+  for (const line of lines) {
+    const trimmed = line.trim().toLowerCase()
+    if (trimmed.includes('sideboard')) {
+      inSideboard = true
+      continue
+    }
+    const match = line.match(/^(\d+)/)
+    if (match) {
+      const qty = parseInt(match[1])
+      if (inSideboard) {
+        sideboard += qty
+      } else {
+        mainboard += qty
+      }
+    }
+  }
+
+  return { mainboard, sideboard, total: mainboard + sideboard }
 })
 
 const formatOptions = [
@@ -52,7 +84,10 @@ const handleCreate = () => {
     alert('El nombre del mazo es requerido')
     return
   }
-  emit('create', form.value)
+  emit('create', {
+    ...form.value,
+    deckList: deckList.value.trim() || undefined
+  })
   resetForm()
 }
 
@@ -63,6 +98,7 @@ const resetForm = () => {
     description: '',
     colors: [],
   }
+  deckList.value = ''
 }
 
 watch(() => props.show, (show) => {
@@ -109,8 +145,29 @@ watch(() => props.show, (show) => {
           <textarea
               v-model="form.description"
               placeholder="Describe tu estrategia, meta, notas..."
-              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-small focus:outline-none focus:border-neon transition-150 resize-none h-24"
+              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-small focus:outline-none focus:border-neon transition-150 resize-none h-20"
           />
+        </div>
+
+        <!-- Deck List (opcional) -->
+        <div>
+          <label class="text-small text-silver-70 block mb-2">
+            Lista de cartas (opcional)
+          </label>
+          <textarea
+              v-model="deckList"
+              placeholder="Pega tu lista aquí:&#10;4 Lightning Bolt&#10;4 Monastery Swiftspear&#10;SIDEBOARD:&#10;2 Blood Moon"
+              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-tiny focus:outline-none focus:border-neon transition-150 resize-none h-32"
+          />
+          <!-- Preview -->
+          <div v-if="deckListPreview" class="mt-2 p-2 border border-silver-30 bg-primary">
+            <p class="text-tiny text-neon font-bold">
+              {{ deckListPreview.total }} cartas detectadas
+            </p>
+            <p class="text-tiny text-silver-70">
+              Mainboard: {{ deckListPreview.mainboard }} | Sideboard: {{ deckListPreview.sideboard }}
+            </p>
+          </div>
         </div>
 
         <!-- Colors -->

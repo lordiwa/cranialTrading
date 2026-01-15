@@ -260,15 +260,11 @@ onMounted(async () => {
       <p class="text-small text-silver-70">{{ collectionCards.length }} cartas total</p>
     </div>
 
-    <!-- ========== LAYOUT PRINCIPAL ========== -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Panel de filtros avanzados (siempre visible) -->
-      <div class="lg:col-span-1">
-        <FilterPanel />
-      </div>
+    <!-- ========== BARRA DE BÚSQUEDA HORIZONTAL ========== -->
+    <FilterPanel />
 
-      <!-- Contenido principal -->
-      <div class="lg:col-span-3">
+    <!-- ========== CONTENIDO PRINCIPAL ========== -->
+    <div class="mt-6">
         <!-- Resultados de búsqueda Scryfall (cuando hay resultados) -->
         <div v-if="searchStore.hasResults" class="space-y-4">
           <div class="flex items-center justify-between mb-4">
@@ -391,7 +387,6 @@ onMounted(async () => {
         </div>
       </div>
         </div>
-      </div>
     </div>
 
     <!-- ========== MODALS ========== -->

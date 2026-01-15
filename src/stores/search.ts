@@ -48,10 +48,12 @@ export const useSearchStore = defineStore('search', () => {
             parts.push(`"${filters.name.trim()}"`)
         }
 
-        // Colores
+        // Colores: mostrar cartas que tengan 1 o más de los colores seleccionados (no otros)
+        // id<= usa color identity que es más preciso para Magic
         if (filters.colors && filters.colors.length > 0) {
             const colorQuery = filters.colors.join('')
-            parts.push(`c:${colorQuery}`)
+            parts.push(`id<=${colorQuery}`)
+            console.log('🎨 Color query:', `id<=${colorQuery}`)
         }
 
         // Tipos
@@ -126,11 +128,17 @@ export const useSearchStore = defineStore('search', () => {
             }
         }
 
-        // Keywords
+        // Keywords (buscar en texto de la carta con o: oracle text, case-insensitive)
         if (filters.keywords && filters.keywords.length > 0) {
             filters.keywords.forEach(kw => {
-                parts.push(`kw:${kw}`)
+                // Si tiene espacios, agregar comillas
+                if (kw.includes(' ')) {
+                    parts.push(`o:"${kw}"`)
+                } else {
+                    parts.push(`o:${kw}`)
+                }
             })
+            console.log('📜 Keywords query:', filters.keywords.map(kw => kw.includes(' ') ? `o:"${kw}"` : `o:${kw}`))
         }
 
         // Foil

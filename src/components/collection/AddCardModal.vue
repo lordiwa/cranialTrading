@@ -7,6 +7,7 @@ import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
+import { useDecksStore } from '../../stores/decks'
 import { searchCards } from '../../services/scryfall'
 import type { CardCondition, CardStatus } from '../../types/card'
 
@@ -22,6 +23,7 @@ const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const authStore = useAuthStore()
 const preferencesStore = usePreferencesStore()
+const decksStore = useDecksStore()
 
 const loading = ref(false)
 
@@ -36,7 +38,11 @@ watch(() => props.scryfallCard, async (card) => {
     selectedPrint.value = card
     loadingPrints.value = true
     try {
-      const results = await searchCards(`!"${card.name}"`)
+      // Cargar prints y mazos en paralelo
+      const [results] = await Promise.all([
+        searchCards(`!"${card.name}"`),
+        decksStore.loadDecks()
+      ])
       availablePrints.value = results
     } catch (err) {
       availablePrints.value = [card]
@@ -128,13 +134,10 @@ const statusOptions = [
   { value: 'wishlist', label: 'Busco / Wishlist' },
 ]
 
-const deckOptions = [
+const deckOptions = computed(() => [
   { value: '', label: 'Sin asignar' },
-  { value: 'modern', label: 'Modern Deck' },
-  { value: 'commander', label: 'Commander' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'vintage', label: 'Vintage' },
-]
+  ...decksStore.decks.map(deck => ({ value: deck.id, label: deck.name }))
+])
 
 const handleAddCard = async () => {
   if (!selectedPrint.value || !authStore.user) return
@@ -156,7 +159,7 @@ const handleAddCard = async () => {
       edition: selectedPrint.value.set_name,
     })
 
-    await collectionStore.addCard({
+    const cardId = await collectionStore.addCard({
       scryfallId: selectedPrint.value.id,
       name: cardName,
       edition: selectedPrint.value.set_name,
@@ -166,8 +169,18 @@ const handleAddCard = async () => {
       status: form.status,
       price: parseFloat(selectedPrint.value.prices?.usd || '0'),
       image: imageToSave,
-      deckName: form.deckName || null,
     })
+
+    // Si se seleccionó un deck, asignar la carta al deck
+    if (cardId && form.deckName) {
+      await decksStore.allocateCardToDeck(
+        form.deckName,  // deckId
+        cardId,
+        form.quantity,
+        false  // isInSideboard
+      )
+      console.log(`✅ Carta asignada al deck: ${form.deckName}`)
+    }
 
     // Si es wishlist, crear preferencia BUSCO automáticamente
     if (form.status === 'wishlist') {

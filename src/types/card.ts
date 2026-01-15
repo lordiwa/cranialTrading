@@ -8,6 +8,7 @@ export interface Card {
     scryfallId: string;
     name: string;
     edition: string;
+    setCode?: string;           // Set code (e.g., "MH2") for price lookups
     quantity: number;           // Total copies owned
     condition: CardCondition;
     foil: boolean;

@@ -2,12 +2,13 @@
 import { ref, watch, computed } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
+import { useCardPrices } from '../../composables/useCardPrices'
 import { searchCards } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
-import type { Card, CardCondition, CardStatus } from '../../types/card'
+import type { Card, CardCondition } from '../../types/card'
 
 const props = defineProps<{
   show: boolean
@@ -22,9 +23,27 @@ const emit = defineEmits<{
 const toastStore = useToastStore()
 const { getCardAllocationSummary, checkQuantityReduction } = useCardAllocation()
 
-// Helper: Limpiar nombre de carta (remover set code y collector number)
+// Card Kingdom prices
+const {
+  loading: loadingCKPrices,
+  cardKingdomRetail,
+  cardKingdomBuylist,
+  hasCardKingdomPrices,
+  fetchPrices: fetchCKPrices,
+  formatPrice,
+} = useCardPrices(
+  () => selectedPrint.value?.id,
+  () => selectedPrint.value?.set
+)
+
+// Helper: Limpiar nombre de carta (remover set code, collector number, foil indicator)
 const cleanCardName = (name: string): string => {
-  return name.replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '').trim()
+  return name
+    .replace(/\s*\*[fF]\*?\s*$/i, '') // Remove foil indicator (*f, *F, *f*, *F*)
+    .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '') // Remove (SET) COLLECTOR patterns like "(PLST) KHM-275"
+    .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '') // Remove (SET) 123 patterns
+    .replace(/\s*\([A-Z0-9]+\)\s*$/i, '') // Remove trailing (SET)
+    .trim()
 }
 
 const form = ref<Partial<Card>>({
@@ -107,6 +126,13 @@ const handlePrintChange = (scryfallId: string) => {
   }
 }
 
+// Fetch CK prices when print changes
+watch(selectedPrint, (print) => {
+  if (print?.id && print?.set) {
+    fetchCKPrices()
+  }
+})
+
 // Obtener imagen actual
 const currentImage = computed(() => {
   if (selectedPrint.value) {
@@ -150,6 +176,7 @@ const handleSave = async () => {
       // Actualizar con el print seleccionado
       scryfallId: selectedPrint.value?.id || props.card.scryfallId,
       edition: selectedPrint.value?.set_name || props.card.edition,
+      setCode: selectedPrint.value?.set || props.card.setCode,
       price: currentPrice.value,
       image: currentImage.value,
     }
@@ -198,7 +225,24 @@ const handleClose = () => {
         <div class="flex-1 space-y-3">
           <div>
             <p class="font-bold text-silver text-h3">{{ card.name }}</p>
-            <p class="text-h2 font-bold text-neon mt-1">${{ currentPrice.toFixed(2) }}</p>
+            <!-- Multi-source prices -->
+            <div class="mt-2 space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">TCGPlayer:</span>
+                <span class="text-body font-bold text-neon">${{ currentPrice.toFixed(2) }}</span>
+              </div>
+              <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">Card Kingdom:</span>
+                <span class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+              </div>
+              <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
+                <span class="text-tiny text-silver-50">CK Buylist:</span>
+                <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+              </div>
+              <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
+                Cargando precios CK...
+              </div>
+            </div>
           </div>
 
           <!-- Print Selector -->

@@ -57,7 +57,7 @@ watch(
       clearTimeout(filterDebounceTimeout)
       filterDebounceTimeout = setTimeout(() => {
         handleSearch()
-      }, 2000)
+      }, 500)
     }
   },
   { deep: true }
@@ -92,6 +92,8 @@ const selectSuggestion = (suggestion: string) => {
   filters.name = suggestion
   showSuggestions.value = false
   suggestions.value = []
+  // Trigger search immediately when selecting suggestion
+  handleSearch()
 }
 
 // Opciones predefinidas
@@ -475,10 +477,16 @@ const activeFilterCount = () => {
               :key="rarity.value"
               @click="toggleRarity(rarity.value)"
               :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
+                'px-2 py-1 text-tiny font-bold transition-fast border',
                 filters.rarity?.includes(rarity.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
+                  ? rarity.value === 'common' ? 'bg-white text-black border-white'
+                    : rarity.value === 'uncommon' ? 'bg-[#C0C0C0] text-black border-[#C0C0C0]'
+                    : rarity.value === 'rare' ? 'bg-[#FFD700] text-black border-[#FFD700]'
+                    : 'bg-[#CD7F32] text-black border-[#CD7F32]'
+                  : rarity.value === 'common' ? 'bg-silver-10 border-silver-30 text-white hover:border-white'
+                    : rarity.value === 'uncommon' ? 'bg-silver-10 border-silver-30 text-[#C0C0C0] hover:border-[#C0C0C0]'
+                    : rarity.value === 'rare' ? 'bg-silver-10 border-silver-30 text-[#FFD700] hover:border-[#FFD700]'
+                    : 'bg-silver-10 border-silver-30 text-[#CD7F32] hover:border-[#CD7F32]'
               ]"
           >
             {{ rarity.label.charAt(0) }}
@@ -513,7 +521,7 @@ const activeFilterCount = () => {
 
       <!-- Indicador de auto-búsqueda -->
       <div v-if="activeFilterCount() > 0" class="mt-2 text-tiny text-silver-50">
-        Los filtros se aplicarán automáticamente en 2 segundos
+        Los filtros se aplicarán automáticamente en 0.5 segundos
       </div>
     </div>
 

@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useCollectionStore } from '../../stores/collection'
 import { useCardAllocation } from '../../composables/useCardAllocation'
+import { useCardPrices } from '../../composables/useCardPrices'
 import { searchCards } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -36,6 +37,19 @@ const emit = defineEmits<{
 const toastStore = useToastStore()
 const collectionStore = useCollectionStore()
 const { findMatchingCollectionCards } = useCardAllocation()
+
+// Card Kingdom prices
+const {
+  loading: loadingCKPrices,
+  cardKingdomRetail,
+  cardKingdomBuylist,
+  hasCardKingdomPrices,
+  fetchPrices: fetchCKPrices,
+  formatPrice,
+} = useCardPrices(
+  () => selectedCard.value?.id,
+  () => selectedCard.value?.set
+)
 
 // Search state (like CollectionView)
 const searchQuery = ref('')
@@ -119,6 +133,13 @@ const handlePrintChange = (scryfallId: string) => {
     addMode.value = hasInCollection.value ? 'collection' : 'wishlist'
   }
 }
+
+// Fetch CK prices when selected card changes
+watch(selectedCard, (card) => {
+  if (card?.id && card?.set) {
+    fetchCKPrices()
+  }
+})
 
 const form = ref({
   quantity: 1,
@@ -358,9 +379,26 @@ watch(() => props.show, (newVal) => {
                 <div class="flex-1 space-y-4">
                   <div>
                     <p class="font-bold text-silver mb-1 text-h3">{{ selectedCard.name }}</p>
-                    <p class="text-h2 font-bold text-neon mb-3">
-                      ${{ selectedCard.prices?.usd ? parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
-                    </p>
+                    <!-- Multi-source prices -->
+                    <div class="mb-3 space-y-1">
+                      <div class="flex justify-between items-center">
+                        <span class="text-tiny text-silver-70">TCGPlayer:</span>
+                        <span class="text-body font-bold text-neon">
+                          ${{ selectedCard.prices?.usd ? parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
+                        </span>
+                      </div>
+                      <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
+                        <span class="text-tiny text-silver-70">Card Kingdom:</span>
+                        <span class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                      </div>
+                      <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
+                        <span class="text-tiny text-silver-50">CK Buylist:</span>
+                        <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                      </div>
+                      <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
+                        Cargando precios CK...
+                      </div>
+                    </div>
 
                     <div v-if="availablePrints.length > 1">
                       <label class="text-tiny text-silver-70 block mb-1">Edición / Print</label>

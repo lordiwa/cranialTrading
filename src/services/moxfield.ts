@@ -12,6 +12,7 @@ export interface MoxfieldCard {
 
 export interface MoxfieldDeck {
     name: string
+    format?: string
     mainboard: Record<string, MoxfieldCard>
     sideboard: Record<string, MoxfieldCard>
     commanders: Record<string, MoxfieldCard>

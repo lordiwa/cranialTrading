@@ -4,6 +4,7 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseBadge from '../ui/BaseBadge.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
+import { useCardPrices } from '../../composables/useCardPrices'
 import type { Card, CardStatus } from '../../types/card'
 
 const props = defineProps<{
@@ -17,6 +18,26 @@ const emit = defineEmits<{
 }>()
 
 const selectedStatus = ref<CardStatus>('collection')
+
+// Card Kingdom prices
+const {
+  loading: loadingCKPrices,
+  cardKingdomRetail,
+  cardKingdomBuylist,
+  hasCardKingdomPrices,
+  fetchPrices: fetchCKPrices,
+  formatPrice,
+} = useCardPrices(
+  () => props.card?.scryfallId,
+  () => props.card?.setCode
+)
+
+// Fetch CK prices when card changes
+watch(() => props.card, (card) => {
+  if (card?.scryfallId && card?.setCode) {
+    fetchCKPrices()
+  }
+}, { immediate: true })
 
 const statusOptions = [
   { value: 'collection', label: 'En colección' },
@@ -82,6 +103,26 @@ watch(() => props.card, (newCard) => {
               :alt="card.name"
               class="w-12 h-16 object-cover border border-silver-30"
           />
+        </div>
+
+        <!-- Prices -->
+        <div class="pt-2 border-t border-silver-20 space-y-1">
+          <p class="text-tiny text-silver-70 mb-2">Precios:</p>
+          <div class="flex justify-between items-center">
+            <span class="text-tiny text-silver-50">TCGPlayer:</span>
+            <span class="text-small font-bold text-neon">${{ card.price?.toFixed(2) || 'N/A' }}</span>
+          </div>
+          <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
+            <span class="text-tiny text-silver-50">Card Kingdom:</span>
+            <span class="text-small font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+          </div>
+          <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
+            <span class="text-tiny text-silver-50">CK Buylist:</span>
+            <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+          </div>
+          <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
+            Cargando precios CK...
+          </div>
         </div>
 
         <!-- Current Status -->

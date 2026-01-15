@@ -9,6 +9,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useDecksStore } from '../../stores/decks'
 import { searchCards } from '../../services/scryfall'
+import { useCardPrices } from '../../composables/useCardPrices'
 import type { CardCondition, CardStatus } from '../../types/card'
 
 interface Props {
@@ -62,6 +63,26 @@ const handlePrintChange = (scryfallId: string) => {
     selectedPrint.value = newPrint
   }
 }
+
+// Card Kingdom prices
+const {
+  loading: loadingCKPrices,
+  cardKingdomRetail,
+  cardKingdomBuylist,
+  hasCardKingdomPrices,
+  fetchPrices: fetchCKPrices,
+  formatPrice,
+} = useCardPrices(
+  () => selectedPrint.value?.id,
+  () => selectedPrint.value?.set
+)
+
+// Fetch CK prices when print changes
+watch(selectedPrint, (print) => {
+  if (print?.id && print?.set) {
+    fetchCKPrices()
+  }
+})
 
 const form = reactive<{
   quantity: number
@@ -163,6 +184,7 @@ const handleAddCard = async () => {
       scryfallId: selectedPrint.value.id,
       name: cardName,
       edition: selectedPrint.value.set_name,
+      setCode: selectedPrint.value.set,
       quantity: form.quantity,
       condition: form.condition,
       foil: form.foil,
@@ -263,7 +285,28 @@ const handleClose = () => {
               <p v-if="isSplitCard" class="text-xs text-[#CCFF00] mt-1">
                 Lado {{ cardFaceIndex + 1 }} de {{ selectedPrint?.card_faces?.length }}
               </p>
-              <p class="text-lg text-[#CCFF00] font-bold mt-2">${{ selectedPrint?.prices?.usd || '0.00' }}</p>
+
+              <!-- Prices Section -->
+              <div class="mt-3 space-y-1">
+                <!-- TCGPlayer Price -->
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">TCGPlayer:</span>
+                  <span class="text-[#CCFF00] font-bold">${{ selectedPrint?.prices?.usd || 'N/A' }}</span>
+                </div>
+
+                <!-- Card Kingdom Prices -->
+                <div v-if="hasCardKingdomPrices" class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">Card Kingdom:</span>
+                  <span class="text-[#4CAF50] font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                </div>
+                <div v-if="cardKingdomBuylist" class="flex justify-between items-center text-xs">
+                  <span class="text-[#EEEEEE]/50">CK Buylist:</span>
+                  <span class="text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                </div>
+                <div v-else-if="loadingCKPrices" class="text-xs text-[#EEEEEE]/50">
+                  Cargando precios CK...
+                </div>
+              </div>
 
               <!-- Print Selector -->
               <div v-if="availablePrints.length > 1" class="mt-3">

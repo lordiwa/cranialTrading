@@ -4,24 +4,23 @@ import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import AppContainer from '../components/layout/AppContainer.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
-import EditCardModal from '../components/collection/EditCardModal.vue'
-import CardStatusModal from '../components/collection/CardStatusModal.vue'
+import CardDetailModal from '../components/collection/CardDetailModal.vue'
 import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import CollectionGrid from '../components/collection/CollectionGrid.vue'
+import CollectionTotalsPanel from '../components/collection/CollectionTotalsPanel.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
 import BaseSelect from '../components/ui/BaseSelect.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import { Card, CardStatus } from '../types/card'
 import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
-import { usePreferencesStore } from '../stores/preferences'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import FilterPanel from '../components/search/FilterPanel.vue'
+import SearchResultCard from '../components/search/SearchResultCard.vue'
 
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
 const searchStore = useSearchStore()
-const preferencesStore = usePreferencesStore()
 const toastStore = useToastStore()
 const { getAllocationsForCard } = useCardAllocation()
 
@@ -29,14 +28,12 @@ const { getAllocationsForCard } = useCardAllocation()
 
 // Modals
 const showAddCardModal = ref(false)
-const showEditModal = ref(false)
-const showStatusModal = ref(false)
+const showCardDetailModal = ref(false)
 const showManageDecksModal = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<any>(null)
-const editingCard = ref<Card | null>(null)
 
 // ✅ Filtros de COLECCIÓN (no Scryfall)
 const statusFilter = ref<'all' | CardStatus>('all')
@@ -120,16 +117,16 @@ const handleCardSelected = (card: any) => {
   showAddCardModal.value = true
 }
 
-// Cuando hace click en una carta de la colección
+// Cuando hace click en una carta de la colección (o editar)
 const handleCardClick = (card: Card) => {
   selectedCard.value = card
-  showStatusModal.value = true
+  showCardDetailModal.value = true
 }
 
-// Editar existente
+// Editar existente - same as click, opens unified modal
 const handleEdit = (card: Card) => {
-  editingCard.value = card
-  showEditModal.value = true
+  selectedCard.value = card
+  showCardDetailModal.value = true
 }
 
 // Gestionar mazos
@@ -163,61 +160,10 @@ const handleDelete = async (card: Card) => {
   }
 }
 
-// Guardar cambios en edición
-const handleSaveEdit = async (updatedCard: Card) => {
-  try {
-    // Check if quantity is being reduced and needs allocation adjustment
-    const currentCard = collectionStore.getCardById(updatedCard.id)
-    if (currentCard && updatedCard.quantity < currentCard.quantity) {
-      // Reduce allocations if quantity is being lowered
-      await decksStore.reduceAllocationsForCard(currentCard, updatedCard.quantity)
-    }
-
-    await collectionStore.updateCard(updatedCard.id, updatedCard)
-    toastStore.show(`✓ "${updatedCard.name}" actualizada`, 'success')
-    showEditModal.value = false
-    editingCard.value = null
-  } catch (err) {
-    toastStore.show('Error actualizando carta', 'error')
-  }
-}
-
-// Actualizar status desde CardStatusModal
-const handleUpdateStatus = async (cardId: string, newStatus: CardStatus) => {
-  try {
-    const card = collectionStore.getCardById(cardId)
-    if (!card) return
-
-    const oldStatus = card.status
-
-    // Actualizar status en colección
-    await collectionStore.updateCard(cardId, { status: newStatus } as any)
-
-    // Gestionar preferencias automáticamente
-    if (newStatus === 'wishlist' && oldStatus !== 'wishlist') {
-      // Crear preferencia BUSCO
-      await preferencesStore.addPreference({
-        scryfallId: card.scryfallId,
-        name: card.name,
-        type: 'BUSCO',
-        quantity: card.quantity,
-        condition: card.condition,
-        edition: card.edition,
-        image: card.image || '',
-      })
-      console.log('✅ Preferencia BUSCO creada')
-    } else if (oldStatus === 'wishlist' && newStatus !== 'wishlist') {
-      // Eliminar preferencia BUSCO
-      await preferencesStore.deletePreferenceByCard(card.scryfallId, card.edition)
-      console.log('✅ Preferencia BUSCO eliminada')
-    }
-
-    toastStore.show('✓ Status actualizado', 'success')
-    showStatusModal.value = false
-    selectedCard.value = null
-  } catch (err) {
-    toastStore.show('Error actualizando status', 'error')
-  }
+// Handler cuando se cierra el modal de detalle
+const handleCardDetailClosed = () => {
+  showCardDetailModal.value = false
+  selectedCard.value = null
 }
 
 // Eliminar deck
@@ -280,28 +226,20 @@ onMounted(async () => {
           </div>
 
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div
+            <SearchResultCard
                 v-for="card in searchStore.results"
                 :key="card.id"
+                :card="card"
                 @click="handleCardSelected(card)"
-                class="cursor-pointer group"
-            >
-              <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150">
-                <img
-                    v-if="card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal"
-                    :src="card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal"
-                    :alt="card.name"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-300"
-                />
-              </div>
-              <p class="text-tiny text-silver mt-2 truncate group-hover:text-neon">{{ card.name }}</p>
-              <p class="text-tiny text-neon font-bold">${{ card.prices?.usd || 'N/A' }}</p>
-            </div>
+            />
           </div>
         </div>
 
         <!-- Vista de colección (cuando NO hay resultados de búsqueda) -->
         <div v-else>
+      <!-- Totals Panel -->
+      <CollectionTotalsPanel />
+
       <!-- Status Tabs -->
       <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
         <button
@@ -399,20 +337,12 @@ onMounted(async () => {
         @added="showAddCardModal = false"
     />
 
-    <!-- Edit Card Modal -->
-    <EditCardModal
-        :show="showEditModal"
-        :card="editingCard"
-        @close="showEditModal = false"
-        @save="handleSaveEdit"
-    />
-
-    <!-- Card Status Modal -->
-    <CardStatusModal
-        :show="showStatusModal"
+    <!-- Card Detail Modal (unified edit + status) -->
+    <CardDetailModal
+        :show="showCardDetailModal"
         :card="selectedCard"
-        @close="showStatusModal = false"
-        @update-status="handleUpdateStatus"
+        @close="handleCardDetailClosed"
+        @saved="handleCardDetailClosed"
     />
 
     <!-- Manage Decks Modal -->

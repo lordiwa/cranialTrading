@@ -115,6 +115,7 @@ export interface Deck {
     format: DeckFormat
     description: string
     colors: string[]
+    commander?: string              // Commander name (for Commander format)
 
     // NEW: Reference-based storage
     allocations: DeckCardAllocation[]
@@ -137,4 +138,5 @@ export interface CreateDeckInput {
     format: DeckFormat
     description: string
     colors: string[]
+    commander?: string              // Commander name (for Commander format)
 }

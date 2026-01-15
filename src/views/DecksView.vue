@@ -13,7 +13,7 @@ import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import { CardCondition } from '../types/card'
 import { searchCards, getCardById } from '../services/scryfall'
-import type { DeckCard } from '../types/deck'
+import type { DeckCard, DeckFormat } from '../types/deck'
 
 const router = useRouter()
 const decksStore = useDecksStore()
@@ -74,29 +74,47 @@ const handleCreateDeck = async (deckData: any) => {
           continue
         }
 
-        const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+\d+)?$/i)
+        // More flexible regex: quantity + card name + optional (set) + optional collector number + optional foil indicator
+        const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
         if (!match) continue
 
         const quantity = parseInt(match[1])
-        const cardName = match[2].trim()
-        const setCode = match[3] || undefined
+        let cardName = match[2].trim()
+        const setCode = match[3] || null
+
+        // Check for foil indicator in the original line (*F*, *f*, *f, *F)
+        const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+
+        // Clean card name: remove any embedded (SET) codes, collector numbers, and foil indicators
+        cardName = cardName
+          .replace(/\s*\*[fF]\*?\s*$/i, '')
+          .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?$/i, '')
+          .replace(/\s*\([A-Z0-9]+\)$/i, '')
+          .trim()
 
         // Buscar en Scryfall
-        const scryfallData = await fetchCardFromScryfall(cardName, setCode)
+        const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
 
-        // Agregar a colección primero
-        collectionCards.push({
+        // Build card data - only include setCode if it has a value
+        const cardData: any = {
           scryfallId: scryfallData?.scryfallId || '',
           name: cardName,
           edition: scryfallData?.edition || setCode || 'Unknown',
           quantity,
           condition: 'NM' as CardCondition,
-          foil: false,
+          foil: isFoil,
           price: scryfallData?.price || 0,
           image: scryfallData?.image || '',
           status: 'collection',
           isInSideboard: inSideboard,
-        })
+        }
+
+        const finalSetCode = scryfallData?.setCode || setCode
+        if (finalSetCode) {
+          cardData.setCode = finalSetCode
+        }
+
+        collectionCards.push(cardData)
       }
 
       // Guardar en colección primero
@@ -142,23 +160,72 @@ const handleDeleteDeck = async (deckId: string) => {
 }
 
 // Helper: Buscar carta en Scryfall y obtener datos completos
+// Prioriza prints con precio, nunca devuelve N/A si hay alternativas
 const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
   try {
-    // Buscar por nombre (y set si está disponible)
-    const query = setCode ? `"${cardName}" e:${setCode}` : `"${cardName}"`
-    const results = await searchCards(query)
-    if (results.length > 0) {
-      const card = results[0]
-      // Obtener imagen (considerar split cards)
-      let image = card.image_uris?.normal || ''
-      if (!image && card.card_faces && card.card_faces.length > 0) {
-        image = card.card_faces[0]?.image_uris?.normal || ''
+    // Clean card name (remove *f foil indicator if present)
+    const cleanName = cardName.replace(/\s*\*f$/, '').trim()
+
+    // First try with specific set if provided
+    if (setCode) {
+      const query = `"${cleanName}" e:${setCode}`
+      const results = await searchCards(query)
+      if (results.length > 0) {
+        const card = results[0]
+        let image = card.image_uris?.normal || ''
+        if (!image && card.card_faces && card.card_faces.length > 0) {
+          image = card.card_faces[0]?.image_uris?.normal || ''
+        }
+        const price = card.prices?.usd ? parseFloat(card.prices.usd) : 0
+
+        // If this print has price, use it
+        if (price > 0 && image) {
+          return {
+            scryfallId: card.id,
+            image,
+            price,
+            edition: card.set_name,
+            setCode: card.set.toUpperCase(),
+          }
+        }
+      }
+    }
+
+    // Search all prints and find one with price
+    const allResults = await searchCards(`!"${cleanName}"`)
+    if (allResults.length > 0) {
+      // Find print with both price and image
+      const printWithPrice = allResults.find(r =>
+          r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+          (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+      ) || allResults.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
+
+      if (printWithPrice) {
+        let image = printWithPrice.image_uris?.normal || ''
+        if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
+          image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
+        }
+        return {
+          scryfallId: printWithPrice.id,
+          image,
+          price: parseFloat(printWithPrice.prices.usd),
+          edition: printWithPrice.set_name,
+          setCode: printWithPrice.set.toUpperCase(),
+        }
+      }
+
+      // Fallback: at least return image from first result
+      const firstCard = allResults[0]
+      let image = firstCard.image_uris?.normal || ''
+      if (!image && firstCard.card_faces && firstCard.card_faces.length > 0) {
+        image = firstCard.card_faces[0]?.image_uris?.normal || ''
       }
       return {
-        scryfallId: card.id,
+        scryfallId: firstCard.id,
         image,
-        price: card.prices?.usd ? parseFloat(card.prices.usd) : 0,
-        edition: card.set.toUpperCase(),
+        price: firstCard.prices?.usd ? parseFloat(firstCard.prices.usd) : 0,
+        edition: firstCard.set_name,
+        setCode: firstCard.set.toUpperCase(),
       }
     }
   } catch (e) {
@@ -173,10 +240,15 @@ const handleImport = async (
   condition: CardCondition,
   includeSideboard: boolean,
   deckName?: string,
-  makePublic?: boolean
+  makePublic?: boolean,
+  format?: DeckFormat,
+  commander?: string
 ) => {
   const finalDeckName = deckName || `Deck${Date.now()}`
-  toastStore.show('Importando cartas...', 'info')
+
+  // Close modal immediately and show background toast
+  showImportModal.value = false
+  toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
 
   // Parsear el texto
   const lines = deckText.split('\n').filter(l => l.trim())
@@ -192,41 +264,62 @@ const handleImport = async (
       continue
     }
 
-    const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+\d+)?$/i)
+    // More flexible regex: quantity + card name + optional (set) + optional collector number + optional foil indicator
+    const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
     if (!match) continue
 
     const quantity = parseInt(match[1])
-    const cardName = match[2].trim()
-    const setCode = match[3] || undefined
+    let cardName = match[2].trim()
+    let setCode = match[3] || null
+
+    // Check for foil indicator in the original line (*F*, *f*, *f, *F)
+    let isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+
+    // Clean card name: remove any embedded (SET) codes, collector numbers, and foil indicators
+    // Handles formats like "Card Name (PLST) KHM-275" or "Card Name (PMKM) 271p" or "Card Name *F*"
+    cardName = cardName
+      .replace(/\s*\*[fF]\*?\s*$/i, '') // Remove foil indicator
+      .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?$/i, '') // Remove trailing (SET) collector
+      .replace(/\s*\([A-Z0-9]+\)$/i, '') // Remove trailing (SET)
+      .trim()
 
     // Skip sideboard if not included
     if (inSideboard && !includeSideboard) continue
 
     // Buscar en Scryfall para obtener imagen y datos
-    const scryfallData = await fetchCardFromScryfall(cardName, setCode)
+    const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
 
-    // Agregar a colección
-    collectionCards.push({
+    // Build card data - only include setCode if it has a value (Firebase rejects undefined)
+    const cardData: any = {
       scryfallId: scryfallData?.scryfallId || '',
       name: cardName,
       edition: scryfallData?.edition || setCode || 'Unknown',
       quantity,
       condition,
-      foil: false,
+      foil: isFoil,
       price: scryfallData?.price || 0,
       image: scryfallData?.image || '',
       status: 'collection',
       public: makePublic || false,
       isInSideboard: inSideboard,
-    })
+    }
+
+    // Only add setCode if we have one (Firebase doesn't accept undefined)
+    const finalSetCode = scryfallData?.setCode || setCode
+    if (finalSetCode) {
+      cardData.setCode = finalSetCode
+    }
+
+    collectionCards.push(cardData)
   }
 
   // 1. Crear el deck
   const deckId = await decksStore.createDeck({
     name: finalDeckName,
-    format: 'custom',
+    format: format || 'custom',
     description: '',
     colors: [],
+    commander: commander || '',
   })
 
   // 2. Agregar cartas a la colección primero
@@ -255,7 +348,6 @@ const handleImport = async (
   }
 
   toastStore.show(`Deck "${finalDeckName}" importado con ${collectionCards.length} cartas`, 'success')
-  showImportModal.value = false
 
   if (deckId) {
     await router.push(`/decks/${deckId}/edit`)
@@ -267,26 +359,41 @@ const handleImportDirect = async (
   cards: any[],
   deckName: string | undefined,
   condition: CardCondition,
-  makePublic?: boolean
+  makePublic?: boolean,
+  format?: DeckFormat,
+  commander?: string
 ) => {
   const finalDeckName = deckName || `Deck${Date.now()}`
-  toastStore.show('Importando cartas desde Moxfield...', 'info')
+
+  // Close modal immediately and show background toast
+  showImportModal.value = false
+  toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
 
   // 1. Crear el deck
   const deckId = await decksStore.createDeck({
     name: finalDeckName,
-    format: 'custom',
+    format: format || 'custom',
     description: '',
     colors: [],
+    commander: commander || '',
   })
 
   const collectionCards: any[] = []
 
   // 2. Procesar cada carta
   for (const card of cards) {
-    // Obtener imagen desde Scryfall usando el scryfallId
+    // Check if card name ends with foil indicator (*f, *F, *f*, *F*)
+    let cardName = card.name
+    let isFoil = /\*[fF]\*?\s*$/.test(cardName)
+    if (isFoil) {
+      cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+    }
+
+    // Obtener imagen y precio desde Scryfall
     let image = ''
     let price = 0
+    let finalScryfallId = card.scryfallId || ''
+    let finalEdition = card.setCode || 'Unknown'
 
     if (card.scryfallId) {
       const scryfallCard = await getCardById(card.scryfallId)
@@ -299,14 +406,47 @@ const handleImportDirect = async (
       }
     }
 
+    // If no price or no image, search for another print with price
+    if (price === 0 || !image) {
+      try {
+        const results = await searchCards(`!"${cardName}"`)
+        // Find a print with price, preferring one with both price and image
+        const printWithPrice = results.find(r =>
+            r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+        ) || results.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
+
+        if (printWithPrice) {
+          finalScryfallId = printWithPrice.id
+          finalEdition = printWithPrice.set.toUpperCase()
+          price = parseFloat(printWithPrice.prices.usd)
+          image = printWithPrice.image_uris?.normal || ''
+          if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
+            image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
+          }
+        } else if (results.length > 0 && !image) {
+          // At least get an image from any print
+          const anyPrint = results[0]
+          image = anyPrint.image_uris?.normal || ''
+          if (!image && anyPrint.card_faces && anyPrint.card_faces.length > 0) {
+            image = anyPrint.card_faces[0]?.image_uris?.normal || ''
+          }
+          if (!finalScryfallId) finalScryfallId = anyPrint.id
+          if (finalEdition === 'Unknown') finalEdition = anyPrint.set.toUpperCase()
+        }
+      } catch (e) {
+        console.warn(`Could not find alternate print for: ${cardName}`)
+      }
+    }
+
     const cardData: DeckCard = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      scryfallId: card.scryfallId || '',
-      name: card.name,
-      edition: card.setCode || 'Unknown',
+      scryfallId: finalScryfallId,
+      name: cardName,
+      edition: finalEdition,
       quantity: card.quantity,
       condition,
-      foil: false,
+      foil: isFoil,
       price,
       image,
       isInSideboard: false,
@@ -316,25 +456,39 @@ const handleImportDirect = async (
     // Agregar al wishlist del deck (se convertirá a allocation cuando se guarde en colección)
     if (deckId) {
       await decksStore.addToWishlist(deckId, {
-        scryfallId: cardData.scryfallId,
-        name: cardData.name,
-        edition: cardData.edition,
-        quantity: cardData.quantity,
-        isInSideboard: cardData.isInSideboard,
-        price: cardData.price,
-        image: cardData.image,
-        condition: cardData.condition,
-        foil: cardData.foil,
+        scryfallId: finalScryfallId,
+        name: cardName,
+        edition: finalEdition,
+        quantity: card.quantity,
+        isInSideboard: false,
+        price,
+        image,
+        condition,
+        foil: isFoil,
       })
     }
 
-    // Agregar a colección
-    collectionCards.push({
-      ...cardData,
+    // Agregar a colección - only include setCode if it's a valid set code (not 'Unknown')
+    const collectionCardData: any = {
+      scryfallId: finalScryfallId,
+      name: cardName,
+      edition: finalEdition,
+      quantity: card.quantity,
+      condition,
+      foil: isFoil,
+      price,
+      image,
       status: 'collection',
       deckName: finalDeckName,
       public: makePublic || false,
-    })
+    }
+
+    // Only add setCode if we have a valid one (Firebase rejects undefined)
+    if (finalEdition && finalEdition !== 'Unknown') {
+      collectionCardData.setCode = finalEdition
+    }
+
+    collectionCards.push(collectionCardData)
   }
 
   // 3. Guardar en colección
@@ -343,7 +497,6 @@ const handleImportDirect = async (
   }
 
   toastStore.show(`Deck "${finalDeckName}" importado con ${cards.length} cartas`, 'success')
-  showImportModal.value = false
 
   if (deckId) {
     await router.push(`/decks/${deckId}/edit`)

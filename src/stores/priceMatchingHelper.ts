@@ -62,6 +62,13 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
         const myOffering: Card[] = []
         let myValue = 0
 
+        console.log('🔍 Bidireccional check:', {
+            myCards: myCards.filter(c => c.status !== 'wishlist').map(c => ({ name: c.name, edition: c.edition })),
+            myPrefs: myPreferences.filter(p => p.type === 'BUSCO').map(p => ({ name: p.name, edition: p.edition })),
+            theirCards: theirCards.filter(c => c.status !== 'wishlist').map(c => ({ name: c.name, edition: c.edition })),
+            theirPrefs: theirPreferences.filter(p => p.type === 'BUSCO').map(p => ({ name: p.name, edition: p.edition })),
+        })
+
         // Mi oferta: cartas que ELLOS BUSCAN (solo BUSCO)
         for (const myCard of myCards) {
             if (myCard.status === 'wishlist') continue
@@ -72,8 +79,16 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             )
 
             if (matchingPref) {
-                myOffering.push(myCard)
-                myValue += (myCard.price || 0) * (myCard.quantity || 1)
+                // Usar la cantidad que ELLOS BUSCAN, limitada a lo que YO TENGO
+                const theirWantedQty = matchingPref.quantity || 1
+                const myAvailableQty = myCard.quantity || 1
+                const matchQty = Math.min(theirWantedQty, myAvailableQty)
+
+                // Crear copia con cantidad ajustada
+                const adjustedCard = { ...myCard, quantity: matchQty }
+                myOffering.push(adjustedCard)
+                myValue += (myCard.price || 0) * matchQty
+                console.log(`✅ Mi carta "${myCard.name}" x${matchQty} (buscan ${theirWantedQty}, tengo ${myAvailableQty})`)
             }
         }
 
@@ -91,20 +106,33 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             )
 
             for (const card of matching) {
-                theirOffering.push(card)
-                theirValue += (card.price || 0) * (card.quantity || 1)
+                // Usar la cantidad que YO BUSCO, limitada a lo que el otro TIENE
+                const wantedQty = myPref.quantity || 1
+                const availableQty = card.quantity || 1
+                const matchQty = Math.min(wantedQty, availableQty)
+
+                // Crear copia con cantidad ajustada
+                const adjustedCard = { ...card, quantity: matchQty }
+                theirOffering.push(adjustedCard)
+                theirValue += (card.price || 0) * matchQty
+                console.log(`✅ Su carta "${card.name}" x${matchQty} (busco ${wantedQty}, tiene ${availableQty})`)
             }
         }
 
+        console.log('📊 Resultado bidireccional:', {
+            myOffering: myOffering.length,
+            theirOffering: theirOffering.length,
+            myValue,
+            theirValue,
+        })
+
         // BIDIRECCIONAL: ambos lados deben tener cartas
         if (myOffering.length === 0 || theirOffering.length === 0) {
+            console.log('❌ Bidireccional fallido: un lado vacío')
             return null
         }
 
-        // Validar precio
-        if (!isValidMatch(myValue, theirValue)) {
-            return null
-        }
+        // Para bidireccional, NO validamos precio - si ambos quieren intercambiar, mostrar el match
 
         return {
             myCardIds: myOffering.map(c => c.id),
@@ -150,8 +178,14 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 )
 
                 if (matchingPref) {
-                    myOffering.push(myCard)
-                    myValue += (myCard.price || 0) * (myCard.quantity || 1)
+                    // Usar la cantidad que ELLOS BUSCAN, limitada a lo que YO TENGO
+                    const theirWantedQty = matchingPref.quantity || 1
+                    const myAvailableQty = myCard.quantity || 1
+                    const matchQty = Math.min(theirWantedQty, myAvailableQty)
+
+                    const adjustedCard = { ...myCard, quantity: matchQty }
+                    myOffering.push(adjustedCard)
+                    myValue += (myCard.price || 0) * matchQty
                 }
             }
 
@@ -171,8 +205,14 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 )
 
                 for (const card of matching) {
-                    theirOffering.push(card)
-                    theirValue += (card.price || 0) * (card.quantity || 1)
+                    // Usar la cantidad que YO BUSCO, limitada a lo que el otro TIENE
+                    const wantedQty = myPref.quantity || 1
+                    const availableQty = card.quantity || 1
+                    const matchQty = Math.min(wantedQty, availableQty)
+
+                    const adjustedCard = { ...card, quantity: matchQty }
+                    theirOffering.push(adjustedCard)
+                    theirValue += (card.price || 0) * matchQty
                 }
             }
 

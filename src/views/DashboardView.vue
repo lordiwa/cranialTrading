@@ -27,6 +27,15 @@
           >
             ⭐ MIS MATCHES
           </BaseButton>
+          <!-- TEMPORAL: Botón para borrar datos -->
+          <BaseButton
+              variant="secondary"
+              size="small"
+              @click="clearAllData"
+              class="w-full md:w-auto border-rust text-rust"
+          >
+            🗑️ BORRAR MIS DATOS
+          </BaseButton>
         </div>
       </div>
 
@@ -95,7 +104,7 @@ import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
 import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
-import { collection, getDocs, addDoc } from 'firebase/firestore'
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '../services/firebase'
 
 const collectionStore = useCollectionStore()
@@ -138,6 +147,90 @@ onMounted(async () => {
 })
 
 /**
+ * TEMPORAL: Borrar todos los datos del usuario (cartas, preferencias, matches)
+ */
+const clearAllData = async () => {
+  if (!authStore.user) return
+
+  if (!confirm('¿Borrar TODAS tus cartas, preferencias y matches? Esta acción no se puede deshacer.')) {
+    return
+  }
+
+  loading.value = true
+  const userId = authStore.user.id
+  let errors = 0
+
+  // Borrar cartas
+  try {
+    const cardsRef = collection(db, 'users', userId, 'cards')
+    const cardsSnapshot = await getDocs(cardsRef)
+    for (const cardDoc of cardsSnapshot.docs) {
+      await deleteDoc(doc(db, 'users', userId, 'cards', cardDoc.id))
+    }
+    console.log(`🗑️ ${cardsSnapshot.docs.length} cartas borradas`)
+  } catch (e) {
+    console.error('Error borrando cartas:', e)
+    errors++
+  }
+
+  // Borrar preferencias
+  try {
+    const prefsRef = collection(db, 'users', userId, 'preferences')
+    const prefsSnapshot = await getDocs(prefsRef)
+    for (const prefDoc of prefsSnapshot.docs) {
+      await deleteDoc(doc(db, 'users', userId, 'preferences', prefDoc.id))
+    }
+    console.log(`🗑️ ${prefsSnapshot.docs.length} preferencias borradas`)
+  } catch (e) {
+    console.error('Error borrando preferencias:', e)
+    errors++
+  }
+
+  // Borrar todas las colecciones de matches
+  const matchCollections = ['matches_nuevos', 'matches_guardados', 'matches_eliminados']
+  for (const colName of matchCollections) {
+    try {
+      const matchesRef = collection(db, 'users', userId, colName)
+      const matchesSnapshot = await getDocs(matchesRef)
+      for (const matchDoc of matchesSnapshot.docs) {
+        await deleteDoc(doc(db, 'users', userId, colName, matchDoc.id))
+      }
+      console.log(`🗑️ ${matchesSnapshot.docs.length} ${colName} borrados`)
+    } catch (e) {
+      console.error(`Error borrando ${colName}:`, e)
+      errors++
+    }
+  }
+
+  // Borrar contactos guardados
+  try {
+    const contactsRef = collection(db, 'users', userId, 'contactos_guardados')
+    const contactsSnapshot = await getDocs(contactsRef)
+    for (const contactDoc of contactsSnapshot.docs) {
+      await deleteDoc(doc(db, 'users', userId, 'contactos_guardados', contactDoc.id))
+    }
+    console.log(`🗑️ ${contactsSnapshot.docs.length} contactos borrados`)
+  } catch (e) {
+    console.error('Error borrando contactos:', e)
+    errors++
+  }
+
+  // Limpiar stores locales
+  collectionStore.clear()
+  preferencesStore.clear()
+  calculatedMatches.value = []
+
+  loading.value = false
+
+  if (errors > 0) {
+    alert(`⚠️ Datos borrados con ${errors} error(es). Recarga la página.`)
+  } else {
+    alert('✅ Todos los datos han sido borrados.')
+  }
+  window.location.reload()
+}
+
+/**
  * CAMBIO 2: Calcular matches y persistir en Firestore
  */
 const calculateMatches = async () => {
@@ -173,7 +266,7 @@ const calculateMatches = async () => {
         // Cargar cartas y preferencias del otro usuario
         const [theirCardsSnapshot, theirPrefsSnapshot] = await Promise.all([
           getDocs(collection(db, 'users', otherUserId, 'cards')),
-          getDocs(collection(db, 'users', otherUserId, 'preferencias')),
+          getDocs(collection(db, 'users', otherUserId, 'preferences')),
         ])
 
         const theirCards = theirCardsSnapshot.docs.map(doc => ({
@@ -255,6 +348,7 @@ const calculateMatches = async () => {
 
 /**
  * CAMBIO 3: Guardar matches en Firestore
+ * Limpia los matches_nuevos existentes antes de guardar los nuevos
  */
 const saveMatchesToFirebase = async (matches: any[]) => {
   if (!authStore.user) return
@@ -262,6 +356,13 @@ const saveMatchesToFirebase = async (matches: any[]) => {
   try {
     const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
 
+    // Primero limpiar matches_nuevos existentes para evitar duplicados
+    const existingSnapshot = await getDocs(matchesRef)
+    for (const docSnap of existingSnapshot.docs) {
+      await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
+    }
+
+    // Ahora guardar los nuevos
     for (const match of matches) {
       await addDoc(matchesRef, {
         id: match.id,
@@ -269,10 +370,8 @@ const saveMatchesToFirebase = async (matches: any[]) => {
         otherUsername: match.otherUsername,
         otherLocation: match.otherLocation,
         otherEmail: match.otherEmail,
-        myCard: match.myCard,
-        otherCard: match.otherCard,
-        myPreference: match.myPreference,
-        otherPreference: match.otherPreference,
+        myCards: match.myCards || [],
+        otherCards: match.otherCards || [],
         myTotalValue: match.myTotalValue,
         theirTotalValue: match.theirTotalValue,
         valueDifference: match.valueDifference,
@@ -284,7 +383,7 @@ const saveMatchesToFirebase = async (matches: any[]) => {
       })
     }
 
-    console.log(`💾 ${matches.length} matches guardados en Firestore`)
+    console.log(`💾 ${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`)
   } catch (err) {
     console.error('Error guardando matches:', err)
   }

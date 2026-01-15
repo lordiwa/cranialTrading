@@ -104,22 +104,29 @@
         <BaseButton
             variant="secondary"
             class="flex-1"
-            @click="handleDiscard"
+            @click="handleOpenChat"
         >
-          ✕ IGNORAR
+          💬 MENSAJE
         </BaseButton>
         <BaseButton
             variant="secondary"
             class="flex-1"
-            @click="showContactModal = true"
+            @click="handleDiscard"
         >
-          👤 CONTACTO
+          ✕ IGNORAR
         </BaseButton>
       </template>
 
       <!-- TAB: SAVED (mis matches guardados) -->
       <template v-else-if="tab === 'saved'">
         <BaseButton
+            class="flex-1"
+            @click="handleOpenChat"
+        >
+          💬 MENSAJE
+        </BaseButton>
+        <BaseButton
+            variant="secondary"
             class="flex-1"
             @click="showContactModal = true"
         >
@@ -220,15 +227,26 @@
         </BaseButton>
       </div>
     </BaseModal>
+
+    <!-- Chat Modal -->
+    <ChatModal
+        :show="showChatModal"
+        :other-user-id="match.otherUserId"
+        :other-username="match.otherUsername"
+        @close="showChatModal = false"
+    />
 </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
+import ChatModal from '../chat/ChatModal.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { useToastStore } from '../../stores/toast'
+import { useMessagesStore } from '../../stores/messages'
 
 interface Props {
   match: any
@@ -243,11 +261,14 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits(['save', 'discard'])
 
+const router = useRouter()
 const saving = ref(false)
 const showContactModal = ref(false)
+const showChatModal = ref(false)
 const contactSaving = ref(false)
 const contactsStore = useContactsStore()
 const toastStore = useToastStore()
+const messagesStore = useMessagesStore()
 
 // TAB: NEW - Guardar match
 const handleSaveMatch = async () => {
@@ -286,6 +307,24 @@ const copyEmailToClipboard = async () => {
     toastStore.show('✓ Email copiado', 'success')
   } catch (err) {
     toastStore.show('Error al copiar email', 'error')
+  }
+}
+
+// MENSAJE - Abrir chat con el usuario
+const handleOpenChat = async () => {
+  const otherUserId = props.match.otherUserId
+  const otherUsername = props.match.otherUsername
+
+  if (!otherUserId) {
+    toastStore.show('Error: No se pudo obtener el ID del usuario', 'error')
+    return
+  }
+
+  // Crear conversación si no existe
+  const conversationId = await messagesStore.createConversation(otherUserId, otherUsername)
+
+  if (conversationId) {
+    showChatModal.value = true
   }
 }
 

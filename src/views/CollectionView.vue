@@ -2,35 +2,30 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
-import { searchCards } from '../services/scryfall'
 import AppContainer from '../components/layout/AppContainer.vue'
-import CardGridSearch from '../components/common/CardGridSearch.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import EditCardModal from '../components/collection/EditCardModal.vue'
 import CardStatusModal from '../components/collection/CardStatusModal.vue'
 import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import CollectionGrid from '../components/collection/CollectionGrid.vue'
-import BaseButton from '../components/ui/BaseButton.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
 import BaseSelect from '../components/ui/BaseSelect.vue'
-import BaseLoader from '../components/ui/BaseLoader.vue'
-import BaseBadge from '../components/ui/BaseBadge.vue'
+import BaseButton from '../components/ui/BaseButton.vue'
 import { Card, CardStatus } from '../types/card'
 import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
+import { usePreferencesStore } from '../stores/preferences'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import FilterPanel from '../components/search/FilterPanel.vue'
 
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
 const searchStore = useSearchStore()
+const preferencesStore = usePreferencesStore()
 const toastStore = useToastStore()
 const { getAllocationsForCard } = useCardAllocation()
 
 // ========== STATE ==========
-
-// Vista: 'grid' o 'search'
-const viewMode = ref<'grid' | 'search'>('grid')
 
 // Modals
 const showAddCardModal = ref(false)
@@ -47,14 +42,6 @@ const editingCard = ref<Card | null>(null)
 const statusFilter = ref<'all' | CardStatus>('all')
 const deckFilter = ref<string>('all')
 const filterQuery = ref('')
-
-// ✅ Estado para Scryfall search results
-const scryfallResults = ref<any[]>([])
-const isSearchingScryfall = ref(false)
-const scryfallError = ref<string | null>(null)
-
-// Referencia a CardGridSearch para manipulación directa
-const cardGridSearchRef = ref()
 
 // ========== COMPUTED ==========
 
@@ -127,27 +114,7 @@ const deckTotalCost = computed(() => {
 
 // ========== METHODS ==========
 
-// ✅ Manejador para evento 'search' de CardGridSearch
-const handleSearchScryfall = async (query: string) => {
-  isSearchingScryfall.value = true
-  scryfallError.value = null
-
-  try {
-    const results = await searchCards(query)
-    scryfallResults.value = results
-
-    // ✅ Usar método expuesto de CardGridSearch para actualizar resultados
-    cardGridSearchRef.value?.setResults(results)
-  } catch (err) {
-    scryfallError.value = err instanceof Error ? err.message : 'Error en la búsqueda'
-    cardGridSearchRef.value?.setError(scryfallError.value)
-    toastStore.show('Error buscando carta', 'error')
-  } finally {
-    isSearchingScryfall.value = false
-  }
-}
-
-// ✅ Cuando selecciona una carta en CardGridSearch
+// Cuando selecciona una carta de búsqueda para agregar
 const handleCardSelected = (card: any) => {
   selectedScryfallCard.value = card
   showAddCardModal.value = true
@@ -218,7 +185,33 @@ const handleSaveEdit = async (updatedCard: Card) => {
 // Actualizar status desde CardStatusModal
 const handleUpdateStatus = async (cardId: string, newStatus: CardStatus) => {
   try {
+    const card = collectionStore.getCardById(cardId)
+    if (!card) return
+
+    const oldStatus = card.status
+
+    // Actualizar status en colección
     await collectionStore.updateCard(cardId, { status: newStatus } as any)
+
+    // Gestionar preferencias automáticamente
+    if (newStatus === 'wishlist' && oldStatus !== 'wishlist') {
+      // Crear preferencia BUSCO
+      await preferencesStore.addPreference({
+        scryfallId: card.scryfallId,
+        name: card.name,
+        type: 'BUSCO',
+        quantity: card.quantity,
+        condition: card.condition,
+        edition: card.edition,
+        image: card.image || '',
+      })
+      console.log('✅ Preferencia BUSCO creada')
+    } else if (oldStatus === 'wishlist' && newStatus !== 'wishlist') {
+      // Eliminar preferencia BUSCO
+      await preferencesStore.deletePreferenceByCard(card.scryfallId, card.edition)
+      console.log('✅ Preferencia BUSCO eliminada')
+    }
+
     toastStore.show('✓ Status actualizado', 'success')
     showStatusModal.value = false
     selectedCard.value = null
@@ -262,37 +255,9 @@ onMounted(async () => {
 <template>
   <AppContainer>
     <!-- ========== HEADER ========== -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-h1 font-bold text-silver">MI COLECCIÓN</h1>
-        <p class="text-small text-silver-70">{{ collectionCards.length }} cartas total</p>
-      </div>
-
-      <!-- Mode Toggle Button -->
-      <div class="flex gap-2">
-        <button
-            @click="viewMode = 'grid'"
-            :class="[
-              'px-4 py-2 text-small font-bold transition-150',
-              viewMode === 'grid'
-                ? 'border-2 border-neon text-neon bg-neon-10'
-                : 'border-2 border-silver-50 text-silver-70 hover:border-silver'
-            ]"
-        >
-          COLECCIÓN
-        </button>
-        <button
-            @click="viewMode = 'search'"
-            :class="[
-              'px-4 py-2 text-small font-bold transition-150',
-              viewMode === 'search'
-                ? 'border-2 border-neon text-neon bg-neon-10'
-                : 'border-2 border-silver-50 text-silver-70 hover:border-silver'
-            ]"
-        >
-          + AGREGAR
-        </button>
-      </div>
+    <div class="mb-6">
+      <h1 class="text-h1 font-bold text-silver">MI COLECCIÓN</h1>
+      <p class="text-small text-silver-70">{{ collectionCards.length }} cartas total</p>
     </div>
 
     <!-- ========== LAYOUT PRINCIPAL ========== -->
@@ -379,7 +344,7 @@ onMounted(async () => {
             v-model="deckFilter"
             :options="[
               { value: 'all', label: 'Todos los decks' },
-              ...decksList.map(deck => ({ value: deck.name, label: deck.name }))
+              ...decksList.map(deck => ({ value: deck.id, label: deck.name }))
             ]"
         />
 
@@ -436,11 +401,7 @@ onMounted(async () => {
         :show="showAddCardModal"
         :scryfall-card="selectedScryfallCard"
         @close="showAddCardModal = false"
-        @added="
-          showAddCardModal = false;
-          cardGridSearchRef?.resetSearch();
-          viewMode = 'grid';
-        "
+        @added="showAddCardModal = false"
     />
 
     <!-- Edit Card Modal -->

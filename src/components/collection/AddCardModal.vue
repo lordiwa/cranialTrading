@@ -6,6 +6,7 @@ import BaseButton from '../ui/BaseButton.vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
+import { usePreferencesStore } from '../../stores/preferences'
 import { searchCards } from '../../services/scryfall'
 import type { CardCondition, CardStatus } from '../../types/card'
 
@@ -20,6 +21,7 @@ const emit = defineEmits(['close', 'added'])
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const authStore = useAuthStore()
+const preferencesStore = usePreferencesStore()
 
 const loading = ref(false)
 
@@ -166,6 +168,20 @@ const handleAddCard = async () => {
       image: imageToSave,
       deckName: form.deckName || null,
     })
+
+    // Si es wishlist, crear preferencia BUSCO automáticamente
+    if (form.status === 'wishlist') {
+      await preferencesStore.addPreference({
+        scryfallId: selectedPrint.value.id,
+        name: cardName,
+        type: 'BUSCO',
+        quantity: form.quantity,
+        condition: form.condition,
+        edition: selectedPrint.value.set_name,
+        image: imageToSave,
+      })
+      console.log('✅ Preferencia BUSCO creada automáticamente')
+    }
 
     toastStore.show(`✓ ${selectedPrint.value.name} agregada`, 'success')
     emit('added')

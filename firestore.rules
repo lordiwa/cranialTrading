@@ -36,6 +36,42 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
+
+      // Colección de matches nuevos (calculados)
+      match /matches_nuevos/{matchId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Colección de matches guardados
+      match /matches_guardados/{matchId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Colección de matches eliminados
+      match /matches_eliminados/{matchId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Colección de contactos guardados
+      match /contactos_guardados/{contactId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
+    }
+
+    // Conversaciones de mensajes (a nivel raíz)
+    match /conversations/{conversationId} {
+      // Permitir a usuarios autenticados crear y leer conversaciones donde participan
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null;
+
+      // Mensajes dentro de la conversación
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null;
+      }
     }
 
     // Legacy colecciones (mantener compatibilidad con datos anteriores)

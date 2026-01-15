@@ -14,7 +14,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
     /**
      * CARGAR preferencias desde Firestore
-     * Ruta: users/{userId}/preferencias/{preferenceId}
+     * Ruta: users/{userId}/preferences/{preferenceId}
      */
     const loadPreferences = async () => {
         if (!authStore.user?.id) {
@@ -24,7 +24,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
         loading.value = true
         try {
-            const prefsRef = collection(db, 'users', authStore.user.id, 'preferencias')
+            const prefsRef = collection(db, 'users', authStore.user.id, 'preferences')
             const snapshot = await getDocs(prefsRef)
 
             _preferences.value = snapshot.docs.map(doc => ({
@@ -57,7 +57,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         if (!authStore.user?.id) throw new Error('No user logged in')
 
         try {
-            const prefsRef = collection(db, 'users', authStore.user.id, 'preferencias')
+            const prefsRef = collection(db, 'users', authStore.user.id, 'preferences')
             const docRef = await addDoc(prefsRef, {
                 ...prefData,
                 createdAt: new Date().toISOString(),
@@ -81,7 +81,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         if (!authStore.user?.id) throw new Error('No user logged in')
 
         try {
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', prefId)
+            const prefRef = doc(db, 'users', authStore.user.id, 'preferences', prefId)
             await updateDoc(prefRef, updates)
 
             const index = _preferences.value.findIndex(p => p.id === prefId)
@@ -109,7 +109,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
         try {
             // Buscar la preferencia por scryfallId y edition
-            const prefsRef = collection(db, 'users', authStore.user.id, 'preferencias')
+            const prefsRef = collection(db, 'users', authStore.user.id, 'preferences')
             const q = query(
                 prefsRef,
                 where('scryfallId', '==', scryfallId),
@@ -124,7 +124,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             // Actualizar la primera coincidencia (debería haber solo una)
             const docId = snapshot.docs[0].id
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', docId)
+            const prefRef = doc(db, 'users', authStore.user.id, 'preferences', docId)
             await updateDoc(prefRef, { type: newType })
 
             // Actualizar en memoria
@@ -149,7 +149,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         if (!authStore.user?.id) throw new Error('No user logged in')
 
         try {
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferencias', prefId)
+            const prefRef = doc(db, 'users', authStore.user.id, 'preferences', prefId)
             await deleteDoc(prefRef)
 
             _preferences.value = _preferences.value.filter(p => p.id !== prefId)
@@ -169,7 +169,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
         try {
             // Buscar la preferencia por scryfallId y edition
-            const prefsRef = collection(db, 'users', authStore.user.id, 'preferencias')
+            const prefsRef = collection(db, 'users', authStore.user.id, 'preferences')
             const q = query(
                 prefsRef,
                 where('scryfallId', '==', scryfallId),

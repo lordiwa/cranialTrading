@@ -68,30 +68,22 @@ const router = createRouter({
             component: () => import('../views/SettingsView.vue'),
             meta: { requiresAuth: true },
         },
-        // ⭐ NUEVAS RUTAS DE DECKS
+        // Deck routes - redirect to collection (decks are now managed via collection tabs)
         {
             path: '/decks',
-            name: 'decks',
-            component: () => import('../views/DecksView.vue'),
-            meta: { requiresAuth: true },
+            redirect: '/collection',
         },
         {
             path: '/decks/new',
-            name: 'newDeck',
-            component: () => import('../views/DeckEditorView.vue'),
-            meta: { requiresAuth: true },
+            redirect: '/collection',
         },
         {
             path: '/decks/:deckId',
-            name: 'deckDetail',
-            component: () => import('../views/DeckDetailView.vue'),
-            meta: { requiresAuth: true },
+            redirect: to => ({ path: '/collection', query: { deck: to.params.deckId } }),
         },
         {
             path: '/decks/:deckId/edit',
-            name: 'deckEdit',
-            component: () => import('../views/DeckEditorView.vue'),
-            meta: { requiresAuth: true },
+            redirect: to => ({ path: '/collection', query: { deck: to.params.deckId } }),
         },
         {
             path: '/@:username',

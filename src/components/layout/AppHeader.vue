@@ -12,7 +12,6 @@ const isAuthenticated = computed(() => !!authStore.user)
 const navigationLinks = [
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/collection', label: 'Colección', icon: '📚' },
-  { path: '/decks', label: 'Mazos', icon: '🎴' },  // ✅ NUEVO: Enlace a Decks
   { path: '/saved-matches', label: 'Matches', icon: '🔗' },
   { path: '/messages', label: 'Mensajes', icon: '💬' },
 ]

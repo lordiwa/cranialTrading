@@ -4,10 +4,8 @@ import { ref } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
-import BaseLoader from '../ui/BaseLoader.vue'
 import { CardCondition } from '../../types/card'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
-import { parseMoxfieldDeck } from '../../utils/deckParser'
 
 const props = defineProps<{
   show: boolean
@@ -24,7 +22,9 @@ const condition = ref<CardCondition>('NM')
 const includeSideboard = ref(false)
 const parsing = ref(false)
 const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string } | null>(null)
+const errorMsg = ref('')
 const isLink = ref(false)
+const moxfieldDeckData = ref<any>(null)
 
 const conditionOptions = [
   { value: 'M', label: 'M - Mint' },
@@ -39,27 +39,40 @@ const handleParse = async () => {
   if (!inputText.value.trim()) return
 
   parsing.value = true
+  errorMsg.value = ''
+  moxfieldDeckData.value = null
 
   // Detectar si es link o ID de Moxfield
   const deckId = extractDeckId(inputText.value)
 
   if (deckId) {
-    // Es un link o ID de Moxfield
+    // Intentar obtener via Cloud Function
     isLink.value = true
-    const deck = await fetchMoxfieldDeck(deckId)
+    const result = await fetchMoxfieldDeck(deckId)
 
-    if (!deck) {
+    if (!result.data) {
       parsing.value = false
+      errorMsg.value = result.error || 'Error desconocido'
       return
     }
 
-    const mainboard = Object.values(deck.mainboard).reduce((sum, item) => sum + item.quantity, 0)
-    const sideboard = Object.values(deck.sideboard).reduce((sum, item) => sum + item.quantity, 0)
+    // Éxito - procesar el deck
+    const deck = result.data
+    moxfieldDeckData.value = deck
+
+    // Nueva estructura: deck.boards.mainboard.cards
+    const mainboardCards = deck.boards?.mainboard?.cards || {}
+    const sideboardCards = deck.boards?.sideboard?.cards || {}
+    const commanderCards = deck.boards?.commanders?.cards || {}
+
+    const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+    const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+    const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
 
     preview.value = {
-      total: mainboard + sideboard,
-      mainboard,
-      sideboard,
+      total: mainboardCount + sideboardCount + commanderCount,
+      mainboard: mainboardCount + commanderCount,
+      sideboard: sideboardCount,
       name: deck.name,
     }
   } else {
@@ -98,16 +111,10 @@ const handleParse = async () => {
   parsing.value = false
 }
 
-const handleImport = async () => {
-  if (isLink.value) {
-    // Importación desde API de Moxfield
-    const deckId = extractDeckId(inputText.value)
-    if (!deckId) return
-
-    const deck = await fetchMoxfieldDeck(deckId)
-    if (!deck) return
-
-    const cards = moxfieldToCardList(deck, includeSideboard.value)
+const handleImport = () => {
+  if (isLink.value && moxfieldDeckData.value) {
+    // Importación directa desde API de Moxfield
+    const cards = moxfieldToCardList(moxfieldDeckData.value, includeSideboard.value)
     emit('importDirect', cards, condition.value)
   } else {
     // Importación desde texto
@@ -120,7 +127,9 @@ const handleClose = () => {
   preview.value = null
   includeSideboard.value = false
   condition.value = 'NM'
+  errorMsg.value = ''
   isLink.value = false
+  moxfieldDeckData.value = null
   emit('close')
 }
 </script>
@@ -150,6 +159,23 @@ const handleClose = () => {
       >
         {{ parsing ? 'ANALIZANDO...' : 'ANALIZAR' }}
       </BaseButton>
+
+      <!-- Instrucciones para Moxfield -->
+      <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="border border-neon bg-neon/10 p-md space-y-2">
+        <p class="text-small text-neon font-bold">Link de Moxfield detectado</p>
+        <p class="text-small text-silver">Moxfield no permite importar directamente. Sigue estos pasos:</p>
+        <ol class="text-small text-silver-70 list-decimal list-inside space-y-1">
+          <li>Abre el deck en Moxfield</li>
+          <li>Click en <span class="text-neon">Export</span> (arriba a la derecha)</li>
+          <li>Click en <span class="text-neon">Copy to Clipboard</span></li>
+          <li>Pega el texto aquí</li>
+        </ol>
+      </div>
+
+      <!-- Error message -->
+      <div v-else-if="errorMsg" class="border border-rust bg-rust/10 p-md">
+        <p class="text-small text-rust">{{ errorMsg }}</p>
+      </div>
 
       <div v-if="preview" class="border border-silver-30 p-md space-y-xs">
         <p v-if="preview.name" class="text-body font-bold text-neon mb-3">

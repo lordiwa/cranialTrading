@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\" log --oneline -20)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run build)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:fix:*)",
+      "Bash(npm run:*)",
+      "WebSearch",
+      "WebFetch(domain:mtgjson.com)",
+      "Bash(curl:*)",
+      "WebFetch(domain:scryfall.com)",
+      "Bash(gzip:*)",
+      "Bash(python3:*)",
+      "Bash(node -e:*)",
+      "Bash(npm init:*)",
+      "Bash(npx wrangler:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri ''https://moxfield-proxy.srparca.workers.dev?id=tiIftnM5wUC29k6F5KisRw'' -UseBasicParsing | Select-Object -ExpandProperty Content\")",
+      "Bash(powershell:*)",
+      "Bash(powershell -Command \"$input | ConvertFrom-Json | Select-Object -Property * | Format-List\")"
+    ]
+  }
+}

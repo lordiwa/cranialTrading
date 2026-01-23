@@ -13,13 +13,17 @@ export const useToastStore = defineStore('toast', () => {
     const toasts = ref<Toast[]>([]);
     let nextId = 0;
 
-    const show = (message: string, type: ToastType = 'info') => {
+    const show = (message: string, type: ToastType = 'info', persistent: boolean = false): number => {
         const id = nextId++;
         toasts.value.push({ id, message, type });
 
-        setTimeout(() => {
-            remove(id);
-        }, 4000);
+        if (!persistent) {
+            setTimeout(() => {
+                remove(id);
+            }, 4000);
+        }
+
+        return id;
     };
 
     const remove = (id: number) => {

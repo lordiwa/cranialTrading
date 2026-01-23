@@ -23,10 +23,35 @@ const logger = require("firebase-functions/logger");
 // this will be the maximum concurrent request count.
 setGlobalOptions({ maxInstances: 10 });
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+// Proxy para Moxfield API (evita CORS y Cloudflare)
+exports.moxfieldDeck = onRequest({ cors: true }, async (request, response) => {
+  const deckId = request.query.id || request.path.split('/').pop();
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+  if (!deckId || !/^[a-zA-Z0-9_-]+$/.test(deckId)) {
+    response.status(400).json({ error: 'Invalid deck ID' });
+    return;
+  }
+
+  try {
+    const moxfieldResponse = await fetch(`https://api2.moxfield.com/v3/decks/all/${deckId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      }
+    });
+
+    if (!moxfieldResponse.ok) {
+      logger.warn(`Moxfield returned ${moxfieldResponse.status} for deck ${deckId}`);
+      response.status(moxfieldResponse.status).json({
+        error: `Moxfield error: ${moxfieldResponse.status}`
+      });
+      return;
+    }
+
+    const data = await moxfieldResponse.json();
+    response.json(data);
+  } catch (error) {
+    logger.error('Moxfield proxy error:', error);
+    response.status(500).json({ error: 'Failed to fetch deck' });
+  }
+});

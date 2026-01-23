@@ -4,12 +4,10 @@ import { ref, watch, computed } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
-import BaseLoader from '../ui/BaseLoader.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import { CardCondition } from '../../types/card'
 import { DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
-import { parseMoxfieldDeck } from '../../utils/deckParser'
 
 const props = defineProps<{
   show: boolean
@@ -23,10 +21,12 @@ const emit = defineEmits<{
 
 const inputText = ref('')
 const condition = ref<CardCondition>('NM')
-const includeSideboard = ref(false)
+const includeSideboard = ref(true)
 const parsing = ref(false)
 const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string; cards?: string[] } | null>(null)
+const errorMsg = ref('')
 const isLink = ref(false)
+const moxfieldDeckData = ref<any>(null)
 
 // NEW: deck name input (optional). Prefill with preview.name when available
 const deckNameInput = ref('')
@@ -66,47 +66,57 @@ const handleParse = async () => {
   if (!inputText.value.trim()) return
 
   parsing.value = true
+  errorMsg.value = ''
+  moxfieldDeckData.value = null
 
   // Detectar si es link o ID de Moxfield
   const deckId = extractDeckId(inputText.value)
 
   if (deckId) {
-    // Es un link o ID de Moxfield
+    // Intentar obtener via Cloud Function
     isLink.value = true
-    const deck = await fetchMoxfieldDeck(deckId)
+    const result = await fetchMoxfieldDeck(deckId)
 
-    if (!deck) {
+    if (!result.data) {
       parsing.value = false
+      errorMsg.value = result.error || 'Error desconocido'
       return
     }
 
-    const mainboard = Object.values(deck.mainboard).reduce((sum, item) => sum + item.quantity, 0)
-    const sideboard = Object.values(deck.sideboard).reduce((sum, item) => sum + item.quantity, 0)
+    // Éxito - procesar el deck
+    const deck = result.data
+    moxfieldDeckData.value = deck
 
-    // Extraer nombres de cartas para selector de comandante
-    const cardNames = Object.values(deck.mainboard).map((item: any) => item.card?.name || '').filter(Boolean)
+    // Nueva estructura: deck.boards.mainboard.cards
+    const mainboardCards = deck.boards?.mainboard?.cards || {}
+    const sideboardCards = deck.boards?.sideboard?.cards || {}
+    const commanderCards = deck.boards?.commanders?.cards || {}
+
+    const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+    const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+    const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+
+    const cardNames = Object.values(mainboardCards).map((item: any) => item.card?.name || '').filter(Boolean)
 
     preview.value = {
-      total: mainboard + sideboard,
-      mainboard,
-      sideboard,
+      total: mainboardCount + sideboardCount + commanderCount,
+      mainboard: mainboardCount + commanderCount,
+      sideboard: sideboardCount,
       name: deck.name,
       cards: cardNames,
     }
-    // prefill deck name
     deckNameInput.value = deck.name || ''
 
-    // Si Moxfield indica que es Commander, auto-seleccionar formato
+    // Auto-detectar formato Commander
     if (deck.format === 'commander' || deck.format === 'edh') {
       deckFormat.value = 'commander'
-      // Intentar detectar el comandante (primera carta legendary creature)
-      if (deck.commanders && Object.keys(deck.commanders).length > 0) {
-        const firstCommander = Object.values(deck.commanders)[0] as any
+      if (Object.keys(commanderCards).length > 0) {
+        const firstCommander = Object.values(commanderCards)[0] as any
         commanderName.value = firstCommander?.card?.name || ''
       }
     }
   } else {
-    // Es texto normal
+    // Es texto normal (lista de cartas o export de Moxfield)
     isLink.value = false
     const lines = inputText.value.split('\n')
     let mainboard = 0
@@ -121,7 +131,6 @@ const handleParse = async () => {
         continue
       }
 
-      // Extraer cantidad y nombre: "4 Lightning Bolt" o "4 Lightning Bolt (M10) 123"
       const match = trimmed.match(/^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/)
       if (match) {
         const qty = parseInt(match[1])
@@ -143,26 +152,18 @@ const handleParse = async () => {
       sideboard,
       cards: cardNames,
     }
-    // do not overwrite user's deckNameInput when parsing text
   }
 
   parsing.value = false
 }
 
-const handleImport = async () => {
-  // normalize deck name: trim and emit undefined if empty
+const handleImport = () => {
   const nameToSend = deckNameInput.value?.trim() || undefined
   const commanderToSend = isCommander.value ? commanderName.value?.trim() || undefined : undefined
 
-  if (isLink.value) {
-    // Importación desde API de Moxfield
-    const deckId = extractDeckId(inputText.value)
-    if (!deckId) return
-
-    const deck = await fetchMoxfieldDeck(deckId)
-    if (!deck) return
-
-    const cards = moxfieldToCardList(deck, includeSideboard.value)
+  if (isLink.value && moxfieldDeckData.value) {
+    // Importación directa desde API de Moxfield
+    const cards = moxfieldToCardList(moxfieldDeckData.value, includeSideboard.value)
     emit('importDirect', cards, nameToSend, condition.value, makeAllPublic.value, deckFormat.value, commanderToSend)
   } else {
     // Importación desde texto
@@ -173,12 +174,14 @@ const handleImport = async () => {
 const handleClose = () => {
   inputText.value = ''
   preview.value = null
-  includeSideboard.value = false
+  includeSideboard.value = true
   condition.value = 'NM'
-  isLink.value = false
   deckNameInput.value = ''
   deckFormat.value = 'modern'
   commanderName.value = ''
+  errorMsg.value = ''
+  isLink.value = false
+  moxfieldDeckData.value = null
   emit('close')
 }
 </script>
@@ -208,6 +211,23 @@ const handleClose = () => {
       >
         {{ parsing ? 'ANALIZANDO...' : 'ANALIZAR' }}
       </BaseButton>
+
+      <!-- Instrucciones para Moxfield -->
+      <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="border border-neon bg-neon/10 p-md space-y-2">
+        <p class="text-small text-neon font-bold">Link de Moxfield detectado</p>
+        <p class="text-small text-silver">Moxfield no permite importar directamente. Sigue estos pasos:</p>
+        <ol class="text-small text-silver-70 list-decimal list-inside space-y-1">
+          <li>Abre el deck en Moxfield</li>
+          <li>Click en <span class="text-neon">Export</span> (arriba a la derecha)</li>
+          <li>Click en <span class="text-neon">Copy to Clipboard</span></li>
+          <li>Pega el texto aquí</li>
+        </ol>
+      </div>
+
+      <!-- Error message -->
+      <div v-else-if="errorMsg" class="border border-rust bg-rust/10 p-md">
+        <p class="text-small text-rust">{{ errorMsg }}</p>
+      </div>
 
       <div v-if="preview" class="border border-silver-30 p-md space-y-xs">
         <p v-if="preview.name" class="text-body font-bold text-neon mb-3">

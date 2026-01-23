@@ -1,21 +1,29 @@
 // src/services/moxfield.ts
+
 export interface MoxfieldCard {
     quantity: number
-    boardType: 'mainboard' | 'sideboard' | 'commanders'
+    boardType: string
     card: {
         name: string
         set: string
         cn: string
-        scryfallId: string
+        scryfall_id: string
     }
+}
+
+export interface MoxfieldBoard {
+    count: number
+    cards: Record<string, MoxfieldCard>
 }
 
 export interface MoxfieldDeck {
     name: string
     format?: string
-    mainboard: Record<string, MoxfieldCard>
-    sideboard: Record<string, MoxfieldCard>
-    commanders: Record<string, MoxfieldCard>
+    boards: {
+        mainboard: MoxfieldBoard
+        sideboard: MoxfieldBoard
+        commanders: MoxfieldBoard
+    }
 }
 
 export const extractDeckId = (input: string): string | null => {
@@ -33,53 +41,93 @@ export const extractDeckId = (input: string): string | null => {
     return null;
 }
 
-export const fetchMoxfieldDeck = async (deckId: string): Promise<MoxfieldDeck | null> => {
+export const fetchMoxfieldDeck = async (deckId: string): Promise<{ data: MoxfieldDeck | null; error?: string }> => {
     try {
-        const response = await fetch(`https://api2.moxfield.com/v3/decks/all/${deckId}`);
-        if (!response.ok) return null;
-        return await response.json();
+        // Usar Cloudflare Worker como proxy para evitar CORS/Cloudflare
+        const response = await fetch(`https://moxfield-proxy.srparca.workers.dev?id=${deckId}`);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                data: null,
+                error: errorData.error || `Error ${response.status}: No se pudo obtener el deck`
+            };
+        }
+
+        return { data: await response.json() };
     } catch (error) {
-        // silent on errors
-        return null;
+        // Si el worker no está disponible, mostrar instrucciones
+        return {
+            data: null,
+            error: 'MOXFIELD_LINK_DETECTED'
+        };
     }
 }
 
-export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard: boolean = false): Array<{
+export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard: boolean = true): Array<{
     quantity: number
     name: string
     setCode: string
     collectorNumber: string
     scryfallId: string
+    isInSideboard: boolean
+    isCommander: boolean
 }> => {
     const cards: Array<any> = [];
 
-    // Mainboard
-    Object.values(deck.mainboard).forEach(item => {
-        if (item.boardType === 'mainboard') {
+    // Commanders (para Commander format)
+    if (deck.boards?.commanders?.cards) {
+        Object.values(deck.boards.commanders.cards).forEach(item => {
             cards.push({
                 quantity: item.quantity,
                 name: item.card.name,
                 setCode: item.card.set.toUpperCase(),
                 collectorNumber: item.card.cn,
-                scryfallId: item.card.scryfallId,
+                scryfallId: item.card.scryfall_id,
+                isInSideboard: false,
+                isCommander: true,
             });
-        }
-    });
+        });
+    }
 
-    // Sideboard
-    if (includeSideboard) {
-        Object.values(deck.sideboard).forEach(item => {
-            if (item.boardType === 'sideboard') {
-                cards.push({
-                    quantity: item.quantity,
-                    name: item.card.name,
-                    setCode: item.card.set.toUpperCase(),
-                    collectorNumber: item.card.cn,
-                    scryfallId: item.card.scryfallId,
-                });
-            }
+    // Mainboard
+    if (deck.boards?.mainboard?.cards) {
+        Object.values(deck.boards.mainboard.cards).forEach(item => {
+            cards.push({
+                quantity: item.quantity,
+                name: item.card.name,
+                setCode: item.card.set.toUpperCase(),
+                collectorNumber: item.card.cn,
+                scryfallId: item.card.scryfall_id,
+                isInSideboard: false,
+                isCommander: false,
+            });
+        });
+    }
+
+    // Sideboard (siempre incluir por defecto)
+    if (includeSideboard && deck.boards?.sideboard?.cards) {
+        Object.values(deck.boards.sideboard.cards).forEach(item => {
+            cards.push({
+                quantity: item.quantity,
+                name: item.card.name,
+                setCode: item.card.set.toUpperCase(),
+                collectorNumber: item.card.cn,
+                scryfallId: item.card.scryfall_id,
+                isInSideboard: true,
+                isCommander: false,
+            });
         });
     }
 
     return cards;
+}
+
+// Helper para obtener conteos del deck
+export const getMoxfieldDeckCounts = (deck: MoxfieldDeck): { mainboard: number; sideboard: number; commanders: number } => {
+    return {
+        mainboard: deck.boards?.mainboard?.count || 0,
+        sideboard: deck.boards?.sideboard?.count || 0,
+        commanders: deck.boards?.commanders?.count || 0,
+    };
 }

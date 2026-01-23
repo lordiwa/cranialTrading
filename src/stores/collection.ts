@@ -221,19 +221,19 @@ export const useCollectionStore = defineStore('collection', () => {
     // ========================================================================
 
     /**
-     * Batch import cards
+     * Batch import cards - returns array of created card IDs
      */
-    const confirmImport = async (cardsToSave: Omit<Card, 'id'>[]): Promise<boolean> => {
-        if (!authStore.user) return false
+    const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent: boolean = false): Promise<string[]> => {
+        if (!authStore.user) return []
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
-            const batchAdds: Promise<any>[] = []
+            const addPromises: Promise<any>[] = []
 
             for (const card of cardsToSave) {
                 // Remove any local id before saving
                 const { id, ...cardWithoutId } = card as any
-                batchAdds.push(
+                addPromises.push(
                     addDoc(colRef, {
                         ...cardWithoutId,
                         createdAt: Timestamp.now(),
@@ -242,14 +242,17 @@ export const useCollectionStore = defineStore('collection', () => {
                 )
             }
 
-            await Promise.all(batchAdds)
+            const docRefs = await Promise.all(addPromises)
+            const createdIds = docRefs.map(ref => ref.id)
             await loadCollection()
-            toastStore.show(`${cardsToSave.length} cartas importadas`, 'success')
-            return true
+            if (!silent) {
+                toastStore.show(`${cardsToSave.length} cartas importadas`, 'success')
+            }
+            return createdIds
         } catch (error) {
             console.error('Error importing cards:', error)
             toastStore.show('Error al importar cartas', 'error')
-            return false
+            return []
         }
     }
 

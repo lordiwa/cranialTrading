@@ -4,6 +4,7 @@ import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { searchCards } from '../../services/scryfall'
+import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -35,16 +36,6 @@ const {
   () => selectedPrint.value?.id,
   () => selectedPrint.value?.set
 )
-
-// Helper: Limpiar nombre de carta (remover set code, collector number, foil indicator)
-const cleanCardName = (name: string): string => {
-  return name
-    .replace(/\s*\*[fF]\*?\s*$/i, '') // Remove foil indicator (*f, *F, *f*, *F*)
-    .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '') // Remove (SET) COLLECTOR patterns like "(PLST) KHM-275"
-    .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '') // Remove (SET) 123 patterns
-    .replace(/\s*\([A-Z0-9]+\)\s*$/i, '') // Remove trailing (SET)
-    .trim()
-}
 
 const form = ref<Partial<Card>>({
   quantity: 1,

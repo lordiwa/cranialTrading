@@ -5,6 +5,7 @@ import { ref, computed, watch } from 'vue'
 import { getCardPrices, formatPrice, type CardPrices } from '../services/mtgjson'
 import { getCardById, searchCards } from '../services/scryfall'
 import { useCollectionStore } from '../stores/collection'
+import { cleanCardName } from '../utils/cardHelpers'
 import type { Card } from '../types/card'
 
 // Cache for prices by scryfallId
@@ -44,16 +45,6 @@ export function useCollectionTotals(cards: () => Card[]) {
 
   // Store prices by card ID
   const cardPrices = ref<Map<string, CardPrices | null>>(new Map())
-
-  // Helper: Clean card name for search
-  const cleanCardName = (name: string): string => {
-    return name
-      .replace(/\s*\*[fF]\*?\s*$/i, '')
-      .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '')
-      .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '')
-      .replace(/\s*\([A-Z0-9]+\)\s*$/i, '')
-      .trim()
-  }
 
   // Auto-fix card with missing scryfallId by searching Scryfall
   const autoFixCard = async (card: Card): Promise<string | null> => {

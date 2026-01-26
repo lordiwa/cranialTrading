@@ -6,6 +6,7 @@ import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { searchCards } from '../../services/scryfall'
+import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
@@ -142,16 +143,6 @@ const showPublicOption = computed(() => {
 })
 
 // ========== METHODS ==========
-
-// Helper: Clean card name for search
-const cleanCardName = (name: string): string => {
-  return name
-    .replace(/\s*\*[fF]\*?\s*$/i, '')
-    .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '')
-    .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '')
-    .replace(/\s*\([A-Z0-9]+\)\s*$/i, '')
-    .trim()
-}
 
 // Find all cards with same scryfallId + edition (grouped entries)
 const findRelatedCards = () => {

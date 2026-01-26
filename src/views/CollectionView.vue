@@ -18,6 +18,7 @@ import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { searchCards, getCardById, getCardsByIds } from '../services/scryfall'
+import { cleanCardName } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
 import type { DeckFormat } from '../types/deck'
@@ -386,16 +387,6 @@ const handleCreateDeck = async (deckData: any) => {
     deckFilter.value = deckId
     toastStore.show(`Deck "${deckData.name}" creado`, 'success')
   }
-}
-
-// Helper para limpiar nombre de carta
-const cleanCardName = (name: string): string => {
-  return name
-    .replace(/\s*\*[fF]\*?\s*$/i, '')
-    .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '')
-    .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '')
-    .replace(/\s*\([A-Z0-9]+\)\s*$/i, '')
-    .trim()
 }
 
 // Helper: Buscar carta en Scryfall

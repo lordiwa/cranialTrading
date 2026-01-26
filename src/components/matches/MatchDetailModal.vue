@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { SimpleMatch } from '../../stores/matches';
-import { useSavedMatchesStore } from '../../stores/savedMatches';
+import { SimpleMatch, useMatchesStore } from '../../stores/matches';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import ChatModal from '../chat/ChatModal.vue';
@@ -18,20 +17,20 @@ const emit = defineEmits<{
   contact: [];
 }>();
 
-const savedMatchesStore = useSavedMatchesStore();
+const matchesStore = useMatchesStore();
 const isSaving = ref(false);
 const showChat = ref(false);
 const showHoverCard = ref(false);
 
 const isMatchSaved = computed(() => {
-  return props.match ? savedMatchesStore.isMatchSaved(props.match.id) : false;
+  return props.match ? matchesStore.isMatchSaved(props.match.id) : false;
 });
 
 const handleSaveMatch = async () => {
   if (!props.match) return;
 
   isSaving.value = true;
-  const success = await savedMatchesStore.saveMatch(props.match);
+  const success = await matchesStore.saveMatch(props.match);
   isSaving.value = false;
 
   if (success) {

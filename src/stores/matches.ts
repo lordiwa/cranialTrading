@@ -428,6 +428,11 @@ export const useMatchesStore = defineStore('matches', () => {
         }).length;
     };
 
+    // Check if a match is already saved
+    const isMatchSaved = (matchId: string): boolean => {
+        return savedMatches.value.some(m => m.id === matchId);
+    };
+
     return {
         newMatches,
         savedMatches,
@@ -444,5 +449,6 @@ export const useMatchesStore = defineStore('matches', () => {
         notifyOtherUser,
         getTotalByTab,
         getUnseenCount,
+        isMatchSaved,
     };
 });

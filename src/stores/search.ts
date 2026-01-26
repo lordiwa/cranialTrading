@@ -3,6 +3,10 @@ import { ref, computed } from 'vue'
 import { searchAdvanced, ScryfallCard } from '../services/scryfall'
 import { useToastStore } from './toast'
 
+// Cache para búsquedas (5 minutos)
+const searchCache = new Map<string, { results: ScryfallCard[], timestamp: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
+
 export interface FilterOptions {
     // Básicos
     name?: string
@@ -155,7 +159,7 @@ export const useSearchStore = defineStore('search', () => {
     }
 
     /**
-     * Ejecutar búsqueda avanzada
+     * Ejecutar búsqueda avanzada con caché
      */
     const search = async (filters: FilterOptions) => {
         if (!filters.name?.trim() &&
@@ -168,11 +172,20 @@ export const useSearchStore = defineStore('search', () => {
             return
         }
 
+        const query = buildQuery(filters)
+        lastQuery.value = query
+
+        // Verificar caché
+        const cached = searchCache.get(query)
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            console.log('⚡ Usando caché para:', query)
+            results.value = cached.results
+            currentFilters.value = filters
+            return
+        }
+
         loading.value = true
         try {
-            const query = buildQuery(filters)
-            lastQuery.value = query
-
             console.log('🔍 Buscando con query:', query)
 
             const searchResults = await searchAdvanced(query, {
@@ -180,6 +193,15 @@ export const useSearchStore = defineStore('search', () => {
                 order: 'released',
                 dir: 'desc',
             })
+
+            // Guardar en caché
+            searchCache.set(query, { results: searchResults, timestamp: Date.now() })
+
+            // Limpiar caché viejo (máximo 50 queries)
+            if (searchCache.size > 50) {
+                const oldestKey = searchCache.keys().next().value
+                if (oldestKey) searchCache.delete(oldestKey)
+            }
 
             results.value = searchResults
             currentFilters.value = filters

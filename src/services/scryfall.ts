@@ -1,5 +1,9 @@
 const SCRYFALL_API = 'https://api.scryfall.com'
 
+// Cache para sugerencias (10 minutos)
+const suggestionsCache = new Map<string, { results: string[], timestamp: number }>()
+const SUGGESTIONS_CACHE_TTL = 10 * 60 * 1000
+
 export interface ScryfallCard {
     id: string
     name: string
@@ -201,7 +205,7 @@ export const searchByMultipleCriteria = async (
 
 /**
  * Obtener sugerencias de cartas (autocomplete)
- * ✅ MEJORADO: Mejor parseo de resultados
+ * ✅ MEJORADO: Con caché para respuestas más rápidas
  */
 export const getCardSuggestions = async (query: string): Promise<string[]> => {
     try {
@@ -209,7 +213,15 @@ export const getCardSuggestions = async (query: string): Promise<string[]> => {
             return []
         }
 
-        const encodedQuery = encodeURIComponent(query.trim())
+        const trimmedQuery = query.trim().toLowerCase()
+
+        // Verificar caché
+        const cached = suggestionsCache.get(trimmedQuery)
+        if (cached && Date.now() - cached.timestamp < SUGGESTIONS_CACHE_TTL) {
+            return cached.results
+        }
+
+        const encodedQuery = encodeURIComponent(trimmedQuery)
         const response = await fetch(
             `${SCRYFALL_API}/cards/autocomplete?q=${encodedQuery}`
         )
@@ -219,7 +231,18 @@ export const getCardSuggestions = async (query: string): Promise<string[]> => {
         }
 
         const data = await response.json()
-        return data.data || []
+        const results = data.data || []
+
+        // Guardar en caché
+        suggestionsCache.set(trimmedQuery, { results, timestamp: Date.now() })
+
+        // Limpiar caché viejo (máximo 100 queries)
+        if (suggestionsCache.size > 100) {
+            const oldestKey = suggestionsCache.keys().next().value
+            if (oldestKey) suggestionsCache.delete(oldestKey)
+        }
+
+        return results
     } catch (error) {
         console.error('Error en getCardSuggestions:', error)
         return []

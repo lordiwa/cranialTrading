@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useContactsStore } from '../stores/contacts'
-import { useMessagesStore } from '../stores/messages'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -9,7 +8,6 @@ import SavedContactCard from '../components/contacts/SavedContactCard.vue'
 import ChatModal from '../components/chat/ChatModal.vue'
 
 const contactsStore = useContactsStore()
-const messagesStore = useMessagesStore()
 
 const showChat = ref(false)
 const selectedContact = ref<any>(null)

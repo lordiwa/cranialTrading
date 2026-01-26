@@ -1,7 +1,7 @@
 /**
  * Composable for calculating collection totals with multi-source prices
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { getCardPrices, formatPrice, type CardPrices } from '../services/mtgjson'
 import { getCardById, searchCards } from '../services/scryfall'
 import { useCollectionStore } from '../stores/collection'

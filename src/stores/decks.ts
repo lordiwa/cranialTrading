@@ -21,7 +21,6 @@ import type {
     DeckWishlistItem,
     CreateDeckInput,
     DeckStats,
-    HydratedDeckCard,
     DisplayDeckCard,
 } from '../types/deck'
 

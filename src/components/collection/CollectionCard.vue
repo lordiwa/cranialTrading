@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { Card } from '../../types/card';
-import BaseButton from '../ui/BaseButton.vue';
-import BaseBadge from '../ui/BaseBadge.vue';
 
 const props = defineProps<{
   card: Card;
@@ -24,27 +22,10 @@ const emit = defineEmits<{
   delete: [cardId: string];
 }>();
 
-const showActions = ref(false);
-
 // ✅ AGREGADO: Handler para click en la card
 const handleCardClick = () => {
   emit('click', props.card);
 };
-
-const handleEdit = (e: Event) => {
-  e.stopPropagation();
-  emit('edit', props.card);
-};
-
-const handleDelete = (e: Event) => {
-  e.stopPropagation();
-  emit('delete', props.card.id);
-};
-
-// icon classes for public flag
-const publicIconClass = computed(() => {
-  return props.card.public ? 'text-neon' : 'text-silver-50 opacity-60 line-through';
-});
 </script>
 
 <template>

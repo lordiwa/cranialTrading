@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -118,8 +118,6 @@ import { db } from '../services/firebase'
 import {
   findCardsMatchingPreferences,
   findPreferencesMatchingCards,
-  getUserPublicCards,
-  getUserPublicPreferences,
   type PublicCard,
   type PublicPreference,
 } from '../services/publicCards'

@@ -25,7 +25,7 @@ const emit = defineEmits<{
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
 const toastStore = useToastStore()
-const { getCardAllocationSummary, getAllocationsForCard, getAvailableQuantity } = useCardAllocation()
+const { getAllocationsForCard } = useCardAllocation()
 
 // ========== STATE ==========
 
@@ -522,12 +522,16 @@ watch(selectedPrint, (print) => {
                 @click="adjustQuantity('collection', -1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
                 :disabled="statusDistribution.collection <= 0"
-              >-</button>
+              >
+-
+</button>
               <span class="w-8 text-center text-small font-bold text-neon">{{ statusDistribution.collection }}</span>
               <button
                 @click="adjustQuantity('collection', 1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
-              >+</button>
+              >
++
+</button>
             </div>
           </div>
 
@@ -542,12 +546,16 @@ watch(selectedPrint, (print) => {
                 @click="adjustQuantity('sale', -1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
                 :disabled="statusDistribution.sale <= 0"
-              >-</button>
+              >
+-
+</button>
               <span class="w-8 text-center text-small font-bold text-yellow-400">{{ statusDistribution.sale }}</span>
               <button
                 @click="adjustQuantity('sale', 1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
-              >+</button>
+              >
++
+</button>
             </div>
           </div>
 
@@ -562,12 +570,16 @@ watch(selectedPrint, (print) => {
                 @click="adjustQuantity('trade', -1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
                 :disabled="statusDistribution.trade <= 0"
-              >-</button>
+              >
+-
+</button>
               <span class="w-8 text-center text-small font-bold text-blue-400">{{ statusDistribution.trade }}</span>
               <button
                 @click="adjustQuantity('trade', 1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
-              >+</button>
+              >
++
+</button>
             </div>
           </div>
 
@@ -582,12 +594,16 @@ watch(selectedPrint, (print) => {
                 @click="adjustQuantity('wishlist', -1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
                 :disabled="statusDistribution.wishlist <= 0"
-              >-</button>
+              >
+-
+</button>
               <span class="w-8 text-center text-small font-bold text-red-400">{{ statusDistribution.wishlist }}</span>
               <button
                 @click="adjustQuantity('wishlist', 1)"
                 class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
-              >+</button>
+              >
++
+</button>
             </div>
           </div>
         </div>
@@ -672,7 +688,9 @@ watch(selectedPrint, (print) => {
                 @click="decrementDeckAllocation(deck.id)"
                 :disabled="getDeckAllocation(deck.id) === 0"
                 class="w-7 h-7 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30"
-              >-</button>
+              >
+-
+</button>
 
               <span class="w-6 text-center text-small font-bold" :class="getDeckAllocation(deck.id) > 0 ? 'text-neon' : 'text-silver-50'">
                 {{ getDeckAllocation(deck.id) }}
@@ -682,7 +700,9 @@ watch(selectedPrint, (print) => {
                 @click="incrementDeckAllocation(deck.id)"
                 :disabled="availableForAllocation <= 0"
                 class="w-7 h-7 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30"
-              >+</button>
+              >
++
+</button>
 
               <!-- Sideboard toggle -->
               <button

@@ -164,7 +164,7 @@ async function saveToDB<T>(storeName: string, key: string, data: T): Promise<boo
 /**
  * Delete data from IndexedDB
  */
-async function deleteFromDB(storeName: string, key: string): Promise<void> {
+async function _deleteFromDB(storeName: string, key: string): Promise<void> {
   try {
     const db = await openDatabase()
     return new Promise((resolve) => {

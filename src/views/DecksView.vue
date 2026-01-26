@@ -270,10 +270,10 @@ const handleImport = async (
 
     const quantity = parseInt(match[1])
     let cardName = match[2].trim()
-    let setCode = match[3] || null
+    const setCode = match[3] || null
 
     // Check for foil indicator in the original line (*F*, *f*, *f, *F)
-    let isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+    const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
 
     // Clean card name: remove any embedded (SET) codes, collector numbers, and foil indicators
     // Handles formats like "Card Name (PLST) KHM-275" or "Card Name (PMKM) 271p" or "Card Name *F*"
@@ -384,7 +384,7 @@ const handleImportDirect = async (
   for (const card of cards) {
     // Check if card name ends with foil indicator (*f, *F, *f*, *F*)
     let cardName = card.name
-    let isFoil = /\*[fF]\*?\s*$/.test(cardName)
+    const isFoil = /\*[fF]\*?\s*$/.test(cardName)
     if (isFoil) {
       cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
     }

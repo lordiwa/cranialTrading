@@ -17,7 +17,7 @@ import { Card, CardStatus, CardCondition } from '../types/card'
 import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { searchCards, getCardById, getCardsByIds } from '../services/scryfall'
+import { searchCards, getCardsByIds } from '../services/scryfall'
 import { cleanCardName } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
@@ -397,7 +397,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
       const results = await searchCards(`"${cleanName}" e:${setCode}`)
       if (results.length > 0) {
         const card = results[0]
-        let image = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
+        const image = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
         const price = card.prices?.usd ? parseFloat(card.prices.usd) : 0
         if (price > 0 && image) {
           return { scryfallId: card.id, image, price, edition: card.set_name, setCode: card.set.toUpperCase() }
@@ -410,7 +410,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
         (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
       ) || allResults.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0) || allResults[0]
-      let image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
+      const image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
       return {
         scryfallId: printWithPrice.id,
         image,
@@ -453,8 +453,8 @@ const handleImport = async (
 
     const quantity = parseInt(match[1])
     let cardName = match[2].trim()
-    let setCode = match[3] || null
-    let isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+    const setCode = match[3] || null
+    const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
 
     cardName = cleanCardName(cardName)
     if (inSideboard && !includeSideboard) continue
@@ -579,12 +579,12 @@ const handleImportDirect = async (
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
       let cardName = card.name
-      let isFoil = /\*[fF]\*?\s*$/.test(cardName)
+      const isFoil = /\*[fF]\*?\s*$/.test(cardName)
       if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
 
       let image = ''
       let price = 0
-      let finalScryfallId = card.scryfallId || ''
+      const finalScryfallId = card.scryfallId || ''
       let finalEdition = card.setCode || 'Unknown'
       let cmc: number | undefined = undefined
       let type_line: string | undefined = undefined

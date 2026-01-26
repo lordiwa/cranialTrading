@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
-import BaseButton from '../components/ui/BaseButton.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
 import { useMessagesStore } from '../stores/messages';
 import { useAuthStore } from '../stores/auth';

@@ -394,3 +394,57 @@ export const getCardsByPowerToughness = async (
         }
     )
 }
+
+/**
+ * ✅ NUEVO: Obtener múltiples cartas en un solo request (hasta 75 por batch)
+ * Usa el endpoint /cards/collection de Scryfall
+ */
+export const getCardsByIds = async (
+    identifiers: Array<{ id: string } | { name: string }>
+): Promise<ScryfallCard[]> => {
+    if (identifiers.length === 0) return []
+
+    const results: ScryfallCard[] = []
+    const BATCH_SIZE = 75
+
+    // Procesar en batches de 75
+    for (let i = 0; i < identifiers.length; i += BATCH_SIZE) {
+        const batch = identifiers.slice(i, i + BATCH_SIZE)
+
+        try {
+            const response = await fetch(`${SCRYFALL_API}/cards/collection`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ identifiers: batch }),
+            })
+
+            if (!response.ok) {
+                if (response.status === 429) {
+                    console.warn('⚠️ Rate limit, esperando 100ms...')
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                    i -= BATCH_SIZE // Reintentar este batch
+                    continue
+                }
+                console.error(`Scryfall collection API error: ${response.status}`)
+                continue
+            }
+
+            const data = await response.json()
+            if (data.data) {
+                results.push(...data.data)
+            }
+
+            // Pequeña pausa entre batches para evitar rate limiting
+            if (i + BATCH_SIZE < identifiers.length) {
+                await new Promise(resolve => setTimeout(resolve, 50))
+            }
+        } catch (error) {
+            console.error('Error en getCardsByIds batch:', error)
+        }
+    }
+
+    console.log(`✅ Obtenidas ${results.length}/${identifiers.length} cartas en batch`)
+    return results
+}

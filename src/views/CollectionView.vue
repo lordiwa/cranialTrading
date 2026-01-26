@@ -17,7 +17,7 @@ import { Card, CardStatus, CardCondition } from '../types/card'
 import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { searchCards, getCardById } from '../services/scryfall'
+import { searchCards, getCardById, getCardsByIds } from '../services/scryfall'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
 import type { DeckFormat } from '../types/deck'
@@ -197,8 +197,16 @@ const sideboardWishlistCount = computed(() => {
 type DeckSortOption = 'name' | 'manaValue' | 'type' | 'price'
 const deckSort = ref<DeckSortOption>('name')
 
-// Helper to extract mana value from card name (basic heuristic - could be improved with Scryfall data)
+// Helper to check if card is a land
+const isLand = (card: any): boolean => {
+  const typeLine = card.type_line?.toLowerCase() || ''
+  return typeLine.includes('land')
+}
+
+// Helper to extract mana value from card (lands go to end)
 const getManaValue = (card: any): number => {
+  // Lands always at the end (high number)
+  if (isLand(card)) return 999
   // If card has cmc stored, use it
   if (card.cmc !== undefined) return card.cmc
   // Default to 0 if unknown
@@ -207,16 +215,16 @@ const getManaValue = (card: any): number => {
 
 // Helper to get card type for sorting
 const getCardType = (card: any): number => {
-  const name = card.name.toLowerCase()
-  // Order: Land, Creature, Planeswalker, Instant, Sorcery, Enchantment, Artifact, Other
-  if (name.includes('land') || card.type_line?.toLowerCase().includes('land')) return 0
-  if (card.type_line?.toLowerCase().includes('creature')) return 1
-  if (card.type_line?.toLowerCase().includes('planeswalker')) return 2
-  if (card.type_line?.toLowerCase().includes('instant')) return 3
-  if (card.type_line?.toLowerCase().includes('sorcery')) return 4
-  if (card.type_line?.toLowerCase().includes('enchantment')) return 5
-  if (card.type_line?.toLowerCase().includes('artifact')) return 6
-  return 7
+  const typeLine = card.type_line?.toLowerCase() || ''
+  // Order: Creature, Planeswalker, Instant, Sorcery, Enchantment, Artifact, Land, Other
+  if (typeLine.includes('creature')) return 1
+  if (typeLine.includes('planeswalker')) return 2
+  if (typeLine.includes('instant')) return 3
+  if (typeLine.includes('sorcery')) return 4
+  if (typeLine.includes('enchantment')) return 5
+  if (typeLine.includes('artifact')) return 6
+  if (typeLine.includes('land')) return 7
+  return 8 // Unknown/Other
 }
 
 // Sorted deck cards
@@ -511,7 +519,7 @@ const handleImport = async (
   }
 }
 
-// Importar desde Moxfield
+// Importar desde Moxfield (OPTIMIZADO con batch API)
 const handleImportDirect = async (
   cards: any[],
   deckName: string | undefined,
@@ -524,14 +532,10 @@ const handleImportDirect = async (
   showImportDeckModal.value = false
 
   // Toast persistente mientras importa
-  let currentToastId = toastStore.show(`Importando "${finalDeckName}"... (0/${cards.length})`, 'info', true)
-
-  const updateProgress = (current: number, total: number) => {
-    toastStore.remove(currentToastId)
-    currentToastId = toastStore.show(`Importando "${finalDeckName}"... (${current}/${total})`, 'info', true)
-  }
+  let currentToastId = toastStore.show(`Importando "${finalDeckName}"... Obteniendo datos...`, 'info', true)
 
   try {
+    // PASO 1: Crear el deck primero
     const deckId = await decksStore.createDeck({
       name: finalDeckName,
       format: format || 'custom',
@@ -546,14 +550,43 @@ const handleImportDirect = async (
       return
     }
 
-    let allocatedCount = 0
-    const collectionCardsToAdd: any[] = []
-    const cardMeta: Array<{ quantity: number; isInSideboard: boolean }> = []
+    // PASO 2: Recolectar todos los scryfallIds para batch request
+    const identifiers: Array<{ id: string }> = []
+    const cardIndexMap = new Map<string, number[]>() // scryfallId -> indices en cards[]
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
-      updateProgress(i + 1, cards.length)
+      if (card.scryfallId) {
+        if (!cardIndexMap.has(card.scryfallId)) {
+          cardIndexMap.set(card.scryfallId, [])
+          identifiers.push({ id: card.scryfallId })
+        }
+        cardIndexMap.get(card.scryfallId)!.push(i)
+      }
+    }
 
+    // PASO 3: Obtener todos los datos de Scryfall en batch (75 por request)
+    toastStore.remove(currentToastId)
+    currentToastId = toastStore.show(`Importando "${finalDeckName}"... Obteniendo ${identifiers.length} cartas...`, 'info', true)
+
+    const scryfallDataMap = new Map<string, any>()
+    if (identifiers.length > 0) {
+      const scryfallCards = await getCardsByIds(identifiers)
+      for (const sc of scryfallCards) {
+        scryfallDataMap.set(sc.id, sc)
+      }
+    }
+
+    // PASO 4: Procesar cada carta con los datos obtenidos
+    toastStore.remove(currentToastId)
+    currentToastId = toastStore.show(`Importando "${finalDeckName}"... Procesando cartas...`, 'info', true)
+
+    const collectionCardsToAdd: any[] = []
+    const cardMeta: Array<{ quantity: number; isInSideboard: boolean }> = []
+    const cardsNeedingSearch: number[] = [] // Indices de cartas que necesitan búsqueda individual
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i]
       let cardName = card.name
       let isFoil = /\*[fF]\*?\s*$/.test(cardName)
       if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
@@ -562,45 +595,24 @@ const handleImportDirect = async (
       let price = 0
       let finalScryfallId = card.scryfallId || ''
       let finalEdition = card.setCode || 'Unknown'
+      let cmc: number | undefined = undefined
+      let type_line: string | undefined = undefined
 
-      // Obtener datos de Scryfall
-      if (card.scryfallId) {
-        try {
-          const scryfallCard = await getCardById(card.scryfallId)
-          if (scryfallCard) {
-            image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
-            price = scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd) : 0
-          }
-        } catch (e) {
-          console.warn(`[Import] Failed to fetch card ${card.scryfallId}:`, e)
-        }
+      // Usar datos del batch si existen
+      if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
+        const scryfallCard = scryfallDataMap.get(card.scryfallId)
+        image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
+        price = scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd) : 0
+        finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
+        cmc = scryfallCard.cmc
+        type_line = scryfallCard.type_line
       }
 
+      // Si falta precio o imagen, marcar para búsqueda individual
       if (price === 0 || !image) {
-        try {
-          const results = await searchCards(`!"${cardName}"`)
-          const printWithPrice = results.find(r =>
-            r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
-            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-          ) || results.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
-
-          if (printWithPrice) {
-            finalScryfallId = printWithPrice.id
-            finalEdition = printWithPrice.set.toUpperCase()
-            price = parseFloat(printWithPrice.prices.usd)
-            image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
-          } else if (results.length > 0 && !image) {
-            const anyPrint = results[0]
-            image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
-            if (!finalScryfallId) finalScryfallId = anyPrint.id
-            if (finalEdition === 'Unknown') finalEdition = anyPrint.set.toUpperCase()
-          }
-        } catch (e) {
-          console.warn(`[Import] Failed to search for "${cardName}":`, e)
-        }
+        cardsNeedingSearch.push(i)
       }
 
-      // Agregar carta a la lista para importar
       collectionCardsToAdd.push({
         scryfallId: finalScryfallId,
         name: cardName,
@@ -612,18 +624,55 @@ const handleImportDirect = async (
         image,
         status: 'collection',
         public: makePublic || false,
+        cmc,
+        type_line,
       })
-      // Guardar metadata: cantidad y si es sideboard
       cardMeta.push({
         quantity: card.quantity,
         isInSideboard: card.isInSideboard || false
       })
     }
 
-    // Remover toast de progreso
-    toastStore.remove(currentToastId)
+    // PASO 5: Búsqueda individual solo para cartas sin precio/imagen (fallback)
+    if (cardsNeedingSearch.length > 0) {
+      toastStore.remove(currentToastId)
+      currentToastId = toastStore.show(`Importando "${finalDeckName}"... Completando ${cardsNeedingSearch.length} cartas...`, 'info', true)
 
-    // Importar cartas a la colección
+      for (const idx of cardsNeedingSearch) {
+        const cardData = collectionCardsToAdd[idx]
+        try {
+          const results = await searchCards(`!"${cardData.name}"`)
+          const printWithPrice = results.find(r =>
+            r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+          ) || results.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
+
+          if (printWithPrice) {
+            cardData.scryfallId = printWithPrice.id
+            cardData.edition = printWithPrice.set.toUpperCase()
+            cardData.price = parseFloat(printWithPrice.prices.usd)
+            cardData.image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
+            cardData.cmc = printWithPrice.cmc
+            cardData.type_line = printWithPrice.type_line
+          } else if (results.length > 0 && !cardData.image) {
+            const anyPrint = results[0]
+            cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
+            if (!cardData.scryfallId) cardData.scryfallId = anyPrint.id
+            if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
+            cardData.cmc = anyPrint.cmc
+            cardData.type_line = anyPrint.type_line
+          }
+        } catch (e) {
+          console.warn(`[Import] Failed to search for "${cardData.name}":`, e)
+        }
+      }
+    }
+
+    // PASO 6: Importar cartas a la colección
+    toastStore.remove(currentToastId)
+    currentToastId = toastStore.show(`Importando "${finalDeckName}"... Guardando...`, 'info', true)
+
+    let allocatedCount = 0
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
 
@@ -639,6 +688,7 @@ const handleImportDirect = async (
     // Recargar para actualizar stats
     await decksStore.loadDecks()
 
+    toastStore.remove(currentToastId)
     toastStore.show(`Deck "${finalDeckName}" importado con ${allocatedCount} cartas`, 'success')
     deckFilter.value = deckId
   } catch (error) {

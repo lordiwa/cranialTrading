@@ -197,6 +197,8 @@ const handleAddCard = async () => {
       price: parseFloat(selectedPrint.value.prices?.usd || '0'),
       image: imageToSave,
       public: showPublicOption.value ? form.public : false,
+      cmc: selectedPrint.value.cmc,
+      type_line: selectedPrint.value.type_line,
     })
 
     // Si se seleccionó un deck, asignar la carta al deck

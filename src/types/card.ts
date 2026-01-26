@@ -17,6 +17,8 @@ export interface Card {
     status: CardStatus;
     public?: boolean;           // Visible on user's public profile
     deckName?: string | null;   // Legacy field for deck association
+    cmc?: number;               // Converted mana cost (mana value)
+    type_line?: string;         // Card type (e.g., "Creature — Human Wizard")
     createdAt?: Date;
     updatedAt: Date;
 }

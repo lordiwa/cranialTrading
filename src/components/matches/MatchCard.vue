@@ -9,9 +9,12 @@
         </h3>
         <p class="text-small text-silver-70 mt-1">
           Con
-          <span class="text-neon hover:underline font-bold">
+          <router-link
+              :to="`/@${match.otherUsername}`"
+              class="text-neon hover:underline font-bold"
+          >
             @{{ match.otherUsername }}
-          </span>
+          </router-link>
           • 📍 {{ match.otherLocation }}
         </p>
       </div>
@@ -177,7 +180,12 @@
         <!-- Usuario -->
         <div>
           <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Usuario</p>
-          <p class="text-body font-bold text-silver">@{{ match.otherUsername }}</p>
+          <router-link
+              :to="`/@${match.otherUsername}`"
+              class="text-body font-bold text-neon hover:underline"
+          >
+            @{{ match.otherUsername }}
+          </router-link>
         </div>
 
         <!-- Ubicación -->

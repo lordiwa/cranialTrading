@@ -13,6 +13,12 @@ import { db } from '../services/firebase'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { Card, CardCondition, CardStatus } from '../types/card'
+import {
+    syncCardToPublic,
+    removeCardFromPublic,
+    syncAllUserCards,
+    syncAllUserPreferences,
+} from '../services/publicCards'
 
 export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
@@ -20,6 +26,17 @@ export const useCollectionStore = defineStore('collection', () => {
 
     const cards = ref<Card[]>([])
     const loading = ref(false)
+
+    // Helper to get user info for public sync
+    const getUserInfo = () => {
+        if (!authStore.user) return null
+        return {
+            userId: authStore.user.id,
+            username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown',
+            location: authStore.user.location,
+            email: authStore.user.email,
+        }
+    }
 
     // ========================================================================
     // CORE OPERATIONS
@@ -75,6 +92,13 @@ export const useCollectionStore = defineStore('collection', () => {
             }
             cards.value.push(newCard)
 
+            // Sync to public collection (non-blocking)
+            const userInfo = getUserInfo()
+            if (userInfo) {
+                syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                    .catch(err => console.error('[PublicSync] Error syncing card:', err))
+            }
+
             console.log(`✅ Carta agregada: ${cardData.name}`)
             return docRef.id
         } catch (error) {
@@ -107,6 +131,13 @@ export const useCollectionStore = defineStore('collection', () => {
                     ...updates,
                     updatedAt: new Date(),
                 }
+
+                // Sync to public collection (non-blocking)
+                const userInfo = getUserInfo()
+                if (userInfo) {
+                    syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                        .catch(err => console.error('[PublicSync] Error syncing card update:', err))
+                }
             }
 
             console.log(`✅ Carta actualizada: ${cardId}`)
@@ -129,6 +160,10 @@ export const useCollectionStore = defineStore('collection', () => {
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await deleteDoc(cardRef)
+
+            // Remove from public collection (non-blocking)
+            removeCardFromPublic(cardId, authStore.user.id)
+                .catch(err => console.error('[PublicSync] Error removing card:', err))
 
             cards.value = cards.value.filter((c) => c.id !== cardId)
             console.log(`✅ Carta eliminada: ${cardId}`)
@@ -257,6 +292,60 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     // ========================================================================
+    // PUBLIC SYNC OPERATIONS
+    // ========================================================================
+
+    /**
+     * Bulk sync all cards to public collection
+     * - sale/trade cards → public_cards (lo que VENDO)
+     * - wishlist cards → public_preferences (lo que BUSCO)
+     */
+    const syncAllToPublic = async (): Promise<void> => {
+        const userInfo = getUserInfo()
+        if (!userInfo) return
+
+        try {
+            // Reload collection first to get latest statuses
+            await loadCollection()
+            console.log(`[PublicSync] Syncing ${cards.value.length} cards...`)
+
+            // Sync sale/trade cards to public_cards
+            await syncAllUserCards(
+                cards.value,
+                userInfo.userId,
+                userInfo.username,
+                userInfo.location,
+                userInfo.email
+            )
+
+            // Sync wishlist cards to public_preferences (lo que BUSCO)
+            const wishlistCards = cards.value.filter(c => c.status === 'wishlist')
+            console.log(`[PublicSync] Syncing ${wishlistCards.length} wishlist cards as preferences...`)
+
+            // Convert wishlist cards to preference format
+            const wishlistAsPrefs = wishlistCards.map(c => ({
+                id: c.id,
+                cardName: c.name,
+                scryfallId: c.scryfallId,
+                name: c.name,
+            }))
+
+            await syncAllUserPreferences(
+                wishlistAsPrefs,
+                userInfo.userId,
+                userInfo.username,
+                userInfo.location,
+                userInfo.email
+            )
+
+            toastStore.show('Cartas sincronizadas para matches', 'success')
+        } catch (error) {
+            console.error('[PublicSync] Error bulk syncing cards:', error)
+            toastStore.show('Error sincronizando cartas', 'error')
+        }
+    }
+
+    // ========================================================================
     // COMPUTED
     // ========================================================================
 
@@ -306,6 +395,9 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Import
         confirmImport,
+
+        // Public sync
+        syncAllToPublic,
 
         // Computed
         totalCards,

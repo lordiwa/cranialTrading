@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseBadge from '../ui/BaseBadge.vue'
 import BaseModal from '../ui/BaseModal.vue'
@@ -14,10 +14,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  updateStatus: [cardId: string, status: CardStatus]
+  updateStatus: [cardId: string, status: CardStatus, isPublic: boolean]
 }>()
 
 const selectedStatus = ref<CardStatus>('collection')
+const isPublic = ref(true)
+
+// Show public checkbox only for sale/trade
+const showPublicOption = computed(() => selectedStatus.value === 'sale' || selectedStatus.value === 'trade')
 
 // Card Kingdom prices
 const {
@@ -65,7 +69,8 @@ const getStatusIcon = (status: CardStatus) => {
 
 const handleUpdateStatus = () => {
   if (props.card) {
-    emit('updateStatus', props.card.id, selectedStatus.value)
+    const publicValue = showPublicOption.value ? isPublic.value : false
+    emit('updateStatus', props.card.id, selectedStatus.value, publicValue)
     emit('close')
   }
 }
@@ -73,6 +78,7 @@ const handleUpdateStatus = () => {
 watch(() => props.card, (newCard) => {
   if (newCard) {
     selectedStatus.value = newCard.status
+    isPublic.value = newCard.public ?? true
   }
 })
 </script>
@@ -143,6 +149,20 @@ watch(() => props.card, (newCard) => {
             v-model="selectedStatus"
             :options="statusOptions"
         />
+      </div>
+
+      <!-- Publicar en perfil (solo para sale/trade) -->
+      <div v-if="showPublicOption" class="flex items-center gap-3 p-3 bg-secondary border border-neon/30">
+        <input
+            v-model="isPublic"
+            type="checkbox"
+            id="public-status"
+            class="w-4 h-4 cursor-pointer"
+        />
+        <div>
+          <label for="public-status" class="text-small text-silver cursor-pointer">Publicar en mi perfil</label>
+          <p class="text-tiny text-silver-50">Visible para otros usuarios en tu perfil público</p>
+        </div>
       </div>
 
       <!-- Status Grid -->

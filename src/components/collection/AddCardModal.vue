@@ -90,12 +90,14 @@ const form = reactive<{
   foil: boolean
   status: CardStatus
   deckName: string
+  public: boolean
 }>({
   quantity: 1,
   condition: 'NM',
   foil: false,
   status: 'collection',
   deckName: '',
+  public: true,
 })
 
 // ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
@@ -155,6 +157,9 @@ const statusOptions = [
   { value: 'wishlist', label: 'Busco / Wishlist' },
 ]
 
+// Show public checkbox only for sale/trade
+const showPublicOption = computed(() => form.status === 'sale' || form.status === 'trade')
+
 const deckOptions = computed(() => [
   { value: '', label: 'Sin asignar' },
   ...decksStore.decks.map(deck => ({ value: deck.id, label: deck.name }))
@@ -191,6 +196,7 @@ const handleAddCard = async () => {
       status: form.status,
       price: parseFloat(selectedPrint.value.prices?.usd || '0'),
       image: imageToSave,
+      public: showPublicOption.value ? form.public : false,
     })
 
     // Si se seleccionó un deck, asignar la carta al deck
@@ -235,6 +241,7 @@ const handleClose = () => {
   form.foil = false
   form.status = 'collection'
   form.deckName = ''
+  form.public = true
   cardFaceIndex.value = 0
   availablePrints.value = []
   selectedPrint.value = null
@@ -373,6 +380,20 @@ const handleClose = () => {
                   :options="statusOptions"
                   class="mt-1"
               />
+            </div>
+
+            <!-- Publicar en perfil (solo para sale/trade) -->
+            <div v-if="showPublicOption" class="flex items-center gap-2 p-3 bg-[#111111] border border-[#CCFF00]/30">
+              <input
+                  v-model="form.public"
+                  type="checkbox"
+                  id="public"
+                  class="w-4 h-4"
+              />
+              <div>
+                <label for="public" class="text-sm text-[#EEEEEE] cursor-pointer">Publicar en mi perfil</label>
+                <p class="text-xs text-[#EEEEEE]/50">Visible en /@{{ authStore.user?.username }}</p>
+              </div>
             </div>
 
             <!-- Deck (opcional) -->

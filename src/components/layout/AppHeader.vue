@@ -71,6 +71,16 @@ const handleNavigate = (path: string) => {
 
           <!-- User Menu -->
           <div v-if="isAuthenticated" class="flex items-center gap-2">
+            <!-- Mi Perfil -->
+            <router-link
+                v-if="authStore.user?.username"
+                :to="`/@${authStore.user.username}`"
+                class="hidden sm:flex px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast items-center gap-1"
+                title="Ver mi perfil público"
+            >
+              <span>👤</span>
+              <span class="text-tiny">@{{ authStore.user.username }}</span>
+            </router-link>
             <router-link
                 to="/settings"
                 class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
@@ -120,6 +130,15 @@ const handleNavigate = (path: string) => {
         >
           <span class="inline-block mr-2">{{ link.icon }}</span>
           {{ link.label }}
+        </router-link>
+        <!-- Mi Perfil (mobile) -->
+        <router-link
+            v-if="authStore.user?.username"
+            :to="`/@${authStore.user.username}`"
+            class="block px-4 py-2 text-small font-bold text-silver-70 hover:text-neon transition-fast"
+        >
+          <span class="inline-block mr-2">👤</span>
+          Mi Perfil (@{{ authStore.user.username }})
         </router-link>
       </nav>
     </div>

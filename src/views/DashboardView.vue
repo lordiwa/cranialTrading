@@ -21,6 +21,15 @@
             {{ loading ? 'CALCULANDO...' : '🔄 RECALCULAR' }}
           </BaseButton>
           <BaseButton
+              variant="secondary"
+              size="small"
+              @click="syncPublicData"
+              :disabled="syncing"
+              class="w-full md:w-auto"
+          >
+            {{ syncing ? 'SINCRONIZANDO...' : '📡 SINCRONIZAR' }}
+          </BaseButton>
+          <BaseButton
               size="small"
               @click="$router.push('/saved-matches')"
               class="w-full md:w-auto"
@@ -106,6 +115,14 @@ import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
 import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '../services/firebase'
+import {
+  findCardsMatchingPreferences,
+  findPreferencesMatchingCards,
+  getUserPublicCards,
+  getUserPublicPreferences,
+  type PublicCard,
+  type PublicPreference,
+} from '../services/publicCards'
 
 const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
@@ -114,10 +131,29 @@ const matchesStore = useMatchesStore()
 const priceMatching = usePriceMatchingStore()
 
 const loading = ref(false)
+const syncing = ref(false)
 const calculatedMatches = ref<any[]>([])
 const progressCurrent = ref(0)
 const progressTotal = ref(0)
 const totalUsers = ref(0)
+
+/**
+ * Sincronizar datos a colecciones públicas para matches optimizados
+ */
+const syncPublicData = async () => {
+  if (!authStore.user) return
+
+  syncing.value = true
+  try {
+    // collectionStore ahora sincroniza tanto sale/trade como wishlist
+    await collectionStore.syncAllToPublic()
+    console.log('✅ Datos sincronizados a colecciones públicas')
+  } catch (error) {
+    console.error('Error sincronizando datos públicos:', error)
+  } finally {
+    syncing.value = false
+  }
+}
 
 onMounted(async () => {
   if (!authStore.user) return
@@ -231,7 +267,8 @@ const clearAllData = async () => {
 }
 
 /**
- * CAMBIO 2: Calcular matches y persistir en Firestore
+ * OPTIMIZED: Calcular matches usando colecciones públicas indexadas
+ * En vez de O(n) usuarios, hace queries directas por scryfallId
  */
 const calculateMatches = async () => {
   if (!authStore.user) return
@@ -243,87 +280,151 @@ const calculateMatches = async () => {
 
   try {
     const myCards = collectionStore.cards
-    const myPrefs = preferencesStore.preferences
+    // Usar cartas con status 'wishlist' como lista de búsqueda (en lugar de preferencias)
+    const myWishlist = myCards.filter(c => c.status === 'wishlist')
     const foundMatches: any[] = []
+    const processedUsers = new Set<string>()
 
-    const usersRef = collection(db, 'users')
-    const usersSnapshot = await getDocs(usersRef)
-    const totalUsersCount = usersSnapshot.docs.length
+    console.log('🔍 Iniciando cálculo de matches (optimizado)...')
+    console.log(`Mis cartas: ${myCards.length}, Mi wishlist: ${myWishlist.length}`)
 
-    console.log('🔍 Iniciando cálculo de matches...')
-    console.log(`Mis cartas: ${myCards.length}, Mis preferencias: ${myPrefs.length}`)
+    // PASO 1: Buscar cartas que coincidan con mi wishlist (lo que BUSCO)
+    progressTotal.value = 2
+    progressCurrent.value = 1
 
-    for (const userDoc of usersSnapshot.docs) {
-      progressCurrent.value++
-      progressTotal.value = totalUsersCount
+    // Debug: mostrar qué nombres estamos buscando
+    const myWishlistNames = myWishlist.map(c => c.name).filter(n => n)
+    console.log(`🔍 Buscando cartas por nombre:`, myWishlistNames)
 
-      if (userDoc.id === authStore.user.id) continue
+    const matchingCards = await findCardsMatchingPreferences(myWishlist, authStore.user.id)
+    console.log(`📦 Encontradas ${matchingCards.length} cartas que busco`)
 
-      try {
-        const otherUserId = userDoc.id
-        const otherUserData = userDoc.data()
+    // PASO 2: Buscar preferencias que coincidan con mis cartas (VENDO)
+    progressCurrent.value = 2
 
-        // Cargar cartas y preferencias del otro usuario
-        const [theirCardsSnapshot, theirPrefsSnapshot] = await Promise.all([
-          getDocs(collection(db, 'users', otherUserId, 'cards')),
-          getDocs(collection(db, 'users', otherUserId, 'preferences')),
-        ])
+    // Debug: mostrar qué nombres tengo para vender
+    const myTradeable = myCards.filter(c => c.status === 'trade' || c.status === 'sale')
+    const myCardNames = myTradeable.map(c => c.name).filter(n => n)
+    console.log(`🏷️ Mis cartas para vender (${myTradeable.length}):`, myCardNames)
 
-        const theirCards = theirCardsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as any[]
+    const matchingPrefs = await findPreferencesMatchingCards(myCards, authStore.user.id)
+    console.log(`🔎 Encontradas ${matchingPrefs.length} personas buscando mis cartas`)
 
-        const theirPreferences = theirPrefsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as any[]
+    // Agrupar por usuario
+    const userMatches = new Map<string, {
+      cards: PublicCard[],
+      prefs: PublicPreference[],
+      username: string,
+      location: string,
+      email: string
+    }>()
 
-        if (theirCards.length === 0 && theirPreferences.length === 0) {
-          continue
-        }
+    // Procesar cartas encontradas
+    for (const card of matchingCards) {
+      if (!userMatches.has(card.userId)) {
+        userMatches.set(card.userId, {
+          cards: [],
+          prefs: [],
+          username: card.username,
+          location: card.location || 'Unknown',
+          email: card.email || ''
+        })
+      }
+      userMatches.get(card.userId)!.cards.push(card)
+    }
 
-        // INTENTAR MATCH BIDIRECCIONAL PRIMERO
-        let matchCalc = priceMatching.calculateBidirectionalMatch(
+    // Procesar preferencias encontradas
+    for (const pref of matchingPrefs) {
+      if (!userMatches.has(pref.userId)) {
+        userMatches.set(pref.userId, {
+          cards: [],
+          prefs: [],
+          username: pref.username,
+          location: pref.location || 'Unknown',
+          email: pref.email || ''
+        })
+      }
+      userMatches.get(pref.userId)!.prefs.push(pref)
+    }
+
+    // Crear matches por usuario
+    progressTotal.value = userMatches.size + 2
+    let userIndex = 0
+
+    for (const [otherUserId, data] of userMatches) {
+      progressCurrent.value = userIndex + 3
+      userIndex++
+
+      // Convertir PublicCards a formato esperado por priceMatching
+      const theirCards = data.cards.map(c => ({
+        id: c.cardId,
+        name: c.cardName,
+        scryfallId: c.scryfallId,
+        price: c.price,
+        edition: c.edition,
+        condition: c.condition as any,
+        foil: c.foil,
+        quantity: c.quantity,
+        image: c.image,
+        status: c.status as any,
+        updatedAt: c.updatedAt?.toDate() || new Date(),
+        createdAt: c.updatedAt?.toDate() || new Date(),
+      }))
+
+      const theirPreferences = data.prefs.map(p => ({
+        id: p.prefId,
+        name: p.cardName,
+        cardName: p.cardName,
+        scryfallId: p.scryfallId,
+        maxPrice: p.maxPrice,
+        minCondition: p.minCondition,
+        // Fill required fields for type compatibility
+        type: 'BUSCO' as const,
+        quantity: 1,
+        condition: 'NM' as const,
+        edition: '',
+        image: '',
+        createdAt: p.updatedAt?.toDate() || new Date(),
+      }))
+
+      // INTENTAR MATCH BIDIRECCIONAL PRIMERO
+      let matchCalc = priceMatching.calculateBidirectionalMatch(
+          myCards,
+          myWishlist,
+          theirCards,
+          theirPreferences
+      )
+
+      // SI NO HAY BIDIRECCIONAL, INTENTAR UNIDIRECCIONAL
+      if (!matchCalc) {
+        matchCalc = priceMatching.calculateUnidirectionalMatch(
             myCards,
-            myPrefs,
+            myWishlist,
             theirCards,
             theirPreferences
         )
+      }
 
-        // SI NO HAY BIDIRECCIONAL, INTENTAR UNIDIRECCIONAL
-        if (!matchCalc) {
-          matchCalc = priceMatching.calculateUnidirectionalMatch(
-              myCards,
-              myPrefs,
-              theirCards,
-              theirPreferences
-          )
+      if (matchCalc && matchCalc.isValid) {
+        const match = {
+          id: `${authStore.user.id}_${otherUserId}_${Date.now()}`,
+          otherUserId,
+          otherUsername: data.username,
+          otherLocation: data.location,
+          otherEmail: data.email,
+          myCards: matchCalc.myCardsInfo || [],
+          otherCards: matchCalc.theirCardsInfo || [],
+          myTotalValue: matchCalc.myTotalValue,
+          theirTotalValue: matchCalc.theirTotalValue,
+          valueDifference: matchCalc.valueDifference,
+          compatibility: matchCalc.compatibility,
+          type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' : 'UNIDIRECTIONAL',
+          createdAt: new Date(),
+          lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
         }
 
-        if (matchCalc && matchCalc.isValid) {
-          const match = {
-            id: `${authStore.user.id}_${otherUserId}_${Date.now()}`,
-            otherUserId,
-            otherUsername: otherUserData.username,
-            otherLocation: otherUserData.location || 'Unknown',
-            otherEmail: otherUserData.email,
-            myCards: matchCalc.myCardsInfo || [],  // ✅ TODAS las cartas, no solo la primera
-            otherCards: matchCalc.theirCardsInfo || [],  // ✅ TODAS las cartas, no solo la primera
-            myTotalValue: matchCalc.myTotalValue,
-            theirTotalValue: matchCalc.theirTotalValue,
-            valueDifference: matchCalc.valueDifference,
-            compatibility: matchCalc.compatibility,
-            type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' : 'UNIDIRECTIONAL',
-            createdAt: new Date(),
-            lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-          }
-
-          foundMatches.push(match)
-          console.log(`✅ Match encontrado con ${otherUserData.username}: ${matchCalc.compatibility}%`)
-        }
-      } catch (err) {
-        console.error(`Error procesando usuario ${userDoc.id}:`, err)
+        foundMatches.push(match)
+        console.log(`✅ Match con ${data.username}: ${matchCalc.compatibility}%`)
       }
     }
 
@@ -331,12 +432,12 @@ const calculateMatches = async () => {
     foundMatches.sort((a, b) => b.compatibility - a.compatibility)
     calculatedMatches.value = foundMatches
 
-    // CAMBIO 3: Persistir matches en Firestore (matches_nuevos)
+    // Persistir matches en Firestore
     if (foundMatches.length > 0) {
       await saveMatchesToFirebase(foundMatches)
     }
 
-    console.log(`✅ Total de matches encontrados: ${foundMatches.length}`)
+    console.log(`✅ Total de matches: ${foundMatches.length} (de ${userMatches.size} usuarios potenciales)`)
   } catch (error) {
     console.error('Error calculando matches:', error)
   } finally {

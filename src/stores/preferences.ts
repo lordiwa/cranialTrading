@@ -4,6 +4,11 @@ import { useAuthStore } from './auth'
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { Preference, PreferenceType } from '../types/preferences'
+import {
+    syncPreferenceToPublic,
+    removePreferenceFromPublic,
+    syncAllUserPreferences,
+} from '../services/publicCards'
 
 export const usePreferencesStore = defineStore('preferences', () => {
     const authStore = useAuthStore()
@@ -11,6 +16,17 @@ export const usePreferencesStore = defineStore('preferences', () => {
     const loading = ref(false)
 
     const preferences = computed(() => _preferences.value)
+
+    // Helper to get user info for public sync
+    const getUserInfo = () => {
+        if (!authStore.user) return null
+        return {
+            userId: authStore.user.id,
+            username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown',
+            location: authStore.user.location,
+            email: authStore.user.email,
+        }
+    }
 
     /**
      * CARGAR preferencias desde Firestore
@@ -65,6 +81,13 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             const newPref = { id: docRef.id, ...prefData } as Preference
             _preferences.value.push(newPref)
+
+            // Sync to public (non-blocking)
+            const userInfo = getUserInfo()
+            if (userInfo) {
+                syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                    .catch(err => console.error('[PublicSync] Error syncing preference:', err))
+            }
 
             console.log('✅ Preference added:', prefData.name)
             return newPref
@@ -152,6 +175,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
             const prefRef = doc(db, 'users', authStore.user.id, 'preferences', prefId)
             await deleteDoc(prefRef)
 
+            // Remove from public (non-blocking)
+            removePreferenceFromPublic(prefId, authStore.user.id)
+                .catch(err => console.error('[PublicSync] Error removing preference:', err))
+
             _preferences.value = _preferences.value.filter(p => p.id !== prefId)
             console.log('✅ Preference deleted:', prefId)
         } catch (error) {
@@ -201,6 +228,28 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
 
     /**
+     * Bulk sync all preferences to public collection
+     * Call this once to migrate existing data
+     */
+    const syncAllToPublic = async (): Promise<void> => {
+        const userInfo = getUserInfo()
+        if (!userInfo) return
+
+        try {
+            await syncAllUserPreferences(
+                _preferences.value,
+                userInfo.userId,
+                userInfo.username,
+                userInfo.location,
+                userInfo.email
+            )
+            console.log('✅ Preferences synced to public')
+        } catch (error) {
+            console.error('[PublicSync] Error bulk syncing preferences:', error)
+        }
+    }
+
+    /**
      * LIMPIAR estado local (logout)
      */
     const clear = () => {
@@ -216,6 +265,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         updatePreferenceType,
         deletePreference,
         deletePreferenceByCard,
+        syncAllToPublic,
         clear,
     }
 })

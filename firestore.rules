@@ -62,6 +62,23 @@ service cloud.firestore {
       }
     }
 
+    // ========== COLECCIONES PÚBLICAS PARA MATCHES OPTIMIZADOS ==========
+    // Cartas públicas (para trade/sale) - cualquier autenticado puede leer
+    match /public_cards/{docId} {
+      allow read: if request.auth != null;
+      // Solo el dueño puede escribir (userId debe coincidir)
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Preferencias públicas (lo que buscan) - cualquier autenticado puede leer
+    match /public_preferences/{docId} {
+      allow read: if request.auth != null;
+      // Solo el dueño puede escribir (userId debe coincidir)
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
     // Conversaciones de mensajes (a nivel raíz)
     match /conversations/{conversationId} {
       // Permitir a usuarios autenticados crear y leer conversaciones donde participan

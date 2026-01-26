@@ -21,7 +21,8 @@
       "Bash(firebase deploy:*)",
       "Bash(powershell -Command \"Invoke-WebRequest -Uri ''https://moxfield-proxy.srparca.workers.dev?id=tiIftnM5wUC29k6F5KisRw'' -UseBasicParsing | Select-Object -ExpandProperty Content\")",
       "Bash(powershell:*)",
-      "Bash(powershell -Command \"$input | ConvertFrom-Json | Select-Object -Property * | Format-List\")"
+      "Bash(powershell -Command \"$input | ConvertFrom-Json | Select-Object -Property * | Format-List\")",
+      "Bash(npx firebase deploy:*)"
     ]
   }
 }

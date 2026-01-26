@@ -88,12 +88,12 @@ const getVisualFor = (obj: any): { badge: BadgeVariant; border: string; label: s
             class="relative"
         >
           <p class="text-small font-bold text-silver-70 mb-2">USUARIO</p>
-          <RouterLink
-              :to="{ name: 'userProfile', params: { username: match.otherUsername } }"
-              class="text-body text-neon hover:text-silver-70 transition-fast font-bold"
+          <router-link
+              :to="`/@${match.otherUsername}`"
+              class="text-body text-neon hover:underline transition-fast font-bold"
           >
             @{{ match.otherUsername }}
-          </RouterLink>
+          </router-link>
           <p v-if="match.otherLocation" class="text-small text-silver-50 mt-1">
             📍 {{ match.otherLocation }}
           </p>

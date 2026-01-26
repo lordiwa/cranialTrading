@@ -43,7 +43,7 @@ const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<any>(null)
 
 // ✅ Filtros de COLECCIÓN (no Scryfall)
-const statusFilter = ref<'all' | 'owned' | CardStatus>('all')
+const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
 const deckFilter = ref<string>('all')
 const filterQuery = ref('')
 
@@ -67,11 +67,9 @@ const ownedCount = computed(() => ownedCards.value.length)
 const collectionCount = computed(() =>
     collectionCards.value.filter(c => c.status === 'collection').length
 )
-const saleCount = computed(() =>
-    collectionCards.value.filter(c => c.status === 'sale').length
-)
-const tradeCount = computed(() =>
-    collectionCards.value.filter(c => c.status === 'trade').length
+// Combinamos sale + trade en "disponible" (para venta o cambio)
+const availableCount = computed(() =>
+    collectionCards.value.filter(c => c.status === 'sale' || c.status === 'trade').length
 )
 const wishlistCount = computed(() => wishlistCards.value.length)
 
@@ -81,6 +79,7 @@ const getStatusLabel = (status: string): string => {
     'all': 'TODAS',
     'owned': 'TENGO',
     'collection': 'COLECCIÓN',
+    'available': 'DISPONIBLE',
     'sale': 'VENTA',
     'trade': 'CAMBIO',
     'wishlist': 'NECESITO',
@@ -256,6 +255,9 @@ const filteredCards = computed(() => {
   // Filtro por status
   if (statusFilter.value === 'owned') {
     cards = cards.filter(c => c.status !== 'wishlist')
+  } else if (statusFilter.value === 'available') {
+    // 'available' incluye tanto 'sale' como 'trade'
+    cards = cards.filter(c => c.status === 'sale' || c.status === 'trade')
   } else if (statusFilter.value !== 'all') {
     cards = cards.filter(c => c.status === statusFilter.value)
   }
@@ -868,7 +870,7 @@ watch(() => route.query.deck, (newDeckId) => {
               v-for="(count, status) in {
                 'all': collectionCards.length,
                 'collection': collectionCount,
-                'trade': tradeCount,
+                'available': availableCount,
                 'wishlist': wishlistCount
               }"
               :key="status"

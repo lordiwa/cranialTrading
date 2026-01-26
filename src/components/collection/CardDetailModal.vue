@@ -38,6 +38,7 @@ const selectedPrint = ref<any>(null)
 // Card properties (shared across all status entries)
 const condition = ref<CardCondition>('NM')
 const foil = ref(false)
+const isPublic = ref(true)
 
 // Status distribution - how many copies in each status
 const statusDistribution = ref<Record<CardStatus, number>>({
@@ -135,6 +136,11 @@ const allocationWarning = computed(() => {
   return null
 })
 
+// Show public option when there are cards for sale or trade
+const showPublicOption = computed(() => {
+  return statusDistribution.value.sale > 0 || statusDistribution.value.trade > 0
+})
+
 // ========== METHODS ==========
 
 // Helper: Clean card name for search
@@ -179,6 +185,7 @@ const initializeForm = async () => {
   // Use condition and foil from the clicked card
   condition.value = props.card.condition
   foil.value = props.card.foil
+  isPublic.value = props.card.public ?? true
 
   // Load deck allocations for all related cards
   deckAllocations.value = {}
@@ -308,6 +315,7 @@ const handleSave = async () => {
       if (targetQty > 0) {
         if (existingCard) {
           // Update existing entry
+          const publicValue = (status === 'sale' || status === 'trade') ? isPublic.value : false
           await collectionStore.updateCard(existingCard.id, {
             quantity: targetQty,
             condition: condition.value,
@@ -317,12 +325,14 @@ const handleSave = async () => {
             setCode: newSetCode,
             image: newImage,
             price: newPrice,
+            public: publicValue,
           })
           if (status !== 'wishlist') {
             updatedCardIds.push(existingCard.id)
           }
         } else {
           // Create new entry for this status
+          const publicValue = (status === 'sale' || status === 'trade') ? isPublic.value : false
           const newCardId = await collectionStore.addCard({
             scryfallId: newScryfallId,
             name: props.card.name,
@@ -334,6 +344,7 @@ const handleSave = async () => {
             price: newPrice,
             image: newImage,
             status: status,
+            public: publicValue,
           })
           if (status !== 'wishlist' && newCardId) {
             updatedCardIds.push(newCardId)
@@ -599,6 +610,21 @@ watch(selectedPrint, (print) => {
         <p v-if="allocationWarning && !validationError" class="text-tiny text-yellow-400 mt-3">
           ⚠️ {{ allocationWarning }}
         </p>
+
+        <!-- Public option (shown when sale or trade > 0) -->
+        <div v-if="showPublicOption" class="mt-4 pt-3 border-t border-silver-20">
+          <label class="flex items-center gap-3 cursor-pointer p-2 border border-neon/30 hover:border-neon transition-150">
+            <input
+                v-model="isPublic"
+                type="checkbox"
+                class="w-4 h-4 cursor-pointer"
+            />
+            <div>
+              <span class="text-small text-silver">Publicar en mi perfil</span>
+              <p class="text-tiny text-silver-50">Visible para otros usuarios en tu perfil público</p>
+            </div>
+          </label>
+        </div>
       </div>
 
       <!-- Condition & Foil -->

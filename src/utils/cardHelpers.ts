@@ -8,14 +8,26 @@
  * - "Card Name *F*" → "Card Name"
  * - "Card Name (SET) 123" → "Card Name"
  * - "Card Name (PLST) KHM-275" → "Card Name"
+ *
+ * Note: Patterns use bounded quantifiers to prevent ReDoS attacks
  */
 export const cleanCardName = (name: string): string => {
-  return name
-    .replace(/\s*\*f\*?\s*$/i, '')                       // Remove foil indicator (*f, *F, *f*, *F*)
-    .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '') // Remove (SET) COLLECTOR patterns
-    .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '')    // Remove (SET) 123 patterns
-    .replace(/\s*\([A-Z0-9]+\)\s*$/i, '')                // Remove trailing (SET)
-    .trim()
+  // Trim first to simplify patterns (removes need for trailing \s*)
+  let result = name.trim()
+
+  // Remove foil indicator (*f, *F, *f*, *F*)
+  result = result.replace(/\s{0,5}\*f\*?$/i, '')
+
+  // Remove (SET) COLLECTOR patterns like "(PLST) KHM-275"
+  result = result.replace(/\s{0,5}\([A-Z0-9]{2,10}\)\s{0,5}[A-Z]{0,5}-?\d{1,5}[a-z]?$/i, '')
+
+  // Remove (SET) 123 patterns
+  result = result.replace(/\s{0,5}\([A-Z0-9]{2,10}\)\s{0,5}\d{1,5}[a-z]?$/i, '')
+
+  // Remove trailing (SET)
+  result = result.replace(/\s{0,5}\([A-Z0-9]{2,10}\)$/i, '')
+
+  return result.trim()
 }
 
 /**
@@ -46,5 +58,5 @@ export const getCardTypePriority = (typeLine?: string): number => {
  * Returns true if name ends with *F* or similar
  */
 export const hasFoilIndicator = (name: string): boolean => {
-  return /\*f\*?\s*$/i.test(name)
+  return /\*f\*?\s{0,5}$/i.test(name)
 }

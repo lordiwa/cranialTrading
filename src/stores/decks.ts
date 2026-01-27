@@ -786,6 +786,8 @@ export const useDecksStore = defineStore('decks', () => {
         const totalAllocated = getTotalAllocatedForCard(card.id)
         if (newQuantity >= totalAllocated) return // No reduction needed
 
+        const collectionStore = useCollectionStore()
+        const updatePromises: Promise<void>[] = []
         let excessToRemove = totalAllocated - newQuantity
 
         for (const deck of decks.value) {
@@ -834,23 +836,25 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             // Recalculate stats
-            const collectionStore = useCollectionStore()
             deck.stats = calculateStats(deck.allocations, deck.wishlist, collectionStore.cards)
             deck.updatedAt = new Date()
 
-            // Save to Firestore
-            try {
-                const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
-                await updateDoc(deckRef, {
+            // Queue Firestore update (parallel)
+            const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
+            updatePromises.push(
+                updateDoc(deckRef, {
                     allocations: deck.allocations,
                     wishlist: deck.wishlist,
                     stats: deck.stats,
                     updatedAt: Timestamp.now(),
+                }).catch(error => {
+                    console.error(`Error reducing allocations for deck ${deck.name}:`, error)
                 })
-            } catch (error) {
-                console.error(`Error reducing allocations for deck ${deck.name}:`, error)
-            }
+            )
         }
+
+        // Execute all updates in parallel
+        await Promise.all(updatePromises)
     }
 
     /**
@@ -859,6 +863,9 @@ export const useDecksStore = defineStore('decks', () => {
      */
     const convertAllocationsToWishlist = async (deletedCard: Card): Promise<void> => {
         if (!authStore.user?.id) return
+
+        const collectionStore = useCollectionStore()
+        const updatePromises: Promise<void>[] = []
 
         for (const deck of decks.value) {
             if (!deck.allocations) continue
@@ -888,23 +895,25 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             // Recalculate stats
-            const collectionStore = useCollectionStore()
             deck.stats = calculateStats(deck.allocations, deck.wishlist, collectionStore.cards)
             deck.updatedAt = new Date()
 
-            // Save to Firestore
-            try {
-                const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
-                await updateDoc(deckRef, {
+            // Queue Firestore update (parallel)
+            const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
+            updatePromises.push(
+                updateDoc(deckRef, {
                     allocations: deck.allocations,
                     wishlist: deck.wishlist,
                     stats: deck.stats,
                     updatedAt: Timestamp.now(),
+                }).catch(error => {
+                    console.error(`Error converting allocations for deck ${deck.name}:`, error)
                 })
-            } catch (error) {
-                console.error(`Error converting allocations for deck ${deck.name}:`, error)
-            }
+            )
         }
+
+        // Execute all updates in parallel
+        await Promise.all(updatePromises)
     }
 
     // ========================================================================

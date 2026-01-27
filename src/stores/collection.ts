@@ -150,13 +150,21 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /**
-     * Delete a single card from collection
-     * Note: The decks store should be notified to convert allocations to wishlist
-     * This is handled by the caller (usually via useCardAllocation or decks store)
+     * Delete a single card from collection (optimistic UI)
+     * Removes from UI immediately, then syncs with Firebase in background
+     * If Firebase fails, restores the card and shows error
      */
     const deleteCard = async (cardId: string): Promise<boolean> => {
         if (!authStore.user) return false
 
+        // Find and remove card optimistically (immediate UI update)
+        const cardIndex = cards.value.findIndex(c => c.id === cardId)
+        if (cardIndex === -1) return false
+
+        const deletedCard = cards.value[cardIndex]
+        cards.value.splice(cardIndex, 1)
+
+        // Sync with Firebase in background
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await deleteDoc(cardRef)
@@ -165,11 +173,12 @@ export const useCollectionStore = defineStore('collection', () => {
             removeCardFromPublic(cardId, authStore.user.id)
                 .catch(err => console.error('[PublicSync] Error removing card:', err))
 
-            cards.value = cards.value.filter((c) => c.id !== cardId)
             console.log(`✅ Carta eliminada: ${cardId}`)
             return true
         } catch (error) {
+            // Restore card on failure
             console.error('Error deleting card:', error)
+            cards.value.splice(cardIndex, 0, deletedCard)
             toastStore.show('Error al eliminar carta', 'error')
             return false
         }

@@ -74,22 +74,24 @@ const handleCreateDeck = async (deckData: any) => {
           continue
         }
 
-        // More flexible regex: quantity + card name + optional (set) + optional collector number + optional foil indicator
-        const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
+        // Simple regex: capture quantity and everything else
+        const match = trimmed.match(/^(\d+)x?\s+(.+)$/)
         if (!match) continue
 
         const quantity = Number.parseInt(match[1])
-        let cardName = match[2].trim()
-        const setCode = match[3] || null
+        let remainder = match[2].trim()
 
         // Check for foil indicator in the original line (*F*, *f*, *f, *F)
-        const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+        const isFoil = /\*[fF]\*?/.test(trimmed)
 
-        // Clean card name: remove any embedded (SET) codes, collector numbers, and foil indicators
-        cardName = cardName
-          .replace(/\s*\*[fF]\*?\s*$/i, '')
-          .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?$/i, '')
-          .replace(/\s*\([A-Z0-9]+\)$/i, '')
+        // Extract set code if present: looks for (ABC) or (ABC123) pattern
+        const setMatch = remainder.match(/\(([A-Za-z0-9]+)\)/)
+        const setCode = setMatch ? setMatch[1] : null
+
+        // Clean card name: remove (SET) and everything after it, plus foil indicators
+        let cardName = remainder
+          .replace(/\s*\*[fF]\*?\s*/gi, '')           // Remove foil indicators anywhere
+          .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')     // Remove (SET) and everything after
           .trim()
 
         // Buscar en Scryfall
@@ -264,23 +266,24 @@ const handleImport = async (
       continue
     }
 
-    // More flexible regex: quantity + card name + optional (set) + optional collector number + optional foil indicator
-    const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
+    // Simple regex: capture quantity and everything else
+    const match = trimmed.match(/^(\d+)x?\s+(.+)$/)
     if (!match) continue
 
     const quantity = Number.parseInt(match[1])
-    let cardName = match[2].trim()
-    const setCode = match[3] || null
+    let remainder = match[2].trim()
 
     // Check for foil indicator in the original line (*F*, *f*, *f, *F)
-    const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+    const isFoil = /\*[fF]\*?/.test(trimmed)
 
-    // Clean card name: remove any embedded (SET) codes, collector numbers, and foil indicators
-    // Handles formats like "Card Name (PLST) KHM-275" or "Card Name (PMKM) 271p" or "Card Name *F*"
-    cardName = cardName
-      .replace(/\s*\*[fF]\*?\s*$/i, '') // Remove foil indicator
-      .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?$/i, '') // Remove trailing (SET) collector
-      .replace(/\s*\([A-Z0-9]+\)$/i, '') // Remove trailing (SET)
+    // Extract set code if present: looks for (ABC) or (ABC123) pattern
+    const setMatch = remainder.match(/\(([A-Za-z0-9]+)\)/)
+    const setCode = setMatch ? setMatch[1] : null
+
+    // Clean card name: remove (SET) and everything after it, plus foil indicators
+    let cardName = remainder
+      .replace(/\s*\*[fF]\*?\s*/gi, '')           // Remove foil indicators anywhere
+      .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')     // Remove (SET) and everything after
       .trim()
 
     // Skip sideboard if not included

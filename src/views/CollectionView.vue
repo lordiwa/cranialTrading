@@ -346,7 +346,7 @@ const handleManageDecks = (card: Card) => {
   showManageDecksModal.value = true
 }
 
-// Eliminar existente
+// Eliminar existente (optimistic UI - visual inmediato, toast después de DB)
 const handleDelete = async (card: Card) => {
   // Check if card has allocations in decks
   const allocations = getAllocationsForCard(card.id)
@@ -358,17 +358,21 @@ const handleDelete = async (card: Card) => {
 
   if (!confirm(message)) return
 
-  try {
-    // Convert allocations to wishlist BEFORE deleting the card
-    if (hasAllocations) {
-      await decksStore.convertAllocationsToWishlist(card)
-    }
+  // Delete card optimistically (UI updates immediately, toast after DB)
+  const deletePromise = collectionStore.deleteCard(card.id)
 
-    await collectionStore.deleteCard(card.id)
-    toastStore.show(`✓ "${card.name}" eliminada`, 'success')
-  } catch (err) {
-    toastStore.show('Error eliminando carta', 'error')
+  // Convert allocations to wishlist in background (non-blocking)
+  if (hasAllocations) {
+    decksStore.convertAllocationsToWishlist(card)
+      .catch(err => console.error('Error converting allocations:', err))
   }
+
+  // Wait for delete to complete, then show toast
+  const success = await deletePromise
+  if (success) {
+    toastStore.show(`✓ "${card.name}" eliminada`, 'success')
+  }
+  // If failed, store already shows error toast and restores card
 }
 
 // Handler cuando se cierra el modal de detalle
@@ -693,30 +697,33 @@ const handleImportDirect = async (
 const handleDeleteDeck = async () => {
   if (!selectedDeck.value) return
 
+  // Guardar referencias ANTES de cualquier operación (el computed puede cambiar)
+  const deckId = selectedDeck.value.id
+  const deckName = selectedDeck.value.name
+  const cardIds = selectedDeck.value.allocations?.length > 0
+    ? [...new Set(selectedDeck.value.allocations.map(a => a.cardId))]
+    : []
+
   // Primera confirmación: eliminar el deck
-  if (!confirm(`¿Eliminar el deck "${selectedDeck.value.name}"?`)) return
+  if (!confirm(`¿Eliminar el deck "${deckName}"?`)) return
 
   // Segunda confirmación: eliminar también las cartas de la colección
-  const deleteCards = confirm('¿También deseas eliminar las cartas de tu colección?\n\nSÍ = Eliminar deck y cartas\nNO = Solo eliminar deck (cartas permanecen)')
+  const deleteCards = cardIds.length > 0 && confirm('¿También deseas eliminar las cartas de tu colección?\n\nSÍ = Eliminar deck y cartas\nNO = Solo eliminar deck (cartas permanecen)')
 
   try {
-    if (deleteCards && selectedDeck.value.allocations?.length > 0) {
-      // Obtener IDs únicos de cartas asignadas
-      const cardIds = [...new Set(selectedDeck.value.allocations.map(a => a.cardId))]
+    // Primero eliminar el deck
+    await decksStore.deleteDeck(deckId)
+    deckFilter.value = 'all'
 
-      // Eliminar cada carta de la colección
-      for (const cardId of cardIds) {
-        await collectionStore.deleteCard(cardId)
-      }
-
+    // Luego eliminar las cartas si el usuario lo solicitó (en paralelo para mayor velocidad)
+    if (deleteCards) {
+      await Promise.all(cardIds.map(cardId => collectionStore.deleteCard(cardId)))
       toastStore.show(`Deck y ${cardIds.length} cartas eliminadas`, 'success')
     } else {
       toastStore.show('Deck eliminado (cartas conservadas)', 'success')
     }
-
-    await decksStore.deleteDeck(selectedDeck.value.id)
-    deckFilter.value = 'all'
   } catch (err) {
+    console.error('Error eliminando deck:', err)
     toastStore.show('Error eliminando deck', 'error')
   }
 }

@@ -138,10 +138,11 @@ const handleClose = () => {
   <BaseModal :show="show" title="IMPORTAR COMO BUSCO" @close="handleClose">
     <div class="space-y-md">
       <div>
-        <label class="text-small text-silver-70 block mb-2">
+        <label for="import-pref-input" class="text-small text-silver-70 block mb-2">
           Link de Moxfield o texto del mazo
         </label>
         <textarea
+            id="import-pref-input"
             v-model="inputText"
             placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;..."
             class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-mono"
@@ -190,8 +191,9 @@ const handleClose = () => {
       </div>
 
       <div v-if="preview">
-        <label class="text-small text-silver-70 block mb-2">Condición mínima deseada</label>
+        <label for="import-pref-condition" class="text-small text-silver-70 block mb-2">Condición mínima deseada</label>
         <BaseSelect
+            id="import-pref-condition"
             v-model="condition"
             :options="conditionOptions"
         />

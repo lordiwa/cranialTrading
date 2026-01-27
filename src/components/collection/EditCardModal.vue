@@ -238,8 +238,9 @@ const handleClose = () => {
 
           <!-- Print Selector -->
           <div v-if="availablePrints.length > 1">
-            <label class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+            <label for="edit-print-select" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
             <select
+                id="edit-print-select"
                 :value="selectedPrint?.id"
                 @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
                 class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
@@ -283,8 +284,9 @@ const handleClose = () => {
         <!-- Quantity & Condition -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="text-small text-silver-70 block mb-2">Cantidad</label>
+            <label for="edit-quantity" class="text-small text-silver-70 block mb-2">Cantidad</label>
             <BaseInput
+                id="edit-quantity"
                 v-model.number="form.quantity"
                 type="number"
                 min="1"
@@ -296,8 +298,9 @@ const handleClose = () => {
           </div>
 
           <div>
-            <label class="text-small text-silver-70 block mb-2">Condición</label>
+            <label for="edit-condition" class="text-small text-silver-70 block mb-2">Condición</label>
             <BaseSelect
+                id="edit-condition"
                 v-model="form.condition"
                 :options="conditionOptions"
             />

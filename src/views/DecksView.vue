@@ -542,8 +542,9 @@ onMounted(async () => {
       <div class="bg-primary border border-silver-30 p-4 md:p-6 mb-6 space-y-4">
         <!-- Búsqueda -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">Buscar</label>
+          <label for="decks-search" class="text-small text-silver-70 block mb-2">Buscar</label>
           <BaseInput
+              id="decks-search"
               v-model="searchQuery"
               placeholder="Buscar por nombre o descripción..."
               type="text"

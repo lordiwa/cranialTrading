@@ -140,8 +140,9 @@ defineExpose({
 
     <!-- Search Input -->
     <div>
-      <label class="text-small text-silver-70 block mb-2">Buscar Carta</label>
+      <label for="card-grid-search" class="text-small text-silver-70 block mb-2">Buscar Carta</label>
       <BaseInput
+          id="card-grid-search"
           v-model="searchQuery"
           :placeholder="placeholder"
           type="text"

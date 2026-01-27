@@ -553,18 +553,20 @@ const activeFilterCount = () => {
 
         <!-- Mana Value -->
         <div>
-          <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">Mana Value</label>
+          <span id="mana-value-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Mana Value</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.manaValue!.min"
                 type="number"
                 placeholder="Min"
+                aria-label="Mana Value minimum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
             <input
                 v-model.number="filters.manaValue!.max"
                 type="number"
                 placeholder="Max"
+                aria-label="Mana Value maximum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
           </div>
@@ -572,13 +574,14 @@ const activeFilterCount = () => {
 
         <!-- Precio USD -->
         <div>
-          <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">Precio USD</label>
+          <span id="price-usd-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Precio USD</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.priceUSD!.min"
                 type="number"
                 placeholder="Min"
                 step="0.01"
+                aria-label="Price USD minimum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
             <input
@@ -586,6 +589,7 @@ const activeFilterCount = () => {
                 type="number"
                 placeholder="Max"
                 step="0.01"
+                aria-label="Price USD maximum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
           </div>
@@ -593,18 +597,20 @@ const activeFilterCount = () => {
 
         <!-- Power -->
         <div>
-          <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">Power</label>
+          <span id="power-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Power</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.power!.min"
                 type="number"
                 placeholder="Min"
+                aria-label="Power minimum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
             <input
                 v-model.number="filters.power!.max"
                 type="number"
                 placeholder="Max"
+                aria-label="Power maximum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
           </div>
@@ -612,18 +618,20 @@ const activeFilterCount = () => {
 
         <!-- Toughness -->
         <div>
-          <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">Toughness</label>
+          <span id="toughness-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Toughness</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.toughness!.min"
                 type="number"
                 placeholder="Min"
+                aria-label="Toughness minimum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
             <input
                 v-model.number="filters.toughness!.max"
                 type="number"
                 placeholder="Max"
+                aria-label="Toughness maximum"
                 class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
             />
           </div>

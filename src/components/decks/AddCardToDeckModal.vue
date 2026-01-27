@@ -288,8 +288,9 @@ watch(() => props.show, (newVal) => {
 
           <!-- Search Input -->
           <div>
-            <label class="text-small text-silver-70 block mb-2">Buscar Carta</label>
+            <label for="add-deck-search" class="text-small text-silver-70 block mb-2">Buscar Carta</label>
             <BaseInput
+                id="add-deck-search"
                 :model-value="searchQuery"
                 @update:model-value="handleSearchInput"
                 placeholder="Ej: Black Lotus, Ragavan, Counterspell..."
@@ -401,8 +402,9 @@ watch(() => props.show, (newVal) => {
                     </div>
 
                     <div v-if="availablePrints.length > 1">
-                      <label class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+                      <label for="add-deck-print-select" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
                       <select
+                          id="add-deck-print-select"
                           :value="selectedCard.id"
                           @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
                           class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
@@ -507,13 +509,14 @@ watch(() => props.show, (newVal) => {
                   <div class="space-y-3 border-t border-silver-20 pt-4">
                     <div class="grid grid-cols-2 gap-3">
                       <div>
-                        <label class="text-tiny text-silver-70 block mb-1">
+                        <label for="add-deck-quantity" class="text-tiny text-silver-70 block mb-1">
                           Cantidad
                           <span v-if="addMode === 'collection' && selectedCollectionCard" class="text-neon">
                             (máx: {{ selectedCollectionCard.availableQuantity }})
                           </span>
                         </label>
                         <input
+                            id="add-deck-quantity"
                             v-model.number="form.quantity"
                             type="number"
                             min="1"
@@ -523,8 +526,8 @@ watch(() => props.show, (newVal) => {
                       </div>
 
                       <div v-if="addMode !== 'collection' || !selectedCollectionCard">
-                        <label class="text-tiny text-silver-70 block mb-1">Condición</label>
-                        <BaseSelect v-model="form.condition" :options="conditionOptions" />
+                        <label for="add-deck-condition" class="text-tiny text-silver-70 block mb-1">Condición</label>
+                        <BaseSelect id="add-deck-condition" v-model="form.condition" :options="conditionOptions" />
                       </div>
                       <div v-else>
                         <label class="text-tiny text-silver-70 block mb-1">Condición</label>

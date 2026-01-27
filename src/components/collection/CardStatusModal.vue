@@ -144,8 +144,9 @@ watch(() => props.card, (newCard) => {
 
       <!-- Status Selector -->
       <div>
-        <label class="text-small text-silver-70 block mb-2">Nuevo status</label>
+        <label for="status-select" class="text-small text-silver-70 block mb-2">Nuevo status</label>
         <BaseSelect
+            id="status-select"
             v-model="selectedStatus"
             :options="statusOptions"
         />

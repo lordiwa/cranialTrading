@@ -121,8 +121,9 @@ watch(() => props.show, (show) => {
       <div class="space-y-4">
         <!-- Name -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">Nombre del Mazo *</label>
+          <label for="create-deck-name" class="text-small text-silver-70 block mb-2">Nombre del Mazo *</label>
           <BaseInput
+              id="create-deck-name"
               v-model="form.name"
               placeholder="Ej: RDW Modern"
               type="text"
@@ -132,8 +133,9 @@ watch(() => props.show, (show) => {
 
         <!-- Format -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">Formato</label>
+          <label for="create-deck-format" class="text-small text-silver-70 block mb-2">Formato</label>
           <BaseSelect
+              id="create-deck-format"
               v-model="form.format"
               :options="formatOptions"
           />
@@ -141,8 +143,9 @@ watch(() => props.show, (show) => {
 
         <!-- Description -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">Descripción</label>
+          <label for="create-deck-description" class="text-small text-silver-70 block mb-2">Descripción</label>
           <textarea
+              id="create-deck-description"
               v-model="form.description"
               placeholder="Describe tu estrategia, meta, notas..."
               class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-small focus:outline-none focus:border-neon transition-150 resize-none h-20"
@@ -151,10 +154,11 @@ watch(() => props.show, (show) => {
 
         <!-- Deck List (opcional) -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">
+          <label for="create-deck-list" class="text-small text-silver-70 block mb-2">
             Lista de cartas (opcional)
           </label>
           <textarea
+              id="create-deck-list"
               v-model="deckList"
               placeholder="Pega tu lista aquí:&#10;4 Lightning Bolt&#10;4 Monastery Swiftspear&#10;SIDEBOARD:&#10;2 Blood Moon"
               class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-tiny focus:outline-none focus:border-neon transition-150 resize-none h-32"

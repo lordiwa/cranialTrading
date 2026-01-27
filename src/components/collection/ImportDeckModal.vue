@@ -190,10 +190,11 @@ const handleClose = () => {
   <BaseModal :show="show" title="IMPORTAR MAZO" @close="handleClose">
     <div class="space-y-md">
       <div>
-        <label class="text-small text-silver-70 block mb-2">
+        <label for="import-deck-input" class="text-small text-silver-70 block mb-2">
           Link de Moxfield o texto del mazo
         </label>
         <textarea
+            id="import-deck-input"
             v-model="inputText"
             placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;..."
             class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-mono"
@@ -242,8 +243,9 @@ const handleClose = () => {
       </div>
 
       <div v-if="preview">
-        <label class="text-small text-silver-70 block mb-2">Condición por defecto</label>
+        <label for="import-deck-condition" class="text-small text-silver-70 block mb-2">Condición por defecto</label>
         <BaseSelect
+            id="import-deck-condition"
             v-model="condition"
             :options="conditionOptions"
         />
@@ -262,14 +264,15 @@ const handleClose = () => {
 
       <!-- Deck name input (optional) -->
       <div v-if="preview">
-        <label class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
-        <BaseInput v-model="deckNameInput" placeholder="Dejar vacío para generar un nombre aleatorio" />
+        <label for="import-deck-name" class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
+        <BaseInput id="import-deck-name" v-model="deckNameInput" placeholder="Dejar vacío para generar un nombre aleatorio" />
       </div>
 
       <!-- Formato del deck -->
       <div v-if="preview">
-        <label class="text-small text-silver-70 block mb-2">Formato</label>
+        <label for="import-deck-format" class="text-small text-silver-70 block mb-2">Formato</label>
         <BaseSelect
+            id="import-deck-format"
             v-model="deckFormat"
             :options="formatOptions"
         />
@@ -277,8 +280,9 @@ const handleClose = () => {
 
       <!-- Commander (solo si es Commander) -->
       <div v-if="preview && isCommander">
-        <label class="text-small text-silver-70 block mb-2">Comandante</label>
+        <label for="import-deck-commander" class="text-small text-silver-70 block mb-2">Comandante</label>
         <BaseInput
+            id="import-deck-commander"
             v-model="commanderName"
             placeholder="Nombre del comandante..."
             list="commander-suggestions"

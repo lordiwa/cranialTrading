@@ -319,8 +319,9 @@ const handleClose = () => {
 
               <!-- Print Selector -->
               <div v-if="availablePrints.length > 1" class="mt-3">
-                <label class="text-xs text-[#EEEEEE]/70 block mb-1">Edición / Print</label>
+                <label for="print-select" class="text-xs text-[#EEEEEE]/70 block mb-1">Edición / Print</label>
                 <select
+                    id="print-select"
                     :value="selectedPrint?.id"
                     @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
                     class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#CCFF00]"
@@ -344,8 +345,9 @@ const handleClose = () => {
           <div class="flex-1 space-y-4">
             <!-- Cantidad -->
             <div>
-              <label class="text-sm text-[#EEEEEE]">Cantidad</label>
+              <label for="quantity" class="text-sm text-[#EEEEEE]">Cantidad</label>
               <input
+                  id="quantity"
                   v-model.number="form.quantity"
                   type="number"
                   min="1"
@@ -355,8 +357,9 @@ const handleClose = () => {
 
             <!-- Condición -->
             <div>
-              <label class="text-sm text-[#EEEEEE]">Condición</label>
+              <label for="condition" class="text-sm text-[#EEEEEE]">Condición</label>
               <BaseSelect
+                  id="condition"
                   v-model="form.condition"
                   :options="conditionOptions"
                   class="mt-1"
@@ -376,8 +379,9 @@ const handleClose = () => {
 
             <!-- Estado -->
             <div>
-              <label class="text-sm text-[#EEEEEE]">Estado</label>
+              <label for="status" class="text-sm text-[#EEEEEE]">Estado</label>
               <BaseSelect
+                  id="status"
                   v-model="form.status"
                   :options="statusOptions"
                   class="mt-1"
@@ -400,8 +404,9 @@ const handleClose = () => {
 
             <!-- Deck (opcional) -->
             <div>
-              <label class="text-sm text-[#EEEEEE]">Asignar a Deck</label>
+              <label for="deck" class="text-sm text-[#EEEEEE]">Asignar a Deck</label>
               <BaseSelect
+                  id="deck"
                   v-model="form.deckName"
                   :options="deckOptions"
                   class="mt-1"

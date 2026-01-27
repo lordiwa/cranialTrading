@@ -197,8 +197,9 @@ const handleClose = () => {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="text-small text-silver-70 block mb-2">Cantidad</label>
+            <label for="new-pref-quantity" class="text-small text-silver-70 block mb-2">Cantidad</label>
             <BaseInput
+                id="new-pref-quantity"
                 v-model="quantity"
                 type="number"
                 placeholder="1"
@@ -206,8 +207,9 @@ const handleClose = () => {
           </div>
 
           <div>
-            <label class="text-small text-silver-70 block mb-2">Condición mínima</label>
+            <label for="new-pref-condition" class="text-small text-silver-70 block mb-2">Condición mínima</label>
             <BaseSelect
+                id="new-pref-condition"
                 v-model="condition"
                 :options="conditionOptions"
             />

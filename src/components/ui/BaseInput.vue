@@ -5,6 +5,7 @@ interface Props {
   placeholder?: string;
   error?: string;
   disabled?: boolean;
+  id?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -27,6 +28,7 @@ const handleInput = (event: Event) => {
 <template>
   <div class="w-full">
     <input
+        :id="id"
         :type="type"
         :value="modelValue"
         :placeholder="placeholder"

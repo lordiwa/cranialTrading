@@ -4,6 +4,7 @@ interface Props {
   options: { value: string; label: string }[];
   placeholder?: string;
   disabled?: boolean;
+  id?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -23,6 +24,7 @@ const handleChange = (event: Event) => {
 
 <template>
   <select
+      :id="id"
       :value="modelValue"
       :disabled="disabled"
       @change="handleChange"

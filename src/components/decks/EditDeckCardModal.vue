@@ -293,8 +293,9 @@ const handleClose = () => {
 
             <!-- Print Selector -->
             <div v-if="availablePrints.length > 1">
-              <label class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+              <label for="edit-deck-card-print" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
               <select
+                  id="edit-deck-card-print"
                   :value="selectedPrint?.id"
                   @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
                   class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
@@ -319,11 +320,12 @@ const handleClose = () => {
           <div class="grid grid-cols-2 gap-4">
             <!-- Quantity -->
             <div>
-              <label class="text-tiny text-silver-70 block mb-1">
+              <label for="edit-deck-card-quantity" class="text-tiny text-silver-70 block mb-1">
                 {{ isOwnedCard ? 'Cantidad asignada' : 'Cantidad deseada' }}
                 <span v-if="isOwnedCard" class="text-neon">(máx: {{ maxQuantityForOwned }})</span>
               </label>
               <input
+                  id="edit-deck-card-quantity"
                   v-model.number="form.quantity"
                   type="number"
                   min="1"
@@ -334,8 +336,9 @@ const handleClose = () => {
 
             <!-- Condition -->
             <div>
-              <label class="text-tiny text-silver-70 block mb-1">Condición</label>
+              <label for="edit-deck-card-condition" class="text-tiny text-silver-70 block mb-1">Condición</label>
               <BaseSelect
+                  id="edit-deck-card-condition"
                   v-model="form.condition"
                   :options="conditionOptions"
               />

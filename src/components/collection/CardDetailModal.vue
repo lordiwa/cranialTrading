@@ -483,8 +483,9 @@ watch(selectedPrint, (print) => {
 
           <!-- Print Selector -->
           <div v-if="availablePrints.length > 1">
-            <label class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+            <label for="detail-print-select" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
             <select
+                id="detail-print-select"
                 :value="selectedPrint?.id"
                 @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
                 class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
@@ -640,8 +641,9 @@ watch(selectedPrint, (print) => {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="text-tiny text-silver-70 block mb-1">Condición</label>
+            <label for="detail-condition" class="text-tiny text-silver-70 block mb-1">Condición</label>
             <BaseSelect
+                id="detail-condition"
                 v-model="condition"
                 :options="conditionOptions"
             />

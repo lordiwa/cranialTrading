@@ -117,7 +117,10 @@ const wishlistCards = computed(() => {
                 </div>
                 <p class="text-tiny text-silver-70">{{ card.edition }}</p>
               </div>
-              <p class="text-neon font-bold">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
+              <div class="text-right">
+                <p class="text-tiny text-silver-50">${{ card.price.toFixed(2) }} c/u</p>
+                <p class="font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
+              </div>
             </div>
             <div class="flex flex-wrap gap-2 text-tiny">
               <span class="px-2 py-1 bg-secondary border border-silver-30 text-silver-70">

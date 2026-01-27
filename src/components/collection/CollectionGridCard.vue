@@ -130,11 +130,12 @@ const getStatusIcon = (status: string) => {
     </div>
 
     <!-- Minimal Card Info -->
-    <div class="mt-1 min-h-[40px]">
+    <div class="mt-1 min-h-[50px]">
       <p class="text-[10px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
         {{ card.name }}
       </p>
-      <p class="text-[10px] text-neon font-bold">${{ card.price ? card.price.toFixed(2) : 'N/A' }}</p>
+      <p class="text-[10px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
+      <p class="text-[10px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
     </div>
   </div>
 

@@ -530,7 +530,7 @@ watch(() => props.show, (newVal) => {
                         <BaseSelect id="add-deck-condition" v-model="form.condition" :options="conditionOptions" />
                       </div>
                       <div v-else>
-                        <label class="text-tiny text-silver-70 block mb-1">Condición</label>
+                        <span class="text-tiny text-silver-70 block mb-1">Condición</span>
                         <div class="px-3 py-2 bg-secondary border border-silver-30 text-silver-70 text-small">
                           {{ selectedCollectionCard.condition }}
                         </div>

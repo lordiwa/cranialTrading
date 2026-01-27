@@ -553,7 +553,7 @@ onMounted(async () => {
 
         <!-- Formato -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">Formato</label>
+          <span class="text-small text-silver-70 block mb-2">Formato</span>
           <div class="flex gap-2 flex-wrap">
             <button
                 @click="filterFormat = 'all'"

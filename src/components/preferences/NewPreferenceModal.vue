@@ -180,7 +180,7 @@ const handleClose = () => {
         </div>
 
         <div>
-          <label class="text-small text-silver-70 block mb-2">Tipo</label>
+          <span class="text-small text-silver-70 block mb-2">Tipo</span>
           <div class="flex gap-2">
             <button
                 v-for="opt in typeOptions"

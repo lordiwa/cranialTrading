@@ -533,7 +533,7 @@ const activeFilterCount = () => {
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- Todos los tipos -->
         <div>
-          <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">Tipos</label>
+          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">Tipos</span>
           <div class="flex flex-wrap gap-1">
             <button
                 v-for="type in typeOptions"
@@ -639,7 +639,7 @@ const activeFilterCount = () => {
 
         <!-- Formato Legal -->
         <div>
-          <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">Formato</label>
+          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">Formato</span>
           <div class="flex flex-wrap gap-1">
             <button
                 v-for="format in formatOptions"
@@ -660,7 +660,7 @@ const activeFilterCount = () => {
 
       <!-- Habilidades Evergreen -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">⚔️ Habilidades Evergreen</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">⚔️ Habilidades Evergreen</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in evergreenKeywords"
@@ -680,7 +680,7 @@ const activeFilterCount = () => {
 
       <!-- Mecánicas Competitivas -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">🏆 Mecánicas Competitivas (Tier 1)</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">🏆 Mecánicas Competitivas (Tier 1)</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in competitiveMechanics"
@@ -700,7 +700,7 @@ const activeFilterCount = () => {
 
       <!-- Mecánicas de Set -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">🎴 Mecánicas de Set</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">🎴 Mecánicas de Set</span>
         <div class="flex flex-wrap gap-1 max-h-40 overflow-y-auto">
           <button
               v-for="keyword in setMechanics"
@@ -720,7 +720,7 @@ const activeFilterCount = () => {
 
       <!-- Keyword Actions -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">📜 Acciones (Rule 701)</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">📜 Acciones (Rule 701)</span>
         <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
           <button
               v-for="keyword in keywordActions"
@@ -740,7 +740,7 @@ const activeFilterCount = () => {
 
       <!-- Triggers -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">⚡ Triggers</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">⚡ Triggers</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in triggerKeywords"
@@ -760,7 +760,7 @@ const activeFilterCount = () => {
 
       <!-- Tokens -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">🪙 Tokens</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">🪙 Tokens</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in tokenKeywords"
@@ -780,7 +780,7 @@ const activeFilterCount = () => {
 
       <!-- Tipos Especiales -->
       <div>
-        <label class="text-tiny font-bold text-silver-70 uppercase block mb-2">✨ Tipos Especiales</label>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">✨ Tipos Especiales</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in specialTypes"

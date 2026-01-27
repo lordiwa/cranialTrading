@@ -176,7 +176,7 @@ watch(() => props.show, (show) => {
 
         <!-- Colors -->
         <div>
-          <label class="text-small text-silver-70 block mb-2">Colores</label>
+          <span class="text-small text-silver-70 block mb-2">Colores</span>
           <div class="flex flex-wrap gap-2">
             <button
                 v-for="color in colorOptions"

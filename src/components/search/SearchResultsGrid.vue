@@ -41,7 +41,7 @@ const formatPrice = (price: string | null | undefined): string => {
   if (!price) return 'N/A'
   try {
     return `$${Number.parseFloat(price).toFixed(2)}`
-  } catch {
+  } catch { /* invalid number format */
     return 'N/A'
   }
 }

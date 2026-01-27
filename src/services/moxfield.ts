@@ -28,7 +28,7 @@ export interface MoxfieldDeck {
 
 export const extractDeckId = (input: string): string | null => {
     // Si es un link: https://moxfield.com/decks/tiIftnM5wUC29k6F5KisRw
-    const linkMatch = input.match(/moxfield\.com\/decks\/([a-zA-Z0-9_-]+)/);
+    const linkMatch = /moxfield\.com\/decks\/([a-zA-Z0-9_-]+)/.exec(input);
     if (linkMatch) {
         return linkMatch[1];
     }

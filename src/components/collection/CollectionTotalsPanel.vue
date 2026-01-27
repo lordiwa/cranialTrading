@@ -11,7 +11,6 @@ const {
   progress,
   totals,
   fetchAllPrices,
-  formatPrice,
 } = useCollectionTotals(() => collectionStore.cards)
 
 // Fetch prices when collection loads

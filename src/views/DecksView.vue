@@ -439,20 +439,6 @@ const handleImportDirect = async (
       }
     }
 
-    const cardData: DeckCard = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      scryfallId: finalScryfallId,
-      name: cardName,
-      edition: finalEdition,
-      quantity: card.quantity,
-      condition,
-      foil: isFoil,
-      price,
-      image,
-      isInSideboard: false,
-      addedAt: new Date(),
-    }
-
     // Agregar al wishlist del deck (se convertirá a allocation cuando se guarde en colección)
     if (deckId) {
       await decksStore.addToWishlist(deckId, {

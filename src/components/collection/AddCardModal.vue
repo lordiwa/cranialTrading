@@ -45,7 +45,7 @@ watch(() => props.scryfallCard, async (card) => {
         decksStore.loadDecks()
       ])
       availablePrints.value = results
-    } catch (err) {
+    } catch {
       availablePrints.value = [card]
     } finally {
       loadingPrints.value = false
@@ -281,6 +281,7 @@ const handleClose = () => {
                   @click="toggleCardFace"
                   class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#CCFF00] p-2 hover:bg-[#CCFF00]/20 transition-all"
                   :title="`Ver lado ${cardFaceIndex === 0 ? 2 : 1}`"
+                  aria-label="Ver otro lado de la carta"
               >
                 <svg class="w-5 h-5 text-[#CCFF00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>

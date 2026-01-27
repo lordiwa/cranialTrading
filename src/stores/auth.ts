@@ -116,10 +116,10 @@ export const useAuthStore = defineStore('auth', () => {
             await loadUserData(userCredential.user.uid);
             emailVerified.value = userCredential.user.emailVerified;
 
-            if (!userCredential.user.emailVerified) {
-                toastStore.show('Por favor verifica tu email', 'info');
-            } else {
+            if (userCredential.user.emailVerified) {
                 toastStore.show('Sesión iniciada', 'success');
+            } else {
+                toastStore.show('Por favor verifica tu email', 'info');
             }
             return true;
         } catch (error: any) {
@@ -135,7 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
             user.value = null;
             emailVerified.value = false;
             toastStore.show('Sesión cerrada', 'success');
-            window.location.reload();
+            globalThis.location.reload();
             setTimeout(() => {
                 isLoggingOut.value = false;
             }, 500);
@@ -183,7 +183,7 @@ export const useAuthStore = defineStore('auth', () => {
     const changePassword = async (currentPassword: string, newPassword: string) => {
         try {
             const firebaseUser = auth.currentUser;
-            if (!firebaseUser || !firebaseUser.email) {
+            if (!firebaseUser?.email) {
                 toastStore.show('Usuario no autenticado', 'error');
                 return false;
             }

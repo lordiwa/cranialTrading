@@ -18,7 +18,7 @@ const emit = defineEmits<{
 
 const decksStore = useDecksStore()
 const toastStore = useToastStore()
-const { getAllocationsForCard, getAvailableQuantity } = useCardAllocation()
+const { getAllocationsForCard } = useCardAllocation()
 
 const saving = ref(false)
 
@@ -29,12 +29,6 @@ const allocations = ref<Record<string, { quantity: number; isInSideboard: boolea
 const currentAllocations = computed(() => {
   if (!props.card) return []
   return getAllocationsForCard(props.card.id)
-})
-
-// Available quantity (total - already allocated)
-const availableQty = computed(() => {
-  if (!props.card) return 0
-  return getAvailableQuantity(props.card.id)
 })
 
 // Total quantity in the card

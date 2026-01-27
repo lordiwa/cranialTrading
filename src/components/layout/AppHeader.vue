@@ -41,7 +41,7 @@ const handleNavigate = (path: string) => {
         </router-link>
 
         <!-- Navigation Links (Desktop) -->
-        <nav v-if="isAuthenticated" class="hidden md:flex items-center gap-1">
+        <nav v-if="isAuthenticated" aria-label="Main navigation" class="hidden md:flex items-center gap-1">
           <router-link
               v-for="link in navigationLinks"
               :key="link.path"
@@ -116,7 +116,7 @@ const handleNavigate = (path: string) => {
       </div>
 
       <!-- Mobile Navigation Menu -->
-      <nav v-if="isAuthenticated" class="md:hidden border-t border-silver-20 pb-2">
+      <nav v-if="isAuthenticated" aria-label="Mobile navigation" class="md:hidden border-t border-silver-20 pb-2">
         <router-link
             v-for="link in navigationLinks"
             :key="link.path"

@@ -95,7 +95,7 @@ export async function syncCardToPublic(
     console.log(`[PublicCards] Synced card ${card.name} to public`)
   } else {
     // Remove from public if not public or status changed
-    await deleteDoc(publicCardRef).catch(() => {})
+    await deleteDoc(publicCardRef).catch(() => { /* doc may not exist */ })
     console.log(`[PublicCards] Removed card ${card.name} from public (status: ${card.status}, public: ${card.public})`)
   }
 }
@@ -105,7 +105,7 @@ export async function syncCardToPublic(
  */
 export async function removeCardFromPublic(cardId: string, userId: string): Promise<void> {
   const publicCardId = `${userId}_${cardId}`
-  await deleteDoc(doc(db, 'public_cards', publicCardId)).catch(() => {})
+  await deleteDoc(doc(db, 'public_cards', publicCardId)).catch(() => { /* doc may not exist */ })
   console.log(`[PublicCards] Removed card ${cardId} from public`)
 }
 
@@ -144,7 +144,7 @@ export async function syncPreferenceToPublic(
  */
 export async function removePreferenceFromPublic(prefId: string, userId: string): Promise<void> {
   const publicPrefId = `${userId}_${prefId}`
-  await deleteDoc(doc(db, 'public_preferences', publicPrefId)).catch(() => {})
+  await deleteDoc(doc(db, 'public_preferences', publicPrefId)).catch(() => { /* doc may not exist */ })
   console.log(`[PublicPrefs] Removed preference ${prefId} from public`)
 }
 
@@ -338,10 +338,10 @@ export async function findCardsMatchingPreferences(
     snapshot.forEach(docSnap => {
       const data = docSnap.data() as PublicCard
       console.log(`[findCards] Found card: ${data.cardName} from ${data.username} (userId: ${data.userId})`)
-      if (data.userId !== excludeUserId) {
-        results.push({ ...data, docId: docSnap.id })
-      } else {
+      if (data.userId === excludeUserId) {
         console.log(`[findCards] Skipping own card`)
+      } else {
+        results.push({ ...data, docId: docSnap.id })
       }
     })
   }

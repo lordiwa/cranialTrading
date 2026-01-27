@@ -24,8 +24,10 @@
 </template>
 
 <script setup lang="ts">
+type TabId = 'new' | 'saved' | 'deleted'
+
 interface Tab {
-  id: 'new' | 'saved' | 'deleted'
+  id: TabId
   label: string
   icon: string
   count: number
@@ -33,7 +35,7 @@ interface Tab {
 
 interface Props {
   tabs: Tab[]
-  modelValue?: 'new' | 'saved' | 'deleted'
+  modelValue?: TabId
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,11 +43,11 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  'tab-change': [tabId: 'new' | 'saved' | 'deleted']
-  'update:modelValue': [tabId: 'new' | 'saved' | 'deleted']
+  'tab-change': [tabId: TabId]
+  'update:modelValue': [tabId: TabId]
 }>()
 
-const handleTabChange = (tabId: 'new' | 'saved' | 'deleted') => {
+const handleTabChange = (tabId: TabId) => {
   emit('tab-change', tabId)
   emit('update:modelValue', tabId)
 }

@@ -17,10 +17,10 @@ const invalidCode = ref(false);
 
 onMounted(() => {
   const oobCode = route.query.oobCode as string;
-  if (!oobCode) {
-    invalidCode.value = true;
-  } else {
+  if (oobCode) {
     code.value = oobCode;
+  } else {
+    invalidCode.value = true;
   }
 });
 

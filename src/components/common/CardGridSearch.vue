@@ -48,11 +48,6 @@ const sortedAndFilteredResults = computed(() => {
     return price !== null && price > 0
   })
 
-  const cardsWithoutPrice = searchResults.value.filter(card => {
-    const price = getCardPrice(card)
-    return price === null || price === 0
-  })
-
   // Si hay cartas con precio válido, mostrar solo esas
   // Si no, mostrar todas (incluyendo sin precio)
   return cardsWithPrice.length > 0 ? cardsWithPrice : searchResults.value
@@ -214,6 +209,7 @@ defineExpose({
                   @click.stop="toggleCardFace(card.id)"
                   class="absolute top-1 left-1 bg-primary border border-neon px-1 py-0.5 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
                   title="Click para ver el otro lado"
+                  aria-label="Ver otro lado de la carta"
               >
                 ↔️
               </button>

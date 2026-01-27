@@ -2,7 +2,7 @@
 import CollectionGridCard from './CollectionGridCard.vue'
 import type { Card } from '../../types/card'
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   cards: Card[]
   compact?: boolean
 }>(), {

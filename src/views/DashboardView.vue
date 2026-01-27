@@ -261,7 +261,7 @@ const clearAllData = async () => {
   } else {
     alert('✅ Todos los datos han sido borrados.')
   }
-  window.location.reload()
+  globalThis.location.reload()
 }
 
 /**
@@ -305,7 +305,7 @@ const calculateMatches = async () => {
     progressCurrent.value = 1
 
     // Debug: mostrar qué nombres estamos buscando
-    const myWishlistNames = myWishlist.map(c => c.name).filter(n => n)
+    const myWishlistNames = myWishlist.map(c => c.name).filter(Boolean)
     console.log(`🔍 Buscando cartas por nombre:`, myWishlistNames)
 
     const matchingCards = await findCardsMatchingPreferences(myWishlist, authStore.user.id)
@@ -316,7 +316,7 @@ const calculateMatches = async () => {
 
     // Debug: mostrar qué nombres tengo para vender
     const myTradeable = myCards.filter(c => c.status === 'trade' || c.status === 'sale')
-    const myCardNames = myTradeable.map(c => c.name).filter(n => n)
+    const myCardNames = myTradeable.map(c => c.name).filter(Boolean)
     console.log(`🏷️ Mis cartas para vender (${myTradeable.length}):`, myCardNames)
 
     const matchingPrefs = await findPreferencesMatchingCards(myCards, authStore.user.id)

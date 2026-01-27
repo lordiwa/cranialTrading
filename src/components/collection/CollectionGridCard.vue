@@ -49,7 +49,7 @@ const getCardImage = (card: Card): string => {
       if (parsed.card_faces && parsed.card_faces.length > 0) {
         return parsed.card_faces[cardFaceIndex.value]?.image_uris?.normal || parsed.card_faces[0]?.image_uris?.normal || ''
       }
-    } catch (e) {
+    } catch {
       return card.image
     }
   }
@@ -61,7 +61,7 @@ const isSplitCard = computed((): boolean => {
     try {
       const parsed = JSON.parse(props.card.image)
       return parsed.card_faces && parsed.card_faces.length > 1
-    } catch (e) {
+    } catch {
       return false
     }
   }
@@ -163,6 +163,7 @@ const getStatusIcon = (status: string) => {
           @click.stop="toggleCardFace"
           class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
           title="Click para ver el otro lado"
+          aria-label="Ver otro lado de la carta"
       >
         &#8596;
       </button>

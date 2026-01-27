@@ -11,7 +11,7 @@
  */
 export const cleanCardName = (name: string): string => {
   return name
-    .replace(/\s*\*[fF]\*?\s*$/i, '')                    // Remove foil indicator (*f, *F, *f*, *F*)
+    .replace(/\s*\*f\*?\s*$/i, '')                       // Remove foil indicator (*f, *F, *f*, *F*)
     .replace(/\s*\([A-Z0-9]+\)\s*[A-Z]*-?\d+[a-z]?\s*$/i, '') // Remove (SET) COLLECTOR patterns
     .replace(/\s*\([A-Z0-9]+\)\s*\d+[a-z]?\s*$/i, '')    // Remove (SET) 123 patterns
     .replace(/\s*\([A-Z0-9]+\)\s*$/i, '')                // Remove trailing (SET)
@@ -46,5 +46,5 @@ export const getCardTypePriority = (typeLine?: string): number => {
  * Returns true if name ends with *F* or similar
  */
 export const hasFoilIndicator = (name: string): boolean => {
-  return /\*[fF]\*?\s*$/.test(name)
+  return /\*f\*?\s*$/i.test(name)
 }

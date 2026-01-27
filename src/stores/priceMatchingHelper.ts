@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { Card } from '../types/card'
 import { Preference } from '../types/preferences'
 
-const PRICE_TOLERANCE = 0.10
+const PRICE_TOLERANCE = 0.1
 
 export interface MatchCalculation {
     myCardIds: string[]
@@ -74,7 +74,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             if (myCard.status === 'wishlist') continue
 
             const matchingPref = theirPreferences.find(p =>
-                p.name && p.name.toLowerCase() === myCard.name?.toLowerCase() &&
+                p.name?.toLowerCase() === myCard.name?.toLowerCase() &&
                 p.type === 'BUSCO'
             )
 
@@ -100,7 +100,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             if (myPref.type !== 'BUSCO') continue
 
             const matching = theirCards.filter(
-                c => c.name && c.name.toLowerCase() === (myPref.name || '').toLowerCase() &&
+                c => c.name?.toLowerCase() === myPref.name?.toLowerCase() &&
                     c.status !== 'wishlist' &&
                     c.quantity > 0
             )
@@ -173,7 +173,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 if (myCard.status === 'wishlist' || !myCard.name) continue
 
                 const matchingPref = theirPreferences.find(p =>
-                    p.name && p.name.toLowerCase() === myCard.name.toLowerCase() &&
+                    p.name?.toLowerCase() === myCard.name?.toLowerCase() &&
                     p.type === 'BUSCO'
                 )
 
@@ -198,8 +198,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
                 // Buscar si él tiene esa carta en colección (cualquier estado excepto wishlist)
                 const matching = theirCards.filter(
-                    c => c.name &&
-                        c.name.toLowerCase() === myPref.name.toLowerCase() &&
+                    c => c.name?.toLowerCase() === myPref.name?.toLowerCase() &&
                         c.status !== 'wishlist' &&
                         c.quantity > 0
                 )

@@ -629,7 +629,7 @@ export const useDecksStore = defineStore('decks', () => {
 
         try {
             const deck = decks.value.find(d => d.id === deckId)
-            if (!deck || !deck.allocations) return false
+            if (!deck?.allocations) return false
 
             // Remove allocation
             deck.allocations = deck.allocations.filter(
@@ -676,7 +676,7 @@ export const useDecksStore = defineStore('decks', () => {
 
         try {
             const deck = decks.value.find(d => d.id === deckId)
-            if (!deck || !deck.wishlist) return false
+            if (!deck?.wishlist) return false
 
             // Remove wishlist item
             deck.wishlist = deck.wishlist.filter(
@@ -725,7 +725,7 @@ export const useDecksStore = defineStore('decks', () => {
 
         try {
             const deck = decks.value.find(d => d.id === deckId)
-            if (!deck || !deck.allocations) return false
+            if (!deck?.allocations) return false
 
             const alloc = deck.allocations.find(
                 a => a.cardId === cardId && a.isInSideboard === isInSideboard

@@ -29,7 +29,6 @@ const handleCardClick = () => {
 </script>
 
 <template>
-  <!-- ✅ AGREGADO: @click="handleCardClick" en el contenedor principal + :class dinámico para border -->
   <div
       @click="handleCardClick"
       :class="[

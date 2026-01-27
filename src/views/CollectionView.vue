@@ -732,7 +732,7 @@ onMounted(async () => {
 
     // Check for deck query param (from redirected deck routes)
     const deckParam = route.query.deck as string
-    if (deckParam && decksStore.decks.find(d => d.id === deckParam)) {
+    if (deckParam && decksStore.decks.some(d => d.id === deckParam)) {
       deckFilter.value = deckParam
     }
   } catch (err) {
@@ -743,7 +743,7 @@ onMounted(async () => {
 // Watch for route changes to handle deck selection via URL
 watch(() => route.query.deck, (newDeckId) => {
   if (newDeckId && typeof newDeckId === 'string') {
-    if (decksStore.decks.find(d => d.id === newDeckId)) {
+    if (decksStore.decks.some(d => d.id === newDeckId)) {
       deckFilter.value = newDeckId
     }
   }

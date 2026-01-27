@@ -9,7 +9,7 @@ import { CardCondition } from '../../types/card'
 import { DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 
-const props = defineProps<{
+defineProps<{
   show: boolean
 }>()
 

@@ -136,7 +136,7 @@ const currentImage = computed(() => {
 // Obtener precio actual
 const currentPrice = computed(() => {
   if (selectedPrint.value?.prices?.usd) {
-    return parseFloat(selectedPrint.value.prices.usd)
+    return Number.parseFloat(selectedPrint.value.prices.usd)
   }
   return props.card?.price || 0
 })

@@ -19,7 +19,7 @@ export const useMessagesStore = defineStore('messages', () => {
      * Ej: "user1_user2" (siempre ordenados alfabéticamente)
      */
     const getConversationId = (userId1: string, userId2: string): string => {
-        return [userId1, userId2].sort().join('_');
+        return [userId1, userId2].sort((a, b) => a.localeCompare(b)).join('_');
     };
 
     /**

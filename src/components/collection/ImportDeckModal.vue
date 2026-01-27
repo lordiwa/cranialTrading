@@ -133,7 +133,7 @@ const handleParse = async () => {
 
       const match = trimmed.match(/^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/)
       if (match) {
-        const qty = parseInt(match[1])
+        const qty = Number.parseInt(match[1])
         const name = match[2].trim()
         if (!inSideboard) {
           cardNames.push(name)

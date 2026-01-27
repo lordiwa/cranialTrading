@@ -35,8 +35,8 @@ const cardFaceIndex = ref<Record<string, number>>({})
 // ✅ NUEVO: Función para obtener el precio de una carta
 const getCardPrice = (card: any): number | null => {
   if (card.prices?.usd) {
-    const price = parseFloat(card.prices.usd)
-    return isNaN(price) ? null : price
+    const price = Number.parseFloat(card.prices.usd)
+    return Number.isNaN(price) ? null : price
   }
   return null
 }
@@ -227,7 +227,7 @@ defineExpose({
                 {{ card.set.toUpperCase() }}
               </p>
               <p v-if="showPrice" class="text-tiny font-bold text-neon">
-                ${{ card.prices?.usd ? parseFloat(card.prices.usd).toFixed(2) : 'N/A' }}
+                ${{ card.prices?.usd ? Number.parseFloat(card.prices.usd).toFixed(2) : 'N/A' }}
               </p>
             </div>
           </button>

@@ -92,7 +92,7 @@ const handleParse = async () => {
 
       const match = trimmed.match(/^(\d+)\s+/)
       if (match) {
-        const qty = parseInt(match[1])
+        const qty = Number.parseInt(match[1])
         if (inSideboard) {
           sideboard += qty
         } else {

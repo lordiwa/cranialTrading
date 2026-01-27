@@ -109,7 +109,7 @@ const getVisualFor = (obj: any): { badge: BadgeVariant; border: string; label: s
           <p class="text-small font-bold text-silver-70 mb-2">TÚ TIENES</p>
           <div v-if="match.myCard" :class="['bg-primary-dark p-md rounded', getVisualFor(match.myCard).border]">
             <div class="flex gap-4">
-              <img v-if="match.myCard.image" :src="match.myCard.image" class="w-20 h-24 object-cover rounded" />
+              <img v-if="match.myCard.image" :src="match.myCard.image" :alt="match.myCard.name" class="w-20 h-24 object-cover rounded" />
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <p
@@ -171,7 +171,7 @@ const getVisualFor = (obj: any): { badge: BadgeVariant; border: string; label: s
           <p class="text-small font-bold text-silver-70 mt-4 mb-2">TIENE</p>
           <div v-if="match.otherCard" :class="['bg-primary-dark p-md rounded', getVisualFor(match.otherCard).border]">
             <div class="flex gap-4">
-              <img v-if="match.otherCard.image" :src="match.otherCard.image" class="w-20 h-24 object-cover rounded" />
+              <img v-if="match.otherCard.image" :src="match.otherCard.image" :alt="match.otherCard.name" class="w-20 h-24 object-cover rounded" />
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <p class="text-body font-bold text-neon">{{ match.otherCard.name }}</p>

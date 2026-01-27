@@ -237,7 +237,7 @@ const handleAdd = () => {
     quantity: form.value.quantity,
     condition: form.value.condition,
     foil: form.value.foil,
-    price: selectedCard.value.prices?.usd ? parseFloat(selectedCard.value.prices.usd) : 0,
+    price: selectedCard.value.prices?.usd ? Number.parseFloat(selectedCard.value.prices.usd) : 0,
     image: cardImage,
     addToCollection: addMode.value === 'new',
   }
@@ -384,7 +384,7 @@ watch(() => props.show, (newVal) => {
                       <div class="flex justify-between items-center">
                         <span class="text-tiny text-silver-70">TCGPlayer:</span>
                         <span class="text-body font-bold text-neon">
-                          ${{ selectedCard.prices?.usd ? parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
+                          ${{ selectedCard.prices?.usd ? Number.parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
                         </span>
                       </div>
                       <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">

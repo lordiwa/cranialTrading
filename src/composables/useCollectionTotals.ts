@@ -61,14 +61,14 @@ export function useCollectionTotals(cards: () => Card[]) {
       if (results.length > 0) {
         // Find print with price, preferring one with image
         const printWithPrice = results.find(r =>
-          r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+          r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
           (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-        ) || results.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0) || results[0]
+        ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || results[0]
 
         const scryfallId = printWithPrice.id
         const setCode = printWithPrice.set?.toUpperCase()
         const edition = printWithPrice.set_name
-        const price = printWithPrice.prices?.usd ? parseFloat(printWithPrice.prices.usd) : 0
+        const price = printWithPrice.prices?.usd ? Number.parseFloat(printWithPrice.prices.usd) : 0
         let image = printWithPrice.image_uris?.normal || ''
         if (!image && printWithPrice.card_faces?.[0]) {
           image = printWithPrice.card_faces[0].image_uris?.normal || ''

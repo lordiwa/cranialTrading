@@ -194,7 +194,7 @@ const handleAddCard = async () => {
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: parseFloat(selectedPrint.value.prices?.usd || '0'),
+      price: Number.parseFloat(selectedPrint.value.prices?.usd || '0'),
       image: imageToSave,
       public: showPublicOption.value ? form.public : false,
       cmc: selectedPrint.value.cmc,

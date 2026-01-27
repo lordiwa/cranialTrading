@@ -78,7 +78,7 @@ const handleCreateDeck = async (deckData: any) => {
         const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
         if (!match) continue
 
-        const quantity = parseInt(match[1])
+        const quantity = Number.parseInt(match[1])
         let cardName = match[2].trim()
         const setCode = match[3] || null
 
@@ -176,7 +176,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         if (!image && card.card_faces && card.card_faces.length > 0) {
           image = card.card_faces[0]?.image_uris?.normal || ''
         }
-        const price = card.prices?.usd ? parseFloat(card.prices.usd) : 0
+        const price = card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0
 
         // If this print has price, use it
         if (price > 0 && image) {
@@ -196,9 +196,9 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
     if (allResults.length > 0) {
       // Find print with both price and image
       const printWithPrice = allResults.find(r =>
-          r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+          r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
           (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-      ) || allResults.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
+      ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
       if (printWithPrice) {
         let image = printWithPrice.image_uris?.normal || ''
@@ -208,7 +208,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         return {
           scryfallId: printWithPrice.id,
           image,
-          price: parseFloat(printWithPrice.prices.usd),
+          price: Number.parseFloat(printWithPrice.prices.usd),
           edition: printWithPrice.set_name,
           setCode: printWithPrice.set.toUpperCase(),
         }
@@ -223,7 +223,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
       return {
         scryfallId: firstCard.id,
         image,
-        price: firstCard.prices?.usd ? parseFloat(firstCard.prices.usd) : 0,
+        price: firstCard.prices?.usd ? Number.parseFloat(firstCard.prices.usd) : 0,
         edition: firstCard.set_name,
         setCode: firstCard.set.toUpperCase(),
       }
@@ -268,7 +268,7 @@ const handleImport = async (
     const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
     if (!match) continue
 
-    const quantity = parseInt(match[1])
+    const quantity = Number.parseInt(match[1])
     let cardName = match[2].trim()
     const setCode = match[3] || null
 
@@ -402,7 +402,7 @@ const handleImportDirect = async (
         if (!image && scryfallCard.card_faces && scryfallCard.card_faces.length > 0) {
           image = scryfallCard.card_faces[0]?.image_uris?.normal || ''
         }
-        price = scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd) : 0
+        price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
       }
     }
 
@@ -412,14 +412,14 @@ const handleImportDirect = async (
         const results = await searchCards(`!"${cardName}"`)
         // Find a print with price, preferring one with both price and image
         const printWithPrice = results.find(r =>
-            r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+            r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
             (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-        ) || results.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
+        ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
         if (printWithPrice) {
           finalScryfallId = printWithPrice.id
           finalEdition = printWithPrice.set.toUpperCase()
-          price = parseFloat(printWithPrice.prices.usd)
+          price = Number.parseFloat(printWithPrice.prices.usd)
           image = printWithPrice.image_uris?.normal || ''
           if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
             image = printWithPrice.card_faces[0]?.image_uris?.normal || ''

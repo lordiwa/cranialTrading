@@ -398,7 +398,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
       if (results.length > 0) {
         const card = results[0]
         const image = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
-        const price = card.prices?.usd ? parseFloat(card.prices.usd) : 0
+        const price = card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0
         if (price > 0 && image) {
           return { scryfallId: card.id, image, price, edition: card.set_name, setCode: card.set.toUpperCase() }
         }
@@ -407,14 +407,14 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
     const allResults = await searchCards(`!"${cleanName}"`)
     if (allResults.length > 0) {
       const printWithPrice = allResults.find(r =>
-        r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+        r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
         (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-      ) || allResults.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0) || allResults[0]
+      ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || allResults[0]
       const image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
       return {
         scryfallId: printWithPrice.id,
         image,
-        price: printWithPrice.prices?.usd ? parseFloat(printWithPrice.prices.usd) : 0,
+        price: printWithPrice.prices?.usd ? Number.parseFloat(printWithPrice.prices.usd) : 0,
         edition: printWithPrice.set_name,
         setCode: printWithPrice.set.toUpperCase(),
       }
@@ -451,7 +451,7 @@ const handleImport = async (
     const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
     if (!match) continue
 
-    const quantity = parseInt(match[1])
+    const quantity = Number.parseInt(match[1])
     let cardName = match[2].trim()
     const setCode = match[3] || null
     const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
@@ -593,7 +593,7 @@ const handleImportDirect = async (
       if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
         const scryfallCard = scryfallDataMap.get(card.scryfallId)
         image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
-        price = scryfallCard.prices?.usd ? parseFloat(scryfallCard.prices.usd) : 0
+        price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
         finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
         cmc = scryfallCard.cmc
         type_line = scryfallCard.type_line
@@ -634,14 +634,14 @@ const handleImportDirect = async (
         try {
           const results = await searchCards(`!"${cardData.name}"`)
           const printWithPrice = results.find(r =>
-            r.prices?.usd && parseFloat(r.prices.usd) > 0 &&
+            r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
             (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-          ) || results.find(r => r.prices?.usd && parseFloat(r.prices.usd) > 0)
+          ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
           if (printWithPrice) {
             cardData.scryfallId = printWithPrice.id
             cardData.edition = printWithPrice.set.toUpperCase()
-            cardData.price = parseFloat(printWithPrice.prices.usd)
+            cardData.price = Number.parseFloat(printWithPrice.prices.usd)
             cardData.image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
             cardData.cmc = printWithPrice.cmc
             cardData.type_line = printWithPrice.type_line

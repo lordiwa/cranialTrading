@@ -40,7 +40,7 @@ const getConditionBadgeVariant = (rarity: string): 'busco' | 'cambio' | 'vendo' 
 const formatPrice = (price: string | null | undefined): string => {
   if (!price) return 'N/A'
   try {
-    return `$${parseFloat(price).toFixed(2)}`
+    return `$${Number.parseFloat(price).toFixed(2)}`
   } catch {
     return 'N/A'
   }

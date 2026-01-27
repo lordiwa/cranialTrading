@@ -410,38 +410,43 @@ export const getCardsByIds = async (
     // Procesar en batches de 75
     for (let i = 0; i < identifiers.length; i += BATCH_SIZE) {
         const batch = identifiers.slice(i, i + BATCH_SIZE)
+        let retries = 3
 
-        try {
-            const response = await fetch(`${SCRYFALL_API}/cards/collection`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ identifiers: batch }),
-            })
+        while (retries > 0) {
+            try {
+                const response = await fetch(`${SCRYFALL_API}/cards/collection`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ identifiers: batch }),
+                })
 
-            if (!response.ok) {
-                if (response.status === 429) {
-                    console.warn('⚠️ Rate limit, esperando 100ms...')
-                    await new Promise(resolve => setTimeout(resolve, 100))
-                    i -= BATCH_SIZE // Reintentar este batch
-                    continue
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        console.warn('⚠️ Rate limit, esperando 100ms...')
+                        await new Promise(resolve => setTimeout(resolve, 100))
+                        retries--
+                        continue
+                    }
+                    console.error(`Scryfall collection API error: ${response.status}`)
+                    break
                 }
-                console.error(`Scryfall collection API error: ${response.status}`)
-                continue
-            }
 
-            const data = await response.json()
-            if (data.data) {
-                results.push(...data.data)
+                const data = await response.json()
+                if (data.data) {
+                    results.push(...data.data)
+                }
+                break // Success, exit retry loop
+            } catch (error) {
+                console.error('Error en getCardsByIds batch:', error)
+                retries--
             }
+        }
 
-            // Pequeña pausa entre batches para evitar rate limiting
-            if (i + BATCH_SIZE < identifiers.length) {
-                await new Promise(resolve => setTimeout(resolve, 50))
-            }
-        } catch (error) {
-            console.error('Error en getCardsByIds batch:', error)
+        // Pequeña pausa entre batches para evitar rate limiting
+        if (i + BATCH_SIZE < identifiers.length) {
+            await new Promise(resolve => setTimeout(resolve, 50))
         }
     }
 

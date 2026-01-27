@@ -127,7 +127,7 @@ export const useMatchesStore = defineStore('matches', () => {
 
         // If lifeExpiresAt is missing or invalid, calculate from createdAt + 15 days
         let lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
-        if (!lifeExpiresAt || isNaN(lifeExpiresAt.getTime())) {
+        if (!lifeExpiresAt || Number.isNaN(lifeExpiresAt.getTime())) {
             lifeExpiresAt = calculateExpirationDate(createdAt);
         }
 
@@ -196,12 +196,12 @@ export const useMatchesStore = defineStore('matches', () => {
                     let expiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
 
                     // If no lifeExpiresAt, calculate from createdAt
-                    if (!expiresAt || isNaN(expiresAt.getTime())) {
+                    if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
                         const createdAt = toDate(data.createdAt);
                         expiresAt = calculateExpirationDate(createdAt);
                     }
 
-                    if (expiresAt && expiresAt <= now && !isNaN(expiresAt.getTime())) {
+                    if (expiresAt && expiresAt <= now && !Number.isNaN(expiresAt.getTime())) {
                         await deleteDoc(docSnap.ref);
                     }
                 }

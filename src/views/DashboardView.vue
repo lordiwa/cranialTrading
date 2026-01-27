@@ -280,8 +280,22 @@ const calculateMatches = async () => {
     const myCards = collectionStore.cards
     // Usar cartas con status 'wishlist' como lista de búsqueda (en lugar de preferencias)
     const myWishlist = myCards.filter(c => c.status === 'wishlist')
+    // Convert wishlist cards to Preference format for matching functions
+    const myPreferences = myWishlist.map(c => ({
+      id: c.id,
+      name: c.name,
+      cardName: c.name,
+      scryfallId: c.scryfallId,
+      maxPrice: c.price || 0,
+      minCondition: c.condition,
+      type: 'BUSCO' as const,
+      quantity: c.quantity || 1,
+      condition: c.condition,
+      edition: c.edition,
+      image: c.image,
+      createdAt: c.createdAt || new Date(),
+    }))
     const foundMatches: any[] = []
-    const processedUsers = new Set<string>()
 
     console.log('🔍 Iniciando cálculo de matches (optimizado)...')
     console.log(`Mis cartas: ${myCards.length}, Mi wishlist: ${myWishlist.length}`)
@@ -388,7 +402,7 @@ const calculateMatches = async () => {
       // INTENTAR MATCH BIDIRECCIONAL PRIMERO
       let matchCalc = priceMatching.calculateBidirectionalMatch(
           myCards,
-          myWishlist,
+          myPreferences,
           theirCards,
           theirPreferences
       )
@@ -397,7 +411,7 @@ const calculateMatches = async () => {
       if (!matchCalc) {
         matchCalc = priceMatching.calculateUnidirectionalMatch(
             myCards,
-            myWishlist,
+            myPreferences,
             theirCards,
             theirPreferences
         )

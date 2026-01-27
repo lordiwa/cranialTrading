@@ -202,7 +202,7 @@ async function clearStore(storeName: string): Promise<void> {
  */
 function getLatestPrice(pricePoint?: MTGJSONPricePoint): number | null {
   if (!pricePoint) return null
-  const dates = Object.keys(pricePoint).sort().reverse()
+  const dates = Object.keys(pricePoint).sort((a, b) => b.localeCompare(a))
   return dates.length > 0 ? pricePoint[dates[0]] : null
 }
 

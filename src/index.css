@@ -24,6 +24,29 @@
     }
 }
 
+/* Background image with dark overlay - outside @layer to avoid Tailwind purging */
+body {
+    position: relative;
+    min-height: 100vh;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url('/bgImage.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    opacity: 0.12;
+    z-index: -1;
+    pointer-events: none;
+}
+
 @layer utilities {
     .transition-fast {
         transition: all 150ms ease-out;

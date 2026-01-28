@@ -25,7 +25,11 @@
       "Bash(npx firebase deploy:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(tr:*)"
     ]
   }
 }

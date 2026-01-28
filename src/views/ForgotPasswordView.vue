@@ -24,7 +24,7 @@ const handleSendReset = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-primary px-4">
+  <div class="min-h-screen flex items-center justify-center px-4">
     <div class="w-full max-w-md">
       <div class="flex flex-col items-center mb-8">
         <h1 class="text-h2 font-bold text-neon text-center">RECUPERAR CONTRASEÑA</h1>

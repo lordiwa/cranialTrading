@@ -320,8 +320,7 @@ const handleSave = async () => {
 
       if (targetQty > 0) {
         if (existingCard) {
-          // Update existing entry
-          const publicValue = (status === 'sale' || status === 'trade') ? savedIsPublic : false
+          // Update existing entry - public defaults to true for all statuses
           await collectionStore.updateCard(existingCard.id, {
             quantity: targetQty,
             condition: savedCondition,
@@ -331,14 +330,13 @@ const handleSave = async () => {
             setCode: newSetCode,
             image: newImage,
             price: newPrice,
-            public: publicValue,
+            public: savedIsPublic,
           })
           if (status !== 'wishlist') {
             updatedCardIds.push(existingCard.id)
           }
         } else {
-          // Create new entry for this status
-          const publicValue = (status === 'sale' || status === 'trade') ? savedIsPublic : false
+          // Create new entry for this status - public defaults to true
           const newCardId = await collectionStore.addCard({
             scryfallId: newScryfallId,
             name: savedCard.name,
@@ -350,7 +348,7 @@ const handleSave = async () => {
             price: newPrice,
             image: newImage,
             status: status,
-            public: publicValue,
+            public: savedIsPublic,
           })
           if (status !== 'wishlist' && newCardId) {
             updatedCardIds.push(newCardId)

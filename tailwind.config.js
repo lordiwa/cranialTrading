@@ -14,13 +14,13 @@ export default {
                 },
                 // Silver - primary text color
                 silver: {
-                    DEFAULT: '#EEEEEE',
-                    70: 'rgba(238, 238, 238, 0.7)',
-                    50: 'rgba(238, 238, 238, 0.5)',
-                    30: 'rgba(238, 238, 238, 0.3)',
-                    20: 'rgba(238, 238, 238, 0.2)',
-                    10: 'rgba(238, 238, 238, 0.1)',
-                    5: 'rgba(238, 238, 238, 0.05)',
+                    DEFAULT: '#FFFFFF',
+                    70: 'rgba(255, 255, 255, 0.85)',
+                    50: 'rgba(255, 255, 255, 0.7)',
+                    30: 'rgba(255, 255, 255, 0.4)',
+                    20: 'rgba(255, 255, 255, 0.25)',
+                    10: 'rgba(255, 255, 255, 0.15)',
+                    5: 'rgba(255, 255, 255, 0.08)',
                 },
                 // Neon Lime - primary accent color
                 neon: {

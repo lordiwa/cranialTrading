@@ -4,7 +4,7 @@
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MATCHES</h1>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">BUSCAR MATCHES</h1>
           <p class="text-small md:text-body text-silver-70">
             {{ calculatedMatches.length }} matches encontrados
           </p>
@@ -28,13 +28,6 @@
               class="w-full md:w-auto"
           >
             {{ syncing ? 'SINCRONIZANDO...' : '📡 SINCRONIZAR' }}
-          </BaseButton>
-          <BaseButton
-              size="small"
-              @click="$router.push('/saved-matches')"
-              class="w-full md:w-auto"
-          >
-            ⭐ MIS MATCHES
           </BaseButton>
           <!-- TEMPORAL: Botón para borrar datos -->
           <BaseButton

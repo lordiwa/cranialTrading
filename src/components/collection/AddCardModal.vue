@@ -158,7 +158,8 @@ const statusOptions = [
 ]
 
 // Show public checkbox only for sale/trade
-const showPublicOption = computed(() => form.status === 'sale' || form.status === 'trade')
+// Public option available for all statuses (default: true)
+const showPublicOption = computed(() => true)
 
 const deckOptions = computed(() => [
   { value: '', label: 'Sin asignar' },
@@ -196,7 +197,7 @@ const handleAddCard = async () => {
       status: form.status,
       price: Number.parseFloat(selectedPrint.value.prices?.usd || '0'),
       image: imageToSave,
-      public: showPublicOption.value ? form.public : false,
+      public: form.public,
       cmc: selectedPrint.value.cmc,
       type_line: selectedPrint.value.type_line,
     })

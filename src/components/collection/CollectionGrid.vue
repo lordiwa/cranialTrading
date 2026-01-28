@@ -2,11 +2,13 @@
 import CollectionGridCard from './CollectionGridCard.vue'
 import type { Card } from '../../types/card'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   cards: Card[]
   compact?: boolean
+  readonly?: boolean
 }>(), {
-  compact: false
+  compact: false,
+  readonly: false
 })
 
 const emit = defineEmits<{
@@ -23,10 +25,11 @@ const emit = defineEmits<{
     : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4'"
   >
     <CollectionGridCard
-        v-for="card in cards"
+        v-for="card in props.cards"
         :key="card.id"
         :card="card"
-        :compact="compact"
+        :compact="props.compact"
+        :readonly="props.readonly"
         @card-click="emit('cardClick', $event)"
         @edit="emit('edit', $event)"
         @delete="emit('delete', $event)"

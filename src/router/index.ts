@@ -90,6 +90,22 @@ const router = createRouter({
             name: 'userProfile',
             component: () => import('../views/UserProfileView.vue'),
         },
+        // Legal pages (public)
+        {
+            path: '/terms',
+            name: 'terms',
+            component: () => import('../views/TermsView.vue'),
+        },
+        {
+            path: '/privacy',
+            name: 'privacy',
+            component: () => import('../views/PrivacyView.vue'),
+        },
+        {
+            path: '/cookies',
+            name: 'cookies',
+            component: () => import('../views/CookiesView.vue'),
+        },
         {
             path: '/:pathMatch(.*)*',
             name: 'notFound',

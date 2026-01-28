@@ -2,13 +2,17 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useCollectionStore } from '../../stores/collection'
+import { useToastStore } from '../../stores/toast'
 import type { Card } from '../../types/card'
 
 const props = withDefaults(defineProps<{
   card: Card
   compact?: boolean
+  readonly?: boolean
 }>(), {
-  compact: false
+  compact: false,
+  readonly: false
 })
 
 const emit = defineEmits<{
@@ -17,6 +21,24 @@ const emit = defineEmits<{
   delete: [card: Card]
   manageDecks: [card: Card]
 }>()
+
+const collectionStore = useCollectionStore()
+const toastStore = useToastStore()
+const togglingPublic = ref(false)
+
+const togglePublic = async () => {
+  if (togglingPublic.value || props.readonly) return
+  togglingPublic.value = true
+  try {
+    const newPublicValue = !props.card.public
+    await collectionStore.updateCard(props.card.id, { public: newPublicValue })
+    toastStore.show(newPublicValue ? 'Carta visible en perfil' : 'Carta oculta del perfil', 'success')
+  } catch (error) {
+    toastStore.show('Error al cambiar visibilidad', 'error')
+  } finally {
+    togglingPublic.value = false
+  }
+}
 
 const { getTotalAllocated, getAvailableQuantity, getAllocationsForCard } = useCardAllocation()
 
@@ -167,6 +189,21 @@ const getStatusIcon = (status: string) => {
           aria-label="Ver otro lado de la carta"
       >
         &#8596;
+      </button>
+
+      <!-- Public toggle button -->
+      <button
+          v-if="!readonly"
+          @click.stop="togglePublic"
+          :disabled="togglingPublic"
+          :class="[
+            'absolute top-2 bg-primary/90 border px-2 py-1 text-tiny font-bold transition-all',
+            isSplitCard ? 'left-12' : 'left-2',
+            card.public ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'
+          ]"
+          :title="card.public ? 'Visible en perfil (click para ocultar)' : 'Oculto del perfil (click para mostrar)'"
+      >
+        {{ card.public ? '👁' : '👁‍🗨' }}
       </button>
 
       <!-- Status Badge (Overlay) -->

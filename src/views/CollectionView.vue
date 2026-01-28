@@ -306,6 +306,12 @@ const deckTotalCost = computed(() => {
   return ownedPrice + wishlistPrice
 })
 
+// ¿Todas las cartas del deck son públicas?
+const isDeckPublic = computed(() => {
+  if (deckOwnedCards.value.length === 0) return true
+  return deckOwnedCards.value.every(card => card.public !== false)
+})
+
 // Cantidad de cartas owned en el deck
 const deckOwnedCount = computed(() => {
   return deckOwnedCards.value.reduce((sum, card) => {
@@ -728,6 +734,34 @@ const handleDeleteDeck = async () => {
   }
 }
 
+// Toggle visibilidad de todas las cartas del deck
+const handleToggleDeckPublic = async () => {
+  if (!selectedDeck.value) return
+
+  const cardIds = deckOwnedCards.value.map(c => c.id)
+  if (cardIds.length === 0) {
+    toastStore.show('No hay cartas en el deck', 'info')
+    return
+  }
+
+  const makePublic = !isDeckPublic.value
+
+  try {
+    await Promise.all(cardIds.map(cardId =>
+      collectionStore.updateCard(cardId, { public: makePublic })
+    ))
+    toastStore.show(
+      makePublic
+        ? `${cardIds.length} cartas ahora son públicas`
+        : `${cardIds.length} cartas ahora son privadas`,
+      'success'
+    )
+  } catch (err) {
+    console.error('Error actualizando visibilidad:', err)
+    toastStore.show('Error actualizando visibilidad', 'error')
+  }
+}
+
 // ========== LIFECYCLE ==========
 
 onMounted(async () => {
@@ -851,9 +885,19 @@ watch(() => route.query.deck, (newDeckId) => {
               <h2 class="text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
               <p class="text-tiny text-silver-50">{{ selectedDeck.format?.toUpperCase() }}</p>
             </div>
-            <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
-              ELIMINAR
-            </BaseButton>
+            <div class="flex gap-2">
+              <BaseButton
+                  size="small"
+                  variant="secondary"
+                  @click="handleToggleDeckPublic"
+                  :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
+              >
+                {{ isDeckPublic ? '👁 PÚBLICO' : '👁‍🗨 PRIVADO' }}
+              </BaseButton>
+              <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
+                ELIMINAR
+              </BaseButton>
+            </div>
           </div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>

@@ -86,21 +86,28 @@ const loadNextPage = async () => {
   loadingMore.value = true;
   try {
     const cardsCol = collection(db, 'users', userId.value, 'cards');
-    let q = query(cardsCol, where('public', '==', true), limit(pageSize));
+    // Fetch all cards and filter client-side (public !== false means visible)
+    // This handles cards without the public field (legacy) as public by default
+    let q = query(cardsCol, limit(pageSize * 2)); // Fetch more to account for filtering
 
     if (lastDoc.value) {
-      q = query(cardsCol, where('public', '==', true), startAfter(lastDoc.value), limit(pageSize));
+      q = query(cardsCol, startAfter(lastDoc.value), limit(pageSize * 2));
     }
 
     const snapshot = await getDocs(q);
-    const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    cards.value.push(...docs);
+    // Filter: show cards where public is not explicitly false
+    const publicCards = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter((card: any) => card.public !== false);
+
+    cards.value.push(...publicCards);
 
     if (snapshot.docs.length > 0) {
       lastDoc.value = snapshot.docs[snapshot.docs.length - 1];
     }
 
-    hasMore.value = snapshot.docs.length === pageSize;
+    // Has more if we got a full batch
+    hasMore.value = snapshot.docs.length === pageSize * 2;
   } catch (err) {
     console.error('Error loading cards:', err);
     toastStore.show('Error al cargar cartas del perfil', 'error');
@@ -180,7 +187,7 @@ onMounted(() => {
         </h2>
 
         <div class="space-y-8">
-          <CollectionGrid :cards="cards" />
+          <CollectionGrid :cards="cards" :readonly="true" />
 
           <!-- Load more button -->
           <div v-if="hasMore" class="text-center">

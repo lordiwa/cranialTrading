@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 
@@ -8,12 +8,22 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const isAuthenticated = computed(() => !!authStore.user)
+const mobileMenuOpen = ref(false)
+
+const toggleMobileMenu = () => {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+const closeMobileMenu = () => {
+  mobileMenuOpen.value = false
+}
 
 const navigationLinks = [
-  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/dashboard', label: 'Buscar', icon: '🔍' },
   { path: '/collection', label: 'Colección', icon: '📚' },
-  { path: '/saved-matches', label: 'Matches', icon: '🔗' },
+  { path: '/saved-matches', label: 'Guardados', icon: '⭐' },
   { path: '/messages', label: 'Mensajes', icon: '💬' },
+  { path: '/contacts', label: 'Contactos', icon: '👥' },
 ]
 
 const isActive = (path: string) => {
@@ -64,9 +74,9 @@ const handleNavigate = (path: string) => {
           <button
               v-if="isAuthenticated"
               class="md:hidden px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
-              @click="$emit('toggle-menu')"
+              @click="toggleMobileMenu"
           >
-            ☰
+            {{ mobileMenuOpen ? '✕' : '☰' }}
           </button>
 
           <!-- User Menu -->
@@ -116,17 +126,22 @@ const handleNavigate = (path: string) => {
       </div>
 
       <!-- Mobile Navigation Menu -->
-      <nav v-if="isAuthenticated" aria-label="Mobile navigation" class="md:hidden border-t border-silver-20 pb-2">
+      <nav
+          v-if="isAuthenticated && mobileMenuOpen"
+          aria-label="Mobile navigation"
+          class="md:hidden border-t border-silver-20 pb-2"
+      >
         <router-link
             v-for="link in navigationLinks"
             :key="link.path"
             :to="link.path"
             :class="[
-              'block px-4 py-2 text-small font-bold transition-fast',
+              'block px-4 py-3 text-small font-bold transition-fast',
               isActive(link.path)
                 ? 'bg-neon-10 border-l-2 border-neon text-neon'
                 : 'text-silver-70 hover:text-silver'
             ]"
+            @click="closeMobileMenu"
         >
           <span class="inline-block mr-2">{{ link.icon }}</span>
           {{ link.label }}
@@ -135,7 +150,8 @@ const handleNavigate = (path: string) => {
         <router-link
             v-if="authStore.user?.username"
             :to="`/@${authStore.user.username}`"
-            class="block px-4 py-2 text-small font-bold text-silver-70 hover:text-neon transition-fast"
+            class="block px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
+            @click="closeMobileMenu"
         >
           <span class="inline-block mr-2">👤</span>
           Mi Perfil (@{{ authStore.user.username }})

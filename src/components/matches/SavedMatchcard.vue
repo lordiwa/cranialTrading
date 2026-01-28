@@ -59,15 +59,17 @@
       <template v-if="tab === 'new'">
         <button
             @click="$emit('save', match)"
-            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
+            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          ✓ ME INTERESA
+          <SpriteIcon name="check" size="tiny" />
+          ME INTERESA
         </button>
         <button
             @click="$emit('discard', match.id, 'new')"
-            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          ✕ IGNORAR
+          <SpriteIcon name="x-mark" size="tiny" />
+          IGNORAR
         </button>
       </template>
 
@@ -75,23 +77,26 @@
       <template v-if="tab === 'saved'">
         <button
             @click="handleContactar"
-            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1"
+            class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          💬 CONTACTAR
+          <SpriteIcon name="chat" size="tiny" />
+          CONTACTAR
         </button>
 
         <button
             @click="$emit('marcar-completado', match.id)"
-            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          ✓ COMPLETADO
+          <SpriteIcon name="check" size="tiny" />
+          COMPLETADO
         </button>
 
         <button
             @click="$emit('descartar', match.id)"
-            class="btn-danger px-lg py-md text-small font-bold transition-fast"
+            class="btn-danger px-lg py-md text-small font-bold transition-fast flex items-center justify-center gap-2"
         >
-          ✕ ELIMINAR
+          <SpriteIcon name="x-mark" size="tiny" />
+          ELIMINAR
         </button>
       </template>
 
@@ -99,15 +104,17 @@
       <template v-if="tab === 'deleted'">
         <button
             @click="$emit('recover', match.id)"
-            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1"
+            class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          ↩️ RECUPERAR
+          <SpriteIcon name="recover" size="tiny" />
+          RECUPERAR
         </button>
         <button
             @click="$emit('delete', match.id)"
-            class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1"
+            class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          🗑️ ELIMINAR
+          <SpriteIcon name="trash" size="tiny" />
+          ELIMINAR
         </button>
       </template>
     </div>
@@ -117,6 +124,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
+import SpriteIcon from '../ui/SpriteIcon.vue'
 
 interface Match {
   id: string

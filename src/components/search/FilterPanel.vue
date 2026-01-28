@@ -3,6 +3,7 @@ import { ref, reactive, watch } from 'vue'
 import { useSearchStore, type FilterOptions } from '../../stores/search'
 import { getCardSuggestions } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
+import SpriteIcon from '../ui/SpriteIcon.vue'
 
 const searchStore = useSearchStore()
 const showAdvancedFilters = ref(false) // Toggle filtros avanzados
@@ -423,9 +424,10 @@ const activeFilterCount = () => {
         <BaseButton
             @click="handleSearch"
             :disabled="searchStore.loading"
-            class="px-6"
+            class="px-6 flex items-center gap-2"
         >
-          {{ searchStore.loading ? '⏳' : '🔍 BUSCAR' }}
+          <SpriteIcon :name="searchStore.loading ? 'loading' : 'search'" size="tiny" />
+          {{ searchStore.loading ? '' : 'BUSCAR' }}
         </BaseButton>
       </div>
 
@@ -499,13 +501,14 @@ const activeFilterCount = () => {
         <button
             @click="showAdvancedFilters = !showAdvancedFilters"
             :class="[
-              'px-3 py-1 text-tiny font-bold transition-fast flex items-center gap-1',
+              'px-3 py-1 text-tiny font-bold transition-fast flex items-center gap-2',
               showAdvancedFilters || activeFilterCount() > 3
                 ? 'bg-neon-10 border border-neon text-neon'
                 : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
             ]"
         >
-          ⚙️ MÁS
+          <SpriteIcon name="settings" size="tiny" />
+          MÁS
           <span v-if="activeFilterCount() > 0" class="bg-neon text-primary px-1 rounded text-tiny">{{ activeFilterCount() }}</span>
         </button>
 
@@ -660,7 +663,7 @@ const activeFilterCount = () => {
 
       <!-- Habilidades Evergreen -->
       <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">⚔️ Habilidades Evergreen</span>
+        <span class="text-tiny font-bold text-silver-70 uppercase flex items-center gap-2 mb-2"><SpriteIcon name="dagger" size="tiny" /> Habilidades Evergreen</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in evergreenKeywords"

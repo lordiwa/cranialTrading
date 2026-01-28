@@ -4,6 +4,7 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
+import SpriteIcon from '../ui/SpriteIcon.vue'
 import type { Card } from '../../types/card'
 
 const props = withDefaults(defineProps<{
@@ -119,14 +120,14 @@ const getStatusColor = (status: string) => {
   return colors[status as keyof typeof colors] || 'text-silver-70'
 }
 
-const getStatusIcon = (status: string) => {
+const getStatusIconName = (status: string) => {
   const icons = {
-    collection: '✓',
-    sale: '$',
-    trade: '~',
-    wishlist: '*',
+    collection: 'check',
+    sale: 'money',
+    trade: 'flip',
+    wishlist: 'star',
   }
-  return icons[status as keyof typeof icons] || '-'
+  return icons[status as keyof typeof icons] || 'check'
 }
 </script>
 
@@ -184,11 +185,11 @@ const getStatusIcon = (status: string) => {
       <button
           v-if="isSplitCard"
           @click.stop="toggleCardFace"
-          class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
+          class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 hover:bg-neon-10 transition-all flex items-center justify-center"
           title="Click para ver el otro lado"
           aria-label="Ver otro lado de la carta"
       >
-        &#8596;
+        <SpriteIcon name="flip" size="tiny" />
       </button>
 
       <!-- Public toggle button -->
@@ -197,19 +198,20 @@ const getStatusIcon = (status: string) => {
           @click.stop="togglePublic"
           :disabled="togglingPublic"
           :class="[
-            'absolute top-2 bg-primary/90 border px-2 py-1 text-tiny font-bold transition-all',
+            'absolute top-2 bg-primary/90 border px-2 py-1 transition-all flex items-center justify-center',
             isSplitCard ? 'left-12' : 'left-2',
-            card.public ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'
+            card.public ? 'border-neon' : 'border-silver-50'
           ]"
           :title="card.public ? 'Visible en perfil (click para ocultar)' : 'Oculto del perfil (click para mostrar)'"
       >
-        {{ card.public ? '👁' : '👁‍🗨' }}
+        <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
       </button>
 
       <!-- Status Badge (Overlay) -->
       <div class="absolute top-2 right-2 bg-primary/90 border border-silver-30 px-2 py-1">
-        <p class="text-tiny font-bold" :class="getStatusColor(card.status)">
-          {{ getStatusIcon(card.status) }} {{ card.status }}
+        <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
+          <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
+          {{ card.status }}
         </p>
       </div>
 

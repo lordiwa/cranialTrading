@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
+import SpriteIcon from '../components/ui/SpriteIcon.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -36,22 +37,22 @@ const handleLogin = async () => {
 
 const features = [
   {
-    icon: '📦',
+    icon: 'box',
     title: 'Gestiona tu Colección',
     description: 'Organiza todas tus cartas en un solo lugar. Controla lo que tienes, lo que vendes y lo que buscas.'
   },
   {
-    icon: '🔍',
+    icon: 'search',
     title: 'Encuentra Matches',
     description: 'Nuestro algoritmo encuentra traders que tienen lo que buscas y buscan lo que tienes.'
   },
   {
-    icon: '💰',
+    icon: 'money',
     title: 'Monetiza tu Bulk',
     description: 'Esas cartas que crees que no valen nada pueden ser el tesoro de otro coleccionista.'
   },
   {
-    icon: '🤝',
+    icon: 'handshake',
     title: 'Conecta con Traders',
     description: 'Mensajería directa para coordinar intercambios y ventas de forma segura.'
   }
@@ -98,7 +99,7 @@ const features = [
               :key="feature.title"
               class="bg-secondary/50 border border-silver-20 p-4 hover:border-neon-30 transition-all"
           >
-            <div class="text-2xl mb-2">{{ feature.icon }}</div>
+            <div class="mb-2"><SpriteIcon :name="feature.icon" size="large" /></div>
             <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
             <p class="text-tiny text-silver-50">{{ feature.description }}</p>
           </div>
@@ -168,9 +169,9 @@ const features = [
 
           <!-- Trust badges -->
           <div class="mt-6 flex items-center justify-center gap-4 text-tiny text-silver-50">
-            <span>🔒 Conexión segura</span>
+            <span class="flex items-center gap-1"><SpriteIcon name="lock" size="tiny" /> Conexión segura</span>
             <span>•</span>
-            <span>🔥 Firebase Auth</span>
+            <span class="flex items-center gap-1"><SpriteIcon name="fire" size="tiny" /> Firebase Auth</span>
           </div>
         </div>
       </div>

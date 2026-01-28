@@ -21,6 +21,7 @@ import { searchCards, getCardsByIds } from '../services/scryfall'
 import { cleanCardName } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
+import SpriteIcon from '../components/ui/SpriteIcon.vue'
 import type { DeckFormat } from '../types/deck'
 
 const route = useRoute()
@@ -891,8 +892,10 @@ watch(() => route.query.deck, (newDeckId) => {
                   variant="secondary"
                   @click="handleToggleDeckPublic"
                   :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
+                  class="flex items-center gap-2"
               >
-                {{ isDeckPublic ? '👁 PÚBLICO' : '👁‍🗨 PRIVADO' }}
+                <SpriteIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
+                {{ isDeckPublic ? 'PÚBLICO' : 'PRIVADO' }}
               </BaseButton>
               <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
                 ELIMINAR

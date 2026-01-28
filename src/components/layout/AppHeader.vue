@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import SpriteIcon from '../ui/SpriteIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -19,11 +20,11 @@ const closeMobileMenu = () => {
 }
 
 const navigationLinks = [
-  { path: '/dashboard', label: 'Buscar', icon: '🔍' },
-  { path: '/collection', label: 'Colección', icon: '📚' },
-  { path: '/saved-matches', label: 'Guardados', icon: '⭐' },
-  { path: '/messages', label: 'Mensajes', icon: '💬' },
-  { path: '/contacts', label: 'Contactos', icon: '👥' },
+  { path: '/dashboard', label: 'Buscar', icon: 'search' },
+  { path: '/collection', label: 'Colección', icon: 'collection' },
+  { path: '/saved-matches', label: 'Guardados', icon: 'star' },
+  { path: '/messages', label: 'Mensajes', icon: 'chat' },
+  { path: '/contacts', label: 'Contactos', icon: 'user' },
 ]
 
 const isActive = (path: string) => {
@@ -46,7 +47,7 @@ const handleNavigate = (path: string) => {
       <div class="flex items-center justify-between h-16 md:h-20">
         <!-- Logo -->
         <router-link to="/dashboard" class="flex items-center gap-2 flex-shrink-0">
-          <div class="text-h3 font-bold text-neon">⚙️</div>
+          <SpriteIcon name="settings" size="medium" />
           <span class="hidden sm:inline text-h3 font-bold text-neon">CRANIAL</span>
         </router-link>
 
@@ -57,13 +58,13 @@ const handleNavigate = (path: string) => {
               :key="link.path"
               :to="link.path"
               :class="[
-                'px-4 py-2 text-small font-bold transition-fast rounded-sm',
+                'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2',
                 isActive(link.path)
                   ? 'bg-neon-10 border-b-2 border-neon text-neon'
                   : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
               ]"
           >
-            <span class="inline-block mr-1">{{ link.icon }}</span>
+            <SpriteIcon :name="link.icon" size="small" />
             {{ link.label }}
           </router-link>
         </nav>
@@ -85,25 +86,25 @@ const handleNavigate = (path: string) => {
             <router-link
                 v-if="authStore.user?.username"
                 :to="`/@${authStore.user.username}`"
-                class="hidden sm:flex px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast items-center gap-1"
+                class="hidden sm:flex px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast items-center gap-2"
                 title="Ver mi perfil público"
             >
-              <span>👤</span>
+              <SpriteIcon name="user-alt" size="small" />
               <span class="text-tiny">@{{ authStore.user.username }}</span>
             </router-link>
             <router-link
                 to="/settings"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center"
                 title="Configuración"
             >
-              ⚙️
+              <SpriteIcon name="settings" size="small" />
             </router-link>
             <button
                 @click="handleLogout"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-ruby hover:text-ruby transition-fast"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-rust hover:text-rust transition-fast flex items-center justify-center"
                 title="Cerrar sesión"
             >
-              🚪
+              <SpriteIcon name="x-mark" size="small" />
             </button>
           </div>
 
@@ -136,24 +137,24 @@ const handleNavigate = (path: string) => {
             :key="link.path"
             :to="link.path"
             :class="[
-              'block px-4 py-3 text-small font-bold transition-fast',
+              'flex items-center gap-3 px-4 py-3 text-small font-bold transition-fast',
               isActive(link.path)
                 ? 'bg-neon-10 border-l-2 border-neon text-neon'
                 : 'text-silver-70 hover:text-silver'
             ]"
             @click="closeMobileMenu"
         >
-          <span class="inline-block mr-2">{{ link.icon }}</span>
+          <SpriteIcon :name="link.icon" size="small" />
           {{ link.label }}
         </router-link>
         <!-- Mi Perfil (mobile) -->
         <router-link
             v-if="authStore.user?.username"
             :to="`/@${authStore.user.username}`"
-            class="block px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
+            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
             @click="closeMobileMenu"
         >
-          <span class="inline-block mr-2">👤</span>
+          <SpriteIcon name="user-alt" size="small" />
           Mi Perfil (@{{ authStore.user.username }})
         </router-link>
       </nav>

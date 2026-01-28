@@ -82,8 +82,9 @@
 
     <!-- Match Type Badge -->
     <div class="flex gap-2 mb-6">
-      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-block bg-neon-10 border border-neon px-3 py-1">
-        <p class="text-tiny font-bold text-neon">✓ BIDIRECCIONAL</p>
+      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1">
+        <SpriteIcon name="check" size="tiny" />
+        <p class="text-tiny font-bold text-neon">BIDIRECCIONAL</p>
       </span>
       <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1">
         <p class="text-tiny font-bold text-silver-70">→ UNIDIRECCIONAL</p>
@@ -98,56 +99,63 @@
       <!-- TAB: NEW (nuevos matches) -->
       <template v-if="tab === 'new'">
         <BaseButton
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleSaveMatch"
             :disabled="saving"
         >
-          {{ saving ? '⏳ GUARDANDO...' : '💾 ME INTERESA' }}
+          <SpriteIcon :name="saving ? 'loading' : 'star'" size="tiny" />
+          {{ saving ? 'GUARDANDO...' : 'ME INTERESA' }}
         </BaseButton>
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleOpenChat"
         >
-          💬 MENSAJE
+          <SpriteIcon name="chat" size="tiny" />
+          MENSAJE
         </BaseButton>
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleDiscard"
         >
-          ✕ IGNORAR
+          <SpriteIcon name="x-mark" size="tiny" />
+          IGNORAR
         </BaseButton>
       </template>
 
       <!-- TAB: SAVED (mis matches guardados) -->
       <template v-else-if="tab === 'saved'">
         <BaseButton
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleOpenChat"
         >
-          💬 MENSAJE
+          <SpriteIcon name="chat" size="tiny" />
+          MENSAJE
         </BaseButton>
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="showContactModal = true"
         >
-          👤 CONTACTO
+          <SpriteIcon name="user" size="tiny" />
+          CONTACTO
         </BaseButton>
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleMarcarCompletado"
         >
-          ✓ COMPLETADO
+          <SpriteIcon name="check" size="tiny" />
+          COMPLETADO
         </BaseButton>
         <BaseButton
             variant="danger"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleDiscard"
         >
-          ✕ ELIMINAR
+          <SpriteIcon name="x-mark" size="tiny" />
+          ELIMINAR
         </BaseButton>
       </template>
 
@@ -155,17 +163,19 @@
       <template v-else-if="tab === 'deleted'">
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleRecuperar"
         >
-          ↩️ RECUPERAR
+          <SpriteIcon name="recover" size="tiny" />
+          RECUPERAR
         </BaseButton>
         <BaseButton
             variant="danger"
-            class="flex-1"
+            class="flex-1 flex items-center justify-center gap-2"
             @click="handleDeletePermanent"
         >
-          🗑️ ELIMINAR
+          <SpriteIcon name="trash" size="tiny" />
+          ELIMINAR
         </BaseButton>
       </template>
     </div>
@@ -209,29 +219,32 @@
         <!-- Botón: Copiar Email -->
         <BaseButton
             variant="secondary"
-            class="w-full"
+            class="w-full flex items-center justify-center gap-2"
             @click="copyEmailToClipboard"
         >
-          📧 COPIAR EMAIL
+          <SpriteIcon name="chat" size="tiny" />
+          COPIAR EMAIL
         </BaseButton>
 
         <!-- Botón: Guardar Contacto -->
         <BaseButton
             variant="secondary"
-            class="w-full"
+            class="w-full flex items-center justify-center gap-2"
             @click="handleSaveContact"
             :disabled="contactSaving"
         >
-          {{ contactSaving ? '⏳ GUARDANDO...' : '⭐ GUARDAR CONTACTO' }}
+          <SpriteIcon :name="contactSaving ? 'loading' : 'star'" size="tiny" />
+          {{ contactSaving ? 'GUARDANDO...' : 'GUARDAR CONTACTO' }}
         </BaseButton>
 
         <!-- Botón: Cerrar -->
         <BaseButton
             variant="secondary"
-            class="w-full"
+            class="w-full flex items-center justify-center gap-2"
             @click="showContactModal = false"
         >
-          ✕ CERRAR
+          <SpriteIcon name="x-mark" size="tiny" />
+          CERRAR
         </BaseButton>
       </div>
     </BaseModal>
@@ -252,6 +265,7 @@ import { useRouter } from 'vue-router'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import ChatModal from '../chat/ChatModal.vue'
+import SpriteIcon from '../ui/SpriteIcon.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { useToastStore } from '../../stores/toast'
 import { useMessagesStore } from '../../stores/messages'

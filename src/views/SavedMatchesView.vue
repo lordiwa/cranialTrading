@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
+import SpriteIcon from '../components/ui/SpriteIcon.vue'
 
 const matchesStore = useMatchesStore()
 const contactsStore = useContactsStore()
@@ -26,19 +27,19 @@ const tabs = computed(() => [
   {
     id: 'new' as const,
     label: 'NUEVOS',
-    icon: '🔴',
+    icon: 'dot',
     count: newMatches.value.length
   },
   {
     id: 'saved' as const,
     label: 'MIS MATCHES',
-    icon: '⭐',
+    icon: 'star',
     count: savedMatches.value.length
   },
   {
     id: 'deleted' as const,
     label: 'ELIMINADOS',
-    icon: '🗑️',
+    icon: 'trash',
     count: deletedMatches.value.length
   }
 ])
@@ -143,7 +144,7 @@ onUnmounted(() => {
               : 'border-transparent text-silver-70 hover:text-silver'
           ]"
         >
-          <span>{{ tab.icon }}</span>
+          <SpriteIcon :name="tab.icon" size="small" />
           <span>{{ tab.label }}</span>
           <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold">
             {{ tab.count }}

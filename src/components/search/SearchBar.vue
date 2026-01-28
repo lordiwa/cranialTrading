@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { searchCards, getCardSuggestions } from '../../services/scryfall'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import SpriteIcon from '../ui/SpriteIcon.vue'
 
 const emit = defineEmits<{
   'add-card': [card: any]
@@ -113,9 +114,10 @@ const selectCard = (card: any) => {
         <BaseButton
             @click="handleSearch"
             :disabled="!searchQuery.trim() || loading"
-            class="whitespace-nowrap"
+            class="whitespace-nowrap flex items-center gap-2"
         >
-          {{ loading ? '🔍 ...' : '🔍 BUSCAR' }}
+          <SpriteIcon :name="loading ? 'loading' : 'search'" size="tiny" />
+          {{ loading ? '' : 'BUSCAR' }}
         </BaseButton>
       </div>
     </div>

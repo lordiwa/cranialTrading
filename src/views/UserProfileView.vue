@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { collection, getDocs, query, where, limit, startAfter } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, startAfter, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
@@ -10,6 +10,7 @@ import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import CollectionGrid from '../components/collection/CollectionGrid.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
+import type { Card } from '../types/card';
 
 const route = useRoute();
 const toastStore = useToastStore();
@@ -33,6 +34,10 @@ const selectedUsername = ref('');
 // Computed properties
 const isOwnProfile = computed(() => {
   return authStore.user?.id === userId.value;
+});
+
+const canShowInterest = computed(() => {
+  return authStore.user && !isOwnProfile.value;
 });
 
 // Watchers
@@ -139,6 +144,75 @@ const handleCloseChat = () => {
   showChat.value = false;
 };
 
+// Track cards user already expressed interest in
+const interestedCards = ref<Set<string>>(new Set());
+
+const handleInterest = async (card: Card) => {
+  if (!authStore.user || !userId.value) return;
+
+  const cardKey = card.scryfallId || card.id;
+  if (interestedCards.value.has(cardKey)) return;
+
+  try {
+    const MATCH_LIFETIME_DAYS = 15;
+    const getExpirationDate = () => {
+      const date = new Date();
+      date.setDate(date.getDate() + MATCH_LIFETIME_DAYS);
+      return date;
+    };
+
+    const cardPrice = typeof card.price === 'number' ? card.price : 0;
+    const cardData = {
+      id: card.id || card.scryfallId,
+      scryfallId: card.scryfallId || '',
+      name: card.name || '',
+      edition: card.edition || '',
+      quantity: card.quantity || 1,
+      condition: card.condition || 'NM',
+      foil: card.foil || false,
+      price: cardPrice,
+      image: card.image || '',
+      status: card.status || 'collection',
+    };
+
+    const totalValue = cardPrice * (card.quantity || 1);
+
+    // Create a SINGLE shared match visible to both users
+    const sharedMatchPayload = {
+      // Participants
+      senderId: authStore.user.id,
+      senderUsername: authStore.user.username,
+      senderLocation: authStore.user.location || '',
+      senderEmail: authStore.user.email || '',
+      receiverId: userId.value,
+      receiverUsername: userInfo.value?.username || '',
+      receiverLocation: userInfo.value?.location || '',
+      // Card info
+      card: cardData,
+      cardType: card.status, // 'sale' or 'trade'
+      totalValue: totalValue,
+      // Status
+      status: 'pending', // pending -> accepted -> completed
+      senderStatus: 'interested', // interested
+      receiverStatus: 'new', // new -> seen -> responded
+      // Timestamps
+      createdAt: new Date(),
+      lifeExpiresAt: getExpirationDate(),
+    };
+
+    // Save to shared collection
+    const sharedMatchesRef = collection(db, 'shared_matches');
+    await addDoc(sharedMatchesRef, sharedMatchPayload);
+
+    // Mark card as interested
+    interestedCards.value.add(cardKey);
+    toastStore.show(`Interés enviado a @${userInfo.value?.username}`, 'success');
+  } catch (error) {
+    console.error('Error sending interest:', error);
+    toastStore.show('Error al enviar interés', 'error');
+  }
+};
+
 // Initialize on mount
 onMounted(() => {
   loadProfile();
@@ -203,7 +277,13 @@ onMounted(() => {
         </h2>
 
         <div class="space-y-8">
-          <CollectionGrid :cards="cards" :readonly="true" />
+          <CollectionGrid
+              :cards="cards"
+              :readonly="true"
+              :show-interest="canShowInterest"
+              :interested-cards="interestedCards"
+              @interest="handleInterest"
+          />
 
           <!-- Load more button -->
           <div v-if="hasMore" class="text-center">

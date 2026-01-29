@@ -15,6 +15,7 @@ import type { CardCondition, CardStatus } from '../../types/card'
 interface Props {
   show: boolean
   scryfallCard?: any
+  selectedDeckId?: string
 }
 
 const props = defineProps<Props>()
@@ -53,6 +54,13 @@ watch(() => props.scryfallCard, async (card) => {
   } else {
     availablePrints.value = []
     selectedPrint.value = null
+  }
+}, { immediate: true })
+
+// Pre-seleccionar deck cuando se abre el modal
+watch(() => props.show, (isVisible) => {
+  if (isVisible && props.selectedDeckId) {
+    form.deckName = props.selectedDeckId
   }
 }, { immediate: true })
 

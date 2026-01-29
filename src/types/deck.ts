@@ -26,6 +26,8 @@ export interface DeckWishlistItem {
     image: string
     condition: CardCondition    // Desired condition
     foil: boolean               // Desired foil status
+    cmc?: number                // Mana value for grouping
+    type_line?: string          // Card type for grouping
     notes?: string
     addedAt: Date
 }
@@ -41,6 +43,8 @@ export interface HydratedDeckCard {
     foil: boolean
     price: number
     image: string
+    cmc?: number              // Mana value for grouping
+    type_line?: string        // Card type for grouping
 
     // From DeckCardAllocation
     allocatedQuantity: number
@@ -63,6 +67,8 @@ export interface HydratedWishlistCard {
     foil: boolean
     price: number
     image: string
+    cmc?: number              // Mana value for grouping
+    type_line?: string        // Card type for grouping
     requestedQuantity: number
     isInSideboard: boolean
     notes?: string

@@ -42,9 +42,12 @@ service cloud.firestore {
       }
 
       // Colección de matches nuevos (calculados)
+      // Cualquier usuario autenticado puede crear un match (enviar interés)
+      // Solo el dueño puede leer, actualizar y eliminar
       match /matches_nuevos/{matchId} {
         allow read: if request.auth != null;
-        allow write: if request.auth.uid == userId;
+        allow create: if request.auth != null;
+        allow update, delete: if request.auth.uid == userId;
       }
 
       // Colección de matches guardados
@@ -93,6 +96,18 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read, write: if request.auth != null;
       }
+    }
+
+    // ========== MATCHES COMPARTIDOS (INTERÉS DESDE PERFIL) ==========
+    // Colección a nivel raíz para matches donde ambos usuarios pueden ver
+    match /shared_matches/{matchId} {
+      // Cualquier usuario autenticado puede crear
+      allow create: if request.auth != null;
+      // Solo participantes pueden leer y modificar
+      allow read: if request.auth != null &&
+        (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
+      allow update, delete: if request.auth != null &&
+        (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
     }
 
     // Legacy colecciones (mantener compatibilidad con datos anteriores)

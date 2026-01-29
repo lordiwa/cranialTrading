@@ -13,12 +13,13 @@ const matchesStore = useMatchesStore()
 const contactsStore = useContactsStore()
 
 // State
-const activeTab = ref<'new' | 'saved' | 'deleted'>('new')
+const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted'>('new')
 const matchesWithEmails = ref<any[]>([])
 const loading = ref(false)
 
 // ✅ DATOS REALES desde store
 const newMatches = computed(() => matchesStore.newMatches)
+const sentMatches = computed(() => matchesStore.sentMatches)
 const savedMatches = computed(() => matchesStore.savedMatches)
 const deletedMatches = computed(() => matchesStore.deletedMatches)
 
@@ -31,8 +32,14 @@ const tabs = computed(() => [
     count: newMatches.value.length
   },
   {
+    id: 'sent' as const,
+    label: 'ENVIADOS',
+    icon: 'hand',
+    count: sentMatches.value.length
+  },
+  {
     id: 'saved' as const,
-    label: 'MIS MATCHES',
+    label: 'GUARDADOS',
     icon: 'star',
     count: savedMatches.value.length
   },
@@ -48,6 +55,7 @@ const tabs = computed(() => [
 const currentMatches = computed(() => {
   switch (activeTab.value) {
     case 'new': return newMatches.value
+    case 'sent': return sentMatches.value
     case 'saved': return matchesWithEmails.value
     case 'deleted': return deletedMatches.value
     default: return []
@@ -103,7 +111,7 @@ const handleDiscardMatch = async (matchId: string) => {
   await loadSavedMatchesWithEmails()
 }
 
-const handleTabChange = (tabId: 'new' | 'saved' | 'deleted') => {
+const handleTabChange = (tabId: 'new' | 'sent' | 'saved' | 'deleted') => {
   activeTab.value = tabId
 }
 
@@ -127,7 +135,7 @@ onUnmounted(() => {
       <div class="mb-lg md:mb-xl">
         <h1 class="text-h2 md:text-h1 font-bold text-silver mb-sm">MIS MATCHES</h1>
         <p class="text-small md:text-body text-silver-70">
-          {{ newMatches.length + savedMatches.length + deletedMatches.length }} matches totales
+          {{ newMatches.length }} nuevos, {{ sentMatches.length }} enviados, {{ savedMatches.length }} guardados
         </p>
       </div>
 
@@ -161,12 +169,14 @@ onUnmounted(() => {
       <div v-else-if="currentMatches.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
         <p class="text-body text-silver-70">
           {{ activeTab === 'new' ? 'No tienes matches nuevos' :
+            activeTab === 'sent' ? 'No has enviado matches' :
             activeTab === 'saved' ? 'No tienes matches guardados' :
                 'No tienes matches eliminados' }}
         </p>
         <p class="text-small text-silver-50 mt-2">
-          {{ activeTab === 'new' ? 'Los nuevos matches aparecerán aquí cuando haya coincidencias.' :
-            activeTab === 'saved' ? 'Guarda matches interesantes para contactar a los usuarios.' :
+          {{ activeTab === 'new' ? 'Cuando alguien se interese en tus cartas, aparecerá aquí.' :
+            activeTab === 'sent' ? 'Cuando expreses interés en cartas de otros con "ME INTERESA", aparecerán aquí.' :
+            activeTab === 'saved' ? 'Los matches que guardes y envíes aparecerán aquí.' :
                 'Los matches eliminados se borrarán permanentemente después de 15 días.' }}
         </p>
       </div>

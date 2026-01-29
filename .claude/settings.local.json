@@ -29,7 +29,8 @@
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(head:*)",
-      "Bash(tr:*)"
+      "Bash(tr:*)",
+      "Bash(echo:*)"
     ]
   }
 }

@@ -9,6 +9,7 @@ import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
 import DeckCardsList from '../components/decks/DeckCardsList.vue'
+import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import AddCardToDeckModal from '../components/decks/AddCardToDeckModal.vue'
 import EditDeckCardModal from '../components/decks/EditDeckCardModal.vue'
 import type { DisplayDeckCard, HydratedDeckCard } from '../types/deck'
@@ -208,6 +209,31 @@ const handleSaveEditedCard = async (updatedData: any) => {
   toastStore.show('Carta actualizada', 'success')
 }
 
+/**
+ * Handle quantity update from grid popup
+ */
+const handleUpdateQuantity = async (card: DisplayDeckCard, newQuantity: number) => {
+  if (!card.isWishlist) {
+    const hydratedCard = card as HydratedDeckCard
+    await decksStore.updateAllocation(
+      deckId,
+      hydratedCard.cardId,
+      hydratedCard.isInSideboard,
+      newQuantity
+    )
+    toastStore.show('Cantidad actualizada', 'success')
+  }
+  // TODO: Handle wishlist quantity update
+}
+
+/**
+ * Handle add to wishlist from grid
+ */
+const handleAddToWishlistFromGrid = async (card: DisplayDeckCard) => {
+  // Card is already in wishlist, this is just a reminder
+  toastStore.show('Esta carta ya está en tu wishlist del deck', 'info')
+}
+
 const handleSave = async () => {
   if (!deck.value?.name.trim()) {
     toastStore.show('El nombre del deck es requerido', 'error')
@@ -337,13 +363,14 @@ onMounted(async () => {
         + AGREGAR CARTA
       </BaseButton>
 
-      <!-- Cards list -->
-      <DeckCardsList
+      <!-- Cards Grid (Visual Editor) -->
+      <DeckEditorGrid
           :cards="activeTab === 'mainboard' ? mainboardCards : sideboardCards"
           :deck-id="deckId"
-          :title="activeTab === 'mainboard' ? 'MAINBOARD' : 'SIDEBOARD'"
           @edit="handleEditCard"
           @remove="handleRemoveCard"
+          @update-quantity="handleUpdateQuantity"
+          @add-to-wishlist="handleAddToWishlistFromGrid"
       />
 
       <!-- Add card modal -->

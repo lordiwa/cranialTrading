@@ -273,7 +273,7 @@ import { useMessagesStore } from '../../stores/messages'
 interface Props {
   match: any
   matchIndex?: number
-  tab?: 'new' | 'saved' | 'deleted'
+  tab?: 'new' | 'sent' | 'saved' | 'deleted'
 }
 
 const props = withDefaults(defineProps<Props>(), {

@@ -11,9 +11,13 @@ const props = withDefaults(defineProps<{
   card: Card
   compact?: boolean
   readonly?: boolean
+  showInterest?: boolean
+  isInterested?: boolean
 }>(), {
   compact: false,
-  readonly: false
+  readonly: false,
+  showInterest: false,
+  isInterested: false
 })
 
 const emit = defineEmits<{
@@ -21,6 +25,7 @@ const emit = defineEmits<{
   edit: [card: Card]
   delete: [card: Card]
   manageDecks: [card: Card]
+  interest: [card: Card]
 }>()
 
 const collectionStore = useCollectionStore()
@@ -296,8 +301,8 @@ const getStatusIconName = (status: string) => {
       </div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="flex gap-1 mt-3">
+    <!-- Action Buttons (only when not readonly) -->
+    <div v-if="!readonly" class="flex gap-1 mt-3">
       <button
           @click="emit('manageDecks', card)"
           class="flex-1 px-2 py-1 bg-blue-10 border border-blue-400 text-blue-400 text-tiny font-bold hover:bg-blue-20 transition-150"
@@ -316,6 +321,26 @@ const getStatusIconName = (status: string) => {
           class="flex-1 px-2 py-1 bg-rust-10 border border-rust text-rust text-tiny font-bold hover:bg-rust-20 transition-150"
       >
         BORRAR
+      </button>
+    </div>
+
+    <!-- Interest Button (only when readonly and showInterest) -->
+    <div v-if="readonly && showInterest && (card.status === 'sale' || card.status === 'trade')" class="mt-3">
+      <button
+          v-if="isInterested"
+          disabled
+          class="w-full px-2 py-1 bg-silver-10 border border-silver-30 text-silver-50 text-tiny font-bold cursor-not-allowed"
+          title="Ya expresaste interés en esta carta"
+      >
+        ✓ INTERÉS ENVIADO
+      </button>
+      <button
+          v-else
+          @click="emit('interest', card)"
+          class="w-full px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150"
+          title="Notificar al vendedor que te interesa esta carta"
+      >
+        ⭐ ME INTERESA
       </button>
     </div>
   </div>
@@ -342,5 +367,8 @@ const getStatusIconName = (status: string) => {
 }
 .bg-blue-20 {
   background-color: rgba(96, 165, 250, 0.2);
+}
+.bg-silver-10 {
+  background-color: rgba(238, 238, 238, 0.1);
 }
 </style>

@@ -156,6 +156,8 @@ export const useDecksStore = defineStore('decks', () => {
                         foil: card.foil,
                         price: card.price,
                         image: card.image,
+                        cmc: card.cmc,
+                        type_line: card.type_line,
                         allocatedQuantity: alloc.quantity,
                         isInSideboard: alloc.isInSideboard,
                         notes: alloc.notes,
@@ -179,6 +181,8 @@ export const useDecksStore = defineStore('decks', () => {
                     foil: item.foil,
                     price: item.price,
                     image: item.image,
+                    cmc: item.cmc,
+                    type_line: item.type_line,
                     requestedQuantity: item.quantity,
                     isInSideboard: item.isInSideboard,
                     notes: item.notes,
@@ -451,15 +455,24 @@ export const useDecksStore = defineStore('decks', () => {
         isInSideboard: boolean,
         notes?: string
     ): Promise<{ allocated: number; wishlisted: number }> => {
-        if (!authStore.user?.id) return { allocated: 0, wishlisted: 0 }
+        if (!authStore.user?.id) {
+            console.warn('[allocateCardToDeck] No user')
+            return { allocated: 0, wishlisted: 0 }
+        }
 
         try {
             const deck = decks.value.find(d => d.id === deckId)
-            if (!deck) return { allocated: 0, wishlisted: 0 }
+            if (!deck) {
+                console.warn(`[allocateCardToDeck] Deck not found: ${deckId}, available decks:`, decks.value.map(d => d.id))
+                return { allocated: 0, wishlisted: 0 }
+            }
 
             const collectionStore = useCollectionStore()
             const card = collectionStore.getCardById(cardId)
-            if (!card) return { allocated: 0, wishlisted: 0 }
+            if (!card) {
+                console.warn(`[allocateCardToDeck] Card not found: ${cardId}`)
+                return { allocated: 0, wishlisted: 0 }
+            }
 
             // Calculate available quantity
             const totalAllocated = getTotalAllocatedForCard(cardId)

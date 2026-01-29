@@ -7,6 +7,9 @@ import {
     deleteDoc,
     doc,
     updateDoc,
+    query,
+    where,
+    or,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
@@ -18,14 +21,25 @@ export interface SimpleMatch {
     otherUserId: string;
     otherUsername: string;
     otherLocation?: string;
+    otherEmail?: string;
     myCard?: any;
     otherCard?: any;
     otherPreference?: any;
     myPreference?: any;
+    // MatchCard.vue format (arrays + totals)
+    myCards?: any[];
+    otherCards?: any[];
+    myTotalValue?: number;
+    theirTotalValue?: number;
+    valueDifference?: number;
+    compatibility?: number;
     createdAt: Date;
     status?: 'nuevo' | 'visto' | 'activo' | 'eliminado';
     lifeExpiresAt?: Date;
     docId?: string;
+    // Shared match fields
+    isSharedMatch?: boolean;
+    isSender?: boolean;
 }
 
 const MATCH_LIFETIME_DAYS = 15;
@@ -91,9 +105,11 @@ function createCleanMatchPayload(match: SimpleMatch, overrides: any = {}) {
 }
 
 export const useMatchesStore = defineStore('matches', () => {
-    const newMatches = ref<SimpleMatch[]>([]);
-    const savedMatches = ref<SimpleMatch[]>([]);
+    const newMatches = ref<SimpleMatch[]>([]);      // Received from others
+    const sentMatches = ref<SimpleMatch[]>([]);     // Sent by me (ME INTERESA)
+    const savedMatches = ref<SimpleMatch[]>([]);    // Manually saved + sent (combined view)
     const deletedMatches = ref<SimpleMatch[]>([]);
+    const sharedMatches = ref<SimpleMatch[]>([]); // Matches from profile interest
     const loading = ref(false);
     const authStore = useAuthStore();
     const toastStore = useToastStore();
@@ -137,15 +153,59 @@ export const useMatchesStore = defineStore('matches', () => {
             otherUserId: data.otherUserId || '',
             otherUsername: data.otherUsername || '',
             otherLocation: data.otherLocation,
+            otherEmail: data.otherEmail,
             myCard: data.myCard,
             otherCard: data.otherCard,
             myPreference: data.myPreference,
             otherPreference: data.otherPreference,
+            // Support for MatchCard.vue format (arrays + totals)
+            myCards: data.myCards || [],
+            otherCards: data.otherCards || [],
+            myTotalValue: data.myTotalValue ?? 0,
+            theirTotalValue: data.theirTotalValue ?? 0,
+            valueDifference: data.valueDifference ?? 0,
+            compatibility: data.compatibility ?? 0,
             createdAt: createdAt,
             status: data.status,
             lifeExpiresAt: lifeExpiresAt,
             docId: docId,
         };
+    };
+
+    /**
+     * Convert shared match to SimpleMatch format for MatchCard.vue
+     */
+    const parseSharedMatch = (docId: string, data: any, currentUserId: string): SimpleMatch => {
+        const createdAt = toDate(data.createdAt);
+        const lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : calculateExpirationDate(createdAt);
+
+        const isSender = data.senderId === currentUserId;
+        const card = data.card || {};
+        const cardPrice = card.price || 0;
+        const totalValue = cardPrice * (card.quantity || 1);
+
+        return {
+            id: docId,
+            docId: docId,
+            type: data.cardType === 'sale' ? (isSender ? 'BUSCO' : 'VENDO') : 'BUSCO',
+            otherUserId: isSender ? data.receiverId : data.senderId,
+            otherUsername: isSender ? data.receiverUsername : data.senderUsername,
+            otherLocation: isSender ? data.receiverLocation : data.senderLocation,
+            otherEmail: isSender ? '' : data.senderEmail,
+            // For sender: they want the card (otherCards), for receiver: it's their card (myCards)
+            myCards: isSender ? [] : [card],
+            otherCards: isSender ? [card] : [],
+            myTotalValue: isSender ? 0 : totalValue,
+            theirTotalValue: isSender ? totalValue : 0,
+            valueDifference: isSender ? totalValue : -totalValue,
+            compatibility: 100,
+            status: isSender ? 'activo' : 'nuevo',
+            createdAt: createdAt,
+            lifeExpiresAt: lifeExpiresAt,
+            // Extra fields for shared match handling
+            isSharedMatch: true,
+            isSender: isSender,
+        } as SimpleMatch;
     };
 
     /**
@@ -159,16 +219,53 @@ export const useMatchesStore = defineStore('matches', () => {
             // Limpiar expirados antes de cargar
             await cleanExpiredMatches();
 
+            // Query shared matches where user is sender or receiver
+            const sharedMatchesRef = collection(db, 'shared_matches');
+            const sharedQuery = query(
+                sharedMatchesRef,
+                or(
+                    where('senderId', '==', authStore.user.id),
+                    where('receiverId', '==', authStore.user.id)
+                )
+            );
+
             // Cargar en paralelo
-            const [newDocs, savedDocs, deletedDocs] = await Promise.all([
+            const [newDocs, savedDocs, deletedDocs, sharedDocs] = await Promise.all([
                 getDocs(collection(db, 'users', authStore.user.id, 'matches_nuevos')),
                 getDocs(collection(db, 'users', authStore.user.id, 'matches_guardados')),
                 getDocs(collection(db, 'users', authStore.user.id, 'matches_eliminados')),
+                getDocs(sharedQuery),
             ]);
 
-            newMatches.value = newDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
-            savedMatches.value = savedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            // Parse shared matches and separate by role
+            const parsedShared = sharedDocs.docs.map(doc =>
+                parseSharedMatch(doc.id, doc.data(), authStore.user!.id)
+            );
+
+            // Shared matches: sender sees in sent, receiver sees in new
+            const sharedForNew = parsedShared.filter(m => !m.isSender);
+            const sharedForSent = parsedShared.filter(m => m.isSender);
+
+            // Parse saved matches from Firestore
+            const savedFromFirestore = savedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+
+            // NUEVOS: received from others (not sent by me)
+            newMatches.value = [
+                ...newDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data())),
+                ...sharedForNew,
+            ];
+
+            // ENVIADOS: matches I sent via "ME INTERESA"
+            sentMatches.value = sharedForSent;
+
+            // GUARDADOS: manually saved + sent matches (combined view)
+            savedMatches.value = [
+                ...savedFromFirestore,
+                ...sharedForSent,
+            ];
+
             deletedMatches.value = deletedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            sharedMatches.value = parsedShared;
         } catch (error: any) {
             console.error('loadAllMatches error:', error);
             toastStore.show('Error al cargar matches', 'error');
@@ -257,14 +354,18 @@ export const useMatchesStore = defineStore('matches', () => {
 
         try {
             const source = tab === 'new' ? 'matches_nuevos' : 'matches_guardados';
+            // Search by both docId and id for compatibility
             const match = tab === 'new'
-                ? newMatches.value.find(m => m.docId === matchId)
-                : savedMatches.value.find(m => m.docId === matchId);
+                ? newMatches.value.find(m => m.docId === matchId || m.id === matchId)
+                : savedMatches.value.find(m => m.docId === matchId || m.id === matchId);
 
             if (!match) {
                 toastStore.show('Match no encontrado', 'error');
                 return false;
             }
+
+            // Use docId for Firestore operations
+            const firestoreDocId = match.docId || matchId;
 
             // Create clean payload for eliminados
             const payload = createCleanMatchPayload(match, {
@@ -278,13 +379,13 @@ export const useMatchesStore = defineStore('matches', () => {
             const docRef = await addDoc(deletedRef, payload);
 
             // Delete from source
-            await deleteDoc(doc(db, 'users', authStore.user.id, source, matchId));
+            await deleteDoc(doc(db, 'users', authStore.user.id, source, firestoreDocId));
 
-            // Update local state
+            // Update local state - filter by both docId and id
             if (tab === 'new') {
-                newMatches.value = newMatches.value.filter(m => m.docId !== matchId);
+                newMatches.value = newMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             } else {
-                savedMatches.value = savedMatches.value.filter(m => m.docId !== matchId);
+                savedMatches.value = savedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             }
             deletedMatches.value.push({ ...match, docId: docRef.id, status: 'eliminado' });
 
@@ -304,8 +405,11 @@ export const useMatchesStore = defineStore('matches', () => {
         if (!authStore.user) return false;
 
         try {
-            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_guardados', matchId));
-            savedMatches.value = savedMatches.value.filter(m => m.docId !== matchId);
+            const match = savedMatches.value.find(m => m.docId === matchId || m.id === matchId);
+            const firestoreDocId = match?.docId || matchId;
+
+            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_guardados', firestoreDocId));
+            savedMatches.value = savedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             toastStore.show('Match completado ✓', 'success');
             return true;
         } catch (error: any) {
@@ -322,8 +426,10 @@ export const useMatchesStore = defineStore('matches', () => {
         if (!authStore.user) return false;
 
         try {
-            const match = deletedMatches.value.find(m => m.docId === matchId);
+            const match = deletedMatches.value.find(m => m.docId === matchId || m.id === matchId);
             if (!match) return false;
+
+            const firestoreDocId = match.docId || matchId;
 
             const payload = createCleanMatchPayload(match, {
                 status: 'nuevo',
@@ -334,9 +440,9 @@ export const useMatchesStore = defineStore('matches', () => {
             const newRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
             const docRef = await addDoc(newRef, payload);
 
-            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', matchId));
+            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', firestoreDocId));
 
-            deletedMatches.value = deletedMatches.value.filter(m => m.docId !== matchId);
+            deletedMatches.value = deletedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             newMatches.value.push({ ...match, docId: docRef.id, status: 'nuevo' });
 
             toastStore.show('Match recuperado', 'success');
@@ -355,8 +461,11 @@ export const useMatchesStore = defineStore('matches', () => {
         if (!authStore.user) return false;
 
         try {
-            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', matchId));
-            deletedMatches.value = deletedMatches.value.filter(m => m.docId !== matchId);
+            const match = deletedMatches.value.find(m => m.docId === matchId || m.id === matchId);
+            const firestoreDocId = match?.docId || matchId;
+
+            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', firestoreDocId));
+            deletedMatches.value = deletedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             toastStore.show('Eliminado permanentemente', 'success');
             return true;
         } catch (error: any) {
@@ -411,9 +520,10 @@ export const useMatchesStore = defineStore('matches', () => {
         }
     };
 
-    const getTotalByTab = (tab: 'new' | 'saved' | 'deleted') => {
+    const getTotalByTab = (tab: 'new' | 'sent' | 'saved' | 'deleted') => {
         switch (tab) {
             case 'new': return newMatches.value.length;
+            case 'sent': return sentMatches.value.length;
             case 'saved': return savedMatches.value.length;
             case 'deleted': return deletedMatches.value.length;
         }
@@ -435,8 +545,10 @@ export const useMatchesStore = defineStore('matches', () => {
 
     return {
         newMatches,
+        sentMatches,
         savedMatches,
         deletedMatches,
+        sharedMatches,
         loading,
         loadAllMatches,
         cleanExpiredMatches,

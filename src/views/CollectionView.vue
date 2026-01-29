@@ -11,9 +11,11 @@ import CollectionGrid from '../components/collection/CollectionGrid.vue'
 import CollectionTotalsPanel from '../components/collection/CollectionTotalsPanel.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
+import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import { Card, CardStatus, CardCondition } from '../types/card'
+import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
 import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
@@ -124,23 +126,36 @@ const isCommanderFormat = computed(() => {
   return selectedDeck.value?.format === 'commander'
 })
 
-// Carta del comandante (owned)
-const deckCommanderCard = computed(() => {
-  if (!selectedDeck.value || !isCommanderFormat.value || !selectedDeck.value.commander) return null
-  // Buscar en cartas owned que coincida con el nombre del comandante
-  return deckOwnedCards.value.find(c =>
-    c.name.toLowerCase() === selectedDeck.value!.commander?.toLowerCase()
+// Lista de nombres de commanders (puede haber varios con Partner)
+const commanderNames = computed((): string[] => {
+  if (!selectedDeck.value || !isCommanderFormat.value || !selectedDeck.value.commander) return []
+  // Split by " // " for partner commanders or return single name
+  const names = selectedDeck.value.commander.split(/\s*\/\/\s*|\s*,\s*/)
+  return names.map(n => n.trim()).filter(n => n.length > 0)
+})
+
+// Cartas del comandante (owned) - puede haber varias
+// Solo busca en cartas asignadas al deck
+const deckCommanderCards = computed(() => {
+  if (!selectedDeck.value || !isCommanderFormat.value || commanderNames.value.length === 0) return []
+  return deckOwnedCards.value.filter(c =>
+    commanderNames.value.some(name => c.name.toLowerCase() === name.toLowerCase())
   )
 })
+
+// Legacy: single commander card (for backward compatibility)
+const deckCommanderCard = computed(() => deckCommanderCards.value[0] || null)
 
 // Cartas del mainboard (owned, no sideboard, no commander)
 const deckMainboardCards = computed(() => {
   if (deckFilter.value === 'all') return []
   return deckOwnedCards.value.filter(c => {
-    // Excluir comandante
-    if (isCommanderFormat.value && selectedDeck.value?.commander &&
-        c.name.toLowerCase() === selectedDeck.value.commander.toLowerCase()) {
-      return false
+    // Excluir comandantes (pueden ser varios con Partner)
+    if (isCommanderFormat.value && commanderNames.value.length > 0) {
+      const cardNameLower = c.name.toLowerCase()
+      if (commanderNames.value.some(name => name.toLowerCase() === cardNameLower)) {
+        return false
+      }
     }
     const allocations = getAllocationsForCard(c.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
@@ -256,6 +271,111 @@ const sortedSideboardCards = computed(() => {
     default:
       return cards.sort((a, b) => a.name.localeCompare(b.name))
   }
+})
+
+// Convert owned cards to DisplayDeckCard format for DeckEditorGrid
+const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
+  if (!selectedDeck.value) return []
+
+  // Include commander cards if applicable (can have multiple with Partner)
+  const cardsToConvert = [...deckMainboardCards.value]
+  if (isCommanderFormat.value && deckCommanderCards.value.length > 0) {
+    cardsToConvert.unshift(...deckCommanderCards.value)
+  }
+
+  // Convert owned cards to HydratedDeckCard format
+  const ownedDisplay: HydratedDeckCard[] = cardsToConvert.map(card => {
+    const allocations = getAllocationsForCard(card.id)
+    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && !a.isInSideboard)
+    return {
+      cardId: card.id,
+      scryfallId: card.scryfallId,
+      name: card.name,
+      edition: card.edition,
+      condition: card.condition,
+      foil: card.foil,
+      price: card.price,
+      image: card.image,
+      cmc: card.cmc,
+      type_line: card.type_line,
+      allocatedQuantity: deckAlloc?.quantity || 0,
+      isInSideboard: false,
+      notes: undefined,
+      addedAt: card.createdAt || new Date(),
+      isWishlist: false as const,
+      availableInCollection: card.quantity - (deckAlloc?.quantity || 0),
+      totalInCollection: card.quantity,
+    }
+  })
+
+  // Convert wishlist items to HydratedWishlistCard format
+  const wishlistDisplay: HydratedWishlistCard[] = deckMainboardWishlist.value.map(item => ({
+    scryfallId: item.scryfallId,
+    name: item.name,
+    edition: item.edition,
+    condition: item.condition,
+    foil: item.foil,
+    price: item.price,
+    image: item.image,
+    cmc: item.cmc,
+    type_line: item.type_line,
+    requestedQuantity: item.quantity,
+    isInSideboard: false,
+    notes: item.notes,
+    addedAt: item.addedAt,
+    isWishlist: true as const,
+  }))
+
+  return [...ownedDisplay, ...wishlistDisplay]
+})
+
+const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
+  if (!selectedDeck.value || isCommanderFormat.value) return []
+
+  // Convert owned cards to HydratedDeckCard format
+  const ownedDisplay: HydratedDeckCard[] = deckSideboardCards.value.map(card => {
+    const allocations = getAllocationsForCard(card.id)
+    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && a.isInSideboard)
+    return {
+      cardId: card.id,
+      scryfallId: card.scryfallId,
+      name: card.name,
+      edition: card.edition,
+      condition: card.condition,
+      foil: card.foil,
+      price: card.price,
+      image: card.image,
+      cmc: card.cmc,
+      type_line: card.type_line,
+      allocatedQuantity: deckAlloc?.quantity || 0,
+      isInSideboard: true,
+      notes: undefined,
+      addedAt: card.createdAt || new Date(),
+      isWishlist: false as const,
+      availableInCollection: card.quantity - (deckAlloc?.quantity || 0),
+      totalInCollection: card.quantity,
+    }
+  })
+
+  // Convert wishlist items to HydratedWishlistCard format
+  const wishlistDisplay: HydratedWishlistCard[] = deckSideboardWishlist.value.map(item => ({
+    scryfallId: item.scryfallId,
+    name: item.name,
+    edition: item.edition,
+    condition: item.condition,
+    foil: item.foil,
+    price: item.price,
+    image: item.image,
+    cmc: item.cmc,
+    type_line: item.type_line,
+    requestedQuantity: item.quantity,
+    isInSideboard: true,
+    notes: item.notes,
+    addedAt: item.addedAt,
+    isWishlist: true as const,
+  }))
+
+  return [...ownedDisplay, ...wishlistDisplay]
 })
 
 // Filtrados según criterios
@@ -386,6 +506,67 @@ const handleDelete = async (card: Card) => {
 const handleCardDetailClosed = () => {
   showCardDetailModal.value = false
   selectedCard.value = null
+}
+
+// ========== DECK EDITOR GRID HANDLERS ==========
+
+// Handle edit from deck grid
+const handleDeckGridEdit = (displayCard: DisplayDeckCard) => {
+  if (!displayCard.isWishlist) {
+    const hydratedCard = displayCard as HydratedDeckCard
+    const card = collectionStore.cards.find(c => c.id === hydratedCard.cardId)
+    if (card) {
+      selectedCard.value = card
+      showCardDetailModal.value = true
+    }
+  }
+}
+
+// Handle remove from deck grid
+const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
+  if (!selectedDeck.value) return
+
+  const cardName = displayCard.name
+  if (!confirm(`¿Eliminar "${cardName}" del deck?`)) return
+
+  if (displayCard.isWishlist) {
+    // Remove from wishlist
+    await decksStore.removeFromWishlist(
+      selectedDeck.value.id,
+      displayCard.scryfallId,
+      displayCard.edition,
+      displayCard.condition,
+      displayCard.foil,
+      displayCard.isInSideboard
+    )
+  } else {
+    // Deallocate from deck (card stays in collection)
+    const ownedCard = displayCard as HydratedDeckCard
+    await decksStore.deallocateCard(selectedDeck.value.id, ownedCard.cardId, ownedCard.isInSideboard)
+  }
+
+  toastStore.show('Carta eliminada del deck', 'success')
+}
+
+// Handle quantity update from deck grid
+const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQuantity: number) => {
+  if (!selectedDeck.value) return
+
+  if (!displayCard.isWishlist) {
+    const hydratedCard = displayCard as HydratedDeckCard
+    await decksStore.updateAllocation(
+      selectedDeck.value.id,
+      hydratedCard.cardId,
+      hydratedCard.isInSideboard,
+      newQuantity
+    )
+    toastStore.show('Cantidad actualizada', 'success')
+  }
+}
+
+// Handle add to wishlist from deck grid (card is already in wishlist)
+const handleDeckGridAddToWishlist = (_displayCard: DisplayDeckCard) => {
+  toastStore.show('Esta carta ya está en tu wishlist del deck', 'info')
 }
 
 // ========== DECK MANAGEMENT ==========
@@ -678,12 +859,19 @@ const handleImportDirect = async (
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
 
+      console.log(`[Import] Cards to add: ${collectionCardsToAdd.length}, Created IDs: ${createdCardIds.length}, Meta: ${cardMeta.length}`)
+
       // Asignar cada carta al deck (con sideboard flag)
       for (let i = 0; i < createdCardIds.length; i++) {
         const cardId = createdCardIds[i]
         const meta = cardMeta[i]
-        await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
-        allocatedCount += meta.quantity
+        if (cardId && meta) {
+          const result = await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
+          console.log(`[Import] Allocated card ${i}: ${cardId}, qty: ${meta.quantity}, result:`, result)
+          allocatedCount += result.allocated
+        } else {
+          console.warn(`[Import] Missing cardId or meta at index ${i}`)
+        }
       }
     }
 
@@ -827,7 +1015,7 @@ watch(() => route.query.deck, (newDeckId) => {
             </p>
           </div>
           <BaseButton size="small" variant="secondary" @click="searchStore.clearSearch()">
-            VER MI COLECCIÓN
+            VOLVER
           </BaseButton>
         </div>
 
@@ -1005,118 +1193,42 @@ watch(() => route.query.deck, (newDeckId) => {
           />
         </div>
 
-        <!-- ========== DECK VIEW: COMANDANTE ========== -->
-        <div v-if="selectedDeck && isCommanderFormat && deckCommanderCard" class="mb-6">
-          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-400/30">
-            <h3 class="text-small font-bold text-purple-400">COMANDANTE</h3>
-          </div>
-          <CollectionGrid
-              :cards="[deckCommanderCard]"
-              :compact="true"
-              @card-click="handleCardClick"
-              @edit="handleEdit"
-              @delete="handleDelete"
-              @manage-decks="handleManageDecks"
-          />
-        </div>
-
-        <!-- ========== DECK VIEW: MAZO PRINCIPAL (owned) ========== -->
-        <div v-if="selectedDeck && sortedMainboardCards.length > 0 && statusFilter !== 'wishlist'" class="mb-6">
+        <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->
+        <div v-if="selectedDeck && mainboardDisplayCards.length > 0 && statusFilter !== 'wishlist'" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b border-neon/30">
             <h3 class="text-small font-bold text-neon">MAZO PRINCIPAL</h3>
-            <span class="text-tiny text-silver-50">({{ mainboardOwnedCount }} cartas)</span>
+            <span class="text-tiny text-silver-50">({{ mainboardOwnedCount + mainboardWishlistCount }} cartas)</span>
           </div>
-          <CollectionGrid
-              :cards="sortedMainboardCards"
-              :compact="true"
-              @card-click="handleCardClick"
-              @edit="handleEdit"
-              @delete="handleDelete"
-              @manage-decks="handleManageDecks"
+          <DeckEditorGrid
+              :cards="mainboardDisplayCards"
+              :deck-id="selectedDeck.id"
+              :commander-names="commanderNames"
+              @edit="handleDeckGridEdit"
+              @remove="handleDeckGridRemove"
+              @update-quantity="handleDeckGridQuantityUpdate"
+              @add-to-wishlist="handleDeckGridAddToWishlist"
           />
-        </div>
-
-        <!-- ========== DECK VIEW: MAZO PRINCIPAL - NECESITO ========== -->
-        <div v-if="selectedDeck && deckMainboardWishlist.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mb-6">
-          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-400/30">
-            <h3 class="text-small font-bold text-yellow-400">NECESITO - MAINBOARD</h3>
-            <span class="text-tiny text-silver-50">({{ mainboardWishlistCount }})</span>
-          </div>
-          <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
-            <div
-                v-for="item in deckMainboardWishlist"
-                :key="item.scryfallId + '-main'"
-                class="min-h-[180px] bg-secondary border border-yellow-400/30 hover:border-yellow-400 transition-150 cursor-pointer"
-            >
-              <div class="relative aspect-[3/4]">
-                <img
-                    v-if="item.image"
-                    :src="item.image"
-                    :alt="item.name"
-                    class="w-full h-full object-cover"
-                />
-                <div class="absolute bottom-1 left-1 bg-primary/90 border border-yellow-400 px-2 py-1">
-                  <span class="text-small font-bold text-yellow-400">x{{ item.quantity }}</span>
-                </div>
-              </div>
-              <div class="p-1 min-h-[40px]">
-                <p class="text-[10px] font-bold text-silver line-clamp-2 leading-tight">{{ item.name }}</p>
-                <p class="text-[10px] text-neon font-bold">${{ item.price?.toFixed(2) || 'N/A' }}</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- ========== SEPARADOR SIDEBOARD ========== -->
-        <div v-if="selectedDeck && !isCommanderFormat && (sortedSideboardCards.length > 0 || deckSideboardWishlist.length > 0)" class="my-8">
+        <div v-if="selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="my-8">
           <div class="border-t-2 border-dashed border-blue-400/50"></div>
         </div>
 
-        <!-- ========== DECK VIEW: SIDEBOARD (owned) - solo no-commander ========== -->
-        <div v-if="selectedDeck && !isCommanderFormat && sortedSideboardCards.length > 0 && statusFilter !== 'wishlist'" class="mb-6">
+        <!-- ========== DECK VIEW: SIDEBOARD (Visual Grid) - solo no-commander ========== -->
+        <div v-if="selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0 && statusFilter !== 'wishlist'" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b border-blue-400/30">
             <h3 class="text-small font-bold text-blue-400">SIDEBOARD</h3>
-            <span class="text-tiny text-silver-50">({{ sideboardOwnedCount }} cartas)</span>
+            <span class="text-tiny text-silver-50">({{ sideboardOwnedCount + sideboardWishlistCount }} cartas)</span>
           </div>
-          <CollectionGrid
-              :cards="sortedSideboardCards"
-              :compact="true"
-              @card-click="handleCardClick"
-              @edit="handleEdit"
-              @delete="handleDelete"
-              @manage-decks="handleManageDecks"
+          <DeckEditorGrid
+              :cards="sideboardDisplayCards"
+              :deck-id="selectedDeck.id"
+              @edit="handleDeckGridEdit"
+              @remove="handleDeckGridRemove"
+              @update-quantity="handleDeckGridQuantityUpdate"
+              @add-to-wishlist="handleDeckGridAddToWishlist"
           />
-        </div>
-
-        <!-- ========== DECK VIEW: SIDEBOARD - NECESITO - solo no-commander ========== -->
-        <div v-if="selectedDeck && !isCommanderFormat && deckSideboardWishlist.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mb-6">
-          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-400/30">
-            <h3 class="text-small font-bold text-yellow-400">NECESITO - SIDEBOARD</h3>
-            <span class="text-tiny text-silver-50">({{ sideboardWishlistCount }})</span>
-          </div>
-          <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
-            <div
-                v-for="item in deckSideboardWishlist"
-                :key="item.scryfallId + '-side'"
-                class="min-h-[180px] bg-secondary border border-yellow-400/30 hover:border-yellow-400 transition-150 cursor-pointer"
-            >
-              <div class="relative aspect-[3/4]">
-                <img
-                    v-if="item.image"
-                    :src="item.image"
-                    :alt="item.name"
-                    class="w-full h-full object-cover"
-                />
-                <div class="absolute bottom-1 left-1 bg-primary/90 border border-yellow-400 px-2 py-1">
-                  <span class="text-small font-bold text-yellow-400">x{{ item.quantity }}</span>
-                </div>
-              </div>
-              <div class="p-1 min-h-[40px]">
-                <p class="text-[10px] font-bold text-silver line-clamp-2 leading-tight">{{ item.name }}</p>
-                <p class="text-[10px] text-neon font-bold">${{ item.price?.toFixed(2) || 'N/A' }}</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- ========== WISHLIST GENERAL (cuando no hay deck seleccionado) ========== -->
@@ -1135,7 +1247,7 @@ watch(() => route.query.deck, (newDeckId) => {
         </div>
 
         <!-- Empty State: Deck sin cartas -->
-        <div v-if="selectedDeck && deckMainboardCards.length === 0 && deckMainboardWishlist.length === 0 && deckSideboardCards.length === 0 && deckSideboardWishlist.length === 0 && !deckCommanderCard" class="flex justify-center items-center h-64">
+        <div v-if="selectedDeck && mainboardDisplayCards.length === 0 && sideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">Deck vacío</p>
             <p class="text-tiny text-silver-70 mt-1">Este deck no tiene cartas asignadas</p>
@@ -1158,6 +1270,7 @@ watch(() => route.query.deck, (newDeckId) => {
     <AddCardModal
         :show="showAddCardModal"
         :scryfall-card="selectedScryfallCard"
+        :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
         @close="showAddCardModal = false"
         @added="showAddCardModal = false"
     />

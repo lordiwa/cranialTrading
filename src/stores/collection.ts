@@ -8,6 +8,7 @@ import {
     getDocs,
     doc,
     Timestamp,
+    writeBatch,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { useAuthStore } from './auth'
@@ -145,6 +146,63 @@ export const useCollectionStore = defineStore('collection', () => {
         } catch (error) {
             console.error('Error updating card:', error)
             toastStore.show('Error al actualizar carta', 'error')
+            return false
+        }
+    }
+
+    /**
+     * Batch update multiple cards at once (more efficient than individual updates)
+     * Uses Firestore writeBatch for atomic operations (max 500 per batch)
+     */
+    const batchUpdateCards = async (cardIds: string[], updates: Partial<Card>): Promise<boolean> => {
+        if (!authStore.user || cardIds.length === 0) return false
+
+        try {
+            // Firestore batches have a limit of 500 operations
+            const BATCH_SIZE = 500
+            const chunks = []
+            for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
+                chunks.push(cardIds.slice(i, i + BATCH_SIZE))
+            }
+
+            for (const chunk of chunks) {
+                const batch = writeBatch(db)
+
+                for (const cardId of chunk) {
+                    const cardRef = doc(db, 'users', authStore.user!.id, 'cards', cardId)
+                    batch.update(cardRef, {
+                        ...updates,
+                        updatedAt: Timestamp.now(),
+                    })
+                }
+
+                await batch.commit()
+            }
+
+            // Update local state
+            const userInfo = getUserInfo()
+            for (const cardId of cardIds) {
+                const index = cards.value.findIndex((c) => c.id === cardId)
+                if (index > -1) {
+                    cards.value[index] = {
+                        ...cards.value[index],
+                        ...updates,
+                        updatedAt: new Date(),
+                    }
+
+                    // Sync to public collection (non-blocking)
+                    if (userInfo) {
+                        syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                            .catch(err => console.error('[PublicSync] Error syncing card update:', err))
+                    }
+                }
+            }
+
+            console.log(`✅ ${cardIds.length} cartas actualizadas en batch`)
+            return true
+        } catch (error) {
+            console.error('Error batch updating cards:', error)
+            toastStore.show('Error al actualizar cartas', 'error')
             return false
         }
     }
@@ -394,6 +452,7 @@ export const useCollectionStore = defineStore('collection', () => {
         loadCollection,
         addCard,
         updateCard,
+        batchUpdateCards,
         deleteCard,
         deleteAllCards,
 

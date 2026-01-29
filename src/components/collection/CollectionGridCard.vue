@@ -236,7 +236,7 @@ const getStatusIconName = (status: string) => {
         <div
             v-for="alloc in allocationInfo.allocations.slice(0, 3)"
             :key="alloc.deckId"
-            class="bg-neon-10 border border-neon px-1.5 py-0.5"
+            class="bg-primary/95 border border-neon px-1.5 py-0.5"
             :title="`${alloc.quantity}x en ${alloc.deckName}${alloc.isInSideboard ? ' (SB)' : ''}`"
         >
           <p class="text-[10px] font-bold text-neon truncate max-w-[60px]">
@@ -245,7 +245,7 @@ const getStatusIconName = (status: string) => {
         </div>
         <div
             v-if="allocationInfo.allocations.length > 3"
-            class="bg-neon-10 border border-neon px-1.5 py-0.5"
+            class="bg-primary/95 border border-neon px-1.5 py-0.5"
             :title="`Y ${allocationInfo.allocations.length - 3} mazos más`"
         >
           <p class="text-[10px] font-bold text-neon">+{{ allocationInfo.allocations.length - 3 }}</p>

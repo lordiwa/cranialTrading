@@ -748,9 +748,8 @@ const handleToggleDeckPublic = async () => {
   const makePublic = !isDeckPublic.value
 
   try {
-    await Promise.all(cardIds.map(cardId =>
-      collectionStore.updateCard(cardId, { public: makePublic })
-    ))
+    // Use batch update for efficiency (single Firestore call instead of N calls)
+    await collectionStore.batchUpdateCards(cardIds, { public: makePublic })
     toastStore.show(
       makePublic
         ? `${cardIds.length} cartas ahora son públicas`

@@ -49,20 +49,29 @@ const loadProfile = async () => {
   userNotFound.value = false;
 
   try {
-    // Query users collection to find userId by username
-    const usersCol = collection(db, 'users');
-    const q = query(usersCol, where('username', '==', username.value), limit(1));
-    const snapshot = await getDocs(q);
+    // Check if viewing own profile - use auth user directly to avoid duplicate username issues
+    if (authStore.user && authStore.user.username === username.value) {
+      userId.value = authStore.user.id;
+      userInfo.value = {
+        username: authStore.user.username,
+        location: authStore.user.location,
+      };
+    } else {
+      // Query users collection to find userId by username
+      const usersCol = collection(db, 'users');
+      const q = query(usersCol, where('username', '==', username.value), limit(1));
+      const snapshot = await getDocs(q);
 
-    if (snapshot.empty) {
-      userNotFound.value = true;
-      loading.value = false;
-      return;
+      if (snapshot.empty) {
+        userNotFound.value = true;
+        loading.value = false;
+        return;
+      }
+
+      const userData = snapshot.docs[0].data();
+      userId.value = snapshot.docs[0].id;
+      userInfo.value = userData as any;
     }
-
-    const userData = snapshot.docs[0].data();
-    userId.value = snapshot.docs[0].id;
-    userInfo.value = userData as any;
 
     // Reset pagination
     cards.value = [];
@@ -86,19 +95,18 @@ const loadNextPage = async () => {
   loadingMore.value = true;
   try {
     const cardsCol = collection(db, 'users', userId.value, 'cards');
-    // Fetch all cards and filter client-side (public !== false means visible)
-    // This handles cards without the public field (legacy) as public by default
-    let q = query(cardsCol, limit(pageSize * 2)); // Fetch more to account for filtering
+    let q = query(cardsCol, limit(pageSize * 2));
 
     if (lastDoc.value) {
       q = query(cardsCol, startAfter(lastDoc.value), limit(pageSize * 2));
     }
 
     const snapshot = await getDocs(q);
-    // Filter: show cards where public is not explicitly false
+
+    // Filter: show cards where public is explicitly true
     const publicCards = snapshot.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter((card: any) => card.public !== false);
+      .filter((card: any) => card.public === true);
 
     cards.value.push(...publicCards);
 

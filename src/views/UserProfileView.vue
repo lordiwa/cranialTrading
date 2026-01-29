@@ -71,7 +71,6 @@ const loadProfile = async () => {
       const userData = snapshot.docs[0].data();
       userId.value = snapshot.docs[0].id;
       userInfo.value = userData as any;
-      console.log('[Profile] Found user by username, userId:', userId.value);
     }
 
     // Reset pagination
@@ -91,7 +90,6 @@ const loadProfile = async () => {
 };
 
 const loadNextPage = async () => {
-  console.log('[Profile] loadNextPage called, userId:', userId.value, 'hasMore:', hasMore.value);
   if (!userId.value || !hasMore.value) return;
 
   loadingMore.value = true;
@@ -104,7 +102,6 @@ const loadNextPage = async () => {
     }
 
     const snapshot = await getDocs(q);
-    console.log('[Profile] Firestore returned', snapshot.docs.length, 'docs');
 
     // Filter: show public cards
     // - Any card with public: true
@@ -115,7 +112,6 @@ const loadNextPage = async () => {
         card.public === true ||
         ((card.status === 'sale' || card.status === 'trade') && card.public !== false)
       );
-    console.log('[Profile] After filter:', publicCards.length, 'public cards');
 
     cards.value.push(...publicCards);
 

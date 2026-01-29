@@ -269,6 +269,67 @@ export const useCollectionStore = defineStore('collection', () => {
         }
     }
 
+    /**
+     * Delete multiple cards efficiently using Firestore batch
+     * Optimistic UI: removes from UI immediately, then syncs with Firebase
+     */
+    const batchDeleteCards = async (cardIds: string[]): Promise<boolean> => {
+        if (!authStore.user || cardIds.length === 0) return false
+
+        // Save cards for potential restore on error
+        const deletedCards: { card: Card; index: number }[] = []
+
+        // Remove from UI immediately (optimistic)
+        for (const cardId of cardIds) {
+            const index = cards.value.findIndex(c => c.id === cardId)
+            if (index !== -1) {
+                deletedCards.push({ card: cards.value[index], index })
+            }
+        }
+
+        // Sort by index descending to remove from end first (preserves indices)
+        deletedCards.sort((a, b) => b.index - a.index)
+        for (const { index } of deletedCards) {
+            cards.value.splice(index, 1)
+        }
+
+        try {
+            const BATCH_SIZE = 400
+            const userId = authStore.user.id
+
+            // Delete in batches of 400 (Firestore limit is 500)
+            for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
+                const batch = writeBatch(db)
+                const chunk = cardIds.slice(i, i + BATCH_SIZE)
+
+                for (const cardId of chunk) {
+                    const cardRef = doc(db, 'users', userId, 'cards', cardId)
+                    batch.delete(cardRef)
+                }
+
+                await batch.commit()
+            }
+
+            // Remove from public_cards collection
+            await Promise.all(cardIds.map(cardId =>
+                removeCardFromPublic(cardId, authStore.user!.id).catch(() => {})
+            ))
+
+            return true
+        } catch (error) {
+            console.error('Error batch deleting cards:', error)
+
+            // Restore cards on error (reverse order)
+            deletedCards.reverse()
+            for (const { card, index } of deletedCards) {
+                cards.value.splice(index, 0, card)
+            }
+
+            toastStore.show('Error al eliminar cartas', 'error')
+            return false
+        }
+    }
+
     // ========================================================================
     // SEARCH / FIND OPERATIONS
     // ========================================================================
@@ -455,6 +516,7 @@ export const useCollectionStore = defineStore('collection', () => {
         batchUpdateCards,
         deleteCard,
         deleteAllCards,
+        batchDeleteCards,
 
         // Search
         getCardById,

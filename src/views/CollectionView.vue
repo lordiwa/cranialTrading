@@ -722,9 +722,9 @@ const handleDeleteDeck = async () => {
     await decksStore.deleteDeck(deckId)
     deckFilter.value = 'all'
 
-    // Luego eliminar las cartas si el usuario lo solicitó (en paralelo para mayor velocidad)
+    // Luego eliminar las cartas si el usuario lo solicitó (batch delete for efficiency)
     if (deleteCards) {
-      await Promise.all(cardIds.map(cardId => collectionStore.deleteCard(cardId)))
+      await collectionStore.batchDeleteCards(cardIds)
       toastStore.show(`Deck y ${cardIds.length} cartas eliminadas`, 'success')
     } else {
       toastStore.show('Deck eliminado (cartas conservadas)', 'success')

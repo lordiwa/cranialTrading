@@ -71,6 +71,7 @@ const loadProfile = async () => {
       const userData = snapshot.docs[0].data();
       userId.value = snapshot.docs[0].id;
       userInfo.value = userData as any;
+      console.log('[Profile] Found user by username, userId:', userId.value);
     }
 
     // Reset pagination
@@ -90,6 +91,7 @@ const loadProfile = async () => {
 };
 
 const loadNextPage = async () => {
+  console.log('[Profile] loadNextPage called, userId:', userId.value, 'hasMore:', hasMore.value);
   if (!userId.value || !hasMore.value) return;
 
   loadingMore.value = true;
@@ -102,11 +104,18 @@ const loadNextPage = async () => {
     }
 
     const snapshot = await getDocs(q);
+    console.log('[Profile] Firestore returned', snapshot.docs.length, 'docs');
 
-    // Filter: show cards where public is explicitly true
+    // Filter: show public cards
+    // - Any card with public: true
+    // - Sale/trade cards default to public (unless public: false)
     const publicCards = snapshot.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter((card: any) => card.public === true);
+      .filter((card: any) =>
+        card.public === true ||
+        ((card.status === 'sale' || card.status === 'trade') && card.public !== false)
+      );
+    console.log('[Profile] After filter:', publicCards.length, 'public cards');
 
     cards.value.push(...publicCards);
 
@@ -148,8 +157,11 @@ onMounted(() => {
       <p class="text-body text-silver-70 mb-8 max-w-md">
         @{{ username }} no existe o su perfil es privado.
       </p>
-      <RouterLink to="/dashboard">
+      <RouterLink v-if="authStore.user" to="/dashboard">
         <BaseButton>VOLVER AL DASHBOARD</BaseButton>
+      </RouterLink>
+      <RouterLink v-else to="/login">
+        <BaseButton>INICIAR SESIÓN</BaseButton>
       </RouterLink>
     </div>
 
@@ -166,8 +178,8 @@ onMounted(() => {
           </p>
         </div>
 
-        <!-- Contact button (only if not own profile) -->
-        <div v-if="!isOwnProfile" class="flex gap-3">
+        <!-- Contact button (only if logged in and not own profile) -->
+        <div v-if="authStore.user && !isOwnProfile" class="flex gap-3">
           <BaseButton
               size="small"
               @click="handleContact(userId!, userInfo?.username || '')"

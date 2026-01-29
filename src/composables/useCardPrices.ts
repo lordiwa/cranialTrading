@@ -17,6 +17,9 @@ export interface PriceDisplay {
 // Cache for scryfallId -> setCode mapping
 const setCodeCache = new Map<string, string>()
 
+// Global cache for prices to avoid refetching for same card
+const pricesCache = new Map<string, CardPrices>()
+
 export function useCardPrices(scryfallId: () => string | undefined, setCode: () => string | undefined) {
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -29,6 +32,13 @@ export function useCardPrices(scryfallId: () => string | undefined, setCode: () 
 
     if (!id) {
       prices.value = null
+      return
+    }
+
+    // Check global cache first (key: scryfallId_setCode or just scryfallId)
+    const cacheKey = set ? `${id}_${set}` : id
+    if (pricesCache.has(cacheKey)) {
+      prices.value = pricesCache.get(cacheKey)!
       return
     }
 
@@ -51,7 +61,14 @@ export function useCardPrices(scryfallId: () => string | undefined, setCode: () 
         }
       }
 
-      prices.value = await getCardPrices(id, set)
+      const fetchedPrices = await getCardPrices(id, set)
+      prices.value = fetchedPrices
+
+      // Store in global cache
+      const finalCacheKey = set ? `${id}_${set}` : id
+      if (fetchedPrices) {
+        pricesCache.set(finalCacheKey, fetchedPrices)
+      }
     } catch (e) {
       console.error('Error fetching prices:', e)
       error.value = 'Failed to load prices'

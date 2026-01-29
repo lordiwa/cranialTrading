@@ -215,12 +215,17 @@ const getStatusIconName = (status: string) => {
         </p>
       </div>
 
-      <!-- Qty Badge (Bottom Left) - Shows allocated info -->
-      <div class="absolute bottom-2 left-2 bg-secondary border border-silver-30 px-2 py-1">
+      <!-- Qty Badge (Bottom Left) - Shows quantity and availability -->
+      <div
+          class="absolute bottom-2 left-2 bg-primary/95 border border-silver-50 px-2 py-1"
+          :title="isCardAllocated
+            ? `${allocationInfo.available} disponibles de ${card.quantity} (${allocationInfo.allocated} en mazos)`
+            : `${card.quantity} copias en colección`"
+      >
         <template v-if="isCardAllocated">
-          <p class="text-tiny font-bold">
+          <p class="text-tiny font-bold flex items-center gap-1">
             <span class="text-neon">{{ allocationInfo.available }}</span>
-            <span class="text-silver-50">/{{ card.quantity }}</span>
+            <span class="text-silver-50">disp</span>
           </p>
         </template>
         <template v-else>

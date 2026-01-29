@@ -23,27 +23,36 @@ export function useCardAllocation() {
     const decksStore = useDecksStore()
 
     /**
-     * Get all allocations for a specific card across all decks
+     * Memoized allocation index - builds once when decks change, O(1) lookups after
+     * Key: cardId, Value: array of DeckAllocation
      */
-    const getAllocationsForCard = (cardId: string): DeckAllocation[] => {
-        const allocations: DeckAllocation[] = []
+    const allocationIndex = computed((): Map<string, DeckAllocation[]> => {
+        const index = new Map<string, DeckAllocation[]>()
 
         for (const deck of decksStore.decks) {
             if (!deck.allocations) continue
 
             for (const alloc of deck.allocations) {
-                if (alloc.cardId === cardId) {
-                    allocations.push({
-                        deckId: deck.id,
-                        deckName: deck.name,
-                        quantity: alloc.quantity,
-                        isInSideboard: alloc.isInSideboard,
-                    })
-                }
+                const existing = index.get(alloc.cardId) || []
+                existing.push({
+                    deckId: deck.id,
+                    deckName: deck.name,
+                    quantity: alloc.quantity,
+                    isInSideboard: alloc.isInSideboard,
+                })
+                index.set(alloc.cardId, existing)
             }
         }
 
-        return allocations
+        return index
+    })
+
+    /**
+     * Get all allocations for a specific card across all decks
+     * Now uses memoized index for O(1) lookup instead of O(decks × allocations)
+     */
+    const getAllocationsForCard = (cardId: string): DeckAllocation[] => {
+        return allocationIndex.value.get(cardId) || []
     }
 
     /**

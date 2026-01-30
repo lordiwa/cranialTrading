@@ -92,7 +92,7 @@ const handleCreateDeck = async (deckData: any) => {
 
         // Clean card name: remove (SET) and everything after it, plus foil indicators
         let cardName = remainder
-          .replace(/\s*\*[fF]\*?\s*/gi, '')           // Remove foil indicators anywhere
+          .replaceAll(/\s*\*[fF]\*?\s*/gi, '')        // Remove foil indicators anywhere
           .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')     // Remove (SET) and everything after
           .trim()
 
@@ -292,7 +292,7 @@ const handleImport = async (
 
     // Clean card name: remove (SET) and everything after it, plus foil indicators
     let cardName = remainder
-      .replace(/\s*\*[fF]\*?\s*/gi, '')           // Remove foil indicators anywhere
+      .replaceAll(/\s*\*[fF]\*?\s*/gi, '')        // Remove foil indicators anywhere
       .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')     // Remove (SET) and everything after
       .trim()
 

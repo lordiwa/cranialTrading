@@ -907,7 +907,7 @@ const addToWishlist = async (card: any) => {
     quantity: 1,
     condition: 'NM' as const,
     foil: false,
-    price: card.prices?.usd ? parseFloat(card.prices.usd) : 0,
+    price: card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0,
     image: imageUrl,
     status: 'wishlist' as const,
     public: true,

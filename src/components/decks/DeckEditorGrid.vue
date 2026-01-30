@@ -28,6 +28,12 @@ const showPopup = ref(false)
 const popupCard = ref<DisplayDeckCard | null>(null)
 const popupPosition = ref({ x: 0, y: 0 })
 
+// Check if mobile (for popup positioning)
+const isMobile = computed(() => {
+  if (typeof window === 'undefined') return false
+  return window.innerWidth < 768
+})
+
 // Type guard
 const isWishlistCard = (card: DisplayDeckCard): card is HydratedWishlistCard => {
   return card.isWishlist === true
@@ -271,9 +277,9 @@ watch(() => props.cards, () => {
 </script>
 
 <template>
-  <div class="flex gap-6 relative" @click.self="closePopup">
-    <!-- Left Panel: Card Preview (Sticky) -->
-    <div class="w-[280px] flex-shrink-0 sticky top-4 self-start">
+  <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative" @click.self="closePopup">
+    <!-- Left Panel: Card Preview (Sticky) - Hidden on mobile -->
+    <div class="hidden md:block w-[280px] flex-shrink-0 sticky top-4 self-start">
       <div v-if="previewCard" class="space-y-3">
         <!-- Card Image -->
         <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden">
@@ -324,7 +330,7 @@ watch(() => props.cards, () => {
     </div>
 
     <!-- Right Panel: Cards Grid -->
-    <div class="flex-1 space-y-6 min-w-0">
+    <div class="flex-1 space-y-4 md:space-y-6 min-w-0">
       <!-- Empty state -->
       <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
         <p class="text-body text-silver-70">No hay cartas en este board</p>
@@ -341,7 +347,7 @@ watch(() => props.cards, () => {
         </h3>
 
         <!-- All cards in this category -->
-        <div class="flex flex-wrap gap-2">
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">
           <div
             v-for="card in group.cards"
             :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
@@ -353,10 +359,10 @@ watch(() => props.cards, () => {
           >
             <!-- Card miniature - ONLY image -->
             <div
-              class="w-[145px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+              class="w-full md:w-[145px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
               :class="[
                 card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
-                'group-hover:border-neon group-hover:scale-105 group-hover:z-10'
+                'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
               ]"
             >
               <img
@@ -369,8 +375,8 @@ watch(() => props.cards, () => {
             </div>
 
             <!-- Quantity badge -->
-            <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1">
-              <span class="text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
+            <div class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1">
+              <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
             </div>
           </div>
         </div>
@@ -381,34 +387,46 @@ watch(() => props.cards, () => {
     <Teleport to="body">
       <div
         v-if="showPopup && popupCard"
-        class="fixed z-50"
-        :style="{
+        class="fixed inset-0 z-50 flex items-center justify-center md:items-start md:justify-start p-4 md:p-0"
+        :style="isMobile ? {} : {
           left: `${popupPosition.x}px`,
           top: `${popupPosition.y}px`,
-          transform: 'translateX(-50%)'
+          transform: 'translateX(-50%)',
+          position: 'fixed',
+          inset: 'auto'
         }"
       >
         <!-- Backdrop -->
-        <div class="fixed inset-0" @click="closePopup"></div>
+        <div class="fixed inset-0 bg-primary/50 md:bg-transparent" @click="closePopup"></div>
 
         <!-- Popup content -->
-        <div class="relative bg-primary border border-silver-30 p-3 shadow-lg min-w-[200px]">
-          <p class="text-tiny font-bold text-silver mb-2 truncate">{{ popupCard.name }}</p>
+        <div class="relative bg-primary border border-silver-30 p-4 md:p-3 shadow-lg w-full max-w-[280px] md:min-w-[200px]">
+          <!-- Mobile: Show card image -->
+          <div class="md:hidden mb-3">
+            <img
+              v-if="getCardImageSmall(popupCard)"
+              :src="getCardImageSmall(popupCard)"
+              :alt="popupCard.name"
+              class="w-24 h-auto mx-auto border border-silver-30"
+            />
+          </div>
+
+          <p class="text-small md:text-tiny font-bold text-silver mb-3 md:mb-2 text-center md:text-left truncate">{{ popupCard.name }}</p>
 
           <!-- Quantity controls -->
-          <div class="flex items-center justify-center gap-3 mb-3">
+          <div class="flex items-center justify-center gap-4 md:gap-3 mb-4 md:mb-3">
             <button
               @click="adjustQuantity(-1)"
-              class="w-8 h-8 bg-rust/20 border border-rust text-rust font-bold hover:bg-rust/40 transition-all"
+              class="w-12 h-12 md:w-8 md:h-8 bg-rust/20 border border-rust text-rust font-bold text-h3 md:text-body hover:bg-rust/40 transition-all"
             >
               -
             </button>
-            <span class="text-h3 font-bold text-neon min-w-[40px] text-center">
+            <span class="text-h2 md:text-h3 font-bold text-neon min-w-[50px] md:min-w-[40px] text-center">
               {{ getQuantity(popupCard) }}
             </span>
             <button
               @click="adjustQuantity(1)"
-              class="w-8 h-8 bg-neon/20 border border-neon text-neon font-bold hover:bg-neon/40 transition-all"
+              class="w-12 h-12 md:w-8 md:h-8 bg-neon/20 border border-neon text-neon font-bold text-h3 md:text-body hover:bg-neon/40 transition-all"
             >
               +
             </button>
@@ -445,6 +463,14 @@ watch(() => props.cards, () => {
               AVANZADO
             </BaseButton>
           </div>
+
+          <!-- Close button for mobile -->
+          <button
+            class="md:hidden absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-silver-50 hover:text-silver"
+            @click="closePopup"
+          >
+            ✕
+          </button>
         </div>
       </div>
     </Teleport>

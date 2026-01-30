@@ -1651,10 +1651,10 @@ onUnmounted(() => {
         <CollectionTotalsPanel v-if="viewMode === 'collection'" />
 
         <!-- ========== DECK STATS (cuando hay deck seleccionado en modo mazos) ========== -->
-        <div v-if="viewMode === 'decks' && selectedDeck" class="bg-neon/10 border-2 border-neon p-4 mb-6">
-          <div class="flex items-center justify-between mb-4">
+        <div v-if="viewMode === 'decks' && selectedDeck" class="bg-neon/10 border-2 border-neon p-3 md:p-4 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h2 class="text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
+              <h2 class="text-body md:text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
               <p class="text-tiny text-silver-50">{{ selectedDeck.format?.toUpperCase() }}</p>
             </div>
             <div class="flex gap-2">
@@ -1663,13 +1663,14 @@ onUnmounted(() => {
                   variant="secondary"
                   @click="handleToggleDeckPublic"
                   :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
-                  class="flex items-center gap-2"
+                  class="flex items-center gap-1 md:gap-2"
               >
                 <SpriteIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
-                {{ isDeckPublic ? 'PÚBLICO' : 'PRIVADO' }}
+                <span class="hidden sm:inline">{{ isDeckPublic ? 'PÚBLICO' : 'PRIVADO' }}</span>
               </BaseButton>
               <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
-                ELIMINAR
+                <span class="hidden sm:inline">ELIMINAR</span>
+                <span class="sm:hidden">🗑️</span>
               </BaseButton>
             </div>
           </div>

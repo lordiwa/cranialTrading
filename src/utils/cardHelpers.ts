@@ -60,3 +60,53 @@ export const getCardTypePriority = (typeLine?: string): number => {
 export const hasFoilIndicator = (name: string): boolean => {
   return /\*f\*?\s{0,5}$/i.test(name)
 }
+
+/**
+ * Parsed deck line result
+ */
+export interface ParsedDeckLine {
+  quantity: number
+  cardName: string
+  setCode: string | null
+  isFoil: boolean
+}
+
+/**
+ * Parse a single line from a deck list
+ * Returns null if line is not a valid card entry
+ *
+ * Handles formats like:
+ * - "4 Lightning Bolt"
+ * - "4x Lightning Bolt"
+ * - "4 Lightning Bolt (M21)"
+ * - "4 Lightning Bolt *F*"
+ */
+export const parseDeckLine = (line: string): ParsedDeckLine | null => {
+  const trimmed = line.trim()
+  if (!trimmed) return null
+
+  // Check for sideboard marker
+  if (trimmed.toLowerCase().includes('sideboard')) return null
+
+  // Match: quantity (optional x) followed by card name
+  const match = trimmed.match(/^(\d+)x?\s+(.+)$/)
+  if (!match) return null
+
+  const quantity = Number.parseInt(match[1])
+  const remainder = match[2].trim()
+
+  // Check for foil indicator in the original line
+  const isFoil = /\*[fF]\*?/.test(trimmed)
+
+  // Extract set code if present: (ABC) or (ABC123)
+  const setMatch = remainder.match(/\(([A-Za-z0-9]+)\)/)
+  const setCode = setMatch ? setMatch[1] : null
+
+  // Clean card name: remove foil indicators and (SET) suffix
+  const cardName = remainder
+    .replaceAll(/\s*\*[fF]\*?\s*/gi, '')
+    .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')
+    .trim()
+
+  return { quantity, cardName, setCode, isFoil }
+}

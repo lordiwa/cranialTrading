@@ -32,6 +32,14 @@ const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
     ) as T
 }
 
+// Helper to process Firestore dates in deck items (allocations/wishlist)
+const processFirestoreDates = <T extends { addedAt?: any }>(items: any[]): T[] => {
+    return (items || []).map((item: any) => ({
+        ...item,
+        addedAt: item.addedAt?.toDate?.() || new Date(item.addedAt) || new Date(),
+    })) as T[]
+}
+
 export const useDecksStore = defineStore('decks', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -304,14 +312,8 @@ export const useDecksStore = defineStore('decks', () => {
                 const data = docSnap.data()
 
                 // Convert dates in allocations and wishlist
-                const processedAllocations = (data.allocations || []).map((a: any) => ({
-                    ...a,
-                    addedAt: a.addedAt?.toDate?.() || new Date(a.addedAt) || new Date(),
-                }))
-                const processedWishlist = (data.wishlist || []).map((w: any) => ({
-                    ...w,
-                    addedAt: w.addedAt?.toDate?.() || new Date(w.addedAt) || new Date(),
-                }))
+                const processedAllocations = processFirestoreDates<DeckCardAllocation>(data.allocations)
+                const processedWishlist = processFirestoreDates<DeckWishlistItem>(data.wishlist)
 
                 return {
                     id: docSnap.id,
@@ -367,14 +369,8 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             const data = docSnap.data()
-            const allocations = (data.allocations || []).map((a: any) => ({
-                ...a,
-                addedAt: a.addedAt?.toDate?.() || new Date(a.addedAt) || new Date(),
-            }))
-            let wishlist = (data.wishlist || []).map((w: any) => ({
-                ...w,
-                addedAt: w.addedAt?.toDate?.() || new Date(w.addedAt) || new Date(),
-            }))
+            const allocations = processFirestoreDates<DeckCardAllocation>(data.allocations)
+            let wishlist = processFirestoreDates<DeckWishlistItem>(data.wishlist)
 
             // Migrate wishlist items missing type_line/colors/cmc (fetches from Scryfall)
             wishlist = await migrateWishlistMetadata(deckId, wishlist)

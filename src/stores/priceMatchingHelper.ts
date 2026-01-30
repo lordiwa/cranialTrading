@@ -22,6 +22,19 @@ export interface MatchCalculation {
 export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
     /**
+     * Calculate the difference ratio between two values
+     * Returns 0 for equal values, up to 1 for completely different
+     */
+    const calculateDifferenceRatio = (value1: number, value2: number): number => {
+        if (value1 === 0 && value2 === 0) return 0
+        if (value1 === 0 || value2 === 0) return 1
+
+        const maxValue = Math.max(value1, value2)
+        const minValue = Math.min(value1, value2)
+        return (maxValue - minValue) / maxValue
+    }
+
+    /**
      * Calcular compatibilidad basada en diferencia de precio
      * 100% = exacta, 90% = ~$10 de diferencia, etc
      */
@@ -29,10 +42,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
         if (myValue === 0 && theirValue === 0) return 100
         if (myValue === 0 || theirValue === 0) return 50
 
-        const maxValue = Math.max(myValue, theirValue)
-        const minValue = Math.min(myValue, theirValue)
-        const diff = (maxValue - minValue) / maxValue
-
+        const diff = calculateDifferenceRatio(myValue, theirValue)
         return Math.max(0, Math.round((1 - diff) * 100))
     }
 
@@ -41,12 +51,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
      */
     const isValidMatch = (myValue: number, theirValue: number): boolean => {
         if (myValue === 0 || theirValue === 0) return true
-
-        const maxValue = Math.max(myValue, theirValue)
-        const minValue = Math.min(myValue, theirValue)
-        const diff = (maxValue - minValue) / maxValue
-
-        return diff <= PRICE_TOLERANCE
+        return calculateDifferenceRatio(myValue, theirValue) <= PRICE_TOLERANCE
     }
 
     /**

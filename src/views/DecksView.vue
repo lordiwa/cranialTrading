@@ -15,6 +15,7 @@ import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import { CardCondition } from '../types/card'
 import { searchCards, getCardById } from '../services/scryfall'
 import type { DeckCard, DeckFormat } from '../types/deck'
+import { parseDeckLine } from '../utils/cardHelpers'
 
 const router = useRouter()
 const decksStore = useDecksStore()
@@ -76,25 +77,10 @@ const handleCreateDeck = async (deckData: any) => {
           continue
         }
 
-        // Simple regex: capture quantity and everything else
-        const match = trimmed.match(/^(\d+)x?\s+(.+)$/)
-        if (!match) continue
+        const parsed = parseDeckLine(trimmed)
+        if (!parsed) continue
 
-        const quantity = Number.parseInt(match[1])
-        let remainder = match[2].trim()
-
-        // Check for foil indicator in the original line (*F*, *f*, *f, *F)
-        const isFoil = /\*[fF]\*?/.test(trimmed)
-
-        // Extract set code if present: looks for (ABC) or (ABC123) pattern
-        const setMatch = remainder.match(/\(([A-Za-z0-9]+)\)/)
-        const setCode = setMatch ? setMatch[1] : null
-
-        // Clean card name: remove (SET) and everything after it, plus foil indicators
-        let cardName = remainder
-          .replaceAll(/\s*\*[fF]\*?\s*/gi, '')        // Remove foil indicators anywhere
-          .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')     // Remove (SET) and everything after
-          .trim()
+        const { quantity, cardName, setCode, isFoil } = parsed
 
         // Buscar en Scryfall
         const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
@@ -276,25 +262,10 @@ const handleImport = async (
       continue
     }
 
-    // Simple regex: capture quantity and everything else
-    const match = trimmed.match(/^(\d+)x?\s+(.+)$/)
-    if (!match) continue
+    const parsed = parseDeckLine(trimmed)
+    if (!parsed) continue
 
-    const quantity = Number.parseInt(match[1])
-    let remainder = match[2].trim()
-
-    // Check for foil indicator in the original line (*F*, *f*, *f, *F)
-    const isFoil = /\*[fF]\*?/.test(trimmed)
-
-    // Extract set code if present: looks for (ABC) or (ABC123) pattern
-    const setMatch = remainder.match(/\(([A-Za-z0-9]+)\)/)
-    const setCode = setMatch ? setMatch[1] : null
-
-    // Clean card name: remove (SET) and everything after it, plus foil indicators
-    let cardName = remainder
-      .replaceAll(/\s*\*[fF]\*?\s*/gi, '')        // Remove foil indicators anywhere
-      .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')     // Remove (SET) and everything after
-      .trim()
+    const { quantity, cardName, setCode, isFoil } = parsed
 
     // Skip sideboard if not included
     if (inSideboard && !includeSideboard) continue

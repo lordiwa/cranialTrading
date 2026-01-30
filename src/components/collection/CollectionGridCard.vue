@@ -13,11 +13,13 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   showInterest?: boolean
   isInterested?: boolean
+  isBeingDeleted?: boolean
 }>(), {
   compact: false,
   readonly: false,
   showInterest: false,
-  isInterested: false
+  isInterested: false,
+  isBeingDeleted: false
 })
 
 const emit = defineEmits<{
@@ -32,7 +34,7 @@ const togglingPublic = ref(false)
 const showMobileMenu = ref(false)
 
 const togglePublic = async () => {
-  if (togglingPublic.value || props.readonly) return
+  if (togglingPublic.value || props.readonly || props.isBeingDeleted) return
   togglingPublic.value = true
   try {
     const newPublicValue = !props.card.public
@@ -167,12 +169,14 @@ const getStatusIconName = (status: string) => {
   </div>
 
   <!-- FULL MODE: For collection view -->
-  <div v-else class="group cursor-pointer">
+  <div v-else class="group" :class="isBeingDeleted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
     <!-- Card Image Container -->
     <div
-        class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all"
-        :class="{ 'border-neon-30': isCardAllocated }"
-        @click="emit('cardClick', card)"
+        class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden transition-all"
+        :class="[
+          isBeingDeleted ? 'border-rust animate-pulse' : (isCardAllocated ? 'border-neon-30' : 'group-hover:border-neon')
+        ]"
+        @click="!isBeingDeleted && emit('cardClick', card)"
     >
       <img
           v-if="getCardImage(card)"
@@ -187,11 +191,23 @@ const getStatusIconName = (status: string) => {
 
       <!-- ========== DESKTOP: Hover overlay ========== -->
       <div
-          v-if="!readonly"
+          v-if="!readonly && !isBeingDeleted"
           class="absolute inset-0 bg-primary/70 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center pointer-events-none group-hover:pointer-events-auto"
       >
         <!-- Edit text -->
         <p class="text-small font-bold text-silver mb-4">CLICK PARA EDITAR</p>
+      </div>
+
+      <!-- ========== Deleting overlay ========== -->
+      <div
+          v-if="isBeingDeleted"
+          class="absolute inset-0 bg-primary/80 flex flex-col items-center justify-center"
+      >
+        <svg class="w-6 h-6 animate-spin text-rust mb-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <p class="text-tiny font-bold text-rust">ELIMINANDO...</p>
       </div>
 
       <!-- ========== DESKTOP: Badges on hover ========== -->
@@ -207,7 +223,7 @@ const getStatusIconName = (status: string) => {
 
       <!-- Public toggle button (desktop: hover only) -->
       <button
-          v-if="!readonly"
+          v-if="!readonly && !isBeingDeleted"
           @click.stop="togglePublic"
           :disabled="togglingPublic"
           :class="[
@@ -272,7 +288,7 @@ const getStatusIconName = (status: string) => {
 
       <!-- Delete button (desktop: hover only, bottom center) -->
       <button
-          v-if="!readonly"
+          v-if="!readonly && !isBeingDeleted"
           @click.stop="emit('delete', card)"
           class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10"
           title="Eliminar carta"
@@ -282,7 +298,7 @@ const getStatusIconName = (status: string) => {
       </button>
 
       <!-- ========== MOBILE: Gear menu ========== -->
-      <div v-if="!readonly" class="md:hidden absolute top-2 right-2 z-20">
+      <div v-if="!readonly && !isBeingDeleted" class="md:hidden absolute top-2 right-2 z-20">
         <button
             @click.stop="showMobileMenu = !showMobileMenu"
             class="bg-primary/95 border border-silver-50 p-2 transition-all"

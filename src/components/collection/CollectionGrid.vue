@@ -8,6 +8,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   showInterest?: boolean
   interestedCards?: Set<string>
+  deletingCardIds?: Set<string>
 }>(), {
   compact: false,
   readonly: false,
@@ -34,6 +35,7 @@ const emit = defineEmits<{
         :readonly="props.readonly"
         :show-interest="props.showInterest"
         :is-interested="props.interestedCards?.has(card.scryfallId || card.id) || false"
+        :is-being-deleted="props.deletingCardIds?.has(card.id) || false"
         @card-click="emit('cardClick', $event)"
         @delete="emit('delete', $event)"
         @interest="emit('interest', $event)"

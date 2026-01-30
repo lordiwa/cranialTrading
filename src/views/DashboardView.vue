@@ -251,6 +251,51 @@ const progressCurrent = ref(0)
 const progressTotal = ref(0)
 const totalUsers = ref(0)
 
+// ========== CLEAR DATA PROGRESS STATE ==========
+type ClearDataStep = 'cards' | 'preferences' | 'matches_nuevos' | 'matches_guardados' | 'matches_eliminados' | 'contactos' | 'decks'
+
+interface ClearDataState {
+  status: 'in_progress' | 'complete' | 'error'
+  completedSteps: ClearDataStep[]
+  currentStep: ClearDataStep | null
+  errors: number
+}
+
+const CLEAR_DATA_STORAGE_KEY = 'cranial_clear_data_progress'
+const clearDataProgress = ref<ClearDataState | null>(null)
+
+const ALL_CLEAR_STEPS: ClearDataStep[] = ['cards', 'preferences', 'matches_nuevos', 'matches_guardados', 'matches_eliminados', 'contactos', 'decks']
+
+const saveClearDataState = (state: ClearDataState) => {
+  try {
+    localStorage.setItem(CLEAR_DATA_STORAGE_KEY, JSON.stringify(state))
+    clearDataProgress.value = state
+  } catch (e) {
+    console.warn('[ClearData] Failed to save state:', e)
+  }
+}
+
+const loadClearDataState = (): ClearDataState | null => {
+  try {
+    const saved = localStorage.getItem(CLEAR_DATA_STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.warn('[ClearData] Failed to load state:', e)
+  }
+  return null
+}
+
+const clearClearDataState = () => {
+  try {
+    localStorage.removeItem(CLEAR_DATA_STORAGE_KEY)
+    clearDataProgress.value = null
+  } catch (e) {
+    console.warn('[ClearData] Failed to clear state:', e)
+  }
+}
+
 // Ignored matches (persisted in localStorage)
 const IGNORED_MATCHES_KEY = 'cranial_ignored_matches'
 const ignoredMatchIds = ref<Set<string>>(new Set())
@@ -308,6 +353,15 @@ const syncPublicData = async () => {
 onMounted(async () => {
   if (!authStore.user) return
 
+  // Check for incomplete clear data operation and resume if needed
+  const savedClearState = loadClearDataState()
+  if (savedClearState && savedClearState.status === 'in_progress') {
+    resumeClearData(savedClearState)
+    return // Don't load other data, we're clearing everything
+  } else if (savedClearState?.status === 'complete') {
+    clearClearDataState()
+  }
+
   // Load ignored matches from localStorage
   loadIgnoredMatches()
 
@@ -336,6 +390,134 @@ onMounted(async () => {
 })
 
 /**
+ * Helper: Delete a single collection step
+ */
+const deleteCollectionStep = async (userId: string, step: ClearDataStep): Promise<boolean> => {
+  const collectionMap: Record<ClearDataStep, string> = {
+    'cards': 'cards',
+    'preferences': 'preferences',
+    'matches_nuevos': 'matches_nuevos',
+    'matches_guardados': 'matches_guardados',
+    'matches_eliminados': 'matches_eliminados',
+    'contactos': 'contactos_guardados',
+    'decks': 'decks'
+  }
+
+  const colName = collectionMap[step]
+  try {
+    const colRef = collection(db, 'users', userId, colName)
+    const snapshot = await getDocs(colRef)
+    for (const docItem of snapshot.docs) {
+      await deleteDoc(doc(db, 'users', userId, colName, docItem.id))
+    }
+    console.log(`🗑️ ${snapshot.docs.length} ${step} borrados`)
+    return true
+  } catch (e) {
+    console.error(`Error borrando ${step}:`, e)
+    return false
+  }
+}
+
+// Step labels for progress display
+const STEP_LABELS: Record<ClearDataStep, string> = {
+  'cards': 'cartas',
+  'preferences': 'preferencias',
+  'matches_nuevos': 'matches nuevos',
+  'matches_guardados': 'matches guardados',
+  'matches_eliminados': 'matches eliminados',
+  'contactos': 'contactos',
+  'decks': 'decks'
+}
+
+/**
+ * Execute clear data with progress tracking (can resume)
+ */
+const executeClearData = async (startFromState?: ClearDataState, progressToast?: ReturnType<typeof toastStore.showProgress>) => {
+  if (!authStore.user) return
+
+  loading.value = true
+  const userId = authStore.user.id
+
+  // Initialize or use existing state
+  const state: ClearDataState = startFromState || {
+    status: 'in_progress',
+    completedSteps: [],
+    currentStep: null,
+    errors: 0
+  }
+
+  // Create progress toast if not provided
+  const progress = progressToast || toastStore.showProgress('Borrando datos...', 0)
+
+  // Get remaining steps
+  const remainingSteps = ALL_CLEAR_STEPS.filter(step => !state.completedSteps.includes(step))
+  const totalSteps = ALL_CLEAR_STEPS.length
+
+  for (const step of remainingSteps) {
+    state.currentStep = step
+    saveClearDataState(state)
+
+    // Update progress toast
+    const currentStepIndex = state.completedSteps.length
+    const percent = Math.round((currentStepIndex / totalSteps) * 100)
+    progress.update(percent, `Borrando ${STEP_LABELS[step]}...`)
+
+    const success = await deleteCollectionStep(userId, step)
+
+    if (success) {
+      state.completedSteps.push(step)
+    } else {
+      state.errors++
+    }
+    saveClearDataState(state)
+  }
+
+  // Clear local stores
+  collectionStore.clear()
+  preferencesStore.clear()
+  decksStore.clear()
+  calculatedMatches.value = []
+
+  // Mark as complete
+  state.status = 'complete'
+  state.currentStep = null
+  saveClearDataState(state)
+
+  loading.value = false
+
+  // Update progress toast to complete
+  if (state.errors > 0) {
+    progress.error(`Borrado con ${state.errors} error(es)`)
+  } else {
+    progress.complete('Todos los datos borrados')
+  }
+
+  // Wait a moment for user to see the result, then reload
+  setTimeout(() => {
+    clearClearDataState()
+    globalThis.location.reload()
+  }, 2000)
+}
+
+/**
+ * Resume incomplete clear data operation
+ */
+const resumeClearData = async (savedState: ClearDataState) => {
+  console.log('[ClearData] Resuming clear operation, completed:', savedState.completedSteps)
+
+  if (savedState.status === 'complete') {
+    clearClearDataState()
+    return
+  }
+
+  // Calculate initial progress for resume
+  const initialProgress = Math.round((savedState.completedSteps.length / ALL_CLEAR_STEPS.length) * 100)
+  const progress = toastStore.showProgress('Continuando borrado de datos...', initialProgress)
+
+  await executeClearData(savedState, progress)
+}
+
+/**
  * TEMPORAL: Borrar todos los datos del usuario (cartas, preferencias, matches)
  */
 const clearAllData = async () => {
@@ -343,7 +525,7 @@ const clearAllData = async () => {
 
   const confirmed = await confirmStore.show({
     title: 'Borrar todos los datos',
-    message: '¿Borrar TODAS tus cartas, preferencias y matches? Esta acción no se puede deshacer.',
+    message: '¿Borrar TODAS tus cartas, preferencias, matches y decks? Esta acción no se puede deshacer.',
     confirmText: 'BORRAR TODO',
     cancelText: 'CANCELAR',
     confirmVariant: 'danger'
@@ -351,102 +533,7 @@ const clearAllData = async () => {
 
   if (!confirmed) return
 
-  loading.value = true
-  const userId = authStore.user.id
-  let errors = 0
-
-  // Borrar cartas
-  try {
-    const cardsRef = collection(db, 'users', userId, 'cards')
-    const cardsSnapshot = await getDocs(cardsRef)
-    for (const cardDoc of cardsSnapshot.docs) {
-      await deleteDoc(doc(db, 'users', userId, 'cards', cardDoc.id))
-    }
-    console.log(`🗑️ ${cardsSnapshot.docs.length} cartas borradas`)
-  } catch (e) {
-    console.error('Error borrando cartas:', e)
-    errors++
-  }
-
-  // Borrar preferencias
-  try {
-    const prefsRef = collection(db, 'users', userId, 'preferences')
-    const prefsSnapshot = await getDocs(prefsRef)
-    for (const prefDoc of prefsSnapshot.docs) {
-      await deleteDoc(doc(db, 'users', userId, 'preferences', prefDoc.id))
-    }
-    console.log(`🗑️ ${prefsSnapshot.docs.length} preferencias borradas`)
-  } catch (e) {
-    console.error('Error borrando preferencias:', e)
-    errors++
-  }
-
-  // Borrar todas las colecciones de matches
-  const matchCollections = ['matches_nuevos', 'matches_guardados', 'matches_eliminados']
-  for (const colName of matchCollections) {
-    try {
-      const matchesRef = collection(db, 'users', userId, colName)
-      const matchesSnapshot = await getDocs(matchesRef)
-      for (const matchDoc of matchesSnapshot.docs) {
-        await deleteDoc(doc(db, 'users', userId, colName, matchDoc.id))
-      }
-      console.log(`🗑️ ${matchesSnapshot.docs.length} ${colName} borrados`)
-    } catch (e) {
-      console.error(`Error borrando ${colName}:`, e)
-      errors++
-    }
-  }
-
-  // Borrar contactos guardados
-  try {
-    const contactsRef = collection(db, 'users', userId, 'contactos_guardados')
-    const contactsSnapshot = await getDocs(contactsRef)
-    for (const contactDoc of contactsSnapshot.docs) {
-      await deleteDoc(doc(db, 'users', userId, 'contactos_guardados', contactDoc.id))
-    }
-    console.log(`🗑️ ${contactsSnapshot.docs.length} contactos borrados`)
-  } catch (e) {
-    console.error('Error borrando contactos:', e)
-    errors++
-  }
-
-  // Borrar decks
-  try {
-    const decksRef = collection(db, 'users', userId, 'decks')
-    const decksSnapshot = await getDocs(decksRef)
-    for (const deckDoc of decksSnapshot.docs) {
-      await deleteDoc(doc(db, 'users', userId, 'decks', deckDoc.id))
-    }
-    console.log(`🗑️ ${decksSnapshot.docs.length} decks borrados`)
-  } catch (e) {
-    console.error('Error borrando decks:', e)
-    errors++
-  }
-
-  // Limpiar stores locales
-  collectionStore.clear()
-  preferencesStore.clear()
-  decksStore.clear()
-  calculatedMatches.value = []
-
-  loading.value = false
-
-  if (errors > 0) {
-    await confirmStore.show({
-      title: 'Datos borrados',
-      message: `Datos borrados con ${errors} error(es). La página se recargará.`,
-      confirmText: 'ACEPTAR',
-      showCancel: false
-    })
-  } else {
-    await confirmStore.show({
-      title: 'Datos borrados',
-      message: 'Todos los datos han sido borrados.',
-      confirmText: 'ACEPTAR',
-      showCancel: false
-    })
-  }
-  globalThis.location.reload()
+  await executeClearData()
 }
 
 /**

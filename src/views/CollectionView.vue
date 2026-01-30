@@ -1,3 +1,10 @@
+<script lang="ts">
+// Module-level flags that persist across component remounts
+// These prevent duplicate executions when navigating away and back
+let isImportRunning = false
+let isDeleteRunning = false
+</script>
+
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -134,6 +141,49 @@ const getImportProgress = (deckId: string): number => {
   if (importProgress.value.status === 'complete') return 100
   if (importProgress.value.totalCards === 0) return 0
   return Math.round((importProgress.value.currentCard / importProgress.value.totalCards) * 100)
+}
+
+// ========== DELETE DECK PROGRESS STATE ==========
+interface DeleteDeckState {
+  deckId: string
+  deckName: string
+  status: 'deleting_deck' | 'deleting_cards' | 'complete' | 'error'
+  deleteCards: boolean
+  cardIds: string[]
+  deletedCardIds: string[]
+}
+
+const DELETE_DECK_STORAGE_KEY = 'cranial_delete_deck_progress'
+const deleteDeckProgress = ref<DeleteDeckState | null>(null)
+
+const saveDeleteDeckState = (state: DeleteDeckState) => {
+  try {
+    localStorage.setItem(DELETE_DECK_STORAGE_KEY, JSON.stringify(state))
+    deleteDeckProgress.value = state
+  } catch (e) {
+    console.warn('[DeleteDeck] Failed to save state:', e)
+  }
+}
+
+const loadDeleteDeckState = (): DeleteDeckState | null => {
+  try {
+    const saved = localStorage.getItem(DELETE_DECK_STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.warn('[DeleteDeck] Failed to load state:', e)
+  }
+  return null
+}
+
+const clearDeleteDeckState = () => {
+  try {
+    localStorage.removeItem(DELETE_DECK_STORAGE_KEY)
+    deleteDeckProgress.value = null
+  } catch (e) {
+    console.warn('[DeleteDeck] Failed to clear state:', e)
+  }
 }
 
 // ========== COMPUTED ==========
@@ -467,6 +517,18 @@ const deckTotalCost = computed(() => {
   return deckOwnedCost.value + deckWishlistCost.value
 })
 
+// Card IDs currently being deleted (for disabling UI)
+const deletingCardIds = computed(() => {
+  if (!deleteDeckProgress.value || deleteDeckProgress.value.status === 'complete') {
+    return new Set<string>()
+  }
+  // Return all card IDs that are pending deletion (not yet deleted)
+  const pendingIds = deleteDeckProgress.value.cardIds.filter(
+    id => !deleteDeckProgress.value!.deletedCardIds.includes(id)
+  )
+  return new Set(pendingIds)
+})
+
 // ¿Todas las cartas del deck son públicas?
 const isDeckPublic = computed(() => {
   if (deckOwnedCards.value.length === 0) return true
@@ -788,11 +850,22 @@ const handleImportDirect = async (
   format?: DeckFormat,
   commander?: string
 ) => {
+  // Prevent duplicate executions
+  if (isImportRunning) {
+    console.log('[Import] Already running, skipping...')
+    return
+  }
+  isImportRunning = true
+
   const finalDeckName = deckName || `Deck${Date.now()}`
   showImportDeckModal.value = false
 
+  // Create progress toast
+  const progressToast = toastStore.showProgress(`Importando "${finalDeckName}"...`, 0)
+
   try {
     // PASO 1: Crear el deck primero
+    progressToast.update(5, `Creando deck "${finalDeckName}"...`)
     const deckId = await decksStore.createDeck({
       name: finalDeckName,
       format: format || 'custom',
@@ -802,7 +875,7 @@ const handleImportDirect = async (
     })
 
     if (!deckId) {
-      toastStore.show('Error al crear el deck', 'error')
+      progressToast.error('Error al crear el deck')
       return
     }
 
@@ -825,6 +898,7 @@ const handleImportDirect = async (
     deckFilter.value = deckId
 
     // PASO 2: Recolectar todos los scryfallIds para batch request
+    progressToast.update(10, `Preparando ${cards.length} cartas...`)
     const identifiers: Array<{ id: string }> = []
     const cardIndexMap = new Map<string, number[]>()
 
@@ -840,6 +914,7 @@ const handleImportDirect = async (
     }
 
     // PASO 3: Obtener todos los datos de Scryfall en batch
+    progressToast.update(15, `Obteniendo datos de ${identifiers.length} cartas...`)
     const scryfallDataMap = new Map<string, any>()
     if (identifiers.length > 0) {
       const scryfallCards = await getCardsByIds(identifiers)
@@ -847,6 +922,7 @@ const handleImportDirect = async (
         scryfallDataMap.set(sc.id, sc)
       }
     }
+    progressToast.update(25, `Procesando cartas...`)
 
     // PASO 4: Procesar cada carta con los datos obtenidos
     saveImportState({ ...initialState, status: 'processing' })
@@ -903,7 +979,9 @@ const handleImportDirect = async (
         isInSideboard: card.isInSideboard || false
       })
 
-      // Update progress
+      // Update progress (25-45% range for processing)
+      const processPercent = 25 + Math.round((i / cards.length) * 20)
+      progressToast.update(processPercent, `Procesando ${i + 1}/${cards.length}...`)
       saveImportState({
         ...initialState,
         status: 'processing',
@@ -914,6 +992,7 @@ const handleImportDirect = async (
     }
 
     // PASO 5: Búsqueda individual para cartas sin precio/imagen
+    progressToast.update(45, `Buscando precios adicionales...`)
     if (cardsNeedingSearch.length > 0) {
       for (const idx of cardsNeedingSearch) {
         const cardData = collectionCardsToAdd[idx]
@@ -948,6 +1027,7 @@ const handleImportDirect = async (
     }
 
     // PASO 6: Importar cartas a la colección
+    progressToast.update(50, `Guardando ${collectionCardsToAdd.length} cartas...`)
     saveImportState({
       deckId,
       deckName: finalDeckName,
@@ -963,6 +1043,7 @@ const handleImportDirect = async (
     let allocatedCount = 0
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      progressToast.update(60, `Asignando cartas al deck...`)
 
       // PASO 7: Asignar cartas al deck con progreso
       saveImportState({
@@ -984,7 +1065,9 @@ const handleImportDirect = async (
           const result = await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
           allocatedCount += result.allocated
 
-          // Update progress for each allocation
+          // Update progress for each allocation (60-95% range)
+          const allocPercent = 60 + Math.round((i / createdCardIds.length) * 35)
+          progressToast.update(allocPercent, `Asignando ${i + 1}/${createdCardIds.length}...`)
           saveImportState({
             deckId,
             deckName: finalDeckName,
@@ -1019,16 +1102,134 @@ const handleImportDirect = async (
     // Limpiar después de un momento para que el UI muestre 100%
     setTimeout(() => {
       clearImportState()
+      isImportRunning = false
     }, 2000)
 
-    toastStore.show(`Deck "${finalDeckName}" importado con ${allocatedCount} cartas`, 'success')
+    progressToast.complete(`"${finalDeckName}" importado con ${allocatedCount} cartas`)
   } catch (error) {
     console.error('[Import] Error during import:', error)
     if (importProgress.value) {
       saveImportState({ ...importProgress.value, status: 'error' })
     }
-    toastStore.show('Error al importar el deck', 'error')
+    progressToast.error('Error al importar el deck')
+    isImportRunning = false
   }
+}
+
+// Execute delete deck with progress tracking (can resume)
+const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnType<typeof toastStore.showProgress>, isResume: boolean = false) => {
+  // Prevent duplicate executions (only check if not a resume with existing toast)
+  if (!isResume && isDeleteRunning) {
+    console.log('[DeleteDeck] Already running, skipping...')
+    return
+  }
+  isDeleteRunning = true
+
+  // Create progress toast if not provided (new operation vs resume)
+  const progress = progressToast || (state.deleteCards && state.cardIds.length > 0
+    ? toastStore.showProgress(`Eliminando "${state.deckName}"...`, 0)
+    : null)
+
+  try {
+    // Step 1: Delete deck (if not already done)
+    if (state.status === 'deleting_deck') {
+      await decksStore.deleteDeck(state.deckId)
+      deckFilter.value = 'all'
+
+      // If no cards to delete, we're done
+      if (!state.deleteCards || state.cardIds.length === 0) {
+        state.status = 'complete'
+        saveDeleteDeckState(state)
+        if (progress) {
+          progress.complete('Deck eliminado')
+        } else {
+          toastStore.show('Deck eliminado (cartas conservadas)', 'success')
+        }
+        clearDeleteDeckState()
+        isDeleteRunning = false
+        return
+      }
+
+      // Move to deleting cards
+      state.status = 'deleting_cards'
+      saveDeleteDeckState(state)
+    }
+
+    // Step 2: Delete cards one by one with progress tracking
+    if (state.status === 'deleting_cards') {
+      const totalCards = state.cardIds.length
+      const remainingCardIds = state.cardIds.filter(id => !state.deletedCardIds.includes(id))
+
+      for (const cardId of remainingCardIds) {
+        try {
+          await collectionStore.deleteCard(cardId)
+          state.deletedCardIds.push(cardId)
+          saveDeleteDeckState(state)
+
+          // Update progress toast
+          if (progress) {
+            const percent = Math.round((state.deletedCardIds.length / totalCards) * 100)
+            progress.update(percent, `Eliminando cartas... ${state.deletedCardIds.length}/${totalCards}`)
+          }
+        } catch (e) {
+          console.error(`[DeleteDeck] Error deleting card ${cardId}:`, e)
+          // Continue with other cards
+        }
+      }
+
+      state.status = 'complete'
+      saveDeleteDeckState(state)
+      if (progress) {
+        progress.complete(`Deck y ${state.deletedCardIds.length} cartas eliminadas`)
+      } else {
+        toastStore.show(`Deck y ${state.deletedCardIds.length} cartas eliminadas`, 'success')
+      }
+      clearDeleteDeckState()
+      isDeleteRunning = false
+    }
+  } catch (err) {
+    console.error('[DeleteDeck] Error:', err)
+    state.status = 'error'
+    saveDeleteDeckState(state)
+    if (progress) {
+      progress.error('Error eliminando deck')
+    } else {
+      toastStore.show('Error eliminando deck', 'error')
+    }
+    isDeleteRunning = false
+  }
+}
+
+// Resume incomplete delete deck operation
+const resumeDeleteDeck = async (savedState: DeleteDeckState) => {
+  console.log('[DeleteDeck] Resuming delete operation for:', savedState.deckName)
+
+  // Prevent duplicate executions
+  if (isDeleteRunning) {
+    console.log('[DeleteDeck] Already running, skipping resume...')
+    return
+  }
+
+  if (savedState.status === 'complete') {
+    clearDeleteDeckState()
+    return
+  }
+
+  if (savedState.status === 'error') {
+    savedState.status = savedState.deletedCardIds.length > 0 ? 'deleting_cards' : 'deleting_deck'
+  }
+
+  // Calculate initial progress for resume
+  const initialProgress = savedState.cardIds.length > 0
+    ? Math.round((savedState.deletedCardIds.length / savedState.cardIds.length) * 100)
+    : 0
+
+  const progress = toastStore.showProgress(
+    `Continuando eliminación de "${savedState.deckName}"...`,
+    initialProgress
+  )
+
+  await executeDeleteDeck(savedState, progress, true)
 }
 
 // Eliminar deck
@@ -1065,22 +1266,18 @@ const handleDeleteDeck = async () => {
     })
   }
 
-  try {
-    // Primero eliminar el deck
-    await decksStore.deleteDeck(deckId)
-    deckFilter.value = 'all'
-
-    // Luego eliminar las cartas si el usuario lo solicitó (batch delete for efficiency)
-    if (deleteCards) {
-      await collectionStore.batchDeleteCards(cardIds)
-      toastStore.show(`Deck y ${cardIds.length} cartas eliminadas`, 'success')
-    } else {
-      toastStore.show('Deck eliminado (cartas conservadas)', 'success')
-    }
-  } catch (err) {
-    console.error('Error eliminando deck:', err)
-    toastStore.show('Error eliminando deck', 'error')
+  // Initialize state and execute
+  const state: DeleteDeckState = {
+    deckId,
+    deckName,
+    status: 'deleting_deck',
+    deleteCards,
+    cardIds: deleteCards ? cardIds : [],
+    deletedCardIds: []
   }
+  saveDeleteDeckState(state)
+
+  await executeDeleteDeck(state)
 }
 
 // Toggle visibilidad de todas las cartas del deck
@@ -1115,6 +1312,12 @@ const handleToggleDeckPublic = async () => {
 const resumeImport = async (savedState: ImportState) => {
   console.log('[Import] Resuming import:', savedState.deckName, 'status:', savedState.status)
 
+  // Prevent duplicate executions
+  if (isImportRunning) {
+    console.log('[Import] Already running, skipping resume...')
+    return
+  }
+
   // Restaurar el estado en memoria
   importProgress.value = savedState
 
@@ -1131,15 +1334,31 @@ const resumeImport = async (savedState: ImportState) => {
     return
   }
 
+  // Mark as running
+  isImportRunning = true
+
   // Cambiar a modo mazos y seleccionar el deck
   viewMode.value = 'decks'
   deckFilter.value = savedState.deckId
 
+  // Calculate initial progress for resume based on status
+  let initialProgress = 0
+  if (savedState.status === 'allocating' && savedState.createdCardIds.length > 0) {
+    initialProgress = 60 + Math.round((savedState.currentCard / savedState.createdCardIds.length) * 35)
+  } else if (savedState.status === 'saving') {
+    initialProgress = 50
+  } else if (savedState.status === 'processing') {
+    initialProgress = 25 + Math.round((savedState.currentCard / savedState.totalCards) * 20)
+  }
+
+  const progressToast = toastStore.showProgress(
+    `Continuando "${savedState.deckName}"...`,
+    initialProgress
+  )
+
   try {
     // Si estaba en 'allocating', continuar desde donde quedó
     if (savedState.status === 'allocating' && savedState.createdCardIds.length > 0) {
-      toastStore.show(`Resumiendo importación de "${savedState.deckName}"...`, 'info')
-
       let allocatedCount = savedState.allocatedCount
       const startIndex = savedState.currentCard
 
@@ -1150,6 +1369,8 @@ const resumeImport = async (savedState: ImportState) => {
           const result = await decksStore.allocateCardToDeck(savedState.deckId, cardId, meta.quantity, meta.isInSideboard)
           allocatedCount += result.allocated
 
+          const allocPercent = 60 + Math.round((i / savedState.createdCardIds.length) * 35)
+          progressToast.update(allocPercent, `Asignando ${i + 1}/${savedState.createdCardIds.length}...`)
           saveImportState({
             ...savedState,
             currentCard: i + 1,
@@ -1161,14 +1382,18 @@ const resumeImport = async (savedState: ImportState) => {
       // Completar
       await decksStore.loadDecks()
       saveImportState({ ...savedState, status: 'complete', currentCard: savedState.totalCards, allocatedCount })
-      setTimeout(() => clearImportState(), 2000)
-      toastStore.show(`Deck "${savedState.deckName}" completado con ${allocatedCount} cartas`, 'success')
+      setTimeout(() => {
+        clearImportState()
+        isImportRunning = false
+      }, 2000)
+      progressToast.complete(`"${savedState.deckName}" completado con ${allocatedCount} cartas`)
 
     } else if (savedState.status === 'saving' && savedState.cards.length > 0) {
       // Si estaba guardando cartas, reiniciar desde guardado
-      toastStore.show(`Resumiendo importación de "${savedState.deckName}"...`, 'info')
+      progressToast.update(55, `Guardando ${savedState.cards.length} cartas...`)
 
       const createdCardIds = await collectionStore.confirmImport(savedState.cards, true)
+      progressToast.update(60, `Asignando cartas al deck...`)
 
       saveImportState({
         ...savedState,
@@ -1187,6 +1412,8 @@ const resumeImport = async (savedState: ImportState) => {
           const result = await decksStore.allocateCardToDeck(savedState.deckId, cardId, meta.quantity, meta.isInSideboard)
           allocatedCount += result.allocated
 
+          const allocPercent = 60 + Math.round((i / createdCardIds.length) * 35)
+          progressToast.update(allocPercent, `Asignando ${i + 1}/${createdCardIds.length}...`)
           saveImportState({
             ...savedState,
             status: 'allocating',
@@ -1200,18 +1427,23 @@ const resumeImport = async (savedState: ImportState) => {
 
       await decksStore.loadDecks()
       saveImportState({ ...savedState, status: 'complete', currentCard: savedState.totalCards, allocatedCount })
-      setTimeout(() => clearImportState(), 2000)
-      toastStore.show(`Deck "${savedState.deckName}" completado con ${allocatedCount} cartas`, 'success')
+      setTimeout(() => {
+        clearImportState()
+        isImportRunning = false
+      }, 2000)
+      progressToast.complete(`"${savedState.deckName}" completado con ${allocatedCount} cartas`)
 
     } else {
       // Para otros estados (fetching, processing), limpiar y avisar
-      toastStore.show(`Import de "${savedState.deckName}" incompleto. El deck puede estar vacío.`, 'warning')
+      progressToast.error(`Import incompleto. El deck puede estar vacío.`)
       clearImportState()
+      isImportRunning = false
     }
   } catch (error) {
     console.error('[Import] Error resuming import:', error)
     saveImportState({ ...savedState, status: 'error' })
-    toastStore.show('Error al resumir importación', 'error')
+    progressToast.error('Error al resumir importación')
+    isImportRunning = false
   }
 }
 
@@ -1239,6 +1471,16 @@ onMounted(async () => {
       // Clean up completed import
       clearImportState()
     }
+
+    // Check for incomplete delete deck operations
+    const savedDeleteDeck = loadDeleteDeckState()
+    if (savedDeleteDeck && savedDeleteDeck.status !== 'complete') {
+      // Resume the delete
+      resumeDeleteDeck(savedDeleteDeck)
+    } else if (savedDeleteDeck?.status === 'complete') {
+      // Clean up completed delete
+      clearDeleteDeckState()
+    }
   } catch (err) {
     toastStore.show('Error cargando datos', 'error')
   }
@@ -1253,11 +1495,14 @@ watch(() => route.query.deck, (newDeckId) => {
   }
 })
 
-// Warn before leaving if import is in progress
+// Warn before leaving if import or delete is in progress
 const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-  if (importProgress.value && importProgress.value.status !== 'complete' && importProgress.value.status !== 'error') {
+  const importInProgress = importProgress.value && importProgress.value.status !== 'complete' && importProgress.value.status !== 'error'
+  const deleteInProgress = deleteDeckProgress.value && deleteDeckProgress.value.status !== 'complete' && deleteDeckProgress.value.status !== 'error'
+
+  if (importInProgress || deleteInProgress) {
     e.preventDefault()
-    e.returnValue = 'Hay una importación en progreso. El progreso se guardará y podrás continuar al volver.'
+    e.returnValue = 'Hay una operación en progreso. El progreso se guardará y podrás continuar al volver.'
     return e.returnValue
   }
 }
@@ -1536,6 +1781,7 @@ onUnmounted(() => {
           </div>
           <CollectionGrid
               :cards="filteredCards"
+              :deleting-card-ids="deletingCardIds"
               @card-click="handleCardClick"
               @delete="handleDelete"
           />
@@ -1592,6 +1838,7 @@ onUnmounted(() => {
           </div>
           <CollectionGrid
               :cards="wishlistCards"
+              :deleting-card-ids="deletingCardIds"
               @card-click="handleCardClick"
               @delete="handleDelete"
           />

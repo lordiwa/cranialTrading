@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useToastStore } from '../../stores/toast'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { CreateDeckInput } from '../../types/deck'
+
+const toastStore = useToastStore()
 
 const props = defineProps<{
   show: boolean
@@ -81,7 +84,7 @@ const toggleColor = (color: string) => {
 
 const handleCreate = () => {
   if (!form.value.name.trim()) {
-    alert('El nombre del mazo es requerido')
+    toastStore.show('El nombre del mazo es requerido', 'error')
     return
   }
   emit('create', {

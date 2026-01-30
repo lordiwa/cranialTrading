@@ -11,6 +11,7 @@ import {
     getDoc,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
+import { getCardById as getScryfallCard } from '../services/scryfall'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { useCollectionStore } from './collection'
@@ -158,6 +159,7 @@ export const useDecksStore = defineStore('decks', () => {
                         image: card.image,
                         cmc: card.cmc,
                         type_line: card.type_line,
+                        colors: card.colors,
                         allocatedQuantity: alloc.quantity,
                         isInSideboard: alloc.isInSideboard,
                         notes: alloc.notes,
@@ -183,6 +185,7 @@ export const useDecksStore = defineStore('decks', () => {
                     image: item.image,
                     cmc: item.cmc,
                     type_line: item.type_line,
+                    colors: item.colors,
                     requestedQuantity: item.quantity,
                     isInSideboard: item.isInSideboard,
                     notes: item.notes,
@@ -210,6 +213,78 @@ export const useDecksStore = defineStore('decks', () => {
     }
 
     // ========================================================================
+    // MIGRATION HELPERS
+    // ========================================================================
+
+    /**
+     * Migrate wishlist items that are missing type_line, colors, or cmc
+     * Fetches the missing data from Scryfall and updates Firestore
+     */
+    const migrateWishlistMetadata = async (
+        deckId: string,
+        wishlist: DeckWishlistItem[]
+    ): Promise<DeckWishlistItem[]> => {
+        if (!authStore.user?.id) return wishlist
+
+        // Find items missing metadata
+        // Note: empty colors array [] is valid for colorless cards, so only check for undefined/null
+        const itemsToMigrate = wishlist.filter(item => {
+            const missingTypeLine = item.type_line === undefined || item.type_line === null
+            const missingColors = item.colors === undefined || item.colors === null
+            const missingCmc = item.cmc === undefined || item.cmc === null
+            return missingTypeLine || missingColors || missingCmc
+        })
+
+        if (itemsToMigrate.length === 0) return wishlist
+
+        let updated = false
+        const updatedWishlist = [...wishlist]
+
+        for (const item of itemsToMigrate) {
+            try {
+                const scryfallCard = await getScryfallCard(item.scryfallId)
+                if (scryfallCard) {
+                    const index = updatedWishlist.findIndex(
+                        w => w.scryfallId === item.scryfallId &&
+                            w.edition === item.edition &&
+                            w.condition === item.condition &&
+                            w.foil === item.foil &&
+                            w.isInSideboard === item.isInSideboard
+                    )
+                    if (index >= 0) {
+                        updatedWishlist[index] = {
+                            ...updatedWishlist[index],
+                            type_line: scryfallCard.type_line,
+                            colors: scryfallCard.colors || [],
+                            cmc: scryfallCard.cmc,
+                        }
+                        updated = true
+                    }
+                }
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 100))
+            } catch (e) {
+                console.warn(`[migrateWishlistMetadata] Failed to fetch ${item.name}:`, e)
+            }
+        }
+
+        // Save back to Firestore if we updated anything
+        if (updated) {
+            try {
+                const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
+                await updateDoc(deckRef, {
+                    wishlist: updatedWishlist,
+                    updatedAt: Timestamp.now(),
+                })
+            } catch (e) {
+                console.error('[migrateWishlistMetadata] Failed to save:', e)
+            }
+        }
+
+        return updatedWishlist
+    }
+
+    // ========================================================================
     // LOAD OPERATIONS
     // ========================================================================
 
@@ -224,7 +299,8 @@ export const useDecksStore = defineStore('decks', () => {
             const decksRef = collection(db, 'users', authStore.user.id, 'decks')
             const snapshot = await getDocs(decksRef)
 
-            decks.value = snapshot.docs.map(docSnap => {
+            // First pass: load all decks
+            const loadedDecks: Deck[] = snapshot.docs.map(docSnap => {
                 const data = docSnap.data()
 
                 // Convert dates in allocations and wishlist
@@ -255,6 +331,17 @@ export const useDecksStore = defineStore('decks', () => {
                 } as Deck
             })
 
+            // Second pass: migrate wishlist metadata for all decks (in parallel)
+            const migratedDecks = await Promise.all(
+                loadedDecks.map(async (deck) => {
+                    if (deck.wishlist && deck.wishlist.length > 0) {
+                        deck.wishlist = await migrateWishlistMetadata(deck.id, deck.wishlist)
+                    }
+                    return deck
+                })
+            )
+
+            decks.value = migratedDecks
             console.log(`Loaded ${decks.value.length} decks`)
         } catch (error) {
             console.error('Error loading decks:', error)
@@ -284,10 +371,13 @@ export const useDecksStore = defineStore('decks', () => {
                 ...a,
                 addedAt: a.addedAt?.toDate?.() || new Date(a.addedAt) || new Date(),
             }))
-            const wishlist = (data.wishlist || []).map((w: any) => ({
+            let wishlist = (data.wishlist || []).map((w: any) => ({
                 ...w,
                 addedAt: w.addedAt?.toDate?.() || new Date(w.addedAt) || new Date(),
             }))
+
+            // Migrate wishlist items missing type_line/colors/cmc (fetches from Scryfall)
+            wishlist = await migrateWishlistMetadata(deckId, wishlist)
 
             const deck: Deck = {
                 id: docSnap.id,
@@ -415,6 +505,60 @@ export const useDecksStore = defineStore('decks', () => {
     }
 
     /**
+     * Toggle a card as commander (add/remove from commander list)
+     */
+    const toggleCommander = async (deckId: string, cardName: string): Promise<boolean> => {
+        if (!authStore.user?.id) return false
+
+        try {
+            const deck = decks.value.find(d => d.id === deckId)
+            if (!deck) return false
+
+            // Parse current commanders
+            const currentCommanders = deck.commander
+                ? deck.commander.split(/\s*\/\/\s*/).map(n => n.trim()).filter(n => n.length > 0)
+                : []
+
+            // Check if card is already a commander
+            const cardNameLower = cardName.toLowerCase()
+            const isCommander = currentCommanders.some(c => c.toLowerCase() === cardNameLower)
+
+            let newCommanders: string[]
+            if (isCommander) {
+                // Remove from commanders
+                newCommanders = currentCommanders.filter(c => c.toLowerCase() !== cardNameLower)
+            } else {
+                // Add to commanders
+                newCommanders = [...currentCommanders, cardName]
+            }
+
+            // Update deck
+            const newCommanderString = newCommanders.join(' // ')
+            deck.commander = newCommanderString
+
+            const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
+            await updateDoc(deckRef, {
+                commander: newCommanderString,
+                updatedAt: Timestamp.now(),
+            })
+
+            if (currentDeck.value?.id === deckId) {
+                currentDeck.value = { ...deck }
+            }
+
+            toastStore.show(
+                isCommander ? `${cardName} ya no es Commander` : `${cardName} es ahora Commander`,
+                'success'
+            )
+            return true
+        } catch (error) {
+            console.error('Error toggling commander:', error)
+            toastStore.show('Error al cambiar commander', 'error')
+            return false
+        }
+    }
+
+    /**
      * Delete a deck (cards stay in collection)
      */
     const deleteDeck = async (deckId: string): Promise<boolean> => {
@@ -527,6 +671,9 @@ export const useDecksStore = defineStore('decks', () => {
                         image: card.image ?? '',
                         condition: card.condition,
                         foil: card.foil,
+                        cmc: card.cmc,
+                        type_line: card.type_line,
+                        colors: card.colors,
                         notes,
                         addedAt: new Date(),
                     }))
@@ -577,6 +724,9 @@ export const useDecksStore = defineStore('decks', () => {
             image: string
             condition: CardCondition
             foil: boolean
+            cmc?: number
+            type_line?: string
+            colors?: string[]
             notes?: string
         }
     ): Promise<boolean> => {
@@ -955,6 +1105,7 @@ export const useDecksStore = defineStore('decks', () => {
         createDeck,
         updateDeck,
         deleteDeck,
+        toggleCommander,
 
         // Allocation operations
         allocateCardToDeck,

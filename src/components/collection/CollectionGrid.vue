@@ -16,9 +16,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   cardClick: [card: Card]
-  edit: [card: Card]
   delete: [card: Card]
-  manageDecks: [card: Card]
   interest: [card: Card]
 }>()
 </script>
@@ -37,9 +35,7 @@ const emit = defineEmits<{
         :show-interest="props.showInterest"
         :is-interested="props.interestedCards?.has(card.scryfallId || card.id) || false"
         @card-click="emit('cardClick', $event)"
-        @edit="emit('edit', $event)"
         @delete="emit('delete', $event)"
-        @manage-decks="emit('manageDecks', $event)"
         @interest="emit('interest', $event)"
     />
   </div>

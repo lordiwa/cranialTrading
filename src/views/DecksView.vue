@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
+import { useConfirmStore } from '../stores/confirm'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
@@ -19,6 +20,7 @@ const router = useRouter()
 const decksStore = useDecksStore()
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
+const confirmStore = useConfirmStore()
 
 const showCreateModal = ref(false)
 const showImportModal = ref(false)
@@ -156,7 +158,15 @@ const handleEditDeck = (deckId: string) => {
 }
 
 const handleDeleteDeck = async (deckId: string) => {
-  if (confirm('¿Eliminar este deck? Esta acción no se puede deshacer.')) {
+  const confirmed = await confirmStore.show({
+    title: 'Eliminar deck',
+    message: '¿Eliminar este deck? Esta acción no se puede deshacer.',
+    confirmText: 'ELIMINAR',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
+  if (confirmed) {
     await decksStore.deleteDeck(deckId)
   }
 }
@@ -397,6 +407,9 @@ const handleImportDirect = async (
     let price = 0
     let finalScryfallId = card.scryfallId || ''
     let finalEdition = card.setCode || 'Unknown'
+    let cmc: number | undefined = undefined
+    let type_line: string | undefined = undefined
+    let colors: string[] = []
 
     if (card.scryfallId) {
       const scryfallCard = await getCardById(card.scryfallId)
@@ -406,6 +419,9 @@ const handleImportDirect = async (
           image = scryfallCard.card_faces[0]?.image_uris?.normal || ''
         }
         price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
+        cmc = scryfallCard.cmc
+        type_line = scryfallCard.type_line
+        colors = scryfallCard.colors || []
       }
     }
 
@@ -427,6 +443,9 @@ const handleImportDirect = async (
           if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
             image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
           }
+          cmc = printWithPrice.cmc
+          type_line = printWithPrice.type_line
+          colors = printWithPrice.colors || []
         } else if (results.length > 0 && !image) {
           // At least get an image from any print
           const anyPrint = results[0]
@@ -436,6 +455,9 @@ const handleImportDirect = async (
           }
           if (!finalScryfallId) finalScryfallId = anyPrint.id
           if (finalEdition === 'Unknown') finalEdition = anyPrint.set.toUpperCase()
+          cmc = anyPrint.cmc
+          type_line = anyPrint.type_line
+          colors = anyPrint.colors || []
         }
       } catch (e) {
         console.warn(`Could not find alternate print for: ${cardName}`)
@@ -454,6 +476,9 @@ const handleImportDirect = async (
         image,
         condition,
         foil: isFoil,
+        cmc,
+        type_line,
+        colors,
       })
     }
 

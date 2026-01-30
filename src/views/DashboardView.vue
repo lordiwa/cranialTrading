@@ -222,8 +222,10 @@ import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
 import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
+import { useDecksStore } from '../stores/decks'
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where, limit } from 'firebase/firestore'
 import { useToastStore } from '../stores/toast'
+import { useConfirmStore } from '../stores/confirm'
 import { db } from '../services/firebase'
 import {
   findCardsMatchingPreferences,
@@ -238,7 +240,9 @@ const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
 const matchesStore = useMatchesStore()
 const priceMatching = usePriceMatchingStore()
+const decksStore = useDecksStore()
 const toastStore = useToastStore()
+const confirmStore = useConfirmStore()
 
 const loading = ref(false)
 const syncing = ref(false)
@@ -337,9 +341,15 @@ onMounted(async () => {
 const clearAllData = async () => {
   if (!authStore.user) return
 
-  if (!confirm('¿Borrar TODAS tus cartas, preferencias y matches? Esta acción no se puede deshacer.')) {
-    return
-  }
+  const confirmed = await confirmStore.show({
+    title: 'Borrar todos los datos',
+    message: '¿Borrar TODAS tus cartas, preferencias y matches? Esta acción no se puede deshacer.',
+    confirmText: 'BORRAR TODO',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
 
   loading.value = true
   const userId = authStore.user.id
@@ -400,17 +410,41 @@ const clearAllData = async () => {
     errors++
   }
 
+  // Borrar decks
+  try {
+    const decksRef = collection(db, 'users', userId, 'decks')
+    const decksSnapshot = await getDocs(decksRef)
+    for (const deckDoc of decksSnapshot.docs) {
+      await deleteDoc(doc(db, 'users', userId, 'decks', deckDoc.id))
+    }
+    console.log(`🗑️ ${decksSnapshot.docs.length} decks borrados`)
+  } catch (e) {
+    console.error('Error borrando decks:', e)
+    errors++
+  }
+
   // Limpiar stores locales
   collectionStore.clear()
   preferencesStore.clear()
+  decksStore.clear()
   calculatedMatches.value = []
 
   loading.value = false
 
   if (errors > 0) {
-    alert(`⚠️ Datos borrados con ${errors} error(es). Recarga la página.`)
+    await confirmStore.show({
+      title: 'Datos borrados',
+      message: `Datos borrados con ${errors} error(es). La página se recargará.`,
+      confirmText: 'ACEPTAR',
+      showCancel: false
+    })
   } else {
-    alert('✅ Todos los datos han sido borrados.')
+    await confirmStore.show({
+      title: 'Datos borrados',
+      message: 'Todos los datos han sido borrados.',
+      confirmText: 'ACEPTAR',
+      showCancel: false
+    })
   }
   globalThis.location.reload()
 }

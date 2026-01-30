@@ -281,7 +281,7 @@
     }
 
     .focus-visible {
-        outline: 2px solid #CCFF00;
+        outline: 2px solid #5AC168;
         outline-offset: 2px;
     }
 }

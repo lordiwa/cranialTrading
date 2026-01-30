@@ -28,6 +28,7 @@ export interface DeckWishlistItem {
     foil: boolean               // Desired foil status
     cmc?: number                // Mana value for grouping
     type_line?: string          // Card type for grouping
+    colors?: string[]           // Card colors for grouping (W, U, B, R, G)
     notes?: string
     addedAt: Date
 }
@@ -45,6 +46,7 @@ export interface HydratedDeckCard {
     image: string
     cmc?: number              // Mana value for grouping
     type_line?: string        // Card type for grouping
+    colors?: string[]         // Card colors for grouping (W, U, B, R, G)
 
     // From DeckCardAllocation
     allocatedQuantity: number
@@ -69,6 +71,7 @@ export interface HydratedWishlistCard {
     image: string
     cmc?: number              // Mana value for grouping
     type_line?: string        // Card type for grouping
+    colors?: string[]         // Card colors for grouping (W, U, B, R, G)
     requestedQuantity: number
     isInSideboard: boolean
     notes?: string

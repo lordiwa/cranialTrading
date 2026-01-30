@@ -2,12 +2,14 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useConfirmStore } from '../stores/confirm';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const confirmStore = useConfirmStore();
 
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -53,7 +55,15 @@ const handleCheckEmailVerification = async () => {
 };
 
 const handleLogout = async () => {
-  if (confirm('¿Cerrar sesión?')) {
+  const confirmed = await confirmStore.show({
+    title: 'Cerrar sesión',
+    message: '¿Estás seguro que deseas cerrar sesión?',
+    confirmText: 'CERRAR SESIÓN',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'secondary'
+  })
+
+  if (confirmed) {
     await authStore.logout();
     router.push('/login');
   }

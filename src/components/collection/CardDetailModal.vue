@@ -482,19 +482,19 @@ watch(selectedPrint, (print) => {
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
               <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">TCGPlayer:</span>
+                <span class="text-tiny text-silver-70">TCG:</span>
                 <span class="text-body font-bold text-neon">${{ currentPrice.toFixed(2) }}</span>
               </div>
-              <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">Card Kingdom:</span>
-                <span class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">CK:</span>
+                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
+                <span v-else class="text-small text-silver-50">-</span>
               </div>
-              <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
-                <span class="text-tiny text-silver-50">CK Buylist:</span>
-                <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
-              </div>
-              <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
-                Cargando precios CK...
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">BL:</span>
+                <span v-if="cardKingdomBuylist" class="text-body font-bold text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                <span v-else class="text-small text-silver-50">-</span>
               </div>
             </div>
           </div>

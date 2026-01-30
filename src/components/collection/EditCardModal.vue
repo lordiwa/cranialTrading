@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useToastStore } from '../../stores/toast'
+import { useConfirmStore } from '../../stores/confirm'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { searchCards } from '../../services/scryfall'
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 }>()
 
 const toastStore = useToastStore()
+const confirmStore = useConfirmStore()
 const { getCardAllocationSummary, checkQuantityReduction } = useCardAllocation()
 
 // Card Kingdom prices
@@ -151,9 +153,14 @@ const handleSave = async () => {
 
   // Warn about quantity reduction affecting allocations
   if (quantityWarning.value) {
-    if (!confirm(quantityWarning.value + '\n\n¿Deseas continuar?')) {
-      return
-    }
+    const confirmed = await confirmStore.show({
+      title: 'Reducir cantidad',
+      message: quantityWarning.value + '\n\n¿Deseas continuar?',
+      confirmText: 'CONTINUAR',
+      cancelText: 'CANCELAR',
+      confirmVariant: 'danger'
+    })
+    if (!confirmed) return
   }
 
   isLoading.value = true

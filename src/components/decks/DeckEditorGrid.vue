@@ -7,6 +7,7 @@ const props = defineProps<{
   cards: DisplayDeckCard[]
   deckId: string
   commanderNames?: string[]
+  groupBy?: 'type' | 'mana' | 'color'
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   remove: [card: DisplayDeckCard]
   updateQuantity: [card: DisplayDeckCard, newQuantity: number]
   addToWishlist: [card: DisplayDeckCard]
+  toggleCommander: [card: DisplayDeckCard]
 }>()
 
 // Preview state
@@ -59,43 +61,115 @@ const getTypeCategory = (card: DisplayDeckCard): string => {
   return 'Other'
 }
 
-// Type order for sorting (Commander first)
-const typeOrder = ['Commander', 'Creatures', 'Instants', 'Sorceries', 'Enchantments', 'Artifacts', 'Planeswalkers', 'Lands', 'Other']
+// Get mana value category for grouping
+const getManaCategory = (card: DisplayDeckCard): string => {
+  if (isCommander(card)) return 'Commander'
 
-// Group cards by type, then by cmc within each type
+  const typeLine = card.type_line?.toLowerCase() || ''
+  if (typeLine.includes('land')) return 'Lands'
+
+  const cmc = card.cmc ?? 0
+  if (cmc >= 7) return '7+'
+  return String(cmc)
+}
+
+// Get color category for grouping
+const getColorCategory = (card: DisplayDeckCard): string => {
+  if (isCommander(card)) return 'Commander'
+
+  const typeLine = card.type_line?.toLowerCase() || ''
+
+  // Lands are always in their own category (at the end)
+  if (typeLine.includes('land')) return 'Lands'
+
+  // Get colors from the card - colors array only contains actual colors (W, U, B, R, G)
+  // Colorless mana doesn't count as a color
+  const cardAny = card as any
+  const colors = cardAny.colors || cardAny.color_identity || []
+
+  // Filter to only actual colors (in case there's any invalid data)
+  const validColors = colors.filter((c: string) => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+
+  // No colors = colorless (artifacts, eldrazi, etc.)
+  if (validColors.length === 0) return 'Colorless'
+
+  // 2+ colors = multicolor
+  if (validColors.length >= 2) return 'Multicolor'
+
+  // Single color
+  const color = validColors[0]?.toUpperCase()
+  if (color === 'W') return 'White'
+  if (color === 'U') return 'Blue'
+  if (color === 'B') return 'Black'
+  if (color === 'R') return 'Red'
+  if (color === 'G') return 'Green'
+
+  return 'Colorless'
+}
+
+// Category orders for different grouping modes
+const typeOrder = ['Commander', 'Creatures', 'Instants', 'Sorceries', 'Enchantments', 'Artifacts', 'Planeswalkers', 'Lands', 'Other']
+const manaOrder = ['Commander', '0', '1', '2', '3', '4', '5', '6', '7+', 'Lands']
+const colorOrder = ['Commander', 'White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Colorless', 'Lands']
+
+// Get category based on current grouping mode
+const getCategory = (card: DisplayDeckCard): string => {
+  switch (props.groupBy) {
+    case 'mana': return getManaCategory(card)
+    case 'color': return getColorCategory(card)
+    default: return getTypeCategory(card)
+  }
+}
+
+// Get order based on current grouping mode
+const getCategoryOrder = (): string[] => {
+  switch (props.groupBy) {
+    case 'mana': return manaOrder
+    case 'color': return colorOrder
+    default: return typeOrder
+  }
+}
+
+// Group cards by selected mode
 const groupedCards = computed(() => {
-  const groups: Record<string, Record<number, DisplayDeckCard[]>> = {}
+  const groups: Record<string, DisplayDeckCard[]> = {}
+  const order = getCategoryOrder()
 
   for (const card of props.cards) {
-    const type = getTypeCategory(card)
-    const cmc = card.cmc ?? 0
-
-    if (!groups[type]) groups[type] = {}
-    if (!groups[type][cmc]) groups[type][cmc] = []
-    groups[type][cmc].push(card)
+    const category = getCategory(card)
+    if (!groups[category]) groups[category] = []
+    groups[category].push(card)
   }
 
-  // Sort by type order
-  const sortedGroups: Array<{ type: string; cmcGroups: Array<{ cmc: number; cards: DisplayDeckCard[] }> }> = []
+  // Sort cards within each group by name
+  for (const category in groups) {
+    groups[category].sort((a, b) => a.name.localeCompare(b.name))
+  }
 
-  for (const type of typeOrder) {
-    if (groups[type]) {
-      const cmcGroups = Object.entries(groups[type])
-        .map(([cmc, cards]) => ({ cmc: parseInt(cmc), cards }))
-        .sort((a, b) => a.cmc - b.cmc)
-      sortedGroups.push({ type, cmcGroups })
+  // Build sorted groups array
+  const sortedGroups: Array<{ type: string; cards: DisplayDeckCard[] }> = []
+
+  for (const category of order) {
+    if (groups[category] && groups[category].length > 0) {
+      sortedGroups.push({ type: category, cards: groups[category] })
+    }
+  }
+
+  // Add any categories not in the order
+  for (const category in groups) {
+    if (!order.includes(category) && groups[category].length > 0) {
+      sortedGroups.push({ type: category, cards: groups[category] })
     }
   }
 
   return sortedGroups
 })
 
-// Count total cards by type
+// Count total cards by category
 const getTypeCount = (type: string): number => {
   const group = groupedCards.value.find(g => g.type === type)
   if (!group) return 0
-  return group.cmcGroups.reduce((sum, cg) =>
-    sum + cg.cards.reduce((s, c) => s + getQuantity(c), 0), 0)
+  return group.cards.reduce((sum, c) => sum + getQuantity(c), 0)
 }
 
 // Hover handlers with delay
@@ -221,9 +295,9 @@ watch(() => props.cards, () => {
           <p v-if="previewCard.foil" class="text-neon">FOIL</p>
           <p v-if="previewCard.type_line" class="text-silver-50 text-tiny">{{ previewCard.type_line }}</p>
 
-          <div class="border-t border-silver-20 pt-2 mt-2">
+          <div class="border-t border-silver-20 pt-2 mt-2 space-y-1">
             <div class="flex justify-between">
-              <span class="text-silver-70">Precio:</span>
+              <span class="text-silver-70">TCG:</span>
               <span class="text-neon font-bold">${{ previewCard.price?.toFixed(2) || 'N/A' }}</span>
             </div>
             <div class="flex justify-between">
@@ -258,7 +332,7 @@ watch(() => props.cards, () => {
 
       <!-- Grouped cards -->
       <div v-for="group in groupedCards" :key="group.type" class="space-y-2">
-        <!-- Type Header -->
+        <!-- Category Header -->
         <h3
           class="text-tiny font-bold uppercase"
           :class="group.type === 'Commander' ? 'text-purple-400' : 'text-silver-70'"
@@ -266,41 +340,39 @@ watch(() => props.cards, () => {
           {{ group.type }} ({{ getTypeCount(group.type) }})
         </h3>
 
-        <!-- All cards in this type (flat, no CMC subgroups) -->
+        <!-- All cards in this category -->
         <div class="flex flex-wrap gap-2">
-          <template v-for="cmcGroup in group.cmcGroups" :key="`${group.type}-${cmcGroup.cmc}`">
+          <div
+            v-for="card in group.cards"
+            :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
+            class="relative cursor-pointer group"
+            :class="{ 'opacity-60': card.isWishlist }"
+            @mouseenter="handleMouseEnter(card)"
+            @mouseleave="handleMouseLeave"
+            @click="handleCardClick(card, $event)"
+          >
+            <!-- Card miniature - ONLY image -->
             <div
-              v-for="card in cmcGroup.cards"
-              :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
-              class="relative cursor-pointer group"
-              :class="{ 'opacity-60': card.isWishlist }"
-              @mouseenter="handleMouseEnter(card)"
-              @mouseleave="handleMouseLeave"
-              @click="handleCardClick(card, $event)"
+              class="w-[145px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+              :class="[
+                card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
+                'group-hover:border-neon group-hover:scale-105 group-hover:z-10'
+              ]"
             >
-              <!-- Card miniature - ONLY image -->
-              <div
-                class="w-[145px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
-                :class="[
-                  card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
-                  'group-hover:border-neon group-hover:scale-105 group-hover:z-10'
-                ]"
-              >
-                <img
-                  v-if="getCardImageSmall(card)"
-                  :src="getCardImageSmall(card)"
-                  :alt="card.name"
-                  loading="lazy"
-                  class="w-full h-full object-cover"
-                />
-              </div>
-
-              <!-- Quantity badge (only if > 1) -->
-              <div v-if="getQuantity(card) > 1" class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1">
-                <span class="text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
-              </div>
+              <img
+                v-if="getCardImageSmall(card)"
+                :src="getCardImageSmall(card)"
+                :alt="card.name"
+                loading="lazy"
+                class="w-full h-full object-cover"
+              />
             </div>
-          </template>
+
+            <!-- Quantity badge -->
+            <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1">
+              <span class="text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -341,6 +413,17 @@ watch(() => props.cards, () => {
               +
             </button>
           </div>
+
+          <!-- Commander toggle button -->
+          <BaseButton
+            size="small"
+            :variant="isCommander(popupCard) ? 'primary' : 'secondary'"
+            class="w-full text-tiny mb-2"
+            :class="isCommander(popupCard) ? 'bg-purple-400/20 border-purple-400 text-purple-400' : ''"
+            @click="emit('toggleCommander', popupCard); closePopup()"
+          >
+            {{ isCommander(popupCard) ? '★ QUITAR COMMANDER' : '☆ HACER COMMANDER' }}
+          </BaseButton>
 
           <!-- Action buttons -->
           <div class="flex gap-2">

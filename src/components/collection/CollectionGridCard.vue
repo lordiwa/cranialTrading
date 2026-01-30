@@ -22,15 +22,14 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   cardClick: [card: Card]
-  edit: [card: Card]
   delete: [card: Card]
-  manageDecks: [card: Card]
   interest: [card: Card]
 }>()
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const togglingPublic = ref(false)
+const showMobileMenu = ref(false)
 
 const togglePublic = async () => {
   if (togglingPublic.value || props.readonly) return
@@ -186,24 +185,34 @@ const getStatusIconName = (status: string) => {
         <span class="text-tiny text-silver-50">No image</span>
       </div>
 
-      <!-- Toggle button para split cards -->
+      <!-- ========== DESKTOP: Hover overlay ========== -->
+      <div
+          v-if="!readonly"
+          class="absolute inset-0 bg-primary/70 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center pointer-events-none group-hover:pointer-events-auto"
+      >
+        <!-- Edit text -->
+        <p class="text-small font-bold text-silver mb-4">CLICK PARA EDITAR</p>
+      </div>
+
+      <!-- ========== DESKTOP: Badges on hover ========== -->
+      <!-- Toggle button para split cards (always visible if split) -->
       <button
           v-if="isSplitCard"
           @click.stop="toggleCardFace"
-          class="absolute top-2 left-2 bg-primary border border-neon px-2 py-1 hover:bg-neon-10 transition-all flex items-center justify-center"
+          class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10"
           title="Click para ver el otro lado"
-          aria-label="Ver otro lado de la carta"
       >
         <SpriteIcon name="flip" size="tiny" />
       </button>
 
-      <!-- Public toggle button -->
+      <!-- Public toggle button (desktop: hover only) -->
       <button
           v-if="!readonly"
           @click.stop="togglePublic"
           :disabled="togglingPublic"
           :class="[
-            'absolute top-2 bg-primary/90 border px-2 py-1 transition-all flex items-center justify-center',
+            'absolute top-2 bg-primary/95 border px-2 py-1 transition-all flex items-center justify-center z-10',
+            'opacity-0 group-hover:opacity-100 md:block hidden',
             isSplitCard ? 'left-12' : 'left-2',
             card.public ? 'border-neon' : 'border-silver-50'
           ]"
@@ -212,17 +221,17 @@ const getStatusIconName = (status: string) => {
         <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
       </button>
 
-      <!-- Status Badge (Overlay) -->
-      <div class="absolute top-2 right-2 bg-primary/90 border border-silver-30 px-2 py-1">
+      <!-- Status Badge (desktop: hover only) -->
+      <div class="absolute top-2 right-2 bg-primary/95 border border-silver-30 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
         <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
           <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
           {{ card.status }}
         </p>
       </div>
 
-      <!-- Qty Badge (Bottom Left) - Shows quantity and availability -->
+      <!-- Qty Badge (desktop: hover only) -->
       <div
-          class="absolute bottom-2 left-2 bg-primary/95 border border-silver-50 px-2 py-1"
+          class="absolute bottom-10 left-2 bg-primary/95 border border-silver-50 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block"
           :title="isCardAllocated
             ? `${allocationInfo.available} disponibles de ${card.quantity} (${allocationInfo.allocated} en mazos)`
             : `${card.quantity} copias en colección`"
@@ -238,28 +247,97 @@ const getStatusIconName = (status: string) => {
         </template>
       </div>
 
-      <!-- Deck badges (Bottom Right) -->
+      <!-- Deck badges (desktop: hover only) -->
       <div
           v-if="isCardAllocated"
-          class="absolute bottom-2 right-2 flex flex-wrap gap-1 justify-end max-w-[60%]"
+          class="absolute bottom-10 right-2 flex flex-wrap gap-1 justify-end max-w-[60%] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
       >
         <div
-            v-for="alloc in allocationInfo.allocations.slice(0, 3)"
+            v-for="alloc in allocationInfo.allocations.slice(0, 2)"
             :key="alloc.deckId"
             class="bg-primary/95 border border-neon px-1.5 py-0.5"
             :title="`${alloc.quantity}x en ${alloc.deckName}${alloc.isInSideboard ? ' (SB)' : ''}`"
         >
-          <p class="text-[10px] font-bold text-neon truncate max-w-[60px]">
-            {{ alloc.quantity }}x {{ alloc.deckName.slice(0, 6) }}{{ alloc.deckName.length > 6 ? '..' : '' }}
+          <p class="text-[10px] font-bold text-neon truncate max-w-[50px]">
+            {{ alloc.quantity }}x {{ alloc.deckName.slice(0, 5) }}..
           </p>
         </div>
         <div
-            v-if="allocationInfo.allocations.length > 3"
+            v-if="allocationInfo.allocations.length > 2"
             class="bg-primary/95 border border-neon px-1.5 py-0.5"
-            :title="`Y ${allocationInfo.allocations.length - 3} mazos más`"
         >
-          <p class="text-[10px] font-bold text-neon">+{{ allocationInfo.allocations.length - 3 }}</p>
+          <p class="text-[10px] font-bold text-neon">+{{ allocationInfo.allocations.length - 2 }}</p>
         </div>
+      </div>
+
+      <!-- Delete button (desktop: hover only, bottom center) -->
+      <button
+          v-if="!readonly"
+          @click.stop="emit('delete', card)"
+          class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10"
+          title="Eliminar carta"
+      >
+        <SpriteIcon name="trash" size="tiny" class="text-rust" />
+        <span class="text-tiny font-bold text-rust">ELIMINAR</span>
+      </button>
+
+      <!-- ========== MOBILE: Gear menu ========== -->
+      <div v-if="!readonly" class="md:hidden absolute top-2 right-2 z-20">
+        <button
+            @click.stop="showMobileMenu = !showMobileMenu"
+            class="bg-primary/95 border border-silver-50 p-2 transition-all"
+            :class="{ 'border-neon': showMobileMenu }"
+        >
+          <SpriteIcon name="settings" size="tiny" />
+        </button>
+
+        <!-- Mobile dropdown menu -->
+        <div
+            v-if="showMobileMenu"
+            class="absolute top-full right-0 mt-1 bg-primary border border-silver-30 shadow-lg min-w-[140px]"
+            @click.stop
+        >
+          <!-- Status info -->
+          <div class="px-3 py-2 border-b border-silver-20">
+            <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
+              <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
+              {{ card.status }}
+            </p>
+            <p class="text-tiny text-silver-50 mt-1">
+              {{ isCardAllocated ? `${allocationInfo.available} disp / ${card.quantity}` : `x${card.quantity}` }}
+            </p>
+          </div>
+
+          <!-- Toggle visibility -->
+          <button
+              @click.stop="togglePublic(); showMobileMenu = false"
+              :disabled="togglingPublic"
+              class="w-full px-3 py-2 text-left text-tiny font-bold flex items-center gap-2 hover:bg-silver-10 transition-colors"
+              :class="card.public ? 'text-neon' : 'text-silver-50'"
+          >
+            <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
+            {{ card.public ? 'PÚBLICO' : 'PRIVADO' }}
+          </button>
+
+          <!-- Delete -->
+          <button
+              @click.stop="emit('delete', card); showMobileMenu = false"
+              class="w-full px-3 py-2 text-left text-tiny font-bold text-rust flex items-center gap-2 hover:bg-rust/10 transition-colors border-t border-silver-20"
+          >
+            <SpriteIcon name="trash" size="tiny" />
+            ELIMINAR
+          </button>
+        </div>
+      </div>
+
+      <!-- ========== MOBILE: Deck badges (always visible, compact) ========== -->
+      <div
+          v-if="isCardAllocated"
+          class="md:hidden absolute bottom-2 left-2 bg-primary/95 border border-neon px-1.5 py-0.5"
+      >
+        <p class="text-[10px] font-bold text-neon">
+          {{ allocationInfo.allocated }} en mazos
+        </p>
       </div>
     </div>
 
@@ -286,43 +364,21 @@ const getStatusIconName = (status: string) => {
       <div class="space-y-0.5 min-h-[48px]">
         <!-- TCGPlayer Price -->
         <p class="text-tiny font-bold text-neon">
-          ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
+          TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
         </p>
         <!-- Card Kingdom Price -->
         <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
           CK: {{ formatPrice(cardKingdomRetail) }}
         </p>
-        <p v-else class="text-tiny text-transparent">-</p>
+        <p v-else class="text-tiny text-silver-50">CK: -</p>
         <!-- CK Buylist -->
         <p v-if="cardKingdomBuylist" class="text-tiny text-[#FF9800]">
           BL: {{ formatPrice(cardKingdomBuylist) }}
         </p>
-        <p v-else class="text-tiny text-transparent">-</p>
+        <p v-else class="text-tiny text-silver-50">BL: -</p>
       </div>
     </div>
 
-    <!-- Action Buttons (only when not readonly) -->
-    <div v-if="!readonly" class="flex gap-1 mt-3">
-      <button
-          @click="emit('manageDecks', card)"
-          class="flex-1 px-2 py-1 bg-blue-10 border border-blue-400 text-blue-400 text-tiny font-bold hover:bg-blue-20 transition-150"
-          title="Asignar a mazos"
-      >
-        MAZOS
-      </button>
-      <button
-          @click="emit('edit', card)"
-          class="flex-1 px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150"
-      >
-        EDITAR
-      </button>
-      <button
-          @click="emit('delete', card)"
-          class="flex-1 px-2 py-1 bg-rust-10 border border-rust text-rust text-tiny font-bold hover:bg-rust-20 transition-150"
-      >
-        BORRAR
-      </button>
-    </div>
 
     <!-- Interest Button (only when readonly and showInterest) -->
     <div v-if="readonly && showInterest && (card.status === 'sale' || card.status === 'trade')" class="mt-3">
@@ -348,27 +404,6 @@ const getStatusIconName = (status: string) => {
 
 <style scoped>
 .border-neon-30 {
-  border-color: rgba(0, 255, 136, 0.3);
-}
-.bg-neon-10 {
-  background-color: rgba(0, 255, 136, 0.1);
-}
-.bg-neon-20 {
-  background-color: rgba(0, 255, 136, 0.2);
-}
-.bg-rust-10 {
-  background-color: rgba(183, 65, 14, 0.1);
-}
-.bg-rust-20 {
-  background-color: rgba(183, 65, 14, 0.2);
-}
-.bg-blue-10 {
-  background-color: rgba(96, 165, 250, 0.1);
-}
-.bg-blue-20 {
-  background-color: rgba(96, 165, 250, 0.2);
-}
-.bg-silver-10 {
-  background-color: rgba(238, 238, 238, 0.1);
+  border-color: rgba(90, 193, 104, 0.3);
 }
 </style>

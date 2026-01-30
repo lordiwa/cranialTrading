@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
+import { useConfirmStore } from '../stores/confirm'
 import AppContainer from '../components/layout/AppContainer.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import CardDetailModal from '../components/collection/CardDetailModal.vue'
@@ -31,6 +32,7 @@ const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
 const searchStore = useSearchStore()
 const toastStore = useToastStore()
+const confirmStore = useConfirmStore()
 const { getAllocationsForCard } = useCardAllocation()
 
 // ========== STATE ==========
@@ -50,6 +52,89 @@ const selectedScryfallCard = ref<any>(null)
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
 const deckFilter = ref<string>('all')
 const filterQuery = ref('')
+
+// Vista principal: Colección o Mazos
+type ViewMode = 'collection' | 'decks'
+const viewMode = ref<ViewMode>('collection')
+
+// Cambiar a modo mazos y seleccionar un deck
+const switchToDecks = (deckId?: string) => {
+  viewMode.value = 'decks'
+  if (deckId) {
+    deckFilter.value = deckId
+  } else if (decksList.value.length > 0 && deckFilter.value === 'all') {
+    // Auto-seleccionar primer deck si no hay ninguno seleccionado
+    deckFilter.value = decksList.value[0].id
+  }
+}
+
+// Cambiar a modo colección
+const switchToCollection = () => {
+  viewMode.value = 'collection'
+  deckFilter.value = 'all'
+}
+
+// ========== IMPORT PROGRESS STATE ==========
+interface ImportState {
+  deckId: string
+  deckName: string
+  status: 'fetching' | 'processing' | 'saving' | 'allocating' | 'complete' | 'error'
+  totalCards: number
+  currentCard: number
+  cards: any[]
+  cardMeta: Array<{ quantity: number; isInSideboard: boolean }>
+  createdCardIds: string[]
+  allocatedCount: number
+}
+
+const IMPORT_STORAGE_KEY = 'cranial_deck_import_progress'
+const importProgress = ref<ImportState | null>(null)
+
+// localStorage helpers
+const saveImportState = (state: ImportState) => {
+  try {
+    localStorage.setItem(IMPORT_STORAGE_KEY, JSON.stringify(state))
+    importProgress.value = state
+  } catch (e) {
+    console.warn('[Import] Failed to save state to localStorage:', e)
+  }
+}
+
+const loadImportState = (): ImportState | null => {
+  try {
+    const saved = localStorage.getItem(IMPORT_STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.warn('[Import] Failed to load state from localStorage:', e)
+  }
+  return null
+}
+
+const clearImportState = () => {
+  try {
+    localStorage.removeItem(IMPORT_STORAGE_KEY)
+    importProgress.value = null
+  } catch (e) {
+    console.warn('[Import] Failed to clear state from localStorage:', e)
+  }
+}
+
+// Check if a deck is currently importing
+const isDeckImporting = (deckId: string): boolean => {
+  return importProgress.value?.deckId === deckId &&
+         importProgress.value?.status !== 'complete' &&
+         importProgress.value?.status !== 'error'
+}
+
+// Get import progress percentage for a deck
+const getImportProgress = (deckId: string): number => {
+  if (!importProgress.value || importProgress.value.deckId !== deckId) return 100
+  if (importProgress.value.status === 'complete') return 100
+  if (importProgress.value.totalCards === 0) return 0
+  return Math.round((importProgress.value.currentCard / importProgress.value.totalCards) * 100)
+}
 
 // ========== COMPUTED ==========
 
@@ -210,68 +295,10 @@ const sideboardWishlistCount = computed(() => {
   return deckSideboardWishlist.value.reduce((sum, item) => sum + item.quantity, 0)
 })
 
-// Deck sorting
-type DeckSortOption = 'name' | 'manaValue' | 'type' | 'price'
-const deckSort = ref<DeckSortOption>('name')
+// Deck grouping
+type DeckGroupOption = 'type' | 'mana' | 'color'
+const deckGroupBy = ref<DeckGroupOption>('type')
 
-// Helper to check if card is a land
-const isLand = (card: any): boolean => {
-  const typeLine = card.type_line?.toLowerCase() || ''
-  return typeLine.includes('land')
-}
-
-// Helper to extract mana value from card (lands go to end)
-const getManaValue = (card: any): number => {
-  // Lands always at the end (high number)
-  if (isLand(card)) return 999
-  // If card has cmc stored, use it
-  if (card.cmc !== undefined) return card.cmc
-  // Default to 0 if unknown
-  return 0
-}
-
-// Helper to get card type for sorting
-const getCardType = (card: any): number => {
-  const typeLine = card.type_line?.toLowerCase() || ''
-  // Order: Creature, Planeswalker, Instant, Sorcery, Enchantment, Artifact, Land, Other
-  if (typeLine.includes('creature')) return 1
-  if (typeLine.includes('planeswalker')) return 2
-  if (typeLine.includes('instant')) return 3
-  if (typeLine.includes('sorcery')) return 4
-  if (typeLine.includes('enchantment')) return 5
-  if (typeLine.includes('artifact')) return 6
-  if (typeLine.includes('land')) return 7
-  return 8 // Unknown/Other
-}
-
-// Sorted deck cards
-const sortedMainboardCards = computed(() => {
-  const cards = [...deckMainboardCards.value]
-  switch (deckSort.value) {
-    case 'manaValue':
-      return cards.sort((a, b) => getManaValue(a) - getManaValue(b))
-    case 'type':
-      return cards.sort((a, b) => getCardType(a) - getCardType(b))
-    case 'price':
-      return cards.sort((a, b) => (b.price || 0) - (a.price || 0))
-    default:
-      return cards.sort((a, b) => a.name.localeCompare(b.name))
-  }
-})
-
-const sortedSideboardCards = computed(() => {
-  const cards = [...deckSideboardCards.value]
-  switch (deckSort.value) {
-    case 'manaValue':
-      return cards.sort((a, b) => getManaValue(a) - getManaValue(b))
-    case 'type':
-      return cards.sort((a, b) => getCardType(a) - getCardType(b))
-    case 'price':
-      return cards.sort((a, b) => (b.price || 0) - (a.price || 0))
-    default:
-      return cards.sort((a, b) => a.name.localeCompare(b.name))
-  }
-})
 
 // Convert owned cards to DisplayDeckCard format for DeckEditorGrid
 const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
@@ -298,6 +325,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
       image: card.image,
       cmc: card.cmc,
       type_line: card.type_line,
+      colors: card.colors,
       allocatedQuantity: deckAlloc?.quantity || 0,
       isInSideboard: false,
       notes: undefined,
@@ -319,6 +347,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
     image: item.image,
     cmc: item.cmc,
     type_line: item.type_line,
+    colors: (item as any).colors,
     requestedQuantity: item.quantity,
     isInSideboard: false,
     notes: item.notes,
@@ -347,6 +376,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
       image: card.image,
       cmc: card.cmc,
       type_line: card.type_line,
+      colors: card.colors,
       allocatedQuantity: deckAlloc?.quantity || 0,
       isInSideboard: true,
       notes: undefined,
@@ -368,6 +398,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
     image: item.image,
     cmc: item.cmc,
     type_line: item.type_line,
+    colors: (item as any).colors,
     requestedQuantity: item.quantity,
     isInSideboard: true,
     notes: item.notes,
@@ -413,18 +444,27 @@ const filteredCards = computed(() => {
   return cards
 })
 
-// Precio total del deck actual (owned + wishlist)
-const deckTotalCost = computed(() => {
+// Precio de cartas owned en el deck
+const deckOwnedCost = computed(() => {
   if (deckFilter.value === 'all') return 0
-  const ownedPrice = deckOwnedCards.value.reduce((sum, card) => {
+  return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
     return sum + (card.price || 0) * (deckAlloc?.quantity || 0)
   }, 0)
-  const wishlistPrice = deckWishlistCards.value.reduce((sum, item) =>
+})
+
+// Precio de cartas wishlist en el deck
+const deckWishlistCost = computed(() => {
+  if (deckFilter.value === 'all') return 0
+  return deckWishlistCards.value.reduce((sum, item) =>
     sum + (item.price || 0) * item.quantity, 0
   )
-  return ownedPrice + wishlistPrice
+})
+
+// Precio total del deck actual (owned + wishlist)
+const deckTotalCost = computed(() => {
+  return deckOwnedCost.value + deckWishlistCost.value
 })
 
 // ¿Todas las cartas del deck son públicas?
@@ -480,10 +520,18 @@ const handleDelete = async (card: Card) => {
   const hasAllocations = allocations.length > 0
 
   const message = hasAllocations
-    ? `¿Eliminar "${card.name}" de tu colección?\n\nEsta carta está asignada en ${allocations.length} mazo(s). Se moverá a wishlist en esos mazos.`
+    ? `Esta carta está asignada en ${allocations.length} mazo(s). Se moverá a wishlist en esos mazos.`
     : `¿Eliminar "${card.name}" de tu colección?`
 
-  if (!confirm(message)) return
+  const confirmed = await confirmStore.show({
+    title: `Eliminar "${card.name}"`,
+    message,
+    confirmText: 'ELIMINAR',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
 
   // Delete card optimistically (UI updates immediately, toast after DB)
   const deletePromise = collectionStore.deleteCard(card.id)
@@ -497,7 +545,7 @@ const handleDelete = async (card: Card) => {
   // Wait for delete to complete, then show toast
   const success = await deletePromise
   if (success) {
-    toastStore.show(`✓ "${card.name}" eliminada`, 'success')
+    toastStore.show(`"${card.name}" eliminada`, 'success')
   }
   // If failed, store already shows error toast and restores card
 }
@@ -527,7 +575,15 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
 
   const cardName = displayCard.name
-  if (!confirm(`¿Eliminar "${cardName}" del deck?`)) return
+  const confirmed = await confirmStore.show({
+    title: `Eliminar del deck`,
+    message: `¿Eliminar "${cardName}" del deck?`,
+    confirmText: 'ELIMINAR',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
 
   if (displayCard.isWishlist) {
     // Remove from wishlist
@@ -569,6 +625,12 @@ const handleDeckGridAddToWishlist = (_displayCard: DisplayDeckCard) => {
   toastStore.show('Esta carta ya está en tu wishlist del deck', 'info')
 }
 
+// Handle toggle commander from deck grid
+const handleDeckGridToggleCommander = async (displayCard: DisplayDeckCard) => {
+  if (!selectedDeck.value) return
+  await decksStore.toggleCommander(selectedDeck.value.id, displayCard.name)
+}
+
 // ========== DECK MANAGEMENT ==========
 
 // Crear deck
@@ -592,7 +654,16 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         const image = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
         const price = card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0
         if (price > 0 && image) {
-          return { scryfallId: card.id, image, price, edition: card.set_name, setCode: card.set.toUpperCase() }
+          return {
+            scryfallId: card.id,
+            image,
+            price,
+            edition: card.set_name,
+            setCode: card.set.toUpperCase(),
+            cmc: card.cmc,
+            type_line: card.type_line,
+            colors: card.colors || [],
+          }
         }
       }
     }
@@ -609,6 +680,9 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         price: printWithPrice.prices?.usd ? Number.parseFloat(printWithPrice.prices.usd) : 0,
         edition: printWithPrice.set_name,
         setCode: printWithPrice.set.toUpperCase(),
+        cmc: printWithPrice.cmc,
+        type_line: printWithPrice.type_line,
+        colors: printWithPrice.colors || [],
       }
     }
   } catch (e) {
@@ -665,6 +739,9 @@ const handleImport = async (
       status: 'collection',
       public: makePublic || false,
       isInSideboard: inSideboard,
+      cmc: scryfallData?.cmc,
+      type_line: scryfallData?.type_line,
+      colors: scryfallData?.colors || [],
     }
     if (scryfallData?.setCode || setCode) {
       cardData.setCode = scryfallData?.setCode || setCode
@@ -702,7 +779,7 @@ const handleImport = async (
   }
 }
 
-// Importar desde Moxfield (OPTIMIZADO con batch API)
+// Importar desde Moxfield (OPTIMIZADO con batch API y progress tracking)
 const handleImportDirect = async (
   cards: any[],
   deckName: string | undefined,
@@ -713,9 +790,6 @@ const handleImportDirect = async (
 ) => {
   const finalDeckName = deckName || `Deck${Date.now()}`
   showImportDeckModal.value = false
-
-  // Toast persistente mientras importa
-  let currentToastId = toastStore.show(`Importando "${finalDeckName}"... Obteniendo datos...`, 'info', true)
 
   try {
     // PASO 1: Crear el deck primero
@@ -728,14 +802,31 @@ const handleImportDirect = async (
     })
 
     if (!deckId) {
-      toastStore.remove(currentToastId)
       toastStore.show('Error al crear el deck', 'error')
       return
     }
 
+    // Inicializar estado de importación
+    const initialState: ImportState = {
+      deckId,
+      deckName: finalDeckName,
+      status: 'fetching',
+      totalCards: cards.length,
+      currentCard: 0,
+      cards: [],
+      cardMeta: [],
+      createdCardIds: [],
+      allocatedCount: 0,
+    }
+    saveImportState(initialState)
+
+    // Cambiar a modo mazos para ver el progreso
+    viewMode.value = 'decks'
+    deckFilter.value = deckId
+
     // PASO 2: Recolectar todos los scryfallIds para batch request
     const identifiers: Array<{ id: string }> = []
-    const cardIndexMap = new Map<string, number[]>() // scryfallId -> indices en cards[]
+    const cardIndexMap = new Map<string, number[]>()
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
@@ -748,10 +839,7 @@ const handleImportDirect = async (
       }
     }
 
-    // PASO 3: Obtener todos los datos de Scryfall en batch (75 por request)
-    toastStore.remove(currentToastId)
-    currentToastId = toastStore.show(`Importando "${finalDeckName}"... Obteniendo ${identifiers.length} cartas...`, 'info', true)
-
+    // PASO 3: Obtener todos los datos de Scryfall en batch
     const scryfallDataMap = new Map<string, any>()
     if (identifiers.length > 0) {
       const scryfallCards = await getCardsByIds(identifiers)
@@ -761,12 +849,11 @@ const handleImportDirect = async (
     }
 
     // PASO 4: Procesar cada carta con los datos obtenidos
-    toastStore.remove(currentToastId)
-    currentToastId = toastStore.show(`Importando "${finalDeckName}"... Procesando cartas...`, 'info', true)
+    saveImportState({ ...initialState, status: 'processing' })
 
     const collectionCardsToAdd: any[] = []
     const cardMeta: Array<{ quantity: number; isInSideboard: boolean }> = []
-    const cardsNeedingSearch: number[] = [] // Indices de cartas que necesitan búsqueda individual
+    const cardsNeedingSearch: number[] = []
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
@@ -780,8 +867,8 @@ const handleImportDirect = async (
       let finalEdition = card.setCode || 'Unknown'
       let cmc: number | undefined = undefined
       let type_line: string | undefined = undefined
+      let colors: string[] = []
 
-      // Usar datos del batch si existen
       if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
         const scryfallCard = scryfallDataMap.get(card.scryfallId)
         image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
@@ -789,9 +876,9 @@ const handleImportDirect = async (
         finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
         cmc = scryfallCard.cmc
         type_line = scryfallCard.type_line
+        colors = scryfallCard.colors || []
       }
 
-      // Si falta precio o imagen, marcar para búsqueda individual
       if (price === 0 || !image) {
         cardsNeedingSearch.push(i)
       }
@@ -809,18 +896,25 @@ const handleImportDirect = async (
         public: makePublic || false,
         cmc,
         type_line,
+        colors,
       })
       cardMeta.push({
         quantity: card.quantity,
         isInSideboard: card.isInSideboard || false
       })
+
+      // Update progress
+      saveImportState({
+        ...initialState,
+        status: 'processing',
+        currentCard: i + 1,
+        cards: collectionCardsToAdd,
+        cardMeta,
+      })
     }
 
-    // PASO 5: Búsqueda individual solo para cartas sin precio/imagen (fallback)
+    // PASO 5: Búsqueda individual para cartas sin precio/imagen
     if (cardsNeedingSearch.length > 0) {
-      toastStore.remove(currentToastId)
-      currentToastId = toastStore.show(`Importando "${finalDeckName}"... Completando ${cardsNeedingSearch.length} cartas...`, 'info', true)
-
       for (const idx of cardsNeedingSearch) {
         const cardData = collectionCardsToAdd[idx]
         try {
@@ -837,6 +931,7 @@ const handleImportDirect = async (
             cardData.image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
             cardData.cmc = printWithPrice.cmc
             cardData.type_line = printWithPrice.type_line
+            cardData.colors = printWithPrice.colors || []
           } else if (results.length > 0 && !cardData.image) {
             const anyPrint = results[0]
             cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
@@ -844,6 +939,7 @@ const handleImportDirect = async (
             if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
             cardData.cmc = anyPrint.cmc
             cardData.type_line = anyPrint.type_line
+            cardData.colors = anyPrint.colors || []
           }
         } catch (e) {
           console.warn(`[Import] Failed to search for "${cardData.name}":`, e)
@@ -852,38 +948,85 @@ const handleImportDirect = async (
     }
 
     // PASO 6: Importar cartas a la colección
-    toastStore.remove(currentToastId)
-    currentToastId = toastStore.show(`Importando "${finalDeckName}"... Guardando...`, 'info', true)
+    saveImportState({
+      deckId,
+      deckName: finalDeckName,
+      status: 'saving',
+      totalCards: cards.length,
+      currentCard: 0,
+      cards: collectionCardsToAdd,
+      cardMeta,
+      createdCardIds: [],
+      allocatedCount: 0,
+    })
 
     let allocatedCount = 0
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
 
-      console.log(`[Import] Cards to add: ${collectionCardsToAdd.length}, Created IDs: ${createdCardIds.length}, Meta: ${cardMeta.length}`)
+      // PASO 7: Asignar cartas al deck con progreso
+      saveImportState({
+        deckId,
+        deckName: finalDeckName,
+        status: 'allocating',
+        totalCards: createdCardIds.length,
+        currentCard: 0,
+        cards: collectionCardsToAdd,
+        cardMeta,
+        createdCardIds,
+        allocatedCount: 0,
+      })
 
-      // Asignar cada carta al deck (con sideboard flag)
       for (let i = 0; i < createdCardIds.length; i++) {
         const cardId = createdCardIds[i]
         const meta = cardMeta[i]
         if (cardId && meta) {
           const result = await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
-          console.log(`[Import] Allocated card ${i}: ${cardId}, qty: ${meta.quantity}, result:`, result)
           allocatedCount += result.allocated
-        } else {
-          console.warn(`[Import] Missing cardId or meta at index ${i}`)
+
+          // Update progress for each allocation
+          saveImportState({
+            deckId,
+            deckName: finalDeckName,
+            status: 'allocating',
+            totalCards: createdCardIds.length,
+            currentCard: i + 1,
+            cards: collectionCardsToAdd,
+            cardMeta,
+            createdCardIds,
+            allocatedCount,
+          })
         }
       }
     }
 
-    // Recargar para actualizar stats
+    // PASO 8: Completar importación
     await decksStore.loadDecks()
 
-    toastStore.remove(currentToastId)
+    // Marcar como completo en localStorage antes de limpiar
+    saveImportState({
+      deckId,
+      deckName: finalDeckName,
+      status: 'complete',
+      totalCards: cards.length,
+      currentCard: cards.length,
+      cards: [],
+      cardMeta: [],
+      createdCardIds: [],
+      allocatedCount,
+    })
+
+    // Limpiar después de un momento para que el UI muestre 100%
+    setTimeout(() => {
+      clearImportState()
+    }, 2000)
+
     toastStore.show(`Deck "${finalDeckName}" importado con ${allocatedCount} cartas`, 'success')
-    deckFilter.value = deckId
   } catch (error) {
     console.error('[Import] Error during import:', error)
-    toastStore.remove(currentToastId)
+    if (importProgress.value) {
+      saveImportState({ ...importProgress.value, status: 'error' })
+    }
     toastStore.show('Error al importar el deck', 'error')
   }
 }
@@ -900,10 +1043,27 @@ const handleDeleteDeck = async () => {
     : []
 
   // Primera confirmación: eliminar el deck
-  if (!confirm(`¿Eliminar el deck "${deckName}"?`)) return
+  const confirmDelete = await confirmStore.show({
+    title: `Eliminar deck`,
+    message: `¿Eliminar el deck "${deckName}"?`,
+    confirmText: 'ELIMINAR',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmDelete) return
 
   // Segunda confirmación: eliminar también las cartas de la colección
-  const deleteCards = cardIds.length > 0 && confirm('¿También deseas eliminar las cartas de tu colección?\n\nSÍ = Eliminar deck y cartas\nNO = Solo eliminar deck (cartas permanecen)')
+  let deleteCards = false
+  if (cardIds.length > 0) {
+    deleteCards = await confirmStore.show({
+      title: '¿Eliminar cartas también?',
+      message: 'SÍ = Eliminar deck y cartas de la colección\nNO = Solo eliminar deck (cartas permanecen)',
+      confirmText: 'SÍ, ELIMINAR CARTAS',
+      cancelText: 'NO, CONSERVAR',
+      confirmVariant: 'danger'
+    })
+  }
 
   try {
     // Primero eliminar el deck
@@ -950,6 +1110,111 @@ const handleToggleDeckPublic = async () => {
   }
 }
 
+// ========== RESUME IMPORT ==========
+
+const resumeImport = async (savedState: ImportState) => {
+  console.log('[Import] Resuming import:', savedState.deckName, 'status:', savedState.status)
+
+  // Restaurar el estado en memoria
+  importProgress.value = savedState
+
+  // Si ya estaba completo, solo limpiar
+  if (savedState.status === 'complete') {
+    setTimeout(() => clearImportState(), 2000)
+    return
+  }
+
+  // Si hubo error, preguntar si quiere reintentar
+  if (savedState.status === 'error') {
+    toastStore.show(`Import de "${savedState.deckName}" falló. Limpiando...`, 'error')
+    clearImportState()
+    return
+  }
+
+  // Cambiar a modo mazos y seleccionar el deck
+  viewMode.value = 'decks'
+  deckFilter.value = savedState.deckId
+
+  try {
+    // Si estaba en 'allocating', continuar desde donde quedó
+    if (savedState.status === 'allocating' && savedState.createdCardIds.length > 0) {
+      toastStore.show(`Resumiendo importación de "${savedState.deckName}"...`, 'info')
+
+      let allocatedCount = savedState.allocatedCount
+      const startIndex = savedState.currentCard
+
+      for (let i = startIndex; i < savedState.createdCardIds.length; i++) {
+        const cardId = savedState.createdCardIds[i]
+        const meta = savedState.cardMeta[i]
+        if (cardId && meta) {
+          const result = await decksStore.allocateCardToDeck(savedState.deckId, cardId, meta.quantity, meta.isInSideboard)
+          allocatedCount += result.allocated
+
+          saveImportState({
+            ...savedState,
+            currentCard: i + 1,
+            allocatedCount,
+          })
+        }
+      }
+
+      // Completar
+      await decksStore.loadDecks()
+      saveImportState({ ...savedState, status: 'complete', currentCard: savedState.totalCards, allocatedCount })
+      setTimeout(() => clearImportState(), 2000)
+      toastStore.show(`Deck "${savedState.deckName}" completado con ${allocatedCount} cartas`, 'success')
+
+    } else if (savedState.status === 'saving' && savedState.cards.length > 0) {
+      // Si estaba guardando cartas, reiniciar desde guardado
+      toastStore.show(`Resumiendo importación de "${savedState.deckName}"...`, 'info')
+
+      const createdCardIds = await collectionStore.confirmImport(savedState.cards, true)
+
+      saveImportState({
+        ...savedState,
+        status: 'allocating',
+        totalCards: createdCardIds.length,
+        currentCard: 0,
+        createdCardIds,
+      })
+
+      // Continuar con allocations
+      let allocatedCount = 0
+      for (let i = 0; i < createdCardIds.length; i++) {
+        const cardId = createdCardIds[i]
+        const meta = savedState.cardMeta[i]
+        if (cardId && meta) {
+          const result = await decksStore.allocateCardToDeck(savedState.deckId, cardId, meta.quantity, meta.isInSideboard)
+          allocatedCount += result.allocated
+
+          saveImportState({
+            ...savedState,
+            status: 'allocating',
+            totalCards: createdCardIds.length,
+            currentCard: i + 1,
+            createdCardIds,
+            allocatedCount,
+          })
+        }
+      }
+
+      await decksStore.loadDecks()
+      saveImportState({ ...savedState, status: 'complete', currentCard: savedState.totalCards, allocatedCount })
+      setTimeout(() => clearImportState(), 2000)
+      toastStore.show(`Deck "${savedState.deckName}" completado con ${allocatedCount} cartas`, 'success')
+
+    } else {
+      // Para otros estados (fetching, processing), limpiar y avisar
+      toastStore.show(`Import de "${savedState.deckName}" incompleto. El deck puede estar vacío.`, 'warning')
+      clearImportState()
+    }
+  } catch (error) {
+    console.error('[Import] Error resuming import:', error)
+    saveImportState({ ...savedState, status: 'error' })
+    toastStore.show('Error al resumir importación', 'error')
+  }
+}
+
 // ========== LIFECYCLE ==========
 
 onMounted(async () => {
@@ -964,6 +1229,16 @@ onMounted(async () => {
     if (deckParam && decksStore.decks.some(d => d.id === deckParam)) {
       deckFilter.value = deckParam
     }
+
+    // Check for incomplete imports
+    const savedImport = loadImportState()
+    if (savedImport && savedImport.status !== 'complete') {
+      // Resume the import
+      resumeImport(savedImport)
+    } else if (savedImport?.status === 'complete') {
+      // Clean up completed import
+      clearImportState()
+    }
   } catch (err) {
     toastStore.show('Error cargando datos', 'error')
   }
@@ -976,6 +1251,23 @@ watch(() => route.query.deck, (newDeckId) => {
       deckFilter.value = newDeckId
     }
   }
+})
+
+// Warn before leaving if import is in progress
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (importProgress.value && importProgress.value.status !== 'complete' && importProgress.value.status !== 'error') {
+    e.preventDefault()
+    e.returnValue = 'Hay una importación en progreso. El progreso se guardará y podrás continuar al volver.'
+    return e.returnValue
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 
@@ -1031,43 +1323,90 @@ watch(() => route.query.deck, (newDeckId) => {
 
       <!-- Vista de colección (cuando NO hay resultados de búsqueda) -->
       <div v-else>
-        <!-- Totals Panel (solo cuando no hay deck seleccionado) -->
-        <CollectionTotalsPanel v-if="deckFilter === 'all'" />
-
-        <!-- ========== DECK TABS ========== -->
+        <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
-          <p class="text-tiny text-silver-50 mb-2">MAZOS</p>
-          <div class="flex gap-2 overflow-x-auto pb-2">
+          <div class="flex gap-1 mb-4">
             <button
-                @click="deckFilter = 'all'"
+                @click="switchToCollection"
                 :class="[
-                  'px-4 py-2 text-small font-bold whitespace-nowrap transition-150',
-                  deckFilter === 'all'
-                    ? 'bg-neon text-primary border-2 border-neon'
-                    : 'bg-primary border-2 border-silver-30 text-silver-70 hover:border-silver-50'
+                  'px-6 py-3 text-body font-bold transition-150 border-2',
+                  viewMode === 'collection'
+                    ? 'bg-neon text-primary border-neon'
+                    : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
                 ]"
             >
-              TODOS
+              MI COLECCIÓN
             </button>
+            <button
+                @click="switchToDecks()"
+                :class="[
+                  'px-6 py-3 text-body font-bold transition-150 border-2',
+                  viewMode === 'decks'
+                    ? 'bg-neon text-primary border-neon'
+                    : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
+                ]"
+            >
+              MAZOS
+              <span class="ml-1 opacity-70">{{ decksList.length }}</span>
+            </button>
+          </div>
+
+          <!-- ========== DECK SUB-TABS (solo en modo mazos) ========== -->
+          <div v-if="viewMode === 'decks'" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon">
             <button
                 v-for="deck in decksList"
                 :key="deck.id"
                 @click="deckFilter = deck.id"
+                class="relative overflow-hidden px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2"
                 :class="[
-                  'px-4 py-2 text-small font-bold whitespace-nowrap transition-150',
                   deckFilter === deck.id
-                    ? 'bg-neon text-primary border-2 border-neon'
-                    : 'bg-primary border-2 border-silver-30 text-silver-70 hover:border-silver-50'
+                    ? isDeckImporting(deck.id)
+                      ? 'bg-primary border-neon text-silver'
+                      : 'bg-neon text-primary border-neon'
+                    : isDeckImporting(deck.id)
+                      ? 'bg-primary border-neon text-silver'
+                      : 'bg-primary border-silver-30 text-silver-70 hover:border-neon/70'
                 ]"
             >
-              {{ deck.name }}
-              <span class="ml-1 opacity-70">{{ deck.stats?.ownedCards || 0 }}</span>
+              <!-- Progress bar background -->
+              <div
+                  v-if="isDeckImporting(deck.id)"
+                  class="absolute inset-0 bg-neon/30 transition-all duration-300"
+                  :style="{ width: getImportProgress(deck.id) + '%' }"
+              ></div>
+              <!-- Content -->
+              <span class="relative z-10">
+                {{ deck.name }}
+                <span v-if="isDeckImporting(deck.id)" class="ml-1 text-neon font-bold">
+                  {{ importProgress?.currentCard || 0 }}/{{ importProgress?.totalCards || 0 }}
+                </span>
+                <span v-else class="ml-1 opacity-70">{{ deck.stats?.ownedCards || 0 }}</span>
+              </span>
             </button>
+            <!-- Botón nuevo deck -->
+            <button
+                @click="showCreateDeckModal = true"
+                class="px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2 border-dashed border-silver-30 text-silver-50 hover:border-neon hover:text-neon"
+            >
+              + NUEVO
+            </button>
+          </div>
+
+          <!-- Mensaje si no hay mazos -->
+          <div v-if="viewMode === 'decks' && decksList.length === 0" class="pl-4 border-l-4 border-neon py-4">
+            <p class="text-silver-50 text-small">No tienes mazos creados.</p>
+            <div class="flex gap-2 mt-3">
+              <BaseButton size="small" @click="showCreateDeckModal = true">+ CREAR MAZO</BaseButton>
+              <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">IMPORTAR</BaseButton>
+            </div>
           </div>
         </div>
 
-        <!-- ========== DECK STATS (cuando hay deck seleccionado) ========== -->
-        <div v-if="selectedDeck" class="bg-secondary border border-silver-30 p-4 mb-6">
+        <!-- Totals Panel (solo en modo colección) -->
+        <CollectionTotalsPanel v-if="viewMode === 'collection'" />
+
+        <!-- ========== DECK STATS (cuando hay deck seleccionado en modo mazos) ========== -->
+        <div v-if="viewMode === 'decks' && selectedDeck" class="bg-neon/10 border-2 border-neon p-4 mb-6">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h2 class="text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
@@ -1089,7 +1428,7 @@ watch(() => route.query.deck, (newDeckId) => {
               </BaseButton>
             </div>
           </div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <p class="text-tiny text-silver-50">Tengo</p>
               <p class="text-h3 font-bold text-neon">{{ deckOwnedCount }}</p>
@@ -1100,14 +1439,26 @@ watch(() => route.query.deck, (newDeckId) => {
             </div>
             <div>
               <p class="text-tiny text-silver-50">Total</p>
-              <p class="text-h3 font-bold text-silver">{{ deckOwnedCount + deckWishlistCount }}</p>
+              <p class="text-h3 font-bold text-silver">
+                <span class="text-neon">{{ deckOwnedCount }}</span>
+                <span class="text-silver-50">/</span>
+                <span>{{ deckOwnedCount + deckWishlistCount }}</span>
+              </p>
             </div>
             <div>
-              <p class="text-tiny text-silver-50">Valor</p>
-              <p class="text-h3 font-bold text-neon">${{ deckTotalCost.toFixed(2) }}</p>
+              <p class="text-tiny text-silver-50">Valor Tengo</p>
+              <p class="text-body font-bold text-neon">TCG: ${{ deckOwnedCost.toFixed(2) }}</p>
+            </div>
+            <div>
+              <p class="text-tiny text-silver-50">Valor Necesito</p>
+              <p class="text-body font-bold text-yellow-400">TCG: ${{ deckWishlistCost.toFixed(2) }}</p>
+            </div>
+            <div>
+              <p class="text-tiny text-silver-50">Valor Total</p>
+              <p class="text-body font-bold text-silver">TCG: ${{ deckTotalCost.toFixed(2) }}</p>
             </div>
           </div>
-          <div v-if="selectedDeckStats" class="mt-4 pt-4 border-t border-silver-20">
+          <div v-if="selectedDeckStats" class="mt-4 pt-4 border-t border-neon/30">
             <div class="flex items-center gap-2">
               <span class="text-tiny text-silver-50">Completado:</span>
               <div class="flex-1 h-2 bg-primary rounded overflow-hidden">
@@ -1120,24 +1471,23 @@ watch(() => route.query.deck, (newDeckId) => {
             </div>
           </div>
 
-          <!-- Sorting controls -->
-          <div class="mt-4 pt-4 border-t border-silver-20">
+          <!-- Grouping controls -->
+          <div class="mt-4 pt-4 border-t border-neon/30">
             <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">Ordenar por:</span>
+              <span class="text-tiny text-silver-50">Agrupar por:</span>
               <button
                   v-for="opt in [
-                    { value: 'name', label: 'Nombre' },
-                    { value: 'manaValue', label: 'Mana' },
                     { value: 'type', label: 'Tipo' },
-                    { value: 'price', label: 'Precio' }
+                    { value: 'mana', label: 'Mana' },
+                    { value: 'color', label: 'Color' }
                   ]"
                   :key="opt.value"
-                  @click="deckSort = opt.value as any"
+                  @click="deckGroupBy = opt.value as DeckGroupOption"
                   :class="[
                     'px-2 py-1 text-tiny font-bold transition-150',
-                    deckSort === opt.value
+                    deckGroupBy === opt.value
                       ? 'bg-neon text-primary'
-                      : 'bg-secondary border border-silver-30 text-silver-50 hover:border-neon'
+                      : 'bg-primary border border-silver-30 text-silver-50 hover:border-neon'
                   ]"
               >
                 {{ opt.label }}
@@ -1146,8 +1496,8 @@ watch(() => route.query.deck, (newDeckId) => {
           </div>
         </div>
 
-        <!-- ========== STATUS FILTERS ========== -->
-        <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+        <!-- ========== STATUS FILTERS (solo en modo colección) ========== -->
+        <div v-if="viewMode === 'collection'" class="flex gap-2 mb-4 overflow-x-auto pb-2">
           <button
               v-for="(count, status) in {
                 'all': collectionCards.length,
@@ -1178,8 +1528,8 @@ watch(() => route.query.deck, (newDeckId) => {
           />
         </div>
 
-        <!-- ========== CARDS GRID: SIN DECK SELECCIONADO ========== -->
-        <div v-if="!selectedDeck && filteredCards.length > 0 && statusFilter !== 'wishlist'">
+        <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
+        <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-small font-bold text-silver">CARTAS QUE TENGO</h3>
             <span class="text-tiny text-silver-50">({{ filteredCards.length }})</span>
@@ -1187,15 +1537,13 @@ watch(() => route.query.deck, (newDeckId) => {
           <CollectionGrid
               :cards="filteredCards"
               @card-click="handleCardClick"
-              @edit="handleEdit"
               @delete="handleDelete"
-              @manage-decks="handleManageDecks"
           />
         </div>
 
         <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->
-        <div v-if="selectedDeck && mainboardDisplayCards.length > 0 && statusFilter !== 'wishlist'" class="mb-6">
-          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-neon/30">
+        <div v-if="viewMode === 'decks' && selectedDeck && mainboardDisplayCards.length > 0" class="mb-6">
+          <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-neon">
             <h3 class="text-small font-bold text-neon">MAZO PRINCIPAL</h3>
             <span class="text-tiny text-silver-50">({{ mainboardOwnedCount + mainboardWishlistCount }} cartas)</span>
           </div>
@@ -1203,20 +1551,22 @@ watch(() => route.query.deck, (newDeckId) => {
               :cards="mainboardDisplayCards"
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
+              :group-by="deckGroupBy"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
               @add-to-wishlist="handleDeckGridAddToWishlist"
+              @toggle-commander="handleDeckGridToggleCommander"
           />
         </div>
 
         <!-- ========== SEPARADOR SIDEBOARD ========== -->
-        <div v-if="selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="my-8">
+        <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="my-8">
           <div class="border-t-2 border-dashed border-blue-400/50"></div>
         </div>
 
         <!-- ========== DECK VIEW: SIDEBOARD (Visual Grid) - solo no-commander ========== -->
-        <div v-if="selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0 && statusFilter !== 'wishlist'" class="mb-6">
+        <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b border-blue-400/30">
             <h3 class="text-small font-bold text-blue-400">SIDEBOARD</h3>
             <span class="text-tiny text-silver-50">({{ sideboardOwnedCount + sideboardWishlistCount }} cartas)</span>
@@ -1224,15 +1574,18 @@ watch(() => route.query.deck, (newDeckId) => {
           <DeckEditorGrid
               :cards="sideboardDisplayCards"
               :deck-id="selectedDeck.id"
+              :commander-names="commanderNames"
+              :group-by="deckGroupBy"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
               @add-to-wishlist="handleDeckGridAddToWishlist"
+              @toggle-commander="handleDeckGridToggleCommander"
           />
         </div>
 
-        <!-- ========== WISHLIST GENERAL (cuando no hay deck seleccionado) ========== -->
-        <div v-if="!selectedDeck && wishlistCards.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mt-8">
+        <!-- ========== WISHLIST GENERAL (solo en modo colección) ========== -->
+        <div v-if="viewMode === 'collection' && wishlistCards.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mt-8">
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-small font-bold text-yellow-400">MI WISHLIST</h3>
             <span class="text-tiny text-silver-50">({{ wishlistCount }})</span>
@@ -1240,14 +1593,12 @@ watch(() => route.query.deck, (newDeckId) => {
           <CollectionGrid
               :cards="wishlistCards"
               @card-click="handleCardClick"
-              @edit="handleEdit"
               @delete="handleDelete"
-              @manage-decks="handleManageDecks"
           />
         </div>
 
         <!-- Empty State: Deck sin cartas -->
-        <div v-if="selectedDeck && mainboardDisplayCards.length === 0 && sideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
+        <div v-if="viewMode === 'decks' && selectedDeck && mainboardDisplayCards.length === 0 && sideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">Deck vacío</p>
             <p class="text-tiny text-silver-70 mt-1">Este deck no tiene cartas asignadas</p>
@@ -1255,7 +1606,7 @@ watch(() => route.query.deck, (newDeckId) => {
         </div>
 
         <!-- Empty State: Colección sin cartas -->
-        <div v-if="!selectedDeck && filteredCards.length === 0 && wishlistCards.length === 0" class="flex justify-center items-center h-64">
+        <div v-if="viewMode === 'collection' && filteredCards.length === 0 && wishlistCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">Sin cartas</p>
             <p class="text-tiny text-silver-70 mt-1">Busca cartas arriba para agregarlas</p>

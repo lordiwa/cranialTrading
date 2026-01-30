@@ -208,6 +208,7 @@ const handleAddCard = async () => {
       public: form.public,
       cmc: selectedPrint.value.cmc,
       type_line: selectedPrint.value.type_line,
+      colors: selectedPrint.value.colors || [],
     })
 
     // Si se seleccionó un deck, asignar la carta al deck
@@ -309,21 +310,21 @@ const handleClose = () => {
               <div class="mt-3 space-y-1">
                 <!-- TCGPlayer Price -->
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">TCGPlayer:</span>
+                  <span class="text-[#EEEEEE]/70">TCG:</span>
                   <span class="text-[#CCFF00] font-bold">${{ selectedPrint?.prices?.usd || 'N/A' }}</span>
                 </div>
 
                 <!-- Card Kingdom Prices -->
-                <div v-if="hasCardKingdomPrices" class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">Card Kingdom:</span>
-                  <span class="text-[#4CAF50] font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">CK:</span>
+                  <span v-if="hasCardKingdomPrices" class="text-[#4CAF50] font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                  <span v-else-if="loadingCKPrices" class="text-[#EEEEEE]/50">...</span>
+                  <span v-else class="text-[#EEEEEE]/50">-</span>
                 </div>
-                <div v-if="cardKingdomBuylist" class="flex justify-between items-center text-xs">
-                  <span class="text-[#EEEEEE]/50">CK Buylist:</span>
-                  <span class="text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
-                </div>
-                <div v-else-if="loadingCKPrices" class="text-xs text-[#EEEEEE]/50">
-                  Cargando precios CK...
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">BL:</span>
+                  <span v-if="cardKingdomBuylist" class="text-[#FF9800] font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
+                  <span v-else class="text-[#EEEEEE]/50">-</span>
                 </div>
               </div>
 

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { searchCards, getCardSuggestions } from '../../services/scryfall'
+import { useToastStore } from '../../stores/toast'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
+
+const toastStore = useToastStore()
 
 const emit = defineEmits<{
   'add-card': [card: any]
@@ -58,11 +61,11 @@ const handleSearch = async () => {
       showSelectCardModal.value = true
       availableCards.value = results
     } else {
-      alert('No se encontraron cartas con ese nombre')
+      toastStore.show('No se encontraron cartas con ese nombre', 'info')
     }
   } catch (err) {
     console.error('Error al buscar:', err)
-    alert('Error al buscar cartas')
+    toastStore.show('Error al buscar cartas', 'error')
   } finally {
     loading.value = false
   }

@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/auth';
 import { preloadPriceData } from './services/mtgjson';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
+import ConfirmModal from './components/ui/ConfirmModal.vue';
 
 const authStore = useAuthStore();
 
@@ -24,4 +25,5 @@ onMounted(() => {
   <RouterView v-else />
 
   <BaseToast />
+  <ConfirmModal />
 </template>

@@ -19,6 +19,7 @@ export interface Card {
     deckName?: string | null;   // Legacy field for deck association
     cmc?: number;               // Converted mana cost (mana value)
     type_line?: string;         // Card type (e.g., "Creature — Human Wizard")
+    colors?: string[];          // Card colors (W, U, B, R, G)
     createdAt?: Date;
     updatedAt: Date;
 }

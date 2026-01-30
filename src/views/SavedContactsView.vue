@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useContactsStore } from '../stores/contacts'
+import { useConfirmStore } from '../stores/confirm'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -8,6 +9,7 @@ import SavedContactCard from '../components/contacts/SavedContactCard.vue'
 import ChatModal from '../components/chat/ChatModal.vue'
 
 const contactsStore = useContactsStore()
+const confirmStore = useConfirmStore()
 
 const showChat = ref(false)
 const selectedContact = ref<any>(null)
@@ -21,7 +23,14 @@ onUnmounted(() => {
 })
 
 const handleDelete = async (contactId: string) => {
-  const confirmed = confirm('¿Eliminar este contacto?')
+  const confirmed = await confirmStore.show({
+    title: 'Eliminar contacto',
+    message: '¿Eliminar este contacto?',
+    confirmText: 'ELIMINAR',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
   if (confirmed) {
     await contactsStore.deleteContact(contactId)
   }

@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
+import { useConfirmStore } from '../stores/confirm'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
@@ -19,6 +20,7 @@ const route = useRoute()
 const decksStore = useDecksStore()
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
+const confirmStore = useConfirmStore()
 
 const loading = ref(false)
 const showAddCardModal = ref(false)
@@ -81,6 +83,9 @@ const handleAddCard = async (cardData: {
   price: number
   image: string
   addToCollection: boolean
+  cmc?: number
+  type_line?: string
+  colors?: string[]
 }) => {
   const isInSideboard = activeTab.value === 'sideboard'
 
@@ -109,6 +114,9 @@ const handleAddCard = async (cardData: {
       price: cardData.price,
       image: cardData.image,
       status: 'collection',
+      cmc: cardData.cmc,
+      type_line: cardData.type_line,
+      colors: cardData.colors || [],
     })
 
     if (newCardId) {
@@ -133,6 +141,9 @@ const handleAddCard = async (cardData: {
       image: cardData.image,
       condition: cardData.condition as any,
       foil: cardData.foil,
+      cmc: cardData.cmc,
+      type_line: cardData.type_line,
+      colors: cardData.colors,
     })
     showAddCardModal.value = false
     toastStore.show(`Carta agregada a wishlist del ${activeTab.value}`, 'info')
@@ -144,7 +155,16 @@ const handleAddCard = async (cardData: {
  */
 const handleRemoveCard = async (card: DisplayDeckCard) => {
   const cardName = card.name
-  if (!confirm(`¿Eliminar "${cardName}" del deck?`)) return
+
+  const confirmed = await confirmStore.show({
+    title: 'Eliminar del deck',
+    message: `¿Eliminar "${cardName}" del deck?`,
+    confirmText: 'ELIMINAR',
+    cancelText: 'CANCELAR',
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
 
   if (card.isWishlist) {
     // Remove from wishlist

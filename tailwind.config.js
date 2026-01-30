@@ -22,13 +22,13 @@ export default {
                     10: 'rgba(255, 255, 255, 0.15)',
                     5: 'rgba(255, 255, 255, 0.08)',
                 },
-                // Neon Lime - primary accent color
+                // Green accent color
                 neon: {
-                    DEFAULT: '#CCFF00',
-                    40: 'rgba(204, 255, 0, 0.4)',
-                    15: 'rgba(204, 255, 0, 0.15)',
-                    10: 'rgba(204, 255, 0, 0.1)',
-                    5: 'rgba(204, 255, 0, 0.05)',
+                    DEFAULT: '#5AC168',
+                    40: 'rgba(90, 193, 104, 0.4)',
+                    15: 'rgba(90, 193, 104, 0.15)',
+                    10: 'rgba(90, 193, 104, 0.1)',
+                    5: 'rgba(90, 193, 104, 0.05)',
                 },
                 // Rust - errors, negatives, rejection
                 rust: {

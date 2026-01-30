@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Contact } from '../../types/contact'
+import { useToastStore } from '../../stores/toast'
 import BaseButton from '../ui/BaseButton.vue'
 
 const props = defineProps<{
@@ -11,12 +12,14 @@ const emit = defineEmits<{
   chat: [contact: Contact]
 }>()
 
+const toastStore = useToastStore()
+
 const copyEmail = async () => {
   try {
     await navigator.clipboard.writeText(props.contact.email)
-    alert('✓ Email copiado: ' + props.contact.email)
+    toastStore.show('Email copiado: ' + props.contact.email, 'success')
   } catch (err) {
-    alert('Error al copiar email')
+    toastStore.show('Error al copiar email', 'error')
   }
 }
 </script>

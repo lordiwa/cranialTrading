@@ -33,6 +33,7 @@ import { cleanCardName } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
 import SpriteIcon from '../components/ui/SpriteIcon.vue'
+import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import type { DeckFormat } from '../types/deck'
 
 const route = useRoute()
@@ -1659,17 +1660,20 @@ onUnmounted(() => {
               <h2 class="text-body md:text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
               <p class="text-tiny text-silver-50">{{ selectedDeck.format?.toUpperCase() }}</p>
             </div>
-            <div class="flex gap-2">
-              <BaseButton
-                  size="small"
-                  variant="secondary"
-                  @click="handleToggleDeckPublic"
-                  :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
-                  class="flex items-center gap-1 md:gap-2"
-              >
-                <SpriteIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
-                <span class="hidden sm:inline">{{ isDeckPublic ? t('collection.visibility.public') : t('collection.visibility.private') }}</span>
-              </BaseButton>
+            <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1">
+                <BaseButton
+                    size="small"
+                    variant="secondary"
+                    @click="handleToggleDeckPublic"
+                    :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
+                    class="flex items-center gap-1 md:gap-2"
+                >
+                  <SpriteIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
+                  <span class="hidden sm:inline">{{ isDeckPublic ? t('collection.visibility.public') : t('collection.visibility.private') }}</span>
+                </BaseButton>
+                <HelpTooltip :text="isDeckPublic ? t('help.tooltips.collection.deckPublic') : t('help.tooltips.collection.deckPrivate')" :title="t('help.titles.deckVisibility')" />
+              </div>
               <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
                 <span class="hidden sm:inline">ELIMINAR</span>
                 <span class="sm:hidden">🗑️</span>
@@ -1745,8 +1749,8 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== STATUS FILTERS (solo en modo colección) ========== -->
-        <div v-if="viewMode === 'collection'" class="flex gap-2 mb-4 overflow-x-auto pb-2">
-          <button
+        <div v-if="viewMode === 'collection'" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
+          <div
               v-for="(count, status) in {
                 'all': collectionCards.length,
                 'collection': collectionCount,
@@ -1754,17 +1758,36 @@ onUnmounted(() => {
                 'wishlist': wishlistCount
               }"
               :key="status"
-              @click="statusFilter = status as any"
-              :class="[
-                'px-3 py-1 text-tiny font-bold whitespace-nowrap transition-150',
-                statusFilter === status
-                  ? status === 'wishlist' ? 'border border-yellow-400 text-yellow-400' : 'border border-neon text-neon'
-                  : 'border border-silver-30 text-silver-50 hover:border-silver-50'
-              ]"
+              class="flex items-center gap-1"
           >
-            {{ getStatusLabel(status) }}
-            <span class="ml-1" :class="status === 'wishlist' ? 'text-yellow-400' : 'text-neon'">{{ count }}</span>
-          </button>
+            <button
+                @click="statusFilter = status as any"
+                :class="[
+                  'px-3 py-1 text-tiny font-bold whitespace-nowrap transition-150 rounded',
+                  statusFilter === status
+                    ? status === 'wishlist' ? 'border border-yellow-400 text-yellow-400' : 'border border-neon text-neon'
+                    : 'border border-silver-30 text-silver-50 hover:border-silver-50'
+                ]"
+            >
+              {{ getStatusLabel(status) }}
+              <span class="ml-1" :class="status === 'wishlist' ? 'text-yellow-400' : 'text-neon'">{{ count }}</span>
+            </button>
+            <HelpTooltip
+                v-if="status === 'collection'"
+                :text="t('help.tooltips.collection.statusCollection')"
+                :title="t('help.titles.statusCollection')"
+            />
+            <HelpTooltip
+                v-else-if="status === 'available'"
+                :text="t('help.tooltips.collection.statusSale') + ' ' + t('help.tooltips.collection.statusTrade')"
+                :title="t('help.titles.statusAvailable')"
+            />
+            <HelpTooltip
+                v-else-if="status === 'wishlist'"
+                :text="t('help.tooltips.collection.statusWishlist')"
+                :title="t('help.titles.statusWishlist')"
+            />
+          </div>
         </div>
 
         <!-- ========== SEARCH ========== -->

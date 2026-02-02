@@ -90,7 +90,12 @@ const router = createRouter({
             name: 'userProfile',
             component: () => import('../views/UserProfileView.vue'),
         },
-        // Legal pages (public)
+        // Help & Legal pages (public)
+        {
+            path: '/faq',
+            name: 'faq',
+            component: () => import('../views/FaqView.vue'),
+        },
         {
             path: '/terms',
             name: 'terms',

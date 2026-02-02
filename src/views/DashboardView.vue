@@ -4,46 +4,61 @@
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">{{ t('dashboard.title') }}</h1>
+          <div class="flex items-center gap-2 mb-2">
+            <h1 class="text-h2 md:text-h1 font-bold text-silver">{{ t('dashboard.title') }}</h1>
+            <HelpTooltip :text="t('help.tooltips.dashboard.matchesFound')" :title="t('help.titles.matchesFound')" />
+          </div>
           <p class="text-small md:text-body text-silver-70">
             {{ calculatedMatches.length }} {{ t('dashboard.matchesFound') }}
           </p>
         </div>
 
         <div class="flex flex-col md:flex-row gap-2">
-          <BaseButton
-              variant="secondary"
-              size="small"
-              @click="recalculateMatches"
-              :disabled="loading || (collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0)"
-              class="w-full md:w-auto"
-          >
-            {{ loading ? t('dashboard.calculating') : t('dashboard.recalculate') }}
-          </BaseButton>
-          <BaseButton
-              variant="secondary"
-              size="small"
-              @click="syncPublicData"
-              :disabled="syncing"
-              class="w-full md:w-auto"
-          >
-            {{ syncing ? t('dashboard.syncing') : t('dashboard.sync') }}
-          </BaseButton>
+          <div class="flex items-center gap-1">
+            <BaseButton
+                variant="secondary"
+                size="small"
+                @click="recalculateMatches"
+                :disabled="loading || (collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0)"
+                class="w-full md:w-auto"
+            >
+              {{ loading ? t('dashboard.calculating') : t('dashboard.recalculate') }}
+            </BaseButton>
+            <HelpTooltip :text="t('help.tooltips.dashboard.recalculate')" :title="t('help.titles.recalculate')" />
+          </div>
+          <div class="flex items-center gap-1">
+            <BaseButton
+                variant="secondary"
+                size="small"
+                @click="syncPublicData"
+                :disabled="syncing"
+                class="w-full md:w-auto"
+            >
+              {{ syncing ? t('dashboard.syncing') : t('dashboard.sync') }}
+            </BaseButton>
+            <HelpTooltip :text="t('help.tooltips.dashboard.sync')" :title="t('help.titles.sync')" />
+          </div>
           <!-- TEMPORAL: Botón para borrar datos -->
-          <BaseButton
-              variant="secondary"
-              size="small"
-              @click="clearAllData"
-              class="w-full md:w-auto border-rust text-rust"
-          >
-            {{ t('dashboard.deleteData') }}
-          </BaseButton>
+          <div class="flex items-center gap-1">
+            <BaseButton
+                variant="secondary"
+                size="small"
+                @click="clearAllData"
+                class="w-full md:w-auto border-rust text-rust"
+            >
+              {{ t('dashboard.deleteData') }}
+            </BaseButton>
+            <HelpTooltip :text="t('help.tooltips.dashboard.deleteData')" :title="t('help.titles.deleteData')" />
+          </div>
         </div>
       </div>
 
       <!-- Card Search Section -->
       <div class="border border-silver-30 p-4 mb-6 rounded-md">
-        <h3 class="text-body font-bold text-silver mb-3">{{ t('dashboard.searchOthers.title') }}</h3>
+        <div class="flex items-center gap-2 mb-3">
+          <h3 class="text-body font-bold text-silver">{{ t('dashboard.searchOthers.title') }}</h3>
+          <HelpTooltip :text="t('help.tooltips.dashboard.searchOthers')" :title="t('help.titles.searchOthers')" />
+        </div>
         <div class="relative mb-4">
           <div class="flex gap-2">
             <div class="flex-1 relative">
@@ -217,6 +232,7 @@ import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
+import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'

@@ -7,6 +7,7 @@ import { useI18n } from '../composables/useI18n';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
+import HelpTooltip from '../components/ui/HelpTooltip.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -79,7 +80,13 @@ const handleLogout = async () => {
 
       <!-- Email verification -->
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
-        <h2 class="text-body font-bold text-silver mb-4">{{ t('settings.sections.emailVerification.title') }}</h2>
+        <h2 class="text-body font-bold text-silver mb-4 flex items-center gap-2">
+          {{ t('settings.sections.emailVerification.title') }}
+          <HelpTooltip
+              :text="t('help.tooltips.settings.emailVerification')"
+              :title="t('help.titles.emailVerification')"
+          />
+        </h2>
 
         <div class="mb-4">
           <p class="text-small text-silver-70">
@@ -122,7 +129,13 @@ const handleLogout = async () => {
       <!-- Change password -->
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-body font-bold text-silver">{{ t('settings.sections.changePassword.title') }}</h2>
+          <h2 class="text-body font-bold text-silver flex items-center gap-2">
+            {{ t('settings.sections.changePassword.title') }}
+            <HelpTooltip
+                :text="t('help.tooltips.settings.password')"
+                :title="t('help.titles.password')"
+            />
+          </h2>
           <BaseButton
               v-if="!showChangeForm"
               variant="secondary"

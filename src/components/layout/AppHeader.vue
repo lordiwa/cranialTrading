@@ -94,6 +94,14 @@ const handleNavigate = (path: string) => {
               <SpriteIcon name="user-alt" size="small" />
               <span class="text-tiny">@{{ authStore.user.username }}</span>
             </router-link>
+            <!-- Help/FAQ -->
+            <router-link
+                to="/faq"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
+                title="Ayuda / FAQ"
+            >
+              <span class="w-5 h-5 rounded-full border border-current flex items-center justify-center text-tiny font-bold">?</span>
+            </router-link>
             <router-link
                 to="/settings"
                 class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
@@ -112,6 +120,13 @@ const handleNavigate = (path: string) => {
 
           <!-- Auth Links (Logged out) -->
           <div v-else class="flex items-center gap-2">
+            <router-link
+                to="/faq"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
+                title="Ayuda / FAQ"
+            >
+              <span class="w-5 h-5 rounded-full border border-current flex items-center justify-center text-tiny font-bold">?</span>
+            </router-link>
             <router-link
                 to="/login"
                 class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast rounded"
@@ -158,6 +173,15 @@ const handleNavigate = (path: string) => {
         >
           <SpriteIcon name="user-alt" size="small" />
           {{ t('header.profile.myProfile') }} (@{{ authStore.user.username }})
+        </router-link>
+        <!-- FAQ (mobile) -->
+        <router-link
+            to="/faq"
+            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
+            @click="closeMobileMenu"
+        >
+          <span class="w-5 h-5 rounded-full border border-current flex items-center justify-center text-tiny font-bold">?</span>
+          Ayuda / FAQ
         </router-link>
       </nav>
     </div>

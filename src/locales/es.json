@@ -1154,5 +1154,205 @@
   "confirm": {
     "defaultConfirm": "ACEPTAR",
     "defaultCancel": "CANCELAR"
+  },
+
+  "help": {
+    "titles": {
+      "matchesFound": "Matches Encontrados",
+      "recalculate": "Recalcular Matches",
+      "sync": "Sincronizar Cartas",
+      "deleteData": "Eliminar Datos",
+      "searchOthers": "Buscar en Otros Usuarios",
+      "statusCollection": "Colección Personal",
+      "statusAvailable": "Cartas Disponibles",
+      "statusWishlist": "Lista de Deseos",
+      "deckVisibility": "Visibilidad del Mazo",
+      "importDeck": "Importar Mazo",
+      "compatibility": "Compatibilidad",
+      "matchType": "Tipo de Match",
+      "tabNew": "Nuevos Matches",
+      "tabSent": "Matches Enviados",
+      "tabSaved": "Matches Guardados",
+      "tabDeleted": "Matches Eliminados",
+      "emailVerification": "Verificación de Email",
+      "password": "Contraseña"
+    },
+    "tooltips": {
+      "dashboard": {
+        "recalculate": "Busca nuevos matches comparando tus cartas en venta/cambio con la wishlist de otros usuarios, y viceversa.",
+        "sync": "Actualiza tus cartas públicas en el sistema para que otros usuarios puedan encontrarte en sus búsquedas.",
+        "deleteData": "Elimina permanentemente todas tus cartas, mazos, preferencias y matches. Esta acción no se puede deshacer.",
+        "searchOthers": "Busca cartas que otros usuarios tienen disponibles para venta o cambio. Si la encuentras, puedes expresar tu interés.",
+        "matchesFound": "Cantidad de usuarios que tienen cartas que buscas, o buscan cartas que tienes."
+      },
+      "collection": {
+        "statusCollection": "Cartas personales que no están disponibles para venta ni cambio. Solo tú las ves.",
+        "statusSale": "Cartas que quieres vender. Aparecen en tu perfil público y otros usuarios pueden contactarte.",
+        "statusTrade": "Cartas disponibles para intercambiar por otras. El sistema buscará matches automáticamente.",
+        "statusWishlist": "Cartas que estás buscando. El sistema encontrará usuarios que las tengan disponibles.",
+        "publicCard": "Esta carta es visible en tu perfil público. Otros usuarios pueden verla y contactarte.",
+        "privateCard": "Esta carta es privada. Solo tú puedes verla en tu colección.",
+        "deckPublic": "Todas las cartas del mazo serán visibles en tu perfil público.",
+        "deckPrivate": "Las cartas del mazo serán privadas y no aparecerán en tu perfil.",
+        "importDeck": "Importa un mazo desde Moxfield o pegando una lista de cartas. Se agregarán a tu colección automáticamente."
+      },
+      "matches": {
+        "compatibility": "Porcentaje que indica qué tan bien coinciden tus necesidades con las del otro usuario. Mayor % = mejor match.",
+        "bidirectional": "Match bidireccional: ambos tienen algo que el otro busca. Ideal para intercambios directos.",
+        "unidirectional": "Match unidireccional: solo uno tiene lo que el otro busca. Puede requerir pago o negociación.",
+        "tabNew": "Matches recién calculados que aún no has revisado.",
+        "tabSent": "Matches donde expresaste interés. Esperando respuesta del otro usuario.",
+        "tabSaved": "Matches que guardaste para contactar después.",
+        "tabDeleted": "Matches eliminados. Se borran permanentemente después de 15 días."
+      },
+      "conditions": {
+        "M": "Mint - Perfecta, como recién abierta del booster. Sin ningún defecto visible.",
+        "NM": "Near Mint - Casi perfecta, puede tener mínimo desgaste en bordes apenas perceptible.",
+        "LP": "Light Play - Jugada ligeramente. Pequeñas marcas o desgaste menor visible.",
+        "MP": "Moderate Play - Desgaste moderado visible. Marcas, pequeños dobleces o decoloración.",
+        "HP": "Heavy Play - Muy jugada. Daño evidente pero la carta sigue siendo legal para torneo.",
+        "PO": "Poor - Mal estado significativo. Solo para colección casual o proxies."
+      },
+      "cards": {
+        "foil": "Carta con acabado holográfico/brillante. Generalmente más valiosa que la versión normal.",
+        "price": "Precio de referencia en USD según TCGPlayer. Puede variar según vendedor y condición.",
+        "edition": "Set/edición de Magic donde se imprimió esta carta. Afecta el precio y legalidad en formatos."
+      },
+      "decks": {
+        "mainboard": "Las 60 cartas principales del mazo (99 en Commander).",
+        "sideboard": "15 cartas opcionales para intercambiar entre partidas en torneos.",
+        "commander": "El comandante es la carta líder de tu mazo Commander/EDH.",
+        "completion": "Porcentaje de cartas del mazo que ya tienes en tu colección."
+      },
+      "settings": {
+        "emailVerification": "Verificar tu email permite que otros usuarios te contacten y te da acceso a todas las funciones de la plataforma.",
+        "password": "Tu contraseña debe tener al menos 8 caracteres. Usa una combinación de letras, números y símbolos para mayor seguridad."
+      }
+    },
+    "guides": {
+      "gettingStarted": {
+        "title": "Cómo empezar",
+        "step1": {
+          "title": "1. Agrega tus cartas",
+          "description": "Busca cartas y agrégalas a tu colección. Marca como 'Venta' o 'Cambio' las que quieras intercambiar."
+        },
+        "step2": {
+          "title": "2. Crea tu wishlist",
+          "description": "Agrega las cartas que buscas con estado 'Deseado'. El sistema buscará usuarios que las tengan."
+        },
+        "step3": {
+          "title": "3. Encuentra matches",
+          "description": "Ve al Dashboard y calcula matches. El sistema encontrará usuarios compatibles automáticamente."
+        },
+        "step4": {
+          "title": "4. Contacta y negocia",
+          "description": "Usa el chat interno para acordar el intercambio. Cranial solo conecta, tú decides cómo hacer el trade."
+        }
+      },
+      "tradeSafety": {
+        "title": "Trading seguro",
+        "tips": [
+          "Verifica el perfil y reputación del usuario antes de acordar un trade",
+          "Usa métodos de pago con protección al comprador cuando sea posible",
+          "Empieza con intercambios pequeños para construir confianza",
+          "Documenta todo: fotos, mensajes, acuerdos",
+          "Para envíos, usa servicios con seguimiento"
+        ]
+      }
+    },
+    "faq": {
+      "title": "Preguntas Frecuentes",
+      "questions": [
+        {
+          "q": "¿Qué es un match?",
+          "a": "Un match ocurre cuando hay compatibilidad entre tus cartas y las de otro usuario. Ejemplo: Tú tienes una 'Lightning Bolt' en venta y Juan tiene 'Lightning Bolt' en su wishlist → ¡Match! El sistema los calcula automáticamente comparando tu colección con la de todos los usuarios."
+        },
+        {
+          "q": "¿Qué tipos de matches existen?",
+          "a": "Hay dos tipos principales: BIDIRECCIONAL y UNIDIRECCIONAL. El bidireccional es cuando ambos usuarios tienen algo que el otro busca (ideal para intercambios). El unidireccional es cuando solo uno tiene lo que el otro necesita (generalmente requiere pago)."
+        },
+        {
+          "q": "¿Qué es un match BIDIRECCIONAL?",
+          "a": "Es el match perfecto para intercambios. Ejemplo: Tú tienes 'Counterspell' en venta y buscas 'Sol Ring'. María tiene 'Sol Ring' en venta y busca 'Counterspell'. ¡Ambos tienen lo que el otro necesita! Pueden intercambiar directamente sin dinero de por medio."
+        },
+        {
+          "q": "¿Qué es un match UNIDIRECCIONAL?",
+          "a": "Ocurre cuando solo una parte tiene lo que la otra busca. Ejemplo: Tú tienes 'Black Lotus' en venta, Pedro la busca, pero Pedro no tiene nada que tú necesites. Pedro tendría que comprártela con dinero en lugar de intercambiar cartas."
+        },
+        {
+          "q": "¿Cuál es la diferencia entre los estados de carta?",
+          "a": "COLECCIÓN: Cartas personales, no disponibles para trade (privadas). VENTA: Cartas que vendes por dinero (públicas). CAMBIO: Cartas para intercambiar por otras (públicas). WISHLIST: Cartas que buscas conseguir. Ejemplo: Tu 'Mox Diamond' en COLECCIÓN no aparecerá en matches, pero si la cambias a VENTA, otros usuarios podrán encontrarla."
+        },
+        {
+          "q": "¿Cómo funciona el porcentaje de compatibilidad?",
+          "a": "Mide qué tan equilibrado es el intercambio basándose en el valor total de las cartas. Ejemplo: Si ofreces cartas por $50 y recibes cartas por $48, la compatibilidad será alta (~96%). Si ofreces $100 y recibes $30, será baja (~30%). Un 100% significa valores exactamente iguales."
+        },
+        {
+          "q": "¿Qué significan los tabs en Matches?",
+          "a": "NUEVOS: Matches recién calculados sin revisar. ENVIADOS: Matches donde expresaste interés, esperando respuesta. GUARDADOS: Matches que guardaste para contactar después. ELIMINADOS: Matches descartados (se borran en 15 días). Ejemplo: Ves un match interesante → lo guardas → contactas al usuario → completan el trade → lo marcas como completado."
+        },
+        {
+          "q": "¿Qué significa que una carta sea 'Pública'?",
+          "a": "Las cartas públicas aparecen en tu perfil (/@tuusuario) y otros usuarios pueden encontrarlas buscando. Las privadas solo tú las ves. Ejemplo: Tu 'Force of Will' en VENTA es pública y aparecerá cuando alguien busque esa carta. Tu 'Island' en COLECCIÓN es privada."
+        },
+        {
+          "q": "¿Cómo se calculan los matches?",
+          "a": "El sistema compara: 1) Tus cartas en VENTA/CAMBIO con la WISHLIST de otros usuarios, 2) Tu WISHLIST con las cartas en VENTA/CAMBIO de otros. Ejemplo: Tienes 3 cartas en venta y 5 en wishlist. El sistema las compara con las colecciones de 1000 usuarios y encuentra 12 matches potenciales."
+        },
+        {
+          "q": "¿Puedo importar mi colección de otro sitio?",
+          "a": "Sí. Puedes: 1) Importar desde Moxfield pegando la URL del mazo, 2) Pegar listas en formato MTGO/Arena. Ejemplo de formato: '4 Lightning Bolt' o '4x Lightning Bolt [M10]'. El sistema reconoce cantidad, nombre y opcionalmente el set."
+        },
+        {
+          "q": "¿Qué significan las condiciones de carta (M, NM, LP...)?",
+          "a": "M (Mint): Perfecta, sin usar. NM (Near Mint): Casi perfecta, mínimo desgaste. LP (Light Play): Pequeñas marcas visibles. MP (Moderate Play): Desgaste moderado, dobleces menores. HP (Heavy Play): Daño evidente pero jugable. PO (Poor): Mal estado significativo. Ejemplo: Una carta recién abierta es M/NM, una jugada en torneos sin fundas probablemente sea LP/MP."
+        },
+        {
+          "q": "¿Cada cuánto se actualizan los precios?",
+          "a": "Los precios se obtienen de Scryfall/TCGPlayer al momento de agregar o editar una carta. Para actualizar precios masivamente, usa el botón 'Sincronizar' en el Dashboard. Los precios pueden variar ±10% del mercado real según la edición y condición."
+        },
+        {
+          "q": "¿Cranial Trading cobra comisión?",
+          "a": "No. La plataforma es 100% gratuita. Solo conectamos usuarios interesados en intercambiar cartas. Las negociaciones, métodos de pago y envíos son acordados directamente entre ustedes."
+        },
+        {
+          "q": "¿Cómo contacto a otro usuario?",
+          "a": "Desde un match puedes: 1) Enviar mensaje interno por el chat de la app, 2) Ver su email (si completaste el match), 3) Visitar su perfil público. Ejemplo: Encuentras un match bueno → click en 'Mensaje' → acuerdas el intercambio por chat → intercambian datos de envío."
+        },
+        {
+          "q": "¿Qué pasa si me estafan?",
+          "a": "Cranial no intermedia en transacciones físicas ni pagos. Recomendaciones: 1) Verifica el perfil y antigüedad del usuario, 2) Usa PayPal Goods & Services u otro método con protección, 3) Empieza con trades pequeños (<$20), 4) Pide fotos/videos de las cartas, 5) Usa envío con seguimiento. Reporta usuarios sospechosos."
+        },
+        {
+          "q": "¿Puedo hacer trades internacionales?",
+          "a": "Sí, pero considera: 1) Costos de envío internacional ($15-30 USD típicamente), 2) Tiempos de entrega (2-4 semanas), 3) Posibles impuestos de aduana, 4) Riesgo de pérdida en tránsito. Recomendación: Para trades internacionales, asegúrate que el valor justifique los costos de envío."
+        }
+      ]
+    },
+    "emptyStates": {
+      "noCards": {
+        "title": "Tu colección está vacía",
+        "message": "Busca cartas arriba para comenzar a agregarlas a tu colección.",
+        "hint": "Tip: Usa 'Importar' para agregar un mazo completo de Moxfield rápidamente."
+      },
+      "noMatches": {
+        "title": "Sin matches por ahora",
+        "message": "El sistema no encontró usuarios compatibles con tus cartas y wishlist.",
+        "hint": "Tip: Agrega más cartas en venta/cambio o más cartas a tu wishlist para aumentar las probabilidades."
+      },
+      "noDecks": {
+        "title": "No tienes mazos",
+        "message": "Crea tu primer mazo para organizar tus cartas por formato.",
+        "hint": "Tip: Puedes importar un mazo completo desde Moxfield con un click."
+      },
+      "noContacts": {
+        "title": "Sin contactos guardados",
+        "message": "Cuando guardes un contacto desde un match, aparecerá aquí para acceso rápido."
+      },
+      "noMessages": {
+        "title": "Sin conversaciones",
+        "message": "Cuando contactes a un usuario desde un match, la conversación aparecerá aquí."
+      }
+    }
   }
 }

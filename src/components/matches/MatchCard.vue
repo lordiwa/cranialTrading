@@ -3,8 +3,12 @@
     <!-- Header: Match Title + Compatibility -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
-        <h3 class="text-h3 text-silver font-bold">
+        <h3 class="text-h3 text-silver font-bold flex items-center gap-2">
           {{ t('matches.card.header', { index: matchIndex, compatibility: match.compatibility }) }}
+          <HelpTooltip
+              :text="t('help.tooltips.matches.compatibility')"
+              :title="t('help.titles.compatibility')"
+          />
         </h3>
         <p class="text-small text-silver-70 mt-1">
           {{ t('matches.card.with', { username: '', location: match.otherLocation }).split('@')[0] }}
@@ -80,7 +84,7 @@
     </div>
 
     <!-- Match Type Badge -->
-    <div class="flex gap-2 mb-6">
+    <div class="flex gap-2 mb-6 items-center">
       <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-sm">
         <SpriteIcon name="check" size="tiny" />
         <p class="text-tiny font-bold text-neon">{{ t('matches.card.bidirectional') }}</p>
@@ -88,6 +92,10 @@
       <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-sm">
         <p class="text-tiny font-bold text-silver-70">{{ t('matches.card.unidirectional') }}</p>
       </span>
+      <HelpTooltip
+          :text="match.type === 'BIDIRECTIONAL' ? t('help.tooltips.matches.bidirectional') : t('help.tooltips.matches.unidirectional')"
+          :title="t('help.titles.matchType')"
+      />
     </div>
 
     <!-- Divider -->
@@ -265,6 +273,7 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import ChatModal from '../chat/ChatModal.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
+import HelpTooltip from '../ui/HelpTooltip.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { useToastStore } from '../../stores/toast'
 import { useMessagesStore } from '../../stores/messages'

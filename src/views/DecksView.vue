@@ -10,6 +10,7 @@ import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
+import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
@@ -506,7 +507,7 @@ onMounted(async () => {
             {{ t('decks.subtitle', { count: decksStore.totalDecks }) }}
           </p>
         </div>
-        <div class="flex gap-2 w-full md:w-auto">
+        <div class="flex gap-2 w-full md:w-auto items-center">
           <BaseButton
               size="small"
               @click="showCreateModal = true"
@@ -522,6 +523,10 @@ onMounted(async () => {
           >
             {{ t('decks.actions.import') }}
           </BaseButton>
+          <HelpTooltip
+              :text="t('help.tooltips.collection.importDeck')"
+              :title="t('help.titles.importDeck')"
+          />
         </div>
       </div>
 

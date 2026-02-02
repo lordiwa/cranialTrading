@@ -9,6 +9,7 @@ import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
 import SpriteIcon from '../components/ui/SpriteIcon.vue'
+import HelpTooltip from '../components/ui/HelpTooltip.vue'
 
 const matchesStore = useMatchesStore()
 const contactsStore = useContactsStore()
@@ -135,14 +136,20 @@ onUnmounted(() => {
     <div>
       <!-- Header -->
       <div class="mb-lg md:mb-xl">
-        <h1 class="text-h2 md:text-h1 font-bold text-silver mb-sm">{{ t('matches.title') }}</h1>
+        <h1 class="text-h2 md:text-h1 font-bold text-silver mb-sm flex items-center gap-sm">
+          {{ t('matches.title') }}
+          <HelpTooltip
+              :text="t('help.tooltips.matches.compatibility')"
+              :title="t('help.titles.compatibility')"
+          />
+        </h1>
         <p class="text-small md:text-body text-silver-70">
           {{ t('matches.subtitle') }}
         </p>
       </div>
 
       <!-- Tabs -->
-      <div class="flex gap-sm md:gap-md mb-lg md:mb-xl border-b border-silver-20 overflow-x-auto">
+      <div class="flex flex-wrap gap-sm md:gap-md mb-lg md:mb-xl border-b border-silver-20">
         <button
             v-for="tab in tabs"
             :key="tab.id"
@@ -156,6 +163,16 @@ onUnmounted(() => {
         >
           <SpriteIcon :name="tab.icon" size="small" />
           <span>{{ tab.label }}</span>
+          <HelpTooltip
+              :text="tab.id === 'new' ? t('help.tooltips.matches.tabNew') :
+                     tab.id === 'sent' ? t('help.tooltips.matches.tabSent') :
+                     tab.id === 'saved' ? t('help.tooltips.matches.tabSaved') :
+                     t('help.tooltips.matches.tabDeleted')"
+              :title="tab.id === 'new' ? t('help.titles.tabNew') :
+                      tab.id === 'sent' ? t('help.titles.tabSent') :
+                      tab.id === 'saved' ? t('help.titles.tabSaved') :
+                      t('help.titles.tabDeleted')"
+          />
           <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-sm">
             {{ tab.count }}
           </span>

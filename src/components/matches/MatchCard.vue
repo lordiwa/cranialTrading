@@ -4,11 +4,10 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
         <h3 class="text-h3 text-silver font-bold">
-          MATCH #{{ matchIndex }} - COMPATIBILIDAD:
-          <span class="text-neon">{{ match.compatibility }}%</span>
+          {{ t('matches.card.header', { index: matchIndex, compatibility: match.compatibility }) }}
         </h3>
         <p class="text-small text-silver-70 mt-1">
-          Con
+          {{ t('matches.card.with', { username: '', location: match.otherLocation }).split('@')[0] }}
           <router-link
               :to="`/@${match.otherUsername}`"
               class="text-neon hover:underline font-bold"
@@ -27,7 +26,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
       <!-- TÚ OFRECES -->
       <div>
-        <h4 class="text-small font-bold text-silver-70 uppercase mb-4">Tú Ofreces</h4>
+        <h4 class="text-small font-bold text-silver-70 uppercase mb-4">{{ t('matches.card.youOffer') }}</h4>
         <div class="space-y-2">
           <div v-if="match.myCards && match.myCards.length > 0">
             <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3">
@@ -37,16 +36,16 @@
             </div>
           </div>
           <div v-else class="text-small text-silver-50 italic">
-            Sin cartas específicas (regalando valor)
+            {{ t('matches.card.noSpecificCards') }}
           </div>
         </div>
         <p class="text-h3 text-neon font-bold mt-4">${{ match.myTotalValue?.toFixed(2) || '0.00' }}</p>
-        <p class="text-tiny text-silver-70">Valor total</p>
+        <p class="text-tiny text-silver-70">{{ t('matches.card.totalValue') }}</p>
       </div>
 
       <!-- RECIBES -->
       <div>
-        <h4 class="text-small font-bold text-silver-70 uppercase mb-4">Recibes</h4>
+        <h4 class="text-small font-bold text-silver-70 uppercase mb-4">{{ t('matches.card.youReceive') }}</h4>
         <div class="space-y-2">
           <div v-if="match.otherCards && match.otherCards.length > 0">
             <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3">
@@ -56,18 +55,18 @@
             </div>
           </div>
           <div v-else class="text-small text-silver-50 italic">
-            Sin cartas específicas (regalando valor)
+            {{ t('matches.card.noSpecificCards') }}
           </div>
         </div>
         <p class="text-h3 text-neon font-bold mt-4">${{ match.theirTotalValue?.toFixed(2) || '0.00' }}</p>
-        <p class="text-tiny text-silver-70">Valor total</p>
+        <p class="text-tiny text-silver-70">{{ t('matches.card.totalValue') }}</p>
       </div>
     </div>
 
     <!-- Price Difference -->
     <div class="bg-silver-5 border border-silver-20 p-4 mb-6">
       <div class="flex justify-between items-center">
-        <p class="text-small text-silver-70">Diferencia de precio:</p>
+        <p class="text-small text-silver-70">{{ t('matches.card.priceDifference') }}</p>
         <p :class="[
           'text-h3 font-bold',
           match.valueDifference >= 0 ? 'text-neon' : 'text-silver-50'
@@ -76,7 +75,7 @@
         </p>
       </div>
       <p class="text-tiny text-silver-70 mt-2">
-        {{ match.valueDifference >= 0 ? 'Tú recibes ventaja' : 'El otro recibe ventaja' }}
+        {{ match.valueDifference >= 0 ? t('matches.card.youReceiveAdvantage') : t('matches.card.otherReceivesAdvantage') }}
       </p>
     </div>
 
@@ -84,10 +83,10 @@
     <div class="flex gap-2 mb-6">
       <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1">
         <SpriteIcon name="check" size="tiny" />
-        <p class="text-tiny font-bold text-neon">BIDIRECCIONAL</p>
+        <p class="text-tiny font-bold text-neon">{{ t('matches.card.bidirectional') }}</p>
       </span>
       <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1">
-        <p class="text-tiny font-bold text-silver-70">→ UNIDIRECCIONAL</p>
+        <p class="text-tiny font-bold text-silver-70">{{ t('matches.card.unidirectional') }}</p>
       </span>
     </div>
 
@@ -104,7 +103,7 @@
             :disabled="saving"
         >
           <SpriteIcon :name="saving ? 'loading' : 'star'" size="tiny" />
-          {{ saving ? 'GUARDANDO...' : 'ME INTERESA' }}
+          {{ saving ? t('common.actions.saving') : t('matches.actions.interested') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
@@ -112,7 +111,7 @@
             @click="handleOpenChat"
         >
           <SpriteIcon name="chat" size="tiny" />
-          MENSAJE
+          {{ t('matches.actions.message') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
@@ -120,7 +119,7 @@
             @click="handleDiscard"
         >
           <SpriteIcon name="x-mark" size="tiny" />
-          IGNORAR
+          {{ t('matches.actions.ignore') }}
         </BaseButton>
       </template>
 
@@ -131,7 +130,7 @@
             @click="handleOpenChat"
         >
           <SpriteIcon name="chat" size="tiny" />
-          MENSAJE
+          {{ t('matches.actions.message') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
@@ -139,7 +138,7 @@
             @click="showContactModal = true"
         >
           <SpriteIcon name="user" size="tiny" />
-          CONTACTO
+          {{ t('matches.actions.contact') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
@@ -147,7 +146,7 @@
             @click="handleMarcarCompletado"
         >
           <SpriteIcon name="check" size="tiny" />
-          COMPLETADO
+          {{ t('matches.actions.completed') }}
         </BaseButton>
         <BaseButton
             variant="danger"
@@ -155,7 +154,7 @@
             @click="handleDiscard"
         >
           <SpriteIcon name="x-mark" size="tiny" />
-          ELIMINAR
+          {{ t('matches.actions.delete') }}
         </BaseButton>
       </template>
 
@@ -167,7 +166,7 @@
             @click="handleRecuperar"
         >
           <SpriteIcon name="recover" size="tiny" />
-          RECUPERAR
+          {{ t('matches.actions.recover') }}
         </BaseButton>
         <BaseButton
             variant="danger"
@@ -175,7 +174,7 @@
             @click="handleDeletePermanent"
         >
           <SpriteIcon name="trash" size="tiny" />
-          ELIMINAR
+          {{ t('matches.actions.delete') }}
         </BaseButton>
       </template>
     </div>
@@ -183,13 +182,13 @@
     <!-- Modal de Contacto -->
     <BaseModal
         :show="showContactModal"
-        title="VER CONTACTO"
+        :title="t('matches.contactModal.title')"
         @close="showContactModal = false"
     >
       <div class="space-y-4 mb-6">
         <!-- Usuario -->
         <div>
-          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Usuario</p>
+          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">{{ t('matches.contactModal.user') }}</p>
           <router-link
               :to="`/@${match.otherUsername}`"
               class="text-body font-bold text-neon hover:underline"
@@ -200,13 +199,13 @@
 
         <!-- Ubicación -->
         <div>
-          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Ubicación</p>
+          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">{{ t('matches.contactModal.location') }}</p>
           <p class="text-body text-silver">📍 {{ match.otherLocation }}</p>
         </div>
 
         <!-- Email -->
         <div>
-          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">Email</p>
+          <p class="text-tiny text-silver-70 uppercase font-bold mb-1">{{ t('matches.contactModal.email') }}</p>
           <p class="text-body text-silver">{{ match.otherEmail }}</p>
         </div>
       </div>
@@ -223,7 +222,7 @@
             @click="copyEmailToClipboard"
         >
           <SpriteIcon name="chat" size="tiny" />
-          COPIAR EMAIL
+          {{ t('matches.contactModal.copyEmail') }}
         </BaseButton>
 
         <!-- Botón: Guardar Contacto -->
@@ -234,7 +233,7 @@
             :disabled="contactSaving"
         >
           <SpriteIcon :name="contactSaving ? 'loading' : 'star'" size="tiny" />
-          {{ contactSaving ? 'GUARDANDO...' : 'GUARDAR CONTACTO' }}
+          {{ contactSaving ? t('common.actions.saving') : t('matches.contactModal.saveContact') }}
         </BaseButton>
 
         <!-- Botón: Cerrar -->
@@ -244,7 +243,7 @@
             @click="showContactModal = false"
         >
           <SpriteIcon name="x-mark" size="tiny" />
-          CERRAR
+          {{ t('matches.contactModal.close') }}
         </BaseButton>
       </div>
     </BaseModal>
@@ -269,6 +268,9 @@ import SpriteIcon from '../ui/SpriteIcon.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { useToastStore } from '../../stores/toast'
 import { useMessagesStore } from '../../stores/messages'
+import { useI18n } from '../../composables/useI18n'
+
+const { t } = useI18n()
 
 interface Props {
   match: any
@@ -326,9 +328,9 @@ const handleDeletePermanent = () => {
 const copyEmailToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(props.match.otherEmail)
-    toastStore.show('✓ Email copiado', 'success')
+    toastStore.show(t('matches.contactModal.emailCopied'), 'success')
   } catch (err) {
-    toastStore.show('Error al copiar email', 'error')
+    toastStore.show(t('messages.errors.sendError'), 'error')
   }
 }
 
@@ -338,7 +340,7 @@ const handleOpenChat = async () => {
   const otherUsername = props.match.otherUsername
 
   if (!otherUserId) {
-    toastStore.show('Error: No se pudo obtener el ID del usuario', 'error')
+    toastStore.show(t('messages.errors.createError'), 'error')
     return
   }
 
@@ -357,7 +359,7 @@ const handleSaveContact = async () => {
     const otherUserId = props.match.otherUserId
 
     if (!otherUserId) {
-      toastStore.show('Error: No se pudo obtener el ID del usuario', 'error')
+      toastStore.show(t('contacts.messages.saveError'), 'error')
       return
     }
 
@@ -368,11 +370,11 @@ const handleSaveContact = async () => {
       location: props.match.otherLocation || 'Unknown',
     })
 
-    toastStore.show('✓ Contacto guardado: @' + props.match.otherUsername, 'success')
+    toastStore.show(t('matches.contactModal.contactSaved', { username: props.match.otherUsername }), 'success')
     showContactModal.value = false
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error al guardar contacto'
-    toastStore.show('❌ ' + message, 'error')
+    const message = error instanceof Error ? error.message : t('contacts.messages.saveError')
+    toastStore.show(message, 'error')
     console.error('Error saving contact:', error)
   } finally {
     contactSaving.value = false

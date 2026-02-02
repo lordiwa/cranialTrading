@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
+import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
@@ -14,6 +15,7 @@ const router = useRouter()
 const route = useRoute()
 const decksStore = useDecksStore()
 const collectionStore = useCollectionStore()
+const { t } = useI18n()
 
 const activeTab = ref<'mainboard' | 'sideboard' | 'stats'>('mainboard')
 const loading = ref(false)
@@ -96,34 +98,34 @@ onMounted(async () => {
           </div>
           <p class="text-small text-silver-70">{{ deck.description }}</p>
           <p class="text-tiny text-silver-50 mt-2">
-            Actualizado: {{ deck.updatedAt.toLocaleDateString() }}
+            {{ t('decks.detail.updated') }} {{ deck.updatedAt.toLocaleDateString() }}
           </p>
         </div>
 
         <div class="flex flex-col gap-2">
-          <BaseButton size="small" @click="handleEdit">EDITAR</BaseButton>
-          <BaseButton variant="secondary" size="small" @click="handleBack">← VOLVER</BaseButton>
+          <BaseButton size="small" @click="handleEdit">{{ t('decks.detail.edit') }}</BaseButton>
+          <BaseButton variant="secondary" size="small" @click="handleBack">{{ t('decks.detail.back') }}</BaseButton>
         </div>
       </div>
 
       <!-- Stats bar -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-primary border border-silver-30 p-4">
-          <p class="text-tiny text-silver-70">TOTAL</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.detail.stats.total') }}</p>
           <p class="text-h3 font-bold text-neon">{{ deck.stats.totalCards }}</p>
         </div>
         <div class="bg-primary border border-silver-30 p-4">
-          <p class="text-tiny text-silver-70">EN COLECCIÓN</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.detail.stats.inCollection') }}</p>
           <p class="text-h3 font-bold text-neon">{{ deck.stats.ownedCards }}</p>
         </div>
         <div class="bg-primary border border-silver-30 p-4">
-          <p class="text-tiny text-silver-70">WISHLIST</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.detail.stats.wishlist') }}</p>
           <p class="text-h3 font-bold" :class="deck.stats.wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
             {{ deck.stats.wishlistCards }}
           </p>
         </div>
         <div class="bg-primary border border-silver-30 p-4">
-          <p class="text-tiny text-silver-70">COSTO TOTAL</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.detail.stats.totalCost') }}</p>
           <p class="text-h3 font-bold text-neon">${{ deck.stats.totalPrice.toFixed(2) }}</p>
         </div>
       </div>
@@ -139,7 +141,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          MAINBOARD ({{ mainboardCount }})
+          {{ t('decks.detail.sections.mainboard') }} ({{ mainboardCount }})
         </button>
         <button
             @click="activeTab = 'sideboard'"
@@ -150,7 +152,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          SIDEBOARD ({{ sideboardCount }})
+          {{ t('decks.detail.sections.sideboard') }} ({{ sideboardCount }})
         </button>
         <button
             @click="activeTab = 'stats'"
@@ -161,7 +163,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          ESTADÍSTICAS
+          {{ t('decks.detail.sections.stats') }}
         </button>
       </div>
 
@@ -193,8 +195,8 @@ onMounted(async () => {
     </div>
 
     <div v-else class="text-center py-16">
-      <p class="text-body text-silver-70 mb-4">No se encontró el mazo</p>
-      <BaseButton @click="handleBack">VOLVER A MAZOS</BaseButton>
+      <p class="text-body text-silver-70 mb-4">{{ t('decks.detail.notFound') }}</p>
+      <BaseButton @click="handleBack">{{ t('decks.detail.backToDecks') }}</BaseButton>
     </div>
   </AppContainer>
 </template>

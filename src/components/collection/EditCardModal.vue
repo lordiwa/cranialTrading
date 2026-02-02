@@ -4,6 +4,7 @@ import { useToastStore } from '../../stores/toast'
 import { useConfirmStore } from '../../stores/confirm'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
@@ -11,6 +12,8 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { Card, CardCondition } from '../../types/card'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -52,14 +55,14 @@ const availablePrints = ref<any[]>([])
 const selectedPrint = ref<any>(null)
 const loadingPrints = ref(false)
 
-const conditionOptions = [
-  { value: 'M', label: 'Mint (M)' },
-  { value: 'NM', label: 'Near Mint (NM)' },
-  { value: 'LP', label: 'Light Play (LP)' },
-  { value: 'MP', label: 'Moderate Play (MP)' },
-  { value: 'HP', label: 'Heavy Play (HP)' },
-  { value: 'PO', label: 'Poor (PO)' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 // Allocation summary for this card
 const allocationSummary = computed(() => {
@@ -77,7 +80,7 @@ const quantityReductionCheck = computed(() => {
 const quantityWarning = computed(() => {
   if (!quantityReductionCheck.value) return null
   if (!quantityReductionCheck.value.canReduce && quantityReductionCheck.value.excessAmount > 0) {
-    return `Esta carta está asignada a ${quantityReductionCheck.value.currentAllocated} copias en mazos. Reducir a ${form.value.quantity} moverá ${quantityReductionCheck.value.excessAmount} copia(s) a wishlist.`
+    return t('cards.editModal.quantityWarning', { excess: quantityReductionCheck.value.excessAmount })
   }
   return null
 })
@@ -147,7 +150,7 @@ const handleSave = async () => {
   if (!props.card) return
 
   if ((form.value.quantity as number) < 1) {
-    toastStore.show('Cantidad debe ser al menos 1', 'error')
+    toastStore.show(t('cards.detailModal.quantityMin'), 'error')
     return
   }
 
@@ -181,7 +184,7 @@ const handleSave = async () => {
 
     emit('save', updatedCard)
   } catch (err) {
-    toastStore.show('Error guardando cambios', 'error')
+    toastStore.show(t('collection.messages.updateError'), 'error')
     console.error(err)
   } finally {
     isLoading.value = false
@@ -200,8 +203,8 @@ const handleClose = () => {
     <div class="space-y-6 w-full max-w-xl">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">EDITAR CARTA</h2>
-        <p class="text-small text-silver-70">Modifica los detalles de tu carta</p>
+        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('cards.editModal.title') }}</h2>
+        <p class="text-small text-silver-70">{{ t('cards.editModal.subtitle') }}</p>
       </div>
 
       <!-- Card Preview -->
@@ -215,7 +218,7 @@ const handleClose = () => {
               class="w-32 h-44 object-cover border border-silver-30"
           />
           <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
-            <span class="text-tiny text-silver-50">No image</span>
+            <span class="text-tiny text-silver-50">{{ t('cards.detailModal.noImage') }}</span>
           </div>
         </div>
 
@@ -238,14 +241,14 @@ const handleClose = () => {
                 <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
               </div>
               <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
-                Cargando precios CK...
+                {{ t('cards.editModal.loadingPrices') }}
               </div>
             </div>
           </div>
 
           <!-- Print Selector -->
           <div v-if="availablePrints.length > 1">
-            <label for="edit-print-select" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+            <label for="edit-print-select" class="text-tiny text-silver-70 block mb-1">{{ t('cards.addModal.editionLabel') }}</label>
             <select
                 id="edit-print-select"
                 :value="selectedPrint?.id"
@@ -260,16 +263,16 @@ const handleClose = () => {
                 {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
               </option>
             </select>
-            <p class="text-tiny text-silver-50 mt-1">{{ availablePrints.length }} prints disponibles</p>
+            <p class="text-tiny text-silver-50 mt-1">{{ t('cards.addModal.printsAvailable', { count: availablePrints.length }) }}</p>
           </div>
-          <p v-else-if="loadingPrints" class="text-tiny text-silver-50">Cargando prints...</p>
+          <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('cards.editModal.loadingPrints') }}</p>
           <p v-else class="text-small text-silver-70">{{ card.edition }}</p>
         </div>
       </div>
 
       <!-- Allocation Summary -->
       <div v-if="allocationSummary && allocationSummary.allocations.length > 0" class="bg-secondary border border-silver-30 p-4">
-        <p class="text-tiny text-silver-70 mb-2">ASIGNADA EN MAZOS</p>
+        <p class="text-tiny text-silver-70 mb-2">{{ t('cards.editModal.allocations.title') }}</p>
         <div class="flex flex-wrap gap-2">
           <div
               v-for="alloc in allocationSummary.allocations"
@@ -277,12 +280,12 @@ const handleClose = () => {
               class="px-2 py-1 bg-primary border border-neon-30 text-small"
           >
             <span class="text-neon font-bold">{{ alloc.quantity }}</span>
-            <span class="text-silver ml-1">en {{ alloc.deckName }}</span>
-            <span v-if="alloc.isInSideboard" class="text-silver-50 ml-1">(SB)</span>
+            <span class="text-silver ml-1">{{ t('cards.editModal.allocations.inDeck', { qty: '', deckName: alloc.deckName }).replace('{qty}', '') }}</span>
+            <span v-if="alloc.isInSideboard" class="text-silver-50 ml-1">{{ t('cards.editModal.allocations.sideboard') }}</span>
           </div>
         </div>
         <p class="text-tiny text-silver-50 mt-2">
-          Total: {{ allocationSummary.allocated }} asignada(s), {{ allocationSummary.available }} disponible(s)
+          {{ t('cards.editModal.allocations.total', { allocated: allocationSummary.allocated, available: allocationSummary.available }) }}
         </p>
       </div>
 
@@ -291,7 +294,7 @@ const handleClose = () => {
         <!-- Quantity & Condition -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label for="edit-quantity" class="text-small text-silver-70 block mb-2">Cantidad</label>
+            <label for="edit-quantity" class="text-small text-silver-70 block mb-2">{{ t('cards.addModal.quantityLabel') }}</label>
             <BaseInput
                 id="edit-quantity"
                 v-model.number="form.quantity"
@@ -305,7 +308,7 @@ const handleClose = () => {
           </div>
 
           <div>
-            <label for="edit-condition" class="text-small text-silver-70 block mb-2">Condición</label>
+            <label for="edit-condition" class="text-small text-silver-70 block mb-2">{{ t('cards.addModal.conditionLabel') }}</label>
             <BaseSelect
                 id="edit-condition"
                 v-model="form.condition"
@@ -321,12 +324,12 @@ const handleClose = () => {
               type="checkbox"
               class="w-4 h-4 cursor-pointer"
           />
-          <span class="text-small text-silver">Foil</span>
+          <span class="text-small text-silver">{{ t('cards.addModal.foilLabel') }}</span>
         </label>
 
         <!-- Info about collection sync -->
         <p v-if="allocationSummary && allocationSummary.allocations.length > 0" class="text-tiny text-silver-50 border-t border-silver-20 pt-3">
-          Los cambios se reflejarán en todos los mazos que usan esta carta.
+          {{ t('cards.editModal.note') }}
         </p>
       </div>
 
@@ -337,7 +340,7 @@ const handleClose = () => {
             :disabled="isLoading"
             @click="handleSave"
         >
-          {{ isLoading ? 'GUARDANDO...' : 'GUARDAR CAMBIOS' }}
+          {{ isLoading ? t('common.actions.saving') : t('cards.editModal.submit') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
@@ -345,7 +348,7 @@ const handleClose = () => {
             :disabled="isLoading"
             @click="handleClose"
         >
-          CANCELAR
+          {{ t('common.actions.cancel') }}
         </BaseButton>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
@@ -10,6 +11,8 @@ import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { DisplayDeckCard, HydratedDeckCard } from '../../types/deck'
 import type { CardCondition } from '../../types/card'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -66,14 +69,14 @@ watch(selectedPrint, (print) => {
   }
 })
 
-const conditionOptions = [
-  { value: 'M', label: 'Mint (M)' },
-  { value: 'NM', label: 'Near Mint (NM)' },
-  { value: 'LP', label: 'Light Play (LP)' },
-  { value: 'MP', label: 'Moderate Play (MP)' },
-  { value: 'HP', label: 'Heavy Play (HP)' },
-  { value: 'PO', label: 'Poor (PO)' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 // Check if card is owned (from collection) or wishlist
 const isOwnedCard = computed(() => props.card && !props.card.isWishlist)
@@ -179,12 +182,12 @@ const handleSave = () => {
 
   // Validate quantity for owned cards
   if (isOwnedCard.value && form.value.quantity > maxQuantityForOwned.value) {
-    toastStore.show(`Solo hay ${maxQuantityForOwned.value} disponibles`, 'error')
+    toastStore.show(t('decks.editDeckCard.onlyAvailable', { max: maxQuantityForOwned.value }), 'error')
     return
   }
 
   if (form.value.quantity < 1) {
-    toastStore.show('La cantidad debe ser al menos 1', 'error')
+    toastStore.show(t('decks.editDeckCard.quantityMin'), 'error')
     return
   }
 
@@ -214,14 +217,14 @@ const handleClose = () => {
       <!-- Title -->
       <div>
         <h2 class="text-h2 font-bold text-silver mb-1">
-          {{ isWishlistCard ? 'EDITAR WISHLIST' : 'EDITAR CARTA' }}
+          {{ isWishlistCard ? t('decks.editDeckCard.titleWishlist') : t('decks.editDeckCard.titleOwned') }}
         </h2>
         <p class="text-small text-silver-70">
           <template v-if="isOwnedCard">
-            Modificar esta carta actualizará tu colección
+            {{ t('decks.editDeckCard.subtitleOwned') }}
           </template>
           <template v-else>
-            Modifica los detalles de la carta en wishlist
+            {{ t('decks.editDeckCard.subtitleWishlist') }}
           </template>
         </p>
       </div>
@@ -238,7 +241,7 @@ const handleClose = () => {
                 class="w-32 h-44 object-cover border border-silver-30"
             />
             <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
-              <span class="text-tiny text-silver-50">No image</span>
+              <span class="text-tiny text-silver-50">{{ t('decks.addToDeck.noImage') }}</span>
             </div>
           </div>
 
@@ -269,21 +272,21 @@ const handleClose = () => {
                   <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
                 </div>
                 <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
-                  Cargando precios CK...
+                  {{ t('decks.editDeckCard.loadingCKPrices') }}
                 </div>
               </div>
             </div>
 
             <!-- Allocation info for owned cards -->
             <div v-if="isOwnedCard && allocationSummary" class="p-2 bg-secondary border border-silver-30">
-              <p class="text-tiny text-silver-70 mb-1">EN TU COLECCIÓN</p>
+              <p class="text-tiny text-silver-70 mb-1">{{ t('decks.editDeckCard.inYourCollection') }}</p>
               <p class="text-small text-silver">
-                <span class="text-neon font-bold">{{ allocationSummary.owned }}</span> copias totales,
-                <span class="font-bold">{{ allocationSummary.available }}</span> disponibles
+                <span class="text-neon font-bold">{{ allocationSummary.owned }}</span> {{ t('decks.editDeckCard.copiesTotal', { qty: '' }).replace('{qty}', '') }}
+                <span class="font-bold">{{ allocationSummary.available }}</span> {{ t('decks.editDeckCard.available', { qty: '' }).replace('{qty}', '') }}
               </p>
               <div v-if="allocationSummary.allocations.length > 0" class="mt-1">
                 <p class="text-tiny text-silver-50">
-                  Usado en:
+                  {{ t('decks.editDeckCard.usedIn') }}
                   <span v-for="(alloc, idx) in allocationSummary.allocations" :key="alloc.deckId">
                     {{ alloc.deckName }} ({{ alloc.quantity }}){{ idx < allocationSummary.allocations.length - 1 ? ', ' : '' }}
                   </span>
@@ -293,7 +296,7 @@ const handleClose = () => {
 
             <!-- Print Selector -->
             <div v-if="availablePrints.length > 1">
-              <label for="edit-deck-card-print" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+              <label for="edit-deck-card-print" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.editionPrint') }}</label>
               <select
                   id="edit-deck-card-print"
                   :value="selectedPrint?.id"
@@ -308,9 +311,9 @@ const handleClose = () => {
                   {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
                 </option>
               </select>
-              <p class="text-tiny text-silver-50 mt-1">{{ availablePrints.length }} prints disponibles</p>
+              <p class="text-tiny text-silver-50 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>
             </div>
-            <p v-else-if="loadingPrints" class="text-tiny text-silver-50">Cargando prints...</p>
+            <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('decks.editDeckCard.loadingPrints') }}</p>
             <p v-else class="text-small text-silver-70">{{ card.edition }}</p>
           </div>
         </div>
@@ -321,8 +324,8 @@ const handleClose = () => {
             <!-- Quantity -->
             <div>
               <label for="edit-deck-card-quantity" class="text-tiny text-silver-70 block mb-1">
-                {{ isOwnedCard ? 'Cantidad asignada' : 'Cantidad deseada' }}
-                <span v-if="isOwnedCard" class="text-neon">(máx: {{ maxQuantityForOwned }})</span>
+                {{ isOwnedCard ? t('decks.editDeckCard.quantityAssigned') : t('decks.editDeckCard.quantityDesired') }}
+                <span v-if="isOwnedCard" class="text-neon">{{ t('decks.editDeckCard.maxQty', { max: maxQuantityForOwned }) }}</span>
               </label>
               <input
                   id="edit-deck-card-quantity"
@@ -336,7 +339,7 @@ const handleClose = () => {
 
             <!-- Condition -->
             <div>
-              <label for="edit-deck-card-condition" class="text-tiny text-silver-70 block mb-1">Condición</label>
+              <label for="edit-deck-card-condition" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.conditionLabel') }}</label>
               <BaseSelect
                   id="edit-deck-card-condition"
                   v-model="form.condition"
@@ -349,14 +352,13 @@ const handleClose = () => {
           <div class="flex gap-6">
             <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
               <input v-model="form.foil" type="checkbox" class="w-4 h-4" />
-              <span class="text-small text-silver">Foil</span>
+              <span class="text-small text-silver">{{ t('decks.editDeckCard.foilLabel') }}</span>
             </label>
           </div>
 
           <!-- Info message for owned cards -->
           <p v-if="isOwnedCard" class="text-tiny text-silver-50 border-t border-silver-20 pt-3">
-            Los cambios de print, condición y foil actualizarán la carta en tu colección.
-            Solo la cantidad asignada es específica de este deck.
+            {{ t('decks.editDeckCard.infoMessage') }}
           </p>
         </div>
       </div>
@@ -364,10 +366,10 @@ const handleClose = () => {
       <!-- Actions -->
       <div class="flex gap-3 pt-4 border-t border-silver-20">
         <BaseButton class="flex-1" @click="handleSave">
-          GUARDAR CAMBIOS
+          {{ t('decks.editDeckCard.submit') }}
         </BaseButton>
         <BaseButton variant="secondary" class="flex-1" @click="handleClose">
-          CANCELAR
+          {{ t('common.actions.cancel') }}
         </BaseButton>
       </div>
     </div>

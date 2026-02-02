@@ -8,9 +8,12 @@ import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useDecksStore } from '../../stores/decks'
+import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
 import type { CardCondition, CardStatus } from '../../types/card'
+
+const { t } = useI18n()
 
 interface Props {
   show: boolean
@@ -111,14 +114,14 @@ const form = reactive<{
 // ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
 const cardFaceIndex = ref(0)
 
-const conditionOptions = [
-  { value: 'M', label: 'M - Mint' },
-  { value: 'NM', label: 'NM - Near Mint' },
-  { value: 'LP', label: 'LP - Light Play' },
-  { value: 'MP', label: 'MP - Moderate Play' },
-  { value: 'HP', label: 'HP - Heavy Play' },
-  { value: 'PO', label: 'PO - Poor' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 // ✅ NUEVO: Función para obtener imagen correcta de split cards
 const getCardImage = (card: any): string => {
@@ -158,12 +161,12 @@ const toggleCardFace = () => {
   }
 }
 
-const statusOptions = [
-  { value: 'collection', label: 'Colección Personal' },
-  { value: 'sale', label: 'A la Venta' },
-  { value: 'trade', label: 'Disponible para Cambio' },
-  { value: 'wishlist', label: 'Busco / Wishlist' },
-]
+const statusOptions = computed(() => [
+  { value: 'collection', label: t('cards.addModal.statusOptions.collection') },
+  { value: 'sale', label: t('cards.addModal.statusOptions.sale') },
+  { value: 'trade', label: t('cards.addModal.statusOptions.trade') },
+  { value: 'wishlist', label: t('cards.addModal.statusOptions.wishlist') },
+])
 
 // Show public checkbox only for sale/trade
 // Public option available for all statuses (default: true)
@@ -236,12 +239,12 @@ const handleAddCard = async () => {
       console.log('✅ Preferencia BUSCO creada automáticamente')
     }
 
-    toastStore.show(`✓ ${selectedPrint.value.name} agregada`, 'success')
+    toastStore.show(t('cards.addModal.success', { name: selectedPrint.value.name }), 'success')
     emit('added')
     handleClose()
   } catch (err) {
     console.error('Error agregando carta:', err)
-    toastStore.show('Error al agregar carta', 'error')
+    toastStore.show(t('collection.messages.addError'), 'error')
   } finally {
     loading.value = false
   }
@@ -265,7 +268,7 @@ const handleClose = () => {
   <BaseModal :show="show" @close="handleClose" :close-on-click-outside="false">
     <div class="space-y-4">
       <!-- Título -->
-      <h2 class="text-xl font-bold text-[#EEEEEE]">AGREGAR CARTA</h2>
+      <h2 class="text-xl font-bold text-[#EEEEEE]">{{ t('cards.addModal.title') }}</h2>
 
       <!-- Datos de la carta -->
       <div v-if="selectedPrint" class="border border-[#EEEEEE]/30 p-4 space-y-4">
@@ -282,7 +285,7 @@ const handleClose = () => {
                   class="w-64 h-96 object-cover border border-[#EEEEEE]/20"
               />
               <div v-else class="w-64 h-96 bg-[#333333] border border-[#EEEEEE]/20 flex items-center justify-center">
-                <span class="text-[#EEEEEE]/50">Sin imagen</span>
+                <span class="text-[#EEEEEE]/50">{{ t('cards.detailModal.noImage') }}</span>
               </div>
 
               <!-- ✅ Botón toggle flotante en esquina (SOLO para split cards) -->
@@ -303,7 +306,7 @@ const handleClose = () => {
             <div class="text-center w-full">
               <p class="font-bold text-[#EEEEEE]">{{ currentCardName }}</p>
               <p v-if="isSplitCard" class="text-xs text-[#CCFF00] mt-1">
-                Lado {{ cardFaceIndex + 1 }} de {{ selectedPrint?.card_faces?.length }}
+                {{ t('cards.addModal.splitCardSide', { current: cardFaceIndex + 1, total: selectedPrint?.card_faces?.length }) }}
               </p>
 
               <!-- Prices Section -->
@@ -330,7 +333,7 @@ const handleClose = () => {
 
               <!-- Print Selector -->
               <div v-if="availablePrints.length > 1" class="mt-3">
-                <label for="print-select" class="text-xs text-[#EEEEEE]/70 block mb-1">Edición / Print</label>
+                <label for="print-select" class="text-xs text-[#EEEEEE]/70 block mb-1">{{ t('cards.addModal.editionLabel') }}</label>
                 <select
                     id="print-select"
                     :value="selectedPrint?.id"
@@ -345,9 +348,9 @@ const handleClose = () => {
                     {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
                   </option>
                 </select>
-                <p class="text-xs text-[#EEEEEE]/50 mt-1">{{ availablePrints.length }} prints disponibles</p>
+                <p class="text-xs text-[#EEEEEE]/50 mt-1">{{ t('cards.addModal.printsAvailable', { count: availablePrints.length }) }}</p>
               </div>
-              <p v-else-if="loadingPrints" class="text-xs text-[#EEEEEE]/50 mt-2">Cargando prints...</p>
+              <p v-else-if="loadingPrints" class="text-xs text-[#EEEEEE]/50 mt-2">{{ t('cards.editModal.loadingPrints') }}</p>
               <p v-else class="text-xs text-[#EEEEEE]/70 mt-2">{{ selectedPrint?.set_name }}</p>
             </div>
           </div>
@@ -356,7 +359,7 @@ const handleClose = () => {
           <div class="flex-1 space-y-4">
             <!-- Cantidad -->
             <div>
-              <label for="quantity" class="text-sm text-[#EEEEEE]">Cantidad</label>
+              <label for="quantity" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.quantityLabel') }}</label>
               <input
                   id="quantity"
                   v-model.number="form.quantity"
@@ -368,7 +371,7 @@ const handleClose = () => {
 
             <!-- Condición -->
             <div>
-              <label for="condition" class="text-sm text-[#EEEEEE]">Condición</label>
+              <label for="condition" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.conditionLabel') }}</label>
               <BaseSelect
                   id="condition"
                   v-model="form.condition"
@@ -385,12 +388,12 @@ const handleClose = () => {
                   id="foil"
                   class="w-4 h-4"
               />
-              <label for="foil" class="text-sm text-[#EEEEEE]">Foil</label>
+              <label for="foil" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.foilLabel') }}</label>
             </div>
 
             <!-- Estado -->
             <div>
-              <label for="status" class="text-sm text-[#EEEEEE]">Estado</label>
+              <label for="status" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.statusLabel') }}</label>
               <BaseSelect
                   id="status"
                   v-model="form.status"
@@ -408,14 +411,14 @@ const handleClose = () => {
                   class="w-4 h-4"
               />
               <div>
-                <label for="public" class="text-sm text-[#EEEEEE] cursor-pointer">Publicar en mi perfil</label>
-                <p class="text-xs text-[#EEEEEE]/50">Visible en /@{{ authStore.user?.username }}</p>
+                <label for="public" class="text-sm text-[#EEEEEE] cursor-pointer">{{ t('cards.addModal.publishLabel') }}</label>
+                <p class="text-xs text-[#EEEEEE]/50">{{ t('cards.addModal.publishHint', { username: authStore.user?.username }) }}</p>
               </div>
             </div>
 
             <!-- Deck (opcional) -->
             <div>
-              <label for="deck" class="text-sm text-[#EEEEEE]">Asignar a Deck</label>
+              <label for="deck" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.assignDeck') }}</label>
               <BaseSelect
                   id="deck"
                   v-model="form.deckName"
@@ -430,10 +433,10 @@ const handleClose = () => {
       <!-- Botones -->
       <div class="flex gap-2 justify-end pt-4 border-t border-[#EEEEEE]/20">
         <BaseButton variant="secondary" @click="handleClose">
-          CANCELAR
+          {{ t('common.actions.cancel') }}
         </BaseButton>
         <BaseButton @click="handleAddCard" :disabled="loading">
-          {{ loading ? 'GUARDANDO...' : 'AGREGAR' }}
+          {{ loading ? t('cards.addModal.submitting') : t('cards.addModal.submit') }}
         </BaseButton>
       </div>
     </div>

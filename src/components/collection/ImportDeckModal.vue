@@ -5,9 +5,12 @@ import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseInput from '../ui/BaseInput.vue'
+import { useI18n } from '../../composables/useI18n'
 import { CardCondition } from '../../types/card'
 import { DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
+
+const { t } = useI18n()
 
 defineProps<{
   show: boolean
@@ -38,13 +41,13 @@ const deckFormat = ref<DeckFormat>('modern')
 // Comandante (solo para Commander)
 const commanderName = ref('')
 
-const formatOptions = [
-  { value: 'standard', label: 'Standard' },
-  { value: 'modern', label: 'Modern' },
-  { value: 'commander', label: 'Commander / EDH' },
-  { value: 'vintage', label: 'Vintage' },
-  { value: 'custom', label: 'Custom / Casual' },
-]
+const formatOptions = computed(() => [
+  { value: 'standard', label: t('common.formats.standard') },
+  { value: 'modern', label: t('common.formats.modern') },
+  { value: 'commander', label: t('common.formats.commander') },
+  { value: 'vintage', label: t('common.formats.vintage') },
+  { value: 'custom', label: t('common.formats.custom') },
+])
 
 // Mostrar selector de comandante solo si es Commander
 const isCommander = computed(() => deckFormat.value === 'commander')
@@ -53,14 +56,14 @@ watch(preview, (p) => {
   if (p?.name) deckNameInput.value = p.name
 })
 
-const conditionOptions = [
-  { value: 'M', label: 'M - Mint' },
-  { value: 'NM', label: 'NM - Near Mint' },
-  { value: 'LP', label: 'LP - Light Play' },
-  { value: 'MP', label: 'MP - Moderate Play' },
-  { value: 'HP', label: 'HP - Heavy Play' },
-  { value: 'PO', label: 'PO - Poor' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 const handleParse = async () => {
   if (!inputText.value.trim()) return
@@ -187,11 +190,11 @@ const handleClose = () => {
 </script>
 
 <template>
-  <BaseModal :show="show" title="IMPORTAR MAZO" @close="handleClose">
+  <BaseModal :show="show" :title="t('decks.importModal.title')" @close="handleClose">
     <div class="space-y-md">
       <div>
         <label for="import-deck-input" class="text-small text-silver-70 block mb-2">
-          Link de Moxfield o texto del mazo
+          {{ t('decks.importModal.inputLabel') }}
         </label>
         <textarea
             id="import-deck-input"
@@ -210,18 +213,18 @@ const handleClose = () => {
           :disabled="!inputText.trim() || parsing"
           class="w-full"
       >
-        {{ parsing ? 'ANALIZANDO...' : 'ANALIZAR' }}
+        {{ parsing ? t('decks.importModal.analyzing') : t('decks.importModal.analyze') }}
       </BaseButton>
 
       <!-- Instrucciones para Moxfield -->
       <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="border border-neon bg-neon/10 p-md space-y-2">
-        <p class="text-small text-neon font-bold">Link de Moxfield detectado</p>
-        <p class="text-small text-silver">Moxfield no permite importar directamente. Sigue estos pasos:</p>
+        <p class="text-small text-neon font-bold">{{ t('decks.importModal.moxfieldDetected.title') }}</p>
+        <p class="text-small text-silver">{{ t('decks.importModal.moxfieldDetected.instruction') }}</p>
         <ol class="text-small text-silver-70 list-decimal list-inside space-y-1">
-          <li>Abre el deck en Moxfield</li>
-          <li>Click en <span class="text-neon">Export</span> (arriba a la derecha)</li>
-          <li>Click en <span class="text-neon">Copy to Clipboard</span></li>
-          <li>Pega el texto aquí</li>
+          <li>{{ t('decks.importModal.moxfieldDetected.step1') }}</li>
+          <li>{{ t('decks.importModal.moxfieldDetected.step2') }}</li>
+          <li>{{ t('decks.importModal.moxfieldDetected.step3') }}</li>
+          <li>{{ t('decks.importModal.moxfieldDetected.step4') }}</li>
         </ol>
       </div>
 
@@ -235,15 +238,15 @@ const handleClose = () => {
           {{ preview.name }}
         </p>
         <p class="text-small text-silver">
-          <span class="font-bold">Total:</span> {{ preview.total }} cartas
+          {{ t('decks.importModal.preview.total', { total: preview.total }) }}
         </p>
         <p class="text-small text-silver-70">
-          Mainboard: {{ preview.mainboard }} | Sideboard: {{ preview.sideboard }}
+          {{ t('decks.importModal.preview.detail', { mainboard: preview.mainboard, sideboard: preview.sideboard }) }}
         </p>
       </div>
 
       <div v-if="preview">
-        <label for="import-deck-condition" class="text-small text-silver-70 block mb-2">Condición por defecto</label>
+        <label for="import-deck-condition" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.conditionLabel') }}</label>
         <BaseSelect
             id="import-deck-condition"
             v-model="condition"
@@ -258,19 +261,19 @@ const handleClose = () => {
               type="checkbox"
               class="w-4 h-4"
           />
-          <span>Incluir sideboard</span>
+          <span>{{ t('decks.importModal.options.includeSideboard') }}</span>
         </label>
       </div>
 
       <!-- Deck name input (optional) -->
       <div v-if="preview">
-        <label for="import-deck-name" class="text-small text-silver-70 block mb-2">Nombre del mazo (opcional)</label>
-        <BaseInput id="import-deck-name" v-model="deckNameInput" placeholder="Dejar vacío para generar un nombre aleatorio" />
+        <label for="import-deck-name" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.deckNameLabel') }}</label>
+        <BaseInput id="import-deck-name" v-model="deckNameInput" :placeholder="t('decks.importModal.options.deckNamePlaceholder')" />
       </div>
 
       <!-- Formato del deck -->
       <div v-if="preview">
-        <label for="import-deck-format" class="text-small text-silver-70 block mb-2">Formato</label>
+        <label for="import-deck-format" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.formatLabel') }}</label>
         <BaseSelect
             id="import-deck-format"
             v-model="deckFormat"
@@ -280,11 +283,11 @@ const handleClose = () => {
 
       <!-- Commander (solo si es Commander) -->
       <div v-if="preview && isCommander">
-        <label for="import-deck-commander" class="text-small text-silver-70 block mb-2">Comandante</label>
+        <label for="import-deck-commander" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.commanderLabel') }}</label>
         <BaseInput
             id="import-deck-commander"
             v-model="commanderName"
-            placeholder="Nombre del comandante..."
+            :placeholder="t('decks.importModal.options.commanderPlaceholder')"
             list="commander-suggestions"
         />
         <!-- Sugerencias de cartas del deck -->
@@ -292,7 +295,7 @@ const handleClose = () => {
           <option v-for="card in preview.cards" :key="card" :value="card" />
         </datalist>
         <p class="text-tiny text-silver-50 mt-1">
-          Escribe el nombre o selecciona de las cartas importadas
+          {{ t('decks.importModal.options.commanderHint') }}
         </p>
       </div>
 
@@ -300,7 +303,7 @@ const handleClose = () => {
       <div v-if="preview" class="pt-2">
         <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
           <input v-model="makeAllPublic" type="checkbox" class="w-4 h-4" />
-          <span>Hacer todas estas cartas públicas</span>
+          <span>{{ t('decks.importModal.options.makePublic') }}</span>
         </label>
       </div>
 
@@ -309,7 +312,7 @@ const handleClose = () => {
           @click="handleImport"
           class="w-full"
       >
-        IMPORTAR {{ includeSideboard ? preview.total : preview.mainboard }} CARTAS
+        {{ t('decks.importModal.submit', { count: includeSideboard ? preview.total : preview.mainboard }) }}
       </BaseButton>
     </div>
   </BaseModal>

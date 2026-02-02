@@ -11,6 +11,7 @@ import { useRoute } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
+import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import CardDetailModal from '../components/collection/CardDetailModal.vue'
@@ -40,6 +41,7 @@ const decksStore = useDecksStore()
 const searchStore = useSearchStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
+const { t } = useI18n()
 const { getAllocationsForCard } = useCardAllocation()
 
 // ========== STATE ==========
@@ -215,13 +217,13 @@ const wishlistCount = computed(() => wishlistCards.value.length)
 // Función para traducir status a español
 const getStatusLabel = (status: string): string => {
   const labels: Record<string, string> = {
-    'all': 'TODAS',
-    'owned': 'TENGO',
-    'collection': 'COLECCIÓN',
-    'available': 'DISPONIBLE',
-    'sale': 'VENTA',
-    'trade': 'CAMBIO',
-    'wishlist': 'NECESITO',
+    'all': t('collection.filters.all'),
+    'owned': t('collection.filters.owned'),
+    'collection': t('common.status.collection'),
+    'available': t('collection.filters.available'),
+    'sale': t('common.status.sale'),
+    'trade': t('common.status.trade'),
+    'wishlist': t('collection.filters.wishlist'),
   }
   return labels[status] || status.toUpperCase()
 }
@@ -1521,18 +1523,18 @@ onUnmounted(() => {
     <!-- ========== HEADER ========== -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-h1 font-bold text-silver">MI COLECCIÓN</h1>
+        <h1 class="text-h1 font-bold text-silver">{{ t('collection.title') }}</h1>
         <p class="text-small text-silver-70">
-          {{ ownedCount }} cartas propias
-          <span v-if="wishlistCount > 0" class="text-yellow-400">• {{ wishlistCount }} en wishlist</span>
+          {{ t('collection.subtitle', { owned: ownedCount }) }}
+          <span v-if="wishlistCount > 0" class="text-yellow-400">• {{ t('collection.wishlistCount', { count: wishlistCount }) }}</span>
         </p>
       </div>
       <div class="flex gap-2">
         <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">
-          IMPORTAR
+          {{ t('collection.actions.import') }}
         </BaseButton>
         <BaseButton size="small" @click="showCreateDeckModal = true">
-          + NUEVO DECK
+          {{ t('collection.actions.newDeck') }}
         </BaseButton>
       </div>
     </div>
@@ -1546,13 +1548,13 @@ onUnmounted(() => {
       <div v-if="searchStore.hasResults" class="space-y-4">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h2 class="text-h3 font-bold text-neon">RESULTADOS DE BÚSQUEDA</h2>
+            <h2 class="text-h3 font-bold text-neon">{{ t('collection.searchResults.title') }}</h2>
             <p class="text-small text-silver-70">
-              {{ searchStore.totalResults }} cartas encontradas - Click para agregar
+              {{ t('collection.searchResults.subtitle', { count: searchStore.totalResults }) }}
             </p>
           </div>
           <BaseButton size="small" variant="secondary" @click="searchStore.clearSearch()">
-            VOLVER
+            {{ t('collection.searchResults.back') }}
           </BaseButton>
         </div>
 
@@ -1580,7 +1582,7 @@ onUnmounted(() => {
                     : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
                 ]"
             >
-              MI COLECCIÓN
+              {{ t('collection.tabs.collection') }}
             </button>
             <button
                 @click="switchToDecks()"
@@ -1591,7 +1593,7 @@ onUnmounted(() => {
                     : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
                 ]"
             >
-              MAZOS
+              {{ t('collection.tabs.decks') }}
               <span class="ml-1 opacity-70">{{ decksList.length }}</span>
             </button>
           </div>
@@ -1633,16 +1635,16 @@ onUnmounted(() => {
                 @click="showCreateDeckModal = true"
                 class="px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2 border-dashed border-silver-30 text-silver-50 hover:border-neon hover:text-neon"
             >
-              + NUEVO
+              {{ t('collection.actions.new') }}
             </button>
           </div>
 
           <!-- Mensaje si no hay mazos -->
           <div v-if="viewMode === 'decks' && decksList.length === 0" class="pl-4 border-l-4 border-neon py-4">
-            <p class="text-silver-50 text-small">No tienes mazos creados.</p>
+            <p class="text-silver-50 text-small">{{ t('collection.noDecks') }}</p>
             <div class="flex gap-2 mt-3">
-              <BaseButton size="small" @click="showCreateDeckModal = true">+ CREAR MAZO</BaseButton>
-              <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">IMPORTAR</BaseButton>
+              <BaseButton size="small" @click="showCreateDeckModal = true">{{ t('collection.actions.createDeck') }}</BaseButton>
+              <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">{{ t('collection.actions.import') }}</BaseButton>
             </div>
           </div>
         </div>
@@ -1666,7 +1668,7 @@ onUnmounted(() => {
                   class="flex items-center gap-1 md:gap-2"
               >
                 <SpriteIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
-                <span class="hidden sm:inline">{{ isDeckPublic ? 'PÚBLICO' : 'PRIVADO' }}</span>
+                <span class="hidden sm:inline">{{ isDeckPublic ? t('collection.visibility.public') : t('collection.visibility.private') }}</span>
               </BaseButton>
               <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
                 <span class="hidden sm:inline">ELIMINAR</span>
@@ -1676,15 +1678,15 @@ onUnmounted(() => {
           </div>
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
-              <p class="text-tiny text-silver-50">Tengo</p>
+              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.have') }}</p>
               <p class="text-h3 font-bold text-neon">{{ deckOwnedCount }}</p>
             </div>
             <div>
-              <p class="text-tiny text-silver-50">Necesito</p>
+              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.need') }}</p>
               <p class="text-h3 font-bold text-yellow-400">{{ deckWishlistCount }}</p>
             </div>
             <div>
-              <p class="text-tiny text-silver-50">Total</p>
+              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.total') }}</p>
               <p class="text-h3 font-bold text-silver">
                 <span class="text-neon">{{ deckOwnedCount }}</span>
                 <span class="text-silver-50">/</span>
@@ -1692,21 +1694,21 @@ onUnmounted(() => {
               </p>
             </div>
             <div>
-              <p class="text-tiny text-silver-50">Valor Tengo</p>
+              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.valueHave') }}</p>
               <p class="text-body font-bold text-neon">TCG: ${{ deckOwnedCost.toFixed(2) }}</p>
             </div>
             <div>
-              <p class="text-tiny text-silver-50">Valor Necesito</p>
+              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.valueNeed') }}</p>
               <p class="text-body font-bold text-yellow-400">TCG: ${{ deckWishlistCost.toFixed(2) }}</p>
             </div>
             <div>
-              <p class="text-tiny text-silver-50">Valor Total</p>
+              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.valueTotal') }}</p>
               <p class="text-body font-bold text-silver">TCG: ${{ deckTotalCost.toFixed(2) }}</p>
             </div>
           </div>
           <div v-if="selectedDeckStats" class="mt-4 pt-4 border-t border-neon/30">
             <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">Completado:</span>
+              <span class="text-tiny text-silver-50">{{ t('collection.deckStats.completed') }}:</span>
               <div class="flex-1 h-2 bg-primary rounded overflow-hidden">
                 <div
                     class="h-full bg-neon transition-all"
@@ -1720,12 +1722,12 @@ onUnmounted(() => {
           <!-- Grouping controls -->
           <div class="mt-4 pt-4 border-t border-neon/30">
             <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">Agrupar por:</span>
+              <span class="text-tiny text-silver-50">{{ t('collection.deckStats.groupBy') }}</span>
               <button
                   v-for="opt in [
-                    { value: 'type', label: 'Tipo' },
-                    { value: 'mana', label: 'Mana' },
-                    { value: 'color', label: 'Color' }
+                    { value: 'type', label: t('collection.deckStats.type') },
+                    { value: 'mana', label: t('collection.deckStats.mana') },
+                    { value: 'color', label: t('collection.deckStats.color') }
                   ]"
                   :key="opt.value"
                   @click="deckGroupBy = opt.value as DeckGroupOption"
@@ -1769,7 +1771,7 @@ onUnmounted(() => {
         <div class="mb-6">
           <BaseInput
               v-model="filterQuery"
-              placeholder="Buscar por nombre..."
+              :placeholder="t('collection.filters.searchPlaceholder')"
               type="text"
           />
         </div>
@@ -1777,7 +1779,7 @@ onUnmounted(() => {
         <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
         <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
-            <h3 class="text-small font-bold text-silver">CARTAS QUE TENGO</h3>
+            <h3 class="text-small font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
             <span class="text-tiny text-silver-50">({{ filteredCards.length }})</span>
           </div>
           <CollectionGrid
@@ -1791,7 +1793,7 @@ onUnmounted(() => {
         <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->
         <div v-if="viewMode === 'decks' && selectedDeck && mainboardDisplayCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-neon">
-            <h3 class="text-small font-bold text-neon">MAZO PRINCIPAL</h3>
+            <h3 class="text-small font-bold text-neon">{{ t('collection.sections.mainboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ mainboardOwnedCount + mainboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid
@@ -1815,7 +1817,7 @@ onUnmounted(() => {
         <!-- ========== DECK VIEW: SIDEBOARD (Visual Grid) - solo no-commander ========== -->
         <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b border-blue-400/30">
-            <h3 class="text-small font-bold text-blue-400">SIDEBOARD</h3>
+            <h3 class="text-small font-bold text-blue-400">{{ t('collection.sections.sideboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ sideboardOwnedCount + sideboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid
@@ -1834,7 +1836,7 @@ onUnmounted(() => {
         <!-- ========== WISHLIST GENERAL (solo en modo colección) ========== -->
         <div v-if="viewMode === 'collection' && wishlistCards.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mt-8">
           <div class="flex items-center gap-2 mb-4">
-            <h3 class="text-small font-bold text-yellow-400">MI WISHLIST</h3>
+            <h3 class="text-small font-bold text-yellow-400">{{ t('collection.sections.myWishlist') }}</h3>
             <span class="text-tiny text-silver-50">({{ wishlistCount }})</span>
           </div>
           <CollectionGrid
@@ -1848,16 +1850,16 @@ onUnmounted(() => {
         <!-- Empty State: Deck sin cartas -->
         <div v-if="viewMode === 'decks' && selectedDeck && mainboardDisplayCards.length === 0 && sideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
-            <p class="text-small text-silver-70">Deck vacío</p>
-            <p class="text-tiny text-silver-70 mt-1">Este deck no tiene cartas asignadas</p>
+            <p class="text-small text-silver-70">{{ t('collection.empty.deckEmpty') }}</p>
+            <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.deckNoCards') }}</p>
           </div>
         </div>
 
         <!-- Empty State: Colección sin cartas -->
         <div v-if="viewMode === 'collection' && filteredCards.length === 0 && wishlistCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
-            <p class="text-small text-silver-70">Sin cartas</p>
-            <p class="text-tiny text-silver-70 mt-1">Busca cartas arriba para agregarlas</p>
+            <p class="text-small text-silver-70">{{ t('collection.empty.noCards') }}</p>
+            <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.searchToAdd') }}</p>
           </div>
         </div>
       </div>

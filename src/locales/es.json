@@ -1,0 +1,1038 @@
+{
+  "common": {
+    "actions": {
+      "save": "GUARDAR",
+      "cancel": "CANCELAR",
+      "delete": "ELIMINAR",
+      "edit": "EDITAR",
+      "add": "AGREGAR",
+      "close": "CERRAR",
+      "search": "BUSCAR",
+      "back": "VOLVER",
+      "confirm": "ACEPTAR",
+      "create": "CREAR",
+      "update": "ACTUALIZAR",
+      "import": "IMPORTAR",
+      "export": "EXPORTAR",
+      "loading": "CARGANDO...",
+      "saving": "GUARDANDO...",
+      "sending": "ENVIANDO...",
+      "loadMore": "CARGAR MÁS",
+      "retry": "REINTENTAR",
+      "apply": "APLICAR",
+      "clear": "LIMPIAR"
+    },
+    "labels": {
+      "quantity": "Cantidad",
+      "condition": "Condición",
+      "foil": "Foil",
+      "status": "Estado",
+      "format": "Formato",
+      "name": "Nombre",
+      "description": "Descripción",
+      "location": "Ubicación",
+      "email": "Email",
+      "password": "Contraseña",
+      "edition": "Edición",
+      "price": "Precio",
+      "total": "Total",
+      "type": "Tipo",
+      "colors": "Colores",
+      "date": "Fecha",
+      "user": "Usuario"
+    },
+    "status": {
+      "collection": "Colección",
+      "sale": "Venta",
+      "trade": "Cambio",
+      "wishlist": "Deseado"
+    },
+    "conditions": {
+      "M": "M - Mint",
+      "NM": "NM - Near Mint",
+      "LP": "LP - Light Play",
+      "MP": "MP - Moderate Play",
+      "HP": "HP - Heavy Play",
+      "PO": "PO - Poor"
+    },
+    "formats": {
+      "standard": "Standard",
+      "modern": "Modern",
+      "commander": "Commander / EDH",
+      "vintage": "Vintage",
+      "custom": "Custom / Casual",
+      "pioneer": "Pioneer",
+      "legacy": "Legacy"
+    },
+    "colors": {
+      "white": "Blanco",
+      "blue": "Azul",
+      "black": "Negro",
+      "red": "Rojo",
+      "green": "Verde",
+      "colorless": "Incoloro"
+    },
+    "time": {
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "daysAgo": "hace {days} días",
+      "updated": "Actualizado"
+    },
+    "empty": {
+      "noResults": "No se encontraron resultados",
+      "noData": "No hay datos disponibles"
+    }
+  },
+
+  "auth": {
+    "login": {
+      "title": "INICIAR SESIÓN",
+      "subtitle": "Magic: The Gathering Trading Platform",
+      "emailPlaceholder": "tu@email.com",
+      "passwordPlaceholder": "Contraseña",
+      "submit": "INGRESAR",
+      "submitting": "INGRESANDO...",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "noAccount": "¿No tienes cuenta?",
+      "register": "Registrarse",
+      "secureConnection": "Conexión segura",
+      "firebaseAuth": "Firebase Auth"
+    },
+    "register": {
+      "title": "REGISTRARSE",
+      "subtitle": "CRANIAL TRADING",
+      "emailLabel": "Email",
+      "passwordLabel": "Contraseña (mínimo 6 caracteres)",
+      "usernameLabel": "Nombre de usuario",
+      "locationLabel": "Ubicación (ej: Buenos Aires, Argentina)",
+      "submit": "CREAR CUENTA",
+      "submitting": "CREANDO CUENTA...",
+      "hasAccount": "¿Ya tienes cuenta?",
+      "login": "Iniciar sesión"
+    },
+    "verify": {
+      "title": "VERIFICA TU EMAIL",
+      "message": "Te hemos enviado un email a",
+      "instruction": "Haz click en el enlace para verificar tu cuenta. Si no lo ves, revisa spam.",
+      "checkButton": "YA VERIFIQUÉ",
+      "checking": "VERIFICANDO...",
+      "resend": "REENVIAR EMAIL"
+    },
+    "forgotPassword": {
+      "title": "RECUPERAR CONTRASEÑA",
+      "instruction": "Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.",
+      "emailPlaceholder": "tu@email.com",
+      "submit": "ENVIAR ENLACE",
+      "submitting": "ENVIANDO...",
+      "success": "Email enviado",
+      "successMessage": "Revisa tu correo para el enlace de recuperación. Si no lo ves, revisa spam.",
+      "backToLogin": "Volver al login"
+    },
+    "resetPassword": {
+      "title": "NUEVA CONTRASEÑA",
+      "newPasswordPlaceholder": "Nueva contraseña",
+      "confirmPasswordPlaceholder": "Confirmar contraseña",
+      "passwordMismatch": "Las contraseñas no coinciden",
+      "submit": "RESTABLECER",
+      "submitting": "RESTABLECIENDO...",
+      "invalidLink": "Enlace inválido",
+      "invalidLinkMessage": "El enlace de recuperación es inválido o expiró.",
+      "requestNewLink": "Solicitar nuevo enlace",
+      "backToLogin": "Volver al login"
+    },
+    "messages": {
+      "accountCreated": "Cuenta creada. Verifica tu email",
+      "registerError": "Error al registrar",
+      "loginSuccess": "Sesión iniciada",
+      "verifyEmail": "Por favor verifica tu email",
+      "invalidCredentials": "Email o contraseña incorrectos",
+      "logoutSuccess": "Sesión cerrada",
+      "logoutError": "Error al cerrar sesión",
+      "recoveryEmailSent": "Email de recuperación enviado",
+      "emailNotRegistered": "Email no registrado",
+      "sendEmailError": "Error al enviar email",
+      "passwordReset": "Contraseña restablecida",
+      "linkExpired": "Enlace expirado o inválido",
+      "weakPassword": "Contraseña débil",
+      "resetError": "Error al restablecer",
+      "notAuthenticated": "Usuario no autenticado",
+      "wrongCurrentPassword": "Contraseña actual incorrecta",
+      "weakNewPassword": "Contraseña nueva débil",
+      "changePasswordError": "Error al cambiar contraseña",
+      "verificationEmailSent": "Email de verificación enviado",
+      "verifyEmailError": "Error al verificar email"
+    }
+  },
+
+  "landing": {
+    "tagline": "From Trash to Treasures",
+    "subtitle": "Tu bulk no es basura. Es el tesoro de otro coleccionista.",
+    "description": "Conectamos traders de Magic para que conviertas esas cartas olvidadas en valor real.",
+    "features": {
+      "collection": {
+        "title": "Gestiona tu Colección",
+        "description": "Organiza todas tus cartas con precios actualizados"
+      },
+      "matches": {
+        "title": "Encuentra Matches",
+        "description": "Nuestro algoritmo encuentra traders compatibles"
+      },
+      "bulk": {
+        "title": "Monetiza tu Bulk",
+        "description": "Esas cartas que crees que no valen, alguien las busca"
+      },
+      "connect": {
+        "title": "Conecta con Traders",
+        "description": "Mensajería directa para cerrar trades"
+      }
+    },
+    "stats": {
+      "free": "Gratis",
+      "p2p": "Sin intermediarios",
+      "mtg": "Especializado"
+    },
+    "footer": {
+      "platform": "PLATAFORMA",
+      "resources": "RECURSOS",
+      "legal": "LEGAL"
+    }
+  },
+
+  "header": {
+    "nav": {
+      "search": "Buscar",
+      "collection": "Colección",
+      "saved": "Guardados",
+      "messages": "Mensajes",
+      "contacts": "Contactos"
+    },
+    "profile": {
+      "myProfile": "Mi Perfil",
+      "viewPublicProfile": "Ver mi perfil público",
+      "settings": "Configuración",
+      "logout": "Cerrar sesión"
+    },
+    "auth": {
+      "login": "Iniciar",
+      "register": "Registrar"
+    }
+  },
+
+  "dashboard": {
+    "title": "BUSCAR MATCHES",
+    "matchesFound": "matches encontrados",
+    "calculating": "CALCULANDO...",
+    "recalculate": "RECALCULAR",
+    "syncing": "SINCRONIZANDO...",
+    "sync": "SINCRONIZAR",
+    "deleteData": "BORRAR MIS DATOS",
+    "searchOthers": {
+      "title": "BUSCAR CARTAS DE OTROS USUARIOS",
+      "placeholder": "Nombre de la carta...",
+      "search": "BUSCAR",
+      "noImage": "Sin imagen",
+      "noOwner": "Sin dueño",
+      "addToWishlist": "+ NECESITO",
+      "interested": "ME INTERESA",
+      "sent": "Enviado",
+      "noOwners": "Ningún usuario tiene esta carta disponible. ¿La necesitas? Agrégala a tu lista de deseos:",
+      "notFound": "No se encontró ninguna carta con ese nombre."
+    },
+    "calculatingMatches": {
+      "title": "CALCULANDO MATCHES",
+      "loading": "Cargando datos..."
+    },
+    "clearData": {
+      "title": "Borrar todos los datos",
+      "message": "¿Borrar TODAS tus cartas, preferencias, matches y decks? Esta acción no se puede deshacer.",
+      "confirm": "BORRAR TODO",
+      "progress": "Borrando datos...",
+      "deleting": "Borrando {step}...",
+      "complete": "Todos los datos borrados",
+      "withErrors": "Borrado con {count} error(es)",
+      "resuming": "Continuando borrado de datos..."
+    },
+    "interest": {
+      "sent": "Interés enviado a @{username}",
+      "error": "Error al enviar interés"
+    },
+    "wishlist": {
+      "added": "{name} agregada a tu lista de deseos"
+    },
+    "empty": {
+      "noCardsOrPrefs": "No tienes cartas ni preferencias",
+      "addCardsOrPrefs": "Agrega cartas a tu colección o crea una preferencia para encontrar matches automáticamente.",
+      "viewCollection": "VER MI COLECCIÓN",
+      "noMatches": "No hay matches disponibles",
+      "usersInPlatform": "Hay {count} usuarios en la plataforma..."
+    }
+  },
+
+  "collection": {
+    "title": "MI COLECCIÓN",
+    "subtitle": "{owned} cartas propias",
+    "wishlistCount": "{count} en wishlist",
+    "tabs": {
+      "collection": "MI COLECCIÓN",
+      "decks": "MAZOS"
+    },
+    "filters": {
+      "all": "TODAS",
+      "owned": "TENGO",
+      "available": "DISPONIBLE",
+      "wishlist": "NECESITO",
+      "searchPlaceholder": "Buscar por nombre..."
+    },
+    "sections": {
+      "myCards": "CARTAS QUE TENGO",
+      "mainboard": "MAZO PRINCIPAL",
+      "sideboard": "SIDEBOARD",
+      "myWishlist": "MI WISHLIST"
+    },
+    "empty": {
+      "deckEmpty": "Deck vacío",
+      "deckNoCards": "Este deck no tiene cartas asignadas",
+      "noCards": "Sin cartas",
+      "searchToAdd": "Busca cartas arriba para agregarlas"
+    },
+    "deckStats": {
+      "have": "Tengo",
+      "need": "Necesito",
+      "total": "Total",
+      "valueHave": "Valor Tengo",
+      "valueNeed": "Valor Necesito",
+      "valueTotal": "Valor Total",
+      "completed": "Completado",
+      "groupBy": "Agrupar por:",
+      "type": "Tipo",
+      "mana": "Mana",
+      "color": "Color"
+    },
+    "visibility": {
+      "public": "PÚBLICO",
+      "private": "PRIVADO"
+    },
+    "actions": {
+      "newDeck": "+ NUEVO DECK",
+      "import": "IMPORTAR",
+      "createDeck": "+ CREAR MAZO",
+      "new": "+ NUEVO"
+    },
+    "searchResults": {
+      "title": "RESULTADOS DE BÚSQUEDA",
+      "subtitle": "{count} cartas encontradas - Click para agregar",
+      "back": "VOLVER"
+    },
+    "noDecks": "No tienes mazos creados.",
+    "totals": {
+      "title": "VALOR DE COLECCION",
+      "update": "ACTUALIZAR",
+      "loading": "Cargando precios... {progress}%",
+      "headers": {
+        "collection": "COLECCION",
+        "wishlist": "WISHLIST",
+        "forSale": "EN VENTA",
+        "total": "TOTAL"
+      }
+    },
+    "messages": {
+      "loadError": "Error al cargar colección",
+      "addError": "Error al agregar carta",
+      "updateError": "Error al actualizar carta",
+      "deleteError": "Error al eliminar carta",
+      "allDeleted": "Todas las cartas fueron eliminadas",
+      "deleteAllError": "Error al eliminar cartas",
+      "imported": "{count} cartas importadas",
+      "importError": "Error al importar cartas",
+      "synced": "Cartas sincronizadas para matches",
+      "syncError": "Error sincronizando cartas"
+    }
+  },
+
+  "cards": {
+    "addModal": {
+      "title": "AGREGAR CARTA",
+      "editionLabel": "Edición / Print",
+      "printsAvailable": "{count} prints disponibles",
+      "quantityLabel": "Cantidad",
+      "conditionLabel": "Condición",
+      "foilLabel": "Foil",
+      "statusLabel": "Estado",
+      "statusOptions": {
+        "collection": "Colección Personal",
+        "sale": "A la Venta",
+        "trade": "Disponible para Cambio",
+        "wishlist": "Busco / Wishlist"
+      },
+      "publishLabel": "Publicar en mi perfil",
+      "publishHint": "Visible en /@{username}",
+      "assignDeck": "Asignar a Deck",
+      "priceTCG": "TCG: ${price}",
+      "priceCK": "CK: {price}",
+      "priceBuylist": "BL: {price}",
+      "submit": "AGREGAR",
+      "submitting": "GUARDANDO...",
+      "success": "✓ {name} agregada",
+      "splitCardSide": "Lado {current} de {total}"
+    },
+    "editModal": {
+      "title": "EDITAR CARTA",
+      "subtitle": "Modifica los detalles de tu carta",
+      "loadingPrices": "Cargando precios CK...",
+      "loadingPrints": "Cargando prints...",
+      "allocations": {
+        "title": "ASIGNADA EN MAZOS",
+        "inDeck": "{qty} en {deckName}",
+        "sideboard": "(SB)",
+        "total": "Total: {allocated} asignada(s), {available} disponible(s)"
+      },
+      "quantityWarning": "{excess} copia(s) a wishlist",
+      "note": "Los cambios se reflejarán en todos los mazos que usan esta carta.",
+      "submit": "GUARDAR CAMBIOS"
+    },
+    "statusModal": {
+      "title": "CAMBIAR STATUS",
+      "subtitle": "Gestiona el estado de esta carta",
+      "prices": "Precios:",
+      "loadingCKPrices": "Cargando precios CK...",
+      "currentStatus": "Status actual:",
+      "newStatus": "Nuevo status",
+      "statusOptions": {
+        "collection": "En colección",
+        "sale": "En venta",
+        "trade": "En cambio",
+        "wishlist": "Deseado"
+      },
+      "statusInfo": {
+        "collection": {
+          "icon": "✓",
+          "label": "COLECCIÓN",
+          "description": "Cartas que tienes"
+        },
+        "sale": {
+          "icon": "💰",
+          "label": "VENTA",
+          "description": "Cartas para vender"
+        },
+        "trade": {
+          "icon": "🔄",
+          "label": "CAMBIO",
+          "description": "Cartas para trocar"
+        },
+        "wishlist": {
+          "icon": "⭐",
+          "label": "DESEADO",
+          "description": "Cartas que buscas"
+        }
+      },
+      "publishLabel": "Publicar en mi perfil",
+      "publishHint": "Visible para otros usuarios en tu perfil público",
+      "submit": "✓ CAMBIAR"
+    },
+    "detailModal": {
+      "title": "DETALLE DE CARTA",
+      "subtitle": "Gestiona tu carta y distribúyela por status",
+      "distribution": "DISTRIBUCIÓN POR STATUS",
+      "totalLabel": "Total: {qty}",
+      "properties": "PROPIEDADES",
+      "conditionLabel": "Condición",
+      "foilLabel": "Foil",
+      "assignToDecks": "ASIGNAR A MAZOS",
+      "available": "{qty} disponible(s)",
+      "deckFormat": "{format}",
+      "sideboardToggle": {
+        "sideboard": "SB",
+        "mainboard": "MB"
+      },
+      "totalAssigned": "Total asignadas: {qty}",
+      "noImage": "No image",
+      "allocatedIn": "ASIGNADA EN MAZOS",
+      "quantityMin": "Cantidad debe ser al menos 1",
+      "validationMinCopy": "Debes tener al menos 1 copia",
+      "allocationWarning": "{excess} carta(s) asignadas a mazos pasarán a wishlist",
+      "loadingPrints": "Cargando prints...",
+      "printsAvailable": "{count} prints disponibles",
+      "editionPrintLabel": "Edición / Print",
+      "updated": "Carta actualizada",
+      "saveError": "Error guardando cambios"
+    },
+    "grid": {
+      "perUnit": "${price} c/u",
+      "total": "${price}",
+      "clickToEdit": "CLICK PARA EDITAR",
+      "available": "disp",
+      "inDecks": "{qty} en mazos",
+      "interestSent": "✓ INTERÉS ENVIADO",
+      "interested": "⭐ ME INTERESA",
+      "noImage": "No image",
+      "noImg": "No img",
+      "delete": "ELIMINAR",
+      "deleting": "ELIMINANDO...",
+      "visibleInProfile": "Carta visible en perfil",
+      "hiddenFromProfile": "Carta oculta del perfil",
+      "visibilityError": "Error al cambiar visibilidad",
+      "visibleTitle": "Visible en perfil (click para ocultar)",
+      "hiddenTitle": "Oculto del perfil (click para mostrar)",
+      "flipTitle": "Click para ver el otro lado",
+      "availableOf": "{available} disponibles de {total} ({allocated} en mazos)",
+      "copiesInCollection": "{qty} copias en colección",
+      "inDeck": "{qty}x en {deckName}",
+      "public": "PÚBLICO",
+      "private": "PRIVADO",
+      "deleteTitle": "Eliminar carta"
+    }
+  },
+
+  "decks": {
+    "title": "MIS MAZOS",
+    "subtitle": "{count} mazos creados",
+    "actions": {
+      "newDeck": "+ NUEVO MAZO",
+      "import": "IMPORTAR",
+      "editDeck": "EDITAR MAZO"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar por nombre o descripción...",
+      "format": "Formato",
+      "all": "TODOS"
+    },
+    "empty": {
+      "noDecks": "No hay mazos",
+      "createFirst": "Crea tu primer mazo para comenzar",
+      "noResults": "No se encontraron mazos con estos filtros",
+      "createButton": "CREAR PRIMER MAZO"
+    },
+    "card": {
+      "noDescription": "Sin descripción",
+      "stats": {
+        "cards": "CARTAS",
+        "cost": "COSTO",
+        "collection": "COLEC."
+      },
+      "updated": "Actualizado: {date}",
+      "edit": "EDITAR",
+      "delete": "BORRAR"
+    },
+    "createModal": {
+      "title": "CREAR NUEVO MAZO",
+      "subtitle": "Define los detalles básicos de tu mazo",
+      "nameLabel": "Nombre del Mazo *",
+      "namePlaceholder": "Ej: RDW Modern",
+      "formatLabel": "Formato",
+      "descriptionLabel": "Descripción",
+      "descriptionPlaceholder": "Describe tu estrategia, meta, notas...",
+      "cardListLabel": "Lista de cartas (opcional)",
+      "cardListPlaceholder": "Pega tu lista aquí: 4 Lightning Bolt...",
+      "colorsLabel": "Colores",
+      "preview": "{total} cartas detectadas",
+      "previewDetail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
+      "validation": {
+        "nameRequired": "El nombre del mazo es requerido"
+      },
+      "submit": "CREAR MAZO"
+    },
+    "importModal": {
+      "title": "IMPORTAR MAZO",
+      "inputLabel": "Link de Moxfield o texto del mazo",
+      "inputPlaceholder": "https://moxfield.com/decks/... o 3 Arid Mesa...",
+      "analyze": "ANALIZAR",
+      "analyzing": "ANALIZANDO...",
+      "moxfieldDetected": {
+        "title": "Link de Moxfield detectado",
+        "instruction": "Moxfield no permite importar directamente. Sigue estos pasos:",
+        "step1": "1. Abre el deck en Moxfield",
+        "step2": "2. Click en Export (arriba a la derecha)",
+        "step3": "3. Click en Copy to Clipboard",
+        "step4": "4. Pega el texto aquí"
+      },
+      "preview": {
+        "total": "Total: {total} cartas",
+        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}"
+      },
+      "options": {
+        "conditionLabel": "Condición por defecto",
+        "includeSideboard": "Incluir sideboard",
+        "deckNameLabel": "Nombre del mazo (opcional)",
+        "deckNamePlaceholder": "Dejar vacío para generar un nombre aleatorio",
+        "formatLabel": "Formato",
+        "commanderLabel": "Comandante",
+        "commanderPlaceholder": "Nombre del comandante...",
+        "commanderHint": "Escribe el nombre o selecciona de las cartas importadas",
+        "makePublic": "Hacer todas estas cartas públicas"
+      },
+      "submit": "IMPORTAR {count} CARTAS"
+    },
+    "editDeckCard": {
+      "titleWishlist": "EDITAR WISHLIST",
+      "titleOwned": "EDITAR CARTA",
+      "subtitleOwned": "Modificar esta carta actualizará tu colección",
+      "subtitleWishlist": "Modifica los detalles de la carta en wishlist",
+      "loadingCKPrices": "Cargando precios CK...",
+      "inYourCollection": "EN TU COLECCIÓN",
+      "copiesTotal": "{qty} copias totales,",
+      "available": "{qty} disponibles",
+      "usedIn": "Usado en:",
+      "editionPrint": "Edición / Print",
+      "printsAvailable": "{count} prints disponibles",
+      "loadingPrints": "Cargando prints...",
+      "quantityAssigned": "Cantidad asignada",
+      "quantityDesired": "Cantidad deseada",
+      "maxQty": "(máx: {max})",
+      "conditionLabel": "Condición",
+      "foilLabel": "Foil",
+      "infoMessage": "Los cambios de print, condición y foil actualizarán la carta en tu colección. Solo la cantidad asignada es específica de este deck.",
+      "submit": "GUARDAR CAMBIOS",
+      "onlyAvailable": "Solo hay {max} disponibles",
+      "quantityMin": "La cantidad debe ser al menos 1"
+    },
+    "addToDeck": {
+      "title": "AGREGAR CARTA AL DECK",
+      "subtitle": "Busca y selecciona una carta",
+      "searchLabel": "Buscar Carta",
+      "searchPlaceholder": "Ej: Black Lotus, Ragavan, Counterspell...",
+      "searchError": "Error en la búsqueda",
+      "noResults": "No se encontraron resultados para \"{query}\"",
+      "resultsCount": "{count} resultados - Click para agregar",
+      "noImage": "No image",
+      "emptyState": "Escribe el nombre de una carta para buscar",
+      "addTo": "AGREGAR AL {section}",
+      "configureAdd": "Configura cómo deseas agregar esta carta",
+      "cardSource": "FUENTE DE LA CARTA",
+      "noCardInCollection": "No tienes esta carta en tu colección",
+      "addToWishlist": "+ Agregar a Wishlist (no tengo)",
+      "addToCollectionFirst": "+ Agregar a mi colección primero",
+      "wishlistOption": "Wishlist",
+      "addToCollection": "Agregar a Colección",
+      "quantityLabel": "Cantidad",
+      "availableDisp": "{available} / {total} disp.",
+      "selectCard": "Selecciona una carta",
+      "assignFromCollection": "ASIGNAR DESDE COLECCIÓN",
+      "addToCollectionAndDeck": "AGREGAR A COLECCIÓN Y DECK",
+      "addToWishlistBtn": "AGREGAR A WISHLIST",
+      "goBack": "← VOLVER",
+      "noFoil": "No Foil"
+    },
+    "cardsList": {
+      "uniqueCards": "CARTAS ÚNICAS",
+      "totalCards": "TOTAL CARTAS",
+      "inCollection": "EN COLECCIÓN",
+      "wishlist": "WISHLIST",
+      "noCardsIn": "No hay cartas en {section}",
+      "headers": {
+        "qty": "QTY",
+        "card": "CARTA",
+        "edition": "EDICIÓN",
+        "status": "ESTADO",
+        "price": "PRECIO",
+        "actions": "ACCIONES"
+      },
+      "perUnit": "c/u",
+      "available": "disp.",
+      "inCollectionCount": "{total} en colección ({available} disp.)",
+      "edit": "EDITAR",
+      "editTitle": "Editar",
+      "remove": "QUITAR",
+      "removeTitle": "Quitar del deck",
+      "legend": {
+        "inCollection": "En colección",
+        "wishlist": "Wishlist (necesitas comprar)"
+      }
+    },
+    "editor": {
+      "title": "EDITOR: {name}",
+      "complete": "completo",
+      "save": "GUARDAR",
+      "back": "← VOLVER",
+      "stats": {
+        "format": "FORMATO",
+        "cards": "CARTAS",
+        "inCollection": "EN COLECCIÓN",
+        "wishlist": "WISHLIST"
+      },
+      "colors": "COLORES",
+      "noColors": "Sin colores definidos",
+      "sections": {
+        "mainboard": "MAINBOARD",
+        "sideboard": "SIDEBOARD"
+      },
+      "addCard": "+ AGREGAR CARTA",
+      "removeFromDeck": "Eliminar del deck",
+      "confirmRemove": "¿Eliminar \"{name}\" del deck?",
+      "messages": {
+        "cardRemoved": "Carta eliminada del deck",
+        "cardUpdated": "Carta actualizada",
+        "cardAdded": "Carta agregada al {section}",
+        "cardAddedToCollection": "Carta agregada a colección y {section}",
+        "cardAddedToWishlist": "Carta agregada a wishlist del {section}",
+        "quantityUpdated": "Cantidad actualizada",
+        "alreadyInWishlist": "Esta carta ya está en tu wishlist del deck",
+        "nameRequired": "El nombre del deck es requerido",
+        "saved": "Deck guardado",
+        "notFound": "No se encontró el mazo"
+      }
+    },
+    "detail": {
+      "stats": {
+        "total": "TOTAL",
+        "inCollection": "EN COLECCIÓN",
+        "wishlist": "WISHLIST",
+        "totalCost": "COSTO TOTAL"
+      },
+      "sections": {
+        "mainboard": "MAINBOARD",
+        "sideboard": "SIDEBOARD",
+        "stats": "ESTADÍSTICAS"
+      },
+      "edit": "EDITAR",
+      "back": "← VOLVER",
+      "updated": "Actualizado:",
+      "notFound": "No se encontró el mazo",
+      "backToDecks": "VOLVER A MAZOS"
+    },
+    "manageModal": {
+      "title": "ASIGNAR A MAZOS",
+      "subtitle": "Gestiona en qué mazos está esta carta",
+      "totalCopies": "{qty} copias total",
+      "unassigned": "{qty} sin asignar",
+      "sideToggle": {
+        "side": "SIDE",
+        "main": "MAIN"
+      },
+      "noDecks": "No tienes mazos creados",
+      "allocationsUpdated": "Asignaciones actualizadas",
+      "saveError": "Error al guardar",
+      "onlyAvailable": "Solo tienes {qty} copias disponibles"
+    },
+    "importResult": {
+      "title": "RESULTADOS DE IMPORTACIÓN",
+      "total": "TOTAL",
+      "success": "EXITOSAS",
+      "failed": "FALLIDAS",
+      "successRate": "Tasa de éxito:",
+      "notFound": "CARTAS NO ENCONTRADAS",
+      "confirmMessage": "¿Deseas agregar las",
+      "correctCards": "{count} cartas correctas",
+      "toCollection": "a tu colección?",
+      "notAddedNote": "Las cartas no encontradas no se agregarán. Puedes intentar importarlas manualmente después.",
+      "addCards": "AGREGAR {count} CARTAS"
+    },
+    "messages": {
+      "loadError": "Error al cargar decks",
+      "notFound": "Deck no encontrado",
+      "loadDeckError": "Error al cargar deck",
+      "created": "✓ Deck \"{name}\" creado",
+      "createError": "Error al crear deck",
+      "updateError": "Error al actualizar deck",
+      "commanderSet": "{name} es ahora Commander",
+      "commanderRemoved": "{name} ya no es Commander",
+      "commanderError": "Error al cambiar commander",
+      "deleted": "✓ Deck eliminado",
+      "deleteError": "Error al eliminar deck",
+      "allocated": "{fromCollection} de colección, {toWishlist} a wishlist",
+      "allocateError": "Error al asignar carta",
+      "addWishlistError": "Error al agregar a wishlist",
+      "deallocateError": "Error al desasignar carta",
+      "removeWishlistError": "Error al eliminar de wishlist",
+      "maxAvailable": "Solo hay {max} disponibles",
+      "updateQuantityError": "Error al actualizar cantidad"
+    }
+  },
+
+  "matches": {
+    "title": "MIS MATCHES",
+    "subtitle": "nuevos, enviados, guardados",
+    "tabs": {
+      "new": "NUEVOS",
+      "sent": "ENVIADOS",
+      "saved": "GUARDADOS",
+      "deleted": "ELIMINADOS"
+    },
+    "empty": {
+      "new": {
+        "title": "No tienes matches nuevos",
+        "message": "Cuando alguien se interese en tus cartas, aparecerá aquí."
+      },
+      "sent": {
+        "title": "No has enviado matches",
+        "message": "Cuando expreses interés en cartas de otros con 'ME INTERESA', aparecerán aquí."
+      },
+      "saved": {
+        "title": "No tienes matches guardados",
+        "message": "Los matches que guardes y envíes aparecerán aquí."
+      },
+      "deleted": {
+        "title": "No tienes matches eliminados",
+        "message": "Los matches eliminados se borrarán permanentemente después de 15 días."
+      }
+    },
+    "card": {
+      "header": "MATCH #{index} - COMPATIBILIDAD: {compatibility}%",
+      "with": "Con @{username} • 📍 {location}",
+      "youOffer": "Tú Ofreces",
+      "youReceive": "Recibes",
+      "noSpecificCards": "Sin cartas específicas (regalando valor)",
+      "totalValue": "Valor total",
+      "priceDifference": "Diferencia de precio:",
+      "youReceiveAdvantage": "Tú recibes ventaja",
+      "otherReceivesAdvantage": "El otro recibe ventaja",
+      "bidirectional": "BIDIRECCIONAL",
+      "unidirectional": "→ UNIDIRECCIONAL"
+    },
+    "actions": {
+      "interested": "ME INTERESA",
+      "message": "MENSAJE",
+      "ignore": "IGNORAR",
+      "contact": "CONTACTO",
+      "completed": "COMPLETADO",
+      "delete": "ELIMINAR",
+      "recover": "RECUPERAR"
+    },
+    "contactModal": {
+      "title": "VER CONTACTO",
+      "user": "Usuario",
+      "location": "Ubicación",
+      "email": "Email",
+      "copyEmail": "COPIAR EMAIL",
+      "saveContact": "GUARDAR CONTACTO",
+      "close": "CERRAR",
+      "emailCopied": "✓ Email copiado",
+      "contactSaved": "✓ Contacto guardado: @{username}"
+    },
+    "messages": {
+      "loadError": "Error al cargar matches",
+      "saved": "Match guardado ✓",
+      "saveError": "Error al guardar match",
+      "notFound": "Match no encontrado",
+      "deleted": "Match eliminado. Se borrará en 15 días",
+      "deleteError": "Error al eliminar match",
+      "completed": "Match completado ✓",
+      "completeError": "Error al completar match",
+      "recovered": "Match recuperado",
+      "recoverError": "Error al recuperar match",
+      "permanentlyDeleted": "Eliminado permanentemente",
+      "permanentDeleteError": "Error al eliminar"
+    }
+  },
+
+  "messages": {
+    "title": "MENSAJES",
+    "subtitle": "conversaciones activas",
+    "searchPlaceholder": "Buscar por usuario...",
+    "empty": {
+      "noResults": "No se encontraron conversaciones",
+      "noMessages": "No tienes mensajes aún",
+      "tryAnother": "Intenta con otro nombre",
+      "whenContact": "Cuando contactes usuarios, aparecerán aquí"
+    },
+    "chat": {
+      "title": "Chat con @{username}",
+      "noMessages": "No hay mensajes aún. ¡Sé el primero en escribir!",
+      "inputPlaceholder": "Escribe un mensaje..."
+    },
+    "errors": {
+      "selfChat": "No puedes conversar contigo mismo",
+      "createError": "Error al crear conversación",
+      "sendError": "Error al enviar mensaje",
+      "loadError": "Error al cargar conversaciones",
+      "listenError": "Error al escuchar mensajes"
+    }
+  },
+
+  "contacts": {
+    "title": "MIS CONTACTOS GUARDADOS",
+    "subtitle": "{count} contactos",
+    "empty": {
+      "title": "No tienes contactos guardados",
+      "message": "Guarda contactos desde los matches para acceder rápidamente",
+      "action": "VER MIS MATCHES"
+    },
+    "messages": {
+      "saved": "✓ Contacto guardado",
+      "saveError": "Error al guardar contacto",
+      "deleted": "Contacto eliminado",
+      "deleteError": "Error al eliminar contacto",
+      "loadError": "Error al cargar contactos"
+    }
+  },
+
+  "settings": {
+    "title": "CONFIGURACIÓN",
+    "sections": {
+      "emailVerification": {
+        "title": "VERIFICACIÓN DE EMAIL",
+        "email": "Email:",
+        "verified": "Verificado",
+        "notVerified": "No verificado",
+        "sendEmail": "ENVIAR EMAIL",
+        "checkStatus": "VERIFICAR ESTADO"
+      },
+      "changePassword": {
+        "title": "CAMBIAR CONTRASEÑA",
+        "change": "CAMBIAR",
+        "currentPlaceholder": "Contraseña actual",
+        "newPlaceholder": "Nueva contraseña",
+        "confirmPlaceholder": "Confirmar contraseña",
+        "mismatch": "Las contraseñas no coinciden",
+        "hint": "Mantén tu contraseña segura y única."
+      },
+      "accountInfo": {
+        "title": "INFORMACIÓN DE CUENTA",
+        "username": "Username",
+        "location": "Ubicación",
+        "created": "Cuenta creada"
+      }
+    },
+    "logout": "CERRAR SESIÓN"
+  },
+
+  "profile": {
+    "notFound": {
+      "title": "404 - Usuario no encontrado",
+      "message": "@{username} no existe o su perfil es privado.",
+      "backToDashboard": "VOLVER AL DASHBOARD",
+      "login": "INICIAR SESIÓN"
+    },
+    "contact": "💬 CONTACTAR",
+    "publicCollection": "Colección pública",
+    "cards": "cartas",
+    "noPublicCards": "Este usuario no tiene cartas públicas en su colección."
+  },
+
+  "search": {
+    "filterPanel": {
+      "placeholder": "Buscar carta por nombre...",
+      "searchButton": "BUSCAR",
+      "moreFilters": "MÁS",
+      "clear": "✕ LIMPIAR",
+      "autoSearch": "Los filtros se aplicarán automáticamente en 0.5 segundos",
+      "filterSearchPlaceholder": "Buscar filtro... (ej: flying, trample, cascade)"
+    },
+    "modal": {
+      "title": "FILTROS AVANZADOS",
+      "apply": "APLICAR FILTROS",
+      "sections": {
+        "types": "Tipos",
+        "manaValue": "Mana Value",
+        "priceUSD": "Precio USD",
+        "power": "Power",
+        "toughness": "Toughness",
+        "format": "Formato",
+        "specialTypes": "Tipos Especiales"
+      },
+      "options": {
+        "foilOnly": "Solo Foil",
+        "fullArt": "Full Art"
+      }
+    },
+    "accordions": {
+      "combat": "Habilidades de Combate",
+      "effects": "Efectos Comunes",
+      "triggers": "Triggers",
+      "setMechanics": "Mecánicas de Set"
+    },
+    "effectCategories": {
+      "removal": "Remoción",
+      "cardAdvantage": "Card Advantage",
+      "tokens": "Tokens",
+      "counters": "Contadores",
+      "control": "Control"
+    },
+    "mechanicCategories": {
+      "meta": "Meta / Competitivas",
+      "popular": "Clásicas Populares",
+      "recent": "Recientes (2023-2025)",
+      "other": "Otras"
+    },
+    "messages": {
+      "defineFilter": "Define al menos un filtro",
+      "noResults": "No se encontraron cartas con estos filtros",
+      "searchError": "Error al buscar cartas"
+    }
+  },
+
+  "notFound": {
+    "title": "404",
+    "userNotFound": "Usuario no encontrado",
+    "message": "El usuario que buscas no existe o el perfil es privado.",
+    "backToDashboard": "VOLVER AL DASHBOARD",
+    "viewCollection": "VER MI COLECCIÓN",
+    "needHelp": "¿Necesitas ayuda?",
+    "contactUs": "Contáctanos desde configuración"
+  },
+
+  "legal": {
+    "terms": {
+      "title": "Términos de Uso",
+      "sections": {
+        "service": "1. Descripción del Servicio",
+        "account": "2. Registro y Cuenta de Usuario",
+        "acceptableUse": "3. Uso Aceptable",
+        "transactions": "4. Transacciones entre Usuarios",
+        "ip": "5. Propiedad Intelectual",
+        "privacy": "6. Privacidad y Datos",
+        "liability": "7. Limitación de Responsabilidad",
+        "modifications": "8. Modificaciones",
+        "termination": "9. Terminación",
+        "contact": "10. Contacto"
+      },
+      "disclaimers": {
+        "noIntermediary": "No somos intermediarios:",
+        "noPayments": "No procesamos pagos:",
+        "noGuarantee": "No garantizamos transacciones:",
+        "noCustody": "No custodiamos cartas:",
+        "recommendation": "Recomendación:"
+      }
+    },
+    "privacy": {
+      "title": "Política de Privacidad",
+      "sections": {
+        "responsible": "1. Responsable del Tratamiento",
+        "dataCollected": "2. Datos que Recopilamos",
+        "dataUse": "3. Cómo Usamos tus Datos",
+        "publicInfo": "4. Información Pública",
+        "sharing": "5. Con Quién Compartimos Datos",
+        "security": "6. Seguridad de los Datos",
+        "retention": "7. Retención de Datos",
+        "rights": "8. Tus Derechos",
+        "minors": "9. Menores de Edad",
+        "changes": "10. Cambios a esta Política",
+        "contact": "11. Contacto"
+      },
+      "control": "Control:"
+    },
+    "cookies": {
+      "title": "Política de Cookies",
+      "lastUpdated": "Última actualización:",
+      "sections": {
+        "what": "1. ¿Qué son las Cookies?",
+        "types": "2. Cookies que Utilizamos",
+        "essential": "2.1 Cookies Esenciales",
+        "performance": "2.2 Cookies de Rendimiento",
+        "localStorage": "2.3 Almacenamiento Local",
+        "thirdParty": "3. Cookies de Terceros",
+        "manage": "4. Cómo Gestionar las Cookies",
+        "browserSettings": "4.1 Configuración del Navegador",
+        "optOut": "4.2 Herramientas de Opt-out",
+        "updates": "5. Actualizaciones de esta Política",
+        "moreInfo": "6. Más Información"
+      },
+      "table": {
+        "cookie": "Cookie",
+        "purpose": "Propósito",
+        "duration": "Duración"
+      }
+    },
+    "footer": {
+      "copyright": "© 2024 Cranial Trading",
+      "terms": "Términos",
+      "privacy": "Privacidad",
+      "cookies": "Cookies"
+    },
+    "backToHome": "← Volver al inicio"
+  },
+
+  "confirm": {
+    "defaultConfirm": "ACEPTAR",
+    "defaultCancel": "CANCELAR"
+  }
+}

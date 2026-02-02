@@ -4,9 +4,9 @@
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">BUSCAR MATCHES</h1>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">{{ t('dashboard.title') }}</h1>
           <p class="text-small md:text-body text-silver-70">
-            {{ calculatedMatches.length }} matches encontrados
+            {{ calculatedMatches.length }} {{ t('dashboard.matchesFound') }}
           </p>
         </div>
 
@@ -18,7 +18,7 @@
               :disabled="loading || (collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0)"
               class="w-full md:w-auto"
           >
-            {{ loading ? 'CALCULANDO...' : '🔄 RECALCULAR' }}
+            {{ loading ? t('dashboard.calculating') : t('dashboard.recalculate') }}
           </BaseButton>
           <BaseButton
               variant="secondary"
@@ -27,7 +27,7 @@
               :disabled="syncing"
               class="w-full md:w-auto"
           >
-            {{ syncing ? 'SINCRONIZANDO...' : '📡 SINCRONIZAR' }}
+            {{ syncing ? t('dashboard.syncing') : t('dashboard.sync') }}
           </BaseButton>
           <!-- TEMPORAL: Botón para borrar datos -->
           <BaseButton
@@ -36,21 +36,21 @@
               @click="clearAllData"
               class="w-full md:w-auto border-rust text-rust"
           >
-            🗑️ BORRAR MIS DATOS
+            {{ t('dashboard.deleteData') }}
           </BaseButton>
         </div>
       </div>
 
       <!-- Card Search Section -->
       <div class="border border-silver-30 p-4 mb-6">
-        <h3 class="text-body font-bold text-silver mb-3">🔍 BUSCAR CARTAS DE OTROS USUARIOS</h3>
+        <h3 class="text-body font-bold text-silver mb-3">{{ t('dashboard.searchOthers.title') }}</h3>
         <div class="relative mb-4">
           <div class="flex gap-2">
             <div class="flex-1 relative">
               <input
                   v-model="searchQuery"
                   type="text"
-                  placeholder="Nombre de la carta..."
+                  :placeholder="t('dashboard.searchOthers.placeholder')"
                   class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
                   @input="handleSearchInput"
                   @keyup.enter="searchPublicCards"
@@ -72,7 +72,7 @@
               </div>
             </div>
             <BaseButton size="small" @click="searchPublicCards" :disabled="searching || !searchQuery.trim()">
-              {{ searching ? '...' : 'BUSCAR' }}
+              {{ searching ? '...' : t('dashboard.searchOthers.search') }}
             </BaseButton>
           </div>
         </div>
@@ -94,7 +94,7 @@
                   loading="lazy"
               />
               <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
-                Sin imagen
+                {{ t('dashboard.searchOthers.noImage') }}
               </div>
             </div>
             <!-- Card Info -->
@@ -108,15 +108,15 @@
                 @click="sendInterestFromSearch(card)"
                 class="w-full mt-2 px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-all"
             >
-              ME INTERESA
+              {{ t('dashboard.searchOthers.interested') }}
             </button>
-            <span v-else class="block w-full mt-2 text-center text-tiny text-silver-50 py-1">✓ Enviado</span>
+            <span v-else class="block w-full mt-2 text-center text-tiny text-silver-50 py-1">{{ t('dashboard.searchOthers.sent') }}</span>
           </div>
         </div>
         <!-- Scryfall Fallback: No users have this card, but it exists -->
         <div v-else-if="showScryfallFallback && scryfallResults.length > 0">
           <p class="text-tiny text-silver-50 mb-3">
-            Ningún usuario tiene esta carta disponible. ¿La necesitas? Agrégala a tu lista de deseos:
+            {{ t('dashboard.searchOthers.noOwners') }}
           </p>
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-96 overflow-y-auto">
             <div
@@ -134,33 +134,33 @@
                     loading="lazy"
                 />
                 <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
-                  Sin imagen
+                  {{ t('dashboard.searchOthers.noImage') }}
                 </div>
               </div>
               <!-- Card Info -->
               <p class="text-tiny font-bold text-silver truncate" :title="card.name">{{ card.name }}</p>
               <p class="text-tiny text-silver-70">{{ card.set?.toUpperCase() }}</p>
               <p class="text-tiny text-neon font-bold">${{ card.prices?.usd || 'N/A' }}</p>
-              <p class="text-tiny text-silver-50 italic">Sin dueño</p>
+              <p class="text-tiny text-silver-50 italic">{{ t('dashboard.searchOthers.noOwner') }}</p>
               <!-- Add to Wishlist Button -->
               <button
                   @click="addToWishlist(card)"
                   class="w-full mt-2 px-2 py-1 bg-rust/20 border border-rust text-rust text-tiny font-bold hover:bg-rust/30 transition-all"
               >
-                + NECESITO
+                {{ t('dashboard.searchOthers.addToWishlist') }}
               </button>
             </div>
           </div>
         </div>
         <p v-else-if="searchQuery && !searching && searchedOnce && !showScryfallFallback" class="text-tiny text-silver-50">
-          No se encontró ninguna carta con ese nombre.
+          {{ t('dashboard.searchOthers.notFound') }}
         </p>
       </div>
 
       <!-- Progress bar -->
       <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6">
         <div class="flex items-center justify-between mb-2">
-          <p class="text-small text-neon font-bold">CALCULANDO MATCHES</p>
+          <p class="text-small text-neon font-bold">{{ t('dashboard.calculatingMatches.title') }}</p>
           <p class="text-tiny text-silver-70">{{ progressCurrent }} / {{ progressTotal }}</p>
         </div>
         <div class="w-full h-2 bg-silver-20">
@@ -174,25 +174,25 @@
       <!-- Loading state -->
       <div v-if="loading && progressTotal === 0" class="text-center py-16">
         <BaseLoader size="large" />
-        <p class="text-body text-silver-70 mt-4">Cargando datos...</p>
+        <p class="text-body text-silver-70 mt-4">{{ t('dashboard.calculatingMatches.loading') }}</p>
       </div>
 
       <!-- No data warning -->
       <div v-else-if="collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
-        <p class="text-h3 text-silver-70 mb-2">⚠️ No tienes cartas ni preferencias</p>
+        <p class="text-h3 text-silver-70 mb-2">{{ t('dashboard.empty.noCardsOrPrefs') }}</p>
         <p class="text-body text-silver-50 mb-6">
-          Agrega cartas a tu colección o crea una preferencia para encontrar matches automáticamente.
+          {{ t('dashboard.empty.addCardsOrPrefs') }}
         </p>
         <RouterLink to="/collection">
-          <BaseButton>VER MI COLECCIÓN</BaseButton>
+          <BaseButton>{{ t('dashboard.empty.viewCollection') }}</BaseButton>
         </RouterLink>
       </div>
 
       <!-- No matches state -->
       <div v-else-if="calculatedMatches.length === 0 && !loading" class="border border-silver-30 p-8 md:p-12 text-center">
-        <p class="text-h3 text-silver-70 mb-2">📭 No hay matches disponibles</p>
+        <p class="text-h3 text-silver-70 mb-2">{{ t('dashboard.empty.noMatches') }}</p>
         <p class="text-body text-silver-50">
-          Hay {{ totalUsers }} usuarios en la plataforma. Cuando alguien tenga cartas que buscas o busque las tuyas, aparecerá aquí.
+          {{ t('dashboard.empty.usersInPlatform', { count: totalUsers }) }}
         </p>
       </div>
 
@@ -226,6 +226,7 @@ import { useDecksStore } from '../stores/decks'
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where, limit } from 'firebase/firestore'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
+import { useI18n } from '../composables/useI18n'
 import { db } from '../services/firebase'
 import {
   findCardsMatchingPreferences,
@@ -243,6 +244,7 @@ const priceMatching = usePriceMatchingStore()
 const decksStore = useDecksStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
+const { t } = useI18n()
 
 const loading = ref(false)
 const syncing = ref(false)
@@ -524,10 +526,10 @@ const clearAllData = async () => {
   if (!authStore.user) return
 
   const confirmed = await confirmStore.show({
-    title: 'Borrar todos los datos',
-    message: '¿Borrar TODAS tus cartas, preferencias, matches y decks? Esta acción no se puede deshacer.',
-    confirmText: 'BORRAR TODO',
-    cancelText: 'CANCELAR',
+    title: t('dashboard.clearData.title'),
+    message: t('dashboard.clearData.message'),
+    confirmText: t('dashboard.clearData.confirm'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -915,7 +917,7 @@ const addToWishlist = async (card: any) => {
 
   const cardId = await collectionStore.addCard(cardData)
   if (cardId) {
-    toastStore.show(`${card.name} agregada a tu lista de deseos`, 'success')
+    toastStore.show(t('dashboard.wishlist.added', { name: card.name }), 'success')
     // Remove from scryfall results to show it was added
     scryfallResults.value = scryfallResults.value.filter(c => c.id !== card.id)
     if (scryfallResults.value.length === 0) {
@@ -973,10 +975,10 @@ const sendInterestFromSearch = async (card: any) => {
     await addDoc(sharedMatchesRef, sharedMatchPayload)
 
     sentInterestIds.value.add(card.id)
-    toastStore.show(`Interés enviado a @${card.username}`, 'success')
+    toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'success')
   } catch (error) {
     console.error('Error sending interest:', error)
-    toastStore.show('Error al enviar interés', 'error')
+    toastStore.show(t('dashboard.interest.error'), 'error')
   }
 }
 </script>

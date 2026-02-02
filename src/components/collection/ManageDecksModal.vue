@@ -3,9 +3,12 @@ import { ref, computed, watch } from 'vue'
 import { useDecksStore } from '../../stores/decks'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
+import { useI18n } from '../../composables/useI18n'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import type { Card } from '../../types/card'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -80,7 +83,7 @@ const updateAllocation = (deckId: string, quantity: number) => {
   const newTotal = allocatedQty.value - currentForDeck + quantity
 
   if (newTotal > totalQty.value) {
-    toastStore.show(`Solo tienes ${totalQty.value} copias disponibles`, 'error')
+    toastStore.show(t('decks.manageModal.onlyAvailable', { qty: totalQty.value }), 'error')
     return
   }
 
@@ -178,11 +181,11 @@ const handleSave = async () => {
       }
     }
 
-    toastStore.show('Asignaciones actualizadas', 'success')
+    toastStore.show(t('decks.manageModal.allocationsUpdated'), 'success')
     emit('close')
   } catch (error) {
     console.error('Error saving allocations:', error)
-    toastStore.show('Error al guardar', 'error')
+    toastStore.show(t('decks.manageModal.saveError'), 'error')
   } finally {
     saving.value = false
   }
@@ -200,8 +203,8 @@ const cardImage = computed(() => {
     <div class="space-y-6 w-full max-w-lg">
       <!-- Header -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">ASIGNAR A MAZOS</h2>
-        <p class="text-small text-silver-70">Gestiona en qué mazos está esta carta</p>
+        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.manageModal.title') }}</h2>
+        <p class="text-small text-silver-70">{{ t('decks.manageModal.subtitle') }}</p>
       </div>
 
       <!-- Card info -->
@@ -216,10 +219,10 @@ const cardImage = computed(() => {
           <p class="font-bold text-silver text-h3">{{ card.name }}</p>
           <p class="text-small text-silver-70">{{ card.edition }} - {{ card.condition }}</p>
           <p class="text-small text-neon font-bold mt-2">
-            {{ totalQty }} copias total
+            {{ t('decks.manageModal.totalCopies', { qty: totalQty }) }}
           </p>
           <p class="text-tiny mt-1" :class="remainingQty > 0 ? 'text-silver-70' : 'text-rust'">
-            {{ remainingQty }} sin asignar
+            {{ t('decks.manageModal.unassigned', { qty: remainingQty }) }}
           </p>
         </div>
       </div>
@@ -227,7 +230,7 @@ const cardImage = computed(() => {
       <!-- Decks list -->
       <div class="space-y-3 max-h-[40vh] overflow-y-auto">
         <div v-if="decksStore.decks.length === 0" class="text-center py-8">
-          <p class="text-small text-silver-70">No tienes mazos creados</p>
+          <p class="text-small text-silver-70">{{ t('decks.manageModal.noDecks') }}</p>
         </div>
 
         <div
@@ -273,7 +276,7 @@ const cardImage = computed(() => {
               class="px-2 py-1 text-tiny border transition-150"
               :class="isInSideboard(deck.id) ? 'border-amber text-amber' : 'border-silver-30 text-silver-50 hover:border-silver'"
             >
-              {{ isInSideboard(deck.id) ? 'SIDE' : 'MAIN' }}
+              {{ isInSideboard(deck.id) ? t('decks.manageModal.sideToggle.side') : t('decks.manageModal.sideToggle.main') }}
             </button>
           </div>
         </div>
@@ -282,10 +285,10 @@ const cardImage = computed(() => {
       <!-- Actions -->
       <div class="flex gap-3 pt-4 border-t border-silver-20">
         <BaseButton class="flex-1" @click="handleSave" :disabled="saving">
-          {{ saving ? 'GUARDANDO...' : 'GUARDAR' }}
+          {{ saving ? t('common.actions.saving') : t('common.actions.save') }}
         </BaseButton>
         <BaseButton variant="secondary" class="flex-1" @click="emit('close')">
-          CANCELAR
+          {{ t('common.actions.cancel') }}
         </BaseButton>
       </div>
     </div>

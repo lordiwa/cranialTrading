@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import type { Deck } from '../../types/deck'
 import BaseBadge from '../ui/BaseBadge.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   deck: Deck
@@ -39,7 +42,7 @@ const completionPercent = computed(() => {
       <img :src="deck.thumbnail" :alt="deck.name" class="w-full h-full object-cover group-hover:scale-105 transition-300" />
       <div class="absolute inset-0 bg-black-80 opacity-0 group-hover:opacity-100 transition-300 flex items-center justify-center">
         <span class="px-4 py-2 bg-neon text-primary font-bold text-small">
-          EDITAR MAZO
+          {{ t('decks.actions.editDeck') }}
         </span>
       </div>
     </div>
@@ -48,7 +51,7 @@ const completionPercent = computed(() => {
     <div v-else class="w-full h-40 bg-secondary border-b border-silver-30 flex items-center justify-center">
       <div class="text-center">
         <p class="text-h3 font-bold text-silver-50">{{ deck.stats.totalCards }}</p>
-        <p class="text-tiny text-silver-70">cartas</p>
+        <p class="text-tiny text-silver-70">{{ t('decks.card.stats.cards').toLowerCase() }}</p>
       </div>
     </div>
 
@@ -62,21 +65,21 @@ const completionPercent = computed(() => {
 
       <!-- Description -->
       <p class="text-small text-silver-70 line-clamp-2 mb-4">
-        {{ deck.description || 'Sin descripción' }}
+        {{ deck.description || t('decks.card.noDescription') }}
       </p>
 
       <!-- Stats -->
       <div class="grid grid-cols-3 gap-2 mb-4 pb-4 border-b border-silver-20">
         <div class="text-center">
-          <p class="text-tiny text-silver-70">CARTAS</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.card.stats.cards') }}</p>
           <p class="text-h3 font-bold text-neon">{{ deck.stats.totalCards }}</p>
         </div>
         <div class="text-center">
-          <p class="text-tiny text-silver-70">COSTO</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.card.stats.cost') }}</p>
           <p class="text-h3 font-bold text-neon">${{ deck.stats.totalPrice.toFixed(0) }}</p>
         </div>
         <div class="text-center">
-          <p class="text-tiny text-silver-70">COLEC.</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.card.stats.collection') }}</p>
           <p class="text-h3 font-bold" :class="completionPercent >= 80 ? 'text-neon' : 'text-silver-70'">
             {{ completionPercent }}%
           </p>
@@ -93,7 +96,7 @@ const completionPercent = computed(() => {
 
       <!-- Date -->
       <p class="text-tiny text-silver-50 mb-4">
-        Actualizado: {{ deck.updatedAt.toLocaleDateString() }}
+        {{ t('decks.card.updated', { date: deck.updatedAt.toLocaleDateString() }) }}
       </p>
 
       <!-- Buttons -->
@@ -102,13 +105,13 @@ const completionPercent = computed(() => {
             @click="emit('edit', deck.id)"
             class="flex-1 px-3 py-2 border-2 border-neon text-neon font-bold text-tiny hover:bg-neon-10 transition-150"
         >
-          EDITAR
+          {{ t('decks.card.edit') }}
         </button>
         <button
             @click="emit('delete', deck.id)"
             class="flex-1 px-3 py-2 border border-secondary text-silver-70 font-bold text-tiny hover:border-ruby hover:text-ruby transition-150"
         >
-          BORRAR
+          {{ t('decks.card.delete') }}
         </button>
       </div>
     </div>

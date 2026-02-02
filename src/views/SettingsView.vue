@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
+import { useI18n } from '../composables/useI18n';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
@@ -10,6 +11,7 @@ import BaseButton from '../components/ui/BaseButton.vue';
 const router = useRouter();
 const authStore = useAuthStore();
 const confirmStore = useConfirmStore();
+const { t } = useI18n();
 
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -56,10 +58,10 @@ const handleCheckEmailVerification = async () => {
 
 const handleLogout = async () => {
   const confirmed = await confirmStore.show({
-    title: 'Cerrar sesión',
-    message: '¿Estás seguro que deseas cerrar sesión?',
-    confirmText: 'CERRAR SESIÓN',
-    cancelText: 'CANCELAR',
+    title: t('settings.logout'),
+    message: t('header.profile.logout'),
+    confirmText: t('settings.logout'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'secondary'
   })
 
@@ -73,15 +75,15 @@ const handleLogout = async () => {
 <template>
   <AppContainer>
     <div class="max-w-2xl">
-      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-8">CONFIGURACIÓN</h1>
+      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-8">{{ t('settings.title') }}</h1>
 
       <!-- Email verification -->
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
-        <h2 class="text-body font-bold text-silver mb-4">VERIFICACIÓN DE EMAIL</h2>
+        <h2 class="text-body font-bold text-silver mb-4">{{ t('settings.sections.emailVerification.title') }}</h2>
 
         <div class="mb-4">
           <p class="text-small text-silver-70">
-            Email: <span class="text-neon font-bold">{{ authStore.user?.email }}</span>
+            {{ t('settings.sections.emailVerification.email') }} <span class="text-neon font-bold">{{ authStore.user?.email }}</span>
           </p>
           <div class="flex items-center gap-3 mt-2">
             <div :class="[
@@ -89,7 +91,7 @@ const handleLogout = async () => {
               emailVerified ? 'bg-neon' : 'bg-rust'
             ]"></div>
             <span class="text-small" :class="emailVerified ? 'text-neon' : 'text-rust'">
-              {{ emailVerified ? 'Verificado' : 'No verificado' }}
+              {{ emailVerified ? t('settings.sections.emailVerification.verified') : t('settings.sections.emailVerification.notVerified') }}
             </span>
           </div>
         </div>
@@ -103,7 +105,7 @@ const handleLogout = async () => {
               :disabled="checkingEmail"
               class="flex-1"
           >
-            {{ checkingEmail ? 'ENVIANDO...' : 'ENVIAR EMAIL' }}
+            {{ checkingEmail ? t('common.actions.sending') : t('settings.sections.emailVerification.sendEmail') }}
           </BaseButton>
           <BaseButton
               variant="secondary"
@@ -112,7 +114,7 @@ const handleLogout = async () => {
               :disabled="checkingEmail"
               class="flex-1"
           >
-            {{ checkingEmail ? 'VERIFICANDO...' : 'VERIFICAR ESTADO' }}
+            {{ checkingEmail ? t('common.actions.loading') : t('settings.sections.emailVerification.checkStatus') }}
           </BaseButton>
         </div>
       </div>
@@ -120,14 +122,14 @@ const handleLogout = async () => {
       <!-- Change password -->
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-body font-bold text-silver">CAMBIAR CONTRASEÑA</h2>
+          <h2 class="text-body font-bold text-silver">{{ t('settings.sections.changePassword.title') }}</h2>
           <BaseButton
               v-if="!showChangeForm"
               variant="secondary"
               size="small"
               @click="showChangeForm = true"
           >
-            CAMBIAR
+            {{ t('settings.sections.changePassword.change') }}
           </BaseButton>
         </div>
 
@@ -135,23 +137,23 @@ const handleLogout = async () => {
           <BaseInput
               v-model="currentPassword"
               type="password"
-              placeholder="Contraseña actual"
+              :placeholder="t('settings.sections.changePassword.currentPlaceholder')"
           />
 
           <BaseInput
               v-model="newPassword"
               type="password"
-              placeholder="Nueva contraseña"
+              :placeholder="t('settings.sections.changePassword.newPlaceholder')"
           />
 
           <BaseInput
               v-model="confirmPassword"
               type="password"
-              placeholder="Confirmar contraseña"
+              :placeholder="t('settings.sections.changePassword.confirmPlaceholder')"
           />
 
           <div v-if="newPassword && confirmPassword && newPassword !== confirmPassword" class="text-tiny text-rust">
-            Las contraseñas no coinciden
+            {{ t('settings.sections.changePassword.mismatch') }}
           </div>
 
           <div class="flex gap-2">
@@ -161,7 +163,7 @@ const handleLogout = async () => {
                 @click="showChangeForm = false"
                 class="flex-1"
             >
-              CANCELAR
+              {{ t('common.actions.cancel') }}
             </BaseButton>
             <BaseButton
                 size="small"
@@ -169,31 +171,31 @@ const handleLogout = async () => {
                 :disabled="loadingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword"
                 class="flex-1"
             >
-              {{ loadingPassword ? 'GUARDANDO...' : 'GUARDAR' }}
+              {{ loadingPassword ? t('common.actions.saving') : t('common.actions.save') }}
             </BaseButton>
           </div>
         </div>
 
         <p v-if="!showChangeForm" class="text-small text-silver-70">
-          Mantén tu contraseña segura y única.
+          {{ t('settings.sections.changePassword.hint') }}
         </p>
       </div>
 
       <!-- User info -->
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
-        <h2 class="text-body font-bold text-silver mb-4">INFORMACIÓN DE CUENTA</h2>
+        <h2 class="text-body font-bold text-silver mb-4">{{ t('settings.sections.accountInfo.title') }}</h2>
 
         <div class="space-y-sm text-small">
           <div>
-            <p class="text-silver-70">Username</p>
+            <p class="text-silver-70">{{ t('settings.sections.accountInfo.username') }}</p>
             <p class="text-silver font-bold">{{ authStore.user?.username }}</p>
           </div>
           <div>
-            <p class="text-silver-70">Ubicación</p>
+            <p class="text-silver-70">{{ t('settings.sections.accountInfo.location') }}</p>
             <p class="text-silver font-bold">{{ authStore.user?.location || '-' }}</p>
           </div>
           <div>
-            <p class="text-silver-70">Cuenta creada</p>
+            <p class="text-silver-70">{{ t('settings.sections.accountInfo.created') }}</p>
             <p class="text-silver font-bold">
               {{ authStore.user?.createdAt.toLocaleDateString() }}
             </p>
@@ -208,7 +210,7 @@ const handleLogout = async () => {
             @click="handleLogout"
             class="w-full"
         >
-          CERRAR SESIÓN
+          {{ t('settings.logout') }}
         </BaseButton>
       </div>
     </div>

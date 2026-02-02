@@ -2,8 +2,10 @@
 import { onMounted, watch } from 'vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useCollectionTotals } from '../../composables/useCollectionTotals'
+import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
 
+const { t } = useI18n()
 const collectionStore = useCollectionStore()
 
 const {
@@ -33,17 +35,17 @@ const fmt = (val: number) => `$${val.toFixed(2)}`
   <div class="bg-secondary border border-silver-30 p-4 mb-6">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
-      <h3 class="text-h3 font-bold text-silver">VALOR DE COLECCION</h3>
+      <h3 class="text-h3 font-bold text-silver">{{ t('collection.totals.title') }}</h3>
       <BaseButton
           v-if="!loading"
           size="small"
           variant="secondary"
           @click="fetchAllPrices"
       >
-        ACTUALIZAR
+        {{ t('collection.totals.update') }}
       </BaseButton>
       <div v-else class="text-tiny text-silver-50">
-        Cargando precios... {{ progress }}%
+        {{ t('collection.totals.loading', { progress }) }}
       </div>
     </div>
 
@@ -59,7 +61,7 @@ const fmt = (val: number) => `$${val.toFixed(2)}`
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <!-- Collection -->
       <div class="space-y-2">
-        <p class="text-tiny text-silver-70 font-bold">COLECCION</p>
+        <p class="text-tiny text-silver-70 font-bold">{{ t('collection.totals.headers.collection') }}</p>
         <div class="space-y-1">
           <div class="flex justify-between">
             <span class="text-tiny text-silver-50">TCG:</span>
@@ -78,7 +80,7 @@ const fmt = (val: number) => `$${val.toFixed(2)}`
 
       <!-- Wishlist -->
       <div class="space-y-2">
-        <p class="text-tiny text-silver-70 font-bold">WISHLIST</p>
+        <p class="text-tiny text-silver-70 font-bold">{{ t('collection.totals.headers.wishlist') }}</p>
         <div class="space-y-1">
           <div class="flex justify-between">
             <span class="text-tiny text-silver-50">TCG:</span>
@@ -93,7 +95,7 @@ const fmt = (val: number) => `$${val.toFixed(2)}`
 
       <!-- Sale -->
       <div class="space-y-2">
-        <p class="text-tiny text-silver-70 font-bold">EN VENTA</p>
+        <p class="text-tiny text-silver-70 font-bold">{{ t('collection.totals.headers.forSale') }}</p>
         <div class="space-y-1">
           <div class="flex justify-between">
             <span class="text-tiny text-silver-50">TCG:</span>
@@ -112,7 +114,7 @@ const fmt = (val: number) => `$${val.toFixed(2)}`
 
       <!-- Total -->
       <div class="space-y-2 border-l border-silver-30 pl-4">
-        <p class="text-tiny text-neon font-bold">TOTAL</p>
+        <p class="text-tiny text-neon font-bold">{{ t('collection.totals.headers.total') }}</p>
         <div class="space-y-1">
           <div class="flex justify-between">
             <span class="text-tiny text-silver-50">TCG:</span>

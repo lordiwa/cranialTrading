@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useContactsStore } from '../stores/contacts'
 import { useConfirmStore } from '../stores/confirm'
+import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -10,6 +11,7 @@ import ChatModal from '../components/chat/ChatModal.vue'
 
 const contactsStore = useContactsStore()
 const confirmStore = useConfirmStore()
+const { t } = useI18n()
 
 const showChat = ref(false)
 const selectedContact = ref<any>(null)
@@ -24,10 +26,10 @@ onUnmounted(() => {
 
 const handleDelete = async (contactId: string) => {
   const confirmed = await confirmStore.show({
-    title: 'Eliminar contacto',
-    message: '¿Eliminar este contacto?',
-    confirmText: 'ELIMINAR',
-    cancelText: 'CANCELAR',
+    title: t('common.actions.delete'),
+    message: t('contacts.messages.deleted'),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -51,19 +53,19 @@ const closeChat = () => {
   <AppContainer>
     <div>
       <div class="mb-8">
-        <h1 class="text-h2 md:text-h1 font-bold text-silver">MIS CONTACTOS GUARDADOS</h1>
-        <p class="text-small text-silver-70 mt-2">{{ contactsStore.contacts.length }} contactos</p>
+        <h1 class="text-h2 md:text-h1 font-bold text-silver">{{ t('contacts.title') }}</h1>
+        <p class="text-small text-silver-70 mt-2">{{ t('contacts.subtitle', { count: contactsStore.contacts.length }) }}</p>
       </div>
 
       <BaseLoader v-if="contactsStore.loading" size="large" />
 
       <div v-else-if="contactsStore.contacts.length === 0" class="border border-silver-30 p-8 text-center">
-        <p class="text-body text-silver-70">No tienes contactos guardados</p>
+        <p class="text-body text-silver-70">{{ t('contacts.empty.title') }}</p>
         <p class="text-small text-silver-50 mt-2">
-          Guarda contactos desde los matches para acceder rápidamente
+          {{ t('contacts.empty.message') }}
         </p>
         <RouterLink to="/saved-matches" class="mt-6 inline-block">
-          <BaseButton size="small">VER MIS MATCHES</BaseButton>
+          <BaseButton size="small">{{ t('contacts.empty.action') }}</BaseButton>
         </RouterLink>
       </div>
 

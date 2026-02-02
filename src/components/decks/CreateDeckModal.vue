@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useToastStore } from '../../stores/toast'
+import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -8,6 +9,7 @@ import BaseModal from '../ui/BaseModal.vue'
 import type { CreateDeckInput } from '../../types/deck'
 
 const toastStore = useToastStore()
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -84,7 +86,7 @@ const toggleColor = (color: string) => {
 
 const handleCreate = () => {
   if (!form.value.name.trim()) {
-    toastStore.show('El nombre del mazo es requerido', 'error')
+    toastStore.show(t('decks.createModal.validation.nameRequired'), 'error')
     return
   }
   emit('create', {
@@ -116,19 +118,19 @@ watch(() => props.show, (show) => {
     <div class="space-y-6">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">CREAR NUEVO MAZO</h2>
-        <p class="text-small text-silver-70">Define los detalles básicos de tu mazo</p>
+        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.createModal.title') }}</h2>
+        <p class="text-small text-silver-70">{{ t('decks.createModal.subtitle') }}</p>
       </div>
 
       <!-- Form -->
       <div class="space-y-4">
         <!-- Name -->
         <div>
-          <label for="create-deck-name" class="text-small text-silver-70 block mb-2">Nombre del Mazo *</label>
+          <label for="create-deck-name" class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.nameLabel') }}</label>
           <BaseInput
               id="create-deck-name"
               v-model="form.name"
-              placeholder="Ej: RDW Modern"
+              :placeholder="t('decks.createModal.namePlaceholder')"
               type="text"
               @keydown.enter="handleCreate"
           />
@@ -136,7 +138,7 @@ watch(() => props.show, (show) => {
 
         <!-- Format -->
         <div>
-          <label for="create-deck-format" class="text-small text-silver-70 block mb-2">Formato</label>
+          <label for="create-deck-format" class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.formatLabel') }}</label>
           <BaseSelect
               id="create-deck-format"
               v-model="form.format"
@@ -146,11 +148,11 @@ watch(() => props.show, (show) => {
 
         <!-- Description -->
         <div>
-          <label for="create-deck-description" class="text-small text-silver-70 block mb-2">Descripción</label>
+          <label for="create-deck-description" class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.descriptionLabel') }}</label>
           <textarea
               id="create-deck-description"
               v-model="form.description"
-              placeholder="Describe tu estrategia, meta, notas..."
+              :placeholder="t('decks.createModal.descriptionPlaceholder')"
               class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-small focus:outline-none focus:border-neon transition-150 resize-none h-20"
           />
         </div>
@@ -158,28 +160,28 @@ watch(() => props.show, (show) => {
         <!-- Deck List (opcional) -->
         <div>
           <label for="create-deck-list" class="text-small text-silver-70 block mb-2">
-            Lista de cartas (opcional)
+            {{ t('decks.createModal.cardListLabel') }}
           </label>
           <textarea
               id="create-deck-list"
               v-model="deckList"
-              placeholder="Pega tu lista aquí:&#10;4 Lightning Bolt&#10;4 Monastery Swiftspear&#10;SIDEBOARD:&#10;2 Blood Moon"
+              :placeholder="t('decks.createModal.cardListPlaceholder')"
               class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-tiny focus:outline-none focus:border-neon transition-150 resize-none h-32"
           />
           <!-- Preview -->
           <div v-if="deckListPreview" class="mt-2 p-2 border border-silver-30 bg-primary">
             <p class="text-tiny text-neon font-bold">
-              {{ deckListPreview.total }} cartas detectadas
+              {{ t('decks.createModal.preview', { total: deckListPreview.total }) }}
             </p>
             <p class="text-tiny text-silver-70">
-              Mainboard: {{ deckListPreview.mainboard }} | Sideboard: {{ deckListPreview.sideboard }}
+              {{ t('decks.createModal.previewDetail', { mainboard: deckListPreview.mainboard, sideboard: deckListPreview.sideboard }) }}
             </p>
           </div>
         </div>
 
         <!-- Colors -->
         <div>
-          <span class="text-small text-silver-70 block mb-2">Colores</span>
+          <span class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.colorsLabel') }}</span>
           <div class="flex flex-wrap gap-2">
             <button
                 v-for="color in colorOptions"
@@ -204,14 +206,14 @@ watch(() => props.show, (show) => {
             class="flex-1"
             @click="handleCreate"
         >
-          CREAR MAZO
+          {{ t('decks.createModal.submit') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
             class="flex-1"
             @click="emit('close')"
         >
-          CANCELAR
+          {{ t('common.actions.cancel') }}
         </BaseButton>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
+import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
@@ -22,6 +23,7 @@ const decksStore = useDecksStore()
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
+const { t } = useI18n()
 
 const showCreateModal = ref(false)
 const showImportModal = ref(false)
@@ -62,7 +64,7 @@ const handleCreateDeck = async (deckData: any) => {
   if (deckId) {
     // Si hay una lista de cartas, importarla
     if (deckList) {
-      toastStore.show('Importando cartas...', 'info')
+      toastStore.show(t('common.actions.loading'), 'info')
 
       const lines = deckList.split('\n').filter((l: string) => l.trim())
       const collectionCards: any[] = []
@@ -130,7 +132,7 @@ const handleCreateDeck = async (deckData: any) => {
           }
         }
 
-        toastStore.show(`${collectionCards.length} cartas importadas`, 'success')
+        toastStore.show(t('collection.messages.imported', { count: collectionCards.length }), 'success')
       }
     }
 
@@ -145,10 +147,10 @@ const handleEditDeck = (deckId: string) => {
 
 const handleDeleteDeck = async (deckId: string) => {
   const confirmed = await confirmStore.show({
-    title: 'Eliminar deck',
-    message: '¿Eliminar este deck? Esta acción no se puede deshacer.',
-    confirmText: 'ELIMINAR',
-    cancelText: 'CANCELAR',
+    title: t('decks.card.delete'),
+    message: t('decks.messages.deleteError'),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -246,7 +248,7 @@ const handleImport = async (
 
   // Close modal immediately and show background toast
   showImportModal.value = false
-  toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
+  toastStore.show(t('decks.importModal.analyzing'), 'info')
 
   // Parsear el texto
   const lines = deckText.split('\n').filter(l => l.trim())
@@ -331,7 +333,7 @@ const handleImport = async (
     }
   }
 
-  toastStore.show(`Deck "${finalDeckName}" importado con ${collectionCards.length} cartas`, 'success')
+  toastStore.show(t('decks.messages.created', { name: finalDeckName }), 'success')
 
   if (deckId) {
     await router.push(`/decks/${deckId}/edit`)
@@ -351,7 +353,7 @@ const handleImportDirect = async (
 
   // Close modal immediately and show background toast
   showImportModal.value = false
-  toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
+  toastStore.show(t('decks.importModal.analyzing'), 'info')
 
   // 1. Crear el deck
   const deckId = await decksStore.createDeck({
@@ -481,7 +483,7 @@ const handleImportDirect = async (
     await collectionStore.confirmImport(collectionCards)
   }
 
-  toastStore.show(`Deck "${finalDeckName}" importado con ${cards.length} cartas`, 'success')
+  toastStore.show(t('decks.messages.created', { name: finalDeckName }), 'success')
 
   if (deckId) {
     await router.push(`/decks/${deckId}/edit`)
@@ -499,9 +501,9 @@ onMounted(async () => {
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver">MIS MAZOS</h1>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver">{{ t('decks.title') }}</h1>
           <p class="text-tiny md:text-small text-silver-70 mt-1">
-            {{ decksStore.totalDecks }} mazos creados
+            {{ t('decks.subtitle', { count: decksStore.totalDecks }) }}
           </p>
         </div>
         <div class="flex gap-2 w-full md:w-auto">
@@ -510,7 +512,7 @@ onMounted(async () => {
               @click="showCreateModal = true"
               class="flex-1 md:flex-none"
           >
-            + NUEVO MAZO
+            {{ t('decks.actions.newDeck') }}
           </BaseButton>
           <BaseButton
               size="small"
@@ -518,7 +520,7 @@ onMounted(async () => {
               @click="showImportModal = true"
               class="flex-1 md:flex-none"
           >
-            IMPORTAR
+            {{ t('decks.actions.import') }}
           </BaseButton>
         </div>
       </div>
@@ -527,18 +529,18 @@ onMounted(async () => {
       <div class="bg-primary border border-silver-30 p-4 md:p-6 mb-6 space-y-4">
         <!-- Búsqueda -->
         <div>
-          <label for="decks-search" class="text-small text-silver-70 block mb-2">Buscar</label>
+          <label for="decks-search" class="text-small text-silver-70 block mb-2">{{ t('common.actions.search') }}</label>
           <BaseInput
               id="decks-search"
               v-model="searchQuery"
-              placeholder="Buscar por nombre o descripción..."
+              :placeholder="t('decks.filters.searchPlaceholder')"
               type="text"
           />
         </div>
 
         <!-- Formato -->
         <div>
-          <span class="text-small text-silver-70 block mb-2">Formato</span>
+          <span class="text-small text-silver-70 block mb-2">{{ t('decks.filters.format') }}</span>
           <div class="flex gap-2 flex-wrap">
             <button
                 @click="filterFormat = 'all'"
@@ -549,7 +551,7 @@ onMounted(async () => {
                     : 'bg-primary border border-silver-30 text-silver hover:border-neon'
                 ]"
             >
-              TODOS
+              {{ t('decks.filters.all') }}
             </button>
             <button
                 v-for="format in formats"
@@ -573,15 +575,15 @@ onMounted(async () => {
 
       <!-- Empty state -->
       <div v-else-if="filteredDecks.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
-        <p class="text-body text-silver-70 mb-4">🗂️ No hay mazos</p>
+        <p class="text-body text-silver-70 mb-4">{{ t('decks.empty.noDecks') }}</p>
         <p class="text-small text-silver-50 mb-6">
           {{ decksStore.totalDecks === 0
-            ? 'Crea tu primer mazo para comenzar'
-            : 'No se encontraron mazos con estos filtros'
+            ? t('decks.empty.createFirst')
+            : t('decks.empty.noResults')
           }}
         </p>
         <BaseButton v-if="decksStore.totalDecks === 0" @click="showCreateModal = true" size="small">
-          CREAR PRIMER MAZO
+          {{ t('decks.empty.createButton') }}
         </BaseButton>
       </div>
 

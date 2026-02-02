@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useI18n } from '../composables/useI18n'
+
+const { t } = useI18n()
 const lastUpdated = '27 de Enero, 2025';
 </script>
 
@@ -16,8 +19,8 @@ const lastUpdated = '27 de Enero, 2025';
 
     <!-- Content -->
     <main class="max-w-4xl mx-auto px-6 py-12">
-      <h1 class="text-h1 font-bold text-silver mb-2">Términos de Uso</h1>
-      <p class="text-small text-silver-50 mb-8">Última actualización: {{ lastUpdated }}</p>
+      <h1 class="text-h1 font-bold text-silver mb-2">{{ t('legal.terms.title') }}</h1>
+      <p class="text-small text-silver-50 mb-8">{{ t('legal.cookies.lastUpdated') }} {{ lastUpdated }}</p>
 
       <div class="space-y-8 text-body text-silver-70">
         <!-- Intro -->
@@ -162,7 +165,7 @@ const lastUpdated = '27 de Enero, 2025';
       <!-- Back link -->
       <div class="mt-12 pt-8 border-t border-silver-20">
         <RouterLink to="/login" class="text-small text-neon hover:underline">
-          ← Volver al inicio
+          {{ t('legal.backToHome') }}
         </RouterLink>
       </div>
     </main>
@@ -170,11 +173,11 @@ const lastUpdated = '27 de Enero, 2025';
     <!-- Simple Footer -->
     <footer class="border-t border-silver-20 py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p class="text-tiny text-silver-50">© 2024 Cranial Trading</p>
+        <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
         <div class="flex gap-6 text-tiny text-silver-50">
-          <RouterLink to="/terms" class="text-neon">Términos</RouterLink>
-          <RouterLink to="/privacy" class="hover:text-neon transition-fast">Privacidad</RouterLink>
-          <RouterLink to="/cookies" class="hover:text-neon transition-fast">Cookies</RouterLink>
+          <RouterLink to="/terms" class="text-neon">{{ t('legal.footer.terms') }}</RouterLink>
+          <RouterLink to="/privacy" class="hover:text-neon transition-fast">{{ t('legal.footer.privacy') }}</RouterLink>
+          <RouterLink to="/cookies" class="hover:text-neon transition-fast">{{ t('legal.footer.cookies') }}</RouterLink>
         </div>
       </div>
     </footer>

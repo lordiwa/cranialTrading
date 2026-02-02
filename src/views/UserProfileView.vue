@@ -5,6 +5,7 @@ import { collection, getDocs, query, where, limit, startAfter, addDoc } from 'fi
 import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
+import { useI18n } from '../composables/useI18n';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
@@ -15,6 +16,7 @@ import type { Card } from '../types/card';
 const route = useRoute();
 const toastStore = useToastStore();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 // State refs
 const username = ref<string>(route.params.username as string || '');
@@ -206,10 +208,10 @@ const handleInterest = async (card: Card) => {
 
     // Mark card as interested
     interestedCards.value.add(cardKey);
-    toastStore.show(`Interés enviado a @${userInfo.value?.username}`, 'success');
+    toastStore.show(t('dashboard.interest.sent', { username: userInfo.value?.username }), 'success');
   } catch (error) {
     console.error('Error sending interest:', error);
-    toastStore.show('Error al enviar interés', 'error');
+    toastStore.show(t('dashboard.interest.error'), 'error');
   }
 };
 
@@ -223,15 +225,15 @@ onMounted(() => {
   <AppContainer>
     <!-- User not found state -->
     <div v-if="userNotFound" class="flex flex-col items-center justify-center min-h-[50vh] text-center">
-      <h2 class="text-h2 font-bold text-rust mb-4">404 - Usuario no encontrado</h2>
+      <h2 class="text-h2 font-bold text-rust mb-4">{{ t('profile.notFound.title') }}</h2>
       <p class="text-body text-silver-70 mb-8 max-w-md">
-        @{{ username }} no existe o su perfil es privado.
+        {{ t('profile.notFound.message', { username: username }) }}
       </p>
       <RouterLink v-if="authStore.user" to="/dashboard">
-        <BaseButton>VOLVER AL DASHBOARD</BaseButton>
+        <BaseButton>{{ t('profile.notFound.backToDashboard') }}</BaseButton>
       </RouterLink>
       <RouterLink v-else to="/login">
-        <BaseButton>INICIAR SESIÓN</BaseButton>
+        <BaseButton>{{ t('profile.notFound.login') }}</BaseButton>
       </RouterLink>
     </div>
 
@@ -254,7 +256,7 @@ onMounted(() => {
               size="small"
               @click="handleContact(userId!, userInfo?.username || '')"
           >
-            💬 CONTACTAR
+            {{ t('profile.contact') }}
           </BaseButton>
         </div>
       </div>
@@ -265,15 +267,15 @@ onMounted(() => {
       <!-- Empty state -->
       <div v-else-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
         <p class="text-body text-silver-70">
-          Este usuario no tiene cartas públicas en su colección.
+          {{ t('profile.noPublicCards') }}
         </p>
       </div>
 
       <!-- Public collection -->
       <div v-else>
         <h2 class="text-h3 font-bold text-silver mb-6">
-          Colección pública
-          <span class="text-small text-silver-70 font-normal ml-2">({{ cards.length }} cartas)</span>
+          {{ t('profile.publicCollection') }}
+          <span class="text-small text-silver-70 font-normal ml-2">({{ cards.length }} {{ t('profile.cards') }})</span>
         </h2>
 
         <div class="space-y-8">
@@ -288,7 +290,7 @@ onMounted(() => {
           <!-- Load more button -->
           <div v-if="hasMore" class="text-center">
             <BaseButton :disabled="loadingMore" @click="loadNextPage">
-              {{ loadingMore ? 'CARGANDO...' : 'CARGAR MÁS' }}
+              {{ loadingMore ? t('common.actions.loading') : t('common.actions.loadMore') }}
             </BaseButton>
           </div>
         </div>

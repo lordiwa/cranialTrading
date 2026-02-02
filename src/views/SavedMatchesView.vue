@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMatchesStore } from '../stores/matches'
 import { useContactsStore } from '../stores/contacts'
+import { useI18n } from '../composables/useI18n'
 import { db } from '../services/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import AppContainer from '../components/layout/AppContainer.vue'
@@ -11,6 +12,7 @@ import SpriteIcon from '../components/ui/SpriteIcon.vue'
 
 const matchesStore = useMatchesStore()
 const contactsStore = useContactsStore()
+const { t } = useI18n()
 
 // State
 const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted'>('new')
@@ -27,25 +29,25 @@ const deletedMatches = computed(() => matchesStore.deletedMatches)
 const tabs = computed(() => [
   {
     id: 'new' as const,
-    label: 'NUEVOS',
+    label: t('matches.tabs.new'),
     icon: 'dot',
     count: newMatches.value.length
   },
   {
     id: 'sent' as const,
-    label: 'ENVIADOS',
+    label: t('matches.tabs.sent'),
     icon: 'hand',
     count: sentMatches.value.length
   },
   {
     id: 'saved' as const,
-    label: 'GUARDADOS',
+    label: t('matches.tabs.saved'),
     icon: 'star',
     count: savedMatches.value.length
   },
   {
     id: 'deleted' as const,
-    label: 'ELIMINADOS',
+    label: t('matches.tabs.deleted'),
     icon: 'trash',
     count: deletedMatches.value.length
   }
@@ -133,9 +135,9 @@ onUnmounted(() => {
     <div>
       <!-- Header -->
       <div class="mb-lg md:mb-xl">
-        <h1 class="text-h2 md:text-h1 font-bold text-silver mb-sm">MIS MATCHES</h1>
+        <h1 class="text-h2 md:text-h1 font-bold text-silver mb-sm">{{ t('matches.title') }}</h1>
         <p class="text-small md:text-body text-silver-70">
-          {{ newMatches.length }} nuevos, {{ sentMatches.length }} enviados, {{ savedMatches.length }} guardados
+          {{ t('matches.subtitle') }}
         </p>
       </div>
 
@@ -168,16 +170,16 @@ onUnmounted(() => {
       <!-- Empty state -->
       <div v-else-if="currentMatches.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
         <p class="text-body text-silver-70">
-          {{ activeTab === 'new' ? 'No tienes matches nuevos' :
-            activeTab === 'sent' ? 'No has enviado matches' :
-            activeTab === 'saved' ? 'No tienes matches guardados' :
-                'No tienes matches eliminados' }}
+          {{ activeTab === 'new' ? t('matches.empty.new.title') :
+            activeTab === 'sent' ? t('matches.empty.sent.title') :
+            activeTab === 'saved' ? t('matches.empty.saved.title') :
+                t('matches.empty.deleted.title') }}
         </p>
         <p class="text-small text-silver-50 mt-2">
-          {{ activeTab === 'new' ? 'Cuando alguien se interese en tus cartas, aparecerá aquí.' :
-            activeTab === 'sent' ? 'Cuando expreses interés en cartas de otros con "ME INTERESA", aparecerán aquí.' :
-            activeTab === 'saved' ? 'Los matches que guardes y envíes aparecerán aquí.' :
-                'Los matches eliminados se borrarán permanentemente después de 15 días.' }}
+          {{ activeTab === 'new' ? t('matches.empty.new.message') :
+            activeTab === 'sent' ? t('matches.empty.sent.message') :
+            activeTab === 'saved' ? t('matches.empty.saved.message') :
+                t('matches.empty.deleted.message') }}
         </p>
       </div>
 

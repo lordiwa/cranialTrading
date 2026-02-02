@@ -5,12 +5,15 @@ import { useDecksStore } from '../../stores/decks'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { Card, CardCondition, CardStatus } from '../../types/card'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -70,14 +73,14 @@ const {
 
 // ========== COMPUTED ==========
 
-const conditionOptions = [
-  { value: 'M', label: 'Mint (M)' },
-  { value: 'NM', label: 'Near Mint (NM)' },
-  { value: 'LP', label: 'Light Play (LP)' },
-  { value: 'MP', label: 'Moderate Play (MP)' },
-  { value: 'HP', label: 'Heavy Play (HP)' },
-  { value: 'PO', label: 'Poor (PO)' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 // Total quantity across all statuses
 const totalQuantity = computed(() => {
@@ -122,7 +125,7 @@ const canSave = computed(() => {
 
 const validationError = computed(() => {
   if (totalQuantity.value === 0) {
-    return 'Debes tener al menos 1 copia'
+    return t('cards.detailModal.validationMinCopy')
   }
   return null
 })
@@ -132,7 +135,7 @@ const allocationWarning = computed(() => {
   const ownedQty = totalQuantity.value - statusDistribution.value.wishlist
   if (ownedQty < totalAllocated.value) {
     const excess = totalAllocated.value - ownedQty
-    return `${excess} carta(s) asignadas a mazos pasarán a wishlist`
+    return t('cards.detailModal.allocationWarning', { excess })
   }
   return null
 })
@@ -415,12 +418,12 @@ const handleSave = async () => {
     // Force reload collection from Firebase to ensure sync
     await collectionStore.loadCollection()
 
-    toastStore.show('Carta actualizada', 'success')
+    toastStore.show(t('cards.detailModal.updated'), 'success')
     emit('saved')
     emit('close')
   } catch (err) {
     console.error('Error saving card:', err)
-    toastStore.show('Error guardando cambios', 'error')
+    toastStore.show(t('cards.detailModal.saveError'), 'error')
   } finally {
     isLoading.value = false
   }
@@ -455,8 +458,8 @@ watch(selectedPrint, (print) => {
     <div class="space-y-5 w-full max-w-xl">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">DETALLE DE CARTA</h2>
-        <p class="text-small text-silver-70">Gestiona tu carta y distribúyela por status</p>
+        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('cards.detailModal.title') }}</h2>
+        <p class="text-small text-silver-70">{{ t('cards.detailModal.subtitle') }}</p>
       </div>
 
       <!-- Card Preview -->
@@ -470,7 +473,7 @@ watch(selectedPrint, (print) => {
               class="w-32 h-44 object-cover border border-silver-30"
           />
           <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
-            <span class="text-tiny text-silver-50">No image</span>
+            <span class="text-tiny text-silver-50">{{ t('cards.detailModal.noImage') }}</span>
           </div>
         </div>
 
@@ -501,7 +504,7 @@ watch(selectedPrint, (print) => {
 
           <!-- Print Selector -->
           <div v-if="availablePrints.length > 1">
-            <label for="detail-print-select" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+            <label for="detail-print-select" class="text-tiny text-silver-70 block mb-1">{{ t('cards.detailModal.editionPrintLabel') }}</label>
             <select
                 id="detail-print-select"
                 :value="selectedPrint?.id"
@@ -516,17 +519,17 @@ watch(selectedPrint, (print) => {
                 {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
               </option>
             </select>
-            <p class="text-tiny text-silver-50 mt-1">{{ availablePrints.length }} prints disponibles</p>
+            <p class="text-tiny text-silver-50 mt-1">{{ t('cards.detailModal.printsAvailable', { count: availablePrints.length }) }}</p>
           </div>
-          <p v-else-if="loadingPrints" class="text-tiny text-silver-50">Cargando prints...</p>
+          <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('cards.detailModal.loadingPrints') }}</p>
         </div>
       </div>
 
       <!-- Status Distribution -->
       <div class="bg-secondary border border-silver-30 p-4">
         <div class="flex justify-between items-center mb-3">
-          <p class="text-small font-bold text-silver">DISTRIBUCIÓN POR STATUS</p>
-          <p class="text-small text-neon font-bold">Total: {{ totalQuantity }}</p>
+          <p class="text-small font-bold text-silver">{{ t('cards.detailModal.distribution') }}</p>
+          <p class="text-small text-neon font-bold">{{ t('cards.detailModal.totalLabel', { qty: totalQuantity }) }}</p>
         </div>
 
         <div class="space-y-2">
@@ -534,7 +537,7 @@ watch(selectedPrint, (print) => {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-neon">✓</span>
-              <span class="text-small text-silver">Colección</span>
+              <span class="text-small text-silver">{{ t('common.status.collection') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -558,7 +561,7 @@ watch(selectedPrint, (print) => {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-yellow-400">$</span>
-              <span class="text-small text-silver">Venta</span>
+              <span class="text-small text-silver">{{ t('common.status.sale') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -582,7 +585,7 @@ watch(selectedPrint, (print) => {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-blue-400">~</span>
-              <span class="text-small text-silver">Cambio</span>
+              <span class="text-small text-silver">{{ t('common.status.trade') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -606,7 +609,7 @@ watch(selectedPrint, (print) => {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-red-400">*</span>
-              <span class="text-small text-silver">Deseado</span>
+              <span class="text-small text-silver">{{ t('common.status.wishlist') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -646,8 +649,8 @@ watch(selectedPrint, (print) => {
                 class="w-4 h-4 cursor-pointer"
             />
             <div>
-              <span class="text-small text-silver">Publicar en mi perfil</span>
-              <p class="text-tiny text-silver-50">Visible para otros usuarios en tu perfil público</p>
+              <span class="text-small text-silver">{{ t('cards.statusModal.publishLabel') }}</span>
+              <p class="text-tiny text-silver-50">{{ t('cards.statusModal.publishHint') }}</p>
             </div>
           </label>
         </div>
@@ -655,11 +658,11 @@ watch(selectedPrint, (print) => {
 
       <!-- Condition & Foil -->
       <div class="bg-secondary border border-silver-30 p-4 space-y-4">
-        <p class="text-small font-bold text-silver">PROPIEDADES</p>
+        <p class="text-small font-bold text-silver">{{ t('cards.detailModal.properties') }}</p>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label for="detail-condition" class="text-tiny text-silver-70 block mb-1">Condición</label>
+            <label for="detail-condition" class="text-tiny text-silver-70 block mb-1">{{ t('cards.detailModal.conditionLabel') }}</label>
             <BaseSelect
                 id="detail-condition"
                 v-model="condition"
@@ -674,7 +677,7 @@ watch(selectedPrint, (print) => {
                   type="checkbox"
                   class="w-4 h-4 cursor-pointer"
               />
-              <span class="text-small text-silver">Foil</span>
+              <span class="text-small text-silver">{{ t('cards.detailModal.foilLabel') }}</span>
             </label>
           </div>
         </div>
@@ -683,9 +686,9 @@ watch(selectedPrint, (print) => {
       <!-- Deck Allocations -->
       <div v-if="allDecks.length > 0" class="bg-secondary border border-silver-30 p-4">
         <div class="flex justify-between items-center mb-3">
-          <p class="text-small font-bold text-silver">ASIGNAR A MAZOS</p>
+          <p class="text-small font-bold text-silver">{{ t('cards.detailModal.assignToDecks') }}</p>
           <p class="text-tiny" :class="availableForAllocation > 0 ? 'text-neon' : 'text-silver-50'">
-            {{ availableForAllocation }} disponible{{ availableForAllocation !== 1 ? 's' : '' }}
+            {{ t('cards.detailModal.available', { qty: availableForAllocation }) }}
           </p>
         </div>
 
@@ -730,14 +733,14 @@ watch(selectedPrint, (print) => {
                 class="ml-1 px-2 py-1 text-tiny border transition-150"
                 :class="isInSideboard(deck.id) ? 'border-amber text-amber' : 'border-silver-30 text-silver-50 hover:border-silver'"
               >
-                {{ isInSideboard(deck.id) ? 'SB' : 'MB' }}
+                {{ isInSideboard(deck.id) ? t('cards.detailModal.sideboardToggle.sideboard') : t('cards.detailModal.sideboardToggle.mainboard') }}
               </button>
             </div>
           </div>
         </div>
 
         <p v-if="totalAllocated > 0" class="text-tiny text-silver-50 mt-2 pt-2 border-t border-silver-20">
-          Total asignadas: {{ totalAllocated }}
+          {{ t('cards.detailModal.totalAssigned', { qty: totalAllocated }) }}
         </p>
       </div>
 
@@ -748,7 +751,7 @@ watch(selectedPrint, (print) => {
             :disabled="isLoading || !canSave"
             @click="handleSave"
         >
-          {{ isLoading ? 'GUARDANDO...' : 'GUARDAR' }}
+          {{ isLoading ? t('common.actions.saving') : t('common.actions.save') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
@@ -756,7 +759,7 @@ watch(selectedPrint, (print) => {
             :disabled="isLoading"
             @click="handleClose"
         >
-          CANCELAR
+          {{ t('common.actions.cancel') }}
         </BaseButton>
       </div>
     </div>

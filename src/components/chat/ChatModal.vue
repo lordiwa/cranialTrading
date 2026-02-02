@@ -3,10 +3,13 @@ import { ref, onUnmounted, computed, nextTick, watch } from 'vue';
 import { useMessagesStore } from '../../stores/messages';
 import { useAuthStore } from '../../stores/auth';
 import { useToastStore } from '../../stores/toast';
+import { useI18n } from '../../composables/useI18n';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import BaseInput from '../ui/BaseInput.vue';
 import BaseLoader from '../ui/BaseLoader.vue';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   show: boolean;
@@ -51,7 +54,7 @@ const initializeConversation = async () => {
     );
 
     if (!convId) {
-      toastStore.show('No se pudo crear la conversación', 'error');
+      toastStore.show(t('messages.errors.createError'), 'error');
       return;
     }
 
@@ -62,7 +65,7 @@ const initializeConversation = async () => {
     messagesStore.loadConversationMessages(convId);
   } catch (error) {
     console.error('Error inicializando conversación:', error);
-    toastStore.show('Error al inicializar chat', 'error');
+    toastStore.show(t('messages.errors.listenError'), 'error');
   }
 };
 
@@ -140,7 +143,7 @@ watch(
 
 <template>
   <!-- ✅ FIX 4: Pasar otherUsername como :title - BaseModal agrega una sola X -->
-  <BaseModal :show="show" :title="`Chat con @${otherUsername}`" @close="handleClose">
+  <BaseModal :show="show" :title="t('messages.chat.title', { username: otherUsername })" @close="handleClose">
     <div class="w-full max-w-md h-96 flex flex-col">
       <!-- Messages -->
       <div ref="messagesContainer" class="flex-1 overflow-y-auto p-md space-y-sm">
@@ -148,7 +151,7 @@ watch(
 
         <div v-if="sortedMessages.length === 0 && !messagesStore.loading" class="text-center py-8">
           <p class="text-small text-silver-50">
-            No hay mensajes aún. ¡Sé el primero en escribir!
+            {{ t('messages.chat.noMessages') }}
           </p>
         </div>
 
@@ -175,7 +178,7 @@ watch(
       <div class="flex gap-2">
         <BaseInput
             v-model="messageInput"
-            placeholder="Escribe un mensaje..."
+            :placeholder="t('messages.chat.inputPlaceholder')"
             @keypress="handleKeyPress"
             :disabled="isSending || !isConversationReady"
         />

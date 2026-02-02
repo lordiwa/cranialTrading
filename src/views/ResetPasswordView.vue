@@ -2,12 +2,14 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const code = ref('');
 const password = ref('');
@@ -45,18 +47,18 @@ const handleReset = async () => {
   <div class="min-h-screen flex items-center justify-center px-4">
     <div class="w-full max-w-md">
       <div class="flex flex-col items-center mb-8">
-        <h1 class="text-h2 font-bold text-neon text-center">NUEVA CONTRASEÑA</h1>
+        <h1 class="text-h2 font-bold text-neon text-center">{{ t('auth.resetPassword.title') }}</h1>
       </div>
 
       <div v-if="invalidCode" class="bg-primary border border-rust p-8 text-center">
         <p class="text-body text-rust mb-4">
-          ✗ Enlace inválido
+          ✗ {{ t('auth.resetPassword.invalidLink') }}
         </p>
         <p class="text-small text-silver-70 mb-6">
-          El enlace de recuperación es inválido o expiró.
+          {{ t('auth.resetPassword.invalidLinkMessage') }}
         </p>
         <RouterLink to="/forgot-password" class="text-small text-neon hover:underline">
-          Solicitar nuevo enlace
+          {{ t('auth.resetPassword.requestNewLink') }}
         </RouterLink>
       </div>
 
@@ -64,17 +66,17 @@ const handleReset = async () => {
         <BaseInput
             v-model="password"
             type="password"
-            placeholder="Nueva contraseña"
+            :placeholder="t('auth.resetPassword.newPasswordPlaceholder')"
         />
 
         <BaseInput
             v-model="passwordConfirm"
             type="password"
-            placeholder="Confirmar contraseña"
+            :placeholder="t('auth.resetPassword.confirmPasswordPlaceholder')"
         />
 
         <div v-if="password && passwordConfirm && password !== passwordConfirm" class="text-tiny text-rust">
-          Las contraseñas no coinciden
+          {{ t('auth.resetPassword.passwordMismatch') }}
         </div>
 
         <BaseButton
@@ -82,12 +84,12 @@ const handleReset = async () => {
             :disabled="loading || !password || password !== passwordConfirm"
             class="w-full"
         >
-          {{ loading ? 'RESTABLECIENDO...' : 'RESTABLECER' }}
+          {{ loading ? t('auth.resetPassword.submitting') : t('auth.resetPassword.submit') }}
         </BaseButton>
 
         <div class="text-center">
           <RouterLink to="/login" class="text-small text-silver hover:text-neon transition-fast">
-            Volver al login
+            {{ t('auth.resetPassword.backToLogin') }}
           </RouterLink>
         </div>
       </div>

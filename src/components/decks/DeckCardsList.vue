@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../../types/deck'
 import BaseBadge from '../ui/BaseBadge.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   cards: DisplayDeckCard[]
@@ -61,19 +64,19 @@ const wishlistCards = computed(() => {
     <!-- Header stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="bg-secondary border border-silver-30 p-3">
-        <p class="text-tiny text-silver-70">CARTAS ÚNICAS</p>
+        <p class="text-tiny text-silver-70">{{ t('decks.cardsList.uniqueCards') }}</p>
         <p class="text-h3 font-bold text-neon">{{ cards.length }}</p>
       </div>
       <div class="bg-secondary border border-silver-30 p-3">
-        <p class="text-tiny text-silver-70">TOTAL CARTAS</p>
+        <p class="text-tiny text-silver-70">{{ t('decks.cardsList.totalCards') }}</p>
         <p class="text-h3 font-bold text-silver">{{ totalCards }}</p>
       </div>
       <div class="bg-secondary border border-silver-30 p-3">
-        <p class="text-tiny text-silver-70">EN COLECCIÓN</p>
+        <p class="text-tiny text-silver-70">{{ t('decks.cardsList.inCollection') }}</p>
         <p class="text-h3 font-bold text-neon">{{ ownedCards }}</p>
       </div>
       <div class="bg-secondary border border-silver-30 p-3">
-        <p class="text-tiny text-silver-70">WISHLIST</p>
+        <p class="text-tiny text-silver-70">{{ t('decks.cardsList.wishlist') }}</p>
         <p class="text-h3 font-bold" :class="wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
           {{ wishlistCards }}
         </p>
@@ -82,19 +85,19 @@ const wishlistCards = computed(() => {
 
     <!-- Empty state -->
     <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
-      <p class="text-body text-silver-70">No hay cartas en {{ title.toLowerCase() }}</p>
+      <p class="text-body text-silver-70">{{ t('decks.cardsList.noCardsIn', { section: title.toLowerCase() }) }}</p>
     </div>
 
     <!-- Cards table -->
     <div v-else class="border border-silver-30 overflow-hidden">
       <!-- Header -->
       <div class="hidden md:grid grid-cols-12 gap-2 bg-secondary border-b border-silver-30 p-3 text-tiny font-bold text-silver-70">
-        <div class="col-span-1">QTY</div>
-        <div class="col-span-5">CARTA</div>
-        <div class="col-span-2">EDICIÓN</div>
-        <div class="col-span-1">ESTADO</div>
-        <div class="col-span-2">PRECIO</div>
-        <div class="col-span-1">ACCIONES</div>
+        <div class="col-span-1">{{ t('decks.cardsList.headers.qty') }}</div>
+        <div class="col-span-5">{{ t('decks.cardsList.headers.card') }}</div>
+        <div class="col-span-2">{{ t('decks.cardsList.headers.edition') }}</div>
+        <div class="col-span-1">{{ t('decks.cardsList.headers.status') }}</div>
+        <div class="col-span-2">{{ t('decks.cardsList.headers.price') }}</div>
+        <div class="col-span-1">{{ t('decks.cardsList.headers.actions') }}</div>
       </div>
 
       <!-- Cards -->
@@ -118,7 +121,7 @@ const wishlistCards = computed(() => {
                 <p class="text-tiny text-silver-70">{{ card.edition }}</p>
               </div>
               <div class="text-right">
-                <p class="text-tiny text-silver-50">${{ card.price.toFixed(2) }} c/u</p>
+                <p class="text-tiny text-silver-50">${{ card.price.toFixed(2) }} {{ t('decks.cardsList.perUnit') }}</p>
                 <p class="font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
               </div>
             </div>
@@ -130,19 +133,19 @@ const wishlistCards = computed(() => {
                 FOIL
               </span>
               <span v-if="!card.isWishlist" class="px-2 py-1 bg-secondary border border-silver-30 text-silver-50">
-                {{ (card as any).availableInCollection }} disp.
+                {{ (card as any).availableInCollection }} {{ t('decks.cardsList.available') }}
               </span>
               <button
                   @click="emit('edit', card)"
                   class="px-2 py-1 border border-silver-30 text-silver hover:text-neon transition-150"
               >
-                EDITAR
+                {{ t('decks.cardsList.edit') }}
               </button>
               <button
                   @click="emit('remove', card)"
                   class="px-2 py-1 border border-silver-30 text-silver-70 hover:text-ruby transition-150"
               >
-                QUITAR
+                {{ t('decks.cardsList.remove') }}
               </button>
             </div>
           </div>
@@ -163,7 +166,7 @@ const wishlistCards = computed(() => {
                 </BaseBadge>
               </div>
               <p v-if="!card.isWishlist" class="text-tiny text-silver-50">
-                {{ (card as any).totalInCollection }} en colección ({{ (card as any).availableInCollection }} disp.)
+                {{ t('decks.cardsList.inCollectionCount', { total: (card as any).totalInCollection, available: (card as any).availableInCollection }) }}
               </p>
             </div>
             <div class="col-span-2 text-small text-silver-70">{{ card.edition }}</div>
@@ -173,7 +176,7 @@ const wishlistCards = computed(() => {
               </span>
             </div>
             <div class="col-span-2">
-              <p class="text-small text-silver">${{ card.price.toFixed(2) }} c/u</p>
+              <p class="text-small text-silver">${{ card.price.toFixed(2) }} {{ t('decks.cardsList.perUnit') }}</p>
               <p class="text-tiny font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">
                 ${{ (card.price * getQuantity(card)).toFixed(2) }}
               </p>
@@ -182,14 +185,14 @@ const wishlistCards = computed(() => {
               <button
                   @click="emit('edit', card)"
                   class="px-2 py-1 text-tiny border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150"
-                  title="Editar"
+                  :title="t('decks.cardsList.editTitle')"
               >
                 ✏️
               </button>
               <button
                   @click="emit('remove', card)"
                   class="px-2 py-1 text-tiny border border-silver-30 text-silver-70 hover:border-ruby hover:text-ruby transition-150"
-                  title="Quitar del deck"
+                  :title="t('decks.cardsList.removeTitle')"
               >
                 ✕
               </button>
@@ -203,11 +206,11 @@ const wishlistCards = computed(() => {
     <div class="flex gap-4 text-tiny text-silver-50">
       <div class="flex items-center gap-1">
         <span class="w-3 h-3 bg-neon"></span>
-        <span>En colección</span>
+        <span>{{ t('decks.cardsList.legend.inCollection') }}</span>
       </div>
       <div class="flex items-center gap-1">
         <span class="w-3 h-3 bg-amber"></span>
-        <span>Wishlist (necesitas comprar)</span>
+        <span>{{ t('decks.cardsList.legend.wishlist') }}</span>
       </div>
     </div>
   </div>

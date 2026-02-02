@@ -5,9 +5,11 @@ import BaseLoader from '../components/ui/BaseLoader.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
 import { useMessagesStore } from '../stores/messages';
 import { useAuthStore } from '../stores/auth';
+import { useI18n } from '../composables/useI18n';
 
 const messagesStore = useMessagesStore();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const showChat = ref(false);
 const selectedUserId = ref('');
@@ -67,9 +69,9 @@ onMounted(async () => {
     <div class="max-w-2xl">
       <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">MENSAJES</h1>
+        <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">{{ t('messages.title') }}</h1>
         <p class="text-small md:text-body text-silver-70">
-          {{ conversations.length }} conversaciones activas
+          {{ conversations.length }} {{ t('messages.subtitle') }}
         </p>
       </div>
 
@@ -78,7 +80,7 @@ onMounted(async () => {
         <input
             v-model="filterQuery"
             type="text"
-            placeholder="Buscar por usuario..."
+            :placeholder="t('messages.searchPlaceholder')"
             class="w-full bg-primary border border-silver px-4 py-3 text-body text-silver placeholder:text-silver-50 focus:outline-none focus:border-2 focus:border-neon transition-fast"
         />
       </div>
@@ -91,10 +93,10 @@ onMounted(async () => {
       <!-- Empty state -->
       <div v-else-if="filteredConversations.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
         <p class="text-body text-silver-70 mb-2">
-          {{ filterQuery ? 'No se encontraron conversaciones' : 'No tienes mensajes aún' }}
+          {{ filterQuery ? t('messages.empty.noResults') : t('messages.empty.noMessages') }}
         </p>
         <p class="text-small text-silver-50">
-          {{ filterQuery ? 'Intenta con otro nombre' : 'Cuando contactes usuarios, aparecerán aquí' }}
+          {{ filterQuery ? t('messages.empty.tryAnother') : t('messages.empty.whenContact') }}
         </p>
       </div>
 

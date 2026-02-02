@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
+import { useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SpriteIcon from '../components/ui/SpriteIcon.vue';
@@ -10,6 +11,7 @@ import SpriteIcon from '../components/ui/SpriteIcon.vue';
 const router = useRouter();
 const authStore = useAuthStore();
 const toastStore = useToastStore();
+const { t } = useI18n();
 
 const email = ref('');
 const password = ref('');
@@ -27,36 +29,36 @@ const handleLogin = async () => {
       return;
     }
 
-    toastStore.show('Credenciales inválidas', 'error');
+    toastStore.show(t('auth.messages.invalidCredentials'), 'error');
   } catch (err) {
-    toastStore.show('Error al iniciar sesión', 'error');
+    toastStore.show(t('auth.messages.invalidCredentials'), 'error');
   } finally {
     loading.value = false;
   }
 };
 
-const features = [
+const features = computed(() => [
   {
     icon: 'box',
-    title: 'Gestiona tu Colección',
-    description: 'Organiza todas tus cartas en un solo lugar. Controla lo que tienes, lo que vendes y lo que buscas.'
+    title: t('landing.features.collection.title'),
+    description: t('landing.features.collection.description')
   },
   {
     icon: 'search',
-    title: 'Encuentra Matches',
-    description: 'Nuestro algoritmo encuentra traders que tienen lo que buscas y buscan lo que tienes.'
+    title: t('landing.features.matches.title'),
+    description: t('landing.features.matches.description')
   },
   {
     icon: 'money',
-    title: 'Monetiza tu Bulk',
-    description: 'Esas cartas que crees que no valen nada pueden ser el tesoro de otro coleccionista.'
+    title: t('landing.features.bulk.title'),
+    description: t('landing.features.bulk.description')
   },
   {
     icon: 'handshake',
-    title: 'Conecta con Traders',
-    description: 'Mensajería directa para coordinar intercambios y ventas de forma segura.'
+    title: t('landing.features.connect.title'),
+    description: t('landing.features.connect.description')
   }
-];
+]);
 </script>
 
 <template>
@@ -75,7 +77,7 @@ const features = [
             />
             <div>
               <h1 class="text-h2 lg:text-h1 font-bold text-neon tracking-wider">CRANIAL TRADING</h1>
-              <p class="text-small text-silver-70">Magic: The Gathering Trading Platform</p>
+              <p class="text-small text-silver-70">{{ t('auth.login.subtitle') }}</p>
             </div>
           </div>
 
@@ -86,8 +88,8 @@ const features = [
               <span class="text-neon">to Treasures</span>
             </h2>
             <p class="text-body text-silver-70 max-w-lg">
-              Tu bulk no es basura. Es el tesoro de otro coleccionista.
-              Conectamos traders de Magic para que conviertas esas cartas olvidadas en valor real.
+              {{ t('landing.subtitle') }}
+              {{ t('landing.description') }}
             </p>
           </div>
         </div>
@@ -109,15 +111,15 @@ const features = [
         <div class="flex gap-8 text-center">
           <div>
             <p class="text-h2 font-bold text-neon">100%</p>
-            <p class="text-tiny text-silver-50">Gratis</p>
+            <p class="text-tiny text-silver-50">{{ t('landing.stats.free') }}</p>
           </div>
           <div>
             <p class="text-h2 font-bold text-neon">P2P</p>
-            <p class="text-tiny text-silver-50">Sin intermediarios</p>
+            <p class="text-tiny text-silver-50">{{ t('landing.stats.p2p') }}</p>
           </div>
           <div>
             <p class="text-h2 font-bold text-neon">MTG</p>
-            <p class="text-tiny text-silver-50">Especializado</p>
+            <p class="text-tiny text-silver-50">{{ t('landing.stats.mtg') }}</p>
           </div>
         </div>
       </div>
@@ -126,19 +128,19 @@ const features = [
       <div class="w-full lg:w-[420px] xl:w-[480px] flex items-center justify-center px-6 py-12 lg:px-12">
         <div class="w-full max-w-sm">
           <div class="bg-primary border border-silver-30 p-8">
-            <h2 class="text-h2 font-bold text-silver mb-6">INICIAR SESIÓN</h2>
+            <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.login.title') }}</h2>
 
             <form @submit.prevent="handleLogin" class="space-y-md">
               <BaseInput
                   v-model="email"
                   type="email"
-                  placeholder="Email"
+                  :placeholder="t('common.labels.email')"
               />
 
               <BaseInput
                   v-model="password"
                   type="password"
-                  placeholder="Contraseña"
+                  :placeholder="t('common.labels.password')"
               />
 
               <BaseButton
@@ -146,7 +148,7 @@ const features = [
                   class="w-full"
                   :disabled="loading || !email || !password"
               >
-                {{ loading ? 'INGRESANDO...' : 'INGRESAR' }}
+                {{ loading ? t('auth.login.submitting') : t('auth.login.submit') }}
               </BaseButton>
             </form>
 
@@ -155,23 +157,23 @@ const features = [
                   to="/forgot-password"
                   class="block text-small text-silver-70 hover:text-neon transition-fast"
               >
-                ¿Olvidaste tu contraseña?
+                {{ t('auth.login.forgotPassword') }}
               </RouterLink>
               <div class="text-silver-50 text-tiny">o</div>
               <RouterLink
                   to="/register"
                   class="block text-small text-silver hover:text-neon transition-fast"
               >
-                ¿No tienes cuenta? Registrarse
+                {{ t('auth.login.noAccount') }} {{ t('auth.login.register') }}
               </RouterLink>
             </div>
           </div>
 
           <!-- Trust badges -->
           <div class="mt-6 flex items-center justify-center gap-4 text-tiny text-silver-50">
-            <span class="flex items-center gap-1"><SpriteIcon name="lock" size="tiny" /> Conexión segura</span>
+            <span class="flex items-center gap-1"><SpriteIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
             <span>•</span>
-            <span class="flex items-center gap-1"><SpriteIcon name="fire" size="tiny" /> Firebase Auth</span>
+            <span class="flex items-center gap-1"><SpriteIcon name="fire" size="tiny" /> {{ t('auth.login.firebaseAuth') }}</span>
           </div>
         </div>
       </div>
@@ -192,24 +194,24 @@ const features = [
               <span class="text-small font-bold text-neon">CRANIAL</span>
             </div>
             <p class="text-tiny text-silver-50">
-              La plataforma de trading de Magic: The Gathering para la comunidad hispanohablante.
+              {{ t('landing.description') }}
             </p>
           </div>
 
           <!-- Platform -->
           <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">PLATAFORMA</h4>
+            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.platform') }}</h4>
             <ul class="space-y-2 text-tiny text-silver-50">
-              <li><RouterLink to="/login" class="hover:text-neon transition-fast">Iniciar Sesión</RouterLink></li>
-              <li><RouterLink to="/register" class="hover:text-neon transition-fast">Registrarse</RouterLink></li>
-              <li><span class="text-silver-30">Colección</span></li>
+              <li><RouterLink to="/login" class="hover:text-neon transition-fast">{{ t('auth.login.title') }}</RouterLink></li>
+              <li><RouterLink to="/register" class="hover:text-neon transition-fast">{{ t('auth.register.title') }}</RouterLink></li>
+              <li><span class="text-silver-30">{{ t('header.nav.collection') }}</span></li>
               <li><span class="text-silver-30">Matches</span></li>
             </ul>
           </div>
 
           <!-- Resources -->
           <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">RECURSOS</h4>
+            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.resources') }}</h4>
             <ul class="space-y-2 text-tiny text-silver-50">
               <li><a href="https://scryfall.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Scryfall</a></li>
               <li><a href="https://www.moxfield.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Moxfield</a></li>
@@ -220,11 +222,11 @@ const features = [
 
           <!-- Legal -->
           <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">LEGAL</h4>
+            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.legal') }}</h4>
             <ul class="space-y-2 text-tiny text-silver-50">
-              <li><RouterLink to="/terms" class="hover:text-neon transition-fast">Términos de Uso</RouterLink></li>
-              <li><RouterLink to="/privacy" class="hover:text-neon transition-fast">Privacidad</RouterLink></li>
-              <li><RouterLink to="/cookies" class="hover:text-neon transition-fast">Cookies</RouterLink></li>
+              <li><RouterLink to="/terms" class="hover:text-neon transition-fast">{{ t('legal.terms.title') }}</RouterLink></li>
+              <li><RouterLink to="/privacy" class="hover:text-neon transition-fast">{{ t('legal.privacy.title') }}</RouterLink></li>
+              <li><RouterLink to="/cookies" class="hover:text-neon transition-fast">{{ t('legal.cookies.title') }}</RouterLink></li>
             </ul>
           </div>
         </div>
@@ -232,7 +234,7 @@ const features = [
         <!-- Bottom bar -->
         <div class="pt-6 border-t border-silver-20 flex flex-col md:flex-row items-center justify-between gap-4">
           <p class="text-tiny text-silver-50">
-            © 2024 Cranial Trading. Todos los derechos reservados.
+            {{ t('legal.footer.copyright') }}. Todos los derechos reservados.
           </p>
           <p class="text-tiny text-silver-30">
             Magic: The Gathering es marca registrada de Wizards of the Coast.

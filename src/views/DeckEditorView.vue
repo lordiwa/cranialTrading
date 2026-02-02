@@ -5,6 +5,7 @@ import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
+import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
@@ -21,6 +22,7 @@ const decksStore = useDecksStore()
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
+const { t } = useI18n()
 
 const loading = ref(false)
 const showAddCardModal = ref(false)
@@ -100,7 +102,7 @@ const handleAddCard = async (cardData: {
 
     if (result.allocated > 0 || result.wishlisted > 0) {
       showAddCardModal.value = false
-      toastStore.show(`Carta agregada al ${activeTab.value}`, 'success')
+      toastStore.show(t('decks.editor.messages.cardAdded', { section: activeTab.value }), 'success')
     }
   } else if (cardData.addToCollection) {
     // Add to collection first, then allocate
@@ -127,7 +129,7 @@ const handleAddCard = async (cardData: {
           isInSideboard
       )
       showAddCardModal.value = false
-      toastStore.show(`Carta agregada a colección y ${activeTab.value}`, 'success')
+      toastStore.show(t('decks.editor.messages.cardAddedToCollection', { section: activeTab.value }), 'success')
     }
   } else {
     // Add directly to wishlist (not in collection)
@@ -146,7 +148,7 @@ const handleAddCard = async (cardData: {
       colors: cardData.colors,
     })
     showAddCardModal.value = false
-    toastStore.show(`Carta agregada a wishlist del ${activeTab.value}`, 'info')
+    toastStore.show(t('decks.editor.messages.cardAddedToWishlist', { section: activeTab.value }), 'info')
   }
 }
 
@@ -157,10 +159,10 @@ const handleRemoveCard = async (card: DisplayDeckCard) => {
   const cardName = card.name
 
   const confirmed = await confirmStore.show({
-    title: 'Eliminar del deck',
-    message: `¿Eliminar "${cardName}" del deck?`,
-    confirmText: 'ELIMINAR',
-    cancelText: 'CANCELAR',
+    title: t('decks.editor.removeFromDeck'),
+    message: t('decks.editor.confirmRemove', { name: cardName }),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -182,7 +184,7 @@ const handleRemoveCard = async (card: DisplayDeckCard) => {
     await decksStore.deallocateCard(deckId, ownedCard.cardId, ownedCard.isInSideboard)
   }
 
-  toastStore.show('Carta eliminada del deck', 'success')
+  toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
 }
 
 /**
@@ -226,7 +228,7 @@ const handleSaveEditedCard = async (updatedData: any) => {
 
   showEditCardModal.value = false
   editingCard.value = null
-  toastStore.show('Carta actualizada', 'success')
+  toastStore.show(t('decks.editor.messages.cardUpdated'), 'success')
 }
 
 /**
@@ -241,7 +243,7 @@ const handleUpdateQuantity = async (card: DisplayDeckCard, newQuantity: number) 
       hydratedCard.isInSideboard,
       newQuantity
     )
-    toastStore.show('Cantidad actualizada', 'success')
+    toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
   }
   // TODO: Handle wishlist quantity update
 }
@@ -251,16 +253,16 @@ const handleUpdateQuantity = async (card: DisplayDeckCard, newQuantity: number) 
  */
 const handleAddToWishlistFromGrid = async (card: DisplayDeckCard) => {
   // Card is already in wishlist, this is just a reminder
-  toastStore.show('Esta carta ya está en tu wishlist del deck', 'info')
+  toastStore.show(t('decks.editor.messages.alreadyInWishlist'), 'info')
 }
 
 const handleSave = async () => {
   if (!deck.value?.name.trim()) {
-    toastStore.show('El nombre del deck es requerido', 'error')
+    toastStore.show(t('decks.editor.messages.nameRequired'), 'error')
     return
   }
 
-  toastStore.show('Deck guardado', 'success')
+  toastStore.show(t('decks.editor.messages.saved'), 'success')
   await router.push('/decks')
 }
 
@@ -292,7 +294,7 @@ onMounted(async () => {
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-silver-20">
         <div class="flex-1">
-          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">EDITOR: {{ deck.name }}</h1>
+          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">{{ t('decks.editor.title', { name: deck.name }) }}</h1>
           <p class="text-small text-silver-70">{{ deck.description }}</p>
 
           <!-- Completion indicator -->
@@ -303,13 +305,13 @@ onMounted(async () => {
                   :style="{ width: `${completionPercent}%` }"
               />
             </div>
-            <span class="text-tiny text-silver-70">{{ completionPercent }}% completo</span>
+            <span class="text-tiny text-silver-70">{{ completionPercent }}% {{ t('decks.editor.complete') }}</span>
           </div>
         </div>
 
         <div class="flex flex-col gap-2">
-          <BaseButton size="small" @click="handleSave">GUARDAR</BaseButton>
-          <BaseButton variant="secondary" size="small" @click="handleBack">← VOLVER</BaseButton>
+          <BaseButton size="small" @click="handleSave">{{ t('decks.editor.save') }}</BaseButton>
+          <BaseButton variant="secondary" size="small" @click="handleBack">{{ t('decks.editor.back') }}</BaseButton>
         </div>
       </div>
 
@@ -317,19 +319,19 @@ onMounted(async () => {
       <div class="bg-secondary border border-silver-30 p-4 md:p-6">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p class="text-tiny text-silver-70 mb-1">FORMATO</p>
+            <p class="text-tiny text-silver-70 mb-1">{{ t('decks.editor.stats.format') }}</p>
             <p class="text-body font-bold text-silver uppercase">{{ deck.format }}</p>
           </div>
           <div>
-            <p class="text-tiny text-silver-70 mb-1">CARTAS</p>
+            <p class="text-tiny text-silver-70 mb-1">{{ t('decks.editor.stats.cards') }}</p>
             <p class="text-body font-bold text-neon">{{ deck.stats.totalCards }}</p>
           </div>
           <div>
-            <p class="text-tiny text-silver-70 mb-1">EN COLECCIÓN</p>
+            <p class="text-tiny text-silver-70 mb-1">{{ t('decks.editor.stats.inCollection') }}</p>
             <p class="text-body font-bold text-neon">{{ deck.stats.ownedCards }}</p>
           </div>
           <div>
-            <p class="text-tiny text-silver-70 mb-1">WISHLIST</p>
+            <p class="text-tiny text-silver-70 mb-1">{{ t('decks.editor.stats.wishlist') }}</p>
             <p class="text-body font-bold" :class="deck.stats.wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
               {{ deck.stats.wishlistCards }}
             </p>
@@ -338,9 +340,9 @@ onMounted(async () => {
 
         <!-- Colors -->
         <div class="mt-4 pt-4 border-t border-silver-20">
-          <p class="text-tiny text-silver-70 mb-2">COLORES</p>
+          <p class="text-tiny text-silver-70 mb-2">{{ t('decks.editor.colors') }}</p>
           <div class="flex gap-2">
-            <span v-if="deck.colors.length === 0" class="text-small text-silver-70">Sin colores definidos</span>
+            <span v-if="deck.colors.length === 0" class="text-small text-silver-70">{{ t('decks.editor.noColors') }}</span>
             <BaseBadge v-for="color in deck.colors" :key="color" variant="cambio">
               {{ color }}
             </BaseBadge>
@@ -359,7 +361,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          MAINBOARD ({{ mainboardCount }})
+          {{ t('decks.editor.sections.mainboard') }} ({{ mainboardCount }})
         </button>
         <button
             @click="activeTab = 'sideboard'"
@@ -370,7 +372,7 @@ onMounted(async () => {
                 : 'border-transparent text-silver-70 hover:text-silver'
             ]"
         >
-          SIDEBOARD ({{ sideboardCount }})
+          {{ t('decks.editor.sections.sideboard') }} ({{ sideboardCount }})
         </button>
       </div>
 
@@ -380,7 +382,7 @@ onMounted(async () => {
           @click="showAddCardModal = true"
           class="w-full md:w-auto"
       >
-        + AGREGAR CARTA
+        {{ t('decks.editor.addCard') }}
       </BaseButton>
 
       <!-- Cards Grid (Visual Editor) -->
@@ -413,8 +415,8 @@ onMounted(async () => {
     </div>
 
     <div v-else class="text-center py-16">
-      <p class="text-body text-silver-70 mb-4">No se encontró el mazo</p>
-      <BaseButton @click="handleBack">VOLVER A MAZOS</BaseButton>
+      <p class="text-body text-silver-70 mb-4">{{ t('decks.editor.messages.notFound') }}</p>
+      <BaseButton @click="handleBack">{{ t('decks.detail.backToDecks') }}</BaseButton>
     </div>
   </AppContainer>
 </template>

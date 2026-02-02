@@ -4,8 +4,11 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
+import { useI18n } from '../../composables/useI18n'
 import SpriteIcon from '../ui/SpriteIcon.vue'
 import type { Card } from '../../types/card'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   card: Card
@@ -39,9 +42,9 @@ const togglePublic = async () => {
   try {
     const newPublicValue = !props.card.public
     await collectionStore.updateCard(props.card.id, { public: newPublicValue })
-    toastStore.show(newPublicValue ? 'Carta visible en perfil' : 'Carta oculta del perfil', 'success')
+    toastStore.show(newPublicValue ? t('cards.grid.visibleInProfile') : t('cards.grid.hiddenFromProfile'), 'success')
   } catch (error) {
-    toastStore.show('Error al cambiar visibilidad', 'error')
+    toastStore.show(t('cards.grid.visibilityError'), 'error')
   } finally {
     togglingPublic.value = false
   }
@@ -149,7 +152,7 @@ const getStatusIconName = (status: string) => {
           class="w-full h-full object-cover"
       />
       <div v-else class="w-full h-full flex items-center justify-center bg-primary">
-        <span class="text-[10px] text-silver-50">No img</span>
+        <span class="text-[10px] text-silver-50">{{ t('cards.grid.noImg') }}</span>
       </div>
 
       <!-- Qty Badge - BIGGER for compact -->
@@ -186,7 +189,7 @@ const getStatusIconName = (status: string) => {
           class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
       />
       <div v-else class="w-full h-full flex items-center justify-center bg-primary">
-        <span class="text-tiny text-silver-50">No image</span>
+        <span class="text-tiny text-silver-50">{{ t('cards.grid.noImage') }}</span>
       </div>
 
       <!-- ========== DESKTOP: Hover overlay ========== -->
@@ -195,7 +198,7 @@ const getStatusIconName = (status: string) => {
           class="absolute inset-0 bg-primary/70 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center pointer-events-none group-hover:pointer-events-auto"
       >
         <!-- Edit text -->
-        <p class="text-small font-bold text-silver mb-4">CLICK PARA EDITAR</p>
+        <p class="text-small font-bold text-silver mb-4">{{ t('cards.grid.clickToEdit') }}</p>
       </div>
 
       <!-- ========== Deleting overlay ========== -->
@@ -207,7 +210,7 @@ const getStatusIconName = (status: string) => {
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <p class="text-tiny font-bold text-rust">ELIMINANDO...</p>
+        <p class="text-tiny font-bold text-rust">{{ t('cards.grid.deleting') }}</p>
       </div>
 
       <!-- ========== DESKTOP: Badges on hover ========== -->
@@ -216,7 +219,7 @@ const getStatusIconName = (status: string) => {
           v-if="isSplitCard"
           @click.stop="toggleCardFace"
           class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10"
-          title="Click para ver el otro lado"
+          :title="t('cards.grid.flipTitle')"
       >
         <SpriteIcon name="flip" size="tiny" />
       </button>
@@ -232,7 +235,7 @@ const getStatusIconName = (status: string) => {
             isSplitCard ? 'left-12' : 'left-2',
             card.public ? 'border-neon' : 'border-silver-50'
           ]"
-          :title="card.public ? 'Visible en perfil (click para ocultar)' : 'Oculto del perfil (click para mostrar)'"
+          :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
       >
         <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
       </button>
@@ -249,13 +252,13 @@ const getStatusIconName = (status: string) => {
       <div
           class="absolute bottom-10 left-2 bg-primary/95 border border-silver-50 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block"
           :title="isCardAllocated
-            ? `${allocationInfo.available} disponibles de ${card.quantity} (${allocationInfo.allocated} en mazos)`
-            : `${card.quantity} copias en colección`"
+            ? t('cards.grid.availableOf', { available: allocationInfo.available, total: card.quantity, allocated: allocationInfo.allocated })
+            : t('cards.grid.copiesInCollection', { qty: card.quantity })"
       >
         <template v-if="isCardAllocated">
           <p class="text-tiny font-bold flex items-center gap-1">
             <span class="text-neon">{{ allocationInfo.available }}</span>
-            <span class="text-silver-50">disp</span>
+            <span class="text-silver-50">{{ t('cards.grid.available') }}</span>
           </p>
         </template>
         <template v-else>
@@ -272,7 +275,7 @@ const getStatusIconName = (status: string) => {
             v-for="alloc in allocationInfo.allocations.slice(0, 2)"
             :key="alloc.deckId"
             class="bg-primary/95 border border-neon px-1.5 py-0.5"
-            :title="`${alloc.quantity}x en ${alloc.deckName}${alloc.isInSideboard ? ' (SB)' : ''}`"
+            :title="t('cards.grid.inDeck', { qty: alloc.quantity, deckName: alloc.deckName }) + (alloc.isInSideboard ? ' (SB)' : '')"
         >
           <p class="text-[10px] font-bold text-neon truncate max-w-[50px]">
             {{ alloc.quantity }}x {{ alloc.deckName.slice(0, 5) }}..
@@ -291,10 +294,10 @@ const getStatusIconName = (status: string) => {
           v-if="!readonly && !isBeingDeleted"
           @click.stop="emit('delete', card)"
           class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10"
-          title="Eliminar carta"
+          :title="t('cards.grid.deleteTitle')"
       >
         <SpriteIcon name="trash" size="tiny" class="text-rust" />
-        <span class="text-tiny font-bold text-rust">ELIMINAR</span>
+        <span class="text-tiny font-bold text-rust">{{ t('cards.grid.delete') }}</span>
       </button>
 
       <!-- ========== MOBILE: Gear menu ========== -->
@@ -332,7 +335,7 @@ const getStatusIconName = (status: string) => {
               :class="card.public ? 'text-neon' : 'text-silver-50'"
           >
             <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
-            {{ card.public ? 'PÚBLICO' : 'PRIVADO' }}
+            {{ card.public ? t('cards.grid.public') : t('cards.grid.private') }}
           </button>
 
           <!-- Delete -->
@@ -341,7 +344,7 @@ const getStatusIconName = (status: string) => {
               class="w-full px-3 py-2 text-left text-tiny font-bold text-rust flex items-center gap-2 hover:bg-rust/10 transition-colors border-t border-silver-20"
           >
             <SpriteIcon name="trash" size="tiny" />
-            ELIMINAR
+            {{ t('cards.grid.delete') }}
           </button>
         </div>
       </div>
@@ -352,7 +355,7 @@ const getStatusIconName = (status: string) => {
           class="md:hidden absolute bottom-2 left-2 bg-primary/95 border border-neon px-1.5 py-0.5"
       >
         <p class="text-[10px] font-bold text-neon">
-          {{ allocationInfo.allocated }} en mazos
+          {{ t('cards.grid.inDecks', { qty: allocationInfo.allocated }) }}
         </p>
       </div>
     </div>
@@ -372,7 +375,7 @@ const getStatusIconName = (status: string) => {
 
       <!-- Allocation summary if used in decks -->
       <p v-if="isCardAllocated" class="text-tiny text-silver-50">
-        {{ allocationInfo.allocated }} en mazos, {{ allocationInfo.available }} disp.
+        {{ t('cards.grid.inDecks', { qty: allocationInfo.allocated }) }}, {{ allocationInfo.available }} {{ t('cards.grid.available') }}.
       </p>
       <p v-else class="text-tiny text-silver-50 invisible">-</p>
 
@@ -402,17 +405,15 @@ const getStatusIconName = (status: string) => {
           v-if="isInterested"
           disabled
           class="w-full px-2 py-1 bg-silver-10 border border-silver-30 text-silver-50 text-tiny font-bold cursor-not-allowed"
-          title="Ya expresaste interés en esta carta"
       >
-        ✓ INTERÉS ENVIADO
+        {{ t('cards.grid.interestSent') }}
       </button>
       <button
           v-else
           @click="emit('interest', card)"
           class="w-full px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150"
-          title="Notificar al vendedor que te interesa esta carta"
       >
-        ⭐ ME INTERESA
+        {{ t('cards.grid.interested') }}
       </button>
     </div>
   </div>

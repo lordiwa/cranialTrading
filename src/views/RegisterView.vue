@@ -2,11 +2,13 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const email = ref('');
 const password = ref('');
@@ -68,15 +70,15 @@ onMounted(() => {
 
       <!-- Verification screen -->
       <div v-if="registered" class="bg-primary border border-silver-30 p-8">
-        <h2 class="text-h2 font-bold text-silver mb-6">VERIFICA TU EMAIL</h2>
+        <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.verify.title') }}</h2>
 
         <div class="space-y-lg">
           <div class="bg-primary-dark border border-silver-30 p-md">
             <p class="text-small text-silver-70">
-              Te hemos enviado un email a <span class="text-neon font-bold">{{ email }}</span>
+              {{ t('auth.verify.message') }} <span class="text-neon font-bold">{{ email }}</span>
             </p>
             <p class="text-tiny text-silver-50 mt-2">
-              Haz click en el enlace para verificar tu cuenta. Si no lo ves, revisa spam.
+              {{ t('auth.verify.instruction') }}
             </p>
           </div>
 
@@ -86,7 +88,7 @@ onMounted(() => {
                 :disabled="checkingVerification"
                 class="w-full"
             >
-              {{ checkingVerification ? 'VERIFICANDO...' : 'YA VERIFIQUÉ' }}
+              {{ checkingVerification ? t('auth.verify.checking') : t('auth.verify.checkButton') }}
             </BaseButton>
 
             <BaseButton
@@ -95,7 +97,7 @@ onMounted(() => {
                 @click="handleResendEmail"
                 class="w-full"
             >
-              REENVIAR EMAIL
+              {{ t('auth.verify.resend') }}
             </BaseButton>
           </div>
 
@@ -104,7 +106,7 @@ onMounted(() => {
                 to="/login"
                 class="text-small text-silver hover:text-neon transition-fast"
             >
-              Volver al login
+              {{ t('auth.forgotPassword.backToLogin') }}
             </RouterLink>
           </div>
         </div>
@@ -112,31 +114,31 @@ onMounted(() => {
 
       <!-- Registration form -->
       <div v-else class="bg-primary border border-silver-30 p-8">
-        <h2 class="text-h2 font-bold text-silver mb-6">REGISTRARSE</h2>
+        <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.register.title') }}</h2>
 
         <form @submit.prevent="handleRegister" class="space-y-md">
           <BaseInput
               v-model="email"
               type="email"
-              placeholder="Email"
+              :placeholder="t('auth.register.emailLabel')"
           />
 
           <BaseInput
               v-model="password"
               type="password"
-              placeholder="Contraseña (mínimo 6 caracteres)"
+              :placeholder="t('auth.register.passwordLabel')"
           />
 
           <BaseInput
               v-model="username"
               type="text"
-              placeholder="Nombre de usuario"
+              :placeholder="t('auth.register.usernameLabel')"
           />
 
           <BaseInput
               v-model="location"
               type="text"
-              placeholder="Ubicación (ej: Buenos Aires, Argentina)"
+              :placeholder="t('auth.register.locationLabel')"
           />
 
           <BaseButton
@@ -144,7 +146,7 @@ onMounted(() => {
               class="w-full"
               :disabled="loading || !email || !password || !username || !location"
           >
-            {{ loading ? 'CREANDO CUENTA...' : 'CREAR CUENTA' }}
+            {{ loading ? t('auth.register.submitting') : t('auth.register.submit') }}
           </BaseButton>
         </form>
 
@@ -153,7 +155,7 @@ onMounted(() => {
               to="/login"
               class="text-small text-silver hover:text-neon transition-fast"
           >
-            ¿Ya tienes cuenta? Iniciar sesión
+            {{ t('auth.register.hasAccount') }} {{ t('auth.register.login') }}
           </RouterLink>
         </div>
       </div>

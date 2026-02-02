@@ -33,11 +33,11 @@ const getIconName = () => {
           class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 px-4"
           @click.self="confirmStore.cancel"
       >
-        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 transition-normal">
+        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 transition-normal rounded-lg">
           <!-- Icon -->
           <div class="flex justify-center mb-4">
             <div
-                class="p-3 border"
+                class="p-3 border rounded"
                 :class="confirmStore.options.confirmVariant === 'danger' ? 'border-rust bg-rust/10' : 'border-neon bg-neon/10'"
             >
               <SpriteIcon

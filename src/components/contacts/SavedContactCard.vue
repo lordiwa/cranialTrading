@@ -27,7 +27,7 @@ const copyEmail = async () => {
 </script>
 
 <template>
-  <div class="border border-silver-30 p-md bg-primary">
+  <div class="border border-silver-30 p-md bg-primary rounded-md">
     <div class="mb-md">
       <p class="text-body font-bold text-silver">@{{ contact.username }}</p>
       <p class="text-small text-silver-70 mt-1">📍 {{ contact.location }}</p>

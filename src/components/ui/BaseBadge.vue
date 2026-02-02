@@ -25,7 +25,7 @@ const variantClasses: Record<BadgeVariant, string> = {
 <template>
   <span
       :class="[
-      'inline-block px-2 py-1 text-tiny font-medium',
+      'inline-block px-2 py-1 text-tiny font-medium rounded-sm',
       variantClasses[variant],
     ]"
   >

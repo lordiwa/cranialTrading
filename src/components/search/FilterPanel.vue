@@ -526,7 +526,7 @@ const removeFilter = (type: string, value?: string) => {
 <template>
   <div class="space-y-4">
     <!-- ========== BARRA DE BÚSQUEDA HORIZONTAL ========== -->
-    <div class="bg-primary border border-silver-30 p-4">
+    <div class="bg-primary border border-silver-30 p-4 rounded-md">
       <!-- Fila 1: Input + Botón Buscar -->
       <div class="flex gap-3 mb-4">
         <div class="relative flex-1">
@@ -536,12 +536,12 @@ const removeFilter = (type: string, value?: string) => {
               @keydown.enter="handleSearch"
               :placeholder="t('search.filterPanel.placeholder')"
               type="text"
-              class="w-full bg-primary border border-silver-30 px-4 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none transition-fast"
+              class="w-full bg-primary border border-silver-30 px-4 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none transition-fast rounded"
           />
           <!-- Sugerencias dropdown -->
           <div
               v-if="showSuggestions && suggestions.length > 0"
-              class="absolute top-full left-0 right-0 bg-primary border border-neon mt-1 max-h-48 overflow-y-auto z-20"
+              class="absolute top-full left-0 right-0 bg-primary border border-neon mt-1 max-h-48 overflow-y-auto z-20 rounded"
           >
             <div
                 v-for="suggestion in suggestions"
@@ -944,7 +944,7 @@ const removeFilter = (type: string, value?: string) => {
       </div>
 
       <!-- ========== ACORDEONES DE KEYWORDS (4 categorías reorganizadas) ========== -->
-      <div class="border border-silver-30">
+      <div class="border border-silver-30 rounded">
 
         <!-- 1. HABILIDADES DE COMBATE (más buscadas) -->
         <div class="border-b border-silver-30">

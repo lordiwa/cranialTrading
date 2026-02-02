@@ -42,7 +42,7 @@
       </div>
 
       <!-- Card Search Section -->
-      <div class="border border-silver-30 p-4 mb-6">
+      <div class="border border-silver-30 p-4 mb-6 rounded-md">
         <h3 class="text-body font-bold text-silver mb-3">{{ t('dashboard.searchOthers.title') }}</h3>
         <div class="relative mb-4">
           <div class="flex gap-2">
@@ -51,7 +51,7 @@
                   v-model="searchQuery"
                   type="text"
                   :placeholder="t('dashboard.searchOthers.placeholder')"
-                  class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
+                  class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
                   @input="handleSearchInput"
                   @keyup.enter="searchPublicCards"
                   @blur="hideSuggestionsDelayed"
@@ -59,7 +59,7 @@
               <!-- Auto-suggest dropdown -->
               <div
                   v-if="showSuggestions && suggestions.length > 0"
-                  class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-20"
+                  class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-20 rounded"
               >
                 <div
                     v-for="suggestion in suggestions"
@@ -82,7 +82,7 @@
           <div
               v-for="card in searchResults"
               :key="card.id"
-              class="bg-silver-5 border border-silver-20 p-2 hover:border-neon transition-all"
+              class="bg-silver-5 border border-silver-20 p-2 hover:border-neon transition-all rounded"
           >
             <!-- Card Image -->
             <div class="aspect-[3/4] bg-secondary mb-2 overflow-hidden">
@@ -106,7 +106,7 @@
             <button
                 v-if="!sentInterestIds.has(card.id)"
                 @click="sendInterestFromSearch(card)"
-                class="w-full mt-2 px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-all"
+                class="w-full mt-2 px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-all rounded"
             >
               {{ t('dashboard.searchOthers.interested') }}
             </button>
@@ -122,7 +122,7 @@
             <div
                 v-for="card in scryfallResults"
                 :key="card.id"
-                class="bg-silver-5 border border-silver-20 p-2 hover:border-neon transition-all"
+                class="bg-silver-5 border border-silver-20 p-2 hover:border-neon transition-all rounded"
             >
               <!-- Card Image -->
               <div class="aspect-[3/4] bg-secondary mb-2 overflow-hidden">
@@ -145,7 +145,7 @@
               <!-- Add to Wishlist Button -->
               <button
                   @click="addToWishlist(card)"
-                  class="w-full mt-2 px-2 py-1 bg-rust/20 border border-rust text-rust text-tiny font-bold hover:bg-rust/30 transition-all"
+                  class="w-full mt-2 px-2 py-1 bg-rust/20 border border-rust text-rust text-tiny font-bold hover:bg-rust/30 transition-all rounded"
               >
                 {{ t('dashboard.searchOthers.addToWishlist') }}
               </button>
@@ -158,7 +158,7 @@
       </div>
 
       <!-- Progress bar -->
-      <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6">
+      <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6 rounded-md">
         <div class="flex items-center justify-between mb-2">
           <p class="text-small text-neon font-bold">{{ t('dashboard.calculatingMatches.title') }}</p>
           <p class="text-tiny text-silver-70">{{ progressCurrent }} / {{ progressTotal }}</p>
@@ -178,7 +178,7 @@
       </div>
 
       <!-- No data warning -->
-      <div v-else-if="collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
+      <div v-else-if="collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
         <p class="text-h3 text-silver-70 mb-2">{{ t('dashboard.empty.noCardsOrPrefs') }}</p>
         <p class="text-body text-silver-50 mb-6">
           {{ t('dashboard.empty.addCardsOrPrefs') }}
@@ -189,7 +189,7 @@
       </div>
 
       <!-- No matches state -->
-      <div v-else-if="calculatedMatches.length === 0 && !loading" class="border border-silver-30 p-8 md:p-12 text-center">
+      <div v-else-if="calculatedMatches.length === 0 && !loading" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
         <p class="text-h3 text-silver-70 mb-2">{{ t('dashboard.empty.noMatches') }}</p>
         <p class="text-body text-silver-50">
           {{ t('dashboard.empty.usersInPlatform', { count: totalUsers }) }}

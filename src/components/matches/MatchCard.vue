@@ -1,5 +1,5 @@
 <template>
-  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300">
+  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300 rounded-md bg-primary/80">
     <!-- Header: Match Title + Compatibility -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
@@ -29,7 +29,7 @@
         <h4 class="text-small font-bold text-silver-70 uppercase mb-4">{{ t('matches.card.youOffer') }}</h4>
         <div class="space-y-2">
           <div v-if="match.myCards && match.myCards.length > 0">
-            <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3">
+            <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
               <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
@@ -48,7 +48,7 @@
         <h4 class="text-small font-bold text-silver-70 uppercase mb-4">{{ t('matches.card.youReceive') }}</h4>
         <div class="space-y-2">
           <div v-if="match.otherCards && match.otherCards.length > 0">
-            <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3">
+            <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
               <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
@@ -64,7 +64,7 @@
     </div>
 
     <!-- Price Difference -->
-    <div class="bg-silver-5 border border-silver-20 p-4 mb-6">
+    <div class="bg-silver-5 border border-silver-20 p-4 mb-6 rounded">
       <div class="flex justify-between items-center">
         <p class="text-small text-silver-70">{{ t('matches.card.priceDifference') }}</p>
         <p :class="[
@@ -81,11 +81,11 @@
 
     <!-- Match Type Badge -->
     <div class="flex gap-2 mb-6">
-      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1">
+      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-sm">
         <SpriteIcon name="check" size="tiny" />
         <p class="text-tiny font-bold text-neon">{{ t('matches.card.bidirectional') }}</p>
       </span>
-      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1">
+      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-sm">
         <p class="text-tiny font-bold text-silver-70">{{ t('matches.card.unidirectional') }}</p>
       </span>
     </div>

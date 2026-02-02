@@ -99,7 +99,7 @@ const features = computed(() => [
           <div
               v-for="feature in features"
               :key="feature.title"
-              class="bg-secondary/50 border border-silver-20 p-4 hover:border-neon-30 transition-all"
+              class="bg-primary/90 border border-silver-20 p-4 hover:border-neon-30 transition-all rounded-md"
           >
             <div class="mb-2"><SpriteIcon :name="feature.icon" size="large" /></div>
             <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
@@ -127,7 +127,7 @@ const features = computed(() => [
       <!-- Right Column: Login Form -->
       <div class="w-full lg:w-[420px] xl:w-[480px] flex items-center justify-center px-6 py-12 lg:px-12">
         <div class="w-full max-w-sm">
-          <div class="bg-primary border border-silver-30 p-8">
+          <div class="bg-primary/95 border border-silver-30 p-8 rounded-lg">
             <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.login.title') }}</h2>
 
             <form @submit.prevent="handleLogin" class="space-y-md">

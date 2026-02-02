@@ -69,11 +69,11 @@ onMounted(() => {
       </div>
 
       <!-- Verification screen -->
-      <div v-if="registered" class="bg-primary border border-silver-30 p-8">
+      <div v-if="registered" class="bg-primary border border-silver-30 p-8 rounded-lg">
         <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.verify.title') }}</h2>
 
         <div class="space-y-lg">
-          <div class="bg-primary-dark border border-silver-30 p-md">
+          <div class="bg-primary-dark border border-silver-30 p-md rounded">
             <p class="text-small text-silver-70">
               {{ t('auth.verify.message') }} <span class="text-neon font-bold">{{ email }}</span>
             </p>
@@ -113,7 +113,7 @@ onMounted(() => {
       </div>
 
       <!-- Registration form -->
-      <div v-else class="bg-primary border border-silver-30 p-8">
+      <div v-else class="bg-primary border border-silver-30 p-8 rounded-lg">
         <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.register.title') }}</h2>
 
         <form @submit.prevent="handleRegister" class="space-y-md">

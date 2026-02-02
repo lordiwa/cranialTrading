@@ -81,7 +81,7 @@ onMounted(async () => {
             v-model="filterQuery"
             type="text"
             :placeholder="t('messages.searchPlaceholder')"
-            class="w-full bg-primary border border-silver px-4 py-3 text-body text-silver placeholder:text-silver-50 focus:outline-none focus:border-2 focus:border-neon transition-fast"
+            class="w-full bg-primary border border-silver px-4 py-3 text-body text-silver placeholder:text-silver-50 focus:outline-none focus:border-2 focus:border-neon transition-fast rounded"
         />
       </div>
 
@@ -91,7 +91,7 @@ onMounted(async () => {
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="filteredConversations.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
+      <div v-else-if="filteredConversations.length === 0" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
         <p class="text-body text-silver-70 mb-2">
           {{ filterQuery ? t('messages.empty.noResults') : t('messages.empty.noMessages') }}
         </p>
@@ -106,13 +106,13 @@ onMounted(async () => {
             v-for="conv in filteredConversations"
             :key="conv.id"
             @click="handleOpenChat(getOtherParticipantInfo(conv).userId, getOtherParticipantInfo(conv).username)"
-            class="bg-primary border border-silver-30 p-4 md:p-6 hover:border-neon cursor-pointer transition-fast"
+            class="bg-primary border border-silver-30 p-4 md:p-6 hover:border-neon cursor-pointer transition-fast rounded-md"
         >
           <div class="flex items-start justify-between mb-2">
             <h3 class="text-body font-bold text-silver">
               @{{ getOtherParticipantInfo(conv).username }}
             </h3>
-            <span v-if="conv.unreadCount > 0" class="bg-neon text-primary text-tiny font-bold px-2 py-1">
+            <span v-if="conv.unreadCount > 0" class="bg-neon text-primary text-tiny font-bold px-2 py-1 rounded-sm">
               {{ conv.unreadCount }}
             </span>
           </div>

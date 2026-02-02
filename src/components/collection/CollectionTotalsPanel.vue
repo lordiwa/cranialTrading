@@ -32,7 +32,7 @@ const fmt = (val: number) => `$${val.toFixed(2)}`
 </script>
 
 <template>
-  <div class="bg-secondary border border-silver-30 p-4 mb-6">
+  <div class="bg-secondary border border-silver-30 p-4 mb-6 rounded-md">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-h3 font-bold text-silver">{{ t('collection.totals.title') }}</h3>

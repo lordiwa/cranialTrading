@@ -7,7 +7,6 @@
 @layer base {
     * {
         @apply border-silver-20;
-        border-radius: 0px !important;
     }
 
     html {
@@ -47,8 +46,7 @@
     input,
     textarea,
     select {
-        @apply font-mono;
-        border-radius: 0px !important;
+        @apply font-mono rounded;
     }
 
     ::-webkit-scrollbar {
@@ -71,8 +69,7 @@
 
 @layer components {
     .btn-base {
-        @apply font-bold cursor-pointer min-h-[44px] flex items-center justify-center border;
-        border-radius: 0px;
+        @apply font-bold cursor-pointer min-h-[44px] flex items-center justify-center border rounded;
         transition: all 150ms ease-out;
     }
 
@@ -130,7 +127,7 @@
     }
 
     .input-base {
-        @apply w-full bg-primary border px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-mono;
+        @apply w-full bg-primary border px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-mono rounded;
         border-color: #EEEEEE;
         transition: all 150ms ease-out;
     }
@@ -148,9 +145,8 @@
     }
 
     .card-base {
-        @apply bg-primary border;
+        @apply bg-primary border rounded-md;
         border-color: rgba(238, 238, 238, 0.3);
-        border-radius: 0px;
     }
 
     .card-base:hover {
@@ -158,22 +154,22 @@
     }
 
     .badge-busco {
-        @apply border border-neon text-neon text-tiny font-medium px-2 py-1;
+        @apply border border-neon text-neon text-tiny font-medium px-2 py-1 rounded-sm;
         background-color: transparent;
     }
 
     .badge-cambio {
-        @apply border border-silver text-silver text-tiny font-medium px-2 py-1;
+        @apply border border-silver text-silver text-tiny font-medium px-2 py-1 rounded-sm;
         background-color: transparent;
     }
 
     .badge-vendo {
-        @apply border border-rust text-rust text-tiny font-medium px-2 py-1;
+        @apply border border-rust text-rust text-tiny font-medium px-2 py-1 rounded-sm;
         background-color: transparent;
     }
 
     .badge-success {
-        @apply border border-neon text-neon text-tiny font-medium px-2 py-1;
+        @apply border border-neon text-neon text-tiny font-medium px-2 py-1 rounded-sm;
         background-color: rgba(204, 255, 0, 0.05);
     }
 
@@ -183,9 +179,8 @@
     }
 
     .modal-content {
-        @apply relative bg-primary border shadow-strong max-w-md w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto;
+        @apply relative bg-primary border shadow-strong max-w-md w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto rounded-lg;
         border-color: rgba(238, 238, 238, 0.5);
-        border-radius: 0px;
         transition: all 300ms ease-in-out;
     }
 }

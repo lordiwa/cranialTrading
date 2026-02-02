@@ -32,7 +32,7 @@ const completionPercent = computed(() => {
 </script>
 
 <template>
-  <div class="bg-primary border border-silver-30 hover:border-neon-40 transition-300 overflow-hidden">
+  <div class="bg-primary border border-silver-30 hover:border-neon-40 transition-300 overflow-hidden rounded-md">
     <!-- Thumbnail -->
     <div
         v-if="deck.thumbnail"
@@ -87,7 +87,7 @@ const completionPercent = computed(() => {
       </div>
 
       <!-- Completion bar -->
-      <div class="w-full h-1.5 bg-secondary border border-silver-30 mb-4 overflow-hidden">
+      <div class="w-full h-1.5 bg-secondary border border-silver-30 mb-4 overflow-hidden rounded">
         <div
             class="h-full bg-neon transition-300"
             :style="{ width: `${deck.stats.completionPercentage * 100}%` }"
@@ -103,13 +103,13 @@ const completionPercent = computed(() => {
       <div class="flex gap-2">
         <button
             @click="emit('edit', deck.id)"
-            class="flex-1 px-3 py-2 border-2 border-neon text-neon font-bold text-tiny hover:bg-neon-10 transition-150"
+            class="flex-1 px-3 py-2 border-2 border-neon text-neon font-bold text-tiny hover:bg-neon-10 transition-150 rounded"
         >
           {{ t('decks.card.edit') }}
         </button>
         <button
             @click="emit('delete', deck.id)"
-            class="flex-1 px-3 py-2 border border-secondary text-silver-70 font-bold text-tiny hover:border-ruby hover:text-ruby transition-150"
+            class="flex-1 px-3 py-2 border border-secondary text-silver-70 font-bold text-tiny hover:border-ruby hover:text-ruby transition-150 rounded"
         >
           {{ t('decks.card.delete') }}
         </button>

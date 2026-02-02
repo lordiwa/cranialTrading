@@ -191,7 +191,7 @@ defineExpose({
               class="group cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
           >
             <!-- Card Image Container -->
-            <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150">
+            <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150 rounded">
               <img
                   v-if="getCardImage(card)"
                   :src="getCardImage(card)"
@@ -207,7 +207,7 @@ defineExpose({
               <button
                   v-if="isSplitCard(card)"
                   @click.stop="toggleCardFace(card.id)"
-                  class="absolute top-1 left-1 bg-primary border border-neon px-1 py-0.5 text-tiny font-bold text-neon hover:bg-neon-10 transition-all"
+                  class="absolute top-1 left-1 bg-primary border border-neon px-1 py-0.5 text-tiny font-bold text-neon hover:bg-neon-10 transition-all rounded"
                   title="Click para ver el otro lado"
                   aria-label="Ver otro lado de la carta"
               >

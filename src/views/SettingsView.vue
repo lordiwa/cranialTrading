@@ -78,7 +78,7 @@ const handleLogout = async () => {
       <h1 class="text-h2 md:text-h1 font-bold text-silver mb-8">{{ t('settings.title') }}</h1>
 
       <!-- Email verification -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
+      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
         <h2 class="text-body font-bold text-silver mb-4">{{ t('settings.sections.emailVerification.title') }}</h2>
 
         <div class="mb-4">
@@ -120,7 +120,7 @@ const handleLogout = async () => {
       </div>
 
       <!-- Change password -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
+      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-body font-bold text-silver">{{ t('settings.sections.changePassword.title') }}</h2>
           <BaseButton
@@ -182,7 +182,7 @@ const handleLogout = async () => {
       </div>
 
       <!-- User info -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6">
+      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
         <h2 class="text-body font-bold text-silver mb-4">{{ t('settings.sections.accountInfo.title') }}</h2>
 
         <div class="space-y-sm text-small">

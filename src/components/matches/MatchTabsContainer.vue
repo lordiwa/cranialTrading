@@ -15,7 +15,7 @@
       >
         <span>{{ tab.icon }}</span>
         <span>{{ tab.label }}</span>
-        <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-none">
+        <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-sm">
           {{ tab.count }}
         </span>
       </button>

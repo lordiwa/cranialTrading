@@ -143,7 +143,7 @@ const getStatusIconName = (status: string) => {
 <template>
   <!-- COMPACT MODE: For deck view -->
   <div v-if="compact" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
-    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all">
+    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded">
       <img
           v-if="getCardImage(card)"
           :src="getCardImage(card)"
@@ -156,7 +156,7 @@ const getStatusIconName = (status: string) => {
       </div>
 
       <!-- Qty Badge - BIGGER for compact -->
-      <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1">
+      <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1 rounded">
         <p class="text-small font-bold text-neon">x{{ card.quantity }}</p>
       </div>
     </div>
@@ -175,7 +175,7 @@ const getStatusIconName = (status: string) => {
   <div v-else class="group" :class="isBeingDeleted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
     <!-- Card Image Container -->
     <div
-        class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden transition-all"
+        class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden transition-all rounded"
         :class="[
           isBeingDeleted ? 'border-rust animate-pulse' : (isCardAllocated ? 'border-neon-30' : 'group-hover:border-neon')
         ]"
@@ -192,13 +192,21 @@ const getStatusIconName = (status: string) => {
         <span class="text-tiny text-silver-50">{{ t('cards.grid.noImage') }}</span>
       </div>
 
+      <!-- ========== Status Badge - ALWAYS VISIBLE, centered top ========== -->
+      <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-silver-30 px-2 py-1 z-10 rounded">
+        <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
+          <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
+          {{ card.status }}
+        </p>
+      </div>
+
       <!-- ========== DESKTOP: Hover overlay ========== -->
       <div
           v-if="!readonly && !isBeingDeleted"
           class="absolute inset-0 bg-primary/70 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center pointer-events-none group-hover:pointer-events-auto"
       >
         <!-- Edit text -->
-        <p class="text-small font-bold text-silver mb-4">{{ t('cards.grid.clickToEdit') }}</p>
+        <p class="text-small font-bold text-silver mt-8">{{ t('cards.grid.clickToEdit') }}</p>
       </div>
 
       <!-- ========== Deleting overlay ========== -->
@@ -218,7 +226,7 @@ const getStatusIconName = (status: string) => {
       <button
           v-if="isSplitCard"
           @click.stop="toggleCardFace"
-          class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10"
+          class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
           :title="t('cards.grid.flipTitle')"
       >
         <SpriteIcon name="flip" size="tiny" />
@@ -230,7 +238,7 @@ const getStatusIconName = (status: string) => {
           @click.stop="togglePublic"
           :disabled="togglingPublic"
           :class="[
-            'absolute top-2 bg-primary/95 border px-2 py-1 transition-all flex items-center justify-center z-10',
+            'absolute top-2 bg-primary/95 border px-2 py-1 transition-all flex items-center justify-center z-10 rounded',
             'opacity-0 group-hover:opacity-100 md:block hidden',
             isSplitCard ? 'left-12' : 'left-2',
             card.public ? 'border-neon' : 'border-silver-50'
@@ -240,17 +248,10 @@ const getStatusIconName = (status: string) => {
         <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
       </button>
 
-      <!-- Status Badge (desktop: hover only) -->
-      <div class="absolute top-2 right-2 bg-primary/95 border border-silver-30 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
-        <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
-          <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
-          {{ card.status }}
-        </p>
-      </div>
 
       <!-- Qty Badge (desktop: hover only) -->
       <div
-          class="absolute bottom-10 left-2 bg-primary/95 border border-silver-50 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block"
+          class="absolute bottom-10 left-2 bg-primary/95 border border-silver-50 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block rounded"
           :title="isCardAllocated
             ? t('cards.grid.availableOf', { available: allocationInfo.available, total: card.quantity, allocated: allocationInfo.allocated })
             : t('cards.grid.copiesInCollection', { qty: card.quantity })"
@@ -274,7 +275,7 @@ const getStatusIconName = (status: string) => {
         <div
             v-for="alloc in allocationInfo.allocations.slice(0, 2)"
             :key="alloc.deckId"
-            class="bg-primary/95 border border-neon px-1.5 py-0.5"
+            class="bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
             :title="t('cards.grid.inDeck', { qty: alloc.quantity, deckName: alloc.deckName }) + (alloc.isInSideboard ? ' (SB)' : '')"
         >
           <p class="text-[10px] font-bold text-neon truncate max-w-[50px]">
@@ -283,7 +284,7 @@ const getStatusIconName = (status: string) => {
         </div>
         <div
             v-if="allocationInfo.allocations.length > 2"
-            class="bg-primary/95 border border-neon px-1.5 py-0.5"
+            class="bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
         >
           <p class="text-[10px] font-bold text-neon">+{{ allocationInfo.allocations.length - 2 }}</p>
         </div>
@@ -293,7 +294,7 @@ const getStatusIconName = (status: string) => {
       <button
           v-if="!readonly && !isBeingDeleted"
           @click.stop="emit('delete', card)"
-          class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10"
+          class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10 rounded"
           :title="t('cards.grid.deleteTitle')"
       >
         <SpriteIcon name="trash" size="tiny" class="text-rust" />
@@ -304,7 +305,7 @@ const getStatusIconName = (status: string) => {
       <div v-if="!readonly && !isBeingDeleted" class="md:hidden absolute top-2 right-2 z-20">
         <button
             @click.stop="showMobileMenu = !showMobileMenu"
-            class="bg-primary/95 border border-silver-50 p-2 transition-all"
+            class="bg-primary/95 border border-silver-50 p-2 transition-all rounded"
             :class="{ 'border-neon': showMobileMenu }"
         >
           <SpriteIcon name="settings" size="tiny" />
@@ -313,7 +314,7 @@ const getStatusIconName = (status: string) => {
         <!-- Mobile dropdown menu -->
         <div
             v-if="showMobileMenu"
-            class="absolute top-full right-0 mt-1 bg-primary border border-silver-30 shadow-lg min-w-[140px]"
+            class="absolute top-full right-0 mt-1 bg-primary border border-silver-30 shadow-lg min-w-[140px] rounded"
             @click.stop
         >
           <!-- Status info -->
@@ -352,7 +353,7 @@ const getStatusIconName = (status: string) => {
       <!-- ========== MOBILE: Deck badges (always visible, compact) ========== -->
       <div
           v-if="isCardAllocated"
-          class="md:hidden absolute bottom-2 left-2 bg-primary/95 border border-neon px-1.5 py-0.5"
+          class="md:hidden absolute bottom-2 left-2 bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
       >
         <p class="text-[10px] font-bold text-neon">
           {{ t('cards.grid.inDecks', { qty: allocationInfo.allocated }) }}
@@ -404,14 +405,14 @@ const getStatusIconName = (status: string) => {
       <button
           v-if="isInterested"
           disabled
-          class="w-full px-2 py-1 bg-silver-10 border border-silver-30 text-silver-50 text-tiny font-bold cursor-not-allowed"
+          class="w-full px-2 py-1 bg-silver-10 border border-silver-30 text-silver-50 text-tiny font-bold cursor-not-allowed rounded"
       >
         {{ t('cards.grid.interestSent') }}
       </button>
       <button
           v-else
           @click="emit('interest', card)"
-          class="w-full px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150"
+          class="w-full px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150 rounded"
       >
         {{ t('cards.grid.interested') }}
       </button>

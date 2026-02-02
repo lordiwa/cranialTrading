@@ -156,7 +156,7 @@ onUnmounted(() => {
         >
           <SpriteIcon :name="tab.icon" size="small" />
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold">
+          <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-sm">
             {{ tab.count }}
           </span>
         </button>
@@ -168,7 +168,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="currentMatches.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
+      <div v-else-if="currentMatches.length === 0" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
         <p class="text-body text-silver-70">
           {{ activeTab === 'new' ? t('matches.empty.new.title') :
             activeTab === 'sent' ? t('matches.empty.sent.title') :

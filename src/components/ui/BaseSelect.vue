@@ -28,7 +28,7 @@ const handleChange = (event: Event) => {
       :value="modelValue"
       :disabled="disabled"
       @change="handleChange"
-      class="w-full bg-primary border border-silver px-3 py-2.5 text-small text-silver transition-fast focus:outline-none focus:border-2 focus:border-neon cursor-pointer"
+      class="w-full bg-primary border border-silver px-3 py-2.5 text-small text-silver transition-fast focus:outline-none focus:border-2 focus:border-neon cursor-pointer rounded"
   >
     <option value="" disabled>{{ placeholder }}</option>
     <option

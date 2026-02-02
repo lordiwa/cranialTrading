@@ -113,6 +113,7 @@ const form = reactive<{
 
 // ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
 const cardFaceIndex = ref(0)
+const showZoom = ref(false)
 
 const conditionOptions = computed(() => [
   { value: 'M', label: t('common.conditions.M') },
@@ -143,6 +144,16 @@ const currentCardImage = computed(() => {
     return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
   }
   return getCardImage(selectedPrint.value)
+})
+
+// Large image for zoom view
+const zoomImage = computed(() => {
+  if (!selectedPrint.value) return ''
+  if (selectedPrint.value.card_faces && selectedPrint.value.card_faces[cardFaceIndex.value]) {
+    return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.large ||
+           selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
+  }
+  return selectedPrint.value.image_uris?.large || selectedPrint.value.image_uris?.normal || ''
 })
 
 // ✅ NUEVO: Obtener nombre del lado actual
@@ -258,6 +269,7 @@ const handleClose = () => {
   form.deckName = ''
   form.public = true
   cardFaceIndex.value = 0
+  showZoom.value = false
   availablePrints.value = []
   selectedPrint.value = null
   emit('close')
@@ -271,28 +283,36 @@ const handleClose = () => {
       <h2 class="text-xl font-bold text-[#EEEEEE]">{{ t('cards.addModal.title') }}</h2>
 
       <!-- Datos de la carta -->
-      <div v-if="selectedPrint" class="border border-[#EEEEEE]/30 p-4 space-y-4">
-        <!-- Imagen (grande) y Formulario lado a lado -->
-        <div class="flex gap-6">
-          <!-- IZQUIERDA: Imagen grande -->
-          <div class="flex flex-col items-center gap-4">
-            <!-- Imagen con botón toggle encima para split cards -->
-            <div class="relative">
-              <img
+      <div v-if="selectedPrint" class="border border-[#EEEEEE]/30 p-4 space-y-4 rounded">
+        <!-- Imagen y Formulario - responsive: columna en móvil, fila en desktop -->
+        <div class="flex flex-col md:flex-row gap-4 md:gap-6">
+          <!-- IZQUIERDA: Imagen -->
+          <div class="flex flex-col items-center gap-4 flex-shrink-0">
+            <!-- Imagen con botón toggle encima para split cards (clickable for zoom) -->
+            <div class="relative w-full max-w-[200px] md:max-w-[256px]">
+              <button
                   v-if="currentCardImage"
-                  :src="currentCardImage"
-                  :alt="currentCardName"
-                  class="w-64 h-96 object-cover border border-[#EEEEEE]/20"
-              />
-              <div v-else class="w-64 h-96 bg-[#333333] border border-[#EEEEEE]/20 flex items-center justify-center">
+                  @click="showZoom = true"
+                  class="relative group cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-neon rounded w-full"
+              >
+                <img
+                    :src="currentCardImage"
+                    :alt="currentCardName"
+                    class="w-full aspect-[2/3] object-cover border border-[#EEEEEE]/20 rounded group-hover:border-neon transition-colors"
+                />
+                <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                  <span class="text-tiny text-silver font-bold">🔍 Zoom</span>
+                </div>
+              </button>
+              <div v-else class="w-full aspect-[2/3] bg-[#333333] border border-[#EEEEEE]/20 flex items-center justify-center rounded">
                 <span class="text-[#EEEEEE]/50">{{ t('cards.detailModal.noImage') }}</span>
               </div>
 
               <!-- ✅ Botón toggle flotante en esquina (SOLO para split cards) -->
               <button
                   v-if="isSplitCard"
-                  @click="toggleCardFace"
-                  class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#CCFF00] p-2 hover:bg-[#CCFF00]/20 transition-all"
+                  @click.stop="toggleCardFace"
+                  class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#CCFF00] p-2 hover:bg-[#CCFF00]/20 transition-all rounded z-10"
                   :title="`Ver lado ${cardFaceIndex === 0 ? 2 : 1}`"
                   aria-label="Ver otro lado de la carta"
               >
@@ -338,7 +358,7 @@ const handleClose = () => {
                     id="print-select"
                     :value="selectedPrint?.id"
                     @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#CCFF00]"
+                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#CCFF00] rounded"
                 >
                   <option
                       v-for="print in availablePrints"
@@ -365,7 +385,7 @@ const handleClose = () => {
                   v-model.number="form.quantity"
                   type="number"
                   min="1"
-                  class="w-full mt-1 bg-[#000000] border border-[#EEEEEE] text-[#EEEEEE] px-3 py-2"
+                  class="w-full mt-1 bg-[#000000] border border-[#EEEEEE] text-[#EEEEEE] px-3 py-2 rounded"
               />
             </div>
 
@@ -403,7 +423,7 @@ const handleClose = () => {
             </div>
 
             <!-- Publicar en perfil (solo para sale/trade) -->
-            <div v-if="showPublicOption" class="flex items-center gap-2 p-3 bg-[#111111] border border-[#CCFF00]/30">
+            <div v-if="showPublicOption" class="flex items-center gap-2 p-3 bg-[#111111] border border-[#CCFF00]/30 rounded">
               <input
                   v-model="form.public"
                   type="checkbox"
@@ -440,5 +460,33 @@ const handleClose = () => {
         </BaseButton>
       </div>
     </div>
+
+    <!-- Zoom Overlay -->
+    <Teleport to="body">
+      <div
+          v-if="showZoom"
+          class="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-zoom-out p-4"
+          @click="showZoom = false"
+      >
+        <img
+            :src="zoomImage"
+            :alt="currentCardName"
+            class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            @click.stop
+        />
+        <button
+            @click="showZoom = false"
+            class="absolute top-4 right-4 text-silver hover:text-neon transition-colors p-2"
+            aria-label="Cerrar zoom"
+        >
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+        <p class="absolute bottom-4 left-1/2 -translate-x-1/2 text-silver-70 text-small">
+          Click para cerrar
+        </p>
+      </div>
+    </Teleport>
   </BaseModal>
 </template>

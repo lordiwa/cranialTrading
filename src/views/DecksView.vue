@@ -526,7 +526,7 @@ onMounted(async () => {
       </div>
 
       <!-- Filtros -->
-      <div class="bg-primary border border-silver-30 p-4 md:p-6 mb-6 space-y-4">
+      <div class="bg-primary border border-silver-30 p-4 md:p-6 mb-6 space-y-4 rounded-md">
         <!-- Búsqueda -->
         <div>
           <label for="decks-search" class="text-small text-silver-70 block mb-2">{{ t('common.actions.search') }}</label>
@@ -545,7 +545,7 @@ onMounted(async () => {
             <button
                 @click="filterFormat = 'all'"
                 :class="[
-                  'px-3 py-2 text-tiny font-bold transition-fast',
+                  'px-3 py-2 text-tiny font-bold transition-fast rounded',
                   filterFormat === 'all'
                     ? 'bg-neon text-primary border border-neon'
                     : 'bg-primary border border-silver-30 text-silver hover:border-neon'
@@ -558,7 +558,7 @@ onMounted(async () => {
                 :key="format"
                 @click="filterFormat = format"
                 :class="[
-                  'px-3 py-2 text-tiny font-bold transition-fast uppercase',
+                  'px-3 py-2 text-tiny font-bold transition-fast uppercase rounded',
                   filterFormat === format
                     ? 'bg-neon text-primary border border-neon'
                     : 'bg-primary border border-silver-30 text-silver hover:border-neon'
@@ -574,7 +574,7 @@ onMounted(async () => {
       <BaseLoader v-if="decksStore.loading" size="large" />
 
       <!-- Empty state -->
-      <div v-else-if="filteredDecks.length === 0" class="border border-silver-30 p-8 md:p-12 text-center">
+      <div v-else-if="filteredDecks.length === 0" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
         <p class="text-body text-silver-70 mb-4">{{ t('decks.empty.noDecks') }}</p>
         <p class="text-small text-silver-50 mb-6">
           {{ decksStore.totalDecks === 0

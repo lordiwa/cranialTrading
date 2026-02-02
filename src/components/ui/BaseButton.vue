@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
 });
 
-const baseClasses = 'font-bold transition-fast cursor-pointer min-h-[44px] flex items-center justify-center';
+const baseClasses = 'font-bold transition-fast cursor-pointer min-h-[44px] flex items-center justify-center rounded';
 
 const sizeClasses = {
   normal: 'px-lg md:px-lg py-md text-small md:text-body',  // CHANGE: px-md → px-lg, py-md → py-md

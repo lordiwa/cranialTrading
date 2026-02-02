@@ -65,7 +65,12 @@ export default {
             },
             borderRadius: {
                 'none': '0px',
-                'DEFAULT': '0px',
+                'sm': '2px',
+                'DEFAULT': '3px',
+                'md': '4px',
+                'lg': '6px',
+                'xl': '8px',
+                'full': '9999px',
             },
             minHeight: {
                 '44': '44px',

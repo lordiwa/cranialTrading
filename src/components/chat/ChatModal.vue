@@ -162,7 +162,7 @@ watch(
           <div :class="{
             'bg-neon text-primary': message.senderId === authStore.user?.id,
             'bg-silver-30 text-silver': message.senderId !== authStore.user?.id,
-          }" class="max-w-xs px-4 py-2">
+          }" class="max-w-xs px-4 py-2 rounded">
             <p class="text-small break-words">{{ message.content }}</p>
             <p class="text-tiny mt-1 opacity-70">
               {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}

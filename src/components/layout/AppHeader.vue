@@ -76,7 +76,7 @@ const handleNavigate = (path: string) => {
           <!-- Mobile Menu Button -->
           <button
               v-if="isAuthenticated"
-              class="md:hidden px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
+              class="md:hidden px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast rounded"
               @click="toggleMobileMenu"
           >
             {{ mobileMenuOpen ? '✕' : '☰' }}
@@ -88,7 +88,7 @@ const handleNavigate = (path: string) => {
             <router-link
                 v-if="authStore.user?.username"
                 :to="`/@${authStore.user.username}`"
-                class="hidden sm:flex px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast items-center gap-2"
+                class="hidden sm:flex px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast items-center gap-2 rounded"
                 :title="t('header.profile.viewPublicProfile')"
             >
               <SpriteIcon name="user-alt" size="small" />
@@ -96,14 +96,14 @@ const handleNavigate = (path: string) => {
             </router-link>
             <router-link
                 to="/settings"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
                 :title="t('header.profile.settings')"
             >
               <SpriteIcon name="settings" size="small" />
             </router-link>
             <button
                 @click="handleLogout"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-rust hover:text-rust transition-fast flex items-center justify-center"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-rust hover:text-rust transition-fast flex items-center justify-center rounded"
                 :title="t('header.profile.logout')"
             >
               <SpriteIcon name="x-mark" size="small" />
@@ -114,13 +114,13 @@ const handleNavigate = (path: string) => {
           <div v-else class="flex items-center gap-2">
             <router-link
                 to="/login"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast"
+                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast rounded"
             >
               {{ t('header.auth.login') }}
             </router-link>
             <router-link
                 to="/register"
-                class="px-3 py-2 bg-neon text-primary font-bold hover:bg-neon-90 transition-fast"
+                class="px-3 py-2 bg-neon text-primary font-bold hover:bg-neon-90 transition-fast rounded"
             >
               {{ t('header.auth.register') }}
             </router-link>

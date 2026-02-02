@@ -103,7 +103,7 @@ const selectCard = (card: any) => {
           <!-- Sugerencias dropdown -->
           <div
               v-if="showSuggestions && suggestions.length > 0"
-              class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-10"
+              class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-10 rounded"
           >
             <div
                 v-for="suggestion in suggestions"
@@ -132,7 +132,7 @@ const selectCard = (card: any) => {
         v-if="showSelectCardModal"
         class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
     >
-      <div class="bg-primary border border-silver-30 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
+      <div class="bg-primary border border-silver-30 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 space-y-4 rounded-lg">
         <h2 class="text-lg font-bold text-silver mb-4">
           {{ t('search.bar.selectEdition', { name: searchQuery }) }}
         </h2>
@@ -142,7 +142,7 @@ const selectCard = (card: any) => {
               v-for="card in availableCards"
               :key="`${card.id}-${card.set}`"
               @click="selectCard(card)"
-              class="border border-silver-30 p-3 hover:border-neon cursor-pointer transition-fast"
+              class="border border-silver-30 p-3 hover:border-neon cursor-pointer transition-fast rounded"
           >
             <img
                 v-if="card.image_uris?.normal"

@@ -34,6 +34,7 @@ const { getAllocationsForCard } = useCardAllocation()
 
 const isLoading = ref(false)
 const loadingPrints = ref(false)
+const showZoom = ref(false)
 
 // Print selection
 const availablePrints = ref<any[]>([])
@@ -91,6 +92,17 @@ const totalQuantity = computed(() => {
 const currentImage = computed(() => {
   if (selectedPrint.value) {
     return selectedPrint.value.image_uris?.normal ||
+           selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
+  }
+  return props.card?.image || ''
+})
+
+// Large image for zoom view
+const zoomImage = computed(() => {
+  if (selectedPrint.value) {
+    return selectedPrint.value.image_uris?.large ||
+           selectedPrint.value.image_uris?.normal ||
+           selectedPrint.value.card_faces?.[0]?.image_uris?.large ||
            selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
   }
   return props.card?.image || ''
@@ -434,6 +446,7 @@ const handleClose = () => {
   selectedPrint.value = null
   relatedCards.value = []
   deckAllocations.value = {}
+  showZoom.value = false
   emit('close')
 }
 
@@ -463,16 +476,24 @@ watch(selectedPrint, (print) => {
       </div>
 
       <!-- Card Preview -->
-      <div v-if="card" class="flex gap-4">
-        <!-- Image -->
-        <div class="flex-shrink-0">
-          <img
+      <div v-if="card" class="flex flex-col sm:flex-row gap-4">
+        <!-- Image (clickable for zoom) -->
+        <div class="flex-shrink-0 mx-auto sm:mx-0">
+          <button
               v-if="currentImage"
-              :src="currentImage"
-              :alt="card.name"
-              class="w-32 h-44 object-cover border border-silver-30"
-          />
-          <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
+              @click="showZoom = true"
+              class="relative group cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-neon rounded"
+          >
+            <img
+                :src="currentImage"
+                :alt="card.name"
+                class="w-28 sm:w-32 aspect-[2/3] object-cover border border-silver-30 rounded group-hover:border-neon transition-colors"
+            />
+            <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+              <span class="text-tiny text-silver font-bold">🔍 Zoom</span>
+            </div>
+          </button>
+          <div v-else class="w-28 sm:w-32 aspect-[2/3] bg-primary border border-silver-30 flex items-center justify-center rounded">
             <span class="text-tiny text-silver-50">{{ t('cards.detailModal.noImage') }}</span>
           </div>
         </div>
@@ -509,7 +530,7 @@ watch(selectedPrint, (print) => {
                 id="detail-print-select"
                 :value="selectedPrint?.id"
                 @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
+                class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150 rounded"
             >
               <option
                   v-for="print in availablePrints"
@@ -526,7 +547,7 @@ watch(selectedPrint, (print) => {
       </div>
 
       <!-- Status Distribution -->
-      <div class="bg-secondary border border-silver-30 p-4">
+      <div class="bg-secondary border border-silver-30 p-4 rounded">
         <div class="flex justify-between items-center mb-3">
           <p class="text-small font-bold text-silver">{{ t('cards.detailModal.distribution') }}</p>
           <p class="text-small text-neon font-bold">{{ t('cards.detailModal.totalLabel', { qty: totalQuantity }) }}</p>
@@ -657,7 +678,7 @@ watch(selectedPrint, (print) => {
       </div>
 
       <!-- Condition & Foil -->
-      <div class="bg-secondary border border-silver-30 p-4 space-y-4">
+      <div class="bg-secondary border border-silver-30 p-4 space-y-4 rounded">
         <p class="text-small font-bold text-silver">{{ t('cards.detailModal.properties') }}</p>
 
         <div class="grid grid-cols-2 gap-4">
@@ -684,7 +705,7 @@ watch(selectedPrint, (print) => {
       </div>
 
       <!-- Deck Allocations -->
-      <div v-if="allDecks.length > 0" class="bg-secondary border border-silver-30 p-4">
+      <div v-if="allDecks.length > 0" class="bg-secondary border border-silver-30 p-4 rounded">
         <div class="flex justify-between items-center mb-3">
           <p class="text-small font-bold text-silver">{{ t('cards.detailModal.assignToDecks') }}</p>
           <p class="text-tiny" :class="availableForAllocation > 0 ? 'text-neon' : 'text-silver-50'">
@@ -763,6 +784,34 @@ watch(selectedPrint, (print) => {
         </BaseButton>
       </div>
     </div>
+
+    <!-- Zoom Overlay -->
+    <Teleport to="body">
+      <div
+          v-if="showZoom"
+          class="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-zoom-out p-4"
+          @click="showZoom = false"
+      >
+        <img
+            :src="zoomImage"
+            :alt="card?.name"
+            class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            @click.stop
+        />
+        <button
+            @click="showZoom = false"
+            class="absolute top-4 right-4 text-silver hover:text-neon transition-colors p-2"
+            aria-label="Cerrar zoom"
+        >
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+        <p class="absolute bottom-4 left-1/2 -translate-x-1/2 text-silver-70 text-small">
+          Click para cerrar
+        </p>
+      </div>
+    </Teleport>
   </BaseModal>
 </template>
 

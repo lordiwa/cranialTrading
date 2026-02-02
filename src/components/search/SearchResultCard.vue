@@ -39,7 +39,7 @@ const getCardImage = (card: any): string => {
       @click="emit('click', card)"
       class="cursor-pointer group"
   >
-    <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150">
+    <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150 rounded">
       <img
           v-if="getCardImage(card)"
           :src="getCardImage(card)"

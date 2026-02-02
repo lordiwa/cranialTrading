@@ -59,7 +59,7 @@ const closeChat = () => {
 
       <BaseLoader v-if="contactsStore.loading" size="large" />
 
-      <div v-else-if="contactsStore.contacts.length === 0" class="border border-silver-30 p-8 text-center">
+      <div v-else-if="contactsStore.contacts.length === 0" class="border border-silver-30 p-8 text-center rounded-md">
         <p class="text-body text-silver-70">{{ t('contacts.empty.title') }}</p>
         <p class="text-small text-silver-50 mt-2">
           {{ t('contacts.empty.message') }}

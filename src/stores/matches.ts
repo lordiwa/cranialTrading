@@ -14,6 +14,7 @@ import {
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
+import { t } from '../composables/useI18n';
 
 export interface SimpleMatch {
     id: string;
@@ -268,7 +269,7 @@ export const useMatchesStore = defineStore('matches', () => {
             sharedMatches.value = parsedShared;
         } catch (error: any) {
             console.error('loadAllMatches error:', error);
-            toastStore.show('Error al cargar matches', 'error');
+            toastStore.show(t('matches.messages.loadError'), 'error');
         } finally {
             loading.value = false;
         }
@@ -337,11 +338,11 @@ export const useMatchesStore = defineStore('matches', () => {
             newMatches.value = newMatches.value.filter(m => m.docId !== match.docId);
             savedMatches.value.push({ ...match, docId: docRef.id, status: 'activo' });
 
-            toastStore.show('Match guardado ✓', 'success');
+            toastStore.show(t('matches.messages.saved'), 'success');
             return true;
         } catch (error: any) {
             console.error('saveMatch error:', error);
-            toastStore.show('Error al guardar match: ' + error.message, 'error');
+            toastStore.show(t('matches.messages.saveError') + ': ' + error.message, 'error');
             return false;
         }
     };
@@ -360,7 +361,7 @@ export const useMatchesStore = defineStore('matches', () => {
                 : savedMatches.value.find(m => m.docId === matchId || m.id === matchId);
 
             if (!match) {
-                toastStore.show('Match no encontrado', 'error');
+                toastStore.show(t('matches.messages.notFound'), 'error');
                 return false;
             }
 
@@ -389,11 +390,11 @@ export const useMatchesStore = defineStore('matches', () => {
             }
             deletedMatches.value.push({ ...match, docId: docRef.id, status: 'eliminado' });
 
-            toastStore.show('Match eliminado. Se borrará en 15 días', 'info');
+            toastStore.show(t('matches.messages.deleted'), 'info');
             return true;
         } catch (error: any) {
             console.error('discardMatch error:', error);
-            toastStore.show('Error al eliminar match: ' + error.message, 'error');
+            toastStore.show(t('matches.messages.deleteError') + ': ' + error.message, 'error');
             return false;
         }
     };
@@ -410,11 +411,11 @@ export const useMatchesStore = defineStore('matches', () => {
 
             await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_guardados', firestoreDocId));
             savedMatches.value = savedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
-            toastStore.show('Match completado ✓', 'success');
+            toastStore.show(t('matches.messages.completed'), 'success');
             return true;
         } catch (error: any) {
             console.error('completeMatch error:', error);
-            toastStore.show('Error al completar match: ' + error.message, 'error');
+            toastStore.show(t('matches.messages.completeError') + ': ' + error.message, 'error');
             return false;
         }
     };
@@ -445,11 +446,11 @@ export const useMatchesStore = defineStore('matches', () => {
             deletedMatches.value = deletedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             newMatches.value.push({ ...match, docId: docRef.id, status: 'nuevo' });
 
-            toastStore.show('Match recuperado', 'success');
+            toastStore.show(t('matches.messages.recovered'), 'success');
             return true;
         } catch (error: any) {
             console.error('recoverMatch error:', error);
-            toastStore.show('Error al recuperar match: ' + error.message, 'error');
+            toastStore.show(t('matches.messages.recoverError') + ': ' + error.message, 'error');
             return false;
         }
     };
@@ -466,11 +467,11 @@ export const useMatchesStore = defineStore('matches', () => {
 
             await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', firestoreDocId));
             deletedMatches.value = deletedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
-            toastStore.show('Eliminado permanentemente', 'success');
+            toastStore.show(t('matches.messages.permanentlyDeleted'), 'success');
             return true;
         } catch (error: any) {
             console.error('permanentDelete error:', error);
-            toastStore.show('Error al eliminar: ' + error.message, 'error');
+            toastStore.show(t('matches.messages.permanentDeleteError') + ': ' + error.message, 'error');
             return false;
         }
     };

@@ -15,6 +15,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User } from '../types/user';
 import { useToastStore } from './toast';
+import { t } from '../composables/useI18n';
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
@@ -69,12 +70,12 @@ export const useAuthStore = defineStore('auth', () => {
                             createdAt: new Date(),
                         });
                     } catch (saveError) {
-                        toastStore.show('Error al guardar datos de usuario', 'error');
+                        toastStore.show(t('auth.messages.saveUserError'), 'error');
                     }
                 }
             }
         } catch (error) {
-            toastStore.show('Error al cargar datos de usuario', 'error');
+            toastStore.show(t('auth.messages.loadUserError'), 'error');
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
                 user.value = {
@@ -102,10 +103,10 @@ export const useAuthStore = defineStore('auth', () => {
 
             await sendEmailVerification(userCredential.user);
             await loadUserData(userId);
-            toastStore.show('Cuenta creada. Verifica tu email', 'success');
+            toastStore.show(t('auth.messages.accountCreated'), 'success');
             return true;
         } catch (error: any) {
-            toastStore.show(error.message || 'Error al registrar', 'error');
+            toastStore.show(error.message || t('auth.messages.registerError'), 'error');
             return false;
         }
     };
@@ -117,13 +118,13 @@ export const useAuthStore = defineStore('auth', () => {
             emailVerified.value = userCredential.user.emailVerified;
 
             if (userCredential.user.emailVerified) {
-                toastStore.show('Sesión iniciada', 'success');
+                toastStore.show(t('auth.messages.loginSuccess'), 'success');
             } else {
-                toastStore.show('Por favor verifica tu email', 'info');
+                toastStore.show(t('auth.messages.verifyEmail'), 'info');
             }
             return true;
         } catch (error: any) {
-            toastStore.show('Email o contraseña incorrectos', 'error');
+            toastStore.show(t('auth.messages.invalidCredentials'), 'error');
             return false;
         }
     };
@@ -134,7 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
             await signOut(auth);
             user.value = null;
             emailVerified.value = false;
-            toastStore.show('Sesión cerrada', 'success');
+            toastStore.show(t('auth.messages.logoutSuccess'), 'success');
             globalThis.location.reload();
             setTimeout(() => {
                 isLoggingOut.value = false;
@@ -142,7 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
             return true;
         } catch (error: any) {
             console.error('Logout error:', error);
-            toastStore.show('Error al cerrar sesión', 'error');
+            toastStore.show(t('auth.messages.logoutError'), 'error');
             isLoggingOut.value = false;
             return false;
         }
@@ -151,13 +152,13 @@ export const useAuthStore = defineStore('auth', () => {
     const sendResetPasswordEmail = async (email: string) => {
         try {
             await sendPasswordResetEmail(auth, email);
-            toastStore.show('Email de recuperación enviado', 'success');
+            toastStore.show(t('auth.messages.recoveryEmailSent'), 'success');
             return true;
         } catch (error: any) {
             if (error.code === 'auth/user-not-found') {
-                toastStore.show('Email no registrado', 'error');
+                toastStore.show(t('auth.messages.emailNotRegistered'), 'error');
             } else {
-                toastStore.show('Error al enviar email', 'error');
+                toastStore.show(t('auth.messages.sendEmailError'), 'error');
             }
             return false;
         }
@@ -166,15 +167,15 @@ export const useAuthStore = defineStore('auth', () => {
     const resetPassword = async (code: string, newPassword: string) => {
         try {
             await confirmPasswordReset(auth, code, newPassword);
-            toastStore.show('Contraseña restablecida', 'success');
+            toastStore.show(t('auth.messages.passwordReset'), 'success');
             return true;
         } catch (error: any) {
             if (error.code === 'auth/invalid-action-code') {
-                toastStore.show('Enlace expirado o inválido', 'error');
+                toastStore.show(t('auth.messages.linkExpired'), 'error');
             } else if (error.code === 'auth/weak-password') {
-                toastStore.show('Contraseña débil', 'error');
+                toastStore.show(t('auth.messages.weakPassword'), 'error');
             } else {
-                toastStore.show('Error al restablecer', 'error');
+                toastStore.show(t('auth.messages.resetError'), 'error');
             }
             return false;
         }
@@ -184,22 +185,22 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const firebaseUser = auth.currentUser;
             if (!firebaseUser?.email) {
-                toastStore.show('Usuario no autenticado', 'error');
+                toastStore.show(t('auth.messages.notAuthenticated'), 'error');
                 return false;
             }
 
             const { signInWithEmailAndPassword } = await import('firebase/auth');
             await signInWithEmailAndPassword(auth, firebaseUser.email, currentPassword);
             await updatePassword(firebaseUser, newPassword);
-            toastStore.show('Contraseña actualizada', 'success');
+            toastStore.show(t('auth.messages.passwordUpdated'), 'success');
             return true;
         } catch (error: any) {
             if (error.code === 'auth/wrong-password') {
-                toastStore.show('Contraseña actual incorrecta', 'error');
+                toastStore.show(t('auth.messages.wrongCurrentPassword'), 'error');
             } else if (error.code === 'auth/weak-password') {
-                toastStore.show('Contraseña nueva débil', 'error');
+                toastStore.show(t('auth.messages.weakNewPassword'), 'error');
             } else {
-                toastStore.show('Error al cambiar contraseña', 'error');
+                toastStore.show(t('auth.messages.changePasswordError'), 'error');
             }
             return false;
         }
@@ -209,15 +210,15 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) {
-                toastStore.show('Usuario no autenticado', 'error');
+                toastStore.show(t('auth.messages.notAuthenticated'), 'error');
                 return false;
             }
 
             await sendEmailVerification(firebaseUser);
-            toastStore.show('Email de verificación enviado', 'success');
+            toastStore.show(t('auth.messages.verificationEmailSent'), 'success');
             return true;
         } catch (error: any) {
-            toastStore.show('Error al enviar email', 'error');
+            toastStore.show(t('auth.messages.sendEmailError'), 'error');
             return false;
         }
     };
@@ -231,7 +232,7 @@ export const useAuthStore = defineStore('auth', () => {
             emailVerified.value = firebaseUser.emailVerified;
             return firebaseUser.emailVerified;
         } catch (error) {
-            toastStore.show('Error al verificar email', 'error');
+            toastStore.show(t('auth.messages.verifyEmailError'), 'error');
             return false;
         }
     };

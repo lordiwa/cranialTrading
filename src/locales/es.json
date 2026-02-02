@@ -160,7 +160,10 @@
       "weakNewPassword": "Contraseña nueva débil",
       "changePasswordError": "Error al cambiar contraseña",
       "verificationEmailSent": "Email de verificación enviado",
-      "verifyEmailError": "Error al verificar email"
+      "verifyEmailError": "Error al verificar email",
+      "saveUserError": "Error al guardar datos de usuario",
+      "loadUserError": "Error al cargar datos de usuario",
+      "passwordUpdated": "Contraseña actualizada"
     }
   },
 
@@ -342,6 +345,8 @@
       "deleteError": "Error al eliminar carta",
       "allDeleted": "Todas las cartas fueron eliminadas",
       "deleteAllError": "Error al eliminar cartas",
+      "batchUpdateError": "Error al actualizar cartas",
+      "batchDeleteError": "Error al eliminar cartas",
       "imported": "{count} cartas importadas",
       "importError": "Error al importar cartas",
       "synced": "Cartas sincronizadas para matches",

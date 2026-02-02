@@ -24,6 +24,7 @@ import type {
     DeckStats,
     DisplayDeckCard,
 } from '../types/deck'
+import { t } from '../composables/useI18n'
 
 // Helper to remove undefined values from objects (Firebase doesn't accept undefined)
 const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
@@ -347,7 +348,7 @@ export const useDecksStore = defineStore('decks', () => {
             console.log(`Loaded ${decks.value.length} decks`)
         } catch (error) {
             console.error('Error loading decks:', error)
-            toastStore.show('Error al cargar decks', 'error')
+            toastStore.show(t('decks.messages.loadError'), 'error')
         } finally {
             loading.value = false
         }
@@ -364,7 +365,7 @@ export const useDecksStore = defineStore('decks', () => {
             const docSnap = await getDoc(deckRef)
 
             if (!docSnap.exists()) {
-                toastStore.show('Deck no encontrado', 'error')
+                toastStore.show(t('decks.messages.notFound'), 'error')
                 return null
             }
 
@@ -404,7 +405,7 @@ export const useDecksStore = defineStore('decks', () => {
             return deck
         } catch (error) {
             console.error('Error loading deck:', error)
-            toastStore.show('Error al cargar deck', 'error')
+            toastStore.show(t('decks.messages.loadDeckError'), 'error')
             return null
         }
     }
@@ -458,11 +459,11 @@ export const useDecksStore = defineStore('decks', () => {
 
             decks.value.push(newDeck)
             currentDeck.value = { ...newDeck }
-            toastStore.show(`✓ Deck "${input.name}" creado`, 'success')
+            toastStore.show(t('decks.messages.created', { name: input.name }), 'success')
             return docRef.id
         } catch (error) {
             console.error('Error creating deck:', error)
-            toastStore.show('Error al crear deck', 'error')
+            toastStore.show(t('decks.messages.createError'), 'error')
             return null
         } finally {
             loading.value = false
@@ -495,7 +496,7 @@ export const useDecksStore = defineStore('decks', () => {
             return true
         } catch (error) {
             console.error('Error updating deck:', error)
-            toastStore.show('Error al actualizar deck', 'error')
+            toastStore.show(t('decks.messages.updateError'), 'error')
             return false
         }
     }
@@ -543,13 +544,13 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             toastStore.show(
-                isCommander ? `${cardName} ya no es Commander` : `${cardName} es ahora Commander`,
+                isCommander ? t('decks.messages.commanderRemoved', { name: cardName }) : t('decks.messages.commanderSet', { name: cardName }),
                 'success'
             )
             return true
         } catch (error) {
             console.error('Error toggling commander:', error)
-            toastStore.show('Error al cambiar commander', 'error')
+            toastStore.show(t('decks.messages.commanderError'), 'error')
             return false
         }
     }
@@ -571,11 +572,11 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             // NOTE: Cards stay in collection - they're just deallocated automatically
-            toastStore.show('✓ Deck eliminado', 'success')
+            toastStore.show(t('decks.messages.deleted'), 'success')
             return true
         } catch (error) {
             console.error('Error deleting deck:', error)
-            toastStore.show('Error al eliminar deck', 'error')
+            toastStore.show(t('decks.messages.deleteError'), 'error')
             return false
         }
     }
@@ -694,13 +695,13 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             if (toWishlist > 0) {
-                toastStore.show(`${toAllocate} de colección, ${toWishlist} a wishlist`, 'info')
+                toastStore.show(t('decks.messages.allocated', { fromCollection: toAllocate, toWishlist: toWishlist }), 'info')
             }
 
             return { allocated: toAllocate, wishlisted: toWishlist }
         } catch (error) {
             console.error('Error allocating card:', error)
-            toastStore.show('Error al asignar carta', 'error')
+            toastStore.show(t('decks.messages.allocateError'), 'error')
             return { allocated: 0, wishlisted: 0 }
         }
     }
@@ -771,7 +772,7 @@ export const useDecksStore = defineStore('decks', () => {
             return true
         } catch (error) {
             console.error('Error adding to wishlist:', error)
-            toastStore.show('Error al agregar a wishlist', 'error')
+            toastStore.show(t('decks.messages.addWishlistError'), 'error')
             return false
         }
     }
@@ -815,7 +816,7 @@ export const useDecksStore = defineStore('decks', () => {
             return true
         } catch (error) {
             console.error('Error deallocating card:', error)
-            toastStore.show('Error al desasignar carta', 'error')
+            toastStore.show(t('decks.messages.deallocateError'), 'error')
             return false
         }
     }
@@ -866,7 +867,7 @@ export const useDecksStore = defineStore('decks', () => {
             return true
         } catch (error) {
             console.error('Error removing from wishlist:', error)
-            toastStore.show('Error al eliminar de wishlist', 'error')
+            toastStore.show(t('decks.messages.removeWishlistError'), 'error')
             return false
         }
     }
@@ -905,7 +906,7 @@ export const useDecksStore = defineStore('decks', () => {
             const maxAvailable = card.quantity - otherAllocations
 
             if (newQuantity > maxAvailable) {
-                toastStore.show(`Solo hay ${maxAvailable} disponibles`, 'error')
+                toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
                 return false
             }
 
@@ -930,7 +931,7 @@ export const useDecksStore = defineStore('decks', () => {
             return true
         } catch (error) {
             console.error('Error updating allocation:', error)
-            toastStore.show('Error al actualizar cantidad', 'error')
+            toastStore.show(t('decks.messages.updateQuantityError'), 'error')
             return false
         }
     }

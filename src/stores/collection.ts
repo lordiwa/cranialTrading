@@ -20,6 +20,7 @@ import {
     syncAllUserCards,
     syncAllUserPreferences,
 } from '../services/publicCards'
+import { t } from '../composables/useI18n'
 
 export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
@@ -64,7 +65,7 @@ export const useCollectionStore = defineStore('collection', () => {
             console.log(`✅ ${cards.value.length} cartas cargadas en colección`)
         } catch (error) {
             console.error('Error loading collection:', error)
-            toastStore.show('Error al cargar colección', 'error')
+            toastStore.show(t('collection.messages.loadError'), 'error')
         } finally {
             loading.value = false
         }
@@ -104,7 +105,7 @@ export const useCollectionStore = defineStore('collection', () => {
             return docRef.id
         } catch (error) {
             console.error('Error adding card:', error)
-            toastStore.show('Error al agregar carta', 'error')
+            toastStore.show(t('collection.messages.addError'), 'error')
             return null
         } finally {
             loading.value = false
@@ -145,7 +146,7 @@ export const useCollectionStore = defineStore('collection', () => {
             return true
         } catch (error) {
             console.error('Error updating card:', error)
-            toastStore.show('Error al actualizar carta', 'error')
+            toastStore.show(t('collection.messages.updateError'), 'error')
             return false
         }
     }
@@ -202,7 +203,7 @@ export const useCollectionStore = defineStore('collection', () => {
             return true
         } catch (error) {
             console.error('Error batch updating cards:', error)
-            toastStore.show('Error al actualizar cartas', 'error')
+            toastStore.show(t('collection.messages.batchUpdateError'), 'error')
             return false
         }
     }
@@ -237,7 +238,7 @@ export const useCollectionStore = defineStore('collection', () => {
             // Restore card on failure
             console.error('Error deleting card:', error)
             cards.value.splice(cardIndex, 0, deletedCard)
-            toastStore.show('Error al eliminar carta', 'error')
+            toastStore.show(t('collection.messages.deleteError'), 'error')
             return false
         }
     }
@@ -260,11 +261,11 @@ export const useCollectionStore = defineStore('collection', () => {
 
             await Promise.all(batchDeletes)
             cards.value = []
-            toastStore.show('Todas las cartas fueron eliminadas', 'success')
+            toastStore.show(t('collection.messages.allDeleted'), 'success')
             return true
         } catch (error) {
             console.error('Error deleting all cards:', error)
-            toastStore.show('Error al eliminar cartas', 'error')
+            toastStore.show(t('collection.messages.deleteAllError'), 'error')
             return false
         }
     }
@@ -325,7 +326,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 cards.value.splice(index, 0, card)
             }
 
-            toastStore.show('Error al eliminar cartas', 'error')
+            toastStore.show(t('collection.messages.batchDeleteError'), 'error')
             return false
         }
     }
@@ -409,12 +410,12 @@ export const useCollectionStore = defineStore('collection', () => {
             const createdIds = docRefs.map(ref => ref.id)
             await loadCollection()
             if (!silent) {
-                toastStore.show(`${cardsToSave.length} cartas importadas`, 'success')
+                toastStore.show(t('collection.messages.imported', { count: cardsToSave.length }), 'success')
             }
             return createdIds
         } catch (error) {
             console.error('Error importing cards:', error)
-            toastStore.show('Error al importar cartas', 'error')
+            toastStore.show(t('collection.messages.importError'), 'error')
             return []
         }
     }
@@ -466,10 +467,10 @@ export const useCollectionStore = defineStore('collection', () => {
                 userInfo.email
             )
 
-            toastStore.show('Cartas sincronizadas para matches', 'success')
+            toastStore.show(t('collection.messages.synced'), 'success')
         } catch (error) {
             console.error('[PublicSync] Error bulk syncing cards:', error)
-            toastStore.show('Error sincronizando cartas', 'error')
+            toastStore.show(t('collection.messages.syncError'), 'error')
         }
     }
 

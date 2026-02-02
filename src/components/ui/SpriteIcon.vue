@@ -57,14 +57,13 @@ const iconPositions: Record<string, [number, number]> = {
 
 // Size mappings in pixels
 // Optimized for 192px source cells (2x for retina at 96px max)
-// Mobile: uses device pixel ratio for sharp rendering
-// Desktop: slightly larger for clarity
+// Increased minimum sizes for better scaling quality
 const sizes = {
-  tiny: 20,
-  small: 28,
-  medium: 40,
-  large: 56,
-  xl: 80
+  tiny: 24,    // was 20 - increased for better scaling
+  small: 32,   // was 28 - increased for better scaling
+  medium: 48,  // was 40 - better ratio with 192px source
+  large: 64,   // was 56 - cleaner division of 192
+  xl: 96       // was 80 - exact 2x scale from 192px
 }
 
 const getPosition = (name: string) => {
@@ -84,7 +83,7 @@ const scale = computed(() => displaySize.value / CELL_SIZE)
 <template>
   <span
     class="sprite-icon inline-block"
-    :class="props.class"
+    :class="[props.class, `sprite-${props.size}`]"
     :style="{
       width: `${displaySize}px`,
       height: `${displaySize}px`,
@@ -100,15 +99,32 @@ const scale = computed(() => displaySize.value / CELL_SIZE)
 .sprite-icon {
   vertical-align: middle;
   flex-shrink: 0;
-  /* Smooth scaling for both mobile and desktop */
+  /* Use high-quality scaling for smooth icons */
   image-rendering: -webkit-optimize-contrast;
-  image-rendering: auto;
+  image-rendering: smooth;
+  /* Slight sharpening filter for small sizes */
+  filter: contrast(1.02);
+}
+
+/* For very small icons, use crisp rendering */
+.sprite-icon.sprite-tiny,
+.sprite-icon.sprite-small {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  filter: contrast(1.05) brightness(1.02);
 }
 
 /* Higher quality rendering on high-DPI screens */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
   .sprite-icon {
     image-rendering: auto;
+    filter: none;
+  }
+
+  .sprite-icon.sprite-tiny,
+  .sprite-icon.sprite-small {
+    image-rendering: auto;
+    filter: contrast(1.02);
   }
 }
 </style>

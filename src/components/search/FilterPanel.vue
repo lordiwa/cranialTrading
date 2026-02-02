@@ -1,12 +1,46 @@
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { useSearchStore, type FilterOptions } from '../../stores/search'
 import { getCardSuggestions } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
+import BaseModal from '../ui/BaseModal.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
 
 const searchStore = useSearchStore()
 const showAdvancedFilters = ref(false) // Toggle filtros avanzados
+
+// Buscador de filtros dentro del modal
+const filterSearchQuery = ref('')
+const filterSearchResults = computed(() => {
+  const query = filterSearchQuery.value.toLowerCase().trim()
+  if (!query || query.length < 2) return []
+
+  // Buscar en todas las categorías
+  const allFilters = [
+    ...combatAbilities.map(k => ({ ...k, category: 'Combate' })),
+    ...allCommonEffects.map(k => ({ ...k, category: 'Efectos' })),
+    ...triggerKeywords.map(k => ({ ...k, category: 'Triggers' })),
+    ...allSetMechanics.map(k => ({ ...k, category: 'Mecánicas' })),
+    ...specialTypes.map(k => ({ ...k, category: 'Tipos' })),
+  ]
+
+  return allFilters
+    .filter(k => k.label.toLowerCase().includes(query) || k.value.toLowerCase().includes(query))
+    .slice(0, 10) // Limitar a 10 resultados
+})
+
+// Acordeones abiertos en el modal
+const openAccordions = ref<Set<string>>(new Set())
+
+const toggleAccordion = (id: string) => {
+  if (openAccordions.value.has(id)) {
+    openAccordions.value.delete(id)
+  } else {
+    openAccordions.value.add(id)
+  }
+}
+
+const isAccordionOpen = (id: string) => openAccordions.value.has(id)
 
 // Form state
 const filters = reactive<FilterOptions>({
@@ -133,175 +167,194 @@ const formatOptions = [
   { value: 'pioneer', label: 'Pioneer' },
 ]
 
-// ============ HABILIDADES EVERGREEN (siempre disponibles) ============
-const evergreenKeywords = [
+// ============ 1. HABILIDADES DE COMBATE (ordenadas por frecuencia de uso) ============
+const combatAbilities = [
+  // Tier 1 - Más buscadas (~70% de búsquedas)
   { value: 'flying', label: 'Flying' },
-  { value: 'first strike', label: 'First Strike' },
-  { value: 'double strike', label: 'Double Strike' },
+  { value: 'trample', label: 'Trample' },
   { value: 'deathtouch', label: 'Deathtouch' },
-  { value: 'defender', label: 'Defender' },
-  { value: 'flash', label: 'Flash' },
   { value: 'haste', label: 'Haste' },
-  { value: 'hexproof', label: 'Hexproof' },
-  { value: 'indestructible', label: 'Indestructible' },
   { value: 'lifelink', label: 'Lifelink' },
+  { value: 'first strike', label: 'First Strike' },
+  // Tier 2 - Comunes (~25%)
+  { value: 'double strike', label: 'Double Strike' },
+  { value: 'hexproof', label: 'Hexproof' },
+  { value: 'flash', label: 'Flash' },
+  { value: 'vigilance', label: 'Vigilance' },
   { value: 'menace', label: 'Menace' },
   { value: 'reach', label: 'Reach' },
-  { value: 'trample', label: 'Trample' },
-  { value: 'vigilance', label: 'Vigilance' },
   { value: 'ward', label: 'Ward' },
-  { value: 'equip', label: 'Equip' },
-  { value: 'enchant', label: 'Enchant' },
+  // Tier 3 - Nicho (~5%)
+  { value: 'indestructible', label: 'Indestructible' },
+  { value: 'defender', label: 'Defender' },
   { value: 'protection', label: 'Protection' },
   { value: 'prowess', label: 'Prowess' },
   { value: 'shroud', label: 'Shroud' },
 ]
 
-// ============ MECÁNICAS COMPETITIVAS 2022-2025 (Tier 1) ============
-const competitiveMechanics = [
-  { value: 'energy', label: 'Energy' },
-  { value: 'discover', label: 'Discover' },
-  { value: 'toxic', label: 'Toxic' },
-  { value: 'domain', label: 'Domain' },
-  { value: 'channel', label: 'Channel' },
-  { value: 'plot', label: 'Plot' },
-  { value: 'connive', label: 'Connive' },
-  { value: 'cascade', label: 'Cascade' },
-  { value: 'affinity', label: 'Affinity' },
-  { value: 'delve', label: 'Delve' },
-  { value: 'convoke', label: 'Convoke' },
-  { value: 'infect', label: 'Infect' },
-  { value: 'dredge', label: 'Dredge' },
-  { value: 'storm', label: 'Storm' },
+// ============ 2. EFECTOS COMUNES (subcategorías por tipo de efecto) ============
+const commonEffects = {
+  removal: [
+    { value: 'destroy', label: 'Destroy' },
+    { value: 'exile', label: 'Exile' },
+    { value: 'sacrifice', label: 'Sacrifice' },
+    { value: 'counter', label: 'Counter' },
+    { value: 'return to hand', label: 'Bounce' },
+    { value: 'fight', label: 'Fight' },
+  ],
+  cardAdvantage: [
+    { value: 'draw', label: 'Draw' },
+    { value: 'scry', label: 'Scry' },
+    { value: 'surveil', label: 'Surveil' },
+    { value: 'mill', label: 'Mill' },
+    { value: 'search your library', label: 'Tutor' },
+    { value: 'explore', label: 'Explore' },
+    { value: 'discard', label: 'Discard' },
+  ],
+  tokens: [
+    { value: 'treasure token', label: 'Treasure' },
+    { value: 'food token', label: 'Food' },
+    { value: 'clue token', label: 'Clue' },
+    { value: 'blood token', label: 'Blood' },
+    { value: 'map token', label: 'Map' },
+    { value: 'powerstone token', label: 'Powerstone' },
+    { value: 'create a token', label: 'Create Token' },
+  ],
+  counters: [
+    { value: 'proliferate', label: 'Proliferate' },
+    { value: '+1/+1 counter', label: '+1/+1' },
+    { value: '-1/-1 counter', label: '-1/-1' },
+    { value: 'amass', label: 'Amass' },
+    { value: 'bolster', label: 'Bolster' },
+  ],
+  control: [
+    { value: 'gain control', label: 'Steal' },
+    { value: 'goad', label: 'Goad' },
+    { value: 'detain', label: 'Detain' },
+    { value: 'tap', label: 'Tap' },
+    { value: 'untap', label: 'Untap' },
+  ],
+}
+
+// Flat list para búsqueda de labels
+const allCommonEffects = [
+  ...commonEffects.removal,
+  ...commonEffects.cardAdvantage,
+  ...commonEffects.tokens,
+  ...commonEffects.counters,
+  ...commonEffects.control,
 ]
 
-// ============ MECÁNICAS DE SET POPULARES ============
-const setMechanics = [
-  // Tier 2 - Muy populares
-  { value: 'offspring', label: 'Offspring' },
-  { value: 'blitz', label: 'Blitz' },
-  { value: 'backup', label: 'Backup' },
-  { value: 'reconfigure', label: 'Reconfigure' },
-  { value: 'prototype', label: 'Prototype' },
-  { value: 'disguise', label: 'Disguise' },
-  { value: 'cloak', label: 'Cloak' },
-  { value: 'impending', label: 'Impending' },
-  // Clásicas populares
-  { value: 'cycling', label: 'Cycling' },
-  { value: 'flashback', label: 'Flashback' },
-  { value: 'kicker', label: 'Kicker' },
-  { value: 'madness', label: 'Madness' },
-  { value: 'suspend', label: 'Suspend' },
-  { value: 'escape', label: 'Escape' },
-  { value: 'foretell', label: 'Foretell' },
-  { value: 'morph', label: 'Morph' },
-  { value: 'mutate', label: 'Mutate' },
-  { value: 'ninjutsu', label: 'Ninjutsu' },
-  { value: 'evoke', label: 'Evoke' },
-  { value: 'emerge', label: 'Emerge' },
-  { value: 'unearth', label: 'Unearth' },
-  { value: 'persist', label: 'Persist' },
-  { value: 'undying', label: 'Undying' },
-  // Tier 3 - Útiles
-  { value: 'alliance', label: 'Alliance' },
-  { value: 'casualty', label: 'Casualty' },
-  { value: 'bargain', label: 'Bargain' },
-  { value: 'incubate', label: 'Incubate' },
-  { value: 'saddle', label: 'Saddle' },
-  { value: 'spree', label: 'Spree' },
-  { value: 'valiant', label: 'Valiant' },
-  { value: 'survival', label: 'Survival' },
-  { value: 'corrupted', label: 'Corrupted' },
-  { value: 'modified', label: 'Modified' },
-  { value: 'exploit', label: 'Exploit' },
-  { value: 'extort', label: 'Extort' },
-  { value: 'exalted', label: 'Exalted' },
-  { value: 'evolve', label: 'Evolve' },
-  { value: 'fabricate', label: 'Fabricate' },
-  { value: 'landfall', label: 'Landfall' },
-  { value: 'raid', label: 'Raid' },
-  { value: 'revolt', label: 'Revolt' },
-  { value: 'spectacle', label: 'Spectacle' },
-  { value: 'mentor', label: 'Mentor' },
-  { value: 'training', label: 'Training' },
-  { value: 'riot', label: 'Riot' },
-  { value: 'adapt', label: 'Adapt' },
-  { value: 'monstrosity', label: 'Monstrosity' },
-]
-
-// ============ KEYWORD ACTIONS (Acciones oficiales Rule 701) ============
-const keywordActions = [
-  // Manipulación de biblioteca
-  { value: 'surveil', label: 'Surveil' },
-  { value: 'explore', label: 'Explore' },
-  { value: 'scry', label: 'Scry' },
-  { value: 'mill', label: 'Mill' },
-  { value: 'search your library', label: 'Tutor' },
-  { value: 'shuffle', label: 'Shuffle' },
-  { value: 'reveal', label: 'Reveal' },
-  { value: 'manifest', label: 'Manifest' },
-  { value: 'transform', label: 'Transform' },
-  // Interacción con permanentes
-  { value: 'destroy', label: 'Destroy' },
-  { value: 'exile', label: 'Exile' },
-  { value: 'sacrifice', label: 'Sacrifice' },
-  { value: 'fight', label: 'Fight' },
-  { value: 'goad', label: 'Goad' },
-  { value: 'detain', label: 'Detain' },
-  { value: 'exert', label: 'Exert' },
-  { value: 'tap', label: 'Tap' },
-  { value: 'untap', label: 'Untap' },
-  // Contadores
-  { value: 'proliferate', label: 'Proliferate' },
-  { value: 'bolster', label: 'Bolster' },
-  { value: 'support', label: 'Support' },
-  { value: 'amass', label: 'Amass' },
-  // Cartas en mano
-  { value: 'draw', label: 'Draw' },
-  { value: 'discard', label: 'Discard' },
-  { value: 'counter', label: 'Counter' },
-  { value: 'return to hand', label: 'Bounce' },
-  { value: 'gain control', label: 'Steal' },
-]
-
-// ============ TRIGGERS (Disparadores) ============
+// ============ 3. TRIGGERS (ordenados por frecuencia) ============
 const triggerKeywords = [
   { value: 'enters the battlefield', label: 'ETB' },
   { value: 'dies', label: 'Dies' },
-  { value: 'leaves the battlefield', label: 'LTB' },
+  { value: 'whenever ~ attacks', label: 'Attack' },
+  { value: 'deals combat damage', label: 'Combat Damage' },
+  { value: 'when you cast', label: 'Cast' },
+  { value: 'whenever you sacrifice', label: 'Sacrifice' },
+  { value: 'whenever you gain life', label: 'Lifegain' },
+  { value: 'whenever a creature dies', label: 'Creature Dies' },
   { value: 'beginning of your upkeep', label: 'Upkeep' },
   { value: 'beginning of your end step', label: 'End Step' },
-  { value: 'whenever ~ attacks', label: 'Attack Trigger' },
-  { value: 'deals combat damage', label: 'Combat Damage' },
-  { value: 'when you cast', label: 'Cast Trigger' },
-  { value: 'whenever you gain life', label: 'Lifegain' },
-  { value: 'whenever you sacrifice', label: 'Sacrifice Trigger' },
-  { value: 'whenever a creature dies', label: 'Creature Dies' },
+  { value: 'leaves the battlefield', label: 'LTB' },
 ]
 
-// ============ TOKENS ============
-const tokenKeywords = [
-  { value: 'treasure token', label: 'Treasure' },
-  { value: 'clue token', label: 'Clue' },
-  { value: 'food token', label: 'Food' },
-  { value: 'blood token', label: 'Blood' },
-  { value: 'map token', label: 'Map' },
-  { value: 'powerstone token', label: 'Powerstone' },
-  { value: 'create a token', label: 'Create Token' },
-  { value: 'populate', label: 'Populate' },
+// ============ 4. MECÁNICAS DE SET (organizadas por relevancia) ============
+const setMechanics = {
+  meta: [
+    // Tier Meta - Competitivas actuales
+    { value: 'cascade', label: 'Cascade' },
+    { value: 'delve', label: 'Delve' },
+    { value: 'affinity', label: 'Affinity' },
+    { value: 'energy', label: 'Energy' },
+    { value: 'convoke', label: 'Convoke' },
+    { value: 'storm', label: 'Storm' },
+    { value: 'infect', label: 'Infect' },
+    { value: 'dredge', label: 'Dredge' },
+  ],
+  popular: [
+    // Tier Popular - Clásicas queridas
+    { value: 'flashback', label: 'Flashback' },
+    { value: 'cycling', label: 'Cycling' },
+    { value: 'kicker', label: 'Kicker' },
+    { value: 'evoke', label: 'Evoke' },
+    { value: 'unearth', label: 'Unearth' },
+    { value: 'madness', label: 'Madness' },
+    { value: 'suspend', label: 'Suspend' },
+    { value: 'escape', label: 'Escape' },
+    { value: 'ninjutsu', label: 'Ninjutsu' },
+    { value: 'morph', label: 'Morph' },
+  ],
+  recent: [
+    // Tier Reciente - 2023-2025
+    { value: 'discover', label: 'Discover' },
+    { value: 'plot', label: 'Plot' },
+    { value: 'offspring', label: 'Offspring' },
+    { value: 'disguise', label: 'Disguise' },
+    { value: 'bargain', label: 'Bargain' },
+    { value: 'impending', label: 'Impending' },
+    { value: 'toxic', label: 'Toxic' },
+    { value: 'connive', label: 'Connive' },
+    { value: 'blitz', label: 'Blitz' },
+    { value: 'prototype', label: 'Prototype' },
+  ],
+  other: [
+    // Tier Otras - Alfabético
+    { value: 'adapt', label: 'Adapt' },
+    { value: 'alliance', label: 'Alliance' },
+    { value: 'backup', label: 'Backup' },
+    { value: 'casualty', label: 'Casualty' },
+    { value: 'channel', label: 'Channel' },
+    { value: 'cloak', label: 'Cloak' },
+    { value: 'corrupted', label: 'Corrupted' },
+    { value: 'domain', label: 'Domain' },
+    { value: 'emerge', label: 'Emerge' },
+    { value: 'evolve', label: 'Evolve' },
+    { value: 'exalted', label: 'Exalted' },
+    { value: 'exploit', label: 'Exploit' },
+    { value: 'extort', label: 'Extort' },
+    { value: 'fabricate', label: 'Fabricate' },
+    { value: 'foretell', label: 'Foretell' },
+    { value: 'incubate', label: 'Incubate' },
+    { value: 'landfall', label: 'Landfall' },
+    { value: 'mentor', label: 'Mentor' },
+    { value: 'modified', label: 'Modified' },
+    { value: 'monstrosity', label: 'Monstrosity' },
+    { value: 'mutate', label: 'Mutate' },
+    { value: 'persist', label: 'Persist' },
+    { value: 'raid', label: 'Raid' },
+    { value: 'reconfigure', label: 'Reconfigure' },
+    { value: 'revolt', label: 'Revolt' },
+    { value: 'riot', label: 'Riot' },
+    { value: 'saddle', label: 'Saddle' },
+    { value: 'spectacle', label: 'Spectacle' },
+    { value: 'spree', label: 'Spree' },
+    { value: 'survival', label: 'Survival' },
+    { value: 'training', label: 'Training' },
+    { value: 'undying', label: 'Undying' },
+    { value: 'valiant', label: 'Valiant' },
+  ],
+}
+
+// Flat list para búsqueda de labels
+const allSetMechanics = [
+  ...setMechanics.meta,
+  ...setMechanics.popular,
+  ...setMechanics.recent,
+  ...setMechanics.other,
 ]
 
-// ============ TIPOS ESPECIALES ============
+// ============ TIPOS ESPECIALES (incluidos en el modal pero no como acordeón separado) ============
 const specialTypes = [
-  { value: 'vehicle', label: 'Vehicle' },
-  { value: 'crew', label: 'Crew' },
-  { value: 'saga', label: 'Saga' },
+  { value: 'legendary', label: 'Legendary' },
   { value: 'equipment', label: 'Equipment' },
   { value: 'aura', label: 'Aura' },
-  { value: 'legendary', label: 'Legendary' },
-  { value: 'snow', label: 'Snow' },
+  { value: 'vehicle', label: 'Vehicle' },
+  { value: 'saga', label: 'Saga' },
   { value: 'modal double-faced', label: 'MDFC' },
-  { value: 'transform', label: 'DFC Transform' },
+  { value: 'transform', label: 'DFC' },
+  { value: 'snow', label: 'Snow' },
 ]
 
 // Métodos
@@ -388,6 +441,83 @@ const activeFilterCount = () => {
   if (filters.isFoil) count++
   if (filters.isFullArt) count++
   return count
+}
+
+// Contar keywords seleccionadas por categoría
+const countSelectedInCategory = (categoryKeywords: { value: string }[]) => {
+  if (!filters.keywords?.length) return 0
+  return categoryKeywords.filter(kw => filters.keywords!.includes(kw.value)).length
+}
+
+// Obtener label de un keyword por su valor
+const getKeywordLabel = (value: string): string => {
+  const allKeywords = [
+    ...combatAbilities,
+    ...allCommonEffects,
+    ...triggerKeywords,
+    ...allSetMechanics,
+    ...specialTypes,
+  ]
+  return allKeywords.find(kw => kw.value === value)?.label || value
+}
+
+// Obtener label de color
+const getColorLabel = (value: string): string => {
+  return colorOptions.find(c => c.value === value)?.label || value
+}
+
+// Obtener label de tipo
+const getTypeLabel = (value: string): string => {
+  return typeOptions.find(t => t.value === value)?.label || value
+}
+
+// Obtener label de rareza
+const getRarityLabel = (value: string): string => {
+  return rarityOptions.find(r => r.value === value)?.label || value
+}
+
+// Obtener label de formato
+const getFormatLabel = (value: string): string => {
+  return formatOptions.find(f => f.value === value)?.label || value
+}
+
+// Remover un filtro específico
+const removeFilter = (type: string, value?: string) => {
+  switch (type) {
+    case 'color':
+      if (value) filters.colors = filters.colors?.filter(c => c !== value)
+      break
+    case 'type':
+      if (value) filters.types = filters.types?.filter(t => t !== value)
+      break
+    case 'rarity':
+      if (value) filters.rarity = filters.rarity?.filter(r => r !== value)
+      break
+    case 'format':
+      if (value) filters.formatLegal = filters.formatLegal?.filter(f => f !== value)
+      break
+    case 'keyword':
+      if (value) filters.keywords = filters.keywords?.filter(k => k !== value)
+      break
+    case 'manaValue':
+      filters.manaValue = { min: undefined, max: undefined }
+      break
+    case 'power':
+      filters.power = { min: undefined, max: undefined }
+      break
+    case 'toughness':
+      filters.toughness = { min: undefined, max: undefined }
+      break
+    case 'priceUSD':
+      filters.priceUSD = { min: undefined, max: undefined }
+      break
+    case 'isFoil':
+      filters.isFoil = false
+      break
+    case 'isFullArt':
+      filters.isFullArt = false
+      break
+  }
 }
 </script>
 
@@ -522,17 +652,167 @@ const activeFilterCount = () => {
         </button>
       </div>
 
+      <!-- Pills de filtros seleccionados -->
+      <div v-if="activeFilterCount() > 0" class="flex flex-wrap gap-1 mt-3 pt-3 border-t border-silver-20">
+        <!-- Colores -->
+        <button
+            v-for="color in filters.colors"
+            :key="'color-' + color"
+            @click="removeFilter('color', color)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          {{ getColorLabel(color) }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Tipos -->
+        <button
+            v-for="type in filters.types"
+            :key="'type-' + type"
+            @click="removeFilter('type', type)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          {{ getTypeLabel(type) }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Rarezas -->
+        <button
+            v-for="rarity in filters.rarity"
+            :key="'rarity-' + rarity"
+            @click="removeFilter('rarity', rarity)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          {{ getRarityLabel(rarity) }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Formatos -->
+        <button
+            v-for="format in filters.formatLegal"
+            :key="'format-' + format"
+            @click="removeFilter('format', format)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          {{ getFormatLabel(format) }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Keywords -->
+        <button
+            v-for="keyword in filters.keywords"
+            :key="'keyword-' + keyword"
+            @click="removeFilter('keyword', keyword)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          {{ getKeywordLabel(keyword) }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Mana Value -->
+        <button
+            v-if="filters.manaValue?.min !== undefined || filters.manaValue?.max !== undefined"
+            @click="removeFilter('manaValue')"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          MV: {{ filters.manaValue?.min ?? '?' }}-{{ filters.manaValue?.max ?? '?' }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Power -->
+        <button
+            v-if="filters.power?.min !== undefined || filters.power?.max !== undefined"
+            @click="removeFilter('power')"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          POW: {{ filters.power?.min ?? '?' }}-{{ filters.power?.max ?? '?' }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Toughness -->
+        <button
+            v-if="filters.toughness?.min !== undefined || filters.toughness?.max !== undefined"
+            @click="removeFilter('toughness')"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          TOU: {{ filters.toughness?.min ?? '?' }}-{{ filters.toughness?.max ?? '?' }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Precio USD -->
+        <button
+            v-if="filters.priceUSD?.min !== undefined || filters.priceUSD?.max !== undefined"
+            @click="removeFilter('priceUSD')"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          ${{ filters.priceUSD?.min ?? '?' }}-${{ filters.priceUSD?.max ?? '?' }} <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Foil -->
+        <button
+            v-if="filters.isFoil"
+            @click="removeFilter('isFoil')"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          Foil <span class="opacity-70">×</span>
+        </button>
+
+        <!-- Full Art -->
+        <button
+            v-if="filters.isFullArt"
+            @click="removeFilter('isFullArt')"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          Full Art <span class="opacity-70">×</span>
+        </button>
+      </div>
+
       <!-- Indicador de auto-búsqueda -->
       <div v-if="activeFilterCount() > 0" class="mt-2 text-tiny text-silver-50">
         Los filtros se aplicarán automáticamente en 0.5 segundos
       </div>
     </div>
 
-    <!-- ========== FILTROS AVANZADOS (Colapsable) ========== -->
-    <div
-        v-if="showAdvancedFilters"
-        class="bg-primary border border-silver-30 p-4 space-y-4"
+    <!-- ========== FILTROS AVANZADOS (Modal) ========== -->
+    <BaseModal
+        :show="showAdvancedFilters"
+        title="FILTROS AVANZADOS"
+        @close="showAdvancedFilters = false; filterSearchQuery = ''"
     >
+      <div class="space-y-4">
+
+      <!-- Buscador de filtros -->
+      <div class="relative">
+        <input
+            v-model="filterSearchQuery"
+            type="text"
+            placeholder="Buscar filtro... (ej: flying, trample, cascade)"
+            class="w-full bg-primary border-2 border-neon px-4 py-3 text-body text-silver placeholder-silver-50 focus:outline-none"
+        />
+        <!-- Resultados de búsqueda -->
+        <div
+            v-if="filterSearchResults.length > 0"
+            class="absolute top-full left-0 right-0 bg-primary border-2 border-neon border-t-0 max-h-64 overflow-y-auto z-20"
+        >
+          <button
+              v-for="result in filterSearchResults"
+              :key="result.value"
+              @click="toggleKeyword(result.value)"
+              class="w-full px-4 py-2 flex items-center justify-between hover:bg-neon-10 transition-fast border-b border-silver-30 last:border-b-0"
+          >
+            <span class="text-small text-silver">
+              {{ result.label }}
+              <span class="text-tiny text-silver-50 ml-2">{{ result.category }}</span>
+            </span>
+            <span
+                v-if="filters.keywords?.includes(result.value)"
+                class="text-neon text-tiny font-bold"
+            >
+              ✓
+            </span>
+          </button>
+        </div>
+        <!-- Mensaje sin resultados -->
+        <div
+            v-if="filterSearchQuery.length >= 2 && filterSearchResults.length === 0"
+            class="absolute top-full left-0 right-0 bg-primary border-2 border-neon border-t-0 px-4 py-3 text-small text-silver-50"
+        >
+          No se encontraron filtros para "{{ filterSearchQuery }}"
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- Todos los tipos -->
         <div>
@@ -661,129 +941,311 @@ const activeFilterCount = () => {
         </div>
       </div>
 
-      <!-- Habilidades Evergreen -->
-      <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase flex items-center gap-2 mb-2"><SpriteIcon name="dagger" size="tiny" /> Habilidades Evergreen</span>
-        <div class="flex flex-wrap gap-1">
+      <!-- ========== ACORDEONES DE KEYWORDS (4 categorías reorganizadas) ========== -->
+      <div class="border border-silver-30">
+
+        <!-- 1. HABILIDADES DE COMBATE (más buscadas) -->
+        <div class="border-b border-silver-30">
           <button
-              v-for="keyword in evergreenKeywords"
-              :key="keyword.value"
-              @click="toggleKeyword(keyword.value)"
-              :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
-                filters.keywords?.includes(keyword.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-              ]"
+              @click="toggleAccordion('combat')"
+              class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
-            {{ keyword.label }}
+            <span class="text-small font-bold text-silver flex items-center gap-2">
+              Habilidades de Combate
+            </span>
+            <span class="flex items-center gap-2">
+              <span v-if="countSelectedInCategory(combatAbilities) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
+                {{ countSelectedInCategory(combatAbilities) }}
+              </span>
+              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('combat') }">▼</span>
+            </span>
           </button>
+          <div v-if="isAccordionOpen('combat')" class="px-3 py-2 bg-silver-10/50">
+            <!-- Tier 1: Más comunes -->
+            <div class="flex flex-wrap gap-1 mb-2">
+              <button
+                  v-for="keyword in combatAbilities.slice(0, 6)"
+                  :key="keyword.value"
+                  @click="toggleKeyword(keyword.value)"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold transition-fast',
+                    filters.keywords?.includes(keyword.value)
+                      ? 'bg-neon text-primary border border-neon'
+                      : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                  ]"
+              >
+                {{ keyword.label }}
+              </button>
+            </div>
+            <!-- Tier 2-3: Menos comunes -->
+            <div class="flex flex-wrap gap-1 pt-2 border-t border-silver-30/50">
+              <button
+                  v-for="keyword in combatAbilities.slice(6)"
+                  :key="keyword.value"
+                  @click="toggleKeyword(keyword.value)"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold transition-fast',
+                    filters.keywords?.includes(keyword.value)
+                      ? 'bg-neon text-primary border border-neon'
+                      : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                  ]"
+              >
+                {{ keyword.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. EFECTOS COMUNES (con subcategorías) -->
+        <div class="border-b border-silver-30">
+          <button
+              @click="toggleAccordion('effects')"
+              class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+          >
+            <span class="text-small font-bold text-silver">
+              Efectos Comunes
+            </span>
+            <span class="flex items-center gap-2">
+              <span v-if="countSelectedInCategory(allCommonEffects) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
+                {{ countSelectedInCategory(allCommonEffects) }}
+              </span>
+              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('effects') }">▼</span>
+            </span>
+          </button>
+          <div v-if="isAccordionOpen('effects')" class="px-3 py-2 bg-silver-10/50 space-y-3">
+            <!-- Remoción -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Remoción</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in commonEffects.removal"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Card Advantage -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Card Advantage</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in commonEffects.cardAdvantage"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Tokens -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Tokens</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in commonEffects.tokens"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Contadores -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Contadores</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in commonEffects.counters"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Control -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Control</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in commonEffects.control"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. TRIGGERS -->
+        <div class="border-b border-silver-30">
+          <button
+              @click="toggleAccordion('triggers')"
+              class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+          >
+            <span class="text-small font-bold text-silver">
+              Triggers
+            </span>
+            <span class="flex items-center gap-2">
+              <span v-if="countSelectedInCategory(triggerKeywords) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
+                {{ countSelectedInCategory(triggerKeywords) }}
+              </span>
+              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('triggers') }">▼</span>
+            </span>
+          </button>
+          <div v-if="isAccordionOpen('triggers')" class="px-3 py-2 bg-silver-10/50">
+            <div class="flex flex-wrap gap-1">
+              <button
+                  v-for="keyword in triggerKeywords"
+                  :key="keyword.value"
+                  @click="toggleKeyword(keyword.value)"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold transition-fast',
+                    filters.keywords?.includes(keyword.value)
+                      ? 'bg-neon text-primary border border-neon'
+                      : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                  ]"
+              >
+                {{ keyword.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. MECÁNICAS DE SET (con subcategorías por relevancia) -->
+        <div>
+          <button
+              @click="toggleAccordion('setMechanics')"
+              class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+          >
+            <span class="text-small font-bold text-silver">
+              Mecánicas de Set
+            </span>
+            <span class="flex items-center gap-2">
+              <span v-if="countSelectedInCategory(allSetMechanics) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
+                {{ countSelectedInCategory(allSetMechanics) }}
+              </span>
+              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('setMechanics') }">▼</span>
+            </span>
+          </button>
+          <div v-if="isAccordionOpen('setMechanics')" class="px-3 py-2 bg-silver-10/50 space-y-3">
+            <!-- Meta -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Meta / Competitivas</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in setMechanics.meta"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Popular -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Clásicas Populares</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in setMechanics.popular"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Recientes -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Recientes (2023-2025)</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in setMechanics.recent"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+            <!-- Otras -->
+            <div>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">Otras</span>
+              <div class="flex flex-wrap gap-1">
+                <button
+                    v-for="keyword in setMechanics.other"
+                    :key="keyword.value"
+                    @click="toggleKeyword(keyword.value)"
+                    :class="[
+                      'px-2 py-1 text-tiny font-bold transition-fast',
+                      filters.keywords?.includes(keyword.value)
+                        ? 'bg-neon text-primary border border-neon'
+                        : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                    ]"
+                >
+                  {{ keyword.label }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Mecánicas Competitivas -->
+      <!-- Tipos Especiales (fuera de acordeón, siempre visible) -->
       <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">🏆 Mecánicas Competitivas (Tier 1)</span>
-        <div class="flex flex-wrap gap-1">
-          <button
-              v-for="keyword in competitiveMechanics"
-              :key="keyword.value"
-              @click="toggleKeyword(keyword.value)"
-              :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
-                filters.keywords?.includes(keyword.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-              ]"
-          >
-            {{ keyword.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Mecánicas de Set -->
-      <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">🎴 Mecánicas de Set</span>
-        <div class="flex flex-wrap gap-1 max-h-40 overflow-y-auto">
-          <button
-              v-for="keyword in setMechanics"
-              :key="keyword.value"
-              @click="toggleKeyword(keyword.value)"
-              :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
-                filters.keywords?.includes(keyword.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-              ]"
-          >
-            {{ keyword.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Keyword Actions -->
-      <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">📜 Acciones (Rule 701)</span>
-        <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-          <button
-              v-for="keyword in keywordActions"
-              :key="keyword.value"
-              @click="toggleKeyword(keyword.value)"
-              :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
-                filters.keywords?.includes(keyword.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-              ]"
-          >
-            {{ keyword.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Triggers -->
-      <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">⚡ Triggers</span>
-        <div class="flex flex-wrap gap-1">
-          <button
-              v-for="keyword in triggerKeywords"
-              :key="keyword.value"
-              @click="toggleKeyword(keyword.value)"
-              :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
-                filters.keywords?.includes(keyword.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-              ]"
-          >
-            {{ keyword.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Tokens -->
-      <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">🪙 Tokens</span>
-        <div class="flex flex-wrap gap-1">
-          <button
-              v-for="keyword in tokenKeywords"
-              :key="keyword.value"
-              @click="toggleKeyword(keyword.value)"
-              :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
-                filters.keywords?.includes(keyword.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-              ]"
-          >
-            {{ keyword.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Tipos Especiales -->
-      <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">✨ Tipos Especiales</span>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">Tipos Especiales</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in specialTypes"
@@ -812,7 +1274,15 @@ const activeFilterCount = () => {
           <span>Full Art</span>
         </label>
       </div>
-    </div>
+
+      <!-- Botón aplicar filtros -->
+      <div class="flex justify-end pt-4 border-t border-silver-30">
+        <BaseButton @click="showAdvancedFilters = false">
+          APLICAR FILTROS
+        </BaseButton>
+      </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
@@ -833,5 +1303,14 @@ const activeFilterCount = () => {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(238, 238, 238, 0.4);
+}
+
+/* Animación de rotación para acordeones */
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.transition-transform {
+  transition: transform 150ms ease-out;
 }
 </style>

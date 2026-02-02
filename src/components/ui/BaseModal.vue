@@ -7,7 +7,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   title: '',
-  closeOnClickOutside: true,
+  closeOnClickOutside: false,
 });
 
 const emit = defineEmits<{

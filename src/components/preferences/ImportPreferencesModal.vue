@@ -1,11 +1,14 @@
 <!-- src/components/preferences/ImportPreferencesModal.vue -->
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import { CardCondition } from '../../types/card'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -26,14 +29,14 @@ const errorMsg = ref('')
 const isLink = ref(false)
 const moxfieldDeckData = ref<any>(null)
 
-const conditionOptions = [
-  { value: 'M', label: 'M - Mint' },
-  { value: 'NM', label: 'NM - Near Mint' },
-  { value: 'LP', label: 'LP - Light Play' },
-  { value: 'MP', label: 'MP - Moderate Play' },
-  { value: 'HP', label: 'HP - Heavy Play' },
-  { value: 'PO', label: 'PO - Poor' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 const handleParse = async () => {
   if (!inputText.value.trim()) return
@@ -135,16 +138,16 @@ const handleClose = () => {
 </script>
 
 <template>
-  <BaseModal :show="show" title="IMPORTAR COMO BUSCO" @close="handleClose">
+  <BaseModal :show="show" :title="t('preferences.importModal.title')" @close="handleClose">
     <div class="space-y-md">
       <div>
         <label for="import-pref-input" class="text-small text-silver-70 block mb-2">
-          Link de Moxfield o texto del mazo
+          {{ t('preferences.importModal.inputLabel') }}
         </label>
         <textarea
             id="import-pref-input"
             v-model="inputText"
-            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;..."
+            :placeholder="t('preferences.importModal.placeholder')"
             class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-mono"
             rows="8"
             @input="preview = null"
@@ -158,18 +161,18 @@ const handleClose = () => {
           :disabled="!inputText.trim() || parsing"
           class="w-full"
       >
-        {{ parsing ? 'ANALIZANDO...' : 'ANALIZAR' }}
+        {{ parsing ? t('preferences.importModal.analyzing') : t('preferences.importModal.analyze') }}
       </BaseButton>
 
       <!-- Instrucciones para Moxfield -->
       <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="border border-neon bg-neon/10 p-md space-y-2">
-        <p class="text-small text-neon font-bold">Link de Moxfield detectado</p>
-        <p class="text-small text-silver">Moxfield no permite importar directamente. Sigue estos pasos:</p>
+        <p class="text-small text-neon font-bold">{{ t('preferences.importModal.moxfieldDetected.title') }}</p>
+        <p class="text-small text-silver">{{ t('preferences.importModal.moxfieldDetected.instruction') }}</p>
         <ol class="text-small text-silver-70 list-decimal list-inside space-y-1">
-          <li>Abre el deck en Moxfield</li>
-          <li>Click en <span class="text-neon">Export</span> (arriba a la derecha)</li>
-          <li>Click en <span class="text-neon">Copy to Clipboard</span></li>
-          <li>Pega el texto aquí</li>
+          <li>{{ t('preferences.importModal.moxfieldDetected.step1') }}</li>
+          <li>{{ t('preferences.importModal.moxfieldDetected.step2') }}</li>
+          <li>{{ t('preferences.importModal.moxfieldDetected.step3') }}</li>
+          <li>{{ t('preferences.importModal.moxfieldDetected.step4') }}</li>
         </ol>
       </div>
 
@@ -183,15 +186,15 @@ const handleClose = () => {
           {{ preview.name }}
         </p>
         <p class="text-small text-silver">
-          <span class="font-bold">Total:</span> {{ preview.total }} cartas
+          <span class="font-bold">{{ t('preferences.importModal.total') }}:</span> {{ preview.total }} {{ t('preferences.importModal.cards') }}
         </p>
         <p class="text-small text-silver-70">
-          Mainboard: {{ preview.mainboard }} | Sideboard: {{ preview.sideboard }}
+          {{ t('preferences.importModal.mainboard') }}: {{ preview.mainboard }} | {{ t('preferences.importModal.sideboard') }}: {{ preview.sideboard }}
         </p>
       </div>
 
       <div v-if="preview">
-        <label for="import-pref-condition" class="text-small text-silver-70 block mb-2">Condición mínima deseada</label>
+        <label for="import-pref-condition" class="text-small text-silver-70 block mb-2">{{ t('preferences.importModal.minCondition') }}</label>
         <BaseSelect
             id="import-pref-condition"
             v-model="condition"
@@ -206,13 +209,13 @@ const handleClose = () => {
               type="checkbox"
               class="w-4 h-4"
           />
-          <span>Incluir sideboard</span>
+          <span>{{ t('preferences.importModal.includeSideboard') }}</span>
         </label>
       </div>
 
       <div v-if="preview" class="bg-primary-dark border border-silver-30 p-sm">
         <p class="text-tiny text-silver-70">
-          💡 Se crearán {{ includeSideboard ? preview.total : preview.mainboard }} preferencias BUSCO automáticamente.
+          {{ t('preferences.importModal.infoMessage', { count: includeSideboard ? preview.total : preview.mainboard }) }}
         </p>
       </div>
 
@@ -221,7 +224,7 @@ const handleClose = () => {
           @click="handleImport"
           class="w-full"
       >
-        IMPORTAR {{ includeSideboard ? preview.total : preview.mainboard }} COMO BUSCO
+        {{ t('preferences.importModal.importButton', { count: includeSideboard ? preview.total : preview.mainboard }) }}
       </BaseButton>
     </div>
   </BaseModal>

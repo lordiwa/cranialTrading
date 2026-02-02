@@ -22,10 +22,10 @@
         </div>
 
         <p class="text-small text-silver-70 mt-sm">
-          📍 {{ match.location || 'Ubicación no disponible' }}
+          📍 {{ match.location || t('matches.savedCard.noLocation') }}
         </p>
       </div>
-      <span class="text-tiny text-silver-50">Guardado: {{ formattedDate }}</span>
+      <span class="text-tiny text-silver-50">{{ t('matches.savedCard.saved') }}: {{ formattedDate }}</span>
     </div>
 
     <div class="border-b border-silver-20 mb-md"></div>
@@ -34,7 +34,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-md mb-md">
       <!-- Cards Offering (Tu lado) -->
       <div>
-        <p class="text-tiny font-bold text-silver mb-sm">QUEREMOS:</p>
+        <p class="text-tiny font-bold text-silver mb-sm">{{ t('matches.savedCard.weWant') }}:</p>
         <div class="space-y-xs">
           <div v-for="card in match.cardsReceiving" :key="card" class="text-small text-silver">
             • {{ card }}
@@ -44,7 +44,7 @@
 
       <!-- Cards Receiving (Su lado) -->
       <div>
-        <p class="text-tiny font-bold text-silver mb-sm">OFRECEN:</p>
+        <p class="text-tiny font-bold text-silver mb-sm">{{ t('matches.savedCard.theyOffer') }}:</p>
         <div class="space-y-xs">
           <div v-for="card in match.cardsOffering" :key="card" class="text-small text-silver">
             • {{ card }}
@@ -62,14 +62,14 @@
             class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
           <SpriteIcon name="check" size="tiny" />
-          ME INTERESA
+          {{ t('matches.actions.interested') }}
         </button>
         <button
             @click="$emit('discard', match.id, 'new')"
             class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
           <SpriteIcon name="x-mark" size="tiny" />
-          IGNORAR
+          {{ t('matches.actions.ignore') }}
         </button>
       </template>
 
@@ -80,7 +80,7 @@
             class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
           <SpriteIcon name="chat" size="tiny" />
-          CONTACTAR
+          {{ t('matches.actions.contact') }}
         </button>
 
         <button
@@ -88,7 +88,7 @@
             class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
           <SpriteIcon name="check" size="tiny" />
-          COMPLETADO
+          {{ t('matches.actions.completed') }}
         </button>
 
         <button
@@ -96,7 +96,7 @@
             class="btn-danger px-lg py-md text-small font-bold transition-fast flex items-center justify-center gap-2"
         >
           <SpriteIcon name="x-mark" size="tiny" />
-          ELIMINAR
+          {{ t('matches.actions.delete') }}
         </button>
       </template>
 
@@ -107,14 +107,14 @@
             class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
           <SpriteIcon name="recover" size="tiny" />
-          RECUPERAR
+          {{ t('matches.actions.recover') }}
         </button>
         <button
             @click="$emit('delete', match.id)"
             class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
           <SpriteIcon name="trash" size="tiny" />
-          ELIMINAR
+          {{ t('matches.actions.delete') }}
         </button>
       </template>
     </div>
@@ -123,8 +123,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
+
+const { t } = useI18n()
 
 interface Match {
   id: string
@@ -160,9 +163,9 @@ const formattedDate = computed(() => {
   const created = new Date(props.match.createdAt)
   const diff = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
 
-  if (diff === 0) return 'hoy'
-  if (diff === 1) return 'ayer'
-  return `hace ${diff}d`
+  if (diff === 0) return t('common.time.today').toLowerCase()
+  if (diff === 1) return t('common.time.yesterday').toLowerCase()
+  return t('matches.savedCard.daysAgo', { days: diff })
 })
 
 const handleContactar = () => {

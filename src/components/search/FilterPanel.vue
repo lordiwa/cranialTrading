@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import { useSearchStore, type FilterOptions } from '../../stores/search'
 import { getCardSuggestions } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
 
+const { t } = useI18n()
 const searchStore = useSearchStore()
 const showAdvancedFilters = ref(false) // Toggle filtros avanzados
 
@@ -532,7 +534,7 @@ const removeFilter = (type: string, value?: string) => {
               :value="filters.name"
               @input="handleNameInput(($event.target as HTMLInputElement).value)"
               @keydown.enter="handleSearch"
-              placeholder="Buscar carta por nombre..."
+              :placeholder="t('search.filterPanel.placeholder')"
               type="text"
               class="w-full bg-primary border border-silver-30 px-4 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none transition-fast"
           />
@@ -557,7 +559,7 @@ const removeFilter = (type: string, value?: string) => {
             class="px-6 flex items-center gap-2"
         >
           <SpriteIcon :name="searchStore.loading ? 'loading' : 'search'" size="tiny" />
-          {{ searchStore.loading ? '' : 'BUSCAR' }}
+          {{ searchStore.loading ? '' : t('search.filterPanel.searchButton') }}
         </BaseButton>
       </div>
 
@@ -638,7 +640,7 @@ const removeFilter = (type: string, value?: string) => {
             ]"
         >
           <SpriteIcon name="settings" size="tiny" />
-          MÁS
+          {{ t('search.filterPanel.moreFilters') }}
           <span v-if="activeFilterCount() > 0" class="bg-neon text-primary px-1 rounded text-tiny">{{ activeFilterCount() }}</span>
         </button>
 
@@ -648,7 +650,7 @@ const removeFilter = (type: string, value?: string) => {
             @click="handleClear"
             class="px-3 py-1 text-tiny font-bold text-rust border border-rust hover:bg-rust hover:text-primary transition-fast"
         >
-          ✕ LIMPIAR
+          {{ t('search.filterPanel.clear') }}
         </button>
       </div>
 
@@ -761,14 +763,14 @@ const removeFilter = (type: string, value?: string) => {
 
       <!-- Indicador de auto-búsqueda -->
       <div v-if="activeFilterCount() > 0" class="mt-2 text-tiny text-silver-50">
-        Los filtros se aplicarán automáticamente en 0.5 segundos
+        {{ t('search.filterPanel.autoSearch') }}
       </div>
     </div>
 
     <!-- ========== FILTROS AVANZADOS (Modal) ========== -->
     <BaseModal
         :show="showAdvancedFilters"
-        title="FILTROS AVANZADOS"
+        :title="t('search.modal.title')"
         @close="showAdvancedFilters = false; filterSearchQuery = ''"
     >
       <div class="space-y-4">
@@ -778,7 +780,7 @@ const removeFilter = (type: string, value?: string) => {
         <input
             v-model="filterSearchQuery"
             type="text"
-            placeholder="Buscar filtro... (ej: flying, trample, cascade)"
+            :placeholder="t('search.filterPanel.filterSearchPlaceholder')"
             class="w-full bg-primary border-2 border-neon px-4 py-3 text-body text-silver placeholder-silver-50 focus:outline-none"
         />
         <!-- Resultados de búsqueda -->
@@ -809,14 +811,14 @@ const removeFilter = (type: string, value?: string) => {
             v-if="filterSearchQuery.length >= 2 && filterSearchResults.length === 0"
             class="absolute top-full left-0 right-0 bg-primary border-2 border-neon border-t-0 px-4 py-3 text-small text-silver-50"
         >
-          No se encontraron filtros para "{{ filterSearchQuery }}"
+          {{ t('search.filterPanel.noFilterResults', { query: filterSearchQuery }) }}
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- Todos los tipos -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">Tipos</span>
+          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.types') }}</span>
           <div class="flex flex-wrap gap-1">
             <button
                 v-for="type in typeOptions"
@@ -836,7 +838,7 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Mana Value -->
         <div>
-          <span id="mana-value-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Mana Value</span>
+          <span id="mana-value-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.manaValue') }}</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.manaValue!.min"
@@ -857,7 +859,7 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Precio USD -->
         <div>
-          <span id="price-usd-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Precio USD</span>
+          <span id="price-usd-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.priceUSD') }}</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.priceUSD!.min"
@@ -880,7 +882,7 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Power -->
         <div>
-          <span id="power-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Power</span>
+          <span id="power-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.power') }}</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.power!.min"
@@ -901,7 +903,7 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Toughness -->
         <div>
-          <span id="toughness-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">Toughness</span>
+          <span id="toughness-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.toughness') }}</span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.toughness!.min"
@@ -922,7 +924,7 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Formato Legal -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">Formato</span>
+          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.format') }}</span>
           <div class="flex flex-wrap gap-1">
             <button
                 v-for="format in formatOptions"
@@ -951,7 +953,7 @@ const removeFilter = (type: string, value?: string) => {
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
             <span class="text-small font-bold text-silver flex items-center gap-2">
-              Habilidades de Combate
+              {{ t('search.accordions.combat') }}
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(combatAbilities) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1003,7 +1005,7 @@ const removeFilter = (type: string, value?: string) => {
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
             <span class="text-small font-bold text-silver">
-              Efectos Comunes
+              {{ t('search.accordions.effects') }}
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(allCommonEffects) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1015,7 +1017,7 @@ const removeFilter = (type: string, value?: string) => {
           <div v-if="isAccordionOpen('effects')" class="px-3 py-2 bg-silver-10/50 space-y-3">
             <!-- Remoción -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Remoción</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.effectCategories.removal') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in commonEffects.removal"
@@ -1034,7 +1036,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Card Advantage -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Card Advantage</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.effectCategories.cardAdvantage') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in commonEffects.cardAdvantage"
@@ -1053,7 +1055,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Tokens -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Tokens</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.effectCategories.tokens') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in commonEffects.tokens"
@@ -1072,7 +1074,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Contadores -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Contadores</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.effectCategories.counters') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in commonEffects.counters"
@@ -1091,7 +1093,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Control -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Control</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.effectCategories.control') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in commonEffects.control"
@@ -1118,7 +1120,7 @@ const removeFilter = (type: string, value?: string) => {
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
             <span class="text-small font-bold text-silver">
-              Triggers
+              {{ t('search.accordions.triggers') }}
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(triggerKeywords) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1153,7 +1155,7 @@ const removeFilter = (type: string, value?: string) => {
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
             <span class="text-small font-bold text-silver">
-              Mecánicas de Set
+              {{ t('search.accordions.setMechanics') }}
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(allSetMechanics) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1165,7 +1167,7 @@ const removeFilter = (type: string, value?: string) => {
           <div v-if="isAccordionOpen('setMechanics')" class="px-3 py-2 bg-silver-10/50 space-y-3">
             <!-- Meta -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Meta / Competitivas</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.mechanicCategories.meta') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in setMechanics.meta"
@@ -1184,7 +1186,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Popular -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Clásicas Populares</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.mechanicCategories.popular') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in setMechanics.popular"
@@ -1203,7 +1205,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Recientes -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Recientes (2023-2025)</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.mechanicCategories.recent') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in setMechanics.recent"
@@ -1222,7 +1224,7 @@ const removeFilter = (type: string, value?: string) => {
             </div>
             <!-- Otras -->
             <div>
-              <span class="text-tiny text-silver-50 uppercase block mb-1">Otras</span>
+              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t('search.mechanicCategories.other') }}</span>
               <div class="flex flex-wrap gap-1">
                 <button
                     v-for="keyword in setMechanics.other"
@@ -1245,7 +1247,7 @@ const removeFilter = (type: string, value?: string) => {
 
       <!-- Tipos Especiales (fuera de acordeón, siempre visible) -->
       <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">Tipos Especiales</span>
+        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.specialTypes') }}</span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in specialTypes"
@@ -1267,18 +1269,18 @@ const removeFilter = (type: string, value?: string) => {
       <div class="flex gap-4 pt-2 border-t border-silver-30">
         <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
           <input v-model="filters.isFoil" type="checkbox" class="w-4 h-4" />
-          <span>Solo Foil</span>
+          <span>{{ t('search.modal.options.foilOnly') }}</span>
         </label>
         <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
           <input v-model="filters.isFullArt" type="checkbox" class="w-4 h-4" />
-          <span>Full Art</span>
+          <span>{{ t('search.modal.options.fullArt') }}</span>
         </label>
       </div>
 
       <!-- Botón aplicar filtros -->
       <div class="flex justify-end pt-4 border-t border-silver-30">
         <BaseButton @click="showAdvancedFilters = false">
-          APLICAR FILTROS
+          {{ t('search.modal.apply') }}
         </BaseButton>
       </div>
       </div>

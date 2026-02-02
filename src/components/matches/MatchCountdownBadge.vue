@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../../composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   createdAt?: Date;
@@ -41,7 +44,7 @@ const progressPercent = computed(() => {
   <div class="flex items-center gap-2">
     <!-- Indicador "NUEVO" -->
     <span v-if="isNew" class="inline-block px-2 py-1 text-tiny font-bold border border-neon text-neon bg-neon-5">
-      NUEVO
+      {{ t('matches.countdown.new') }}
     </span>
 
     <!-- Countdown -->
@@ -51,7 +54,7 @@ const progressPercent = computed(() => {
           {{ daysRemaining }}/{{ totalDays }}
         </div>
       </div>
-      <span class="text-tiny text-silver-70">días</span>
+      <span class="text-tiny text-silver-70">{{ t('matches.countdown.days') }}</span>
     </div>
 
     <!-- Progress bar -->

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import { useSearchStore } from '../../stores/search'
 import BaseLoader from '../ui/BaseLoader.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseBadge from '../ui/BaseBadge.vue'
 
+const { t } = useI18n()
 const searchStore = useSearchStore()
 
 const emit = defineEmits<{
@@ -56,15 +58,15 @@ const formatPrice = (price: string | null | undefined): string => {
 
     <!-- Empty state -->
     <div v-else-if="!hasResults && searchStore.lastQuery" class="border border-silver-30 p-8 md:p-12 text-center">
-      <p class="text-body text-silver-70 mb-2">📭 No se encontraron cartas</p>
+      <p class="text-body text-silver-70 mb-2">{{ t('search.results.noCardsFound') }}</p>
       <p class="text-small text-silver-50">
-        Intenta ajustar los filtros o realizar una búsqueda más general
+        {{ t('search.results.adjustFilters') }}
       </p>
     </div>
 
     <!-- No search state -->
     <div v-else-if="!hasResults && !searchStore.lastQuery" class="border border-silver-30 p-8 md:p-12 text-center">
-      <p class="text-body text-silver-70">🔍 Configura los filtros y busca cartas</p>
+      <p class="text-body text-silver-70">{{ t('search.results.configureFilters') }}</p>
     </div>
 
     <!-- Results grid -->
@@ -72,10 +74,10 @@ const formatPrice = (price: string | null | undefined): string => {
       <!-- Results header -->
       <div class="bg-primary border border-silver-30 p-md flex items-center justify-between">
         <p class="text-small font-bold text-silver">
-          {{ totalResults }} cartas encontradas
+          {{ t('search.results.cardsFound', { count: totalResults }) }}
         </p>
         <p class="text-tiny text-silver-50">
-          Mostrando los resultados más relevantes
+          {{ t('search.results.showingRelevant') }}
         </p>
       </div>
 
@@ -122,7 +124,7 @@ const formatPrice = (price: string | null | undefined): string => {
                   @click="handleAddToCollection(card)"
                   class="w-full"
               >
-                ➕ AGREGAR
+                {{ t('search.results.addButton') }}
               </BaseButton>
               <BaseButton
                   variant="secondary"
@@ -130,7 +132,7 @@ const formatPrice = (price: string | null | undefined): string => {
                   @click="handleAddAsPreference(card)"
                   class="w-full"
               >
-                ⭐ PREFERENCIA
+                {{ t('search.results.preferenceButton') }}
               </BaseButton>
             </div>
           </div>
@@ -140,7 +142,7 @@ const formatPrice = (price: string | null | undefined): string => {
       <!-- Load more hint -->
       <div class="text-center pt-4 border-t border-silver-20">
         <p class="text-tiny text-silver-50">
-          Mostrando {{ totalResults }} de los resultados más relevantes
+          {{ t('search.results.showingOf', { count: totalResults }) }}
         </p>
       </div>
     </div>

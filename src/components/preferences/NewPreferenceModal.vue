@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
+import { useI18n } from '../../composables/useI18n';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseInput from '../ui/BaseInput.vue';
 import BaseSelect from '../ui/BaseSelect.vue';
@@ -9,6 +10,8 @@ import BaseBadge from '../ui/BaseBadge.vue';
 import { searchCards } from '../../services/scryfall';
 import { ScryfallCard, CardCondition, Card } from '../../types/card';
 import { PreferenceType } from '../../types/preferences';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   show: boolean;
@@ -35,14 +38,14 @@ const typeOptions: { value: PreferenceType; label: string; variant: 'busco' | 'c
   { value: 'VENDO', label: 'VENDO', variant: 'vendo' },
 ];
 
-const conditionOptions = [
-  { value: 'M', label: 'M - Mint' },
-  { value: 'NM', label: 'NM - Near Mint' },
-  { value: 'LP', label: 'LP - Light Play' },
-  { value: 'MP', label: 'MP - Moderate Play' },
-  { value: 'HP', label: 'HP - Heavy Play' },
-  { value: 'PO', label: 'PO - Poor' },
-];
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+]);
 
 let searchTimeout: ReturnType<typeof setTimeout>;
 
@@ -125,13 +128,13 @@ const handleClose = () => {
 </script>
 
 <template>
-  <BaseModal :show="show" title="NUEVA PREFERENCIA" @close="handleClose">
+  <BaseModal :show="show" :title="t('preferences.newModal.title')" @close="handleClose">
     <div class="space-y-md">
       <!-- Search -->
       <div v-if="!selectedCard">
         <BaseInput
             v-model="searchQuery"
-            placeholder="Buscar carta..."
+            :placeholder="t('preferences.newModal.searchPlaceholder')"
             type="text"
         />
 
@@ -180,7 +183,7 @@ const handleClose = () => {
         </div>
 
         <div>
-          <span class="text-small text-silver-70 block mb-2">Tipo</span>
+          <span class="text-small text-silver-70 block mb-2">{{ t('common.labels.type') }}</span>
           <div class="flex gap-2">
             <button
                 v-for="opt in typeOptions"
@@ -197,7 +200,7 @@ const handleClose = () => {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label for="new-pref-quantity" class="text-small text-silver-70 block mb-2">Cantidad</label>
+            <label for="new-pref-quantity" class="text-small text-silver-70 block mb-2">{{ t('common.labels.quantity') }}</label>
             <BaseInput
                 id="new-pref-quantity"
                 v-model="quantity"
@@ -207,7 +210,7 @@ const handleClose = () => {
           </div>
 
           <div>
-            <label for="new-pref-condition" class="text-small text-silver-70 block mb-2">Condición mínima</label>
+            <label for="new-pref-condition" class="text-small text-silver-70 block mb-2">{{ t('preferences.newModal.minCondition') }}</label>
             <BaseSelect
                 id="new-pref-condition"
                 v-model="condition"
@@ -223,7 +226,7 @@ const handleClose = () => {
               @click="selectedCard = null"
               class="flex-1"
           >
-            CAMBIAR CARTA
+            {{ t('preferences.newModal.changeCard') }}
           </BaseButton>
           <BaseButton
               variant="primary"
@@ -231,7 +234,7 @@ const handleClose = () => {
               :disabled="quantity < 1"
               class="flex-1"
           >
-            ACTUALIZAR
+            {{ t('common.actions.update') }}
           </BaseButton>
         </div>
       </div>

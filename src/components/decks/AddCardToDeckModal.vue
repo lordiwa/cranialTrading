@@ -4,6 +4,7 @@ import { useToastStore } from '../../stores/toast'
 import { useCollectionStore } from '../../stores/collection'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -11,6 +12,8 @@ import BaseModal from '../ui/BaseModal.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
 import type { CardCondition } from '../../types/card'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -88,7 +91,7 @@ const handleSearchInput = (query: string) => {
       const results = await searchCards(query)
       searchResults.value = results
     } catch (err) {
-      searchError.value = err instanceof Error ? err.message : 'Error en la búsqueda'
+      searchError.value = err instanceof Error ? err.message : t('decks.addToDeck.searchError')
       searchResults.value = []
     } finally {
       isSearching.value = false
@@ -147,14 +150,14 @@ const form = ref({
   foil: false,
 })
 
-const conditionOptions = [
-  { value: 'M', label: 'Mint (M)' },
-  { value: 'NM', label: 'Near Mint (NM)' },
-  { value: 'LP', label: 'Light Play (LP)' },
-  { value: 'MP', label: 'Moderate Play (MP)' },
-  { value: 'HP', label: 'Heavy Play (HP)' },
-  { value: 'PO', label: 'Poor (PO)' },
-]
+const conditionOptions = computed(() => [
+  { value: 'M', label: t('common.conditions.M') },
+  { value: 'NM', label: t('common.conditions.NM') },
+  { value: 'LP', label: t('common.conditions.LP') },
+  { value: 'MP', label: t('common.conditions.MP') },
+  { value: 'HP', label: t('common.conditions.HP') },
+  { value: 'PO', label: t('common.conditions.PO') },
+])
 
 // Get card image (handle split cards)
 const getCardImage = (card: any): string => {
@@ -209,18 +212,18 @@ const maxQuantity = computed(() => {
 
 const handleAdd = () => {
   if (!selectedCard.value) {
-    toastStore.show('Selecciona una carta', 'error')
+    toastStore.show(t('decks.addToDeck.selectCard'), 'error')
     return
   }
 
   if (form.value.quantity < 1) {
-    toastStore.show('La cantidad debe ser al menos 1', 'error')
+    toastStore.show(t('decks.editDeckCard.quantityMin'), 'error')
     return
   }
 
   if (addMode.value === 'collection' && selectedCollectionCard.value) {
     if (form.value.quantity > selectedCollectionCard.value.availableQuantity) {
-      toastStore.show(`Solo hay ${selectedCollectionCard.value.availableQuantity} disponibles`, 'error')
+      toastStore.show(t('decks.editDeckCard.onlyAvailable', { max: selectedCollectionCard.value.availableQuantity }), 'error')
       return
     }
   }
@@ -282,18 +285,18 @@ watch(() => props.show, (newVal) => {
         <div class="space-y-4">
           <!-- Header -->
           <div>
-            <h2 class="text-h2 font-bold text-silver mb-1">AGREGAR CARTA AL DECK</h2>
-            <p class="text-small text-silver-70">Busca y selecciona una carta</p>
+            <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.addToDeck.title') }}</h2>
+            <p class="text-small text-silver-70">{{ t('decks.addToDeck.subtitle') }}</p>
           </div>
 
           <!-- Search Input -->
           <div>
-            <label for="add-deck-search" class="text-small text-silver-70 block mb-2">Buscar Carta</label>
+            <label for="add-deck-search" class="text-small text-silver-70 block mb-2">{{ t('decks.addToDeck.searchLabel') }}</label>
             <BaseInput
                 id="add-deck-search"
                 :model-value="searchQuery"
                 @update:model-value="handleSearchInput"
-                placeholder="Ej: Black Lotus, Ragavan, Counterspell..."
+                :placeholder="t('decks.addToDeck.searchPlaceholder')"
                 type="text"
             />
           </div>
@@ -310,12 +313,12 @@ watch(() => props.show, (newVal) => {
 
           <!-- No results -->
           <div v-else-if="searchQuery && searchResults.length === 0" class="text-center py-8">
-            <p class="text-small text-silver-70">No se encontraron resultados para "{{ searchQuery }}"</p>
+            <p class="text-small text-silver-70">{{ t('decks.addToDeck.noResults', { query: searchQuery }) }}</p>
           </div>
 
           <!-- Results Grid -->
           <div v-else-if="searchResults.length > 0" class="space-y-2">
-            <p class="text-tiny text-silver-70">{{ searchResults.length }} resultados - Click para agregar</p>
+            <p class="text-tiny text-silver-70">{{ t('decks.addToDeck.resultsCount', { count: searchResults.length }) }}</p>
 
             <div class="grid grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto">
               <div
@@ -333,7 +336,7 @@ watch(() => props.show, (newVal) => {
                       class="w-full h-full object-cover group-hover:scale-105 transition-300"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
-                    No image
+                    {{ t('decks.addToDeck.noImage') }}
                   </div>
                 </div>
                 <p class="text-tiny text-silver mt-1 truncate group-hover:text-neon">{{ card.name }}</p>
@@ -344,12 +347,12 @@ watch(() => props.show, (newVal) => {
 
           <!-- Empty state -->
           <div v-else class="text-center py-8">
-            <p class="text-small text-silver-70">Escribe el nombre de una carta para buscar</p>
+            <p class="text-small text-silver-70">{{ t('decks.addToDeck.emptyState') }}</p>
           </div>
 
           <!-- Close button -->
           <BaseButton class="w-full" variant="secondary" @click="emit('close')">
-            CERRAR
+            {{ t('common.actions.close') }}
           </BaseButton>
         </div>
       </template>
@@ -358,8 +361,8 @@ watch(() => props.show, (newVal) => {
       <template v-else>
         <div class="space-y-6 flex flex-col h-full">
           <div>
-            <h2 class="text-h2 font-bold text-silver mb-1">AGREGAR AL {{ isSideboard ? 'SIDEBOARD' : 'MAINBOARD' }}</h2>
-            <p class="text-small text-silver-70">Configura cómo deseas agregar esta carta</p>
+            <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.addToDeck.addTo', { section: isSideboard ? 'SIDEBOARD' : 'MAINBOARD' }) }}</h2>
+            <p class="text-small text-silver-70">{{ t('decks.addToDeck.configureAdd') }}</p>
           </div>
 
           <div class="flex-1 overflow-y-auto">
@@ -373,7 +376,7 @@ watch(() => props.show, (newVal) => {
                       class="w-32 h-44 object-cover border border-silver-30"
                   />
                   <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
-                    <span class="text-tiny text-silver-50">No image</span>
+                    <span class="text-tiny text-silver-50">{{ t('decks.addToDeck.noImage') }}</span>
                   </div>
                 </div>
 
@@ -397,12 +400,12 @@ watch(() => props.show, (newVal) => {
                         <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
                       </div>
                       <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
-                        Cargando precios CK...
+                        {{ t('decks.editDeckCard.loadingCKPrices') }}
                       </div>
                     </div>
 
                     <div v-if="availablePrints.length > 1">
-                      <label for="add-deck-print-select" class="text-tiny text-silver-70 block mb-1">Edición / Print</label>
+                      <label for="add-deck-print-select" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.editionPrint') }}</label>
                       <select
                           id="add-deck-print-select"
                           :value="selectedCard.id"
@@ -413,14 +416,14 @@ watch(() => props.show, (newVal) => {
                           {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
                         </option>
                       </select>
-                      <p class="text-tiny text-silver-50 mt-1">{{ availablePrints.length }} prints disponibles</p>
+                      <p class="text-tiny text-silver-50 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>
                     </div>
-                    <p v-else-if="loadingPrints" class="text-tiny text-silver-50">Cargando prints...</p>
+                    <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('decks.editDeckCard.loadingPrints') }}</p>
                     <p v-else class="text-small text-silver-70">{{ selectedCard.set_name }} ({{ selectedCard.set.toUpperCase() }})</p>
                   </div>
 
                   <div class="border-t border-silver-20 pt-4">
-                    <p class="text-tiny text-silver-70 mb-2">FUENTE DE LA CARTA</p>
+                    <p class="text-tiny text-silver-70 mb-2">{{ t('decks.addToDeck.cardSource') }}</p>
 
                     <div v-if="hasInCollection" class="space-y-2">
                       <div
@@ -443,7 +446,7 @@ watch(() => props.show, (newVal) => {
                           </div>
                           <div class="text-right">
                             <span class="text-tiny" :class="card.availableQuantity > 0 ? 'text-neon' : 'text-ruby'">
-                              {{ card.availableQuantity }} / {{ card.quantity }} disp.
+                              {{ t('decks.addToDeck.availableDisp', { available: card.availableQuantity, total: card.quantity }) }}
                             </span>
                           </div>
                         </div>
@@ -458,7 +461,7 @@ watch(() => props.show, (newVal) => {
                               : 'border-silver-30 hover:border-silver-50'
                           ]"
                       >
-                        <span class="text-small text-amber">+ Agregar a Wishlist (no tengo)</span>
+                        <span class="text-small text-amber">{{ t('decks.addToDeck.addToWishlist') }}</span>
                       </div>
 
                       <div
@@ -470,13 +473,13 @@ watch(() => props.show, (newVal) => {
                               : 'border-silver-30 hover:border-silver-50'
                           ]"
                       >
-                        <span class="text-small text-silver">+ Agregar a mi colección primero</span>
+                        <span class="text-small text-silver">{{ t('decks.addToDeck.addToCollectionFirst') }}</span>
                       </div>
                     </div>
 
                     <div v-else class="space-y-2">
                       <div class="p-2 bg-secondary border border-silver-30">
-                        <p class="text-small text-silver-50">No tienes esta carta en tu colección</p>
+                        <p class="text-small text-silver-50">{{ t('decks.addToDeck.noCardInCollection') }}</p>
                       </div>
 
                       <div class="flex gap-2">
@@ -489,7 +492,7 @@ watch(() => props.show, (newVal) => {
                                 : 'border-silver-30 text-silver-70 hover:border-silver-50'
                             ]"
                         >
-                          Wishlist
+                          {{ t('decks.addToDeck.wishlistOption') }}
                         </button>
                         <button
                             @click="addMode = 'new'"
@@ -500,7 +503,7 @@ watch(() => props.show, (newVal) => {
                                 : 'border-silver-30 text-silver-70 hover:border-silver-50'
                             ]"
                         >
-                          Agregar a Colección
+                          {{ t('decks.addToDeck.addToCollection') }}
                         </button>
                       </div>
                     </div>
@@ -510,9 +513,9 @@ watch(() => props.show, (newVal) => {
                     <div class="grid grid-cols-2 gap-3">
                       <div>
                         <label for="add-deck-quantity" class="text-tiny text-silver-70 block mb-1">
-                          Cantidad
+                          {{ t('decks.addToDeck.quantityLabel') }}
                           <span v-if="addMode === 'collection' && selectedCollectionCard" class="text-neon">
-                            (máx: {{ selectedCollectionCard.availableQuantity }})
+                            {{ t('decks.editDeckCard.maxQty', { max: selectedCollectionCard.availableQuantity }) }}
                           </span>
                         </label>
                         <input
@@ -526,11 +529,11 @@ watch(() => props.show, (newVal) => {
                       </div>
 
                       <div v-if="addMode !== 'collection' || !selectedCollectionCard">
-                        <label for="add-deck-condition" class="text-tiny text-silver-70 block mb-1">Condición</label>
+                        <label for="add-deck-condition" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.conditionLabel') }}</label>
                         <BaseSelect id="add-deck-condition" v-model="form.condition" :options="conditionOptions" />
                       </div>
                       <div v-else>
-                        <span class="text-tiny text-silver-70 block mb-1">Condición</span>
+                        <span class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.conditionLabel') }}</span>
                         <div class="px-3 py-2 bg-secondary border border-silver-30 text-silver-70 text-small">
                           {{ selectedCollectionCard.condition }}
                         </div>
@@ -540,12 +543,12 @@ watch(() => props.show, (newVal) => {
                     <div v-if="addMode !== 'collection' || !selectedCollectionCard" class="space-y-2">
                       <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
                         <input v-model="form.foil" type="checkbox" class="w-4 h-4" />
-                        <span class="text-small text-silver">Foil</span>
+                        <span class="text-small text-silver">{{ t('decks.editDeckCard.foilLabel') }}</span>
                       </label>
                     </div>
                     <div v-else class="text-small text-silver-50">
                       <span v-if="selectedCollectionCard.foil" class="text-neon">FOIL</span>
-                      <span v-else>No Foil</span>
+                      <span v-else>{{ t('decks.addToDeck.noFoil') }}</span>
                     </div>
                   </div>
                 </div>
@@ -559,12 +562,12 @@ watch(() => props.show, (newVal) => {
                 @click="handleAdd"
                 :class="{ 'opacity-50': addMode === 'collection' && !selectedCollectionCard }"
             >
-              <template v-if="addMode === 'collection'">ASIGNAR DESDE COLECCIÓN</template>
-              <template v-else-if="addMode === 'new'">AGREGAR A COLECCIÓN Y DECK</template>
-              <template v-else>AGREGAR A WISHLIST</template>
+              <template v-if="addMode === 'collection'">{{ t('decks.addToDeck.assignFromCollection') }}</template>
+              <template v-else-if="addMode === 'new'">{{ t('decks.addToDeck.addToCollectionAndDeck') }}</template>
+              <template v-else>{{ t('decks.addToDeck.addToWishlistBtn') }}</template>
             </BaseButton>
             <BaseButton variant="secondary" class="flex-1" @click="deselectCard">
-              ← VOLVER
+              {{ t('decks.addToDeck.goBack') }}
             </BaseButton>
           </div>
         </div>

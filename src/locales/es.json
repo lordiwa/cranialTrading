@@ -716,6 +716,44 @@
       "notAddedNote": "Las cartas no encontradas no se agregarán. Puedes intentar importarlas manualmente después.",
       "addCards": "AGREGAR {count} CARTAS"
     },
+    "editorGrid": {
+      "noImage": "No image",
+      "tcg": "TCG:",
+      "total": "Total:",
+      "noCardsInCollection": "No tienes esta carta en colección",
+      "noCards": "Sin cartas",
+      "emptyBoard": "No hay cartas en este board",
+      "removeCommander": "★ QUITAR COMMANDER",
+      "makeCommander": "☆ HACER COMMANDER",
+      "wishlist": "+ WISHLIST",
+      "advanced": "AVANZADO",
+      "categories": {
+        "Commander": "Commander",
+        "Creatures": "Criaturas",
+        "Instants": "Instantáneos",
+        "Sorceries": "Conjuros",
+        "Enchantments": "Encantamientos",
+        "Artifacts": "Artefactos",
+        "Planeswalkers": "Planeswalkers",
+        "Lands": "Tierras",
+        "Other": "Otros",
+        "White": "Blanco",
+        "Blue": "Azul",
+        "Black": "Negro",
+        "Red": "Rojo",
+        "Green": "Verde",
+        "Multicolor": "Multicolor",
+        "Colorless": "Incoloro",
+        "0": "0",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "4": "4",
+        "5": "5",
+        "6": "6",
+        "7+": "7+"
+      }
+    },
     "messages": {
       "loadError": "Error al cargar decks",
       "notFound": "Deck no encontrado",
@@ -797,6 +835,28 @@
       "close": "CERRAR",
       "emailCopied": "✓ Email copiado",
       "contactSaved": "✓ Contacto guardado: @{username}"
+    },
+    "countdown": {
+      "new": "NUEVO",
+      "days": "días"
+    },
+    "detailModal": {
+      "title": "DETALLES DEL MATCH",
+      "user": "USUARIO",
+      "youHave": "TÚ TIENES",
+      "wants": "QUIERE",
+      "youSearch": "TÚ BUSCAS",
+      "has": "TIENE",
+      "qty": "Cant",
+      "cond": "Cond",
+      "contact": "CONTACTAR"
+    },
+    "savedCard": {
+      "noLocation": "Ubicación no disponible",
+      "saved": "Guardado",
+      "daysAgo": "hace {days}d",
+      "weWant": "QUEREMOS",
+      "theyOffer": "OFRECEN"
     },
     "messages": {
       "loadError": "Error al cargar matches",
@@ -905,7 +965,8 @@
       "moreFilters": "MÁS",
       "clear": "✕ LIMPIAR",
       "autoSearch": "Los filtros se aplicarán automáticamente en 0.5 segundos",
-      "filterSearchPlaceholder": "Buscar filtro... (ej: flying, trample, cascade)"
+      "filterSearchPlaceholder": "Buscar filtro... (ej: flying, trample, cascade)",
+      "noFilterResults": "No se encontraron filtros para \"{query}\""
     },
     "modal": {
       "title": "FILTROS AVANZADOS",
@@ -942,6 +1003,23 @@
       "popular": "Clásicas Populares",
       "recent": "Recientes (2023-2025)",
       "other": "Otras"
+    },
+    "results": {
+      "noCardsFound": "📭 No se encontraron cartas",
+      "adjustFilters": "Intenta ajustar los filtros o realizar una búsqueda más general",
+      "configureFilters": "🔍 Configura los filtros y busca cartas",
+      "cardsFound": "{count} cartas encontradas",
+      "showingRelevant": "Mostrando los resultados más relevantes",
+      "addButton": "➕ AGREGAR",
+      "preferenceButton": "⭐ PREFERENCIA",
+      "showingOf": "Mostrando {count} de los resultados más relevantes"
+    },
+    "bar": {
+      "placeholder": "Busca una carta (ej: Black Lotus, Counterspell...)",
+      "searchButton": "BUSCAR",
+      "noCardsFound": "No se encontraron cartas con ese nombre",
+      "searchError": "Error al buscar cartas",
+      "selectEdition": "Selecciona la edición de {name}"
     },
     "messages": {
       "defineFilter": "Define al menos un filtro",
@@ -1029,6 +1107,43 @@
       "cookies": "Cookies"
     },
     "backToHome": "← Volver al inicio"
+  },
+
+  "preferences": {
+    "card": {
+      "orBetter": "o mejor",
+      "added": "Agregada",
+      "matches": "Coincidencias"
+    },
+    "newModal": {
+      "title": "NUEVA PREFERENCIA",
+      "searchPlaceholder": "Buscar carta...",
+      "minCondition": "Condición mínima",
+      "changeCard": "CAMBIAR CARTA"
+    },
+    "importModal": {
+      "title": "IMPORTAR COMO BUSCO",
+      "inputLabel": "Link de Moxfield o texto del mazo",
+      "placeholder": "https://moxfield.com/decks/...\no\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n...",
+      "analyzing": "ANALIZANDO...",
+      "analyze": "ANALIZAR",
+      "moxfieldDetected": {
+        "title": "Link de Moxfield detectado",
+        "instruction": "Moxfield no permite importar directamente. Sigue estos pasos:",
+        "step1": "Abre el deck en Moxfield",
+        "step2": "Click en Export (arriba a la derecha)",
+        "step3": "Click en Copy to Clipboard",
+        "step4": "Pega el texto aquí"
+      },
+      "total": "Total",
+      "cards": "cartas",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "minCondition": "Condición mínima deseada",
+      "includeSideboard": "Incluir sideboard",
+      "infoMessage": "💡 Se crearán {count} preferencias BUSCO automáticamente.",
+      "importButton": "IMPORTAR {count} COMO BUSCO"
+    }
   },
 
   "confirm": {

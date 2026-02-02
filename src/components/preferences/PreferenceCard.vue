@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from '../../composables/useI18n';
 import { Preference } from '../../types/preferences';
 import BaseBadge from '../ui/BaseBadge.vue';
 import BaseButton from '../ui/BaseButton.vue';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   preference: Preference;
@@ -23,9 +26,9 @@ const formatDate = (date: Date) => {
   const diff = now.getTime() - date.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-  if (days === 0) return 'Hoy';
-  if (days === 1) return 'Ayer';
-  return `Hace ${days} días`;
+  if (days === 0) return t('common.time.today');
+  if (days === 1) return t('common.time.yesterday');
+  return t('common.time.daysAgo', { days });
 };
 </script>
 
@@ -43,15 +46,15 @@ const formatDate = (date: Date) => {
     <div class="mt-2 text-tiny md:text-small text-silver-70">
       <span>{{ preference.quantity }}x</span>
       <span class="mx-2">|</span>
-      <span>{{ preference.condition }} o mejor</span>
+      <span>{{ preference.condition }} {{ t('preferences.card.orBetter') }}</span>
     </div>
 
     <p class="text-tiny text-silver-50 mt-3">
-      Agregada: {{ formatDate(preference.createdAt) }}
+      {{ t('preferences.card.added') }}: {{ formatDate(preference.createdAt) }}
     </p>
 
     <p class="text-tiny md:text-small text-silver-50 mt-2">
-      Coincidencias: <span class="text-neon">0</span>
+      {{ t('preferences.card.matches') }}: <span class="text-neon">0</span>
     </p>
 
     <div class="flex flex-col md:flex-row gap-2 mt-4">
@@ -61,7 +64,7 @@ const formatDate = (date: Date) => {
           @click="emit('edit', preference)"
           class="flex-1 w-full"
       >
-        EDITAR
+        {{ t('common.actions.edit') }}
       </BaseButton>
       <BaseButton
           variant="danger"
@@ -69,7 +72,7 @@ const formatDate = (date: Date) => {
           @click="emit('delete', preference.id)"
           class="flex-1 w-full"
       >
-        ELIMINAR
+        {{ t('common.actions.delete') }}
       </BaseButton>
     </div>
   </div>

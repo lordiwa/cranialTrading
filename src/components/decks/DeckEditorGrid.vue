@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../../types/deck'
 import BaseButton from '../ui/BaseButton.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   cards: DisplayDeckCard[]
@@ -134,6 +137,11 @@ const getCategoryOrder = (): string[] => {
     case 'color': return colorOrder
     default: return typeOrder
   }
+}
+
+// Translate category name
+const translateCategory = (category: string): string => {
+  return t(`decks.editorGrid.categories.${category}`) || category
 }
 
 // Group cards by selected mode
@@ -290,7 +298,7 @@ watch(() => props.cards, () => {
             class="w-full h-full object-cover"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
-            No image
+            {{ t('decks.editorGrid.noImage') }}
           </div>
         </div>
 
@@ -303,29 +311,29 @@ watch(() => props.cards, () => {
 
           <div class="border-t border-silver-20 pt-2 mt-2 space-y-1">
             <div class="flex justify-between">
-              <span class="text-silver-70">TCG:</span>
+              <span class="text-silver-70">{{ t('decks.editorGrid.tcg') }}</span>
               <span class="text-neon font-bold">${{ previewCard.price?.toFixed(2) || 'N/A' }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-silver-70">Total:</span>
+              <span class="text-silver-70">{{ t('decks.editorGrid.total') }}</span>
               <span class="text-neon font-bold">${{ (previewCard.price * getQuantity(previewCard)).toFixed(2) }}</span>
             </div>
           </div>
 
           <!-- Commander indicator -->
           <div v-if="isCommander(previewCard)" class="bg-purple-400/10 border border-purple-400 p-2 text-tiny text-purple-400">
-            Commander
+            {{ t('decks.editorGrid.categories.Commander') }}
           </div>
 
           <!-- Wishlist indicator -->
           <div v-if="previewCard.isWishlist" class="bg-amber/10 border border-amber p-2 text-tiny text-amber">
-            No tienes esta carta en colección
+            {{ t('decks.editorGrid.noCardsInCollection') }}
           </div>
         </div>
       </div>
 
       <div v-else class="aspect-[3/4] bg-secondary border border-silver-30 flex items-center justify-center">
-        <p class="text-tiny text-silver-50">Sin cartas</p>
+        <p class="text-tiny text-silver-50">{{ t('decks.editorGrid.noCards') }}</p>
       </div>
     </div>
 
@@ -333,7 +341,7 @@ watch(() => props.cards, () => {
     <div class="flex-1 space-y-4 md:space-y-6 min-w-0">
       <!-- Empty state -->
       <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
-        <p class="text-body text-silver-70">No hay cartas en este board</p>
+        <p class="text-body text-silver-70">{{ t('decks.editorGrid.emptyBoard') }}</p>
       </div>
 
       <!-- Grouped cards -->
@@ -343,7 +351,7 @@ watch(() => props.cards, () => {
           class="text-tiny font-bold uppercase"
           :class="group.type === 'Commander' ? 'text-purple-400' : 'text-silver-70'"
         >
-          {{ group.type }} ({{ getTypeCount(group.type) }})
+          {{ translateCategory(group.type) }} ({{ getTypeCount(group.type) }})
         </h3>
 
         <!-- All cards in this category -->
@@ -440,7 +448,7 @@ watch(() => props.cards, () => {
             :class="isCommander(popupCard) ? 'bg-purple-400/20 border-purple-400 text-purple-400' : ''"
             @click="emit('toggleCommander', popupCard); closePopup()"
           >
-            {{ isCommander(popupCard) ? '★ QUITAR COMMANDER' : '☆ HACER COMMANDER' }}
+            {{ isCommander(popupCard) ? t('decks.editorGrid.removeCommander') : t('decks.editorGrid.makeCommander') }}
           </BaseButton>
 
           <!-- Action buttons -->
@@ -452,7 +460,7 @@ watch(() => props.cards, () => {
               class="flex-1 text-tiny"
               @click="emit('addToWishlist', popupCard); closePopup()"
             >
-              + WISHLIST
+              {{ t('decks.editorGrid.wishlist') }}
             </BaseButton>
             <BaseButton
               size="small"
@@ -460,7 +468,7 @@ watch(() => props.cards, () => {
               class="flex-1 text-tiny"
               @click="emit('edit', popupCard); closePopup()"
             >
-              AVANZADO
+              {{ t('decks.editorGrid.advanced') }}
             </BaseButton>
           </div>
 

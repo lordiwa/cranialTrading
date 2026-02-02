@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 import { searchCards, getCardSuggestions } from '../../services/scryfall'
 import { useToastStore } from '../../stores/toast'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
 
+const { t } = useI18n()
 const toastStore = useToastStore()
 
 const emit = defineEmits<{
@@ -61,11 +63,11 @@ const handleSearch = async () => {
       showSelectCardModal.value = true
       availableCards.value = results
     } else {
-      toastStore.show('No se encontraron cartas con ese nombre', 'info')
+      toastStore.show(t('search.bar.noCardsFound'), 'info')
     }
   } catch (err) {
     console.error('Error al buscar:', err)
-    toastStore.show('Error al buscar cartas', 'error')
+    toastStore.show(t('search.bar.searchError'), 'error')
   } finally {
     loading.value = false
   }
@@ -93,7 +95,7 @@ const selectCard = (card: any) => {
               :model-value="searchQuery"
               @update:model-value="handleInput"
               @keyup.enter="handleSearch"
-              placeholder="Busca una carta (ej: Black Lotus, Counterspell...)"
+              :placeholder="t('search.bar.placeholder')"
               type="text"
               class="w-full"
           />
@@ -120,7 +122,7 @@ const selectCard = (card: any) => {
             class="whitespace-nowrap flex items-center gap-2"
         >
           <SpriteIcon :name="loading ? 'loading' : 'search'" size="tiny" />
-          {{ loading ? '' : 'BUSCAR' }}
+          {{ loading ? '' : t('search.bar.searchButton') }}
         </BaseButton>
       </div>
     </div>
@@ -132,7 +134,7 @@ const selectCard = (card: any) => {
     >
       <div class="bg-primary border border-silver-30 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
         <h2 class="text-lg font-bold text-silver mb-4">
-          Selecciona la edición de {{ searchQuery }}
+          {{ t('search.bar.selectEdition', { name: searchQuery }) }}
         </h2>
 
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -158,7 +160,7 @@ const selectCard = (card: any) => {
             @click="showSelectCardModal = false"
             class="w-full"
         >
-          CERRAR
+          {{ t('common.actions.close') }}
         </BaseButton>
       </div>
     </div>

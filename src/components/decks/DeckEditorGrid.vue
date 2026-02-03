@@ -8,7 +8,8 @@ const props = defineProps<{
   cards: DisplayDeckCard[]
   deckId: string
   commanderNames?: string[]
-  groupBy?: 'type' | 'mana' | 'color'
+  groupBy?: 'none' | 'type' | 'mana' | 'color'
+  sortBy?: 'recent' | 'name' | 'price'
 }>()
 
 const emit = defineEmits<{
@@ -144,8 +145,36 @@ const translateCategory = (category: string): string => {
   return t(`decks.editorGrid.categories.${category}`) || category
 }
 
+// Sort function based on sortBy prop
+const sortCards = (cards: DisplayDeckCard[]): DisplayDeckCard[] => {
+  const sorted = [...cards]
+  switch (props.sortBy) {
+    case 'recent':
+      sorted.sort((a, b) => {
+        const dateA = (a as any).addedAt ? new Date((a as any).addedAt).getTime() : 0
+        const dateB = (b as any).addedAt ? new Date((b as any).addedAt).getTime() : 0
+        return dateB - dateA
+      })
+      break
+    case 'price':
+      sorted.sort((a, b) => (b.price || 0) - (a.price || 0))
+      break
+    case 'name':
+    default:
+      sorted.sort((a, b) => a.name.localeCompare(b.name))
+      break
+  }
+  return sorted
+}
+
 // Group cards by selected mode
 const groupedCards = computed(() => {
+  // If groupBy is 'none', return flat sorted list
+  if (props.groupBy === 'none') {
+    const sortedCards = sortCards(props.cards)
+    return [{ type: 'all', cards: sortedCards }]
+  }
+
   const groups: Record<string, DisplayDeckCard[]> = {}
   const order = getCategoryOrder()
 
@@ -155,11 +184,11 @@ const groupedCards = computed(() => {
     groups[category].push(card)
   }
 
-  // Sort cards within each group by name
+  // Sort cards within each group using sortBy
   for (const category in groups) {
     const group = groups[category]
     if (group) {
-      group.sort((a, b) => a.name.localeCompare(b.name))
+      groups[category] = sortCards(group)
     }
   }
 
@@ -351,8 +380,9 @@ watch(() => props.cards, () => {
 
       <!-- Grouped cards -->
       <div v-for="group in groupedCards" :key="group.type" class="space-y-2">
-        <!-- Category Header -->
+        <!-- Category Header (hidden when groupBy is 'none') -->
         <h3
+          v-if="group.type !== 'all'"
           class="text-tiny font-bold uppercase"
           :class="group.type === 'Commander' ? 'text-purple-400' : 'text-silver-70'"
         >

@@ -205,12 +205,40 @@ const ownedCards = computed(() =>
     collectionCards.value.filter(c => c.status !== 'wishlist')
 )
 
-// Cartas que NECESITO (wishlist)
-const wishlistCards = computed(() =>
-    collectionCards.value.filter(c => c.status === 'wishlist')
-)
+// Cartas que NECESITO (wishlist) - con filtro de búsqueda y ordenamiento
+const wishlistCards = computed(() => {
+  let cards = collectionCards.value.filter(c => c.status === 'wishlist')
 
-// Contadores por status
+  // Aplicar filtro de búsqueda (mismo que filteredCards)
+  if (filterQuery.value.trim()) {
+    const q = filterQuery.value.toLowerCase()
+    cards = cards.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.edition.toLowerCase().includes(q)
+    )
+  }
+
+  // Aplicar ordenamiento (mismo que filteredCards)
+  switch (sortBy.value) {
+    case 'recent':
+      cards = [...cards].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return dateB - dateA
+      })
+      break
+    case 'name':
+      cards = [...cards].sort((a, b) => a.name.localeCompare(b.name))
+      break
+    case 'price':
+      cards = [...cards].sort((a, b) => (b.price || 0) - (a.price || 0))
+      break
+  }
+
+  return cards
+})
+
+// Contadores por status (totales, sin filtrar por búsqueda)
 const ownedCount = computed(() => ownedCards.value.length)
 const collectionCount = computed(() =>
     collectionCards.value.filter(c => c.status === 'collection').length
@@ -219,6 +247,11 @@ const collectionCount = computed(() =>
 const availableCount = computed(() =>
     collectionCards.value.filter(c => c.status === 'sale' || c.status === 'trade').length
 )
+// Total de wishlist (sin filtrar, para mostrar en badges)
+const wishlistTotalCount = computed(() =>
+    collectionCards.value.filter(c => c.status === 'wishlist').length
+)
+// Wishlist filtrada (para mostrar en la sección)
 const wishlistCount = computed(() => wishlistCards.value.length)
 
 // Función para traducir status a español
@@ -352,9 +385,173 @@ const sideboardWishlistCount = computed(() => {
 })
 
 // Deck grouping
-type DeckGroupOption = 'type' | 'mana' | 'color'
-const deckGroupBy = ref<DeckGroupOption>('type')
+type DeckGroupOption = 'none' | 'type' | 'mana' | 'color'
+const deckGroupBy = ref<DeckGroupOption>('none')
 
+// ========== COLLECTION GROUPING ==========
+
+// Category helper functions for collection cards
+const getCardTypeCategory = (card: Card): string => {
+  const typeLine = card.type_line?.toLowerCase() || ''
+  if (typeLine.includes('creature')) return 'Creatures'
+  if (typeLine.includes('instant')) return 'Instants'
+  if (typeLine.includes('sorcery')) return 'Sorceries'
+  if (typeLine.includes('enchantment')) return 'Enchantments'
+  if (typeLine.includes('artifact')) return 'Artifacts'
+  if (typeLine.includes('planeswalker')) return 'Planeswalkers'
+  if (typeLine.includes('land')) return 'Lands'
+  return 'Other'
+}
+
+const getCardManaCategory = (card: Card): string => {
+  const typeLine = card.type_line?.toLowerCase() || ''
+  if (typeLine.includes('land')) return 'Lands'
+  const cmc = card.cmc ?? 0
+  if (cmc >= 7) return '7+'
+  return String(cmc)
+}
+
+const getCardColorCategory = (card: Card): string => {
+  const typeLine = card.type_line?.toLowerCase() || ''
+  if (typeLine.includes('land')) return 'Lands'
+
+  const colors = card.colors || []
+  const validColors = colors.filter((c: string) => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+
+  if (validColors.length === 0) return 'Colorless'
+  if (validColors.length >= 2) return 'Multicolor'
+
+  const color = validColors[0]?.toUpperCase()
+  if (color === 'W') return 'White'
+  if (color === 'U') return 'Blue'
+  if (color === 'B') return 'Black'
+  if (color === 'R') return 'Red'
+  if (color === 'G') return 'Green'
+
+  return 'Colorless'
+}
+
+const getCardCategory = (card: Card): string => {
+  switch (deckGroupBy.value) {
+    case 'mana': return getCardManaCategory(card)
+    case 'color': return getCardColorCategory(card)
+    case 'type': return getCardTypeCategory(card)
+    default: return 'all'
+  }
+}
+
+// Category orders
+const typeOrder = ['Creatures', 'Instants', 'Sorceries', 'Enchantments', 'Artifacts', 'Planeswalkers', 'Lands', 'Other']
+const manaOrder = ['0', '1', '2', '3', '4', '5', '6', '7+', 'Lands']
+const colorOrder = ['White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Colorless', 'Lands']
+
+const getCategoryOrder = (): string[] => {
+  switch (deckGroupBy.value) {
+    case 'mana': return manaOrder
+    case 'color': return colorOrder
+    case 'type': return typeOrder
+    default: return []
+  }
+}
+
+// Translate category name
+const translateCategory = (category: string): string => {
+  const translations: Record<string, string> = {
+    'Creatures': 'Criaturas',
+    'Instants': 'Instantáneos',
+    'Sorceries': 'Conjuros',
+    'Enchantments': 'Encantamientos',
+    'Artifacts': 'Artefactos',
+    'Planeswalkers': 'Planeswalkers',
+    'Lands': 'Tierras',
+    'Other': 'Otros',
+    'White': 'Blanco',
+    'Blue': 'Azul',
+    'Black': 'Negro',
+    'Red': 'Rojo',
+    'Green': 'Verde',
+    'Multicolor': 'Multicolor',
+    'Colorless': 'Incoloro',
+  }
+  return translations[category] || category
+}
+
+// Grouped cards for collection view
+const groupedFilteredCards = computed(() => {
+  if (deckGroupBy.value === 'none') {
+    return [{ type: 'all', cards: filteredCards.value }]
+  }
+
+  const groups: Record<string, Card[]> = {}
+  const order = getCategoryOrder()
+
+  for (const card of filteredCards.value) {
+    const category = getCardCategory(card)
+    if (!groups[category]) groups[category] = []
+    groups[category].push(card)
+  }
+
+  // Build sorted groups array
+  const sortedGroups: { type: string; cards: Card[] }[] = []
+
+  for (const category of order) {
+    const group = groups[category]
+    if (group && group.length > 0) {
+      sortedGroups.push({ type: category, cards: group })
+    }
+  }
+
+  // Add any categories not in the order
+  for (const category in groups) {
+    const group = groups[category]
+    if (!order.includes(category) && group && group.length > 0) {
+      sortedGroups.push({ type: category, cards: group })
+    }
+  }
+
+  return sortedGroups
+})
+
+// Grouped wishlist cards
+const groupedWishlistCards = computed(() => {
+  if (deckGroupBy.value === 'none') {
+    return [{ type: 'all', cards: wishlistCards.value }]
+  }
+
+  const groups: Record<string, Card[]> = {}
+  const order = getCategoryOrder()
+
+  for (const card of wishlistCards.value) {
+    const category = getCardCategory(card)
+    if (!groups[category]) groups[category] = []
+    groups[category].push(card)
+  }
+
+  // Build sorted groups array
+  const sortedGroups: { type: string; cards: Card[] }[] = []
+
+  for (const category of order) {
+    const group = groups[category]
+    if (group && group.length > 0) {
+      sortedGroups.push({ type: category, cards: group })
+    }
+  }
+
+  // Add any categories not in the order
+  for (const category in groups) {
+    const group = groups[category]
+    if (!order.includes(category) && group && group.length > 0) {
+      sortedGroups.push({ type: category, cards: group })
+    }
+  }
+
+  return sortedGroups
+})
+
+// Count cards in a group
+const getGroupCardCount = (cards: Card[]): number => {
+  return cards.reduce((sum, card) => sum + card.quantity, 0)
+}
 
 // Convert owned cards to DisplayDeckCard format for DeckEditorGrid
 const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
@@ -1615,7 +1812,7 @@ onUnmounted(() => {
         <h1 class="text-h1 font-bold text-silver">{{ t('collection.title') }}</h1>
         <p class="text-small text-silver-70">
           {{ t('collection.subtitle', { owned: ownedCount }) }}
-          <span v-if="wishlistCount > 0" class="text-yellow-400">• {{ t('collection.wishlistCount', { count: wishlistCount }) }}</span>
+          <span v-if="wishlistTotalCount > 0" class="text-yellow-400">• {{ t('collection.wishlistCount', { count: wishlistTotalCount }) }}</span>
         </p>
       </div>
       <div class="flex gap-2">
@@ -1812,30 +2009,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Grouping controls -->
-          <div class="mt-4 pt-4 border-t border-neon/30">
-            <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">{{ t('collection.deckStats.groupBy') }}</span>
-              <button
-                  v-for="opt in [
-                    { value: 'type', label: t('collection.deckStats.type') },
-                    { value: 'mana', label: t('collection.deckStats.mana') },
-                    { value: 'color', label: t('collection.deckStats.color') }
-                  ]"
-                  :key="opt.value"
-                  @click="deckGroupBy = opt.value as DeckGroupOption"
-                  :class="[
-                    'px-2 py-1 text-tiny font-bold transition-150',
-                    deckGroupBy === opt.value
-                      ? 'bg-neon text-primary'
-                      : 'bg-primary border border-silver-30 text-silver-50 hover:border-neon'
-                  ]"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-          </div>
-        </div>
+                  </div>
 
         <!-- ========== STATUS FILTERS (solo en modo colección) ========== -->
         <div v-if="viewMode === 'collection'" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
@@ -1844,7 +2018,7 @@ onUnmounted(() => {
                 'all': collectionCards.length,
                 'collection': collectionCount,
                 'available': availableCount,
-                'wishlist': wishlistCount
+                'wishlist': wishlistTotalCount
               }"
               :key="status"
               class="flex items-center gap-1"
@@ -1906,8 +2080,29 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <!-- View type -->
-            <div class="flex items-center gap-1">
+            <!-- Group by -->
+            <div class="flex items-center gap-2">
+              <span class="text-tiny text-silver-50">{{ t('collection.deckStats.groupBy') }}:</span>
+              <button
+                  v-for="opt in [
+                    { value: 'none', label: t('collection.group.none') },
+                    { value: 'type', label: t('collection.deckStats.type') },
+                    { value: 'mana', label: t('collection.deckStats.mana') },
+                    { value: 'color', label: t('collection.deckStats.color') }
+                  ]"
+                  :key="opt.value"
+                  @click="deckGroupBy = opt.value as DeckGroupOption"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold rounded transition-colors',
+                    deckGroupBy === opt.value ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
+                  ]"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- View type (only in collection mode) -->
+            <div v-if="viewMode === 'collection'" class="flex items-center gap-1">
               <button
                   @click="viewType = 'grid'"
                   :class="[
@@ -1938,13 +2133,22 @@ onUnmounted(() => {
             <h3 class="text-small font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
             <span class="text-tiny text-silver-50">({{ filteredCards.length }})</span>
           </div>
-          <CollectionGrid
-              :cards="filteredCards"
-              :compact="viewType === 'compact'"
-              :deleting-card-ids="deletingCardIds"
-              @card-click="handleCardClick"
-              @delete="handleDelete"
-          />
+
+          <!-- Grouped view -->
+          <div v-for="group in groupedFilteredCards" :key="group.type" class="mb-6">
+            <!-- Category Header (hidden when no grouping) -->
+            <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-silver-20">
+              <h4 class="text-tiny font-bold text-neon uppercase">{{ translateCategory(group.type) }}</h4>
+              <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+            </div>
+            <CollectionGrid
+                :cards="group.cards"
+                :compact="viewType === 'compact'"
+                :deleting-card-ids="deletingCardIds"
+                @card-click="handleCardClick"
+                @delete="handleDelete"
+            />
+          </div>
         </div>
 
         <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->
@@ -1958,6 +2162,7 @@ onUnmounted(() => {
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
+              :sort-by="sortBy"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
@@ -1982,6 +2187,7 @@ onUnmounted(() => {
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
+              :sort-by="sortBy"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
@@ -1996,13 +2202,22 @@ onUnmounted(() => {
             <h3 class="text-small font-bold text-yellow-400">{{ t('collection.sections.myWishlist') }}</h3>
             <span class="text-tiny text-silver-50">({{ wishlistCount }})</span>
           </div>
-          <CollectionGrid
-              :cards="wishlistCards"
-              :compact="viewType === 'compact'"
-              :deleting-card-ids="deletingCardIds"
-              @card-click="handleCardClick"
-              @delete="handleDelete"
-          />
+
+          <!-- Grouped view -->
+          <div v-for="group in groupedWishlistCards" :key="group.type" class="mb-6">
+            <!-- Category Header (hidden when no grouping) -->
+            <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-400/30">
+              <h4 class="text-tiny font-bold text-yellow-400 uppercase">{{ translateCategory(group.type) }}</h4>
+              <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+            </div>
+            <CollectionGrid
+                :cards="group.cards"
+                :compact="viewType === 'compact'"
+                :deleting-card-ids="deletingCardIds"
+                @card-click="handleCardClick"
+                @delete="handleDelete"
+            />
+          </div>
         </div>
 
         <!-- Empty State: Deck sin cartas -->

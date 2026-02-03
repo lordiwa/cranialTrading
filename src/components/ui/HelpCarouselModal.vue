@@ -53,7 +53,7 @@ watch(() => helpStore.isOpen.value, (isOpen) => {
         <div class="absolute inset-0 bg-black/80" />
 
         <!-- Modal Content -->
-        <div class="relative bg-primary border border-silver-30 rounded-md w-full max-w-md shadow-strong">
+        <div class="relative bg-primary border border-silver-30 rounded-md w-full max-w-md md:max-w-lg lg:max-w-xl shadow-strong">
           <!-- Header -->
           <div class="flex items-center justify-between p-4 border-b border-silver-20">
             <div class="flex items-center gap-2">

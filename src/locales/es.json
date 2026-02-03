@@ -317,6 +317,9 @@
       "grid": "Vista cuadrícula",
       "compact": "Vista compacta"
     },
+    "group": {
+      "none": "Ninguno"
+    },
     "sections": {
       "myCards": "CARTAS QUE TENGO",
       "mainboard": "MAZO PRINCIPAL",
@@ -766,6 +769,7 @@
       "wishlist": "+ WISHLIST",
       "advanced": "AVANZADO",
       "categories": {
+        "all": "Todas",
         "Commander": "Commander",
         "Creatures": "Criaturas",
         "Instants": "Instantáneos",
@@ -1277,7 +1281,18 @@
       "avatar": "Avatar",
       "sets": "Ediciones",
       "manaValue": "Mana Value",
-      "onlyReleased": "Solo Lanzadas"
+      "onlyReleased": "Solo Lanzadas",
+      "types": "Tipos de Carta",
+      "priceUSD": "Precio USD",
+      "power": "Poder",
+      "toughness": "Resistencia",
+      "format": "Formato Legal",
+      "combat": "Habilidades de Combate",
+      "effects": "Efectos Comunes",
+      "triggers": "Triggers",
+      "setMechanics": "Mecánicas de Set",
+      "specialTypes": "Tipos Especiales",
+      "foilFullArt": "Foil / Full Art"
     },
     "tooltips": {
       "dashboard": {
@@ -1336,7 +1351,18 @@
       "search": {
         "sets": "Filtra por edición/set de Magic. Puedes seleccionar múltiples ediciones. Los sets están ordenados por fecha de lanzamiento.",
         "manaValue": "Coste de mana convertido. Selecciona uno o más valores. El 10+ incluye cartas de mana 10 o superior.",
-        "onlyReleased": "Excluye cartas de sets que aún no han sido lanzados (previews/spoilers)."
+        "onlyReleased": "Excluye cartas de sets que aún no han sido lanzados (previews/spoilers).",
+        "types": "Tipo de carta: Criatura, Instantáneo, Conjuro, Encantamiento, Artefacto, Planeswalker o Tierra.",
+        "priceUSD": "Rango de precio en dólares según TCGPlayer. Útil para buscar cartas dentro de tu presupuesto.",
+        "power": "Poder de criaturas. Valores numéricos (0-15+). Algunas cartas tienen poder variable (*) o indefinido.",
+        "toughness": "Resistencia de criaturas. Valores numéricos (0-15+). Algunas cartas tienen resistencia variable.",
+        "format": "Filtra cartas legales en formatos específicos: Standard, Modern, Pioneer, Legacy, Vintage o Commander.",
+        "combat": "Habilidades que afectan el combate: Flying, Trample, First Strike, Deathtouch, Lifelink, etc.",
+        "effects": "Efectos comunes: Destruir, Exiliar, Robar cartas, Crear tokens, Contadores +1/+1, etc.",
+        "triggers": "Habilidades que se activan por eventos: ETB (al entrar), LTB (al salir), Ataque, Muerte, etc.",
+        "setMechanics": "Mecánicas específicas de sets: Cascade, Convoke, Delve, Flashback, Madness, etc.",
+        "specialTypes": "Tipos especiales de cartas: Legendarias, Saga, Equipamiento, Aura, Vehículo, etc.",
+        "foilFullArt": "Filtrar por cartas Foil (holográficas) o Full Art (arte extendido sin borde)."
       }
     },
     "guides": {

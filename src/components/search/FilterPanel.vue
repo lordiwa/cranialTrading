@@ -963,7 +963,13 @@ const removeFilter = (type: string, value?: string) => {
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- Todos los tipos -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.types') }}</span>
+          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+            {{ t('search.modal.sections.types') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.types')"
+                :title="t('help.titles.types')"
+            />
+          </span>
           <div class="flex flex-wrap gap-1">
             <button
                 v-for="type in typeOptions"
@@ -1021,7 +1027,13 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Precio USD -->
         <div>
-          <span id="price-usd-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.priceUSD') }}</span>
+          <span id="price-usd-label" class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+            {{ t('search.modal.sections.priceUSD') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.priceUSD')"
+                :title="t('help.titles.priceUSD')"
+            />
+          </span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.priceUSD!.min"
@@ -1044,7 +1056,13 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Power -->
         <div>
-          <span id="power-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.power') }}</span>
+          <span id="power-label" class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+            {{ t('search.modal.sections.power') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.power')"
+                :title="t('help.titles.power')"
+            />
+          </span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.power!.min"
@@ -1065,7 +1083,13 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Toughness -->
         <div>
-          <span id="toughness-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.toughness') }}</span>
+          <span id="toughness-label" class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+            {{ t('search.modal.sections.toughness') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.toughness')"
+                :title="t('help.titles.toughness')"
+            />
+          </span>
           <div class="flex gap-2">
             <input
                 v-model.number="filters.toughness!.min"
@@ -1086,7 +1110,13 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Formato Legal -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.format') }}</span>
+          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+            {{ t('search.modal.sections.format') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.format')"
+                :title="t('help.titles.format')"
+            />
+          </span>
           <div class="flex flex-wrap gap-1">
             <button
                 v-for="format in formatOptions"
@@ -1195,6 +1225,10 @@ const removeFilter = (type: string, value?: string) => {
           >
             <span class="text-small font-bold text-silver flex items-center gap-2">
               {{ t('search.accordions.combat') }}
+              <HelpTooltip
+                  :text="t('help.tooltips.search.combat')"
+                  :title="t('help.titles.combat')"
+              />
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(combatAbilities) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1245,8 +1279,12 @@ const removeFilter = (type: string, value?: string) => {
               @click="toggleAccordion('effects')"
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
-            <span class="text-small font-bold text-silver">
+            <span class="text-small font-bold text-silver flex items-center gap-2">
               {{ t('search.accordions.effects') }}
+              <HelpTooltip
+                  :text="t('help.tooltips.search.effects')"
+                  :title="t('help.titles.effects')"
+              />
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(allCommonEffects) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1360,8 +1398,12 @@ const removeFilter = (type: string, value?: string) => {
               @click="toggleAccordion('triggers')"
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
-            <span class="text-small font-bold text-silver">
+            <span class="text-small font-bold text-silver flex items-center gap-2">
               {{ t('search.accordions.triggers') }}
+              <HelpTooltip
+                  :text="t('help.tooltips.search.triggers')"
+                  :title="t('help.titles.triggers')"
+              />
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(triggerKeywords) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1395,8 +1437,12 @@ const removeFilter = (type: string, value?: string) => {
               @click="toggleAccordion('setMechanics')"
               class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
           >
-            <span class="text-small font-bold text-silver">
+            <span class="text-small font-bold text-silver flex items-center gap-2">
               {{ t('search.accordions.setMechanics') }}
+              <HelpTooltip
+                  :text="t('help.tooltips.search.setMechanics')"
+                  :title="t('help.titles.setMechanics')"
+              />
             </span>
             <span class="flex items-center gap-2">
               <span v-if="countSelectedInCategory(allSetMechanics) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
@@ -1488,7 +1534,13 @@ const removeFilter = (type: string, value?: string) => {
 
       <!-- Tipos Especiales (fuera de acordeón, siempre visible) -->
       <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.specialTypes') }}</span>
+        <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          {{ t('search.modal.sections.specialTypes') }}
+          <HelpTooltip
+              :text="t('help.tooltips.search.specialTypes')"
+              :title="t('help.titles.specialTypes')"
+          />
+        </span>
         <div class="flex flex-wrap gap-1">
           <button
               v-for="keyword in specialTypes"
@@ -1507,7 +1559,7 @@ const removeFilter = (type: string, value?: string) => {
       </div>
 
       <!-- Opciones especiales -->
-      <div class="flex gap-4 pt-2 border-t border-silver-30">
+      <div class="flex gap-4 pt-2 border-t border-silver-30 items-center">
         <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
           <input v-model="filters.isFoil" type="checkbox" class="w-4 h-4" />
           <span>{{ t('search.modal.options.foilOnly') }}</span>
@@ -1516,6 +1568,10 @@ const removeFilter = (type: string, value?: string) => {
           <input v-model="filters.isFullArt" type="checkbox" class="w-4 h-4" />
           <span>{{ t('search.modal.options.fullArt') }}</span>
         </label>
+        <HelpTooltip
+            :text="t('help.tooltips.search.foilFullArt')"
+            :title="t('help.titles.foilFullArt')"
+        />
       </div>
 
       <!-- Botón aplicar filtros -->

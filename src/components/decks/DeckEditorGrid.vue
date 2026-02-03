@@ -157,22 +157,27 @@ const groupedCards = computed(() => {
 
   // Sort cards within each group by name
   for (const category in groups) {
-    groups[category].sort((a, b) => a.name.localeCompare(b.name))
+    const group = groups[category]
+    if (group) {
+      group.sort((a, b) => a.name.localeCompare(b.name))
+    }
   }
 
   // Build sorted groups array
   const sortedGroups: { type: string; cards: DisplayDeckCard[] }[] = []
 
   for (const category of order) {
-    if (groups[category] && groups[category].length > 0) {
-      sortedGroups.push({ type: category, cards: groups[category] })
+    const group = groups[category]
+    if (group && group.length > 0) {
+      sortedGroups.push({ type: category, cards: group })
     }
   }
 
   // Add any categories not in the order
   for (const category in groups) {
-    if (!order.includes(category) && groups[category].length > 0) {
-      sortedGroups.push({ type: category, cards: groups[category] })
+    const group = groups[category]
+    if (!order.includes(category) && group && group.length > 0) {
+      sortedGroups.push({ type: category, cards: group })
     }
   }
 

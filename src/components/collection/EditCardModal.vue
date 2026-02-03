@@ -318,7 +318,8 @@ const handleClose = () => {
             <label for="edit-quantity" class="text-small text-silver-70 block mb-2">{{ t('cards.addModal.quantityLabel') }}</label>
             <BaseInput
                 id="edit-quantity"
-                v-model.number="form.quantity"
+                :model-value="form.quantity ?? 1"
+                @update:model-value="(v) => form.quantity = Number(v)"
                 type="number"
                 min="1"
             />
@@ -332,7 +333,8 @@ const handleClose = () => {
             <label for="edit-condition" class="text-small text-silver-70 block mb-2">{{ t('cards.addModal.conditionLabel') }}</label>
             <BaseSelect
                 id="edit-condition"
-                v-model="form.condition"
+                :model-value="form.condition ?? 'NM'"
+                @update:model-value="(v) => form.condition = v as Card['condition']"
                 :options="conditionOptions"
             />
           </div>

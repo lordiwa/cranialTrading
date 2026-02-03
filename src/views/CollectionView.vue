@@ -808,10 +808,12 @@ const handleImport = async (
     if (trimmed.toLowerCase().includes('sideboard')) { inSideboard = true; continue }
 
     const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
-    if (!match) continue
+    const matchQty = match?.[1]
+    const matchName = match?.[2]
+    if (!match || !matchQty || !matchName) continue
 
-    const quantity = Number.parseInt(match[1])
-    let cardName = match[2].trim()
+    const quantity = Number.parseInt(matchQty)
+    let cardName = matchName.trim()
     const setCode = match[3] || null
     const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
 
@@ -1034,7 +1036,7 @@ const handleImportDirect = async (
             (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
           ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
-          if (printWithPrice) {
+          if (printWithPrice?.prices?.usd) {
             cardData.scryfallId = printWithPrice.id
             cardData.edition = printWithPrice.set.toUpperCase()
             cardData.price = Number.parseFloat(printWithPrice.prices.usd)
@@ -1044,12 +1046,14 @@ const handleImportDirect = async (
             cardData.colors = printWithPrice.colors || []
           } else if (results.length > 0 && !cardData.image) {
             const anyPrint = results[0]
-            cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
-            if (!cardData.scryfallId) cardData.scryfallId = anyPrint.id
-            if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
-            cardData.cmc = anyPrint.cmc
-            cardData.type_line = anyPrint.type_line
-            cardData.colors = anyPrint.colors || []
+            if (anyPrint) {
+              cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
+              if (!cardData.scryfallId) cardData.scryfallId = anyPrint.id
+              if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
+              cardData.cmc = anyPrint.cmc
+              cardData.type_line = anyPrint.type_line
+              cardData.colors = anyPrint.colors || []
+            }
           }
         } catch (e) {
           console.warn(`[Import] Failed to search for "${cardData.name}":`, e)

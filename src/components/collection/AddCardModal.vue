@@ -433,7 +433,7 @@ const handleClose = () => {
               />
               <div>
                 <label for="public" class="text-sm text-[#EEEEEE] cursor-pointer">{{ t('cards.addModal.publishLabel') }}</label>
-                <p class="text-xs text-[#EEEEEE]/50">{{ t('cards.addModal.publishHint', { username: authStore.user?.username }) }}</p>
+                <p class="text-xs text-[#EEEEEE]/50">{{ t('cards.addModal.publishHint', { username: authStore.user?.username ?? '' }) }}</p>
               </div>
             </div>
 

@@ -290,7 +290,7 @@ watch(() => props.show, (newVal) => {
             <BaseInput
                 id="add-deck-search"
                 :model-value="searchQuery"
-                @update:model-value="handleSearchInput"
+                @update:model-value="(v) => handleSearchInput(String(v))"
                 :placeholder="t('decks.addToDeck.searchPlaceholder')"
                 type="text"
             />

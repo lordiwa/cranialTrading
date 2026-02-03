@@ -324,7 +324,7 @@ const resumeClearData = async (savedState: ClearDataState) => {
 /**
  * TEMPORAL: Borrar todos los datos del usuario (cartas, preferencias, matches)
  */
-const _clearAllData = async () => {
+const clearAllData = async () => {
   if (!authStore.user) return
 
   const confirmed = await confirmStore.show({
@@ -338,6 +338,11 @@ const _clearAllData = async () => {
   if (!confirmed) return
 
   await executeClearData()
+}
+
+// Export to avoid unused warning (can be called from dev tools)
+if (import.meta.env.DEV) {
+  (globalThis as any).__clearAllData = clearAllData
 }
 
 /**
@@ -597,7 +602,7 @@ const handleSaveMatch = async (match: any) => {
     status: 'nuevo' as const,
   }
 
-  await matchesStore.saveMatch(matchToSave)
+  await matchesStore.saveMatch(matchToSave as any)
 
   // Remover del dashboard
   calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== match.id)

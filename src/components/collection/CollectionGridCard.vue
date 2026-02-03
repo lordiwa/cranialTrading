@@ -48,13 +48,17 @@ const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
 
 const handleTouchStart = (e: TouchEvent) => {
   if (props.readonly || props.isBeingDeleted) return
-  startX.value = e.touches[0].clientX
+  const touch = e.touches[0]
+  if (!touch) return
+  startX.value = touch.clientX
   isSwiping.value = true
 }
 
 const handleTouchMove = (e: TouchEvent) => {
   if (!isSwiping.value) return
-  const currentX = e.touches[0].clientX
+  const touch = e.touches[0]
+  if (!touch) return
+  const currentX = touch.clientX
   swipeOffset.value = currentX - startX.value
   // Limit swipe distance
   swipeOffset.value = Math.max(-120, Math.min(120, swipeOffset.value))
@@ -70,10 +74,10 @@ const handleTouchEnd = async () => {
     // Swipe right = cycle status
     const currentIndex = STATUS_ORDER.indexOf(props.card.status)
     const nextIndex = (currentIndex + 1) % STATUS_ORDER.length
-    const nextStatus = STATUS_ORDER[nextIndex]
+    const nextStatus = STATUS_ORDER[nextIndex] ?? 'collection'
     try {
       await collectionStore.updateCard(props.card.id, { status: nextStatus })
-      toastStore.show(t('cards.grid.statusChanged', { status: nextStatus }), 'success')
+      toastStore.show(t('cards.grid.statusChanged', { status: nextStatus ?? '' }), 'success')
     } catch {
       toastStore.show(t('cards.grid.statusError'), 'error')
     }

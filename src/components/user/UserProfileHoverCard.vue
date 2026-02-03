@@ -28,9 +28,10 @@ const loadUserInfo = async () => {
     const q = query(usersCol, where('username', '==', props.username), limit(1));
     const snapshot = await getDocs(q);
 
-    if (!snapshot.empty) {
-      const userData = snapshot.docs[0].data();
-      const userId = snapshot.docs[0].id;
+    const firstDoc = snapshot.docs[0]
+    if (!snapshot.empty && firstDoc) {
+      const userData = firstDoc.data();
+      const userId = firstDoc.id;
       userInfo.value = userData as any;
 
       // Count public cards

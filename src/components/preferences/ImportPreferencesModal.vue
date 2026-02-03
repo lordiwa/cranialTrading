@@ -94,8 +94,9 @@ const handleParse = async () => {
       }
 
       const match = /^(\d+)\s+/.exec(trimmed)
-      if (match) {
-        const qty = Number.parseInt(match[1])
+      const matchQty = match?.[1]
+      if (match && matchQty) {
+        const qty = Number.parseInt(matchQty)
         if (inSideboard) {
           sideboard += qty
         } else {

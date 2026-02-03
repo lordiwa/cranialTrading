@@ -65,7 +65,7 @@ export function useCollectionTotals(cards: () => Card[]) {
           (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
         ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || results[0]
 
-        if (!printWithPrice) return
+        if (!printWithPrice) return null
 
         const scryfallId = printWithPrice.id
         const setCode = printWithPrice.set?.toUpperCase()

@@ -171,8 +171,8 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
     if (setCode) {
       const query = `"${cleanName}" e:${setCode}`
       const results = await searchCards(query)
-      if (results.length > 0) {
-        const card = results[0]
+      const card = results[0]
+      if (card) {
         let image = card.image_uris?.normal || ''
         if (!image && card.card_faces && card.card_faces.length > 0) {
           image = card.card_faces[0]?.image_uris?.normal || ''
@@ -201,7 +201,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
           (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
       ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
-      if (printWithPrice && printWithPrice.prices?.usd) {
+      if (printWithPrice?.prices?.usd) {
         let image = printWithPrice.image_uris?.normal || ''
         if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
           image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
@@ -411,7 +411,7 @@ const handleImportDirect = async (
             (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
         ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
-        if (printWithPrice && printWithPrice.prices?.usd) {
+        if (printWithPrice?.prices?.usd) {
           finalScryfallId = printWithPrice.id
           finalEdition = printWithPrice.set.toUpperCase()
           price = Number.parseFloat(printWithPrice.prices.usd)

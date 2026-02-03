@@ -5,7 +5,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
-import SpriteIcon from '../ui/SpriteIcon.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
 import { getAvatarUrlForUser } from '../../utils/avatar'
@@ -136,7 +136,7 @@ onUnmounted(() => {
               ]"
           >
             <span class="relative">
-              <SpriteIcon :name="link.icon" size="small" />
+              <SvgIcon :name="link.icon" size="small" />
               <span
                   v-if="link.badge > 0"
                   class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
@@ -149,10 +149,10 @@ onUnmounted(() => {
         </nav>
 
         <!-- Global Search (Desktop) -->
-        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" class="hidden md:block" />
+        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" class="hidden md:block flex-shrink-0" />
 
         <!-- Right side: User & Settings -->
-        <div class="flex items-center gap-2 md:gap-4">
+        <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
           <!-- Mobile Menu Button -->
           <button
               v-if="isAuthenticated"
@@ -178,7 +178,7 @@ onUnmounted(() => {
                 <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
               </router-link>
               <!-- User Popover (avatar only, dropdown has logout) -->
-              <UserPopover class="hidden sm:block" />
+              <UserPopover class="hidden md:block" />
             </div>
           </div>
 
@@ -226,7 +226,7 @@ onUnmounted(() => {
             @click="closeMobileMenu"
         >
           <span class="relative">
-            <SpriteIcon :name="link.icon" size="small" />
+            <SvgIcon :name="link.icon" size="small" />
             <span
                 v-if="link.badge > 0"
                 class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
@@ -265,7 +265,7 @@ onUnmounted(() => {
             class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
             @click="closeMobileMenu"
         >
-          <SpriteIcon name="settings" size="small" />
+          <SvgIcon name="settings" size="small" />
           {{ t('header.profile.settings') }}
         </router-link>
         <!-- Logout (mobile) -->
@@ -273,7 +273,7 @@ onUnmounted(() => {
             @click="handleLogout(); closeMobileMenu()"
             class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-rust transition-fast w-full text-left"
         >
-          <SpriteIcon name="x-mark" size="small" />
+          <SvgIcon name="x-mark" size="small" />
           {{ t('header.profile.logout') }}
         </button>
       </nav>

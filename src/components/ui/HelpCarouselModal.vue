@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch, onMounted, onUnmounted } from 'vue'
 import { useHelpStore } from '../../stores/help'
-import SpriteIcon from './SpriteIcon.vue'
+import SvgIcon from './SvgIcon.vue'
 
 const helpStore = useHelpStore()
 
@@ -66,7 +66,7 @@ watch(() => helpStore.isOpen.value, (isOpen) => {
                 @click="helpStore.close()"
                 class="text-silver-50 hover:text-silver transition-colors p-1"
             >
-              <SpriteIcon name="x-mark" size="small" />
+              <SvgIcon name="x-mark" size="small" />
             </button>
           </div>
 
@@ -99,7 +99,7 @@ watch(() => helpStore.isOpen.value, (isOpen) => {
                 :class="{ 'opacity-50': helpStore.totalItems.value <= 1 }"
                 :disabled="helpStore.totalItems.value <= 1"
             >
-              <SpriteIcon name="chevron-left" size="tiny" />
+              <SvgIcon name="chevron-left" size="tiny" />
               <span>Anterior</span>
             </button>
 
@@ -127,7 +127,7 @@ watch(() => helpStore.isOpen.value, (isOpen) => {
                 :disabled="helpStore.totalItems.value <= 1"
             >
               <span>Siguiente</span>
-              <SpriteIcon name="chevron-right" size="tiny" />
+              <SvgIcon name="chevron-right" size="tiny" />
             </button>
           </div>
 

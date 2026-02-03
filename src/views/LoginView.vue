@@ -6,7 +6,7 @@ import { useToastStore } from '../stores/toast';
 import { useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
-import SpriteIcon from '../components/ui/SpriteIcon.vue';
+import SvgIcon from '../components/ui/SvgIcon.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -101,7 +101,7 @@ const features = computed(() => [
               :key="feature.title"
               class="bg-primary/90 border border-silver-20 p-4 hover:border-neon-30 transition-all rounded-md"
           >
-            <div class="mb-2"><SpriteIcon :name="feature.icon" size="large" /></div>
+            <div class="mb-2"><SvgIcon :name="feature.icon" size="large" /></div>
             <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
             <p class="text-tiny text-silver-50">{{ feature.description }}</p>
           </div>
@@ -171,9 +171,9 @@ const features = computed(() => [
 
           <!-- Trust badges -->
           <div class="mt-6 flex items-center justify-center gap-4 text-tiny text-silver-50">
-            <span class="flex items-center gap-1"><SpriteIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
+            <span class="flex items-center gap-1"><SvgIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
             <span>•</span>
-            <span class="flex items-center gap-1"><SpriteIcon name="fire" size="tiny" /> {{ t('auth.login.firebaseAuth') }}</span>
+            <span class="flex items-center gap-1"><SvgIcon name="fire" size="tiny" /> {{ t('auth.login.firebaseAuth') }}</span>
           </div>
         </div>
       </div>

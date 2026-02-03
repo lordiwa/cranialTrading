@@ -5,7 +5,7 @@ import { useCardPrices } from '../../composables/useCardPrices'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
-import SpriteIcon from '../ui/SpriteIcon.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
 import type { Card, CardStatus } from '../../types/card'
 
 const { t } = useI18n()
@@ -251,14 +251,14 @@ const getStatusIconName = (status: string) => {
           class="flex-1 flex items-center justify-start pl-4 rounded-l transition-colors"
           :class="swipeIndicator === 'delete' ? 'bg-rust/30' : 'bg-transparent'"
       >
-        <SpriteIcon v-if="swipeOffset < -20" name="trash" size="medium" class="text-rust" />
+        <SvgIcon v-if="swipeOffset < -20" name="trash" size="medium" class="text-rust" />
       </div>
       <!-- Right side (status change) -->
       <div
           class="flex-1 flex items-center justify-end pr-4 rounded-r transition-colors"
           :class="swipeIndicator === 'status' ? 'bg-neon/20' : 'bg-transparent'"
       >
-        <SpriteIcon v-if="swipeOffset > 20" name="flip" size="medium" class="text-neon" />
+        <SvgIcon v-if="swipeOffset > 20" name="flip" size="medium" class="text-neon" />
       </div>
     </div>
 
@@ -285,7 +285,7 @@ const getStatusIconName = (status: string) => {
       <!-- ========== Status Badge - ALWAYS VISIBLE, centered top ========== -->
       <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-silver-30 px-2 py-1 z-10 rounded">
         <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
-          <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
+          <SvgIcon :name="getStatusIconName(card.status)" size="tiny" />
           {{ card.status }}
         </p>
       </div>
@@ -319,7 +319,7 @@ const getStatusIconName = (status: string) => {
           class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
           :title="t('cards.grid.flipTitle')"
       >
-        <SpriteIcon name="flip" size="tiny" />
+        <SvgIcon name="flip" size="tiny" />
       </button>
 
       <!-- Public toggle button (desktop: hover only) -->
@@ -335,7 +335,7 @@ const getStatusIconName = (status: string) => {
           ]"
           :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
       >
-        <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
+        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
       </button>
 
 
@@ -387,7 +387,7 @@ const getStatusIconName = (status: string) => {
           class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10 rounded"
           :title="t('cards.grid.deleteTitle')"
       >
-        <SpriteIcon name="trash" size="tiny" class="text-rust" />
+        <SvgIcon name="trash" size="tiny" class="text-rust" />
         <span class="text-tiny font-bold text-rust">{{ t('cards.grid.delete') }}</span>
       </button>
 
@@ -398,7 +398,7 @@ const getStatusIconName = (status: string) => {
             class="bg-primary/95 border border-silver-50 p-2 transition-all rounded"
             :class="{ 'border-neon': showMobileMenu }"
         >
-          <SpriteIcon name="settings" size="tiny" />
+          <SvgIcon name="settings" size="tiny" />
         </button>
 
         <!-- Mobile dropdown menu -->
@@ -410,7 +410,7 @@ const getStatusIconName = (status: string) => {
           <!-- Status info -->
           <div class="px-3 py-2 border-b border-silver-20">
             <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
-              <SpriteIcon :name="getStatusIconName(card.status)" size="tiny" />
+              <SvgIcon :name="getStatusIconName(card.status)" size="tiny" />
               {{ card.status }}
             </p>
             <p class="text-tiny text-silver-50 mt-1">
@@ -425,7 +425,7 @@ const getStatusIconName = (status: string) => {
               class="w-full px-3 py-2 text-left text-tiny font-bold flex items-center gap-2 hover:bg-silver-10 transition-colors"
               :class="card.public ? 'text-neon' : 'text-silver-50'"
           >
-            <SpriteIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
+            <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
             {{ card.public ? t('cards.grid.public') : t('cards.grid.private') }}
           </button>
 
@@ -434,7 +434,7 @@ const getStatusIconName = (status: string) => {
               @click.stop="emit('delete', card); showMobileMenu = false"
               class="w-full px-3 py-2 text-left text-tiny font-bold text-rust flex items-center gap-2 hover:bg-rust/10 transition-colors border-t border-silver-20"
           >
-            <SpriteIcon name="trash" size="tiny" />
+            <SvgIcon name="trash" size="tiny" />
             {{ t('cards.grid.delete') }}
           </button>
         </div>

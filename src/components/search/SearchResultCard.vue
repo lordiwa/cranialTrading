@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
+import ManaCost from '../ui/ManaCost.vue'
 
 const { t } = useI18n()
 
@@ -62,6 +63,7 @@ const getCardImage = (card: any): string => {
       </div>
     </div>
     <p class="text-tiny text-silver mt-2 truncate group-hover:text-neon">{{ card.name }}</p>
+    <ManaCost v-if="card.mana_cost" :cost="card.mana_cost" size="tiny" class="mt-1" />
 
     <!-- Multi-source prices -->
     <div class="space-y-0.5 mt-1">

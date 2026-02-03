@@ -2,10 +2,12 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { useSearchStore, type FilterOptions } from '../../stores/search'
-import { getCardSuggestions } from '../../services/scryfall'
+import { getCardSuggestions, getAllSets, type ScryfallSet } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
-import SpriteIcon from '../ui/SpriteIcon.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
+import ManaIcon from '../ui/ManaIcon.vue'
+import HelpTooltip from '../ui/HelpTooltip.vue'
 
 const { t } = useI18n()
 const searchStore = useSearchStore()
@@ -44,12 +46,54 @@ const toggleAccordion = (id: string) => {
 
 const isAccordionOpen = (id: string) => openAccordions.value.has(id)
 
+// Sets/Editions state
+const allSets = ref<ScryfallSet[]>([])
+const setsLoading = ref(false)
+const setSearchQuery = ref('')
+
+// Filtered sets based on search
+const filteredSets = computed(() => {
+  const query = setSearchQuery.value.toLowerCase().trim()
+  if (!query) return allSets.value.slice(0, 50) // Show first 50 if no search
+  return allSets.value.filter(set =>
+    set.name.toLowerCase().includes(query) ||
+    set.code.toLowerCase().includes(query)
+  ).slice(0, 50)
+})
+
+// Load sets when accordion opens
+const loadSets = async () => {
+  if (allSets.value.length > 0) return // Already loaded
+  setsLoading.value = true
+  try {
+    allSets.value = await getAllSets()
+  } finally {
+    setsLoading.value = false
+  }
+}
+
+// Toggle set selection
+const toggleSet = (setCode: string) => {
+  const index = filters.sets!.indexOf(setCode)
+  if (index > -1) {
+    filters.sets!.splice(index, 1)
+  } else {
+    filters.sets!.push(setCode)
+  }
+}
+
+// Get set name by code
+const getSetName = (code: string): string => {
+  const set = allSets.value.find(s => s.code === code)
+  return set?.name || code.toUpperCase()
+}
+
 // Form state
 const filters = reactive<FilterOptions>({
   name: '',
   colors: [],
   types: [],
-  manaValue: { min: undefined, max: undefined },
+  manaValue: { min: undefined, max: undefined, values: undefined },
   rarity: [],
   sets: [],
   power: { min: undefined, max: undefined },
@@ -59,6 +103,7 @@ const filters = reactive<FilterOptions>({
   keywords: [],
   isFoil: false,
   isFullArt: false,
+  onlyReleased: true,
 })
 
 // Sugerencias de nombres
@@ -76,8 +121,10 @@ watch(
     filters.types,
     filters.rarity,
     filters.formatLegal,
+    filters.sets,
     filters.manaValue?.min,
     filters.manaValue?.max,
+    filters.manaValue?.values,
     filters.power?.min,
     filters.power?.max,
     filters.toughness?.min,
@@ -87,6 +134,7 @@ watch(
     filters.keywords,
     filters.isFoil,
     filters.isFullArt,
+    filters.onlyReleased,
   ],
   () => {
     // Solo auto-buscar si hay al menos un filtro activo
@@ -360,6 +408,50 @@ const specialTypes = [
 ]
 
 // Métodos
+// Mana value options (0-10, with 10 meaning 10+)
+const manaValueOptions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// Selected mana values for range selection
+const selectedManaValues = ref<number[]>([])
+
+// Toggle mana value selection - handles range logic
+const toggleManaValue = (value: number) => {
+  const index = selectedManaValues.value.indexOf(value)
+
+  if (index > -1) {
+    // Deselect this value
+    selectedManaValues.value.splice(index, 1)
+  } else {
+    // Add this value
+    selectedManaValues.value.push(value)
+  }
+
+  // Update filters based on selection
+  updateManaValueFilter()
+}
+
+// Update the filter based on selected values (discrete, not range)
+const updateManaValueFilter = () => {
+  if (selectedManaValues.value.length === 0) {
+    filters.manaValue = { min: undefined, max: undefined, values: undefined }
+  } else {
+    // Use discrete values array - each selected button is an exact value
+    // 10 means "10 or more" and is handled specially in the search store
+    filters.manaValue = { values: [...selectedManaValues.value].sort((a, b) => a - b) }
+  }
+}
+
+// Check if a mana value is selected
+const isManaValueSelected = (value: number) => {
+  return selectedManaValues.value.includes(value)
+}
+
+// Clear mana value selection
+const clearManaValueSelection = () => {
+  selectedManaValues.value = []
+  filters.manaValue = { min: undefined, max: undefined, values: undefined }
+}
+
 const toggleColor = (color: string) => {
   const index = filters.colors!.indexOf(color)
   if (index > -1) {
@@ -413,7 +505,7 @@ const handleClear = () => {
   filters.name = ''
   filters.colors = []
   filters.types = []
-  filters.manaValue = { min: undefined, max: undefined }
+  filters.manaValue = { min: undefined, max: undefined, values: undefined }
   filters.rarity = []
   filters.sets = []
   filters.power = { min: undefined, max: undefined }
@@ -423,6 +515,8 @@ const handleClear = () => {
   filters.keywords = []
   filters.isFoil = false
   filters.isFullArt = false
+  filters.onlyReleased = true
+  selectedManaValues.value = []
   searchStore.clearSearch()
 }
 
@@ -432,7 +526,7 @@ const activeFilterCount = () => {
   if (filters.name?.trim()) count++
   if (filters.colors?.length) count++
   if (filters.types?.length) count++
-  if (filters.manaValue?.min || filters.manaValue?.max) count++
+  if (filters.manaValue?.min || filters.manaValue?.max || filters.manaValue?.values?.length) count++
   if (filters.rarity?.length) count++
   if (filters.sets?.length) count++
   if (filters.power?.min || filters.power?.max) count++
@@ -498,11 +592,15 @@ const removeFilter = (type: string, value?: string) => {
     case 'format':
       if (value) filters.formatLegal = filters.formatLegal?.filter(f => f !== value)
       break
+    case 'set':
+      if (value) filters.sets = filters.sets?.filter(s => s !== value)
+      break
     case 'keyword':
       if (value) filters.keywords = filters.keywords?.filter(k => k !== value)
       break
     case 'manaValue':
-      filters.manaValue = { min: undefined, max: undefined }
+      filters.manaValue = { min: undefined, max: undefined, values: undefined }
+      selectedManaValues.value = []
       break
     case 'power':
       filters.power = { min: undefined, max: undefined }
@@ -567,7 +665,7 @@ const removeFilter = (type: string, value?: string) => {
             :disabled="searchStore.loading"
             class="px-6 flex items-center gap-2"
         >
-          <SpriteIcon :name="searchStore.loading ? 'loading' : 'search'" size="tiny" />
+          <SvgIcon :name="searchStore.loading ? 'loading' : 'search'" size="tiny" />
           {{ searchStore.loading ? '' : t('search.filterPanel.searchButton') }}
         </BaseButton>
       </div>
@@ -581,14 +679,14 @@ const removeFilter = (type: string, value?: string) => {
               :key="color.value"
               @click="toggleColor(color.value)"
               :class="[
-                'w-8 h-8 text-sm font-bold transition-fast flex items-center justify-center',
+                'w-8 h-8 text-sm font-bold transition-fast flex items-center justify-center rounded',
                 filters.colors?.includes(color.value)
                   ? 'bg-neon text-primary border-2 border-neon'
                   : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
               ]"
               :title="color.label"
           >
-            {{ color.value === 'w' ? '⚪' : color.value === 'u' ? '🔵' : color.value === 'b' ? '⚫' : color.value === 'r' ? '🔴' : color.value === 'g' ? '🟢' : '◇' }}
+            <ManaIcon :symbol="color.value.toUpperCase()" size="small" />
           </button>
         </div>
 
@@ -638,6 +736,22 @@ const removeFilter = (type: string, value?: string) => {
 
         <span class="text-silver-30">|</span>
 
+        <!-- Only Released checkbox -->
+        <label class="flex items-center gap-1 cursor-pointer">
+          <input
+              v-model="filters.onlyReleased"
+              type="checkbox"
+              class="w-4 h-4 accent-neon"
+          />
+          <span class="text-tiny text-silver-70">{{ t('search.filterPanel.onlyReleased') }}</span>
+          <HelpTooltip
+              :text="t('help.tooltips.search.onlyReleased')"
+              :title="t('help.titles.onlyReleased')"
+          />
+        </label>
+
+        <span class="text-silver-30">|</span>
+
         <!-- Toggle Filtros Avanzados -->
         <button
             @click="showAdvancedFilters = !showAdvancedFilters"
@@ -648,7 +762,7 @@ const removeFilter = (type: string, value?: string) => {
                 : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
             ]"
         >
-          <SpriteIcon name="settings" size="tiny" />
+          <SvgIcon name="settings" size="tiny" />
           {{ t('search.filterPanel.moreFilters') }}
           <span v-if="activeFilterCount() > 0" class="bg-neon text-primary px-1 rounded text-tiny">{{ activeFilterCount() }}</span>
         </button>
@@ -705,6 +819,16 @@ const removeFilter = (type: string, value?: string) => {
           {{ getFormatLabel(format) }} <span class="opacity-70">×</span>
         </button>
 
+        <!-- Sets/Ediciones -->
+        <button
+            v-for="setCode in filters.sets"
+            :key="'set-' + setCode"
+            @click="removeFilter('set', setCode)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
+        >
+          {{ getSetName(setCode) }} <span class="opacity-70">×</span>
+        </button>
+
         <!-- Keywords -->
         <button
             v-for="keyword in filters.keywords"
@@ -717,11 +841,13 @@ const removeFilter = (type: string, value?: string) => {
 
         <!-- Mana Value -->
         <button
-            v-if="filters.manaValue?.min !== undefined || filters.manaValue?.max !== undefined"
+            v-if="filters.manaValue?.values?.length || filters.manaValue?.min !== undefined || filters.manaValue?.max !== undefined"
             @click="removeFilter('manaValue')"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
-          MV: {{ filters.manaValue?.min ?? '?' }}-{{ filters.manaValue?.max ?? '?' }} <span class="opacity-70">×</span>
+          MV: {{ filters.manaValue?.values?.length
+              ? filters.manaValue.values.map(v => v === 10 ? '10+' : v).join(', ')
+              : `${filters.manaValue?.min ?? '?'}-${filters.manaValue?.max ?? '?'}` }} <span class="opacity-70">×</span>
         </button>
 
         <!-- Power -->
@@ -855,24 +981,41 @@ const removeFilter = (type: string, value?: string) => {
         </div>
 
         <!-- Mana Value -->
-        <div>
-          <span id="mana-value-label" class="text-tiny font-bold text-silver-70 uppercase block mb-2">{{ t('search.modal.sections.manaValue') }}</span>
-          <div class="flex gap-2">
-            <input
-                v-model.number="filters.manaValue!.min"
-                type="number"
-                placeholder="Min"
-                aria-label="Mana Value minimum"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
+        <div class="md:col-span-2 lg:col-span-3">
+          <span id="mana-value-label" class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+            {{ t('search.modal.sections.manaValue') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.manaValue')"
+                :title="t('help.titles.manaValue')"
             />
-            <input
-                v-model.number="filters.manaValue!.max"
-                type="number"
-                placeholder="Max"
-                aria-label="Mana Value maximum"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
-            />
+          </span>
+          <div class="flex flex-wrap gap-1 items-center">
+            <button
+                v-for="mv in manaValueOptions"
+                :key="mv"
+                @click="toggleManaValue(mv)"
+                :class="[
+                  'w-8 h-8 flex items-center justify-center transition-fast rounded',
+                  isManaValueSelected(mv)
+                    ? 'bg-neon border-2 border-neon'
+                    : 'bg-silver-10 border border-silver-30 hover:border-neon'
+                ]"
+                :title="mv === 10 ? '10+' : String(mv)"
+            >
+              <ManaIcon v-if="mv < 10" :symbol="String(mv)" size="small" />
+              <span v-else class="text-tiny font-bold" :class="isManaValueSelected(mv) ? 'text-primary' : 'text-silver'">10+</span>
+            </button>
+            <button
+                v-if="selectedManaValues.length > 0"
+                @click="clearManaValueSelection"
+                class="ml-2 px-2 py-1 text-tiny text-rust hover:bg-rust hover:text-primary transition-fast border border-rust rounded"
+            >
+              ✕
+            </button>
           </div>
+          <p v-if="selectedManaValues.length > 0" class="text-tiny text-silver-50 mt-1">
+            MV: {{ [...selectedManaValues].sort((a, b) => a - b).map(v => v === 10 ? '10+' : v).join(', ') }}
+          </p>
         </div>
 
         <!-- Precio USD -->
@@ -957,6 +1100,86 @@ const removeFilter = (type: string, value?: string) => {
             >
               {{ format.label }}
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== EDICIONES / SETS ========== -->
+      <div class="border border-silver-30 rounded">
+        <button
+            @click="toggleAccordion('sets'); loadSets()"
+            class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+        >
+          <span class="text-small font-bold text-silver flex items-center gap-2">
+            {{ t('search.accordions.sets') }}
+            <HelpTooltip
+                :text="t('help.tooltips.search.sets')"
+                :title="t('help.titles.sets')"
+            />
+          </span>
+          <span class="flex items-center gap-2">
+            <span v-if="filters.sets?.length" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">
+              {{ filters.sets.length }}
+            </span>
+            <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('sets') }">▼</span>
+          </span>
+        </button>
+        <div v-if="isAccordionOpen('sets')" class="px-3 py-2 bg-silver-10/50">
+          <!-- Search input for sets -->
+          <div class="relative mb-2">
+            <input
+                v-model="setSearchQuery"
+                type="text"
+                :placeholder="t('search.filterPanel.setSearchPlaceholder')"
+                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+            />
+            <button
+                v-if="setSearchQuery.length > 0"
+                @click="setSearchQuery = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+                type="button"
+            >
+              ✕
+            </button>
+          </div>
+
+          <!-- Loading state -->
+          <div v-if="setsLoading" class="text-center py-4 text-silver-50 text-small">
+            {{ t('common.loading') }}...
+          </div>
+
+          <!-- Selected sets pills -->
+          <div v-if="filters.sets?.length" class="flex flex-wrap gap-1 mb-2 pb-2 border-b border-silver-30">
+            <button
+                v-for="setCode in filters.sets"
+                :key="'selected-' + setCode"
+                @click="toggleSet(setCode)"
+                class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast rounded"
+            >
+              {{ getSetName(setCode) }} <span class="opacity-70">×</span>
+            </button>
+          </div>
+
+          <!-- Sets list -->
+          <div v-if="!setsLoading" class="max-h-48 overflow-y-auto space-y-1">
+            <button
+                v-for="set in filteredSets"
+                :key="set.code"
+                @click="toggleSet(set.code)"
+                :class="[
+                  'w-full px-2 py-1.5 text-left text-small transition-fast flex items-center gap-2 rounded',
+                  filters.sets?.includes(set.code)
+                    ? 'bg-neon text-primary font-bold'
+                    : 'text-silver hover:bg-silver-10'
+                ]"
+            >
+              <img :src="set.icon_svg_uri" alt="" class="w-4 h-4" />
+              <span class="flex-1 truncate">{{ set.name }}</span>
+              <span class="text-tiny opacity-70">{{ set.code.toUpperCase() }}</span>
+            </button>
+            <p v-if="filteredSets.length === 0 && setSearchQuery" class="text-tiny text-silver-50 py-2">
+              {{ t('search.filterPanel.noSetsFound') }}
+            </p>
           </div>
         </div>
       </div>

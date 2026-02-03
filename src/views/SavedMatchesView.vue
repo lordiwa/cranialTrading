@@ -8,7 +8,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
-import SpriteIcon from '../components/ui/SpriteIcon.vue'
+import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
@@ -207,7 +207,7 @@ onUnmounted(() => {
               : 'border-transparent text-silver-70 hover:text-silver'
           ]"
         >
-          <SpriteIcon :name="tab.icon" size="small" />
+          <SvgIcon :name="tab.icon" size="small" />
           <span>{{ tab.label }}</span>
           <HelpTooltip
               :text="tab.id === 'new' ? t('help.tooltips.matches.tabNew') :

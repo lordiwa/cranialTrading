@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { debounce } from 'lodash-es'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
+import ManaCost from '../ui/ManaCost.vue'
 
 interface CardGridSearchProps {
   title: string
@@ -220,6 +221,7 @@ defineExpose({
               <p class="text-tiny font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors">
                 {{ card.name }}
               </p>
+              <ManaCost v-if="card.mana_cost" :cost="card.mana_cost" size="tiny" />
               <p class="text-tiny text-silver-70">
                 {{ card.set.toUpperCase() }}
               </p>

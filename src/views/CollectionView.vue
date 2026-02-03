@@ -32,7 +32,7 @@ import { searchCards, getCardsByIds } from '../services/scryfall'
 import { cleanCardName } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
-import SpriteIcon from '../components/ui/SpriteIcon.vue'
+import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import type { DeckFormat } from '../types/deck'
@@ -1766,7 +1766,7 @@ onUnmounted(() => {
                     :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
                     class="flex items-center gap-1 md:gap-2"
                 >
-                  <SpriteIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
+                  <SvgIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
                   <span class="hidden sm:inline">{{ isDeckPublic ? t('collection.visibility.public') : t('collection.visibility.private') }}</span>
                 </BaseButton>
                 <HelpTooltip :text="isDeckPublic ? t('help.tooltips.collection.deckPublic') : t('help.tooltips.collection.deckPrivate')" :title="t('help.titles.deckVisibility')" />
@@ -1924,7 +1924,7 @@ onUnmounted(() => {
                   ]"
                   :title="t('collection.view.grid')"
               >
-                <SpriteIcon name="collection" size="small" />
+                <SvgIcon name="collection" size="small" />
               </button>
               <button
                   @click="viewType = 'compact'"
@@ -1934,7 +1934,7 @@ onUnmounted(() => {
                   ]"
                   :title="t('collection.view.compact')"
               >
-                <SpriteIcon name="settings" size="small" />
+                <SvgIcon name="settings" size="small" />
               </button>
             </div>
           </div>

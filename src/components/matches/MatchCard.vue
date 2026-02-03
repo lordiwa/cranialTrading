@@ -91,7 +91,7 @@
     <!-- Match Type Badge -->
     <div class="flex gap-2 mb-6 items-center">
       <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-sm">
-        <SpriteIcon name="check" size="tiny" />
+        <SvgIcon name="check" size="tiny" />
         <p class="text-tiny font-bold text-neon">{{ t('matches.card.bidirectional') }}</p>
       </span>
       <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-sm">
@@ -115,7 +115,7 @@
             @click="handleSaveMatch"
             :disabled="saving"
         >
-          <SpriteIcon :name="saving ? 'loading' : 'star'" size="tiny" />
+          <SvgIcon :name="saving ? 'loading' : 'star'" size="tiny" />
           {{ saving ? t('common.actions.saving') : t('matches.actions.interested') }}
         </BaseButton>
         <BaseButton
@@ -123,7 +123,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleOpenChat"
         >
-          <SpriteIcon name="chat" size="tiny" />
+          <SvgIcon name="chat" size="tiny" />
           {{ t('matches.actions.message') }}
         </BaseButton>
         <BaseButton
@@ -131,7 +131,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleDiscard"
         >
-          <SpriteIcon name="x-mark" size="tiny" />
+          <SvgIcon name="x-mark" size="tiny" />
           {{ t('matches.actions.ignore') }}
         </BaseButton>
       </template>
@@ -142,7 +142,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleOpenChat"
         >
-          <SpriteIcon name="chat" size="tiny" />
+          <SvgIcon name="chat" size="tiny" />
           {{ t('matches.actions.message') }}
         </BaseButton>
         <BaseButton
@@ -150,7 +150,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="showContactModal = true"
         >
-          <SpriteIcon name="user" size="tiny" />
+          <SvgIcon name="user" size="tiny" />
           {{ t('matches.actions.contact') }}
         </BaseButton>
         <BaseButton
@@ -158,7 +158,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleMarcarCompletado"
         >
-          <SpriteIcon name="check" size="tiny" />
+          <SvgIcon name="check" size="tiny" />
           {{ t('matches.actions.completed') }}
         </BaseButton>
         <BaseButton
@@ -166,7 +166,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleDiscard"
         >
-          <SpriteIcon name="x-mark" size="tiny" />
+          <SvgIcon name="x-mark" size="tiny" />
           {{ t('matches.actions.delete') }}
         </BaseButton>
       </template>
@@ -178,7 +178,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleRecuperar"
         >
-          <SpriteIcon name="recover" size="tiny" />
+          <SvgIcon name="recover" size="tiny" />
           {{ t('matches.actions.recover') }}
         </BaseButton>
         <BaseButton
@@ -186,7 +186,7 @@
             class="flex-1 flex items-center justify-center gap-2"
             @click="handleDeletePermanent"
         >
-          <SpriteIcon name="trash" size="tiny" />
+          <SvgIcon name="trash" size="tiny" />
           {{ t('matches.actions.delete') }}
         </BaseButton>
       </template>
@@ -239,7 +239,7 @@
             class="w-full flex items-center justify-center gap-2"
             @click="copyEmailToClipboard"
         >
-          <SpriteIcon name="chat" size="tiny" />
+          <SvgIcon name="chat" size="tiny" />
           {{ t('matches.contactModal.copyEmail') }}
         </BaseButton>
 
@@ -250,7 +250,7 @@
             @click="handleSaveContact"
             :disabled="contactSaving"
         >
-          <SpriteIcon :name="contactSaving ? 'loading' : 'star'" size="tiny" />
+          <SvgIcon :name="contactSaving ? 'loading' : 'star'" size="tiny" />
           {{ contactSaving ? t('common.actions.saving') : t('matches.contactModal.saveContact') }}
         </BaseButton>
 
@@ -260,7 +260,7 @@
             class="w-full flex items-center justify-center gap-2"
             @click="showContactModal = false"
         >
-          <SpriteIcon name="x-mark" size="tiny" />
+          <SvgIcon name="x-mark" size="tiny" />
           {{ t('matches.contactModal.close') }}
         </BaseButton>
       </div>
@@ -282,7 +282,7 @@ import { useRouter } from 'vue-router'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import ChatModal from '../chat/ChatModal.vue'
-import SpriteIcon from '../ui/SpriteIcon.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { useToastStore } from '../../stores/toast'

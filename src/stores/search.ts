@@ -14,7 +14,7 @@ export interface FilterOptions {
     types?: string[]
 
     // Intermedios
-    manaValue?: { min?: number; max?: number; even?: boolean }
+    manaValue?: { min?: number; max?: number; even?: boolean; values?: number[] }
     rarity?: string[]
     sets?: string[]
 
@@ -26,6 +26,7 @@ export interface FilterOptions {
     keywords?: string[]
     isFoil?: boolean
     isFullArt?: boolean
+    onlyReleased?: boolean
 }
 
 export const useSearchStore = defineStore('search', () => {
@@ -71,6 +72,24 @@ export const useSearchStore = defineStore('search', () => {
         if (filters.manaValue) {
             if (filters.manaValue.even) {
                 parts.push('mv:even')
+            } else if (filters.manaValue.values && filters.manaValue.values.length > 0) {
+                // Discrete values: (mv=3 OR mv=4 OR mv=7)
+                // Check if 10 is included (means 10+)
+                const values = filters.manaValue.values
+                const has10Plus = values.includes(10)
+                const regularValues = values.filter(v => v < 10)
+
+                const mvParts: string[] = []
+                regularValues.forEach(v => mvParts.push(`mv=${v}`))
+                if (has10Plus) {
+                    mvParts.push('mv>=10')
+                }
+
+                if (mvParts.length === 1) {
+                    parts.push(mvParts[0])
+                } else if (mvParts.length > 1) {
+                    parts.push(`(${mvParts.join(' OR ')})`)
+                }
             } else {
                 if (filters.manaValue.min !== undefined) {
                     parts.push(`mv>=${filters.manaValue.min}`)
@@ -153,6 +172,11 @@ export const useSearchStore = defineStore('search', () => {
         // Full art
         if (filters.isFullArt) {
             parts.push('is:full')
+        }
+
+        // Only released (exclude preview/spoiler cards)
+        if (filters.onlyReleased) {
+            parts.push('-is:preview')
         }
 
         return parts.join(' ')

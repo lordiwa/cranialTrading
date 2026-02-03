@@ -4,6 +4,21 @@ const SCRYFALL_API = 'https://api.scryfall.com'
 const suggestionsCache = new Map<string, { results: string[], timestamp: number }>()
 const SUGGESTIONS_CACHE_TTL = 10 * 60 * 1000
 
+export interface ScryfallSet {
+    id: string
+    code: string
+    name: string
+    set_type: string
+    released_at?: string
+    card_count: number
+    icon_svg_uri: string
+    parent_set_code?: string
+}
+
+// Cache para sets (1 hora)
+const setsCache: { sets: ScryfallSet[], timestamp: number } | null = null
+const SETS_CACHE_TTL = 60 * 60 * 1000
+
 export interface ScryfallCard {
     id: string
     name: string
@@ -452,4 +467,53 @@ export const getCardsByIds = async (
 
     console.log(`✅ Obtenidas ${results.length}/${identifiers.length} cartas en batch`)
     return results
+}
+
+/**
+ * ✅ NUEVO: Obtener todas las ediciones/sets de Magic
+ * Usa el endpoint /sets de Scryfall con caché de 1 hora
+ */
+let cachedSets: { sets: ScryfallSet[], timestamp: number } | null = null
+
+export const getAllSets = async (): Promise<ScryfallSet[]> => {
+    try {
+        // Verificar caché
+        if (cachedSets && Date.now() - cachedSets.timestamp < SETS_CACHE_TTL) {
+            console.log('⚡ Usando caché para sets')
+            return cachedSets.sets
+        }
+
+        console.log('🔍 Obteniendo sets de Scryfall...')
+        const response = await fetch(`${SCRYFALL_API}/sets`)
+
+        if (!response.ok) {
+            throw new Error(`Scryfall sets API error: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const allSets: ScryfallSet[] = data.data || []
+
+        // Filtrar solo sets relevantes (excluir tokens, memorabilia, etc.)
+        const relevantTypes = ['core', 'expansion', 'masters', 'draft_innovation', 'commander', 'starter', 'reprint', 'box', 'from_the_vault', 'premium_deck', 'duel_deck', 'archenemy', 'planechase', 'conspiracy']
+        const filteredSets = allSets.filter(set =>
+            relevantTypes.includes(set.set_type) &&
+            set.card_count > 0
+        )
+
+        // Ordenar por fecha de lanzamiento (más reciente primero)
+        filteredSets.sort((a, b) => {
+            if (!a.released_at) return 1
+            if (!b.released_at) return -1
+            return new Date(b.released_at).getTime() - new Date(a.released_at).getTime()
+        })
+
+        // Guardar en caché
+        cachedSets = { sets: filteredSets, timestamp: Date.now() }
+
+        console.log(`✅ ${filteredSets.length} sets obtenidos`)
+        return filteredSets
+    } catch (error) {
+        console.error('Error en getAllSets:', error)
+        return []
+    }
 }

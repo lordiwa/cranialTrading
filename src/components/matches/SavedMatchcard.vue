@@ -66,14 +66,14 @@
             @click="$emit('save', match)"
             class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="check" size="tiny" />
+          <SvgIcon name="check" size="tiny" />
           {{ t('matches.actions.interested') }}
         </button>
         <button
             @click="$emit('discard', match.id, 'new')"
             class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="x-mark" size="tiny" />
+          <SvgIcon name="x-mark" size="tiny" />
           {{ t('matches.actions.ignore') }}
         </button>
       </template>
@@ -84,7 +84,7 @@
             @click="handleContactar"
             class="btn-primary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="chat" size="tiny" />
+          <SvgIcon name="chat" size="tiny" />
           {{ t('matches.actions.contact') }}
         </button>
 
@@ -92,7 +92,7 @@
             @click="$emit('marcar-completado', match.id)"
             class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="check" size="tiny" />
+          <SvgIcon name="check" size="tiny" />
           {{ t('matches.actions.completed') }}
         </button>
 
@@ -100,7 +100,7 @@
             @click="$emit('descartar', match.id)"
             class="btn-danger px-lg py-md text-small font-bold transition-fast flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="x-mark" size="tiny" />
+          <SvgIcon name="x-mark" size="tiny" />
           {{ t('matches.actions.delete') }}
         </button>
       </template>
@@ -111,14 +111,14 @@
             @click="$emit('recover', match.id)"
             class="btn-secondary px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="recover" size="tiny" />
+          <SvgIcon name="recover" size="tiny" />
           {{ t('matches.actions.recover') }}
         </button>
         <button
             @click="$emit('delete', match.id)"
             class="btn-danger px-lg py-md text-small font-bold transition-fast flex-1 flex items-center justify-center gap-2"
         >
-          <SpriteIcon name="trash" size="tiny" />
+          <SvgIcon name="trash" size="tiny" />
           {{ t('matches.actions.delete') }}
         </button>
       </template>
@@ -130,7 +130,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
-import SpriteIcon from '../ui/SpriteIcon.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
 import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const { t } = useI18n()

@@ -13,7 +13,7 @@ import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import HelpTooltip from '../components/ui/HelpTooltip.vue';
-import SpriteIcon from '../components/ui/SpriteIcon.vue';
+import SvgIcon from '../components/ui/SvgIcon.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -800,7 +800,7 @@ const handleDeleteAllData = async () => {
       <!-- Danger Zone -->
       <div class="bg-primary border border-rust p-6 md:p-8 mb-6 rounded-md">
         <h2 class="text-body font-bold text-rust mb-2 flex items-center gap-2">
-          <SpriteIcon name="warning" size="small" />
+          <SvgIcon name="warning" size="small" />
           {{ t('settings.dangerZone.title') }}
         </h2>
         <p class="text-small text-silver-50 mb-4">

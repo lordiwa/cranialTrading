@@ -7,7 +7,8 @@ import { searchCards } from '../../services/scryfall'
 import { collection, query, where, getDocs, limit } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useAuthStore } from '../../stores/auth'
-import SpriteIcon from './SpriteIcon.vue'
+import SvgIcon from './SvgIcon.vue'
+import ManaCost from './ManaCost.vue'
 import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const router = useRouter()
@@ -181,7 +182,7 @@ defineExpose({
   <div ref="containerRef" class="relative">
     <!-- Search Input -->
     <div class="relative">
-      <SpriteIcon
+      <SvgIcon
         name="search"
         size="small"
         class="absolute left-3 top-1/2 -translate-y-1/2 text-silver-50 pointer-events-none"
@@ -331,7 +332,10 @@ defineExpose({
             />
             <div class="flex-1 min-w-0">
               <p class="text-small font-bold text-silver truncate">{{ card.name }}</p>
-              <p class="text-tiny text-silver-50">{{ card.set_name }}</p>
+              <div class="flex items-center gap-2">
+                <ManaCost v-if="card.mana_cost" :cost="card.mana_cost" size="tiny" />
+                <span class="text-tiny text-silver-50">{{ card.set_name }}</span>
+              </div>
             </div>
             <span class="text-tiny text-neon">+ {{ t('header.search.addToCollection') }}</span>
           </button>

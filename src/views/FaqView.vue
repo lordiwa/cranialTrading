@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
-import SpriteIcon from '../components/ui/SpriteIcon.vue'
+import SvgIcon from '../components/ui/SvgIcon.vue'
 import esLocale from '../locales/es.json'
 
 const { t } = useI18n()
@@ -65,7 +65,7 @@ const collapseAll = () => {
       <!-- Getting Started Guide -->
       <section class="mb-10">
         <h2 class="text-h2 font-bold text-neon mb-4 flex items-center gap-2">
-          <SpriteIcon name="star" size="small" />
+          <SvgIcon name="star" size="small" />
           {{ gettingStarted.title }}
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -84,7 +84,7 @@ const collapseAll = () => {
       <section class="mb-10">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-h2 font-bold text-neon flex items-center gap-2">
-            <SpriteIcon name="chat" size="small" />
+            <SvgIcon name="chat" size="small" />
             Preguntas Frecuentes
           </h2>
           <div class="flex gap-2">
@@ -116,7 +116,7 @@ const collapseAll = () => {
                 class="w-full flex items-center justify-between p-4 text-left hover:bg-silver-5 transition-colors"
             >
               <span class="text-body font-bold text-silver pr-4">{{ item.q }}</span>
-              <SpriteIcon
+              <SvgIcon
                   :name="isExpanded(index) ? 'chevron-up' : 'chevron-down'"
                   size="small"
                   class="text-silver-50 flex-shrink-0 transition-transform"
@@ -147,7 +147,7 @@ const collapseAll = () => {
       <!-- Trading Safety Tips -->
       <section class="mb-10">
         <h2 class="text-h2 font-bold text-neon mb-4 flex items-center gap-2">
-          <SpriteIcon name="eye-open" size="small" />
+          <SvgIcon name="eye-open" size="small" />
           {{ t('help.guides.tradeSafety.title') }}
         </h2>
         <div class="bg-primary border border-silver-30 p-6 rounded-md">
@@ -176,7 +176,7 @@ const collapseAll = () => {
             href="mailto:support@cranialtrading.com"
             class="inline-flex items-center gap-2 text-neon hover:underline text-small font-bold"
         >
-          <SpriteIcon name="chat" size="tiny" />
+          <SvgIcon name="chat" size="tiny" />
           support@cranialtrading.com
         </a>
       </section>

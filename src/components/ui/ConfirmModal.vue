@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useConfirmStore } from '../../stores/confirm'
-import SpriteIcon from './SpriteIcon.vue'
+import SvgIcon from './SvgIcon.vue'
 
 const confirmStore = useConfirmStore()
 
@@ -40,7 +40,7 @@ const getIconName = () => {
                 class="p-3 border rounded"
                 :class="confirmStore.options.confirmVariant === 'danger' ? 'border-rust bg-rust/10' : 'border-neon bg-neon/10'"
             >
-              <SpriteIcon
+              <SvgIcon
                   :name="getIconName()"
                   size="large"
                   :class="confirmStore.options.confirmVariant === 'danger' ? 'text-rust' : 'text-neon'"

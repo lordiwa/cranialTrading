@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useI18n } from '../../composables/useI18n'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
+import SvgIcon from './SvgIcon.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -12,6 +13,7 @@ const { t } = useI18n()
 
 const isOpen = ref(false)
 const popoverRef = ref<HTMLElement | null>(null)
+const avatarError = ref(false)
 
 // Location editing
 const editingLocation = ref(false)
@@ -137,6 +139,7 @@ const startEditAvatar = () => {
   newAvatarUrl.value = ''
   selectedFile.value = null
   avatarPreview.value = avatarUrl.value
+  avatarError.value = false
   editingAvatar.value = true
 }
 
@@ -175,6 +178,7 @@ const saveAvatar = async () => {
     editingAvatar.value = false
     selectedFile.value = null
     newAvatarUrl.value = ''
+    avatarError.value = false
   }
 }
 
@@ -212,10 +216,18 @@ const handleLogout = async () => {
         :title="t('header.profile.viewPublicProfile')"
     >
       <img
+          v-if="!avatarError"
           :src="avatarUrl"
           alt="Avatar"
-          class="w-8 h-8 rounded-full bg-silver-10 border-2 border-transparent hover:border-neon transition-fast"
+          class="w-8 h-8 rounded-full bg-silver-10 border-2 border-transparent hover:border-neon transition-fast object-cover"
+          @error="avatarError = true"
       />
+      <span
+          v-else
+          class="w-8 h-8 rounded-full bg-silver-20 border-2 border-silver-30 hover:border-neon transition-fast flex items-center justify-center"
+      >
+        <SvgIcon name="user" size="small" />
+      </span>
     </button>
 
     <!-- Popover content -->
@@ -236,10 +248,18 @@ const handleLogout = async () => {
           <div class="flex items-center gap-3">
             <div class="relative group">
               <img
+                  v-if="!avatarError || editingAvatar"
                   :src="editingAvatar ? avatarPreview : avatarUrl"
                   alt="Avatar"
                   class="w-14 h-14 rounded-full bg-silver-10 object-cover"
+                  @error="avatarError = true"
               />
+              <span
+                  v-else
+                  class="w-14 h-14 rounded-full bg-silver-10 flex items-center justify-center"
+              >
+                <SvgIcon name="user" size="large" />
+              </span>
               <button
                   v-if="!editingAvatar"
                   @click.stop="startEditAvatar"

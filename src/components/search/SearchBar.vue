@@ -5,7 +5,7 @@ import { searchCards, getCardSuggestions } from '../../services/scryfall'
 import { useToastStore } from '../../stores/toast'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseButton from '../ui/BaseButton.vue'
-import SpriteIcon from '../ui/SpriteIcon.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
 
 const { t } = useI18n()
 const toastStore = useToastStore()
@@ -121,7 +121,7 @@ const selectCard = (card: any) => {
             :disabled="!searchQuery.trim() || loading"
             class="whitespace-nowrap flex items-center gap-2"
         >
-          <SpriteIcon :name="loading ? 'loading' : 'search'" size="tiny" />
+          <SvgIcon :name="loading ? 'loading' : 'search'" size="tiny" />
           {{ loading ? '' : t('search.bar.searchButton') }}
         </BaseButton>
       </div>

@@ -1,0 +1,1498 @@
+{
+  "common": {
+    "actions": {
+      "save": "SAVE",
+      "cancel": "CANCEL",
+      "delete": "DELETE",
+      "edit": "EDIT",
+      "add": "ADD",
+      "close": "CLOSE",
+      "search": "SEARCH",
+      "back": "BACK",
+      "confirm": "CONFIRM",
+      "create": "CREATE",
+      "update": "UPDATE",
+      "import": "IMPORT",
+      "export": "EXPORT",
+      "loading": "LOADING...",
+      "saving": "SAVING...",
+      "sending": "SENDING...",
+      "loadMore": "LOAD MORE",
+      "retry": "RETRY",
+      "apply": "APPLY",
+      "clear": "CLEAR"
+    },
+    "labels": {
+      "quantity": "Quantity",
+      "condition": "Condition",
+      "foil": "Foil",
+      "status": "Status",
+      "format": "Format",
+      "name": "Name",
+      "description": "Description",
+      "location": "Location",
+      "email": "Email",
+      "password": "Password",
+      "edition": "Edition",
+      "price": "Price",
+      "total": "Total",
+      "type": "Type",
+      "colors": "Colors",
+      "date": "Date",
+      "user": "User"
+    },
+    "status": {
+      "collection": "Collection",
+      "sale": "For Sale",
+      "trade": "For Trade",
+      "wishlist": "Wishlist"
+    },
+    "conditions": {
+      "M": "M - Mint",
+      "NM": "NM - Near Mint",
+      "LP": "LP - Light Play",
+      "MP": "MP - Moderate Play",
+      "HP": "HP - Heavy Play",
+      "PO": "PO - Poor"
+    },
+    "formats": {
+      "standard": "Standard",
+      "modern": "Modern",
+      "commander": "Commander / EDH",
+      "vintage": "Vintage",
+      "custom": "Custom / Casual",
+      "pioneer": "Pioneer",
+      "legacy": "Legacy"
+    },
+    "colors": {
+      "white": "White",
+      "blue": "Blue",
+      "black": "Black",
+      "red": "Red",
+      "green": "Green",
+      "colorless": "Colorless"
+    },
+    "time": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "daysAgo": "{days} days ago",
+      "updated": "Updated"
+    },
+    "empty": {
+      "noResults": "No results found",
+      "noData": "No data available"
+    }
+  },
+
+  "auth": {
+    "login": {
+      "title": "SIGN IN",
+      "subtitle": "Magic: The Gathering Trading Platform",
+      "emailPlaceholder": "your@email.com",
+      "passwordPlaceholder": "Password",
+      "submit": "SIGN IN",
+      "submitting": "SIGNING IN...",
+      "forgotPassword": "Forgot your password?",
+      "noAccount": "Don't have an account?",
+      "register": "Register",
+      "secureConnection": "Secure connection",
+      "firebaseAuth": "Firebase Auth"
+    },
+    "register": {
+      "title": "REGISTER",
+      "subtitle": "CRANIAL TRADING",
+      "emailLabel": "Email",
+      "passwordLabel": "Password (minimum 6 characters)",
+      "usernameLabel": "Username",
+      "locationLabel": "Location (e.g.: New York, USA)",
+      "submit": "CREATE ACCOUNT",
+      "submitting": "CREATING ACCOUNT...",
+      "hasAccount": "Already have an account?",
+      "login": "Sign in"
+    },
+    "verify": {
+      "title": "VERIFY YOUR EMAIL",
+      "message": "We've sent an email to",
+      "instruction": "Click the link to verify your account. If you don't see it, check spam.",
+      "checkButton": "I VERIFIED",
+      "checking": "VERIFYING...",
+      "resend": "RESEND EMAIL"
+    },
+    "forgotPassword": {
+      "title": "RECOVER PASSWORD",
+      "instruction": "Enter your email and we'll send you a link to reset your password.",
+      "emailPlaceholder": "your@email.com",
+      "submit": "SEND LINK",
+      "submitting": "SENDING...",
+      "success": "Email sent",
+      "successMessage": "Check your email for the recovery link. If you don't see it, check spam.",
+      "backToLogin": "Back to login"
+    },
+    "resetPassword": {
+      "title": "NEW PASSWORD",
+      "newPasswordPlaceholder": "New password",
+      "confirmPasswordPlaceholder": "Confirm password",
+      "passwordMismatch": "Passwords don't match",
+      "submit": "RESET",
+      "submitting": "RESETTING...",
+      "invalidLink": "Invalid link",
+      "invalidLinkMessage": "The recovery link is invalid or expired.",
+      "requestNewLink": "Request new link",
+      "backToLogin": "Back to login"
+    },
+    "messages": {
+      "accountCreated": "Account created. Verify your email",
+      "registerError": "Registration error",
+      "loginSuccess": "Signed in",
+      "verifyEmail": "Please verify your email",
+      "invalidCredentials": "Invalid email or password",
+      "logoutSuccess": "Signed out",
+      "logoutError": "Sign out error",
+      "recoveryEmailSent": "Recovery email sent",
+      "emailNotRegistered": "Email not registered",
+      "sendEmailError": "Error sending email",
+      "passwordReset": "Password reset",
+      "linkExpired": "Link expired or invalid",
+      "weakPassword": "Weak password",
+      "resetError": "Reset error",
+      "notAuthenticated": "User not authenticated",
+      "wrongCurrentPassword": "Wrong current password",
+      "weakNewPassword": "Weak new password",
+      "changePasswordError": "Error changing password",
+      "verificationEmailSent": "Verification email sent",
+      "verifyEmailError": "Error verifying email",
+      "saveUserError": "Error saving user data",
+      "loadUserError": "Error loading user data",
+      "passwordUpdated": "Password updated"
+    }
+  },
+
+  "landing": {
+    "tagline": "From Trash to Treasures",
+    "subtitle": "Your bulk isn't trash. It's another collector's treasure.",
+    "description": "We connect Magic traders so you can turn those forgotten cards into real value.",
+    "features": {
+      "collection": {
+        "title": "Manage Your Collection",
+        "description": "Organize all your cards with updated prices"
+      },
+      "matches": {
+        "title": "Find Matches",
+        "description": "Our algorithm finds compatible traders"
+      },
+      "bulk": {
+        "title": "Monetize Your Bulk",
+        "description": "Those cards you think are worthless, someone is looking for them"
+      },
+      "connect": {
+        "title": "Connect with Traders",
+        "description": "Direct messaging to close trades"
+      }
+    },
+    "stats": {
+      "free": "Free",
+      "p2p": "No middlemen",
+      "mtg": "Specialized"
+    },
+    "footer": {
+      "platform": "PLATFORM",
+      "resources": "RESOURCES",
+      "legal": "LEGAL"
+    }
+  },
+
+  "header": {
+    "nav": {
+      "search": "Search",
+      "collection": "Collection",
+      "saved": "Saved",
+      "messages": "Messages",
+      "contacts": "Contacts"
+    },
+    "profile": {
+      "myProfile": "My Profile",
+      "viewPublicProfile": "View my public profile",
+      "settings": "Settings",
+      "logout": "Sign out"
+    },
+    "auth": {
+      "login": "Login",
+      "register": "Register"
+    },
+    "locationSuggestion": {
+      "message": "We detected you're in {location}. Update your location?",
+      "update": "UPDATE"
+    },
+    "search": {
+      "placeholder": "Search cards...",
+      "tabs": {
+        "collection": "My collection",
+        "users": "Other users",
+        "scryfall": "Scryfall"
+      },
+      "noResults": "No results",
+      "addToCollection": "Add"
+    }
+  },
+
+  "dashboard": {
+    "title": "FIND MATCHES",
+    "matchesFound": "matches found",
+    "calculating": "CALCULATING...",
+    "recalculate": "RECALCULATE",
+    "syncing": "SYNCING...",
+    "sync": "SYNC",
+    "lastSync": "Last sync",
+    "justNow": "just now",
+    "minutesAgo": "{mins} min ago",
+    "hoursAgo": "{hours}h ago",
+    "deleteData": "DELETE MY DATA",
+    "searchOthers": {
+      "title": "SEARCH OTHER USERS' CARDS",
+      "placeholder": "Card name...",
+      "search": "SEARCH",
+      "noImage": "No image",
+      "noOwner": "No owner",
+      "addToWishlist": "+ I NEED",
+      "interested": "I'M INTERESTED",
+      "sent": "Sent",
+      "noOwners": "No user has this card available. Need it? Add it to your wishlist:",
+      "notFound": "No card found with that name."
+    },
+    "calculatingMatches": {
+      "title": "CALCULATING MATCHES",
+      "loading": "Loading data..."
+    },
+    "clearData": {
+      "title": "Delete all data",
+      "message": "Delete ALL your cards, preferences, matches and decks? This action cannot be undone.",
+      "confirm": "DELETE ALL",
+      "progress": "Deleting data...",
+      "deleting": "Deleting {step}...",
+      "complete": "All data deleted",
+      "withErrors": "Deleted with {count} error(s)",
+      "resuming": "Resuming data deletion..."
+    },
+    "interest": {
+      "sent": "Interest sent to @{username}",
+      "error": "Error sending interest"
+    },
+    "wishlist": {
+      "added": "{name} added to your wishlist"
+    },
+    "empty": {
+      "noCardsOrPrefs": "You have no cards or preferences",
+      "addCardsOrPrefs": "Add cards to your collection or create a preference to find matches automatically.",
+      "viewCollection": "VIEW MY COLLECTION",
+      "noMatches": "No matches available",
+      "usersInPlatform": "There are {count} users on the platform..."
+    }
+  },
+
+  "collection": {
+    "title": "MY COLLECTION",
+    "subtitle": "{owned} cards owned",
+    "wishlistCount": "{count} in wishlist",
+    "tabs": {
+      "collection": "MY COLLECTION",
+      "decks": "DECKS"
+    },
+    "fab": {
+      "addCard": "Add card"
+    },
+    "filters": {
+      "all": "ALL",
+      "owned": "OWNED",
+      "available": "AVAILABLE",
+      "wishlist": "WANTED",
+      "searchPlaceholder": "Search by name..."
+    },
+    "sort": {
+      "label": "Sort",
+      "recent": "Recent",
+      "name": "Name",
+      "price": "Price"
+    },
+    "view": {
+      "grid": "Grid view",
+      "compact": "Compact view"
+    },
+    "group": {
+      "none": "None"
+    },
+    "sections": {
+      "myCards": "CARDS I OWN",
+      "mainboard": "MAINBOARD",
+      "sideboard": "SIDEBOARD",
+      "myWishlist": "MY WISHLIST"
+    },
+    "empty": {
+      "deckEmpty": "Empty deck",
+      "deckNoCards": "This deck has no assigned cards",
+      "noCards": "No cards",
+      "searchToAdd": "Search cards above to add them"
+    },
+    "deckStats": {
+      "have": "Have",
+      "need": "Need",
+      "total": "Total",
+      "valueHave": "Value Owned",
+      "valueNeed": "Value Needed",
+      "valueTotal": "Total Value",
+      "completed": "Completed",
+      "groupBy": "Group by:",
+      "type": "Type",
+      "mana": "Mana",
+      "color": "Color"
+    },
+    "visibility": {
+      "public": "PUBLIC",
+      "private": "PRIVATE"
+    },
+    "actions": {
+      "newDeck": "+ NEW DECK",
+      "import": "IMPORT",
+      "createDeck": "+ CREATE DECK",
+      "new": "+ NEW"
+    },
+    "searchResults": {
+      "title": "SEARCH RESULTS",
+      "subtitle": "{count} cards found - Click to add",
+      "back": "BACK"
+    },
+    "noDecks": "You have no decks created.",
+    "totals": {
+      "title": "COLLECTION VALUE",
+      "update": "UPDATE",
+      "loading": "Loading prices... {progress}%",
+      "headers": {
+        "collection": "COLLECTION",
+        "wishlist": "WISHLIST",
+        "forSale": "FOR SALE",
+        "total": "TOTAL"
+      }
+    },
+    "messages": {
+      "loadError": "Error loading collection",
+      "addError": "Error adding card",
+      "updateError": "Error updating card",
+      "deleteError": "Error deleting card",
+      "allDeleted": "All cards were deleted",
+      "deleteAllError": "Error deleting cards",
+      "batchUpdateError": "Error updating cards",
+      "batchDeleteError": "Error deleting cards",
+      "imported": "{count} cards imported",
+      "importError": "Error importing cards",
+      "synced": "Cards synced for matches",
+      "syncError": "Error syncing cards"
+    }
+  },
+
+  "cards": {
+    "addModal": {
+      "title": "ADD CARD",
+      "editionLabel": "Edition / Print",
+      "printsAvailable": "{count} prints available",
+      "quantityLabel": "Quantity",
+      "conditionLabel": "Condition",
+      "foilLabel": "Foil",
+      "statusLabel": "Status",
+      "statusOptions": {
+        "collection": "Personal Collection",
+        "sale": "For Sale",
+        "trade": "Available for Trade",
+        "wishlist": "Wanted / Wishlist"
+      },
+      "publishLabel": "Publish on my profile",
+      "publishHint": "Visible at /@{username}",
+      "assignDeck": "Assign to Deck",
+      "priceTCG": "TCG: ${price}",
+      "priceCK": "CK: {price}",
+      "priceBuylist": "BL: {price}",
+      "submit": "ADD",
+      "submitting": "SAVING...",
+      "success": "✓ {name} added",
+      "splitCardSide": "Side {current} of {total}"
+    },
+    "editModal": {
+      "title": "EDIT CARD",
+      "subtitle": "Modify your card details",
+      "loadingPrices": "Loading CK prices...",
+      "loadingPrints": "Loading prints...",
+      "allocations": {
+        "title": "ASSIGNED TO DECKS",
+        "inDeck": "{qty} in {deckName}",
+        "sideboard": "(SB)",
+        "total": "Total: {allocated} assigned, {available} available"
+      },
+      "quantityWarning": "{excess} copy(ies) to wishlist",
+      "note": "Changes will be reflected in all decks using this card.",
+      "submit": "SAVE CHANGES"
+    },
+    "statusModal": {
+      "title": "CHANGE STATUS",
+      "subtitle": "Manage this card's status",
+      "prices": "Prices:",
+      "loadingCKPrices": "Loading CK prices...",
+      "currentStatus": "Current status:",
+      "newStatus": "New status",
+      "statusOptions": {
+        "collection": "In collection",
+        "sale": "For sale",
+        "trade": "For trade",
+        "wishlist": "Wanted"
+      },
+      "statusInfo": {
+        "collection": {
+          "icon": "✓",
+          "label": "COLLECTION",
+          "description": "Cards you own"
+        },
+        "sale": {
+          "icon": "💰",
+          "label": "SALE",
+          "description": "Cards to sell"
+        },
+        "trade": {
+          "icon": "🔄",
+          "label": "TRADE",
+          "description": "Cards to trade"
+        },
+        "wishlist": {
+          "icon": "⭐",
+          "label": "WANTED",
+          "description": "Cards you're looking for"
+        }
+      },
+      "publishLabel": "Publish on my profile",
+      "publishHint": "Visible to other users on your public profile",
+      "submit": "✓ CHANGE"
+    },
+    "detailModal": {
+      "title": "CARD DETAILS",
+      "subtitle": "Manage your card and distribute by status",
+      "distribution": "DISTRIBUTION BY STATUS",
+      "totalLabel": "Total: {qty}",
+      "properties": "PROPERTIES",
+      "conditionLabel": "Condition",
+      "foilLabel": "Foil",
+      "assignToDecks": "ASSIGN TO DECKS",
+      "available": "{qty} available",
+      "deckFormat": "{format}",
+      "sideboardToggle": {
+        "sideboard": "SB",
+        "mainboard": "MB"
+      },
+      "totalAssigned": "Total assigned: {qty}",
+      "noImage": "No image",
+      "allocatedIn": "ASSIGNED TO DECKS",
+      "quantityMin": "Quantity must be at least 1",
+      "validationMinCopy": "You must have at least 1 copy",
+      "allocationWarning": "{excess} card(s) assigned to decks will move to wishlist",
+      "loadingPrints": "Loading prints...",
+      "printsAvailable": "{count} prints available",
+      "editionPrintLabel": "Edition / Print",
+      "updated": "Card updated",
+      "saveError": "Error saving changes"
+    },
+    "grid": {
+      "perUnit": "${price} ea",
+      "total": "${price}",
+      "clickToEdit": "CLICK TO EDIT",
+      "available": "avail",
+      "inDecks": "{qty} in decks",
+      "interestSent": "✓ INTEREST SENT",
+      "interested": "⭐ I'M INTERESTED",
+      "noImage": "No image",
+      "noImg": "No img",
+      "delete": "DELETE",
+      "deleting": "DELETING...",
+      "visibleInProfile": "Card visible on profile",
+      "hiddenFromProfile": "Card hidden from profile",
+      "visibilityError": "Error changing visibility",
+      "visibleTitle": "Visible on profile (click to hide)",
+      "hiddenTitle": "Hidden from profile (click to show)",
+      "flipTitle": "Click to see the other side",
+      "availableOf": "{available} available of {total} ({allocated} in decks)",
+      "copiesInCollection": "{qty} copies in collection",
+      "inDeck": "{qty}x in {deckName}",
+      "public": "PUBLIC",
+      "private": "PRIVATE",
+      "deleteTitle": "Delete card",
+      "statusChanged": "Status changed to {status}",
+      "statusError": "Error changing status"
+    }
+  },
+
+  "decks": {
+    "title": "MY DECKS",
+    "subtitle": "{count} decks created",
+    "actions": {
+      "newDeck": "+ NEW DECK",
+      "import": "IMPORT",
+      "editDeck": "EDIT DECK"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by name or description...",
+      "format": "Format",
+      "all": "ALL"
+    },
+    "empty": {
+      "noDecks": "No decks",
+      "createFirst": "Create your first deck to get started",
+      "noResults": "No decks found with these filters",
+      "createButton": "CREATE FIRST DECK"
+    },
+    "card": {
+      "noDescription": "No description",
+      "stats": {
+        "cards": "CARDS",
+        "cost": "COST",
+        "collection": "COLL."
+      },
+      "updated": "Updated: {date}",
+      "edit": "EDIT",
+      "delete": "DELETE"
+    },
+    "createModal": {
+      "title": "CREATE NEW DECK",
+      "subtitle": "Define your deck's basic details",
+      "nameLabel": "Deck Name *",
+      "namePlaceholder": "Ex: RDW Modern",
+      "formatLabel": "Format",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Describe your strategy, meta, notes...",
+      "cardListLabel": "Card list (optional)",
+      "cardListPlaceholder": "Paste your list here: 4 Lightning Bolt...",
+      "colorsLabel": "Colors",
+      "preview": "{total} cards detected",
+      "previewDetail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
+      "validation": {
+        "nameRequired": "Deck name is required"
+      },
+      "submit": "CREATE DECK"
+    },
+    "importModal": {
+      "title": "IMPORT DECK",
+      "inputLabel": "Moxfield link or deck text",
+      "inputPlaceholder": "https://moxfield.com/decks/... or 3 Arid Mesa...",
+      "analyze": "ANALYZE",
+      "analyzing": "ANALYZING...",
+      "moxfieldDetected": {
+        "title": "Moxfield link detected",
+        "instruction": "Moxfield doesn't allow direct imports. Follow these steps:",
+        "step1": "1. Open the deck on Moxfield",
+        "step2": "2. Click on Export (top right)",
+        "step3": "3. Click on Copy to Clipboard",
+        "step4": "4. Paste the text here"
+      },
+      "preview": {
+        "total": "Total: {total} cards",
+        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}"
+      },
+      "options": {
+        "conditionLabel": "Default condition",
+        "includeSideboard": "Include sideboard",
+        "deckNameLabel": "Deck name (optional)",
+        "deckNamePlaceholder": "Leave empty to generate a random name",
+        "formatLabel": "Format",
+        "commanderLabel": "Commander",
+        "commanderPlaceholder": "Commander name...",
+        "commanderHint": "Type the name or select from imported cards",
+        "makePublic": "Make all these cards public"
+      },
+      "submit": "IMPORT {count} CARDS"
+    },
+    "editDeckCard": {
+      "titleWishlist": "EDIT WISHLIST",
+      "titleOwned": "EDIT CARD",
+      "subtitleOwned": "Modifying this card will update your collection",
+      "subtitleWishlist": "Modify the wishlist card details",
+      "loadingCKPrices": "Loading CK prices...",
+      "inYourCollection": "IN YOUR COLLECTION",
+      "copiesTotal": "{qty} total copies,",
+      "available": "{qty} available",
+      "usedIn": "Used in:",
+      "editionPrint": "Edition / Print",
+      "printsAvailable": "{count} prints available",
+      "loadingPrints": "Loading prints...",
+      "quantityAssigned": "Quantity assigned",
+      "quantityDesired": "Quantity desired",
+      "maxQty": "(max: {max})",
+      "conditionLabel": "Condition",
+      "foilLabel": "Foil",
+      "infoMessage": "Print, condition and foil changes will update the card in your collection. Only the assigned quantity is specific to this deck.",
+      "submit": "SAVE CHANGES",
+      "onlyAvailable": "Only {max} available",
+      "quantityMin": "Quantity must be at least 1"
+    },
+    "addToDeck": {
+      "title": "ADD CARD TO DECK",
+      "subtitle": "Search and select a card",
+      "searchLabel": "Search Card",
+      "searchPlaceholder": "Ex: Black Lotus, Ragavan, Counterspell...",
+      "searchError": "Search error",
+      "noResults": "No results found for \"{query}\"",
+      "resultsCount": "{count} results - Click to add",
+      "noImage": "No image",
+      "emptyState": "Type a card name to search",
+      "addTo": "ADD TO {section}",
+      "configureAdd": "Configure how you want to add this card",
+      "cardSource": "CARD SOURCE",
+      "noCardInCollection": "You don't have this card in your collection",
+      "addToWishlist": "+ Add to Wishlist (don't have)",
+      "addToCollectionFirst": "+ Add to my collection first",
+      "wishlistOption": "Wishlist",
+      "addToCollection": "Add to Collection",
+      "quantityLabel": "Quantity",
+      "availableDisp": "{available} / {total} avail.",
+      "selectCard": "Select a card",
+      "assignFromCollection": "ASSIGN FROM COLLECTION",
+      "addToCollectionAndDeck": "ADD TO COLLECTION AND DECK",
+      "addToWishlistBtn": "ADD TO WISHLIST",
+      "goBack": "← BACK",
+      "noFoil": "No Foil"
+    },
+    "cardsList": {
+      "uniqueCards": "UNIQUE CARDS",
+      "totalCards": "TOTAL CARDS",
+      "inCollection": "IN COLLECTION",
+      "wishlist": "WISHLIST",
+      "noCardsIn": "No cards in {section}",
+      "headers": {
+        "qty": "QTY",
+        "card": "CARD",
+        "edition": "EDITION",
+        "status": "STATUS",
+        "price": "PRICE",
+        "actions": "ACTIONS"
+      },
+      "perUnit": "ea",
+      "available": "avail.",
+      "inCollectionCount": "{total} in collection ({available} avail.)",
+      "edit": "EDIT",
+      "editTitle": "Edit",
+      "remove": "REMOVE",
+      "removeTitle": "Remove from deck",
+      "legend": {
+        "inCollection": "In collection",
+        "wishlist": "Wishlist (need to buy)"
+      }
+    },
+    "editor": {
+      "title": "EDITOR: {name}",
+      "complete": "complete",
+      "save": "SAVE",
+      "back": "← BACK",
+      "stats": {
+        "format": "FORMAT",
+        "cards": "CARDS",
+        "inCollection": "IN COLLECTION",
+        "wishlist": "WISHLIST"
+      },
+      "colors": "COLORS",
+      "noColors": "No colors defined",
+      "sections": {
+        "mainboard": "MAINBOARD",
+        "sideboard": "SIDEBOARD"
+      },
+      "addCard": "+ ADD CARD",
+      "removeFromDeck": "Remove from deck",
+      "confirmRemove": "Remove \"{name}\" from deck?",
+      "messages": {
+        "cardRemoved": "Card removed from deck",
+        "cardUpdated": "Card updated",
+        "cardAdded": "Card added to {section}",
+        "cardAddedToCollection": "Card added to collection and {section}",
+        "cardAddedToWishlist": "Card added to {section} wishlist",
+        "quantityUpdated": "Quantity updated",
+        "alreadyInWishlist": "This card is already in your deck wishlist",
+        "nameRequired": "Deck name is required",
+        "saved": "Deck saved",
+        "notFound": "Deck not found"
+      }
+    },
+    "detail": {
+      "stats": {
+        "total": "TOTAL",
+        "inCollection": "IN COLLECTION",
+        "wishlist": "WISHLIST",
+        "totalCost": "TOTAL COST"
+      },
+      "sections": {
+        "mainboard": "MAINBOARD",
+        "sideboard": "SIDEBOARD",
+        "stats": "STATISTICS"
+      },
+      "edit": "EDIT",
+      "back": "← BACK",
+      "updated": "Updated:",
+      "notFound": "Deck not found",
+      "backToDecks": "BACK TO DECKS"
+    },
+    "manageModal": {
+      "title": "ASSIGN TO DECKS",
+      "subtitle": "Manage which decks have this card",
+      "totalCopies": "{qty} total copies",
+      "unassigned": "{qty} unassigned",
+      "sideToggle": {
+        "side": "SIDE",
+        "main": "MAIN"
+      },
+      "noDecks": "You have no decks created",
+      "allocationsUpdated": "Allocations updated",
+      "saveError": "Error saving",
+      "onlyAvailable": "You only have {qty} copies available"
+    },
+    "importResult": {
+      "title": "IMPORT RESULTS",
+      "total": "TOTAL",
+      "success": "SUCCESSFUL",
+      "failed": "FAILED",
+      "successRate": "Success rate:",
+      "notFound": "CARDS NOT FOUND",
+      "confirmMessage": "Do you want to add the",
+      "correctCards": "{count} correct cards",
+      "toCollection": "to your collection?",
+      "notAddedNote": "Cards not found will not be added. You can try importing them manually later.",
+      "addCards": "ADD {count} CARDS"
+    },
+    "editorGrid": {
+      "noImage": "No image",
+      "tcg": "TCG:",
+      "total": "Total:",
+      "noCardsInCollection": "You don't have this card in collection",
+      "noCards": "No cards",
+      "emptyBoard": "No cards in this board",
+      "removeCommander": "★ REMOVE COMMANDER",
+      "makeCommander": "☆ MAKE COMMANDER",
+      "wishlist": "+ WISHLIST",
+      "advanced": "ADVANCED",
+      "categories": {
+        "all": "All",
+        "Commander": "Commander",
+        "Creatures": "Creatures",
+        "Instants": "Instants",
+        "Sorceries": "Sorceries",
+        "Enchantments": "Enchantments",
+        "Artifacts": "Artifacts",
+        "Planeswalkers": "Planeswalkers",
+        "Lands": "Lands",
+        "Other": "Other",
+        "White": "White",
+        "Blue": "Blue",
+        "Black": "Black",
+        "Red": "Red",
+        "Green": "Green",
+        "Multicolor": "Multicolor",
+        "Colorless": "Colorless",
+        "0": "0",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "4": "4",
+        "5": "5",
+        "6": "6",
+        "7+": "7+"
+      }
+    },
+    "messages": {
+      "loadError": "Error loading decks",
+      "notFound": "Deck not found",
+      "loadDeckError": "Error loading deck",
+      "created": "✓ Deck \"{name}\" created",
+      "createError": "Error creating deck",
+      "updateError": "Error updating deck",
+      "commanderSet": "{name} is now Commander",
+      "commanderRemoved": "{name} is no longer Commander",
+      "commanderError": "Error changing commander",
+      "deleted": "✓ Deck deleted",
+      "deleteError": "Error deleting deck",
+      "allocated": "{fromCollection} from collection, {toWishlist} to wishlist",
+      "allocateError": "Error assigning card",
+      "addWishlistError": "Error adding to wishlist",
+      "deallocateError": "Error unassigning card",
+      "removeWishlistError": "Error removing from wishlist",
+      "maxAvailable": "Only {max} available",
+      "updateQuantityError": "Error updating quantity"
+    }
+  },
+
+  "matches": {
+    "title": "MY MATCHES",
+    "subtitle": "new, sent, saved",
+    "tabs": {
+      "new": "NEW",
+      "sent": "SENT",
+      "saved": "SAVED",
+      "deleted": "DELETED"
+    },
+    "controls": {
+      "groupByUser": "Group by user",
+      "saveAllToday": "Save all from today ({count})",
+      "matchesCount": "matches"
+    },
+    "empty": {
+      "new": {
+        "title": "You have no new matches",
+        "message": "When someone is interested in your cards, they'll appear here."
+      },
+      "sent": {
+        "title": "You haven't sent any matches",
+        "message": "When you express interest in others' cards with 'I'M INTERESTED', they'll appear here."
+      },
+      "saved": {
+        "title": "You have no saved matches",
+        "message": "Matches you save and send will appear here."
+      },
+      "deleted": {
+        "title": "You have no deleted matches",
+        "message": "Deleted matches will be permanently removed after 15 days."
+      }
+    },
+    "card": {
+      "header": "MATCH #{index} - COMPATIBILITY: {compatibility}%",
+      "with": "With @{username} • 📍 {location}",
+      "youOffer": "You Offer",
+      "youReceive": "You Receive",
+      "noSpecificCards": "No specific cards (giving away value)",
+      "totalValue": "Total value",
+      "priceDifference": "Price difference:",
+      "youReceiveAdvantage": "You receive advantage",
+      "otherReceivesAdvantage": "Other receives advantage",
+      "bidirectional": "BIDIRECTIONAL",
+      "unidirectional": "→ UNIDIRECTIONAL"
+    },
+    "actions": {
+      "interested": "I'M INTERESTED",
+      "message": "MESSAGE",
+      "ignore": "IGNORE",
+      "contact": "CONTACT",
+      "completed": "COMPLETED",
+      "delete": "DELETE",
+      "recover": "RECOVER"
+    },
+    "contactModal": {
+      "title": "VIEW CONTACT",
+      "user": "User",
+      "location": "Location",
+      "email": "Email",
+      "copyEmail": "COPY EMAIL",
+      "saveContact": "SAVE CONTACT",
+      "close": "CLOSE",
+      "emailCopied": "✓ Email copied",
+      "contactSaved": "✓ Contact saved: @{username}"
+    },
+    "countdown": {
+      "new": "NEW",
+      "days": "days"
+    },
+    "detailModal": {
+      "title": "MATCH DETAILS",
+      "user": "USER",
+      "youHave": "YOU HAVE",
+      "wants": "WANTS",
+      "youSearch": "YOU SEARCH",
+      "has": "HAS",
+      "qty": "Qty",
+      "cond": "Cond",
+      "contact": "CONTACT"
+    },
+    "savedCard": {
+      "noLocation": "Location not available",
+      "saved": "Saved",
+      "daysAgo": "{days}d ago",
+      "weWant": "WE WANT",
+      "theyOffer": "THEY OFFER"
+    },
+    "messages": {
+      "loadError": "Error loading matches",
+      "saved": "Match saved ✓",
+      "saveError": "Error saving match",
+      "notFound": "Match not found",
+      "deleted": "Match deleted. Will be removed in 15 days",
+      "deleteError": "Error deleting match",
+      "completed": "Match completed ✓",
+      "completeError": "Error completing match",
+      "recovered": "Match recovered",
+      "recoverError": "Error recovering match",
+      "permanentlyDeleted": "Permanently deleted",
+      "permanentDeleteError": "Error deleting"
+    }
+  },
+
+  "messages": {
+    "title": "MESSAGES",
+    "subtitle": "active conversations",
+    "searchPlaceholder": "Search by user...",
+    "empty": {
+      "noResults": "No conversations found",
+      "noMessages": "You have no messages yet",
+      "tryAnother": "Try another name",
+      "whenContact": "When you contact users, they'll appear here"
+    },
+    "chat": {
+      "title": "Chat with @{username}",
+      "noMessages": "No messages yet. Be the first to write!",
+      "inputPlaceholder": "Write a message..."
+    },
+    "errors": {
+      "selfChat": "You cannot chat with yourself",
+      "createError": "Error creating conversation",
+      "sendError": "Error sending message",
+      "loadError": "Error loading conversations",
+      "listenError": "Error listening for messages"
+    }
+  },
+
+  "contacts": {
+    "title": "MY SAVED CONTACTS",
+    "subtitle": "{count} contacts",
+    "empty": {
+      "title": "You have no saved contacts",
+      "message": "Save contacts from matches for quick access",
+      "action": "VIEW MY MATCHES"
+    },
+    "messages": {
+      "saved": "✓ Contact saved",
+      "saveError": "Error saving contact",
+      "deleted": "Contact deleted",
+      "deleteError": "Error deleting contact",
+      "loadError": "Error loading contacts"
+    }
+  },
+
+  "settings": {
+    "title": "SETTINGS",
+    "sections": {
+      "emailVerification": {
+        "title": "EMAIL VERIFICATION",
+        "email": "Email:",
+        "verified": "Verified",
+        "notVerified": "Not verified",
+        "sendEmail": "SEND EMAIL",
+        "checkStatus": "CHECK STATUS"
+      },
+      "changePassword": {
+        "title": "CHANGE PASSWORD",
+        "change": "CHANGE",
+        "currentPlaceholder": "Current password",
+        "newPlaceholder": "New password",
+        "confirmPlaceholder": "Confirm password",
+        "mismatch": "Passwords don't match",
+        "hint": "Keep your password secure and unique."
+      },
+      "accountInfo": {
+        "title": "ACCOUNT INFO",
+        "username": "Username",
+        "location": "Location",
+        "created": "Account created"
+      }
+    },
+    "logout": "SIGN OUT",
+    "changeUsername": {
+      "button": "CHANGE",
+      "placeholder": "New username",
+      "formatHint": "3-20 characters. Only letters, numbers and underscore (_).",
+      "suggestions": "Username not available. Try with:",
+      "nextChange": "You can change your username in {time}.",
+      "invalidFormat": "Username must be 3-20 characters (letters, numbers, _).",
+      "rateLimited": "You can only change your username once a month. Next change: {date}.",
+      "taken": "This username is already taken.",
+      "success": "Username updated successfully.",
+      "error": "Error changing username. Try again."
+    },
+    "changeLocation": {
+      "button": "CHANGE",
+      "placeholder": "City, Country",
+      "detect": "📍 Detect automatically",
+      "detecting": "Detecting...",
+      "detected": "Location detected:",
+      "notSet": "Not set",
+      "success": "Location updated successfully.",
+      "error": "Error changing location. Try again.",
+      "detectError": "Could not detect your location. Enter it manually."
+    },
+    "changeAvatar": {
+      "edit": "Change",
+      "upload": "📷 UPLOAD IMAGE",
+      "placeholder": "...or paste image URL",
+      "hint": "Upload an image or paste a URL. Leave empty and save to use generated avatar.",
+      "reset": "RESET",
+      "custom": "Custom avatar",
+      "generated": "Auto-generated avatar",
+      "tooLarge": "Image is too large. Use a smaller image.",
+      "success": "Avatar updated successfully.",
+      "error": "Error changing avatar. Try again."
+    },
+    "dangerZone": {
+      "title": "DANGER ZONE",
+      "description": "Actions in this section are irreversible. Proceed with caution.",
+      "deleteData": {
+        "label": "Delete all my data",
+        "hint": "Permanently deletes cards, decks, matches and contacts.",
+        "title": "Delete all your data?",
+        "message": "This action will permanently delete all your cards, decks, saved matches and contacts. This action CANNOT be undone.",
+        "confirm": "YES, DELETE ALL",
+        "progress": "Deleting data...",
+        "success": "All data has been deleted",
+        "error": "Error deleting data. Try again."
+      },
+      "logout": {
+        "label": "Sign out",
+        "hint": "Signs out your current session on this device."
+      }
+    }
+  },
+
+  "profile": {
+    "notFound": {
+      "title": "404 - User not found",
+      "message": "@{username} doesn't exist or their profile is private.",
+      "backToDashboard": "BACK TO DASHBOARD",
+      "login": "SIGN IN"
+    },
+    "contact": "💬 CONTACT",
+    "publicCollection": "Public collection",
+    "cards": "cards",
+    "noPublicCards": "This user has no public cards in their collection."
+  },
+
+  "search": {
+    "owned": "x{count} owned",
+    "filterPanel": {
+      "placeholder": "Search card by name...",
+      "searchButton": "SEARCH",
+      "moreFilters": "MORE",
+      "clear": "✕ CLEAR",
+      "autoSearch": "Filters will be applied automatically in 0.5 seconds",
+      "filterSearchPlaceholder": "Search filter... (e.g., flying, trample, cascade)",
+      "noFilterResults": "No filters found for \"{query}\"",
+      "onlyReleased": "Only released",
+      "setSearchPlaceholder": "Search edition... (e.g., Dominaria, MH3)",
+      "noSetsFound": "No editions found"
+    },
+    "modal": {
+      "title": "ADVANCED FILTERS",
+      "apply": "APPLY FILTERS",
+      "sections": {
+        "types": "Types",
+        "manaValue": "Mana Value",
+        "priceUSD": "Price USD",
+        "power": "Power",
+        "toughness": "Toughness",
+        "format": "Format",
+        "specialTypes": "Special Types"
+      },
+      "options": {
+        "foilOnly": "Foil Only",
+        "fullArt": "Full Art"
+      }
+    },
+    "accordions": {
+      "combat": "Combat Abilities",
+      "effects": "Common Effects",
+      "triggers": "Triggers",
+      "setMechanics": "Set Mechanics",
+      "sets": "Editions / Sets"
+    },
+    "effectCategories": {
+      "removal": "Removal",
+      "cardAdvantage": "Card Advantage",
+      "tokens": "Tokens",
+      "counters": "Counters",
+      "control": "Control"
+    },
+    "mechanicCategories": {
+      "meta": "Meta / Competitive",
+      "popular": "Classic Popular",
+      "recent": "Recent (2023-2025)",
+      "other": "Other"
+    },
+    "results": {
+      "noCardsFound": "📭 No cards found",
+      "adjustFilters": "Try adjusting the filters or make a more general search",
+      "configureFilters": "🔍 Configure filters and search for cards",
+      "cardsFound": "{count} cards found",
+      "showingRelevant": "Showing the most relevant results",
+      "addButton": "➕ ADD",
+      "preferenceButton": "⭐ PREFERENCE",
+      "showingOf": "Showing {count} of the most relevant results"
+    },
+    "bar": {
+      "placeholder": "Search for a card (e.g., Black Lotus, Counterspell...)",
+      "searchButton": "SEARCH",
+      "noCardsFound": "No cards found with that name",
+      "searchError": "Error searching cards",
+      "selectEdition": "Select the edition of {name}"
+    },
+    "messages": {
+      "defineFilter": "Define at least one filter",
+      "noResults": "No cards found with these filters",
+      "searchError": "Error searching cards"
+    }
+  },
+
+  "notFound": {
+    "title": "404",
+    "userNotFound": "User not found",
+    "message": "The user you're looking for doesn't exist or the profile is private.",
+    "backToDashboard": "BACK TO DASHBOARD",
+    "viewCollection": "VIEW MY COLLECTION",
+    "needHelp": "Need help?",
+    "contactUs": "Contact us from settings"
+  },
+
+  "legal": {
+    "terms": {
+      "title": "Terms of Use",
+      "sections": {
+        "service": "1. Service Description",
+        "account": "2. Registration and User Account",
+        "acceptableUse": "3. Acceptable Use",
+        "transactions": "4. Transactions Between Users",
+        "ip": "5. Intellectual Property",
+        "privacy": "6. Privacy and Data",
+        "liability": "7. Limitation of Liability",
+        "modifications": "8. Modifications",
+        "termination": "9. Termination",
+        "contact": "10. Contact"
+      },
+      "disclaimers": {
+        "noIntermediary": "We are not intermediaries:",
+        "noPayments": "We don't process payments:",
+        "noGuarantee": "We don't guarantee transactions:",
+        "noCustody": "We don't hold cards:",
+        "recommendation": "Recommendation:"
+      }
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "sections": {
+        "responsible": "1. Data Controller",
+        "dataCollected": "2. Data We Collect",
+        "dataUse": "3. How We Use Your Data",
+        "publicInfo": "4. Public Information",
+        "sharing": "5. Who We Share Data With",
+        "security": "6. Data Security",
+        "retention": "7. Data Retention",
+        "rights": "8. Your Rights",
+        "minors": "9. Minors",
+        "changes": "10. Changes to This Policy",
+        "contact": "11. Contact"
+      },
+      "control": "Control:"
+    },
+    "cookies": {
+      "title": "Cookie Policy",
+      "lastUpdated": "Last updated:",
+      "sections": {
+        "what": "1. What Are Cookies?",
+        "types": "2. Cookies We Use",
+        "essential": "2.1 Essential Cookies",
+        "performance": "2.2 Performance Cookies",
+        "localStorage": "2.3 Local Storage",
+        "thirdParty": "3. Third-Party Cookies",
+        "manage": "4. How to Manage Cookies",
+        "browserSettings": "4.1 Browser Settings",
+        "optOut": "4.2 Opt-out Tools",
+        "updates": "5. Updates to This Policy",
+        "moreInfo": "6. More Information"
+      },
+      "table": {
+        "cookie": "Cookie",
+        "purpose": "Purpose",
+        "duration": "Duration"
+      }
+    },
+    "footer": {
+      "copyright": "© 2024 Cranial Trading",
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "cookies": "Cookies"
+    },
+    "backToHome": "← Back to home"
+  },
+
+  "preferences": {
+    "card": {
+      "orBetter": "or better",
+      "added": "Added",
+      "matches": "Matches"
+    },
+    "newModal": {
+      "title": "NEW PREFERENCE",
+      "searchPlaceholder": "Search card...",
+      "minCondition": "Minimum condition",
+      "changeCard": "CHANGE CARD"
+    },
+    "importModal": {
+      "title": "IMPORT AS WANTED",
+      "inputLabel": "Moxfield link or deck text",
+      "placeholder": "https://moxfield.com/decks/...\nor\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n...",
+      "analyzing": "ANALYZING...",
+      "analyze": "ANALYZE",
+      "moxfieldDetected": {
+        "title": "Moxfield link detected",
+        "instruction": "Moxfield doesn't allow direct imports. Follow these steps:",
+        "step1": "Open the deck on Moxfield",
+        "step2": "Click on Export (top right)",
+        "step3": "Click on Copy to Clipboard",
+        "step4": "Paste the text here"
+      },
+      "total": "Total",
+      "cards": "cards",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "minCondition": "Minimum desired condition",
+      "includeSideboard": "Include sideboard",
+      "infoMessage": "💡 {count} WANTED preferences will be created automatically.",
+      "importButton": "IMPORT {count} AS WANTED"
+    }
+  },
+
+  "confirm": {
+    "defaultConfirm": "CONFIRM",
+    "defaultCancel": "CANCEL"
+  },
+
+  "help": {
+    "titles": {
+      "matchesFound": "Matches Found",
+      "recalculate": "Recalculate Matches",
+      "sync": "Sync Cards",
+      "deleteData": "Delete Data",
+      "searchOthers": "Search Other Users",
+      "statusCollection": "Personal Collection",
+      "statusAvailable": "Available Cards",
+      "statusWishlist": "Wishlist",
+      "deckVisibility": "Deck Visibility",
+      "importDeck": "Import Deck",
+      "compatibility": "Compatibility",
+      "matchType": "Match Type",
+      "tabNew": "New Matches",
+      "tabSent": "Sent Matches",
+      "tabSaved": "Saved Matches",
+      "tabDeleted": "Deleted Matches",
+      "emailVerification": "Email Verification",
+      "password": "Password",
+      "username": "Username",
+      "location": "Location",
+      "avatar": "Avatar",
+      "sets": "Editions",
+      "manaValue": "Mana Value",
+      "onlyReleased": "Only Released",
+      "types": "Card Types",
+      "priceUSD": "Price USD",
+      "power": "Power",
+      "toughness": "Toughness",
+      "format": "Legal Format",
+      "combat": "Combat Abilities",
+      "effects": "Common Effects",
+      "triggers": "Triggers",
+      "setMechanics": "Set Mechanics",
+      "specialTypes": "Special Types",
+      "foilFullArt": "Foil / Full Art"
+    },
+    "tooltips": {
+      "dashboard": {
+        "recalculate": "Finds new matches by comparing your cards for sale/trade with other users' wishlists, and vice versa.",
+        "sync": "Updates your public cards in the system so other users can find you in their searches.",
+        "deleteData": "Permanently deletes all your cards, decks, preferences and matches. This action cannot be undone.",
+        "searchOthers": "Search for cards that other users have available for sale or trade. If you find it, you can express your interest.",
+        "matchesFound": "Number of users who have cards you're looking for, or are looking for cards you have."
+      },
+      "collection": {
+        "statusCollection": "Personal cards that are not available for sale or trade. Only you can see them.",
+        "statusSale": "Cards you want to sell. They appear on your public profile and other users can contact you.",
+        "statusTrade": "Cards available for trade. The system will automatically find matches.",
+        "statusWishlist": "Cards you're looking for. The system will find users who have them available.",
+        "publicCard": "This card is visible on your public profile. Other users can see it and contact you.",
+        "privateCard": "This card is private. Only you can see it in your collection.",
+        "deckPublic": "All cards in the deck will be visible on your public profile.",
+        "deckPrivate": "Deck cards will be private and won't appear on your profile.",
+        "importDeck": "Import a deck from Moxfield or by pasting a card list. They will be added to your collection automatically."
+      },
+      "matches": {
+        "compatibility": "Percentage indicating how well your needs match with the other user. Higher % = better match.",
+        "bidirectional": "Bidirectional match: both have something the other is looking for. Ideal for direct trades.",
+        "unidirectional": "Unidirectional match: only one has what the other is looking for. May require payment or negotiation.",
+        "tabNew": "Newly calculated matches you haven't reviewed yet.",
+        "tabSent": "Matches where you expressed interest. Waiting for the other user's response.",
+        "tabSaved": "Matches you saved to contact later.",
+        "tabDeleted": "Deleted matches. They are permanently removed after 15 days."
+      },
+      "conditions": {
+        "M": "Mint - Perfect, as if just opened from the booster. No visible defects.",
+        "NM": "Near Mint - Almost perfect, may have minimal barely noticeable edge wear.",
+        "LP": "Light Play - Lightly played. Small marks or minor visible wear.",
+        "MP": "Moderate Play - Visible moderate wear. Marks, small bends or discoloration.",
+        "HP": "Heavy Play - Very played. Obvious damage but the card is still tournament legal.",
+        "PO": "Poor - Significant poor condition. Only for casual collection or proxies."
+      },
+      "cards": {
+        "foil": "Card with holographic/shiny finish. Generally more valuable than the regular version.",
+        "price": "Reference price in USD according to TCGPlayer. May vary by seller and condition.",
+        "edition": "Magic set/edition where this card was printed. Affects price and format legality."
+      },
+      "decks": {
+        "mainboard": "The main 60 cards of the deck (99 in Commander).",
+        "sideboard": "15 optional cards to swap between games in tournaments.",
+        "commander": "The commander is the leader card of your Commander/EDH deck.",
+        "completion": "Percentage of deck cards you already have in your collection."
+      },
+      "settings": {
+        "emailVerification": "Verifying your email allows other users to contact you and gives you access to all platform features.",
+        "password": "Your password must be at least 8 characters. Use a combination of letters, numbers and symbols for better security.",
+        "username": "Your unique username on the platform. It's displayed on your public profile and when other users search for you. You can only change it occasionally.",
+        "location": "Your location helps find nearby traders for in-person exchanges. You can detect it automatically or enter it manually.",
+        "avatar": "Your profile picture. By default it's auto-generated based on your username, but you can use a custom image URL."
+      },
+      "search": {
+        "sets": "Filter by Magic edition/set. You can select multiple editions. Sets are sorted by release date.",
+        "manaValue": "Converted mana cost. Select one or more values. 10+ includes cards with mana 10 or higher.",
+        "onlyReleased": "Excludes cards from sets that haven't been released yet (previews/spoilers).",
+        "types": "Card type: Creature, Instant, Sorcery, Enchantment, Artifact, Planeswalker or Land.",
+        "priceUSD": "Price range in dollars according to TCGPlayer. Useful for finding cards within your budget.",
+        "power": "Creature power. Numeric values (0-15+). Some cards have variable (*) or undefined power.",
+        "toughness": "Creature toughness. Numeric values (0-15+). Some cards have variable toughness.",
+        "format": "Filter cards legal in specific formats: Standard, Modern, Pioneer, Legacy, Vintage or Commander.",
+        "combat": "Abilities that affect combat: Flying, Trample, First Strike, Deathtouch, Lifelink, etc.",
+        "effects": "Common effects: Destroy, Exile, Draw cards, Create tokens, +1/+1 counters, etc.",
+        "triggers": "Abilities that trigger on events: ETB (enters), LTB (leaves), Attack, Death, etc.",
+        "setMechanics": "Set-specific mechanics: Cascade, Convoke, Delve, Flashback, Madness, etc.",
+        "specialTypes": "Special card types: Legendary, Saga, Equipment, Aura, Vehicle, etc.",
+        "foilFullArt": "Filter by Foil cards (holographic) or Full Art (extended art without border)."
+      }
+    },
+    "guides": {
+      "gettingStarted": {
+        "title": "Getting Started",
+        "step1": {
+          "title": "1. Add your cards",
+          "description": "Search for cards and add them to your collection. Mark as 'Sale' or 'Trade' the ones you want to exchange."
+        },
+        "step2": {
+          "title": "2. Create your wishlist",
+          "description": "Add cards you're looking for with 'Wanted' status. The system will search for users who have them."
+        },
+        "step3": {
+          "title": "3. Find matches",
+          "description": "Go to Dashboard and calculate matches. The system will automatically find compatible users."
+        },
+        "step4": {
+          "title": "4. Contact and negotiate",
+          "description": "Use the internal chat to arrange the trade. Cranial only connects, you decide how to make the trade."
+        }
+      },
+      "tradeSafety": {
+        "title": "Safe Trading",
+        "tips": [
+          "Verify the user's profile and reputation before agreeing to a trade",
+          "Use payment methods with buyer protection when possible",
+          "Start with small trades to build trust",
+          "Document everything: photos, messages, agreements",
+          "For shipping, use services with tracking"
+        ]
+      }
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "questions": [
+        {
+          "q": "What is a match?",
+          "a": "A match occurs when there's compatibility between your cards and another user's. Example: You have a 'Lightning Bolt' for sale and Juan has 'Lightning Bolt' in his wishlist → Match! The system calculates them automatically by comparing your collection with all users."
+        },
+        {
+          "q": "What types of matches exist?",
+          "a": "There are two main types: BIDIRECTIONAL and UNIDIRECTIONAL. Bidirectional is when both users have something the other is looking for (ideal for trades). Unidirectional is when only one has what the other needs (usually requires payment)."
+        },
+        {
+          "q": "What is a BIDIRECTIONAL match?",
+          "a": "It's the perfect match for trades. Example: You have 'Counterspell' for sale and want 'Sol Ring'. Maria has 'Sol Ring' for sale and wants 'Counterspell'. Both have what the other needs! They can trade directly without money."
+        },
+        {
+          "q": "What is a UNIDIRECTIONAL match?",
+          "a": "Occurs when only one party has what the other is looking for. Example: You have 'Black Lotus' for sale, Pedro wants it, but Pedro doesn't have anything you need. Pedro would have to buy it with money instead of trading cards."
+        },
+        {
+          "q": "What's the difference between card statuses?",
+          "a": "COLLECTION: Personal cards, not available for trade (private). SALE: Cards you sell for money (public). TRADE: Cards for exchange (public). WISHLIST: Cards you want to get. Example: Your 'Mox Diamond' in COLLECTION won't appear in matches, but if you change it to SALE, other users can find it."
+        },
+        {
+          "q": "How does the compatibility percentage work?",
+          "a": "It measures how balanced the trade is based on total card value. Example: If you offer cards worth $50 and receive cards worth $48, compatibility will be high (~96%). If you offer $100 and receive $30, it will be low (~30%). 100% means exactly equal values."
+        },
+        {
+          "q": "What do the Matches tabs mean?",
+          "a": "NEW: Newly calculated unreviewed matches. SENT: Matches where you expressed interest, waiting for response. SAVED: Matches you saved to contact later. DELETED: Discarded matches (deleted in 15 days). Example: See an interesting match → save it → contact the user → complete the trade → mark as completed."
+        },
+        {
+          "q": "What does it mean for a card to be 'Public'?",
+          "a": "Public cards appear on your profile (/@yourusername) and other users can find them searching. Private ones only you can see. Example: Your 'Force of Will' for SALE is public and will appear when someone searches for that card. Your 'Island' in COLLECTION is private."
+        },
+        {
+          "q": "How are matches calculated?",
+          "a": "The system compares: 1) Your cards for SALE/TRADE with other users' WISHLISTS, 2) Your WISHLIST with other users' cards for SALE/TRADE. Example: You have 3 cards for sale and 5 in wishlist. The system compares them with 1000 users' collections and finds 12 potential matches."
+        },
+        {
+          "q": "Can I import my collection from another site?",
+          "a": "Yes. You can: 1) Import from Moxfield by pasting the deck URL, 2) Paste lists in MTGO/Arena format. Format example: '4 Lightning Bolt' or '4x Lightning Bolt [M10]'. The system recognizes quantity, name and optionally the set."
+        },
+        {
+          "q": "What do card conditions (M, NM, LP...) mean?",
+          "a": "M (Mint): Perfect, unused. NM (Near Mint): Almost perfect, minimal wear. LP (Light Play): Small visible marks. MP (Moderate Play): Moderate wear, minor bends. HP (Heavy Play): Obvious damage but playable. PO (Poor): Significant poor condition. Example: A freshly opened card is M/NM, one played in tournaments without sleeves is probably LP/MP."
+        },
+        {
+          "q": "How often are prices updated?",
+          "a": "Prices are fetched from Scryfall/TCGPlayer when adding or editing a card. To update prices in bulk, use the 'Sync' button on the Dashboard. Prices may vary ±10% from actual market depending on edition and condition."
+        },
+        {
+          "q": "Does Cranial Trading charge a commission?",
+          "a": "No. The platform is 100% free. We only connect users interested in trading cards. Negotiations, payment methods and shipping are agreed directly between you."
+        },
+        {
+          "q": "How do I contact another user?",
+          "a": "From a match you can: 1) Send internal message through the app chat, 2) See their email (if you completed the match), 3) Visit their public profile. Example: Find a good match → click 'Message' → arrange the trade via chat → exchange shipping details."
+        },
+        {
+          "q": "What if I get scammed?",
+          "a": "Cranial doesn't intermediate in physical transactions or payments. Recommendations: 1) Verify user profile and seniority, 2) Use PayPal Goods & Services or another protected method, 3) Start with small trades (<$20), 4) Ask for card photos/videos, 5) Use tracked shipping. Report suspicious users."
+        },
+        {
+          "q": "Can I do international trades?",
+          "a": "Yes, but consider: 1) International shipping costs ($15-30 USD typically), 2) Delivery times (2-4 weeks), 3) Possible customs taxes, 4) Risk of loss in transit. Recommendation: For international trades, make sure the value justifies shipping costs."
+        }
+      ]
+    },
+    "emptyStates": {
+      "noCards": {
+        "title": "Your collection is empty",
+        "message": "Search for cards above to start adding them to your collection.",
+        "hint": "Tip: Use 'Import' to quickly add a complete Moxfield deck."
+      },
+      "noMatches": {
+        "title": "No matches for now",
+        "message": "The system didn't find users compatible with your cards and wishlist.",
+        "hint": "Tip: Add more cards for sale/trade or more cards to your wishlist to increase the odds."
+      },
+      "noDecks": {
+        "title": "You have no decks",
+        "message": "Create your first deck to organize your cards by format.",
+        "hint": "Tip: You can import a complete deck from Moxfield with one click."
+      },
+      "noContacts": {
+        "title": "No saved contacts",
+        "message": "When you save a contact from a match, they'll appear here for quick access."
+      },
+      "noMessages": {
+        "title": "No conversations",
+        "message": "When you contact a user from a match, the conversation will appear here."
+      }
+    }
+  },
+
+  "footer": {
+    "language": "Language"
+  }
+}

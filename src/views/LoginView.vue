@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
-import { useI18n } from '../composables/useI18n';
+import { useI18n, type SupportedLocale } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SvgIcon from '../components/ui/SvgIcon.vue';
@@ -11,7 +11,13 @@ import SvgIcon from '../components/ui/SvgIcon.vue';
 const router = useRouter();
 const authStore = useAuthStore();
 const toastStore = useToastStore();
-const { t } = useI18n();
+const { t, locale, setLocale } = useI18n();
+
+// Language options
+const languages = [
+  { code: 'es' as SupportedLocale, label: 'ES', name: 'Español' },
+  { code: 'en' as SupportedLocale, label: 'EN', name: 'English' },
+];
 
 const email = ref('');
 const password = ref('');
@@ -230,10 +236,32 @@ const features = computed(() => [
         <!-- Bottom bar -->
         <div class="pt-6 border-t border-silver-20 flex flex-col md:flex-row items-center justify-between gap-4">
           <p class="text-tiny text-silver-50">
-            {{ t('legal.footer.copyright') }}. Todos los derechos reservados.
+            {{ t('legal.footer.copyright') }}
           </p>
+
+          <!-- Language Selector -->
+          <div class="flex items-center gap-2">
+            <span class="text-tiny text-silver-50">{{ t('footer.language') }}:</span>
+            <div class="flex items-center gap-1">
+              <button
+                v-for="lang in languages"
+                :key="lang.code"
+                @click="setLocale(lang.code)"
+                :title="lang.name"
+                :class="[
+                  'px-2 py-1 text-tiny font-bold rounded transition-colors',
+                  locale === lang.code
+                    ? 'bg-neon text-primary'
+                    : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                ]"
+              >
+                {{ lang.label }}
+              </button>
+            </div>
+          </div>
+
           <p class="text-tiny text-silver-30">
-            Magic: The Gathering es marca registrada de Wizards of the Coast.
+            Magic: The Gathering™ Wizards of the Coast
           </p>
         </div>
       </div>

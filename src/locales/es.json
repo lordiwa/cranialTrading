@@ -1490,5 +1490,9 @@
         "message": "Cuando contactes a un usuario desde un match, la conversación aparecerá aquí."
       }
     }
+  },
+
+  "footer": {
+    "language": "Idioma"
   }
 }

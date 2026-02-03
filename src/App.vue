@@ -1,12 +1,27 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAuthStore } from './stores/auth';
 import { preloadPriceData } from './services/mtgjson';
+import { initI18n } from './composables/useI18n';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
+import AppFooter from './components/layout/AppFooter.vue';
 
 const authStore = useAuthStore();
+const route = useRoute();
+
+// Initialize i18n from localStorage
+initI18n();
+
+// Pages where footer should NOT appear
+const noFooterRoutes = ['login', 'register', 'forgot-password', 'reset-password', 'verify-email'];
+
+const showFooter = computed(() => {
+  const routeName = route.name as string;
+  return !noFooterRoutes.includes(routeName);
+});
 
 onMounted(() => {
   authStore.initAuth();
@@ -22,7 +37,11 @@ onMounted(() => {
     <BaseLoader size="large" />
   </div>
 
-  <RouterView v-else />
+  <div v-else class="pb-10">
+    <RouterView />
+  </div>
+
+  <AppFooter v-if="showFooter" />
 
   <BaseToast />
   <ConfirmModal />

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useI18n } from '../../composables/useI18n'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const { t } = useI18n()
 
@@ -192,23 +194,28 @@ const cancelEditAvatar = () => {
   newAvatarUrl.value = ''
   selectedFile.value = null
 }
+
+// Logout
+const handleLogout = async () => {
+  closePopover()
+  await authStore.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
   <div ref="popoverRef" class="relative">
-    <!-- Trigger button -->
+    <!-- Trigger button (avatar only) -->
     <button
         @click.stop="togglePopover"
-        class="flex items-center gap-2 p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast rounded"
+        class="flex items-center p-1 text-silver-50 hover:text-neon transition-fast rounded-full"
         :title="t('header.profile.viewPublicProfile')"
     >
       <img
           :src="avatarUrl"
           alt="Avatar"
-          class="w-7 h-7 rounded-full bg-silver-10"
+          class="w-8 h-8 rounded-full bg-silver-10 border-2 border-transparent hover:border-neon transition-fast"
       />
-      <span class="text-tiny hidden sm:inline">@{{ authStore.user?.username }}</span>
-      <span class="text-tiny hidden sm:inline">▾</span>
     </button>
 
     <!-- Popover content -->
@@ -382,6 +389,12 @@ const cancelEditAvatar = () => {
           >
             {{ t('header.profile.settings') }}
           </router-link>
+          <button
+              @click="handleLogout"
+              class="flex items-center gap-2 px-3 py-2 text-tiny text-rust hover:bg-rust-10 rounded transition-fast w-full text-left"
+          >
+            {{ t('header.profile.logout') }}
+          </button>
         </div>
       </div>
     </Transition>

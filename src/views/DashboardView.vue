@@ -39,6 +39,10 @@
             <HelpTooltip :text="t('help.tooltips.dashboard.sync')" :title="t('help.titles.sync')" />
           </div>
         </div>
+        <!-- Last sync indicator -->
+        <p v-if="collectionStore.lastSyncAt" class="text-tiny text-silver-50 mt-2 md:mt-0 md:text-right">
+          {{ t('dashboard.lastSync') }}: {{ formatLastSync(collectionStore.lastSyncAt) }}
+        </p>
       </div>
 
       <!-- Card Search Section -->
@@ -264,6 +268,19 @@ const calculatedMatches = ref<any[]>([])
 const progressCurrent = ref(0)
 const progressTotal = ref(0)
 const totalUsers = ref(0)
+
+// Format last sync time
+const formatLastSync = (date: Date): string => {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+
+  if (diffMins < 1) return t('dashboard.justNow')
+  if (diffMins < 60) return t('dashboard.minutesAgo', { mins: diffMins })
+  if (diffHours < 24) return t('dashboard.hoursAgo', { hours: diffHours })
+  return date.toLocaleDateString()
+}
 
 // ========== CLEAR DATA PROGRESS STATE ==========
 type ClearDataStep = 'cards' | 'preferences' | 'matches_nuevos' | 'matches_guardados' | 'matches_eliminados' | 'contactos' | 'decks'

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import SpriteIcon from '../ui/SpriteIcon.vue'
-import type { Card } from '../../types/card'
+import type { Card, CardStatus } from '../../types/card'
 
 const { t } = useI18n()
 
@@ -35,6 +35,69 @@ const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const togglingPublic = ref(false)
 const showMobileMenu = ref(false)
+
+// Swipe state
+const cardRef = ref<HTMLElement | null>(null)
+const swipeOffset = ref(0)
+const isSwiping = ref(false)
+const startX = ref(0)
+const SWIPE_THRESHOLD = 80
+
+// Status cycle order
+const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
+
+const handleTouchStart = (e: TouchEvent) => {
+  if (props.readonly || props.isBeingDeleted) return
+  startX.value = e.touches[0].clientX
+  isSwiping.value = true
+}
+
+const handleTouchMove = (e: TouchEvent) => {
+  if (!isSwiping.value) return
+  const currentX = e.touches[0].clientX
+  swipeOffset.value = currentX - startX.value
+  // Limit swipe distance
+  swipeOffset.value = Math.max(-120, Math.min(120, swipeOffset.value))
+}
+
+const handleTouchEnd = async () => {
+  if (!isSwiping.value) return
+
+  if (swipeOffset.value < -SWIPE_THRESHOLD) {
+    // Swipe left = delete
+    emit('delete', props.card)
+  } else if (swipeOffset.value > SWIPE_THRESHOLD) {
+    // Swipe right = cycle status
+    const currentIndex = STATUS_ORDER.indexOf(props.card.status as CardStatus)
+    const nextIndex = (currentIndex + 1) % STATUS_ORDER.length
+    const nextStatus = STATUS_ORDER[nextIndex]
+    try {
+      await collectionStore.updateCard(props.card.id, { status: nextStatus })
+      toastStore.show(t('cards.grid.statusChanged', { status: nextStatus }), 'success')
+    } catch {
+      toastStore.show(t('cards.grid.statusError'), 'error')
+    }
+  }
+
+  // Reset
+  isSwiping.value = false
+  swipeOffset.value = 0
+}
+
+// Swipe visual indicator
+const swipeStyle = computed(() => {
+  if (!isSwiping.value || swipeOffset.value === 0) return {}
+  return {
+    transform: `translateX(${swipeOffset.value}px)`,
+    transition: isSwiping.value ? 'none' : 'transform 0.2s ease-out'
+  }
+})
+
+const swipeIndicator = computed(() => {
+  if (swipeOffset.value < -40) return 'delete'
+  if (swipeOffset.value > 40) return 'status'
+  return null
+})
 
 const togglePublic = async () => {
   if (togglingPublic.value || props.readonly || props.isBeingDeleted) return
@@ -172,14 +235,41 @@ const getStatusIconName = (status: string) => {
   </div>
 
   <!-- FULL MODE: For collection view -->
-  <div v-else class="group" :class="isBeingDeleted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+  <div
+      v-else
+      ref="cardRef"
+      class="group relative"
+      :class="isBeingDeleted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+  >
+    <!-- Swipe background indicators (mobile only) -->
+    <div v-if="isSwiping && !readonly" class="absolute inset-0 md:hidden flex">
+      <!-- Left side (delete) -->
+      <div
+          class="flex-1 flex items-center justify-start pl-4 rounded-l transition-colors"
+          :class="swipeIndicator === 'delete' ? 'bg-rust/30' : 'bg-transparent'"
+      >
+        <SpriteIcon v-if="swipeOffset < -20" name="trash" size="medium" class="text-rust" />
+      </div>
+      <!-- Right side (status change) -->
+      <div
+          class="flex-1 flex items-center justify-end pr-4 rounded-r transition-colors"
+          :class="swipeIndicator === 'status' ? 'bg-neon/20' : 'bg-transparent'"
+      >
+        <SpriteIcon v-if="swipeOffset > 20" name="flip" size="medium" class="text-neon" />
+      </div>
+    </div>
+
     <!-- Card Image Container -->
     <div
         class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden transition-all rounded"
         :class="[
           isBeingDeleted ? 'border-rust animate-pulse' : (isCardAllocated ? 'border-neon-30' : 'group-hover:border-neon')
         ]"
-        @click="!isBeingDeleted && emit('cardClick', card)"
+        :style="swipeStyle"
+        @click="!isBeingDeleted && !isSwiping && emit('cardClick', card)"
     >
       <img
           v-if="getCardImage(card)"

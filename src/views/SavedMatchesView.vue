@@ -10,6 +10,8 @@ import BaseLoader from '../components/ui/BaseLoader.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
 import SpriteIcon from '../components/ui/SpriteIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
+import BaseButton from '../components/ui/BaseButton.vue'
+import { getAvatarUrlForUser } from '../utils/avatar'
 
 const matchesStore = useMatchesStore()
 const contactsStore = useContactsStore()
@@ -54,6 +56,9 @@ const tabs = computed(() => [
   }
 ])
 
+// Group matches by user option
+const groupByUser = ref(true)
+
 // Current tab matches
 const currentMatches = computed(() => {
   switch (activeTab.value) {
@@ -63,6 +68,39 @@ const currentMatches = computed(() => {
     case 'deleted': return deletedMatches.value
     default: return []
   }
+})
+
+// Grouped matches by user
+const groupedMatches = computed(() => {
+  if (!groupByUser.value) return null
+
+  const groups: Record<string, { username: string; userId: string; avatarUrl?: string; location?: string; matches: any[] }> = {}
+
+  for (const match of currentMatches.value) {
+    const key = match.otherUserId
+    if (!groups[key]) {
+      groups[key] = {
+        username: match.otherUsername,
+        userId: match.otherUserId,
+        avatarUrl: match.otherAvatarUrl,
+        location: match.otherLocation,
+        matches: []
+      }
+    }
+    groups[key].matches.push(match)
+  }
+
+  return Object.values(groups).sort((a, b) => b.matches.length - a.matches.length)
+})
+
+// Today's matches (for bulk action)
+const todaysNewMatches = computed(() => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return newMatches.value.filter(m => {
+    const created = m.createdAt instanceof Date ? m.createdAt : new Date(m.createdAt)
+    return created >= today
+  })
 })
 
 // ✅ CARGAR EMAILS para matches guardados
@@ -116,6 +154,14 @@ const handleDiscardMatch = async (matchId: string) => {
 
 const handleTabChange = (tabId: 'new' | 'sent' | 'saved' | 'deleted') => {
   activeTab.value = tabId
+}
+
+// Bulk save all today's matches
+const handleSaveAllToday = async () => {
+  for (const match of todaysNewMatches.value) {
+    await matchesStore.saveMatch(match)
+  }
+  await loadSavedMatchesWithEmails()
 }
 
 // ✅ CARGAR DATOS AL MONTAR
@@ -179,6 +225,28 @@ onUnmounted(() => {
         </button>
       </div>
 
+      <!-- Controls bar -->
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <!-- Group toggle -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+              v-model="groupByUser"
+              type="checkbox"
+              class="w-4 h-4 accent-neon"
+          />
+          <span class="text-small text-silver-70">{{ t('matches.controls.groupByUser') }}</span>
+        </label>
+
+        <!-- Bulk action -->
+        <BaseButton
+            v-if="activeTab === 'new' && todaysNewMatches.length > 0"
+            size="small"
+            @click="handleSaveAllToday"
+        >
+          {{ t('matches.controls.saveAllToday', { count: todaysNewMatches.length }) }}
+        </BaseButton>
+      </div>
+
       <!-- Loading state -->
       <div v-if="loading" class="flex justify-center items-center py-xl">
         <BaseLoader size="large" />
@@ -200,7 +268,50 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <!-- Matches list - ✅ REUTILIZA MatchCard.vue -->
+      <!-- Matches list - Grouped by user -->
+      <div v-else-if="groupByUser && groupedMatches" class="space-y-8">
+        <div
+            v-for="group in groupedMatches"
+            :key="group.userId"
+            class="border border-silver-30 rounded-md overflow-hidden"
+        >
+          <!-- Group header -->
+          <div class="bg-silver-5 px-4 py-3 flex items-center gap-3 border-b border-silver-20">
+            <img
+                :src="getAvatarUrlForUser(group.username, 32, group.avatarUrl)"
+                alt=""
+                class="w-8 h-8 rounded-full"
+            />
+            <div class="flex-1">
+              <router-link
+                  :to="`/@${group.username}`"
+                  class="text-body font-bold text-neon hover:underline"
+              >
+                @{{ group.username }}
+              </router-link>
+              <p v-if="group.location" class="text-tiny text-silver-50">📍 {{ group.location }}</p>
+            </div>
+            <span class="text-small text-silver-70">
+              {{ group.matches.length }} {{ t('matches.controls.matchesCount') }}
+            </span>
+          </div>
+
+          <!-- Group matches -->
+          <div class="p-4 space-y-4">
+            <MatchCard
+                v-for="(match, idx) in group.matches"
+                :key="match.docId || match.id"
+                :match="match"
+                :match-index="idx + 1"
+                :tab="activeTab"
+                @save="handleSaveMatch"
+                @discard="handleDiscardMatch"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Matches list - Flat (no grouping) -->
       <div v-else class="space-y-md">
         <MatchCard
             v-for="match in currentMatches"

@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { useMatchesStore } from '../../stores/matches'
+import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
 import SpriteIcon from '../ui/SpriteIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
+import GlobalSearch from '../ui/GlobalSearch.vue'
 import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const matchesStore = useMatchesStore()
+const messagesStore = useMessagesStore()
 const { t } = useI18n()
 
 const isAuthenticated = computed(() => !!authStore.user)
+
+// Badge counts
+const newMatchesCount = computed(() => matchesStore.getUnseenCount())
+const unreadMessagesCount = computed(() => {
+  return messagesStore.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
+})
 const mobileMenuOpen = ref(false)
 const detectedLocation = ref<string | null>(null)
 const showLocationSuggestion = ref(false)
@@ -55,11 +66,11 @@ const closeMobileMenu = () => {
 }
 
 const navigationLinks = computed(() => [
-  { path: '/dashboard', label: t('header.nav.search'), icon: 'search' },
-  { path: '/collection', label: t('header.nav.collection'), icon: 'collection' },
-  { path: '/saved-matches', label: t('header.nav.saved'), icon: 'star' },
-  { path: '/messages', label: t('header.nav.messages'), icon: 'chat' },
-  { path: '/contacts', label: t('header.nav.contacts'), icon: 'user' },
+  { path: '/dashboard', label: t('header.nav.search'), icon: 'search', badge: newMatchesCount.value },
+  { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: 0 },
+  { path: '/saved-matches', label: t('header.nav.saved'), icon: 'star', badge: 0 },
+  { path: '/messages', label: t('header.nav.messages'), icon: 'chat', badge: unreadMessagesCount.value },
+  { path: '/contacts', label: t('header.nav.contacts'), icon: 'user', badge: 0 },
 ])
 
 const isActive = (path: string) => {
@@ -74,6 +85,31 @@ const handleLogout = async () => {
 const handleNavigate = (path: string) => {
   router.push(path)
 }
+
+// Global search ref for keyboard shortcut
+const globalSearchRef = ref<InstanceType<typeof GlobalSearch> | null>(null)
+
+// Keyboard shortcut: "/" to focus search
+const handleKeydown = (e: KeyboardEvent) => {
+  // Don't trigger if typing in input fields
+  const target = e.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    globalSearchRef.value?.focus()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
@@ -93,16 +129,27 @@ const handleNavigate = (path: string) => {
               :key="link.path + link.label"
               :to="link.path"
               :class="[
-                'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2',
+                'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative',
                 isActive(link.path)
                   ? 'bg-neon-10 border-b-2 border-neon text-neon'
                   : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
               ]"
           >
-            <SpriteIcon :name="link.icon" size="small" />
+            <span class="relative">
+              <SpriteIcon :name="link.icon" size="small" />
+              <span
+                  v-if="link.badge > 0"
+                  class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
+              >
+                {{ link.badge > 9 ? '9+' : link.badge }}
+              </span>
+            </span>
             {{ link.label }}
           </router-link>
         </nav>
+
+        <!-- Global Search (Desktop) -->
+        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" class="hidden md:block" />
 
         <!-- Right side: User & Settings -->
         <div class="flex items-center gap-2 md:gap-4">
@@ -121,26 +168,17 @@ const handleNavigate = (path: string) => {
             <div class="hidden md:block w-px h-6 bg-silver-30 mr-4"></div>
 
             <!-- User actions -->
-            <div class="flex items-center gap-1">
-              <!-- User Popover (avatar, username, location) -->
-              <UserPopover class="hidden sm:block" />
-
+            <div class="flex items-center gap-2">
               <!-- Help/FAQ -->
               <router-link
                   to="/faq"
-                  class="p-2 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
+                  class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                   title="Ayuda / FAQ"
               >
-                <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+                <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
               </router-link>
-              <!-- Logout -->
-              <button
-                  @click="handleLogout"
-                  class="p-2 text-silver-50 hover:text-rust hover:bg-rust-5 transition-fast flex items-center justify-center rounded"
-                  :title="t('header.profile.logout')"
-              >
-                <SpriteIcon name="x-mark" size="small" />
-              </button>
+              <!-- User Popover (avatar only, dropdown has logout) -->
+              <UserPopover class="hidden sm:block" />
             </div>
           </div>
 
@@ -148,10 +186,10 @@ const handleNavigate = (path: string) => {
           <div v-else class="flex items-center gap-3">
             <router-link
                 to="/faq"
-                class="p-2 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
+                class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                 title="Ayuda / FAQ"
             >
-              <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+              <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
             </router-link>
             <router-link
                 to="/login"
@@ -187,7 +225,15 @@ const handleNavigate = (path: string) => {
             ]"
             @click="closeMobileMenu"
         >
-          <SpriteIcon :name="link.icon" size="small" />
+          <span class="relative">
+            <SpriteIcon :name="link.icon" size="small" />
+            <span
+                v-if="link.badge > 0"
+                class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
+            >
+              {{ link.badge > 9 ? '9+' : link.badge }}
+            </span>
+          </span>
           {{ link.label }}
         </router-link>
         <!-- Mi Perfil (mobile) -->
@@ -210,7 +256,7 @@ const handleNavigate = (path: string) => {
             class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
             @click="closeMobileMenu"
         >
-          <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+          <span class="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
           Ayuda / FAQ
         </router-link>
         <!-- Settings (mobile) -->

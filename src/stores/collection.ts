@@ -28,6 +28,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
     const cards = ref<Card[]>([])
     const loading = ref(false)
+    const lastSyncAt = ref<Date | null>(null)
 
     // Helper to get user info for public sync
     const getUserInfo = () => {
@@ -470,6 +471,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 userInfo.avatarUrl
             )
 
+            lastSyncAt.value = new Date()
             toastStore.show(t('collection.messages.synced'), 'success')
         } catch (error) {
             console.error('[PublicSync] Error bulk syncing cards:', error)
@@ -512,6 +514,7 @@ export const useCollectionStore = defineStore('collection', () => {
         // State
         cards,
         loading,
+        lastSyncAt,
 
         // Core operations
         loadCollection,

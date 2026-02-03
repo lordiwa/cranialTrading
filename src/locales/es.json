@@ -222,6 +222,16 @@
     "locationSuggestion": {
       "message": "Detectamos que estás en {location}. ¿Actualizar tu ubicación?",
       "update": "ACTUALIZAR"
+    },
+    "search": {
+      "placeholder": "Buscar cartas...",
+      "tabs": {
+        "collection": "Mi colección",
+        "users": "Otros usuarios",
+        "scryfall": "Scryfall"
+      },
+      "noResults": "Sin resultados",
+      "addToCollection": "Agregar"
     }
   },
 
@@ -232,6 +242,10 @@
     "recalculate": "RECALCULAR",
     "syncing": "SINCRONIZANDO...",
     "sync": "SINCRONIZAR",
+    "lastSync": "Última sincronización",
+    "justNow": "ahora mismo",
+    "minutesAgo": "hace {mins} min",
+    "hoursAgo": "hace {hours}h",
     "deleteData": "BORRAR MIS DATOS",
     "searchOthers": {
       "title": "BUSCAR CARTAS DE OTROS USUARIOS",
@@ -283,12 +297,25 @@
       "collection": "MI COLECCIÓN",
       "decks": "MAZOS"
     },
+    "fab": {
+      "addCard": "Agregar carta"
+    },
     "filters": {
       "all": "TODAS",
       "owned": "TENGO",
       "available": "DISPONIBLE",
       "wishlist": "NECESITO",
       "searchPlaceholder": "Buscar por nombre..."
+    },
+    "sort": {
+      "label": "Ordenar",
+      "recent": "Recientes",
+      "name": "Nombre",
+      "price": "Precio"
+    },
+    "view": {
+      "grid": "Vista cuadrícula",
+      "compact": "Vista compacta"
     },
     "sections": {
       "myCards": "CARTAS QUE TENGO",
@@ -488,7 +515,9 @@
       "inDeck": "{qty}x en {deckName}",
       "public": "PÚBLICO",
       "private": "PRIVADO",
-      "deleteTitle": "Eliminar carta"
+      "deleteTitle": "Eliminar carta",
+      "statusChanged": "Status cambiado a {status}",
+      "statusError": "Error al cambiar status"
     }
   },
 
@@ -794,6 +823,11 @@
       "saved": "GUARDADOS",
       "deleted": "ELIMINADOS"
     },
+    "controls": {
+      "groupByUser": "Agrupar por usuario",
+      "saveAllToday": "Guardar todos de hoy ({count})",
+      "matchesCount": "matches"
+    },
     "empty": {
       "new": {
         "title": "No tienes matches nuevos",
@@ -1021,6 +1055,7 @@
   },
 
   "search": {
+    "owned": "x{count} tengo",
     "filterPanel": {
       "placeholder": "Buscar carta por nombre...",
       "searchButton": "BUSCAR",

@@ -7,7 +7,7 @@ let isDeleteRunning = false
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
@@ -34,9 +34,11 @@ import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
 import SpriteIcon from '../components/ui/SpriteIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
+import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import type { DeckFormat } from '../types/deck'
 
 const route = useRoute()
+const router = useRouter()
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
 const searchStore = useSearchStore()
@@ -62,6 +64,8 @@ const selectedScryfallCard = ref<any>(null)
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
 const deckFilter = ref<string>('all')
 const filterQuery = ref('')
+const sortBy = ref<'recent' | 'name' | 'price'>('recent')
+const viewType = ref<'grid' | 'compact'>('grid')
 
 // Vista principal: Colección o Mazos
 type ViewMode = 'collection' | 'decks'
@@ -494,6 +498,23 @@ const filteredCards = computed(() => {
     )
   }
 
+  // Sort
+  switch (sortBy.value) {
+    case 'recent':
+      cards = [...cards].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return dateB - dateA
+      })
+      break
+    case 'name':
+      cards = [...cards].sort((a, b) => a.name.localeCompare(b.name))
+      break
+    case 'price':
+      cards = [...cards].sort((a, b) => (b.price || 0) - (a.price || 0))
+      break
+  }
+
   return cards
 })
 
@@ -554,10 +575,29 @@ const deckWishlistCount = computed(() => {
 
 // ========== METHODS ==========
 
+// Get how many copies of a card the user owns (by name, any edition)
+const getOwnedCount = (scryfallCard: any): number => {
+  const cardName = scryfallCard.name?.toLowerCase()
+  if (!cardName) return 0
+  return collectionStore.cards
+    .filter(c => c.name.toLowerCase() === cardName)
+    .reduce((sum, c) => sum + c.quantity, 0)
+}
+
 // Cuando selecciona una carta de búsqueda para agregar
 const handleCardSelected = (card: any) => {
   selectedScryfallCard.value = card
   showAddCardModal.value = true
+}
+
+// Cerrar modal de agregar carta y limpiar URL
+const handleAddCardModalClose = () => {
+  showAddCardModal.value = false
+  selectedScryfallCard.value = null
+  // Clear addCard query param if present
+  if (route.query.addCard) {
+    router.replace({ path: '/collection', query: { ...route.query, addCard: undefined } })
+  }
 }
 
 // Cuando hace click en una carta de la colección (o editar)
@@ -1498,6 +1538,22 @@ watch(() => route.query.deck, (newDeckId) => {
   }
 })
 
+// Watch for addCard query parameter (from GlobalSearch)
+watch(() => route.query.addCard, async (cardName) => {
+  if (cardName && typeof cardName === 'string') {
+    try {
+      // Search for the card in Scryfall
+      const results = await searchCards(`!"${cardName}"`)
+      if (results.length > 0) {
+        selectedScryfallCard.value = results[0]
+        showAddCardModal.value = true
+      }
+    } catch (err) {
+      console.error('Error searching card:', err)
+    }
+  }
+}, { immediate: true })
+
 // Warn before leaving if import or delete is in progress
 const handleBeforeUnload = (e: BeforeUnloadEvent) => {
   const importInProgress = importProgress.value && importProgress.value.status !== 'complete' && importProgress.value.status !== 'error'
@@ -1516,6 +1572,46 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+// Keyboard shortcut: "n" to open add card modal
+const handleKeyboardShortcut = (e: KeyboardEvent) => {
+  // Don't trigger if typing in input fields
+  const target = e.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+
+  // "n" opens add card modal
+  if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    e.preventDefault()
+    showAddCardModal.value = true
+  }
+
+  // "Escape" closes modals
+  if (e.key === 'Escape') {
+    if (showAddCardModal.value) {
+      showAddCardModal.value = false
+    } else if (showCardDetailModal.value) {
+      showCardDetailModal.value = false
+      selectedCard.value = null
+    } else if (showManageDecksModal.value) {
+      showManageDecksModal.value = false
+      selectedCard.value = null
+    } else if (showCreateDeckModal.value) {
+      showCreateDeckModal.value = false
+    } else if (showImportDeckModal.value) {
+      showImportDeckModal.value = false
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyboardShortcut)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyboardShortcut)
 })
 </script>
 
@@ -1564,6 +1660,7 @@ onUnmounted(() => {
               v-for="card in searchStore.results"
               :key="card.id"
               :card="card"
+              :owned-count="getOwnedCount(card)"
               @click="handleCardSelected(card)"
           />
         </div>
@@ -1790,13 +1887,57 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- ========== SEARCH ========== -->
-        <div class="mb-6">
+        <!-- ========== SEARCH + SORT + VIEW ========== -->
+        <div class="mb-6 space-y-3">
           <BaseInput
               v-model="filterQuery"
               :placeholder="t('collection.filters.searchPlaceholder')"
               type="text"
+              clearable
           />
+
+          <!-- Sort & View controls -->
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <!-- Sort -->
+            <div class="flex items-center gap-2">
+              <span class="text-tiny text-silver-50">{{ t('collection.sort.label') }}:</span>
+              <button
+                  v-for="opt in ['recent', 'name', 'price']"
+                  :key="opt"
+                  @click="sortBy = opt as 'recent' | 'name' | 'price'"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold rounded transition-colors',
+                    sortBy === opt ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
+                  ]"
+              >
+                {{ t(`collection.sort.${opt}`) }}
+              </button>
+            </div>
+
+            <!-- View type -->
+            <div class="flex items-center gap-1">
+              <button
+                  @click="viewType = 'grid'"
+                  :class="[
+                    'p-2 rounded transition-colors',
+                    viewType === 'grid' ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
+                  ]"
+                  :title="t('collection.view.grid')"
+              >
+                <SpriteIcon name="collection" size="small" />
+              </button>
+              <button
+                  @click="viewType = 'compact'"
+                  :class="[
+                    'p-2 rounded transition-colors',
+                    viewType === 'compact' ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
+                  ]"
+                  :title="t('collection.view.compact')"
+              >
+                <SpriteIcon name="settings" size="small" />
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
@@ -1807,6 +1948,7 @@ onUnmounted(() => {
           </div>
           <CollectionGrid
               :cards="filteredCards"
+              :compact="viewType === 'compact'"
               :deleting-card-ids="deletingCardIds"
               @card-click="handleCardClick"
               @delete="handleDelete"
@@ -1864,6 +2006,7 @@ onUnmounted(() => {
           </div>
           <CollectionGrid
               :cards="wishlistCards"
+              :compact="viewType === 'compact'"
               :deleting-card-ids="deletingCardIds"
               @card-click="handleCardClick"
               @delete="handleDelete"
@@ -1895,8 +2038,8 @@ onUnmounted(() => {
         :show="showAddCardModal"
         :scryfall-card="selectedScryfallCard"
         :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
-        @close="showAddCardModal = false"
-        @added="showAddCardModal = false"
+        @close="handleAddCardModalClose"
+        @added="handleAddCardModalClose"
     />
 
     <!-- Card Detail Modal (unified edit + status) -->
@@ -1927,6 +2070,13 @@ onUnmounted(() => {
         @close="showImportDeckModal = false"
         @import="handleImport"
         @import-direct="handleImportDirect"
+    />
+
+    <!-- Floating Action Button (mobile) -->
+    <FloatingActionButton
+        icon="plus"
+        :label="t('collection.fab.addCard')"
+        @click="showAddCardModal = true"
     />
   </AppContainer>
 </template>

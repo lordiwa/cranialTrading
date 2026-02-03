@@ -536,8 +536,17 @@ const removeFilter = (type: string, value?: string) => {
               @keydown.enter="handleSearch"
               :placeholder="t('search.filterPanel.placeholder')"
               type="text"
-              class="w-full bg-primary border border-silver-30 px-4 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none transition-fast rounded"
+              class="w-full bg-primary border border-silver-30 px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none transition-fast rounded"
           />
+          <!-- Clear button -->
+          <button
+              v-if="filters.name && filters.name.length > 0"
+              @click="filters.name = ''; showSuggestions = false; suggestions = []"
+              class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+              type="button"
+          >
+            ✕
+          </button>
           <!-- Sugerencias dropdown -->
           <div
               v-if="showSuggestions && suggestions.length > 0"
@@ -781,8 +790,17 @@ const removeFilter = (type: string, value?: string) => {
             v-model="filterSearchQuery"
             type="text"
             :placeholder="t('search.filterPanel.filterSearchPlaceholder')"
-            class="w-full bg-primary border-2 border-neon px-4 py-3 text-body text-silver placeholder-silver-50 focus:outline-none"
+            class="w-full bg-primary border-2 border-neon px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:outline-none"
         />
+        <!-- Clear button -->
+        <button
+            v-if="filterSearchQuery.length > 0"
+            @click="filterSearchQuery = ''"
+            class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+            type="button"
+        >
+          ✕
+        </button>
         <!-- Resultados de búsqueda -->
         <div
             v-if="filterSearchResults.length > 0"

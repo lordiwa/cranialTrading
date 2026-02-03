@@ -38,18 +38,6 @@
             </BaseButton>
             <HelpTooltip :text="t('help.tooltips.dashboard.sync')" :title="t('help.titles.sync')" />
           </div>
-          <!-- TEMPORAL: Botón para borrar datos -->
-          <div class="flex items-center gap-1">
-            <BaseButton
-                variant="secondary"
-                size="small"
-                @click="clearAllData"
-                class="w-full md:w-auto border-rust text-rust"
-            >
-              {{ t('dashboard.deleteData') }}
-            </BaseButton>
-            <HelpTooltip :text="t('help.tooltips.dashboard.deleteData')" :title="t('help.titles.deleteData')" />
-          </div>
         </div>
       </div>
 

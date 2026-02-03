@@ -218,6 +218,10 @@
     "auth": {
       "login": "Iniciar",
       "register": "Registrar"
+    },
+    "locationSuggestion": {
+      "message": "Detectamos que estás en {location}. ¿Actualizar tu ubicación?",
+      "update": "ACTUALIZAR"
     }
   },
 
@@ -947,7 +951,60 @@
         "created": "Cuenta creada"
       }
     },
-    "logout": "CERRAR SESIÓN"
+    "logout": "CERRAR SESIÓN",
+    "changeUsername": {
+      "button": "CAMBIAR",
+      "placeholder": "Nuevo username",
+      "formatHint": "3-20 caracteres. Solo letras, números y guión bajo (_).",
+      "suggestions": "Username no disponible. Prueba con:",
+      "nextChange": "Podrás cambiar tu username en {time}.",
+      "invalidFormat": "El username debe tener 3-20 caracteres (letras, números, _).",
+      "rateLimited": "Solo puedes cambiar tu username una vez al mes. Próximo cambio: {date}.",
+      "taken": "Este username ya está en uso.",
+      "success": "Username actualizado correctamente.",
+      "error": "Error al cambiar el username. Intenta de nuevo."
+    },
+    "changeLocation": {
+      "button": "CAMBIAR",
+      "placeholder": "Ciudad, País",
+      "detect": "📍 Detectar automáticamente",
+      "detecting": "Detectando...",
+      "detected": "Ubicación detectada:",
+      "notSet": "No configurada",
+      "success": "Ubicación actualizada correctamente.",
+      "error": "Error al cambiar la ubicación. Intenta de nuevo.",
+      "detectError": "No se pudo detectar tu ubicación. Ingrésala manualmente."
+    },
+    "changeAvatar": {
+      "edit": "Cambiar",
+      "upload": "📷 SUBIR IMAGEN",
+      "placeholder": "...o pega URL de imagen",
+      "hint": "Sube una imagen o pega una URL. Deja vacío y guarda para usar avatar generado.",
+      "reset": "RESET",
+      "custom": "Avatar personalizado",
+      "generated": "Avatar generado automáticamente",
+      "tooLarge": "La imagen es muy grande. Usa una imagen más pequeña.",
+      "success": "Avatar actualizado correctamente.",
+      "error": "Error al cambiar el avatar. Intenta de nuevo."
+    },
+    "dangerZone": {
+      "title": "ZONA DE PELIGRO",
+      "description": "Las acciones en esta sección son irreversibles. Procede con cuidado.",
+      "deleteData": {
+        "label": "Eliminar todos mis datos",
+        "hint": "Borra permanentemente cartas, mazos, matches y contactos.",
+        "title": "¿Eliminar todos tus datos?",
+        "message": "Esta acción eliminará permanentemente todas tus cartas, mazos, matches guardados y contactos. Esta acción NO se puede deshacer.",
+        "confirm": "SÍ, ELIMINAR TODO",
+        "progress": "Eliminando datos...",
+        "success": "Todos los datos han sido eliminados",
+        "error": "Error al eliminar datos. Intenta de nuevo."
+      },
+      "logout": {
+        "label": "Cerrar sesión",
+        "hint": "Cierra tu sesión actual en este dispositivo."
+      }
+    }
   },
 
   "profile": {
@@ -1175,7 +1232,10 @@
       "tabSaved": "Matches Guardados",
       "tabDeleted": "Matches Eliminados",
       "emailVerification": "Verificación de Email",
-      "password": "Contraseña"
+      "password": "Contraseña",
+      "username": "Nombre de Usuario",
+      "location": "Ubicación",
+      "avatar": "Avatar"
     },
     "tooltips": {
       "dashboard": {
@@ -1226,7 +1286,10 @@
       },
       "settings": {
         "emailVerification": "Verificar tu email permite que otros usuarios te contacten y te da acceso a todas las funciones de la plataforma.",
-        "password": "Tu contraseña debe tener al menos 8 caracteres. Usa una combinación de letras, números y símbolos para mayor seguridad."
+        "password": "Tu contraseña debe tener al menos 8 caracteres. Usa una combinación de letras, números y símbolos para mayor seguridad.",
+        "username": "Tu nombre de usuario único en la plataforma. Se muestra en tu perfil público y cuando otros usuarios te buscan. Solo puedes cambiarlo cada cierto tiempo.",
+        "location": "Tu ubicación ayuda a encontrar traders cercanos para intercambios en persona. Puedes detectarla automáticamente o ingresarla manualmente.",
+        "avatar": "Tu imagen de perfil. Por defecto se genera automáticamente basado en tu username, pero puedes usar una URL de imagen personalizada."
       }
     },
     "guides": {

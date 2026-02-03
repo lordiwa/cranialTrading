@@ -4,4 +4,6 @@ export interface User {
     username: string;
     location: string;
     createdAt: Date;
+    lastUsernameChange?: Date | null;
+    avatarUrl?: string | null; // Custom avatar URL, if null uses generated avatar
 }

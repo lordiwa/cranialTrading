@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useI18n } from '../../composables/useI18n'
 import SpriteIcon from '../ui/SpriteIcon.vue'
+import UserPopover from '../ui/UserPopover.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,6 +13,43 @@ const { t } = useI18n()
 
 const isAuthenticated = computed(() => !!authStore.user)
 const mobileMenuOpen = ref(false)
+const detectedLocation = ref<string | null>(null)
+const showLocationSuggestion = ref(false)
+
+// Detect location silently (IP-based, no permission needed) to suggest updates
+const checkLocation = async () => {
+  if (authStore.user) {
+    const detected = await authStore.detectLocationSilent()
+    if (detected) {
+      detectedLocation.value = detected
+      // Compare with stored location (case-insensitive, trimmed)
+      const storedLocation = authStore.user.location?.toLowerCase().trim() || ''
+      const detectedLower = detected.toLowerCase().trim()
+      // Show suggestion if location is empty or significantly different
+      if (!storedLocation || (storedLocation && !detectedLower.includes(storedLocation.split(',')[0]))) {
+        showLocationSuggestion.value = true
+      }
+    }
+  }
+}
+
+// Watch for user login to check location
+watch(() => authStore.user, (newUser) => {
+  if (newUser && !detectedLocation.value) {
+    checkLocation()
+  }
+}, { immediate: true })
+
+const handleUpdateLocation = async () => {
+  if (detectedLocation.value) {
+    await authStore.changeLocation(detectedLocation.value)
+    showLocationSuggestion.value = false
+  }
+}
+
+const dismissLocationSuggestion = () => {
+  showLocationSuggestion.value = false
+}
 
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value
@@ -83,59 +121,52 @@ const handleNavigate = (path: string) => {
           </button>
 
           <!-- User Menu -->
-          <div v-if="isAuthenticated" class="flex items-center gap-2">
-            <!-- Mi Perfil -->
-            <router-link
-                v-if="authStore.user?.username"
-                :to="`/@${authStore.user.username}`"
-                class="hidden sm:flex px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast items-center gap-2 rounded"
-                :title="t('header.profile.viewPublicProfile')"
-            >
-              <SpriteIcon name="user-alt" size="small" />
-              <span class="text-tiny">@{{ authStore.user.username }}</span>
-            </router-link>
-            <!-- Help/FAQ -->
-            <router-link
-                to="/faq"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
-                title="Ayuda / FAQ"
-            >
-              <span class="w-5 h-5 rounded-full border border-current flex items-center justify-center text-tiny font-bold">?</span>
-            </router-link>
-            <router-link
-                to="/settings"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
-                :title="t('header.profile.settings')"
-            >
-              <SpriteIcon name="settings" size="small" />
-            </router-link>
-            <button
-                @click="handleLogout"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-rust hover:text-rust transition-fast flex items-center justify-center rounded"
-                :title="t('header.profile.logout')"
-            >
-              <SpriteIcon name="x-mark" size="small" />
-            </button>
+          <div v-if="isAuthenticated" class="flex items-center">
+            <!-- Divider -->
+            <div class="hidden md:block w-px h-6 bg-silver-30 mr-4"></div>
+
+            <!-- User actions -->
+            <div class="flex items-center gap-1">
+              <!-- User Popover (avatar, username, location) -->
+              <UserPopover class="hidden sm:block" />
+
+              <!-- Help/FAQ -->
+              <router-link
+                  to="/faq"
+                  class="p-2 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
+                  title="Ayuda / FAQ"
+              >
+                <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+              </router-link>
+              <!-- Logout -->
+              <button
+                  @click="handleLogout"
+                  class="p-2 text-silver-50 hover:text-rust hover:bg-rust-5 transition-fast flex items-center justify-center rounded"
+                  :title="t('header.profile.logout')"
+              >
+                <SpriteIcon name="x-mark" size="small" />
+              </button>
+            </div>
           </div>
 
           <!-- Auth Links (Logged out) -->
-          <div v-else class="flex items-center gap-2">
+          <div v-else class="flex items-center gap-3">
             <router-link
                 to="/faq"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast flex items-center justify-center rounded"
+                class="p-2 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                 title="Ayuda / FAQ"
             >
-              <span class="w-5 h-5 rounded-full border border-current flex items-center justify-center text-tiny font-bold">?</span>
+              <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
             </router-link>
             <router-link
                 to="/login"
-                class="px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast rounded"
+                class="px-4 py-2 text-silver-70 hover:text-neon transition-fast rounded text-small font-bold"
             >
               {{ t('header.auth.login') }}
             </router-link>
             <router-link
                 to="/register"
-                class="px-3 py-2 bg-neon text-primary font-bold hover:bg-neon-90 transition-fast rounded"
+                class="px-4 py-2 bg-neon text-primary font-bold hover:bg-neon/90 transition-fast rounded text-small"
             >
               {{ t('header.auth.register') }}
             </router-link>
@@ -180,10 +211,53 @@ const handleNavigate = (path: string) => {
             class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
             @click="closeMobileMenu"
         >
-          <span class="w-5 h-5 rounded-full border border-current flex items-center justify-center text-tiny font-bold">?</span>
+          <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
           Ayuda / FAQ
         </router-link>
+        <!-- Settings (mobile) -->
+        <router-link
+            to="/settings"
+            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
+            @click="closeMobileMenu"
+        >
+          <SpriteIcon name="settings" size="small" />
+          {{ t('header.profile.settings') }}
+        </router-link>
+        <!-- Logout (mobile) -->
+        <button
+            @click="handleLogout(); closeMobileMenu()"
+            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-rust transition-fast w-full text-left"
+        >
+          <SpriteIcon name="x-mark" size="small" />
+          {{ t('header.profile.logout') }}
+        </button>
       </nav>
+    </div>
+
+    <!-- Location suggestion banner -->
+    <div
+        v-if="showLocationSuggestion && detectedLocation"
+        class="bg-neon-10 border-b border-neon-20 px-4 py-2"
+    >
+      <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <p class="text-tiny text-silver">
+          📍 {{ t('header.locationSuggestion.message', { location: detectedLocation }) }}
+        </p>
+        <div class="flex items-center gap-2">
+          <button
+              @click="handleUpdateLocation"
+              class="px-3 py-1 text-tiny bg-neon text-primary font-bold rounded hover:bg-neon/90 transition-fast"
+          >
+            {{ t('header.locationSuggestion.update') }}
+          </button>
+          <button
+              @click="dismissLocationSuggestion"
+              class="px-2 py-1 text-tiny text-silver-50 hover:text-silver transition-fast"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 </template>

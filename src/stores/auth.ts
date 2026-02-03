@@ -11,7 +11,7 @@ import {
     sendEmailVerification,
     User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User } from '../types/user';
 import { useToastStore } from './toast';
@@ -50,6 +50,8 @@ export const useAuthStore = defineStore('auth', () => {
                     username: data.username,
                     location: data.location,
                     createdAt: data.createdAt.toDate(),
+                    lastUsernameChange: data.lastUsernameChange?.toDate() || null,
+                    avatarUrl: data.avatarUrl || null,
                 };
             } else {
                 const firebaseUser = auth.currentUser;
@@ -237,6 +239,361 @@ export const useAuthStore = defineStore('auth', () => {
         }
     };
 
+    /**
+     * Check if a username is available
+     * Checks both lowercase and original case since existing usernames may vary
+     */
+    const checkUsernameAvailable = async (username: string): Promise<boolean> => {
+        try {
+            const usersRef = collection(db, 'users');
+            const normalizedUsername = username.toLowerCase();
+
+            // Check lowercase version
+            const qLower = query(usersRef, where('username', '==', normalizedUsername));
+            const snapshotLower = await getDocs(qLower);
+
+            console.log(`Checking username "${normalizedUsername}": found ${snapshotLower.size} matches (lowercase)`);
+
+            if (!snapshotLower.empty) {
+                return false; // Username taken
+            }
+
+            // Also check original case in case usernames were stored with mixed case
+            if (username !== normalizedUsername) {
+                const qOriginal = query(usersRef, where('username', '==', username));
+                const snapshotOriginal = await getDocs(qOriginal);
+                console.log(`Checking username "${username}": found ${snapshotOriginal.size} matches (original case)`);
+
+                if (!snapshotOriginal.empty) {
+                    return false; // Username taken
+                }
+            }
+
+            return true; // Username available
+        } catch (error) {
+            console.error('Error checking username:', error);
+            return false;
+        }
+    };
+
+    /**
+     * Generate username suggestions based on desired username
+     */
+    const generateUsernameSuggestions = async (baseUsername: string): Promise<string[]> => {
+        const suggestions: string[] = [];
+        const suffixes = ['_mtg', '_tcg', '_cards', '01', '02', '99', '_pro', '_trading'];
+
+        for (const suffix of suffixes) {
+            const suggestion = `${baseUsername}${suffix}`;
+            const isAvailable = await checkUsernameAvailable(suggestion);
+            if (isAvailable) {
+                suggestions.push(suggestion);
+                if (suggestions.length >= 3) break;
+            }
+        }
+
+        // Add random number suggestions if we don't have enough
+        while (suggestions.length < 3) {
+            const randomNum = Math.floor(Math.random() * 9000) + 1000;
+            const suggestion = `${baseUsername}${randomNum}`;
+            const isAvailable = await checkUsernameAvailable(suggestion);
+            if (isAvailable && !suggestions.includes(suggestion)) {
+                suggestions.push(suggestion);
+            }
+        }
+
+        return suggestions;
+    };
+
+    /**
+     * Check if user can change username (10 minute cooldown for testing)
+     * TODO: Change to 1 month for production
+     * Location: src/stores/auth.ts line ~288
+     */
+    const canChangeUsername = (): { allowed: boolean; nextChangeDate: Date | null } => {
+        if (!user.value?.lastUsernameChange) {
+            return { allowed: true, nextChangeDate: null };
+        }
+
+        const lastChange = new Date(user.value.lastUsernameChange);
+        const nextChangeDate = new Date(lastChange);
+        // 10 minutes cooldown for testing (change to setMonth(+1) for production)
+        nextChangeDate.setMinutes(nextChangeDate.getMinutes() + 10);
+
+        const now = new Date();
+        return {
+            allowed: now >= nextChangeDate,
+            nextChangeDate: now < nextChangeDate ? nextChangeDate : null
+        };
+    };
+
+    /**
+     * Change username with validation
+     */
+    const changeUsername = async (newUsername: string): Promise<{ success: boolean; suggestions?: string[] }> => {
+        if (!user.value) {
+            toastStore.show(t('auth.messages.notAuthenticated'), 'error');
+            return { success: false };
+        }
+
+        // Validate username format
+        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        if (!usernameRegex.test(newUsername)) {
+            toastStore.show(t('settings.changeUsername.invalidFormat'), 'error');
+            return { success: false };
+        }
+
+        // Check rate limit
+        const { allowed, nextChangeDate } = canChangeUsername();
+        if (!allowed && nextChangeDate) {
+            toastStore.show(t('settings.changeUsername.rateLimited', { date: nextChangeDate.toLocaleDateString() }), 'error');
+            return { success: false };
+        }
+
+        // Check availability
+        const normalizedUsername = newUsername.toLowerCase();
+        const isAvailable = await checkUsernameAvailable(normalizedUsername);
+
+        if (!isAvailable) {
+            const suggestions = await generateUsernameSuggestions(normalizedUsername);
+            toastStore.show(t('settings.changeUsername.taken'), 'error');
+            return { success: false, suggestions };
+        }
+
+        try {
+            // Update in Firestore
+            await updateDoc(doc(db, 'users', user.value.id), {
+                username: normalizedUsername,
+                lastUsernameChange: new Date()
+            });
+
+            // Update local state
+            user.value.username = normalizedUsername;
+            user.value.lastUsernameChange = new Date();
+
+            toastStore.show(t('settings.changeUsername.success'), 'success');
+            return { success: true };
+        } catch (error) {
+            console.error('Error changing username:', error);
+            toastStore.show(t('settings.changeUsername.error'), 'error');
+            return { success: false };
+        }
+    };
+
+    /**
+     * Change user location
+     */
+    const changeLocation = async (newLocation: string): Promise<boolean> => {
+        if (!user.value) {
+            toastStore.show(t('auth.messages.notAuthenticated'), 'error');
+            return false;
+        }
+
+        try {
+            await updateDoc(doc(db, 'users', user.value.id), {
+                location: newLocation
+            });
+
+            user.value.location = newLocation;
+            toastStore.show(t('settings.changeLocation.success'), 'success');
+            return true;
+        } catch (error) {
+            console.error('Error changing location:', error);
+            toastStore.show(t('settings.changeLocation.error'), 'error');
+            return false;
+        }
+    };
+
+    /**
+     * Detect location using IP only (silent, no permission needed)
+     * Used for automatic suggestions
+     */
+    const detectLocationSilent = async (): Promise<string | null> => {
+        const apis = [
+            {
+                url: 'https://ipwho.is/',
+                parse: (data: any) => data.city && data.country ? `${data.city}, ${data.country}` : null
+            },
+            {
+                url: 'https://get.geojs.io/v1/ip/geo.json',
+                parse: (data: any) => data.city && data.country ? `${data.city}, ${data.country}` : null
+            }
+        ];
+
+        for (const api of apis) {
+            try {
+                const response = await fetch(api.url);
+                if (!response.ok) continue;
+                const data = await response.json();
+                const location = api.parse(data);
+                if (location) return location;
+            } catch (error) {
+                console.warn(`Failed to fetch from ${api.url}:`, error);
+                continue;
+            }
+        }
+
+        return null;
+    };
+
+    /**
+     * Detect user location using browser Geolocation API (GPS/WiFi)
+     * Asks for permission - use only when user explicitly requests detection
+     */
+    const detectLocation = async (): Promise<string | null> => {
+        // Try browser geolocation (more accurate - uses GPS/WiFi)
+        try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation not supported'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes cache
+                });
+            });
+
+            // Reverse geocode coordinates to get city/country
+            const { latitude, longitude } = position.coords;
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+                { headers: { 'Accept-Language': 'es' } }
+            );
+            const data = await response.json();
+
+            if (data.address) {
+                const city = data.address.city || data.address.town || data.address.village || data.address.municipality || '';
+                const country = data.address.country || '';
+                if (city && country) {
+                    return `${city}, ${country}`;
+                }
+            }
+        } catch (error) {
+            console.warn('Browser geolocation failed, trying IP-based:', error);
+        }
+
+        // Fallback to IP-based detection
+        return detectLocationSilent();
+    };
+
+    /**
+     * Get avatar URL - returns custom URL or generates one from username
+     * Uses DiceBear API for generated avatars (free, no storage needed)
+     */
+    const getAvatarUrl = (size: number = 40): string => {
+        if (user.value?.avatarUrl) {
+            return user.value.avatarUrl;
+        }
+        // Generate avatar using DiceBear (identicon style)
+        const username = user.value?.username || 'user';
+        return `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(username)}&size=${size}`;
+    };
+
+    /**
+     * Change user avatar URL
+     */
+    const changeAvatar = async (avatarUrl: string | null): Promise<boolean> => {
+        if (!user.value) {
+            toastStore.show(t('auth.messages.notAuthenticated'), 'error');
+            return false;
+        }
+
+        try {
+            await updateDoc(doc(db, 'users', user.value.id), {
+                avatarUrl: avatarUrl
+            });
+
+            user.value.avatarUrl = avatarUrl;
+            toastStore.show(t('settings.changeAvatar.success'), 'success');
+            return true;
+        } catch (error) {
+            console.error('Error changing avatar:', error);
+            toastStore.show(t('settings.changeAvatar.error'), 'error');
+            return false;
+        }
+    };
+
+    /**
+     * Upload avatar from file (compresses and converts to base64)
+     * Max output size: ~100KB base64 string
+     */
+    const uploadAvatar = async (file: File): Promise<boolean> => {
+        if (!user.value) {
+            toastStore.show(t('auth.messages.notAuthenticated'), 'error');
+            return false;
+        }
+
+        try {
+            // Compress and resize image
+            const base64 = await compressImage(file, 200, 0.8);
+
+            // Check size (Firestore limit is 1MB per doc, keep avatar under 100KB)
+            if (base64.length > 150000) {
+                toastStore.show(t('settings.changeAvatar.tooLarge'), 'error');
+                return false;
+            }
+
+            await updateDoc(doc(db, 'users', user.value.id), {
+                avatarUrl: base64
+            });
+
+            user.value.avatarUrl = base64;
+            toastStore.show(t('settings.changeAvatar.success'), 'success');
+            return true;
+        } catch (error) {
+            console.error('Error uploading avatar:', error);
+            toastStore.show(t('settings.changeAvatar.error'), 'error');
+            return false;
+        }
+    };
+
+    /**
+     * Compress and resize image to base64
+     */
+    const compressImage = (file: File, maxSize: number, quality: number): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Scale down if larger than maxSize
+                    if (width > maxSize || height > maxSize) {
+                        if (width > height) {
+                            height = (height / width) * maxSize;
+                            width = maxSize;
+                        } else {
+                            width = (width / height) * maxSize;
+                            height = maxSize;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        reject(new Error('Could not get canvas context'));
+                        return;
+                    }
+
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const base64 = canvas.toDataURL('image/jpeg', quality);
+                    resolve(base64);
+                };
+                img.onerror = reject;
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
     return {
         user,
         loading,
@@ -251,5 +608,15 @@ export const useAuthStore = defineStore('auth', () => {
         changePassword,
         sendVerificationEmail,
         checkEmailVerification,
+        checkUsernameAvailable,
+        generateUsernameSuggestions,
+        canChangeUsername,
+        changeUsername,
+        changeLocation,
+        detectLocation,
+        getAvatarUrl,
+        changeAvatar,
+        uploadAvatar,
+        detectLocationSilent,
     };
 });

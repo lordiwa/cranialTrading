@@ -23,6 +23,7 @@ export interface SimpleMatch {
     otherUsername: string;
     otherLocation?: string;
     otherEmail?: string;
+    otherAvatarUrl?: string | null;
     myCard?: any;
     otherCard?: any;
     otherPreference?: any;
@@ -92,6 +93,7 @@ function createCleanMatchPayload(match: SimpleMatch, overrides: any = {}) {
         otherUserId: match.otherUserId || '',
         otherUsername: match.otherUsername || '',
         otherLocation: match.otherLocation || '',
+        otherAvatarUrl: match.otherAvatarUrl || null,
         status: match.status || 'nuevo',
         createdAt: match.createdAt instanceof Date ? match.createdAt : new Date(),
         lifeExpiresAt: match.lifeExpiresAt instanceof Date ? match.lifeExpiresAt : new Date(),
@@ -155,6 +157,7 @@ export const useMatchesStore = defineStore('matches', () => {
             otherUsername: data.otherUsername || '',
             otherLocation: data.otherLocation,
             otherEmail: data.otherEmail,
+            otherAvatarUrl: data.otherAvatarUrl || null,
             myCard: data.myCard,
             otherCard: data.otherCard,
             myPreference: data.myPreference,
@@ -193,6 +196,7 @@ export const useMatchesStore = defineStore('matches', () => {
             otherUsername: isSender ? data.receiverUsername : data.senderUsername,
             otherLocation: isSender ? data.receiverLocation : data.senderLocation,
             otherEmail: isSender ? '' : data.senderEmail,
+            otherAvatarUrl: isSender ? data.receiverAvatarUrl : data.senderAvatarUrl,
             // For sender: they want the card (otherCards), for receiver: it's their card (myCards)
             myCards: isSender ? [] : [card],
             otherCards: isSender ? [card] : [],
@@ -508,6 +512,7 @@ export const useMatchesStore = defineStore('matches', () => {
                     otherUserId: authStore.user.id,
                     otherUsername: authStore.user.username,
                     otherLocation: authStore.user.location,
+                    otherAvatarUrl: authStore.user.avatarUrl || null,
                     status: 'nuevo',
                     createdAt: new Date(),
                     lifeExpiresAt: getExpirationDate(),

@@ -10,12 +10,17 @@
               :title="t('help.titles.compatibility')"
           />
         </h3>
-        <p class="text-small text-silver-70 mt-1">
+        <p class="text-small text-silver-70 mt-1 flex items-center gap-2">
           {{ t('matches.card.with', { username: '', location: match.otherLocation }).split('@')[0] }}
           <router-link
               :to="`/@${match.otherUsername}`"
-              class="text-neon hover:underline font-bold"
+              class="text-neon hover:underline font-bold inline-flex items-center gap-1"
           >
+            <img
+                :src="getAvatarUrlForUser(match.otherUsername, 20, match.otherAvatarUrl)"
+                alt=""
+                class="w-5 h-5 rounded-full"
+            />
             @{{ match.otherUsername }}
           </router-link>
           • 📍 {{ match.otherLocation }}
@@ -199,8 +204,13 @@
           <p class="text-tiny text-silver-70 uppercase font-bold mb-1">{{ t('matches.contactModal.user') }}</p>
           <router-link
               :to="`/@${match.otherUsername}`"
-              class="text-body font-bold text-neon hover:underline"
+              class="text-body font-bold text-neon hover:underline inline-flex items-center gap-2"
           >
+            <img
+                :src="getAvatarUrlForUser(match.otherUsername, 24, match.otherAvatarUrl)"
+                alt=""
+                class="w-6 h-6 rounded-full"
+            />
             @{{ match.otherUsername }}
           </router-link>
         </div>
@@ -278,6 +288,7 @@ import { useContactsStore } from '../../stores/contacts'
 import { useToastStore } from '../../stores/toast'
 import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
+import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const { t } = useI18n()
 
@@ -377,6 +388,7 @@ const handleSaveContact = async () => {
       username: props.match.otherUsername,
       email: props.match.otherEmail,
       location: props.match.otherLocation || 'Unknown',
+      avatarUrl: props.match.otherAvatarUrl || null,
     })
 
     toastStore.show(t('matches.contactModal.contactSaved', { username: props.match.otherUsername }), 'success')

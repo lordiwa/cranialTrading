@@ -11,8 +11,13 @@
         >
           <RouterLink
               :to="{ name: 'userProfile', params: { username: match.username } }"
-              class="text-h3 text-silver font-bold hover:text-neon transition-fast"
+              class="text-h3 text-silver font-bold hover:text-neon transition-fast inline-flex items-center gap-2"
           >
+            <img
+                :src="getAvatarUrlForUser(match.username, 28, match.avatarUrl)"
+                alt=""
+                class="w-7 h-7 rounded-full"
+            />
             @{{ match.username }}
           </RouterLink>
           <UserProfileHoverCard
@@ -126,6 +131,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
 import SpriteIcon from '../ui/SpriteIcon.vue'
+import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const { t } = useI18n()
 
@@ -134,6 +140,7 @@ interface Match {
   username: string
   location: string
   email: string
+  avatarUrl?: string | null
   cardsOffering: string[]
   cardsReceiving: string[]
   createdAt: Date

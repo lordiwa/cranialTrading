@@ -12,6 +12,7 @@ import BaseButton from '../components/ui/BaseButton.vue';
 import CollectionGrid from '../components/collection/CollectionGrid.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
 import type { Card } from '../types/card';
+import { getAvatarUrlForUser } from '../utils/avatar';
 
 const route = useRoute();
 const toastStore = useToastStore();
@@ -21,7 +22,7 @@ const { t } = useI18n();
 // State refs
 const username = ref<string>(route.params.username as string || '');
 const userId = ref<string | null>(null);
-const userInfo = ref<{ username?: string; location?: string } | null>(null);
+const userInfo = ref<{ username?: string; location?: string; avatarUrl?: string | null } | null>(null);
 const cards = ref<any[]>([]);
 const loading = ref(false);
 const loadingMore = ref(false);
@@ -40,6 +41,14 @@ const isOwnProfile = computed(() => {
 
 const canShowInterest = computed(() => {
   return authStore.user && !isOwnProfile.value;
+});
+
+// Use custom avatar if available (own profile or other user's uploaded avatar)
+const profileAvatarUrl = computed(() => {
+  if (isOwnProfile.value) {
+    return authStore.getAvatarUrl(64);
+  }
+  return getAvatarUrlForUser(userInfo.value?.username || '', 64, userInfo.value?.avatarUrl);
 });
 
 // Watchers
@@ -186,9 +195,11 @@ const handleInterest = async (card: Card) => {
       senderUsername: authStore.user.username,
       senderLocation: authStore.user.location || '',
       senderEmail: authStore.user.email || '',
+      senderAvatarUrl: authStore.user.avatarUrl || null,
       receiverId: userId.value,
       receiverUsername: userInfo.value?.username || '',
       receiverLocation: userInfo.value?.location || '',
+      receiverAvatarUrl: (userInfo.value as any)?.avatarUrl || null,
       // Card info
       card: cardData,
       cardType: card.status, // 'sale' or 'trade'
@@ -241,13 +252,20 @@ onMounted(() => {
     <div v-else>
       <!-- Profile header -->
       <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-8 border-b border-silver-20">
-        <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">
-            @{{ userInfo?.username }}
-          </h1>
-          <p class="text-body text-silver-70 flex items-center gap-2">
-            📍 {{ userInfo?.location || 'Ubicación no disponida' }}
-          </p>
+        <div class="flex items-center gap-4">
+          <img
+              :src="profileAvatarUrl"
+              alt=""
+              class="w-16 h-16 rounded-full object-cover"
+          />
+          <div>
+            <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">
+              @{{ userInfo?.username }}
+            </h1>
+            <p class="text-body text-silver-70 flex items-center gap-2">
+              📍 {{ userInfo?.location || 'Ubicación no disponida' }}
+            </p>
+          </div>
         </div>
 
         <!-- Contact button (only if logged in and not own profile) -->

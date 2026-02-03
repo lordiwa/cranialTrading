@@ -26,7 +26,7 @@ export const useMessagesStore = defineStore('messages', () => {
      * Crear o obtener una conversación existente
      * @returns conversationId o empty string si falla
      */
-    const createConversation = async (otherUserId: string, otherUsername: string): Promise<string> => {
+    const createConversation = async (otherUserId: string, otherUsername: string, otherAvatarUrl?: string | null): Promise<string> => {
         if (!authStore.user?.id) {
             console.error('❌ No authenticated user');
             return '';
@@ -52,6 +52,10 @@ export const useMessagesStore = defineStore('messages', () => {
                     participantNames: {
                         [authStore.user.id]: authStore.user.username,
                         [otherUserId]: otherUsername,
+                    },
+                    participantAvatars: {
+                        [authStore.user.id]: authStore.user.avatarUrl || null,
+                        [otherUserId]: otherAvatarUrl || null,
                     },
                     createdAt: Timestamp.now(),
                     lastMessage: '',
@@ -138,6 +142,7 @@ export const useMessagesStore = defineStore('messages', () => {
                         id: data.id,
                         participantIds: data.participantIds || [],
                         participantNames: data.participantNames || {},
+                        participantAvatars: data.participantAvatars || {},
                         lastMessage: data.lastMessage || '',
                         lastMessageTime: data.lastMessageTime?.toDate() || new Date(),
                         unreadCount: 0, // TODO: implementar contador de no leídos

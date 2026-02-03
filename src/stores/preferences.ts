@@ -25,6 +25,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown',
             location: authStore.user.location,
             email: authStore.user.email,
+            avatarUrl: authStore.user.avatarUrl,
         }
     }
 
@@ -85,7 +86,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             // Sync to public (non-blocking)
             const userInfo = getUserInfo()
             if (userInfo) {
-                syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                     .catch(err => console.error('[PublicSync] Error syncing preference:', err))
             }
 
@@ -241,7 +242,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
                 userInfo.userId,
                 userInfo.username,
                 userInfo.location,
-                userInfo.email
+                userInfo.email,
+                userInfo.avatarUrl
             )
             console.log('✅ Preferences synced to public')
         } catch (error) {

@@ -3,6 +3,7 @@ import { Contact } from '../../types/contact'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
+import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const props = defineProps<{
   contact: Contact
@@ -29,7 +30,14 @@ const copyEmail = async () => {
 <template>
   <div class="border border-silver-30 p-md bg-primary rounded-md">
     <div class="mb-md">
-      <p class="text-body font-bold text-silver">@{{ contact.username }}</p>
+      <p class="text-body font-bold text-silver flex items-center gap-2">
+        <img
+            :src="getAvatarUrlForUser(contact.username, 28, contact.avatarUrl)"
+            alt=""
+            class="w-7 h-7 rounded-full"
+        />
+        @{{ contact.username }}
+      </p>
       <p class="text-small text-silver-70 mt-1">📍 {{ contact.location }}</p>
       <p class="text-small text-silver-70 mt-1">📧 {{ contact.email }}</p>
     </div>

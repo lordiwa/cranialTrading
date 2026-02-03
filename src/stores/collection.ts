@@ -37,6 +37,7 @@ export const useCollectionStore = defineStore('collection', () => {
             username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown',
             location: authStore.user.location,
             email: authStore.user.email,
+            avatarUrl: authStore.user.avatarUrl,
         }
     }
 
@@ -97,7 +98,7 @@ export const useCollectionStore = defineStore('collection', () => {
             // Sync to public collection (non-blocking)
             const userInfo = getUserInfo()
             if (userInfo) {
-                syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                     .catch(err => console.error('[PublicSync] Error syncing card:', err))
             }
 
@@ -137,7 +138,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 // Sync to public collection (non-blocking)
                 const userInfo = getUserInfo()
                 if (userInfo) {
-                    syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                    syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                         .catch(err => console.error('[PublicSync] Error syncing card update:', err))
                 }
             }
@@ -193,7 +194,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
                     // Sync to public collection (non-blocking)
                     if (userInfo) {
-                        syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email)
+                        syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                             .catch(err => console.error('[PublicSync] Error syncing card update:', err))
                     }
                 }
@@ -444,7 +445,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 userInfo.userId,
                 userInfo.username,
                 userInfo.location,
-                userInfo.email
+                userInfo.email,
+                userInfo.avatarUrl
             )
 
             // Sync wishlist cards to public_preferences (lo que BUSCO)
@@ -464,7 +466,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 userInfo.userId,
                 userInfo.username,
                 userInfo.location,
-                userInfo.email
+                userInfo.email,
+                userInfo.avatarUrl
             )
 
             toastStore.show(t('collection.messages.synced'), 'success')

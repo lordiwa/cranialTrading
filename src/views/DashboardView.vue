@@ -104,7 +104,14 @@
             <p class="text-tiny font-bold text-silver truncate" :title="card.cardName">{{ card.cardName }}</p>
             <p class="text-tiny text-silver-70 truncate">{{ card.edition || 'N/A' }} • {{ card.condition }}</p>
             <p class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) || '0.00' }}</p>
-            <p class="text-tiny text-silver-50 truncate">@{{ card.username }}</p>
+            <p class="text-tiny text-silver-50 truncate flex items-center gap-1">
+              <img
+                  :src="getAvatarUrlForUser(card.username, 16, card.avatarUrl)"
+                  alt=""
+                  class="w-4 h-4 rounded-full"
+              />
+              @{{ card.username }}
+            </p>
             <!-- Interest Button -->
             <button
                 v-if="!sentInterestIds.has(card.id)"
@@ -221,6 +228,7 @@ import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
+import { getAvatarUrlForUser } from '../utils/avatar'
 import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'

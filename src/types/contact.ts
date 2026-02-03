@@ -4,5 +4,6 @@ export interface Contact {
     username: string;
     email: string;
     location: string;
+    avatarUrl?: string | null;
     savedAt: Date;
 }

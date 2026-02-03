@@ -28,6 +28,7 @@ export interface PublicCard {
   cardId: string // matches the user's card document ID
   userId: string
   username: string
+  avatarUrl?: string | null
   cardName: string
   scryfallId: string
   status: 'trade' | 'sale'
@@ -47,6 +48,7 @@ export interface PublicPreference {
   prefId: string // matches the user's preference document ID
   userId: string
   username: string
+  avatarUrl?: string | null
   cardName: string
   scryfallId: string
   maxPrice?: number
@@ -65,7 +67,8 @@ export async function syncCardToPublic(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string
+  userEmail?: string,
+  userAvatarUrl?: string | null
 ): Promise<void> {
   const publicCardId = `${userId}_${card.id}`
   const publicCardRef = doc(db, 'public_cards', publicCardId)
@@ -78,6 +81,7 @@ export async function syncCardToPublic(
       cardId: card.id,
       userId,
       username,
+      avatarUrl: userAvatarUrl || null,
       cardName: card.name,
       scryfallId: card.scryfallId,
       status: card.status as 'trade' | 'sale',
@@ -117,7 +121,8 @@ export async function syncPreferenceToPublic(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string
+  userEmail?: string,
+  userAvatarUrl?: string | null
 ): Promise<void> {
   const publicPrefId = `${userId}_${preference.id}`
   const publicPrefRef = doc(db, 'public_preferences', publicPrefId)
@@ -127,6 +132,7 @@ export async function syncPreferenceToPublic(
     prefId: preference.id,
     userId,
     username,
+    avatarUrl: userAvatarUrl || null,
     cardName: preference.cardName || preference.name || '',
     scryfallId: preference.scryfallId || '',
     updatedAt: Timestamp.now(),
@@ -157,7 +163,8 @@ export async function syncAllUserCards(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string
+  userEmail?: string,
+  userAvatarUrl?: string | null
 ): Promise<void> {
   // Debug: log all statuses
   const statusCounts: Record<string, number> = {}
@@ -206,6 +213,7 @@ export async function syncAllUserCards(
         cardId: card.id,
         userId,
         username,
+        avatarUrl: userAvatarUrl || null,
         cardName: card.name,
         scryfallId: card.scryfallId,
         status: card.status,
@@ -234,7 +242,8 @@ export async function syncAllUserPreferences(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string
+  userEmail?: string,
+  userAvatarUrl?: string | null
 ): Promise<void> {
   console.log(`[PublicPrefs] Syncing ${preferences.length} preferences...`)
 
@@ -275,6 +284,7 @@ export async function syncAllUserPreferences(
         prefId: pref.id,
         userId,
         username,
+        avatarUrl: userAvatarUrl || null,
         cardName: pref.cardName || pref.name || '',
         scryfallId: pref.scryfallId || '',
         updatedAt: Timestamp.now(),

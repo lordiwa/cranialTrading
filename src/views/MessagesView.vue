@@ -6,6 +6,7 @@ import ChatModal from '../components/chat/ChatModal.vue';
 import { useMessagesStore } from '../stores/messages';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
+import { getAvatarUrlForUser } from '../utils/avatar';
 
 const messagesStore = useMessagesStore();
 const authStore = useAuthStore();
@@ -31,13 +32,16 @@ const filteredConversations = computed(() => {
   });
 });
 
-const getOtherParticipantInfo = (conv: any): { username: string; userId: string } => {
+const getOtherParticipantInfo = (conv: any): { username: string; userId: string; avatarUrl: string | null } => {
   const entry = Object.entries(conv.participantNames as Record<string, string>).find(
       ([id]) => id !== authStore.user?.id
   );
+  const otherUserId = entry?.[0] || '';
+  const avatarUrl = conv.participantAvatars?.[otherUserId] || null;
   return {
     username: entry?.[1] || 'Unknown',
-    userId: entry?.[0] || '',
+    userId: otherUserId,
+    avatarUrl: avatarUrl,
   };
 };
 
@@ -109,7 +113,12 @@ onMounted(async () => {
             class="bg-primary border border-silver-30 p-4 md:p-6 hover:border-neon cursor-pointer transition-fast rounded-md"
         >
           <div class="flex items-start justify-between mb-2">
-            <h3 class="text-body font-bold text-silver">
+            <h3 class="text-body font-bold text-silver flex items-center gap-2">
+              <img
+                  :src="getAvatarUrlForUser(getOtherParticipantInfo(conv).username, 28, getOtherParticipantInfo(conv).avatarUrl)"
+                  alt=""
+                  class="w-7 h-7 rounded-full"
+              />
               @{{ getOtherParticipantInfo(conv).username }}
             </h3>
             <span v-if="conv.unreadCount > 0" class="bg-neon text-primary text-tiny font-bold px-2 py-1 rounded-sm">

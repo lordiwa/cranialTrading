@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useI18n } from '../../composables/useI18n'
 import SpriteIcon from '../ui/SpriteIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
+import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const router = useRouter()
 const route = useRoute()
@@ -16,19 +17,13 @@ const mobileMenuOpen = ref(false)
 const detectedLocation = ref<string | null>(null)
 const showLocationSuggestion = ref(false)
 
-// Detect location silently (IP-based, no permission needed) to suggest updates
+// Only suggest location if user has none set (IP detection is unreliable for accuracy)
 const checkLocation = async () => {
-  if (authStore.user) {
+  if (authStore.user && !authStore.user.location) {
     const detected = await authStore.detectLocationSilent()
     if (detected) {
       detectedLocation.value = detected
-      // Compare with stored location (case-insensitive, trimmed)
-      const storedLocation = authStore.user.location?.toLowerCase().trim() || ''
-      const detectedLower = detected.toLowerCase().trim()
-      // Show suggestion if location is empty or significantly different
-      if (!storedLocation || (storedLocation && !detectedLower.includes(storedLocation.split(',')[0]))) {
-        showLocationSuggestion.value = true
-      }
+      showLocationSuggestion.value = true
     }
   }
 }
@@ -202,7 +197,11 @@ const handleNavigate = (path: string) => {
             class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
             @click="closeMobileMenu"
         >
-          <SpriteIcon name="user-alt" size="small" />
+          <img
+              :src="authStore.getAvatarUrl(24)"
+              alt=""
+              class="w-6 h-6 rounded-full object-cover"
+          />
           {{ t('header.profile.myProfile') }} (@{{ authStore.user.username }})
         </router-link>
         <!-- FAQ (mobile) -->

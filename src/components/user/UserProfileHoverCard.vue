@@ -3,13 +3,14 @@ import { ref, computed, onMounted } from 'vue';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import BaseLoader from '../ui/BaseLoader.vue';
+import { getAvatarUrlForUser } from '../../utils/avatar';
 
 const props = defineProps<{
   username: string;
   show: boolean;
 }>();
 
-const userInfo = ref<{ username: string; location?: string } | null>(null);
+const userInfo = ref<{ username: string; location?: string; avatarUrl?: string | null } | null>(null);
 const cardCount = ref(0);
 const loading = ref(false);
 
@@ -56,10 +57,17 @@ onMounted(() => {
       <BaseLoader v-if="loading" size="small" />
 
       <div v-else-if="userInfo" class="space-y-3">
-        <!-- Username -->
-        <div>
-          <p class="text-tiny text-silver-70">Usuario</p>
-          <p class="text-body font-bold text-neon">@{{ userInfo.username }}</p>
+        <!-- Username with Avatar -->
+        <div class="flex items-center gap-3">
+          <img
+              :src="getAvatarUrlForUser(userInfo.username, 40, userInfo.avatarUrl)"
+              alt=""
+              class="w-10 h-10 rounded-full"
+          />
+          <div>
+            <p class="text-tiny text-silver-70">Usuario</p>
+            <p class="text-body font-bold text-neon">@{{ userInfo.username }}</p>
+          </div>
         </div>
 
         <!-- Location -->

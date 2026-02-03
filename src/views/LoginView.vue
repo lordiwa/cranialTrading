@@ -70,11 +70,9 @@ const features = computed(() => [
         <!-- Logo & Tagline -->
         <div class="mb-10">
           <div class="flex items-center gap-4 mb-6">
-            <img
-                src="/cranial-trading-logo-color.png"
-                alt="Cranial Trading Logo"
-                class="h-16 w-16 lg:h-20 lg:w-20"
-            />
+            <svg class="w-16 h-16 lg:w-20 lg:h-20 text-neon" viewBox="0 0 100 100" fill="currentColor">
+              <use href="/icons.svg#cranial-logo" />
+            </svg>
             <div>
               <h1 class="text-h2 lg:text-h1 font-bold text-neon tracking-wider">CRANIAL TRADING</h1>
               <p class="text-small text-silver-70">{{ t('auth.login.subtitle') }}</p>
@@ -186,11 +184,9 @@ const features = computed(() => [
           <!-- Brand -->
           <div class="col-span-2 md:col-span-1">
             <div class="flex items-center gap-2 mb-4">
-              <img
-                  src="/cranial-trading-logo-color.png"
-                  alt="Cranial Trading"
-                  class="h-8 w-8"
-              />
+              <svg class="w-8 h-8 text-neon" viewBox="0 0 100 100" fill="currentColor">
+                <use href="/icons.svg#cranial-logo" />
+              </svg>
               <span class="text-small font-bold text-neon">CRANIAL</span>
             </div>
             <p class="text-tiny text-silver-50">

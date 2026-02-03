@@ -35,7 +35,8 @@
       "Bash(npm i:*)",
       "Bash(Select-String -Pattern \"error\" -Context 0,0)",
       "Bash(npx eslint:*)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

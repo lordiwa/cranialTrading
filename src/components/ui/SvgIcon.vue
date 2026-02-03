@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 interface Props {
   name: string
-  size?: 'tiny' | 'small' | 'medium' | 'large' | 'xl'
+  size?: 'tiny' | 'small' | 'medium' | 'large' | 'xl' | '2xl' | '3xl' | '4xl'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -16,7 +16,10 @@ const sizes = {
   small: 20,
   medium: 24,
   large: 32,
-  xl: 48
+  xl: 48,
+  '2xl': 64,
+  '3xl': 80,
+  '4xl': 96
 }
 
 const displaySize = computed(() => sizes[props.size])

@@ -11,7 +11,9 @@ const lastUpdated = '27 de Enero, 2025';
     <header class="border-b border-silver-20 py-6">
       <div class="max-w-4xl mx-auto px-6">
         <RouterLink to="/login" class="flex items-center gap-3 w-fit">
-          <img src="/cranial-trading-logo-color.png" alt="Cranial Trading" class="h-10 w-10" />
+          <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
+            <use href="/icons.svg#cranial-logo" />
+          </svg>
           <span class="text-h3 font-bold text-neon">CRANIAL TRADING</span>
         </RouterLink>
       </div>

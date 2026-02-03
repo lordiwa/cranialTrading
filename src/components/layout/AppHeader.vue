@@ -113,7 +113,9 @@ onUnmounted(() => {
       <div class="flex items-center justify-between h-16 md:h-20">
         <!-- Logo -->
         <router-link to="/dashboard" class="flex items-center gap-2 flex-shrink-0">
-          <img src="/cranial-trading-logo-color.png" alt="Cranial Trading" class="h-8 w-8 md:h-10 md:w-10" />
+          <svg class="w-10 h-10 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
+            <use href="/icons.svg#cranial-logo" />
+          </svg>
           <span class="hidden sm:inline text-h3 font-bold text-neon">CRANIAL TRADING</span>
         </router-link>
 

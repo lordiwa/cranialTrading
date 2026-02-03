@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useI18n, type SupportedLocale } from '../../composables/useI18n'
+import { type SupportedLocale, useI18n } from '../../composables/useI18n'
 
 const { t, locale, setLocale } = useI18n()
 

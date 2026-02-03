@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
-import { useI18n, type SupportedLocale } from '../composables/useI18n';
+import { type SupportedLocale, useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SvgIcon from '../components/ui/SvgIcon.vue';

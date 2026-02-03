@@ -1,8 +1,8 @@
 /**
  * Composable for fetching and displaying card prices from multiple sources
  */
-import { ref, computed } from 'vue'
-import { getCardPrices, formatPrice, type CardPrices } from '../services/mtgjson'
+import { computed, ref } from 'vue'
+import { type CardPrices, formatPrice, getCardPrices } from '../services/mtgjson'
 import { getCardById } from '../services/scryfall'
 
 export interface PriceDisplay {

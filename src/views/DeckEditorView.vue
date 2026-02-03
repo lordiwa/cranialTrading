@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
@@ -10,7 +10,6 @@ import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
-import DeckCardsList from '../components/decks/DeckCardsList.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import AddCardToDeckModal from '../components/decks/AddCardToDeckModal.vue'
 import EditDeckCardModal from '../components/decks/EditDeckCardModal.vue'
@@ -51,10 +50,10 @@ const sideboardCards = computed(() =>
 
 // Type guard and helper to get quantity from either type
 const getCardQuantity = (card: DisplayDeckCard): number => {
-  if (card.isWishlist === true) {
+  if (card.isWishlist) {
     return card.requestedQuantity
   }
-  return (card as HydratedDeckCard).allocatedQuantity
+  return (card).allocatedQuantity
 }
 
 // Stats
@@ -180,7 +179,7 @@ const handleRemoveCard = async (card: DisplayDeckCard) => {
     )
   } else {
     // Deallocate from deck (card stays in collection)
-    const ownedCard = card as HydratedDeckCard
+    const ownedCard = card
     await decksStore.deallocateCard(deckId, ownedCard.cardId, ownedCard.isInSideboard)
   }
 
@@ -236,7 +235,7 @@ const handleSaveEditedCard = async (updatedData: any) => {
  */
 const handleUpdateQuantity = async (card: DisplayDeckCard, newQuantity: number) => {
   if (!card.isWishlist) {
-    const hydratedCard = card as HydratedDeckCard
+    const hydratedCard = card
     await decksStore.updateAllocation(
       deckId,
       hydratedCard.cardId,
@@ -251,7 +250,7 @@ const handleUpdateQuantity = async (card: DisplayDeckCard, newQuantity: number) 
 /**
  * Handle add to wishlist from grid
  */
-const handleAddToWishlistFromGrid = async (card: DisplayDeckCard) => {
+const handleAddToWishlistFromGrid = async (_card: DisplayDeckCard) => {
   // Card is already in wishlist, this is just a reminder
   toastStore.show(t('decks.editor.messages.alreadyInWishlist'), 'info')
 }

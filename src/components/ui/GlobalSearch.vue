@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCollectionStore } from '../../stores/collection'
 import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
-import { collection, query, where, getDocs, limit } from 'firebase/firestore'
+import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useAuthStore } from '../../stores/auth'
+import { getAvatarUrlForUser } from '../../utils/avatar'
 import SvgIcon from './SvgIcon.vue'
 import ManaCost from './ManaCost.vue'
-import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const router = useRouter()
 const collectionStore = useCollectionStore()
@@ -112,7 +112,7 @@ const searchScryfall = async (query: string) => {
   try {
     const results = await searchCards(query)
     scryfallResults.value = results.slice(0, 8)
-  } catch (error) {
+  } catch {
     scryfallResults.value = []
   }
 }

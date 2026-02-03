@@ -16,7 +16,6 @@ export interface ScryfallSet {
 }
 
 // Cache para sets (1 hora)
-const setsCache: { sets: ScryfallSet[], timestamp: number } | null = null
 const SETS_CACHE_TTL = 60 * 60 * 1000
 
 export interface ScryfallCard {
@@ -29,6 +28,7 @@ export interface ScryfallCard {
     type_line: string
     mana_cost?: string
     cmc?: number
+    colors?: string[]
     power?: string
     toughness?: string
     image_uris?: {
@@ -40,7 +40,7 @@ export interface ScryfallCard {
         border_crop?: string
     }
     // ✅ NUEVO: Soporte para cartas de dos caras (split cards)
-    card_faces?: Array<{
+    card_faces?: {
         name: string
         image_uris?: {
             small?: string
@@ -50,7 +50,7 @@ export interface ScryfallCard {
             art_crop?: string
             border_crop?: string
         }
-    }>
+    }[]
     prices?: {
         usd?: string
         usd_foil?: string
@@ -163,7 +163,7 @@ export const searchAdvanced = async (
             if (response.status === 429) {
                 console.warn('⚠️ Rate limit alcanzado, esperando...')
                 await new Promise(resolve => setTimeout(resolve, 1000))
-                return searchAdvanced(query, options) // Reintentar
+                return await searchAdvanced(query, options) // Reintentar
             }
             if (response.status === 404) {
                 console.warn('⚠️ No se encontraron cartas con estos filtros')
@@ -415,7 +415,7 @@ export const getCardsByPowerToughness = async (
  * Usa el endpoint /cards/collection de Scryfall
  */
 export const getCardsByIds = async (
-    identifiers: Array<{ id: string } | { name: string }>
+    identifiers: ({ id: string } | { name: string })[]
 ): Promise<ScryfallCard[]> => {
     if (identifiers.length === 0) return []
 

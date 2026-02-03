@@ -1,8 +1,8 @@
 /**
  * Composable for calculating collection totals with multi-source prices
  */
-import { ref, computed } from 'vue'
-import { getCardPrices, formatPrice, type CardPrices } from '../services/mtgjson'
+import { computed, ref } from 'vue'
+import { type CardPrices, formatPrice, getCardPrices } from '../services/mtgjson'
 import { getCardById, searchCards } from '../services/scryfall'
 import { useCollectionStore } from '../stores/collection'
 import { cleanCardName } from '../utils/cardHelpers'
@@ -65,13 +65,16 @@ export function useCollectionTotals(cards: () => Card[]) {
           (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
         ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || results[0]
 
+        if (!printWithPrice) return
+
         const scryfallId = printWithPrice.id
         const setCode = printWithPrice.set?.toUpperCase()
         const edition = printWithPrice.set_name
         const price = printWithPrice.prices?.usd ? Number.parseFloat(printWithPrice.prices.usd) : 0
         let image = printWithPrice.image_uris?.normal || ''
-        if (!image && printWithPrice.card_faces?.[0]) {
-          image = printWithPrice.card_faces[0].image_uris?.normal || ''
+        const firstFace = printWithPrice.card_faces?.[0]
+        if (!image && firstFace) {
+          image = firstFace.image_uris?.normal || ''
         }
 
         // Update card in collection store (background, don't await)
@@ -84,7 +87,7 @@ export function useCollectionTotals(cards: () => Card[]) {
           image: image || card.image,
         }).then(() => {
           console.log(`✅ Auto-fixed card: ${card.name}`)
-        }).catch(e => {
+        }).catch((e: unknown) => {
           console.warn(`Failed to auto-fix ${card.name}:`, e)
         })
 
@@ -127,7 +130,7 @@ export function useCollectionTotals(cards: () => Card[]) {
             setCode = scryfallCard.set
             setCodeCache.set(scryfallId, setCode)
           }
-        } catch (e) {
+        } catch {
           console.warn('Error fetching setCode for', card.name)
         }
       }
@@ -137,7 +140,7 @@ export function useCollectionTotals(cards: () => Card[]) {
       const prices = await getCardPrices(scryfallId, setCode)
       pricesCache.set(scryfallId, prices)
       return prices
-    } catch (e) {
+    } catch {
       console.warn('Error fetching prices for', card.name)
       pricesCache.set(scryfallId, null)
       return null

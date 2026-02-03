@@ -7,7 +7,7 @@ interface Props {
   id?: string;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   placeholder: 'Seleccionar',
   disabled: false,
 });

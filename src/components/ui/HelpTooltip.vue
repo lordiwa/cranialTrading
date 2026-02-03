@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useHelpStore } from '../../stores/help'
 
 interface Props {

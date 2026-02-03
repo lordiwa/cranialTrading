@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { collection, getDocs, doc, onSnapshot, Timestamp, setDoc, getDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
-import { Message, Conversation } from '../types/message';
+import { type Conversation, type Message } from '../types/message';
 
 export const useMessagesStore = defineStore('messages', () => {
     const conversations = ref<Conversation[]>([]);
@@ -148,7 +148,7 @@ export const useMessagesStore = defineStore('messages', () => {
                         unreadCount: 0, // TODO: implementar contador de no leídos
                     } as Conversation;
                 })
-                .sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
+                .sort((a, b) => (b.lastMessageTime?.getTime() ?? 0) - (a.lastMessageTime?.getTime() ?? 0));
 
             console.log(`✅ ${conversations.value.length} conversaciones cargadas`);
         } catch (error) {

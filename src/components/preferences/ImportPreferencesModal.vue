@@ -1,16 +1,14 @@
 <!-- src/components/preferences/ImportPreferencesModal.vue -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
-import { CardCondition } from '../../types/card'
+import { type CardCondition } from '../../types/card'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 
-const { t } = useI18n()
-
-const props = defineProps<{
+defineProps<{
   show: boolean
 }>()
 
@@ -19,6 +17,8 @@ const emit = defineEmits<{
   import: [deckText: string, condition: CardCondition, includeSideboard: boolean]
   importDirect: [cards: any[], condition: CardCondition]
 }>()
+
+const { t } = useI18n()
 
 const inputText = ref('')
 const condition = ref<CardCondition>('NM')
@@ -93,7 +93,7 @@ const handleParse = async () => {
         continue
       }
 
-      const match = trimmed.match(/^(\d+)\s+/)
+      const match = /^(\d+)\s+/.exec(trimmed)
       if (match) {
         const qty = Number.parseInt(match[1])
         if (inSideboard) {

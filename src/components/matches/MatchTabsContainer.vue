@@ -1,3 +1,33 @@
+<script setup lang="ts">
+type TabId = 'new' | 'saved' | 'deleted'
+
+interface Tab {
+  id: TabId
+  label: string
+  icon: string
+  count: number
+}
+
+interface Props {
+  tabs: Tab[]
+  modelValue?: TabId
+}
+
+withDefaults(defineProps<Props>(), {
+  modelValue: 'new'
+})
+
+const emit = defineEmits<{
+  'tab-change': [tabId: TabId]
+  'update:modelValue': [tabId: TabId]
+}>()
+
+const handleTabChange = (tabId: TabId) => {
+  emit('tab-change', tabId)
+  emit('update:modelValue', tabId)
+}
+</script>
+
 <template>
   <div class="w-full">
     <!-- Tabs Navigation -->
@@ -22,36 +52,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-type TabId = 'new' | 'saved' | 'deleted'
-
-interface Tab {
-  id: TabId
-  label: string
-  icon: string
-  count: number
-}
-
-interface Props {
-  tabs: Tab[]
-  modelValue?: TabId
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  modelValue: 'new'
-})
-
-const emit = defineEmits<{
-  'tab-change': [tabId: TabId]
-  'update:modelValue': [tabId: TabId]
-}>()
-
-const handleTabChange = (tabId: TabId) => {
-  emit('tab-change', tabId)
-  emit('update:modelValue', tabId)
-}
-</script>
 
 <style scoped>
 /* All styles in global style.css */

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
@@ -9,10 +9,8 @@ import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
-import type { DisplayDeckCard, HydratedDeckCard } from '../../types/deck'
+import type { DisplayDeckCard } from '../../types/deck'
 import type { CardCondition } from '../../types/card'
-
-const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -33,6 +31,8 @@ const emit = defineEmits<{
     image: string
   }]
 }>()
+
+const { t } = useI18n()
 
 const toastStore = useToastStore()
 const { getCardAllocationSummary } = useCardAllocation()
@@ -85,7 +85,7 @@ const isWishlistCard = computed(() => props.card?.isWishlist)
 // For owned cards, get allocation info
 const allocationSummary = computed(() => {
   if (!props.card || props.card.isWishlist) return null
-  return getCardAllocationSummary((props.card as HydratedDeckCard).cardId)
+  return getCardAllocationSummary((props.card).cardId)
 })
 
 // Max quantity for owned cards
@@ -93,7 +93,7 @@ const maxQuantityForOwned = computed(() => {
   if (!allocationSummary.value) return 99
   // Available = total owned - allocated to other decks + current allocation in this deck
   const currentAllocation = props.card && !props.card.isWishlist
-      ? (props.card as HydratedDeckCard).allocatedQuantity
+      ? (props.card).allocatedQuantity
       : 0
   return allocationSummary.value.available + currentAllocation
 })
@@ -102,7 +102,7 @@ const maxQuantityForOwned = computed(() => {
 watch(() => props.card, async (card) => {
   if (card && props.show) {
     // Inicializar formulario con datos actuales
-    const qty = card.isWishlist ? card.requestedQuantity : (card as HydratedDeckCard).allocatedQuantity
+    const qty = card.isWishlist ? card.requestedQuantity : (card).allocatedQuantity
     form.value = {
       quantity: qty,
       condition: card.condition,
@@ -133,7 +133,7 @@ watch(() => props.show, async (show) => {
   if (show && props.card) {
     const qty = props.card.isWishlist
         ? props.card.requestedQuantity
-        : (props.card as HydratedDeckCard).allocatedQuantity
+        : (props.card).allocatedQuantity
 
     form.value = {
       quantity: qty,
@@ -148,7 +148,7 @@ watch(() => props.show, async (show) => {
       availablePrints.value = results
       const currentPrint = results.find(p => p.id === props.card!.scryfallId)
       selectedPrint.value = currentPrint || results[0] || null
-    } catch (err) {
+    } catch {
       availablePrints.value = []
     } finally {
       loadingPrints.value = false

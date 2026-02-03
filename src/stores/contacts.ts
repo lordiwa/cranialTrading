@@ -1,17 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
-    collection,
     addDoc,
+    collection,
     deleteDoc,
     doc,
+    getDocs,
     onSnapshot,
     Timestamp,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
-import { Contact } from '../types/contact'
+import { type Contact } from '../types/contact'
 
 export const useContactsStore = defineStore('contacts', () => {
     const contacts = ref<Contact[]>([])
@@ -99,11 +100,32 @@ export const useContactsStore = defineStore('contacts', () => {
         }
     }
 
+    /**
+     * Delete all contacts for current user
+     */
+    const deleteAllContacts = async (): Promise<boolean> => {
+        if (!authStore.user?.id) return false
+
+        try {
+            const contactsRef = collection(db, 'users', authStore.user.id, 'contactos_guardados')
+            const snapshot = await getDocs(contactsRef)
+
+            await Promise.all(snapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'contactos_guardados', docSnap.id))))
+
+            contacts.value = []
+            return true
+        } catch (error) {
+            console.error('Error deleting all contacts:', error)
+            return false
+        }
+    }
+
     return {
         contacts,
         loading,
         saveContact,
         deleteContact,
+        deleteAllContacts,
         loadSavedContacts,
         stopListeningContacts,
     }

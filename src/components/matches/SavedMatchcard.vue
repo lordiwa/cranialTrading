@@ -1,3 +1,62 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useI18n } from '../../composables/useI18n'
+import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
+import { getAvatarUrlForUser } from '../../utils/avatar'
+
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  save: [match: Match]
+  discard: [matchId: string, tab: 'new']
+  contactar: [contact: { username: string; email: string; location: string }]
+  'marcar-completado': [matchId: string]
+  descartar: [matchId: string]
+  recover: [matchId: string]
+  delete: [matchId: string]
+}>()
+
+const { t } = useI18n()
+
+interface Match {
+  id: string
+  username: string
+  location: string
+  email: string
+  avatarUrl?: string | null
+  cardsOffering: string[]
+  cardsReceiving: string[]
+  createdAt: Date
+}
+
+interface Props {
+  match: Match
+  tab: 'new' | 'saved' | 'deleted'
+}
+
+const showProfileHover = ref(false)
+
+const formattedDate = computed(() => {
+  const now = new Date()
+  const created = new Date(props.match.createdAt)
+  const diff = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diff === 0) return t('common.time.today').toLowerCase()
+  if (diff === 1) return t('common.time.yesterday').toLowerCase()
+  return t('matches.savedCard.daysAgo', { days: diff })
+})
+
+const handleContactar = () => {
+  // Emit contactar event with contact data
+  emit('contactar', {
+    username: props.match.username,
+    email: props.match.email,
+    location: props.match.location
+  })
+}
+</script>
+
 <template>
   <div class="card-base p-md md:p-lg border border-silver-30 hover:border-neon-40">
     <!-- Header with Username and Location -->
@@ -125,65 +184,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useI18n } from '../../composables/useI18n'
-import UserProfileHoverCard from '../user/UserProfileHoverCard.vue'
-import SvgIcon from '../ui/SvgIcon.vue'
-import { getAvatarUrlForUser } from '../../utils/avatar'
-
-const { t } = useI18n()
-
-interface Match {
-  id: string
-  username: string
-  location: string
-  email: string
-  avatarUrl?: string | null
-  cardsOffering: string[]
-  cardsReceiving: string[]
-  createdAt: Date
-}
-
-interface Props {
-  match: Match
-  tab: 'new' | 'saved' | 'deleted'
-}
-
-const props = defineProps<Props>()
-
-const emit = defineEmits<{
-  save: [match: Match]
-  discard: [matchId: string, tab: 'new']
-  contactar: [contact: { username: string; email: string; location: string }]
-  'marcar-completado': [matchId: string]
-  descartar: [matchId: string]
-  recover: [matchId: string]
-  delete: [matchId: string]
-}>()
-
-const showProfileHover = ref(false)
-
-const formattedDate = computed(() => {
-  const now = new Date()
-  const created = new Date(props.match.createdAt)
-  const diff = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-
-  if (diff === 0) return t('common.time.today').toLowerCase()
-  if (diff === 1) return t('common.time.yesterday').toLowerCase()
-  return t('matches.savedCard.daysAgo', { days: diff })
-})
-
-const handleContactar = () => {
-  // Emit contactar event with contact data
-  emit('contactar', {
-    username: props.match.username,
-    email: props.match.email,
-    location: props.match.location
-  })
-}
-</script>
 
 <style scoped>
 /* All styles in global style.css */

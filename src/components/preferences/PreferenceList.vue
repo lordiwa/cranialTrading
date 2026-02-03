@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Preference } from '../../types/preferences';
+import { type Preference } from '../../types/preferences';
 import PreferenceCard from './PreferenceCard.vue';
 
 defineProps<{

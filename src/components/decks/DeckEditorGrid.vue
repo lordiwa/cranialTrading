@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../../types/deck'
 import BaseButton from '../ui/BaseButton.vue'
-
-const { t } = useI18n()
 
 const props = defineProps<{
   cards: DisplayDeckCard[]
@@ -20,6 +18,8 @@ const emit = defineEmits<{
   addToWishlist: [card: DisplayDeckCard]
   toggleCommander: [card: DisplayDeckCard]
 }>()
+
+const { t } = useI18n()
 
 // Preview state
 const hoveredCard = ref<DisplayDeckCard | null>(null)
@@ -39,12 +39,12 @@ const isMobile = computed(() => {
 
 // Type guard
 const isWishlistCard = (card: DisplayDeckCard): card is HydratedWishlistCard => {
-  return card.isWishlist === true
+  return card.isWishlist
 }
 
 const getQuantity = (card: DisplayDeckCard): number => {
   if (isWishlistCard(card)) return card.requestedQuantity
-  return (card as HydratedDeckCard).allocatedQuantity
+  return (card).allocatedQuantity
 }
 
 // Check if card is a commander
@@ -161,7 +161,7 @@ const groupedCards = computed(() => {
   }
 
   // Build sorted groups array
-  const sortedGroups: Array<{ type: string; cards: DisplayDeckCard[] }> = []
+  const sortedGroups: { type: string; cards: DisplayDeckCard[] }[] = []
 
   for (const category of order) {
     if (groups[category] && groups[category].length > 0) {

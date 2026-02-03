@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
@@ -8,7 +8,6 @@ import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
-import { getAvatarUrlForUser } from '../../utils/avatar'
 
 const router = useRouter()
 const route = useRoute()
@@ -82,12 +81,8 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-const handleNavigate = (path: string) => {
-  router.push(path)
-}
-
 // Global search ref for keyboard shortcut
-const globalSearchRef = ref<InstanceType<typeof GlobalSearch> | null>(null)
+const globalSearchRef = ref<{ focus: () => void } | null>(null)
 
 // Keyboard shortcut: "/" to focus search
 const handleKeydown = (e: KeyboardEvent) => {
@@ -215,7 +210,7 @@ onUnmounted(() => {
       >
         <router-link
             v-for="link in navigationLinks"
-            :key="'mobile-' + link.path"
+            :key="`mobile-${ link.path}`"
             :to="link.path"
             :class="[
               'flex items-center gap-3 px-4 py-3 text-small font-bold transition-fast',

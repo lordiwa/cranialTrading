@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { useSearchStore, type FilterOptions } from '../../stores/search'
-import { getCardSuggestions, getAllSets, type ScryfallSet } from '../../services/scryfall'
+import { type FilterOptions, useSearchStore } from '../../stores/search'
+import { getAllSets, getCardSuggestions, type ScryfallSet } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
@@ -161,15 +161,17 @@ const handleNameInput = async (value: string) => {
   }
 
   // Debounce 300ms
-  suggestionTimeout = setTimeout(async () => {
-    try {
-      const results = await getCardSuggestions(value)
-      suggestions.value = results.slice(0, 8)
-      showSuggestions.value = true
-    } catch (err) {
-      console.error('Error obteniendo sugerencias:', err)
-      suggestions.value = []
-    }
+  suggestionTimeout = setTimeout(() => {
+    void (async () => {
+      try {
+        const results = await getCardSuggestions(value)
+        suggestions.value = results.slice(0, 8)
+        showSuggestions.value = true
+      } catch (err) {
+        console.error('Error obteniendo sugerencias:', err)
+        suggestions.value = []
+      }
+    })()
   }, 300)
 }
 
@@ -782,7 +784,7 @@ const removeFilter = (type: string, value?: string) => {
         <!-- Colores -->
         <button
             v-for="color in filters.colors"
-            :key="'color-' + color"
+            :key="`color-${ color}`"
             @click="removeFilter('color', color)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
@@ -792,7 +794,7 @@ const removeFilter = (type: string, value?: string) => {
         <!-- Tipos -->
         <button
             v-for="type in filters.types"
-            :key="'type-' + type"
+            :key="`type-${ type}`"
             @click="removeFilter('type', type)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
@@ -802,7 +804,7 @@ const removeFilter = (type: string, value?: string) => {
         <!-- Rarezas -->
         <button
             v-for="rarity in filters.rarity"
-            :key="'rarity-' + rarity"
+            :key="`rarity-${ rarity}`"
             @click="removeFilter('rarity', rarity)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
@@ -812,7 +814,7 @@ const removeFilter = (type: string, value?: string) => {
         <!-- Formatos -->
         <button
             v-for="format in filters.formatLegal"
-            :key="'format-' + format"
+            :key="`format-${ format}`"
             @click="removeFilter('format', format)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
@@ -822,7 +824,7 @@ const removeFilter = (type: string, value?: string) => {
         <!-- Sets/Ediciones -->
         <button
             v-for="setCode in filters.sets"
-            :key="'set-' + setCode"
+            :key="`set-${ setCode}`"
             @click="removeFilter('set', setCode)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
@@ -832,7 +834,7 @@ const removeFilter = (type: string, value?: string) => {
         <!-- Keywords -->
         <button
             v-for="keyword in filters.keywords"
-            :key="'keyword-' + keyword"
+            :key="`keyword-${ keyword}`"
             @click="removeFilter('keyword', keyword)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast"
         >
@@ -909,8 +911,7 @@ const removeFilter = (type: string, value?: string) => {
         @close="showAdvancedFilters = false; filterSearchQuery = ''"
     >
       <div class="space-y-4">
-
-      <!-- Buscador de filtros -->
+<!-- Buscador de filtros -->
       <div class="relative">
         <input
             v-model="filterSearchQuery"
@@ -1152,7 +1153,7 @@ const removeFilter = (type: string, value?: string) => {
           <div v-if="filters.sets?.length" class="flex flex-wrap gap-1 mb-2 pb-2 border-b border-silver-30">
             <button
                 v-for="setCode in filters.sets"
-                :key="'selected-' + setCode"
+                :key="`selected-${ setCode}`"
                 @click="toggleSet(setCode)"
                 class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast rounded"
             >
@@ -1186,8 +1187,7 @@ const removeFilter = (type: string, value?: string) => {
 
       <!-- ========== ACORDEONES DE KEYWORDS (4 categorías reorganizadas) ========== -->
       <div class="border border-silver-30 rounded">
-
-        <!-- 1. HABILIDADES DE COMBATE (más buscadas) -->
+<!-- 1. HABILIDADES DE COMBATE (más buscadas) -->
         <div class="border-b border-silver-30">
           <button
               @click="toggleAccordion('combat')"

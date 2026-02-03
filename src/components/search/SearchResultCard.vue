@@ -4,8 +4,6 @@ import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
 import ManaCost from '../ui/ManaCost.vue'
 
-const { t } = useI18n()
-
 const props = withDefaults(defineProps<{
   card: any
   ownedCount?: number
@@ -16,6 +14,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   click: [card: any]
 }>()
+
+const { t } = useI18n()
 
 // Card Kingdom prices
 const {

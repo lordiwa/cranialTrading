@@ -4,8 +4,6 @@ import { useI18n } from '../../composables/useI18n'
 import type { Deck } from '../../types/deck'
 import BaseBadge from '../ui/BaseBadge.vue'
 
-const { t } = useI18n()
-
 const props = defineProps<{
   deck: Deck
 }>()
@@ -14,6 +12,8 @@ const emit = defineEmits<{
   edit: [deckId: string]
   delete: [deckId: string]
 }>()
+
+const { t } = useI18n()
 
 const formatLabel = computed(() => {
   const labels: Record<string, string> = {

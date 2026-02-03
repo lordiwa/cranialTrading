@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useDecksStore } from '../../stores/decks'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
@@ -7,8 +7,6 @@ import { useI18n } from '../../composables/useI18n'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import type { Card } from '../../types/card'
-
-const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -18,6 +16,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
+
+const { t } = useI18n()
 
 const decksStore = useDecksStore()
 const toastStore = useToastStore()

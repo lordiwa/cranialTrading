@@ -1,3 +1,128 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseModal from '../ui/BaseModal.vue'
+import ChatModal from '../chat/ChatModal.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
+import HelpTooltip from '../ui/HelpTooltip.vue'
+import { useContactsStore } from '../../stores/contacts'
+import { useToastStore } from '../../stores/toast'
+import { useMessagesStore } from '../../stores/messages'
+import { useI18n } from '../../composables/useI18n'
+import { getAvatarUrlForUser } from '../../utils/avatar'
+
+const props = withDefaults(defineProps<Props>(), {
+  matchIndex: 0,
+  tab: 'new'
+})
+
+const emit = defineEmits(['save', 'discard'])
+
+const { t } = useI18n()
+
+interface Props {
+  match: any
+  matchIndex?: number
+  tab?: 'new' | 'sent' | 'saved' | 'deleted'
+}
+
+const saving = ref(false)
+const showContactModal = ref(false)
+const showChatModal = ref(false)
+const contactSaving = ref(false)
+const contactsStore = useContactsStore()
+const toastStore = useToastStore()
+const messagesStore = useMessagesStore()
+
+// TAB: NEW - Guardar match
+const handleSaveMatch = async () => {
+  saving.value = true
+  try {
+    emit('save', props.match)
+  } finally {
+    saving.value = false
+  }
+}
+
+// TAB: NEW/SAVED/DELETED - Descartar match
+const handleDiscard = () => {
+  emit('discard', props.match.id || props.match.docId)
+}
+
+// TAB: SAVED - Marcar como completado
+const handleMarcarCompletado = () => {
+  emit('discard', props.match.id || props.match.docId)
+}
+
+// TAB: DELETED - Recuperar match
+const handleRecuperar = () => {
+  emit('save', props.match)
+}
+
+// TAB: DELETED - Eliminar permanentemente
+const handleDeletePermanent = () => {
+  emit('discard', props.match.id || props.match.docId)
+}
+
+// CONTACTO - Copiar email
+const copyEmailToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(props.match.otherEmail)
+    toastStore.show(t('matches.contactModal.emailCopied'), 'success')
+  } catch {
+    toastStore.show(t('messages.errors.sendError'), 'error')
+  }
+}
+
+// MENSAJE - Abrir chat con el usuario
+const handleOpenChat = async () => {
+  const otherUserId = props.match.otherUserId
+  const otherUsername = props.match.otherUsername
+
+  if (!otherUserId) {
+    toastStore.show(t('messages.errors.createError'), 'error')
+    return
+  }
+
+  // Crear conversación si no existe
+  const conversationId = await messagesStore.createConversation(otherUserId, otherUsername)
+
+  if (conversationId) {
+    showChatModal.value = true
+  }
+}
+
+// CONTACTO - Guardar contacto
+const handleSaveContact = async () => {
+  contactSaving.value = true
+  try {
+    const otherUserId = props.match.otherUserId
+
+    if (!otherUserId) {
+      toastStore.show(t('contacts.messages.saveError'), 'error')
+      return
+    }
+
+    await contactsStore.saveContact({
+      userId: otherUserId,
+      username: props.match.otherUsername,
+      email: props.match.otherEmail,
+      location: props.match.otherLocation || 'Unknown',
+      avatarUrl: props.match.otherAvatarUrl || null,
+    })
+
+    toastStore.show(t('matches.contactModal.contactSaved', { username: props.match.otherUsername }), 'success')
+    showContactModal.value = false
+  } catch (error) {
+    const message = error instanceof Error ? error.message : t('contacts.messages.saveError')
+    toastStore.show(message, 'error')
+    console.error('Error saving contact:', error)
+  } finally {
+    contactSaving.value = false
+  }
+}
+</script>
+
 <template>
   <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300 rounded-md bg-primary/80">
     <!-- Header: Match Title + Compatibility -->
@@ -275,133 +400,6 @@
     />
 </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import BaseButton from '../ui/BaseButton.vue'
-import BaseModal from '../ui/BaseModal.vue'
-import ChatModal from '../chat/ChatModal.vue'
-import SvgIcon from '../ui/SvgIcon.vue'
-import HelpTooltip from '../ui/HelpTooltip.vue'
-import { useContactsStore } from '../../stores/contacts'
-import { useToastStore } from '../../stores/toast'
-import { useMessagesStore } from '../../stores/messages'
-import { useI18n } from '../../composables/useI18n'
-import { getAvatarUrlForUser } from '../../utils/avatar'
-
-const { t } = useI18n()
-
-interface Props {
-  match: any
-  matchIndex?: number
-  tab?: 'new' | 'sent' | 'saved' | 'deleted'
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  matchIndex: 0,
-  tab: 'new'
-})
-
-const emit = defineEmits(['save', 'discard'])
-
-const router = useRouter()
-const saving = ref(false)
-const showContactModal = ref(false)
-const showChatModal = ref(false)
-const contactSaving = ref(false)
-const contactsStore = useContactsStore()
-const toastStore = useToastStore()
-const messagesStore = useMessagesStore()
-
-// TAB: NEW - Guardar match
-const handleSaveMatch = async () => {
-  saving.value = true
-  try {
-    emit('save', props.match)
-  } finally {
-    saving.value = false
-  }
-}
-
-// TAB: NEW/SAVED/DELETED - Descartar match
-const handleDiscard = () => {
-  emit('discard', props.match.id || props.match.docId)
-}
-
-// TAB: SAVED - Marcar como completado
-const handleMarcarCompletado = () => {
-  emit('discard', props.match.id || props.match.docId)
-}
-
-// TAB: DELETED - Recuperar match
-const handleRecuperar = () => {
-  emit('save', props.match)
-}
-
-// TAB: DELETED - Eliminar permanentemente
-const handleDeletePermanent = () => {
-  emit('discard', props.match.id || props.match.docId)
-}
-
-// CONTACTO - Copiar email
-const copyEmailToClipboard = async () => {
-  try {
-    await navigator.clipboard.writeText(props.match.otherEmail)
-    toastStore.show(t('matches.contactModal.emailCopied'), 'success')
-  } catch (err) {
-    toastStore.show(t('messages.errors.sendError'), 'error')
-  }
-}
-
-// MENSAJE - Abrir chat con el usuario
-const handleOpenChat = async () => {
-  const otherUserId = props.match.otherUserId
-  const otherUsername = props.match.otherUsername
-
-  if (!otherUserId) {
-    toastStore.show(t('messages.errors.createError'), 'error')
-    return
-  }
-
-  // Crear conversación si no existe
-  const conversationId = await messagesStore.createConversation(otherUserId, otherUsername)
-
-  if (conversationId) {
-    showChatModal.value = true
-  }
-}
-
-// CONTACTO - Guardar contacto
-const handleSaveContact = async () => {
-  contactSaving.value = true
-  try {
-    const otherUserId = props.match.otherUserId
-
-    if (!otherUserId) {
-      toastStore.show(t('contacts.messages.saveError'), 'error')
-      return
-    }
-
-    await contactsStore.saveContact({
-      userId: otherUserId,
-      username: props.match.otherUsername,
-      email: props.match.otherEmail,
-      location: props.match.otherLocation || 'Unknown',
-      avatarUrl: props.match.otherAvatarUrl || null,
-    })
-
-    toastStore.show(t('matches.contactModal.contactSaved', { username: props.match.otherUsername }), 'success')
-    showContactModal.value = false
-  } catch (error) {
-    const message = error instanceof Error ? error.message : t('contacts.messages.saveError')
-    toastStore.show(message, 'error')
-    console.error('Error saving contact:', error)
-  } finally {
-    contactSaving.value = false
-  }
-}
-</script>
 
 <style scoped>
 /* Los estilos se aplican directamente con clases Tailwind en el template */

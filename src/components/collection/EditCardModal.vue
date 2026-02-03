@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useConfirmStore } from '../../stores/confirm'
 import { useCardAllocation } from '../../composables/useCardAllocation'
@@ -11,9 +11,7 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
-import type { Card, CardCondition } from '../../types/card'
-
-const { t } = useI18n()
+import type { Card } from '../../types/card'
 
 const props = defineProps<{
   show: boolean
@@ -24,6 +22,8 @@ const emit = defineEmits<{
   close: []
   save: [card: Card]
 }>()
+
+const { t } = useI18n()
 
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
@@ -74,7 +74,7 @@ const allocationSummary = computed(() => {
 // Check if reducing quantity would affect allocations
 const quantityReductionCheck = computed(() => {
   if (!props.card || !form.value.quantity) return null
-  return checkQuantityReduction(props.card.id, form.value.quantity as number)
+  return checkQuantityReduction(props.card.id, form.value.quantity)
 })
 
 // Warning message if reducing below allocated
@@ -161,7 +161,7 @@ const currentPrice = computed(() => {
 const handleSave = async () => {
   if (!props.card) return
 
-  if ((form.value.quantity as number) < 1) {
+  if ((form.value.quantity!) < 1) {
     toastStore.show(t('cards.detailModal.quantityMin'), 'error')
     return
   }
@@ -183,9 +183,9 @@ const handleSave = async () => {
   try {
     const updatedCard: Card = {
       ...props.card,
-      quantity: form.value.quantity as number,
-      condition: form.value.condition as CardCondition,
-      foil: form.value.foil as boolean,
+      quantity: form.value.quantity!,
+      condition: form.value.condition!,
+      foil: form.value.foil!,
       // Actualizar con el print seleccionado
       scryfallId: selectedPrint.value?.id || props.card.scryfallId,
       edition: selectedPrint.value?.set_name || props.card.edition,

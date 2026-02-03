@@ -11,8 +11,8 @@ export interface Message {
 export interface Conversation {
     id: string;
     participantIds: string[]; // [userId1, userId2]
-    participantNames: { [key: string]: string };
-    participantAvatars?: { [key: string]: string | null };
+    participantNames: Record<string, string>;
+    participantAvatars?: Record<string, string | null>;
     lastMessage?: Message;
     lastMessageTime?: Date;
     unreadCount: number;

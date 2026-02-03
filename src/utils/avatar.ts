@@ -5,7 +5,7 @@
  * @param customAvatarUrl - Optional custom avatar URL (if user uploaded one)
  * @returns URL string for the avatar image
  */
-export const getAvatarUrlForUser = (username: string, size: number = 40, customAvatarUrl?: string | null): string => {
+export const getAvatarUrlForUser = (username: string, size = 40, customAvatarUrl?: string | null): string => {
   if (customAvatarUrl) {
     return customAvatarUrl;
   }

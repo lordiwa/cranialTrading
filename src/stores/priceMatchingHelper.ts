@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { Card } from '../types/card'
-import { Preference } from '../types/preferences'
+import { type Card } from '../types/card'
+import { type Preference } from '../types/preferences'
 
 const PRICE_TOLERANCE = 0.1
 

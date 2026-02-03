@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from '../../composables/useI18n';
-import { SimpleMatch, useMatchesStore } from '../../stores/matches';
+import { type SimpleMatch, useMatchesStore } from '../../stores/matches';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import ChatModal from '../chat/ChatModal.vue';
 import BaseBadge from '../ui/BaseBadge.vue';
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
-
-const { t } = useI18n();
 
 const props = defineProps<{
   show: boolean;
@@ -19,6 +17,8 @@ const emit = defineEmits<{
   close: [];
   contact: [];
 }>();
+
+const { t } = useI18n();
 
 const matchesStore = useMatchesStore();
 const isSaving = ref(false);

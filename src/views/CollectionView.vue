@@ -6,7 +6,7 @@ let isDeleteRunning = false
 </script>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
@@ -23,19 +23,18 @@ import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
-import { Card, CardStatus, CardCondition } from '../types/card'
-import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
+import { type Card, type CardCondition, type CardStatus } from '../types/card'
+import type { DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
 import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { searchCards, getCardsByIds } from '../services/scryfall'
+import { getCardsByIds, searchCards } from '../services/scryfall'
 import { cleanCardName } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
-import type { DeckFormat } from '../types/deck'
 
 const route = useRoute()
 const router = useRouter()
@@ -76,9 +75,12 @@ const switchToDecks = (deckId?: string) => {
   viewMode.value = 'decks'
   if (deckId) {
     deckFilter.value = deckId
-  } else if (decksList.value.length > 0 && deckFilter.value === 'all') {
-    // Auto-seleccionar primer deck si no hay ninguno seleccionado
-    deckFilter.value = decksList.value[0].id
+  } else {
+    const firstDeck = decksList.value[0]
+    if (firstDeck && deckFilter.value === 'all') {
+      // Auto-seleccionar primer deck si no hay ninguno seleccionado
+      deckFilter.value = firstDeck.id
+    }
   }
 }
 
@@ -96,7 +98,7 @@ interface ImportState {
   totalCards: number
   currentCard: number
   cards: any[]
-  cardMeta: Array<{ quantity: number; isInSideboard: boolean }>
+  cardMeta: { quantity: number; isInSideboard: boolean }[]
   createdCardIds: string[]
   allocatedCount: number
 }
@@ -144,7 +146,7 @@ const isDeckImporting = (deckId: string): boolean => {
 
 // Get import progress percentage for a deck
 const getImportProgress = (deckId: string): number => {
-  if (!importProgress.value || importProgress.value.deckId !== deckId) return 100
+  if (importProgress.value?.deckId !== deckId) return 100
   if (importProgress.value.status === 'complete') return 100
   if (importProgress.value.totalCards === 0) return 0
   return Math.round((importProgress.value.currentCard / importProgress.value.totalCards) * 100)
@@ -285,9 +287,6 @@ const deckCommanderCards = computed(() => {
   )
 })
 
-// Legacy: single commander card (for backward compatibility)
-const deckCommanderCard = computed(() => deckCommanderCards.value[0] || null)
-
 // Cartas del mainboard (owned, no sideboard, no commander)
 const deckMainboardCards = computed(() => {
   if (deckFilter.value === 'all') return []
@@ -311,7 +310,7 @@ const deckSideboardCards = computed(() => {
   return deckOwnedCards.value.filter(c => {
     const allocations = getAllocationsForCard(c.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return deckAlloc && deckAlloc.isInSideboard
+    return deckAlloc?.isInSideboard
   })
 })
 
@@ -606,18 +605,6 @@ const handleCardClick = (card: Card) => {
   showCardDetailModal.value = true
 }
 
-// Editar existente - same as click, opens unified modal
-const handleEdit = (card: Card) => {
-  selectedCard.value = card
-  showCardDetailModal.value = true
-}
-
-// Gestionar mazos
-const handleManageDecks = (card: Card) => {
-  selectedCard.value = card
-  showManageDecksModal.value = true
-}
-
 // Eliminar existente (optimistic UI - visual inmediato, toast después de DB)
 const handleDelete = async (card: Card) => {
   // Check if card has allocations in decks
@@ -644,7 +631,7 @@ const handleDelete = async (card: Card) => {
   // Convert allocations to wishlist in background (non-blocking)
   if (hasAllocations) {
     decksStore.convertAllocationsToWishlist(card)
-      .catch(err => console.error('Error converting allocations:', err))
+      .catch((err: unknown) => { console.error('Error converting allocations:', err); })
   }
 
   // Wait for delete to complete, then show toast
@@ -666,7 +653,7 @@ const handleCardDetailClosed = () => {
 // Handle edit from deck grid
 const handleDeckGridEdit = (displayCard: DisplayDeckCard) => {
   if (!displayCard.isWishlist) {
-    const hydratedCard = displayCard as HydratedDeckCard
+    const hydratedCard = displayCard
     const card = collectionStore.cards.find(c => c.id === hydratedCard.cardId)
     if (card) {
       selectedCard.value = card
@@ -702,7 +689,7 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
     )
   } else {
     // Deallocate from deck (card stays in collection)
-    const ownedCard = displayCard as HydratedDeckCard
+    const ownedCard = displayCard
     await decksStore.deallocateCard(selectedDeck.value.id, ownedCard.cardId, ownedCard.isInSideboard)
   }
 
@@ -714,7 +701,7 @@ const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQua
   if (!selectedDeck.value) return
 
   if (!displayCard.isWishlist) {
-    const hydratedCard = displayCard as HydratedDeckCard
+    const hydratedCard = displayCard
     await decksStore.updateAllocation(
       selectedDeck.value.id,
       hydratedCard.cardId,
@@ -754,8 +741,8 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
     const cleanName = cleanCardName(cardName)
     if (setCode) {
       const results = await searchCards(`"${cleanName}" e:${setCode}`)
-      if (results.length > 0) {
-        const card = results[0]
+      const card = results[0]
+      if (card) {
         const image = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
         const price = card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0
         if (price > 0 && image) {
@@ -778,6 +765,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
         (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
       ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || allResults[0]
+      if (!printWithPrice) return null
       const image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
       return {
         scryfallId: printWithPrice.id,
@@ -819,7 +807,7 @@ const handleImport = async (
     if (!trimmed) continue
     if (trimmed.toLowerCase().includes('sideboard')) { inSideboard = true; continue }
 
-    const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i)
+    const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
     if (!match) continue
 
     const quantity = Number.parseInt(match[1])
@@ -942,7 +930,7 @@ const handleImportDirect = async (
 
     // PASO 2: Recolectar todos los scryfallIds para batch request
     progressToast.update(10, `Preparando ${cards.length} cartas...`)
-    const identifiers: Array<{ id: string }> = []
+    const identifiers: { id: string }[] = []
     const cardIndexMap = new Map<string, number[]>()
 
     for (let i = 0; i < cards.length; i++) {
@@ -971,7 +959,7 @@ const handleImportDirect = async (
     saveImportState({ ...initialState, status: 'processing' })
 
     const collectionCardsToAdd: any[] = []
-    const cardMeta: Array<{ quantity: number; isInSideboard: boolean }> = []
+    const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
     const cardsNeedingSearch: number[] = []
 
     for (let i = 0; i < cards.length; i++) {
@@ -1160,7 +1148,7 @@ const handleImportDirect = async (
 }
 
 // Execute delete deck with progress tracking (can resume)
-const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnType<typeof toastStore.showProgress>, isResume: boolean = false) => {
+const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnType<typeof toastStore.showProgress>, isResume = false) => {
   // Prevent duplicate executions (only check if not a resume with existing toast)
   if (!isResume && isDeleteRunning) {
     console.log('[DeleteDeck] Already running, skipping...')
@@ -1366,7 +1354,7 @@ const resumeImport = async (savedState: ImportState) => {
 
   // Si ya estaba completo, solo limpiar
   if (savedState.status === 'complete') {
-    setTimeout(() => clearImportState(), 2000)
+    setTimeout(() => { clearImportState(); }, 2000)
     return
   }
 
@@ -1561,8 +1549,8 @@ const handleBeforeUnload = (e: BeforeUnloadEvent) => {
 
   if (importInProgress || deleteInProgress) {
     e.preventDefault()
-    e.returnValue = 'Hay una operación en progreso. El progreso se guardará y podrás continuar al volver.'
-    return e.returnValue
+    // Note: returnValue is deprecated but required for cross-browser compatibility
+    // Modern browsers only show generic message anyway
   }
 }
 
@@ -1717,7 +1705,7 @@ onUnmounted(() => {
               <div
                   v-if="isDeckImporting(deck.id)"
                   class="absolute inset-0 bg-neon/30 transition-all duration-300"
-                  :style="{ width: getImportProgress(deck.id) + '%' }"
+                  :style="{ width: `${getImportProgress(deck.id) }%` }"
               ></div>
               <!-- Content -->
               <span class="relative z-10">
@@ -1876,7 +1864,7 @@ onUnmounted(() => {
             />
             <HelpTooltip
                 v-else-if="status === 'available'"
-                :text="t('help.tooltips.collection.statusSale') + ' ' + t('help.tooltips.collection.statusTrade')"
+                :text="`${t('help.tooltips.collection.statusSale') } ${ t('help.tooltips.collection.statusTrade')}`"
                 :title="t('help.titles.statusAvailable')"
             />
             <HelpTooltip

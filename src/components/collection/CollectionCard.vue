@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Card } from '../../types/card';
+import { type Card } from '../../types/card';
 
 const props = defineProps<{
   card: Card;
+}>();
+
+const emit = defineEmits<{
+  click: [card: Card];
+  edit: [card: Card];
+  delete: [cardId: string];
 }>();
 
 // ✅ CORREGIDO: Usar 'sale' en lugar de 'sell', 'trade' en lugar de 'trade', 'wishlist' en lugar de 'busco'
@@ -15,12 +21,6 @@ const statusBorderClass = computed(() => {
   // default / collection - gris claro
   return 'border-silver-20';
 });
-
-const emit = defineEmits<{
-  click: [card: Card];
-  edit: [card: Card];
-  delete: [cardId: string];
-}>();
 
 // ✅ AGREGADO: Handler para click en la card
 const handleCardClick = () => {

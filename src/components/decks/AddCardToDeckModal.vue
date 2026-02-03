@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
-import { useCollectionStore } from '../../stores/collection'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
@@ -12,8 +11,6 @@ import BaseModal from '../ui/BaseModal.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
 import type { CardCondition } from '../../types/card'
-
-const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -37,8 +34,9 @@ const emit = defineEmits<{
   }]
 }>()
 
+const { t } = useI18n()
+
 const toastStore = useToastStore()
-const collectionStore = useCollectionStore()
 const { findMatchingCollectionCards } = useCardAllocation()
 
 // Card Kingdom prices
@@ -83,19 +81,21 @@ const handleSearchInput = (query: string) => {
     return
   }
 
-  searchTimeout = setTimeout(async () => {
-    isSearching.value = true
-    searchError.value = null
+  searchTimeout = setTimeout(() => {
+    void (async () => {
+      isSearching.value = true
+      searchError.value = null
 
-    try {
-      const results = await searchCards(query)
-      searchResults.value = results
-    } catch (err) {
-      searchError.value = err instanceof Error ? err.message : t('decks.addToDeck.searchError')
-      searchResults.value = []
-    } finally {
-      isSearching.value = false
-    }
+      try {
+        const results = await searchCards(query)
+        searchResults.value = results
+      } catch (err) {
+        searchError.value = err instanceof Error ? err.message : t('decks.addToDeck.searchError')
+        searchResults.value = []
+      } finally {
+        isSearching.value = false
+      }
+    })()
   }, 300)
 }
 
@@ -117,11 +117,6 @@ const loadAllPrints = async (cardName: string) => {
 const matchingCollectionCards = computed(() => {
   if (!selectedCard.value) return []
   return findMatchingCollectionCards({ scryfallId: selectedCard.value.id })
-})
-
-// Total available in collection for this card
-const totalAvailableInCollection = computed(() => {
-  return matchingCollectionCards.value.reduce((sum, c) => sum + c.availableQuantity, 0)
 })
 
 // Check if we have any of this card in collection
@@ -162,7 +157,7 @@ const conditionOptions = computed(() => [
 // Get card image (handle split cards)
 const getCardImage = (card: any): string => {
   if (card.image_uris?.normal) return card.image_uris.normal
-  if (card.card_faces && card.card_faces[0]?.image_uris?.normal) {
+  if (card.card_faces?.[0]?.image_uris?.normal) {
     return card.card_faces[0].image_uris.normal
   }
   return ''
@@ -170,7 +165,7 @@ const getCardImage = (card: any): string => {
 
 const getCardImageSmall = (card: any): string => {
   if (card.image_uris?.small) return card.image_uris.small
-  if (card.card_faces && card.card_faces[0]?.image_uris?.small) {
+  if (card.card_faces?.[0]?.image_uris?.small) {
     return card.card_faces[0].image_uris.small
   }
   return ''

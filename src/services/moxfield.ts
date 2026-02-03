@@ -29,8 +29,9 @@ export interface MoxfieldDeck {
 export const extractDeckId = (input: string): string | null => {
     // Si es un link: https://moxfield.com/decks/tiIftnM5wUC29k6F5KisRw
     const linkMatch = /moxfield\.com\/decks\/([a-zA-Z0-9_-]+)/.exec(input);
-    if (linkMatch) {
-        return linkMatch[1];
+    const deckId = linkMatch?.[1];
+    if (deckId) {
+        return deckId;
     }
 
     // Si es solo el ID
@@ -55,7 +56,7 @@ export const fetchMoxfieldDeck = async (deckId: string): Promise<{ data: Moxfiel
         }
 
         return { data: await response.json() };
-    } catch (error) {
+    } catch {
         // Si el worker no está disponible, mostrar instrucciones
         return {
             data: null,
@@ -64,7 +65,7 @@ export const fetchMoxfieldDeck = async (deckId: string): Promise<{ data: Moxfiel
     }
 }
 
-export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard: boolean = true): Array<{
+export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard = true): {
     quantity: number
     name: string
     setCode: string
@@ -72,8 +73,8 @@ export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard: boolean
     scryfallId: string
     isInSideboard: boolean
     isCommander: boolean
-}> => {
-    const cards: Array<any> = [];
+}[] => {
+    const cards: any[] = [];
 
     // Commanders (para Commander format)
     if (deck.boards?.commanders?.cards) {

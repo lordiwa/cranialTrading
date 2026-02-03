@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix"
+    "type-check": "vue-tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix",
+    "lint:report": "eslint src --format html --output-file eslint-report.html",
+    "lint:strict": "eslint src --max-warnings 0 --rule '{\"@typescript-eslint/no-explicit-any\": \"error\", \"no-console\": \"error\"}'",
+    "prebuild": "npm run type-check && npm run lint"
   },
   "dependencies": {
     "firebase": "^11.0.0",
@@ -20,9 +24,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@types/lodash-es": "^4.17.12",
     "@vitejs/plugin-vue": "^6.0.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.2",
+    "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-vue": "^10.6.2",
     "globals": "^17.0.0",
     "postcss": "^8.4.47",

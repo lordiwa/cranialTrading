@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseBadge from '../ui/BaseBadge.vue'
 import BaseModal from '../ui/BaseModal.vue'
@@ -7,8 +7,6 @@ import BaseSelect from '../ui/BaseSelect.vue'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
 import type { Card, CardStatus } from '../../types/card'
-
-const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -19,6 +17,8 @@ const emit = defineEmits<{
   close: []
   updateStatus: [cardId: string, status: CardStatus, isPublic: boolean]
 }>()
+
+const { t } = useI18n()
 
 const selectedStatus = ref<CardStatus>('collection')
 const isPublic = ref(true)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useI18n } from '../../composables/useI18n'
@@ -78,27 +78,29 @@ const handleLocationInput = () => {
   locationSuggestions.value = []
 
   if (newLocation.value.length >= 2) {
-    locationSearchTimeout = setTimeout(async () => {
-      searchingLocations.value = true
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newLocation.value)}&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'es' } }
-        )
-        const data = await response.json()
-        locationSuggestions.value = data.map((item: any) => {
-          const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || ''
-          const state = item.address?.state || ''
-          const country = item.address?.country || ''
-          if (city && country) {
-            return state ? `${city}, ${state}, ${country}` : `${city}, ${country}`
-          }
-          return item.display_name.split(',').slice(0, 3).join(',').trim()
-        }).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i) // Remove duplicates
-      } catch (error) {
-        console.error('Error searching locations:', error)
-      }
-      searchingLocations.value = false
+    locationSearchTimeout = setTimeout(() => {
+      void (async () => {
+        searchingLocations.value = true
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newLocation.value)}&limit=5&addressdetails=1`,
+            { headers: { 'Accept-Language': 'es' } }
+          )
+          const data = await response.json()
+          locationSuggestions.value = data.map((item: any) => {
+            const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || ''
+            const state = item.address?.state || ''
+            const country = item.address?.country || ''
+            if (city && country) {
+              return state ? `${city}, ${state}, ${country}` : `${city}, ${country}`
+            }
+            return item.display_name.split(',').slice(0, 3).join(',').trim()
+          }).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i) // Remove duplicates
+        } catch (error) {
+          console.error('Error searching locations:', error)
+        }
+        searchingLocations.value = false
+      })()
     }, 300)
   }
 }
@@ -145,7 +147,7 @@ const startEditAvatar = () => {
 
 const handleFileSelect = (event: Event) => {
   const input = event.target as HTMLInputElement
-  if (input.files && input.files[0]) {
+  if (input.files?.[0]) {
     const file = input.files[0]
     selectedFile.value = file
     newAvatarUrl.value = ''

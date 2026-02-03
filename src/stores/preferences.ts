@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAuthStore } from './auth'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { db } from '../services/firebase'
-import { Preference, PreferenceType } from '../types/preferences'
+import { type Preference, type PreferenceType } from '../types/preferences'
 import {
-    syncPreferenceToPublic,
     removePreferenceFromPublic,
     syncAllUserPreferences,
+    syncPreferenceToPublic,
 } from '../services/publicCards'
 
 export const usePreferencesStore = defineStore('preferences', () => {
@@ -87,7 +87,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             const userInfo = getUserInfo()
             if (userInfo) {
                 syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                    .catch(err => console.error('[PublicSync] Error syncing preference:', err))
+                    .catch((err: unknown) => { console.error('[PublicSync] Error syncing preference:', err); })
             }
 
             console.log('✅ Preference added:', prefData.name)
@@ -109,8 +109,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
             await updateDoc(prefRef, updates)
 
             const index = _preferences.value.findIndex(p => p.id === prefId)
-            if (index >= 0) {
-                _preferences.value[index] = { ..._preferences.value[index], ...updates }
+            const existingPref = _preferences.value[index]
+            if (index >= 0 && existingPref) {
+                _preferences.value[index] = { ...existingPref, ...updates }
             }
 
             console.log('✅ Preference updated:', prefId)
@@ -141,13 +142,14 @@ export const usePreferencesStore = defineStore('preferences', () => {
             )
             const snapshot = await getDocs(q)
 
-            if (snapshot.empty) {
+            const firstDoc = snapshot.docs[0]
+            if (snapshot.empty || !firstDoc) {
                 console.warn(`⚠️ No preference found for ${scryfallId} (${edition})`)
                 return
             }
 
             // Actualizar la primera coincidencia (debería haber solo una)
-            const docId = snapshot.docs[0].id
+            const docId = firstDoc.id
             const prefRef = doc(db, 'users', authStore.user.id, 'preferences', docId)
             await updateDoc(prefRef, { type: newType })
 
@@ -155,8 +157,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
             const index = _preferences.value.findIndex(
                 p => p.scryfallId === scryfallId && p.edition === edition
             )
-            if (index >= 0) {
-                _preferences.value[index].type = newType
+            const existingPref = _preferences.value[index]
+            if (index >= 0 && existingPref) {
+                existingPref.type = newType
             }
 
             console.log(`✅ Preference type updated: ${scryfallId} → ${newType}`)
@@ -178,7 +181,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
             // Remove from public (non-blocking)
             removePreferenceFromPublic(prefId, authStore.user.id)
-                .catch(err => console.error('[PublicSync] Error removing preference:', err))
+                .catch((err: unknown) => { console.error('[PublicSync] Error removing preference:', err); })
 
             _preferences.value = _preferences.value.filter(p => p.id !== prefId)
             console.log('✅ Preference deleted:', prefId)

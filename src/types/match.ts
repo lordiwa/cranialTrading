@@ -1,4 +1,4 @@
-import {CardCondition} from "./card";
+import {type CardCondition} from "./card";
 
 export type MatchStatus = 'nuevo' | 'visto' | 'activo' | 'eliminado';
 export type MatchType = 'VENDO' | 'BUSCO';

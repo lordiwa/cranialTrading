@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
@@ -8,17 +8,15 @@ import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { CreateDeckInput } from '../../types/deck'
 
-const toastStore = useToastStore()
-const { t } = useI18n()
-
 const props = defineProps<{
   show: boolean
 }>()
-
 const emit = defineEmits<{
   close: []
   create: [data: CreateDeckInput & { deckList?: string }]
 }>()
+const toastStore = useToastStore()
+const { t } = useI18n()
 
 const form = ref<CreateDeckInput>({
   name: '',
@@ -45,7 +43,7 @@ const deckListPreview = computed(() => {
       inSideboard = true
       continue
     }
-    const match = line.match(/^(\d+)/)
+    const match = /^(\d+)/.exec(line)
     if (match) {
       const qty = Number.parseInt(match[1])
       if (inSideboard) {

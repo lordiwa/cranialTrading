@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
@@ -30,7 +30,7 @@ const handleLogin = async () => {
     }
 
     toastStore.show(t('auth.messages.invalidCredentials'), 'error');
-  } catch (err) {
+  } catch {
     toastStore.show(t('auth.messages.invalidCredentials'), 'error');
   } finally {
     loading.value = false;

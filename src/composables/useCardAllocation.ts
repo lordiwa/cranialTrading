@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { useCollectionStore } from '../stores/collection'
 import { useDecksStore } from '../stores/decks'
-import type { Card, CardWithAllocation, DeckAllocation, CardCondition } from '../types/card'
+import type { Card, CardCondition, CardWithAllocation, DeckAllocation } from '../types/card'
 
 export interface AllocationSummary {
     card: Card

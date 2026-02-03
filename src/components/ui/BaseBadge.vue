@@ -5,7 +5,7 @@ interface Props {
   variant?: BadgeVariant;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   variant: 'busco',
 });
 

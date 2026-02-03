@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
@@ -41,7 +41,7 @@ const getOtherParticipantInfo = (conv: any): { username: string; userId: string;
   return {
     username: entry?.[1] || 'Unknown',
     userId: otherUserId,
-    avatarUrl: avatarUrl,
+    avatarUrl,
   };
 };
 

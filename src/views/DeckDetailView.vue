@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
 import { useI18n } from '../composables/useI18n'
@@ -40,7 +40,7 @@ const sideboardCards = computed(() =>
 
 // Type guard and helper to get quantity from either type
 const getCardQuantity = (card: typeof allCards.value[number]): number => {
-  if (card.isWishlist === true) {
+  if (card.isWishlist) {
     return card.requestedQuantity
   }
   return (card as any).allocatedQuantity

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import esLocale from '../locales/es.json'
 
 // Tipo para los locales soportados

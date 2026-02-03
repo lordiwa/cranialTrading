@@ -131,7 +131,9 @@ export interface Deck {
     wishlist: DeckWishlistItem[]
 
     // LEGACY: Keep for migration, will be removed
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     mainboard?: DeckCard[]
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     sideboard?: DeckCard[]
 
     thumbnail: string

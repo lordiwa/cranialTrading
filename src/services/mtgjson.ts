@@ -7,9 +7,7 @@
  */
 
 // Types for MTGJSON price data
-export interface MTGJSONPricePoint {
-  [date: string]: number
-}
+export type MTGJSONPricePoint = Record<string, number>;
 
 export interface MTGJSONPriceList {
   buylist?: {
@@ -66,7 +64,7 @@ const MTGJSON_API = 'https://mtgjson.com/api/v5'
 
 // In-memory caches
 let priceDataCache: Record<string, MTGJSONPriceFormats> | null = null
-let scryfallToUuidMap: Map<string, string> = new Map()
+let scryfallToUuidMap = new Map<string, string>()
 let dbInstance: IDBDatabase | null = null
 
 // One-time cleanup of old localStorage keys (migrating to IndexedDB)
@@ -96,7 +94,7 @@ function openDatabase(): Promise<IDBDatabase> {
 
     request.onerror = () => {
       console.warn('IndexedDB not available, falling back to memory-only cache')
-      reject(request.error)
+      reject(new Error(String(request.error)))
     }
 
     request.onsuccess = () => {
@@ -126,13 +124,13 @@ function openDatabase(): Promise<IDBDatabase> {
 async function getFromDB<T>(storeName: string, key: string): Promise<T | null> {
   try {
     const db = await openDatabase()
-    return new Promise((resolve) => {
+    return await new Promise<T | null>((resolve) => {
       const transaction = db.transaction(storeName, 'readonly')
       const store = transaction.objectStore(storeName)
       const request = store.get(key)
 
-      request.onsuccess = () => resolve(request.result || null)
-      request.onerror = () => resolve(null)
+      request.onsuccess = () => { resolve((request.result as T) || null); }
+      request.onerror = () => { resolve(null); }
     })
   } catch {
     return null
@@ -142,15 +140,15 @@ async function getFromDB<T>(storeName: string, key: string): Promise<T | null> {
 /**
  * Save data to IndexedDB
  */
-async function saveToDB<T>(storeName: string, key: string, data: T): Promise<boolean> {
+async function saveToDB(storeName: string, key: string, data: unknown): Promise<boolean> {
   try {
     const db = await openDatabase()
-    return new Promise((resolve) => {
+    return await new Promise((resolve) => {
       const transaction = db.transaction(storeName, 'readwrite')
       const store = transaction.objectStore(storeName)
       const request = store.put(data, key)
 
-      request.onsuccess = () => resolve(true)
+      request.onsuccess = () => { resolve(true); }
       request.onerror = () => {
         console.warn('Error saving to IndexedDB:', request.error)
         resolve(false)
@@ -162,29 +160,12 @@ async function saveToDB<T>(storeName: string, key: string, data: T): Promise<boo
 }
 
 /**
- * Delete data from IndexedDB
- */
-async function _deleteFromDB(storeName: string, key: string): Promise<void> {
-  try {
-    const db = await openDatabase()
-    return new Promise((resolve) => {
-      const transaction = db.transaction(storeName, 'readwrite')
-      const store = transaction.objectStore(storeName)
-      store.delete(key)
-      resolve()
-    })
-  } catch {
-    // Ignore errors
-  }
-}
-
-/**
  * Clear all data from a store
  */
 async function clearStore(storeName: string): Promise<void> {
   try {
     const db = await openDatabase()
-    return new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       const transaction = db.transaction(storeName, 'readwrite')
       const store = transaction.objectStore(storeName)
       store.clear()
@@ -203,7 +184,9 @@ async function clearStore(storeName: string): Promise<void> {
 function getLatestPrice(pricePoint?: MTGJSONPricePoint): number | null {
   if (!pricePoint) return null
   const dates = Object.keys(pricePoint).sort((a, b) => b.localeCompare(a))
-  return dates.length > 0 ? pricePoint[dates[0]] : null
+  const latestDate = dates[0]
+  if (!latestDate) return null
+  return pricePoint[latestDate] ?? null
 }
 
 /**
@@ -323,7 +306,7 @@ async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
     // Save to IndexedDB (async, don't await)
     savePriceDataToCache(response.data).then(() => {
       console.log('MTGJSON price data cached to IndexedDB')
-    }).catch((e) => {
+    }).catch((e: unknown) => {
       console.warn('Failed to cache price data:', e)
     })
 
@@ -358,7 +341,7 @@ async function fetchSetMapping(setCode: string): Promise<void> {
   console.log(`Fetching MTGJSON set data for ${setCode}...`)
 
   try {
-    const response = await fetchGzippedJson<{ data: { cards: Array<{ uuid: string; identifiers: { scryfallId?: string } }> } }>(
+    const response = await fetchGzippedJson<{ data: { cards: { uuid: string; identifiers: { scryfallId?: string } }[] } }>(
       `${MTGJSON_API}/${setCode.toUpperCase()}.json.gz`
     )
 
@@ -487,7 +470,7 @@ export async function clearMTGJSONCache(): Promise<void> {
       keysToRemove.push(key)
     }
   }
-  keysToRemove.forEach(key => localStorage.removeItem(key))
+  keysToRemove.forEach(key => { localStorage.removeItem(key); })
 
   // Also remove old localStorage keys if they exist
   localStorage.removeItem('mtgjson_prices')

@@ -6,13 +6,12 @@ import BaseLoader from '../ui/BaseLoader.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseBadge from '../ui/BaseBadge.vue'
 
-const { t } = useI18n()
-const searchStore = useSearchStore()
-
 const emit = defineEmits<{
   'add-to-collection': [card: any]
   'add-preference': [card: any]
 }>()
+const { t } = useI18n()
+const searchStore = useSearchStore()
 
 const cards = computed(() => searchStore.results)
 const loading = computed(() => searchStore.loading)

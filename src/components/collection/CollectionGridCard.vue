@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useCollectionStore } from '../../stores/collection'
@@ -7,8 +7,6 @@ import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
 import type { Card, CardStatus } from '../../types/card'
-
-const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   card: Card
@@ -30,6 +28,8 @@ const emit = defineEmits<{
   delete: [card: Card]
   interest: [card: Card]
 }>()
+
+const { t } = useI18n()
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
@@ -68,7 +68,7 @@ const handleTouchEnd = async () => {
     emit('delete', props.card)
   } else if (swipeOffset.value > SWIPE_THRESHOLD) {
     // Swipe right = cycle status
-    const currentIndex = STATUS_ORDER.indexOf(props.card.status as CardStatus)
+    const currentIndex = STATUS_ORDER.indexOf(props.card.status)
     const nextIndex = (currentIndex + 1) % STATUS_ORDER.length
     const nextStatus = STATUS_ORDER[nextIndex]
     try {
@@ -106,7 +106,7 @@ const togglePublic = async () => {
     const newPublicValue = !props.card.public
     await collectionStore.updateCard(props.card.id, { public: newPublicValue })
     toastStore.show(newPublicValue ? t('cards.grid.visibleInProfile') : t('cards.grid.hiddenFromProfile'), 'success')
-  } catch (error) {
+  } catch {
     toastStore.show(t('cards.grid.visibilityError'), 'error')
   } finally {
     togglingPublic.value = false

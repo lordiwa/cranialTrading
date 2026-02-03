@@ -1,4 +1,4 @@
-import {CardCondition} from "./card";
+import {type CardCondition} from "./card";
 
 export type PreferenceType = 'BUSCO' | 'CAMBIO' | 'VENDO';
 

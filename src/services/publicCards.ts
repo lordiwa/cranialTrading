@@ -11,14 +11,14 @@
 
 import {
   collection,
-  doc,
-  setDoc,
   deleteDoc,
-  query,
-  where,
+  doc,
   getDocs,
-  writeBatch,
+  query,
+  setDoc,
   Timestamp,
+  where,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Card } from '../types/card'

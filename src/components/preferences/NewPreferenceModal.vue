@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from '../../composables/useI18n';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseInput from '../ui/BaseInput.vue';
@@ -8,10 +8,8 @@ import BaseButton from '../ui/BaseButton.vue';
 import BaseLoader from '../ui/BaseLoader.vue';
 import BaseBadge from '../ui/BaseBadge.vue';
 import { searchCards } from '../../services/scryfall';
-import { ScryfallCard, CardCondition, Card } from '../../types/card';
-import { PreferenceType } from '../../types/preferences';
-
-const { t } = useI18n();
+import { type Card, type CardCondition, type ScryfallCard } from '../../types/card';
+import { type PreferenceType } from '../../types/preferences';
 
 const props = defineProps<{
   show: boolean;
@@ -23,6 +21,8 @@ const emit = defineEmits<{
   close: [];
   add: [prefData: any];
 }>();
+
+const { t } = useI18n();
 
 const searchQuery = ref('');
 const searchResults = ref<ScryfallCard[]>([]);
@@ -88,9 +88,11 @@ watch(searchQuery, (newQuery) => {
   }
 
   searching.value = true;
-  searchTimeout = setTimeout(async () => {
-    searchResults.value = await searchCards(newQuery);
-    searching.value = false;
+  searchTimeout = setTimeout(() => {
+    void (async () => {
+      searchResults.value = await searchCards(newQuery);
+      searching.value = false;
+    })();
   }, 300);
 });
 

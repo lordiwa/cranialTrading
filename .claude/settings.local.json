@@ -30,7 +30,9 @@
       "Bash(grep:*)",
       "Bash(head:*)",
       "Bash(tr:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(findstr:*)",
+      "Bash(npm i:*)"
     ]
   }
 }

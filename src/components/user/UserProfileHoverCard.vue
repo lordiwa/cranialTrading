@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { computed, onMounted, ref } from 'vue';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import BaseLoader from '../ui/BaseLoader.vue';
 import { getAvatarUrlForUser } from '../../utils/avatar';
@@ -39,7 +39,7 @@ const loadUserInfo = async () => {
       const cardsSnapshot = await getDocs(cardsQuery);
       cardCount.value = cardsSnapshot.size;
     }
-  } catch (error) {
+  } catch {
     // silent fail
   } finally {
     loading.value = false;

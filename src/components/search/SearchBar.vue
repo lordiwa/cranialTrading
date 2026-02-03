@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards, getCardSuggestions } from '../../services/scryfall'
+import { getCardSuggestions, searchCards } from '../../services/scryfall'
 import { useToastStore } from '../../stores/toast'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 
-const { t } = useI18n()
-const toastStore = useToastStore()
-
 const emit = defineEmits<{
   'add-card': [card: any]
 }>()
+const { t } = useI18n()
+const toastStore = useToastStore()
 
 const searchQuery = ref('')
 const suggestions = ref<string[]>([])

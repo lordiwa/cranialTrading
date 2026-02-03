@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useToastStore, isProgressToast, type Toast } from '../../stores/toast';
+import { isProgressToast, type Toast, useToastStore } from '../../stores/toast';
 
 const toastStore = useToastStore();
 

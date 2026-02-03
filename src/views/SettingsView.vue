@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -60,27 +60,29 @@ const handleLocationInput = () => {
   locationSuggestions.value = [];
 
   if (newLocation.value.length >= 2) {
-    locationSearchTimeout = setTimeout(async () => {
-      searchingLocations.value = true;
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newLocation.value)}&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'es' } }
-        );
-        const data = await response.json();
-        locationSuggestions.value = data.map((item: any) => {
-          const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || '';
-          const state = item.address?.state || '';
-          const country = item.address?.country || '';
-          if (city && country) {
-            return state ? `${city}, ${state}, ${country}` : `${city}, ${country}`;
-          }
-          return item.display_name.split(',').slice(0, 3).join(',').trim();
-        }).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
-      } catch (error) {
-        console.error('Error searching locations:', error);
-      }
-      searchingLocations.value = false;
+    locationSearchTimeout = setTimeout(() => {
+      void (async () => {
+        searchingLocations.value = true;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newLocation.value)}&limit=5&addressdetails=1`,
+            { headers: { 'Accept-Language': 'es' } }
+          );
+          const data = await response.json();
+          locationSuggestions.value = data.map((item: any) => {
+            const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || '';
+            const state = item.address?.state || '';
+            const country = item.address?.country || '';
+            if (city && country) {
+              return state ? `${city}, ${state}, ${country}` : `${city}, ${country}`;
+            }
+            return item.display_name.split(',').slice(0, 3).join(',').trim();
+          }).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+        } catch (error) {
+          console.error('Error searching locations:', error);
+        }
+        searchingLocations.value = false;
+      })();
     }, 300);
   }
 };
@@ -109,7 +111,7 @@ const updateAvatarPreview = () => {
 
 const handleFileSelect = (event: Event) => {
   const input = event.target as HTMLInputElement;
-  if (input.files && input.files[0]) {
+  if (input.files?.[0]) {
     const file = input.files[0];
     selectedFile.value = file;
     newAvatarUrl.value = ''; // Clear URL if file is selected
@@ -163,15 +165,17 @@ const handleUsernameInput = () => {
   }
 
   if (newUsername.value.length >= 3) {
-    usernameCheckTimeout = setTimeout(async () => {
-      checkingUsername.value = true;
-      const available = await authStore.checkUsernameAvailable(newUsername.value);
-      usernameAvailable.value = available;
+    usernameCheckTimeout = setTimeout(() => {
+      void (async () => {
+        checkingUsername.value = true;
+        const available = await authStore.checkUsernameAvailable(newUsername.value);
+        usernameAvailable.value = available;
 
-      if (!available) {
-        usernameSuggestions.value = await authStore.generateUsernameSuggestions(newUsername.value);
-      }
-      checkingUsername.value = false;
+        if (!available) {
+          usernameSuggestions.value = await authStore.generateUsernameSuggestions(newUsername.value);
+        }
+        checkingUsername.value = false;
+      })();
     }, 500);
   }
 };
@@ -353,12 +357,12 @@ const handleDeleteAllData = async () => {
 
     // Complete
     progress.update(100, t('settings.dangerZone.deleteData.success'));
-    setTimeout(() => progress.close(), 2000);
+    setTimeout(() => { progress.dismiss(); }, 2000);
 
     toastStore.show(t('settings.dangerZone.deleteData.success'), 'success');
   } catch (error) {
     console.error('Error deleting data:', error);
-    progress.close();
+    progress.dismiss();
     toastStore.show(t('settings.dangerZone.deleteData.error'), 'error');
   } finally {
     deletingData.value = false;

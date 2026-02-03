@@ -1,24 +1,24 @@
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
-    collection,
     addDoc,
-    updateDoc,
+    collection,
     deleteDoc,
-    getDocs,
     doc,
+    getDocs,
     Timestamp,
+    updateDoc,
     writeBatch,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
-import { Card, CardCondition, CardStatus } from '../types/card'
+import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import {
-    syncCardToPublic,
     removeCardFromPublic,
     syncAllUserCards,
     syncAllUserPreferences,
+    syncCardToPublic,
 } from '../services/publicCards'
 import { t } from '../composables/useI18n'
 
@@ -100,7 +100,7 @@ export const useCollectionStore = defineStore('collection', () => {
             const userInfo = getUserInfo()
             if (userInfo) {
                 syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                    .catch(err => console.error('[PublicSync] Error syncing card:', err))
+                    .catch((err: unknown) => { console.error('[PublicSync] Error syncing card:', err); })
             }
 
             console.log(`✅ Carta agregada: ${cardData.name}`)
@@ -129,18 +129,20 @@ export const useCollectionStore = defineStore('collection', () => {
             })
 
             const index = cards.value.findIndex((c) => c.id === cardId)
-            if (index > -1) {
-                cards.value[index] = {
-                    ...cards.value[index],
+            const existingCard = cards.value[index]
+            if (index > -1 && existingCard) {
+                const updatedCard = {
+                    ...existingCard,
                     ...updates,
                     updatedAt: new Date(),
                 }
+                cards.value[index] = updatedCard
 
                 // Sync to public collection (non-blocking)
                 const userInfo = getUserInfo()
                 if (userInfo) {
-                    syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                        .catch(err => console.error('[PublicSync] Error syncing card update:', err))
+                    syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
+                        .catch((err: unknown) => { console.error('[PublicSync] Error syncing card update:', err); })
                 }
             }
 
@@ -172,7 +174,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 const batch = writeBatch(db)
 
                 for (const cardId of chunk) {
-                    const cardRef = doc(db, 'users', authStore.user!.id, 'cards', cardId)
+                    const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
                     batch.update(cardRef, {
                         ...updates,
                         updatedAt: Timestamp.now(),
@@ -186,17 +188,19 @@ export const useCollectionStore = defineStore('collection', () => {
             const userInfo = getUserInfo()
             for (const cardId of cardIds) {
                 const index = cards.value.findIndex((c) => c.id === cardId)
-                if (index > -1) {
-                    cards.value[index] = {
-                        ...cards.value[index],
+                const existingCard = cards.value[index]
+                if (index > -1 && existingCard) {
+                    const updatedCard = {
+                        ...existingCard,
                         ...updates,
                         updatedAt: new Date(),
                     }
+                    cards.value[index] = updatedCard
 
                     // Sync to public collection (non-blocking)
                     if (userInfo) {
-                        syncCardToPublic(cards.value[index], userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                            .catch(err => console.error('[PublicSync] Error syncing card update:', err))
+                        syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
+                            .catch((err: unknown) => { console.error('[PublicSync] Error syncing card update:', err); })
                     }
                 }
             }
@@ -220,9 +224,9 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Find and remove card optimistically (immediate UI update)
         const cardIndex = cards.value.findIndex(c => c.id === cardId)
-        if (cardIndex === -1) return false
-
         const deletedCard = cards.value[cardIndex]
+        if (cardIndex === -1 || !deletedCard) return false
+
         cards.value.splice(cardIndex, 1)
 
         // Sync with Firebase in background
@@ -232,7 +236,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
             // Remove from public collection (non-blocking)
             removeCardFromPublic(cardId, authStore.user.id)
-                .catch(err => console.error('[PublicSync] Error removing card:', err))
+                .catch((err: unknown) => { console.error('[PublicSync] Error removing card:', err); })
 
             console.log(`✅ Carta eliminada: ${cardId}`)
             return true
@@ -285,8 +289,9 @@ export const useCollectionStore = defineStore('collection', () => {
         // Remove from UI immediately (optimistic)
         for (const cardId of cardIds) {
             const index = cards.value.findIndex(c => c.id === cardId)
-            if (index !== -1) {
-                deletedCards.push({ card: cards.value[index], index })
+            const card = cards.value[index]
+            if (index !== -1 && card) {
+                deletedCards.push({ card, index })
             }
         }
 
@@ -389,7 +394,7 @@ export const useCollectionStore = defineStore('collection', () => {
     /**
      * Batch import cards - returns array of created card IDs
      */
-    const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent: boolean = false): Promise<string[]> => {
+    const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent = false): Promise<string[]> => {
         if (!authStore.user) return []
 
         try {
@@ -398,7 +403,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
             for (const card of cardsToSave) {
                 // Remove any local id before saving
-                const { id, ...cardWithoutId } = card as any
+                const { id: _id, ...cardWithoutId } = card as any
                 addPromises.push(
                     addDoc(colRef, {
                         ...cardWithoutId,

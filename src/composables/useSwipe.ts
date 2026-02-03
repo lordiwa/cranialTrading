@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted, type Ref } from 'vue'
+import { onMounted, onUnmounted, type Ref, ref } from 'vue'
 
 export interface SwipeOptions {
   threshold?: number // minimum distance to trigger swipe (default: 50px)
@@ -15,14 +15,18 @@ export function useSwipe(elementRef: Ref<HTMLElement | null>, options: SwipeOpti
   const swipeOffset = ref(0)
 
   const handleTouchStart = (e: TouchEvent) => {
-    startX.value = e.touches[0].clientX
-    currentX.value = e.touches[0].clientX
+    const touch = e.touches[0]
+    if (!touch) return
+    startX.value = touch.clientX
+    currentX.value = touch.clientX
     isSwiping.value = true
   }
 
   const handleTouchMove = (e: TouchEvent) => {
     if (!isSwiping.value) return
-    currentX.value = e.touches[0].clientX
+    const touch = e.touches[0]
+    if (!touch) return
+    currentX.value = touch.clientX
     swipeOffset.value = currentX.value - startX.value
 
     // Prevent page scroll when swiping horizontally

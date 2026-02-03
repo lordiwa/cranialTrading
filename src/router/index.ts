@@ -119,7 +119,7 @@ const router = createRouter({
     ],
 });
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
     const authStore = useAuthStore();
 
     while (authStore.loading) {
@@ -143,11 +143,11 @@ router.beforeEach(async (to, from, next) => {
     const requiresGuest = to.meta.requiresGuest;
 
     if (requiresAuth && !isAuthenticated) {
-        return next('/login');
+        next('/login'); return;
     }
 
     if (requiresGuest && isAuthenticated) {
-        return next('/dashboard');
+        next('/dashboard'); return;
     }
 
     next();

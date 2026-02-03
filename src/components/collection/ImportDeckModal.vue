@@ -1,16 +1,14 @@
 <!-- src/components/collection/ImportDeckModal.vue -->
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import { useI18n } from '../../composables/useI18n'
-import { CardCondition } from '../../types/card'
-import { DeckFormat } from '../../types/deck'
+import { type CardCondition } from '../../types/card'
+import { type DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
-
-const { t } = useI18n()
 
 defineProps<{
   show: boolean
@@ -21,6 +19,8 @@ const emit = defineEmits<{
   (e: 'import', deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string): void
   (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition, makePublic?: boolean, format?: DeckFormat, commander?: string): void
 }>()
+
+const { t } = useI18n()
 
 const inputText = ref('')
 const condition = ref<CardCondition>('NM')
@@ -134,7 +134,7 @@ const handleParse = async () => {
         continue
       }
 
-      const match = trimmed.match(/^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/)
+      const match = /^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/.exec(trimmed)
       if (match) {
         const qty = Number.parseInt(match[1])
         const name = match[2].trim()

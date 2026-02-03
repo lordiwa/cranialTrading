@@ -89,18 +89,20 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
   if (trimmed.toLowerCase().includes('sideboard')) return null
 
   // Match: quantity (optional x) followed by card name
-  const match = trimmed.match(/^(\d+)x?\s+(.+)$/)
-  if (!match) return null
+  const match = /^(\d+)x?\s+(.+)$/.exec(trimmed)
+  const matchQty = match?.[1]
+  const matchRemainder = match?.[2]
+  if (!match || !matchQty || !matchRemainder) return null
 
-  const quantity = Number.parseInt(match[1])
-  const remainder = match[2].trim()
+  const quantity = Number.parseInt(matchQty)
+  const remainder = matchRemainder.trim()
 
   // Check for foil indicator in the original line
   const isFoil = /\*[fF]\*?/.test(trimmed)
 
   // Extract set code if present: (ABC) or (ABC123)
-  const setMatch = remainder.match(/\(([A-Za-z0-9]+)\)/)
-  const setCode = setMatch ? setMatch[1] : null
+  const setMatch = /\(([A-Za-z0-9]+)\)/.exec(remainder)
+  const setCode = setMatch?.[1] ?? null
 
   // Clean card name: remove foil indicators and (SET) suffix
   const cardName = remainder

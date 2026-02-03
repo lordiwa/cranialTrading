@@ -3,8 +3,6 @@ import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import { useI18n } from '../../composables/useI18n';
 
-const { t } = useI18n();
-
 const props = defineProps<{
   show: boolean;
   success: number;
@@ -17,6 +15,8 @@ const emit = defineEmits<{
   confirm: [];
   cancel: [];
 }>();
+
+const { t } = useI18n();
 
 const successRate = Math.round((props.success / props.total) * 100);
 </script>

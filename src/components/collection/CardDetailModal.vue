@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useDecksStore } from '../../stores/decks'
 import { useToastStore } from '../../stores/toast'
@@ -13,8 +13,6 @@ import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { Card, CardCondition, CardStatus } from '../../types/card'
 
-const { t } = useI18n()
-
 const props = defineProps<{
   show: boolean
   card: Card | null
@@ -24,6 +22,8 @@ const emit = defineEmits<{
   close: []
   saved: []
 }>()
+
+const { t } = useI18n()
 
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
@@ -158,16 +158,6 @@ const showPublicOption = computed(() => {
 })
 
 // ========== METHODS ==========
-
-// Find all cards with same scryfallId + edition (grouped entries)
-const findRelatedCards = () => {
-  if (!props.card) return []
-
-  return collectionStore.cards.filter(c =>
-    c.scryfallId === props.card!.scryfallId &&
-    c.edition === props.card!.edition
-  )
-}
 
 // Initialize form when modal opens
 const initializeForm = async () => {
@@ -362,7 +352,7 @@ const handleSave = async () => {
             foil: savedFoil,
             price: newPrice,
             image: newImage,
-            status: status,
+            status,
             public: savedIsPublic,
           })
           if (status !== 'wishlist' && newCardId) {

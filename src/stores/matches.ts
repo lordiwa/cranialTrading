@@ -1,15 +1,15 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
-    collection,
-    getDocs,
     addDoc,
+    collection,
     deleteDoc,
     doc,
-    updateDoc,
-    query,
-    where,
+    getDocs,
     or,
+    query,
+    updateDoc,
+    where,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
@@ -169,10 +169,10 @@ export const useMatchesStore = defineStore('matches', () => {
             theirTotalValue: data.theirTotalValue ?? 0,
             valueDifference: data.valueDifference ?? 0,
             compatibility: data.compatibility ?? 0,
-            createdAt: createdAt,
+            createdAt,
             status: data.status,
-            lifeExpiresAt: lifeExpiresAt,
-            docId: docId,
+            lifeExpiresAt,
+            docId,
         };
     };
 
@@ -190,7 +190,7 @@ export const useMatchesStore = defineStore('matches', () => {
 
         return {
             id: docId,
-            docId: docId,
+            docId,
             type: data.cardType === 'sale' ? (isSender ? 'BUSCO' : 'VENDO') : 'BUSCO',
             otherUserId: isSender ? data.receiverId : data.senderId,
             otherUsername: isSender ? data.receiverUsername : data.senderUsername,
@@ -205,11 +205,11 @@ export const useMatchesStore = defineStore('matches', () => {
             valueDifference: isSender ? totalValue : -totalValue,
             compatibility: 100,
             status: isSender ? 'activo' : 'nuevo',
-            createdAt: createdAt,
-            lifeExpiresAt: lifeExpiresAt,
+            createdAt,
+            lifeExpiresAt,
             // Extra fields for shared match handling
             isSharedMatch: true,
-            isSender: isSender,
+            isSender,
         } as SimpleMatch;
     };
 
@@ -308,7 +308,7 @@ export const useMatchesStore = defineStore('matches', () => {
                     }
                 }
             }
-        } catch (error) {
+        } catch {
             // silent fail
         }
     };
@@ -493,7 +493,7 @@ export const useMatchesStore = defineStore('matches', () => {
 
             const match = newMatches.value.find(m => m.docId === matchId);
             if (match) match.status = 'visto';
-        } catch (error) {
+        } catch {
             // silent fail
         }
     };
@@ -521,7 +521,7 @@ export const useMatchesStore = defineStore('matches', () => {
 
                 await addDoc(recipientRef, payload);
             }
-        } catch (error) {
+        } catch {
             // silent fail
         }
     };
@@ -549,6 +549,42 @@ export const useMatchesStore = defineStore('matches', () => {
         return savedMatches.value.some(m => m.id === matchId);
     };
 
+    /**
+     * Delete all matches for current user
+     */
+    const deleteAllMatches = async (): Promise<boolean> => {
+        if (!authStore.user?.id) return false;
+
+        try {
+            // Delete from user's sent_matches
+            const sentRef = collection(db, 'users', authStore.user.id, 'sent_matches');
+            const sentSnapshot = await getDocs(sentRef);
+            await Promise.all(sentSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'sent_matches', docSnap.id))));
+
+            // Delete from user's saved_matches
+            const savedRef = collection(db, 'users', authStore.user.id, 'saved_matches');
+            const savedSnapshot = await getDocs(savedRef);
+            await Promise.all(savedSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'saved_matches', docSnap.id))));
+
+            // Delete from user's discarded_matches
+            const discardedRef = collection(db, 'users', authStore.user.id, 'discarded_matches');
+            const discardedSnapshot = await getDocs(discardedRef);
+            await Promise.all(discardedSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'discarded_matches', docSnap.id))));
+
+            // Clear local state
+            newMatches.value = [];
+            sentMatches.value = [];
+            savedMatches.value = [];
+            deletedMatches.value = [];
+            sharedMatches.value = [];
+
+            return true;
+        } catch (error) {
+            console.error('Error deleting all matches:', error);
+            return false;
+        }
+    };
+
     return {
         newMatches,
         sentMatches,
@@ -563,6 +599,7 @@ export const useMatchesStore = defineStore('matches', () => {
         completeMatch,
         recoverMatch,
         permanentDelete,
+        deleteAllMatches,
         markAsSeen,
         notifyOtherUser,
         getTotalByTab,

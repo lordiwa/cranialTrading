@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { collection, getDocs, query, where, limit, startAfter, addDoc } from 'firebase/firestore';
+import { addDoc, collection, getDocs, limit, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
@@ -28,7 +28,7 @@ const loading = ref(false);
 const loadingMore = ref(false);
 const userNotFound = ref(false);
 const pageSize = 24;
-const lastDoc = ref<any | null>(null);
+const lastDoc = ref<any>(null);
 const hasMore = ref(true);
 const showChat = ref(false);
 const selectedUserId = ref('');
@@ -40,7 +40,7 @@ const isOwnProfile = computed(() => {
 });
 
 const canShowInterest = computed(() => {
-  return authStore.user && !isOwnProfile.value;
+  return !!(authStore.user && !isOwnProfile.value);
 });
 
 // Use custom avatar if available (own profile or other user's uploaded avatar)
@@ -66,7 +66,7 @@ const loadProfile = async () => {
 
   try {
     // Check if viewing own profile - use auth user directly to avoid duplicate username issues
-    if (authStore.user && authStore.user.username === username.value) {
+    if (authStore.user?.username === username.value) {
       userId.value = authStore.user.id;
       userInfo.value = {
         username: authStore.user.username,
@@ -78,14 +78,15 @@ const loadProfile = async () => {
       const q = query(usersCol, where('username', '==', username.value), limit(1));
       const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
+      const firstDoc = snapshot.docs[0];
+      if (snapshot.empty || !firstDoc) {
         userNotFound.value = true;
         loading.value = false;
         return;
       }
 
-      const userData = snapshot.docs[0].data();
-      userId.value = snapshot.docs[0].id;
+      const userData = firstDoc.data();
+      userId.value = firstDoc.id;
       userInfo.value = userData as any;
     }
 
@@ -203,7 +204,7 @@ const handleInterest = async (card: Card) => {
       // Card info
       card: cardData,
       cardType: card.status, // 'sale' or 'trade'
-      totalValue: totalValue,
+      totalValue,
       // Status
       status: 'pending', // pending -> accepted -> completed
       senderStatus: 'interested', // interested
@@ -219,7 +220,7 @@ const handleInterest = async (card: Card) => {
 
     // Mark card as interested
     interestedCards.value.add(cardKey);
-    toastStore.show(t('dashboard.interest.sent', { username: userInfo.value?.username }), 'success');
+    toastStore.show(t('dashboard.interest.sent', { username: userInfo.value?.username ?? '' }), 'success');
   } catch (error) {
     console.error('Error sending interest:', error);
     toastStore.show(t('dashboard.interest.error'), 'error');

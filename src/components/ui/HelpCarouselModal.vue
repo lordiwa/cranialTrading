@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useHelpStore } from '../../stores/help'
 import SvgIcon from './SvgIcon.vue'
 

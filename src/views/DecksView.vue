@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
@@ -14,9 +14,9 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
-import { CardCondition } from '../types/card'
-import { searchCards, getCardById } from '../services/scryfall'
-import type { DeckCard, DeckFormat } from '../types/deck'
+import { type CardCondition } from '../types/card'
+import { getCardById, searchCards } from '../services/scryfall'
+import type { DeckFormat } from '../types/deck'
 import { parseDeckLine } from '../utils/cardHelpers'
 
 const router = useRouter()
@@ -29,7 +29,7 @@ const { t } = useI18n()
 const showCreateModal = ref(false)
 const showImportModal = ref(false)
 const searchQuery = ref('')
-const filterFormat = ref<'all' | string>('all')
+const filterFormat = ref<string>('all')
 
 // Decks filtrados
 const filteredDecks = computed(() => {
@@ -201,7 +201,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
           (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
       ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
-      if (printWithPrice) {
+      if (printWithPrice && printWithPrice.prices?.usd) {
         let image = printWithPrice.image_uris?.normal || ''
         if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
           image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
@@ -217,19 +217,21 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
 
       // Fallback: at least return image from first result
       const firstCard = allResults[0]
-      let image = firstCard.image_uris?.normal || ''
-      if (!image && firstCard.card_faces && firstCard.card_faces.length > 0) {
-        image = firstCard.card_faces[0]?.image_uris?.normal || ''
-      }
-      return {
-        scryfallId: firstCard.id,
-        image,
-        price: firstCard.prices?.usd ? Number.parseFloat(firstCard.prices.usd) : 0,
-        edition: firstCard.set_name,
-        setCode: firstCard.set.toUpperCase(),
+      if (firstCard) {
+        let image = firstCard.image_uris?.normal || ''
+        if (!image && firstCard.card_faces && firstCard.card_faces.length > 0) {
+          image = firstCard.card_faces[0]?.image_uris?.normal || ''
+        }
+        return {
+          scryfallId: firstCard.id,
+          image,
+          price: firstCard.prices?.usd ? Number.parseFloat(firstCard.prices.usd) : 0,
+          edition: firstCard.set_name,
+          setCode: firstCard.set.toUpperCase(),
+        }
       }
     }
-  } catch (e) {
+  } catch {
     console.warn(`No se pudo obtener datos de Scryfall para: ${cardName}`)
   }
   return null
@@ -409,7 +411,7 @@ const handleImportDirect = async (
             (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
         ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
-        if (printWithPrice) {
+        if (printWithPrice && printWithPrice.prices?.usd) {
           finalScryfallId = printWithPrice.id
           finalEdition = printWithPrice.set.toUpperCase()
           price = Number.parseFloat(printWithPrice.prices.usd)
@@ -420,20 +422,22 @@ const handleImportDirect = async (
           cmc = printWithPrice.cmc
           type_line = printWithPrice.type_line
           colors = printWithPrice.colors || []
-        } else if (results.length > 0 && !image) {
+        } else if (!image) {
           // At least get an image from any print
           const anyPrint = results[0]
-          image = anyPrint.image_uris?.normal || ''
-          if (!image && anyPrint.card_faces && anyPrint.card_faces.length > 0) {
-            image = anyPrint.card_faces[0]?.image_uris?.normal || ''
+          if (anyPrint) {
+            image = anyPrint.image_uris?.normal || ''
+            if (!image && anyPrint.card_faces && anyPrint.card_faces.length > 0) {
+              image = anyPrint.card_faces[0]?.image_uris?.normal || ''
+            }
+            if (!finalScryfallId) finalScryfallId = anyPrint.id
+            if (finalEdition === 'Unknown') finalEdition = anyPrint.set.toUpperCase()
+            cmc = anyPrint.cmc
+            type_line = anyPrint.type_line
+            colors = anyPrint.colors || []
           }
-          if (!finalScryfallId) finalScryfallId = anyPrint.id
-          if (finalEdition === 'Unknown') finalEdition = anyPrint.set.toUpperCase()
-          cmc = anyPrint.cmc
-          type_line = anyPrint.type_line
-          colors = anyPrint.colors || []
         }
-      } catch (e) {
+      } catch {
         console.warn(`Could not find alternate print for: ${cardName}`)
       }
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseButton from '../ui/BaseButton.vue'
@@ -13,6 +13,10 @@ import { searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
 import type { CardCondition, CardStatus } from '../../types/card'
 
+const props = defineProps<Props>()
+
+const emit = defineEmits(['close', 'added'])
+
 const { t } = useI18n()
 
 interface Props {
@@ -20,9 +24,6 @@ interface Props {
   scryfallCard?: any
   selectedDeckId?: string
 }
-
-const props = defineProps<Props>()
-const emit = defineEmits(['close', 'added'])
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
@@ -140,7 +141,7 @@ const isSplitCard = computed(() => {
 // ✅ NUEVO: Obtener imagen actual según el lado
 const currentCardImage = computed(() => {
   if (!selectedPrint.value) return ''
-  if (selectedPrint.value.card_faces && selectedPrint.value.card_faces[cardFaceIndex.value]) {
+  if (selectedPrint.value.card_faces?.[cardFaceIndex.value]) {
     return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
   }
   return getCardImage(selectedPrint.value)
@@ -149,7 +150,7 @@ const currentCardImage = computed(() => {
 // Large image for zoom view
 const zoomImage = computed(() => {
   if (!selectedPrint.value) return ''
-  if (selectedPrint.value.card_faces && selectedPrint.value.card_faces[cardFaceIndex.value]) {
+  if (selectedPrint.value.card_faces?.[cardFaceIndex.value]) {
     return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.large ||
            selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
   }
@@ -159,7 +160,7 @@ const zoomImage = computed(() => {
 // ✅ NUEVO: Obtener nombre del lado actual
 const currentCardName = computed(() => {
   if (!selectedPrint.value) return ''
-  if (selectedPrint.value.card_faces && selectedPrint.value.card_faces[cardFaceIndex.value]) {
+  if (selectedPrint.value.card_faces?.[cardFaceIndex.value]) {
     return selectedPrint.value.card_faces[cardFaceIndex.value].name
   }
   return selectedPrint.value.name

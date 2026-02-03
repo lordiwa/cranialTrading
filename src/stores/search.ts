@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { searchAdvanced, ScryfallCard } from '../services/scryfall'
+import { computed, ref } from 'vue'
+import { type ScryfallCard, searchAdvanced } from '../services/scryfall'
 import { useToastStore } from './toast'
 
 // Cache para búsquedas (5 minutos)
@@ -85,8 +85,9 @@ export const useSearchStore = defineStore('search', () => {
                     mvParts.push('mv>=10')
                 }
 
-                if (mvParts.length === 1) {
-                    parts.push(mvParts[0])
+                const firstPart = mvParts[0]
+                if (mvParts.length === 1 && firstPart) {
+                    parts.push(firstPart)
                 } else if (mvParts.length > 1) {
                     parts.push(`(${mvParts.join(' OR ')})`)
                 }

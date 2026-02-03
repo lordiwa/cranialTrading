@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { useI18n } from '../../composables/useI18n';
-import { Preference } from '../../types/preferences';
+import { type Preference } from '../../types/preferences';
 import BaseBadge from '../ui/BaseBadge.vue';
 import BaseButton from '../ui/BaseButton.vue';
 
-const { t } = useI18n();
-
-const props = defineProps<{
+defineProps<{
   preference: Preference;
 }>();
 
@@ -14,6 +12,8 @@ const emit = defineEmits<{
   edit: [preference: Preference];
   delete: [prefId: string];
 }>();
+
+const { t } = useI18n();
 
 const getVariant = (type: string): 'busco' | 'cambio' | 'vendo' => {
   if (type === 'BUSCO') return 'busco';

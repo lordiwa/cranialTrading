@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../../types/deck'
+import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
 import BaseBadge from '../ui/BaseBadge.vue'
-
-const { t } = useI18n()
 
 const props = defineProps<{
   cards: DisplayDeckCard[]
@@ -17,9 +15,11 @@ const emit = defineEmits<{
   remove: [card: DisplayDeckCard]
 }>()
 
+const { t } = useI18n()
+
 // Type guard for wishlist cards
 const isWishlistCard = (card: DisplayDeckCard): card is HydratedWishlistCard => {
-  return card.isWishlist === true
+  return card.isWishlist
 }
 
 // Helper to get quantity from either type
@@ -27,7 +27,7 @@ const getQuantity = (card: DisplayDeckCard): number => {
   if (isWishlistCard(card)) {
     return card.requestedQuantity
   }
-  return (card as HydratedDeckCard).allocatedQuantity
+  return (card).allocatedQuantity
 }
 
 // Helper to get card key for v-for
@@ -35,12 +35,8 @@ const getCardKey = (card: DisplayDeckCard, index: number): string => {
   if (isWishlistCard(card)) {
     return `wish-${card.scryfallId}-${index}`
   }
-  return `own-${(card as HydratedDeckCard).cardId}`
+  return `own-${(card).cardId}`
 }
-
-const totalPrice = computed(() => {
-  return props.cards.reduce((sum, card) => sum + card.price * getQuantity(card), 0)
-})
 
 const totalCards = computed(() => {
   return props.cards.reduce((sum, card) => sum + getQuantity(card), 0)

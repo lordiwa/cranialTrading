@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted, computed, nextTick, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useMessagesStore } from '../../stores/messages';
 import { useAuthStore } from '../../stores/auth';
 import { useToastStore } from '../../stores/toast';
@@ -8,8 +8,6 @@ import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import BaseInput from '../ui/BaseInput.vue';
 import BaseLoader from '../ui/BaseLoader.vue';
-
-const { t } = useI18n();
 
 const props = defineProps<{
   show: boolean;
@@ -20,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
 }>();
+
+const { t } = useI18n();
 
 const messagesStore = useMessagesStore();
 const authStore = useAuthStore();

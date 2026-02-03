@@ -11,7 +11,7 @@ const { t } = useI18n()
 const expandedQuestions = ref<Set<number>>(new Set())
 
 // Get FAQ questions directly from locale (t() only returns strings)
-const faqQuestions = esLocale.help.faq.questions as Array<{ q: string; a: string }>
+const faqQuestions = esLocale.help.faq.questions as { q: string; a: string }[]
 
 // Get guides from localization
 const gettingStarted = {
@@ -25,7 +25,7 @@ const gettingStarted = {
 }
 
 // Get safety tips directly from locale
-const tradeSafetyTips = esLocale.help.guides.tradeSafety.tips as string[]
+const tradeSafetyTips = esLocale.help.guides.tradeSafety.tips
 
 const toggleQuestion = (index: number) => {
   if (expandedQuestions.value.has(index)) {

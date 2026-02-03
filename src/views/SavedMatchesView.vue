@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useMatchesStore } from '../stores/matches'
 import { useContactsStore } from '../stores/contacts'
 import { useI18n } from '../composables/useI18n'

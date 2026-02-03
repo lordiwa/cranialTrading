@@ -1,19 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
+    confirmPasswordReset,
     createUserWithEmailAndPassword,
+    type User as FirebaseUser,
+    onAuthStateChanged,
+    sendEmailVerification,
+    sendPasswordResetEmail,
     signInWithEmailAndPassword,
     signOut,
-    onAuthStateChanged,
-    sendPasswordResetEmail,
-    confirmPasswordReset,
-    updatePassword,
-    sendEmailVerification,
-    User as FirebaseUser
+    updatePassword
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
-import { User } from '../types/user';
+import { type User } from '../types/user';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
 
@@ -25,17 +25,17 @@ export const useAuthStore = defineStore('auth', () => {
     const toastStore = useToastStore();
 
     const initAuth = () => {
-        onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
             if (isLoggingOut.value) return;
 
             if (firebaseUser) {
                 emailVerified.value = firebaseUser.emailVerified;
-                await loadUserData(firebaseUser.uid);
+                void loadUserData(firebaseUser.uid);
             } else {
                 user.value = null;
                 emailVerified.value = false;
+                loading.value = false;
             }
-            loading.value = false;
         });
     };
 
@@ -71,12 +71,12 @@ export const useAuthStore = defineStore('auth', () => {
                             location: user.value.location,
                             createdAt: new Date(),
                         });
-                    } catch (saveError) {
+                    } catch {
                         toastStore.show(t('auth.messages.saveUserError'), 'error');
                     }
                 }
             }
-        } catch (error) {
+        } catch {
             toastStore.show(t('auth.messages.loadUserError'), 'error');
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
@@ -88,6 +88,8 @@ export const useAuthStore = defineStore('auth', () => {
                     createdAt: new Date(),
                 };
             }
+        } finally {
+            loading.value = false;
         }
     };
 
@@ -125,7 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
                 toastStore.show(t('auth.messages.verifyEmail'), 'info');
             }
             return true;
-        } catch (error: any) {
+        } catch {
             toastStore.show(t('auth.messages.invalidCredentials'), 'error');
             return false;
         }
@@ -219,7 +221,7 @@ export const useAuthStore = defineStore('auth', () => {
             await sendEmailVerification(firebaseUser);
             toastStore.show(t('auth.messages.verificationEmailSent'), 'success');
             return true;
-        } catch (error: any) {
+        } catch {
             toastStore.show(t('auth.messages.sendEmailError'), 'error');
             return false;
         }
@@ -233,7 +235,7 @@ export const useAuthStore = defineStore('auth', () => {
             await firebaseUser.reload();
             emailVerified.value = firebaseUser.emailVerified;
             return firebaseUser.emailVerified;
-        } catch (error) {
+        } catch {
             toastStore.show(t('auth.messages.verifyEmailError'), 'error');
             return false;
         }
@@ -482,7 +484,7 @@ export const useAuthStore = defineStore('auth', () => {
      * Get avatar URL - returns custom URL or generates one from username
      * Uses DiceBear API for generated avatars (free, no storage needed)
      */
-    const getAvatarUrl = (size: number = 40): string => {
+    const getAvatarUrl = (size = 40): string => {
         if (user.value?.avatarUrl) {
             return user.value.avatarUrl;
         }
@@ -502,7 +504,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         try {
             await updateDoc(doc(db, 'users', user.value.id), {
-                avatarUrl: avatarUrl
+                avatarUrl
             });
 
             user.value.avatarUrl = avatarUrl;

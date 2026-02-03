@@ -28,7 +28,7 @@ export const useToastStore = defineStore('toast', () => {
     /**
      * Show a regular toast notification
      */
-    const show = (message: string, type: ToastType = 'info', persistent: boolean = false): number => {
+    const show = (message: string, type: ToastType = 'info', persistent = false): number => {
         const id = nextId++;
         toasts.value.push({ id, message, type });
 
@@ -45,7 +45,7 @@ export const useToastStore = defineStore('toast', () => {
      * Show a progress toast with a progress bar
      * Returns an object with methods to update/complete the progress
      */
-    const showProgress = (message: string, initialProgress: number = 0) => {
+    const showProgress = (message: string, initialProgress = 0) => {
         const id = nextId++;
         const progressToast: ProgressToast = {
             id,
@@ -77,7 +77,7 @@ export const useToastStore = defineStore('toast', () => {
                     toast.progress = 100;
                     toast.status = 'complete';
                     if (successMessage) toast.message = successMessage;
-                    setTimeout(() => remove(id), 2000);
+                    setTimeout(() => { remove(id); }, 2000);
                 }
             },
             /**
@@ -88,13 +88,13 @@ export const useToastStore = defineStore('toast', () => {
                 if (toast && isProgressToast(toast)) {
                     toast.status = 'error';
                     if (errorMessage) toast.message = errorMessage;
-                    setTimeout(() => remove(id), 4000);
+                    setTimeout(() => { remove(id); }, 4000);
                 }
             },
             /**
              * Remove immediately
              */
-            dismiss: () => remove(id)
+            dismiss: () => { remove(id); }
         };
     };
 

@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
-    collection,
     addDoc,
-    updateDoc,
+    collection,
     deleteDoc,
-    getDocs,
     doc,
-    Timestamp,
     getDoc,
+    getDocs,
+    Timestamp,
+    updateDoc,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { getCardById as getScryfallCard } from '../services/scryfall'
@@ -17,11 +17,11 @@ import { useToastStore } from './toast'
 import { useCollectionStore } from './collection'
 import type { Card, CardCondition } from '../types/card'
 import type {
+    CreateDeckInput,
     Deck,
     DeckCardAllocation,
-    DeckWishlistItem,
-    CreateDeckInput,
     DeckStats,
+    DeckWishlistItem,
     DisplayDeckCard,
 } from '../types/deck'
 import { t } from '../composables/useI18n'
@@ -260,9 +260,10 @@ export const useDecksStore = defineStore('decks', () => {
                             w.foil === item.foil &&
                             w.isInSideboard === item.isInSideboard
                     )
-                    if (index >= 0) {
+                    const existingItem = updatedWishlist[index]
+                    if (index >= 0 && existingItem) {
                         updatedWishlist[index] = {
-                            ...updatedWishlist[index],
+                            ...existingItem,
                             type_line: scryfallCard.type_line,
                             colors: scryfallCard.colors || [],
                             cmc: scryfallCard.cmc,
@@ -695,7 +696,7 @@ export const useDecksStore = defineStore('decks', () => {
             }
 
             if (toWishlist > 0) {
-                toastStore.show(t('decks.messages.allocated', { fromCollection: toAllocate, toWishlist: toWishlist }), 'info')
+                toastStore.show(t('decks.messages.allocated', { fromCollection: toAllocate, toWishlist }), 'info')
             }
 
             return { allocated: toAllocate, wishlisted: toWishlist }
@@ -894,7 +895,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             if (newQuantity <= 0) {
                 // Remove allocation
-                return deallocateCard(deckId, cardId, isInSideboard)
+                return await deallocateCard(deckId, cardId, isInSideboard)
             }
 
             // Check available quantity
@@ -1007,7 +1008,7 @@ export const useDecksStore = defineStore('decks', () => {
                     wishlist: deck.wishlist,
                     stats: deck.stats,
                     updatedAt: Timestamp.now(),
-                }).catch(error => {
+                }).catch((error: unknown) => {
                     console.error(`Error reducing allocations for deck ${deck.name}:`, error)
                 })
             )
@@ -1066,7 +1067,7 @@ export const useDecksStore = defineStore('decks', () => {
                     wishlist: deck.wishlist,
                     stats: deck.stats,
                     updatedAt: Timestamp.now(),
-                }).catch(error => {
+                }).catch((error: unknown) => {
                     console.error(`Error converting allocations for deck ${deck.name}:`, error)
                 })
             )
@@ -1083,6 +1084,29 @@ export const useDecksStore = defineStore('decks', () => {
     const clear = () => {
         decks.value = []
         currentDeck.value = null
+    }
+
+    /**
+     * Delete all decks for current user
+     */
+    const deleteAllDecks = async (): Promise<boolean> => {
+        if (!authStore.user?.id) return false
+
+        try {
+            const decksRef = collection(db, 'users', authStore.user.id, 'decks')
+            const snapshot = await getDocs(decksRef)
+
+            // Delete all deck documents
+            await Promise.all(snapshot.docs.map(docSnap => deleteDoc(docSnap.ref)))
+
+            decks.value = []
+            currentDeck.value = null
+
+            return true
+        } catch (error) {
+            console.error('Error deleting all decks:', error)
+            return false
+        }
     }
 
     return {
@@ -1102,6 +1126,7 @@ export const useDecksStore = defineStore('decks', () => {
         createDeck,
         updateDeck,
         deleteDeck,
+        deleteAllDecks,
         toggleCommander,
 
         // Allocation operations

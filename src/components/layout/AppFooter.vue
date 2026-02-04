@@ -18,13 +18,29 @@ const handleLanguageChange = (code: SupportedLocale) => {
   <footer class="fixed bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur-sm border-t border-silver-20">
     <div class="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
       <!-- Copyright & Links -->
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4 flex-wrap">
         <p class="text-tiny text-silver-50">
           © 2024 Cranial Trading
         </p>
-        <router-link to="/faq" class="text-tiny text-silver-50 hover:text-neon transition-fast hidden sm:inline">
-          {{ t('legal.footer.faq') }}
-        </router-link>
+        <!-- Legal Links -->
+        <nav class="hidden sm:flex items-center gap-1 text-tiny" aria-label="Legal links">
+          <span class="text-silver-30">|</span>
+          <router-link to="/terms" class="text-silver-50 hover:text-silver hover:underline transition-fast px-1">
+            {{ t('legal.footer.terms') }}
+          </router-link>
+          <span class="text-silver-30">·</span>
+          <router-link to="/privacy" class="text-silver-50 hover:text-silver hover:underline transition-fast px-1">
+            {{ t('legal.footer.privacy') }}
+          </router-link>
+          <span class="text-silver-30">·</span>
+          <router-link to="/cookies" class="text-silver-50 hover:text-silver hover:underline transition-fast px-1">
+            {{ t('legal.footer.cookies') }}
+          </router-link>
+          <span class="text-silver-30">|</span>
+          <router-link to="/faq" class="text-neon hover:text-neon/80 font-bold underline underline-offset-2 transition-fast px-1">
+            {{ t('legal.footer.faq') }}
+          </router-link>
+        </nav>
       </div>
 
       <!-- Language Selector -->

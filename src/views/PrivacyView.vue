@@ -206,12 +206,13 @@ const lastUpdated = '27 de Enero, 2025';
     <footer class="border-t border-silver-20 py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
-        <div class="flex gap-6 text-tiny text-silver-50">
-          <RouterLink to="/terms" class="hover:text-neon transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
-          <RouterLink to="/privacy" class="text-neon">{{ t('legal.footer.privacy') }}</RouterLink>
-          <RouterLink to="/cookies" class="hover:text-neon transition-fast">{{ t('legal.footer.cookies') }}</RouterLink>
-          <RouterLink to="/faq" class="hover:text-neon transition-fast">{{ t('legal.footer.faq') }}</RouterLink>
-        </div>
+        <nav class="flex gap-4 text-tiny" aria-label="Legal links">
+          <RouterLink to="/terms" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
+          <RouterLink to="/privacy" class="text-neon underline underline-offset-2">{{ t('legal.footer.privacy') }}</RouterLink>
+          <RouterLink to="/cookies" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.cookies') }}</RouterLink>
+          <span class="text-silver-30">|</span>
+          <RouterLink to="/faq" class="text-neon font-bold underline underline-offset-2 hover:text-neon/80 transition-fast">{{ t('legal.footer.faq') }}</RouterLink>
+        </nav>
       </div>
     </footer>
   </div>

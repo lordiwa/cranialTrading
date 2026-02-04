@@ -267,7 +267,7 @@ const useCases = computed(() => [
     <!-- Footer -->
     <footer class="border-t border-silver-20 bg-secondary/30">
       <div class="max-w-7xl mx-auto px-6 py-8">
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           <!-- Brand -->
           <div class="col-span-2 md:col-span-1">
             <div class="flex items-center gap-2 mb-4">
@@ -289,17 +289,6 @@ const useCases = computed(() => [
               <li><RouterLink to="/register" class="hover:text-neon transition-fast">{{ t('auth.register.title') }}</RouterLink></li>
               <li><span class="text-silver-30">{{ t('header.nav.collection') }}</span></li>
               <li><span class="text-silver-30">Matches</span></li>
-            </ul>
-          </div>
-
-          <!-- Resources -->
-          <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.resources') }}</h4>
-            <ul class="space-y-2 text-tiny text-silver-50">
-              <li><a href="https://scryfall.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Scryfall</a></li>
-              <li><a href="https://www.moxfield.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Moxfield</a></li>
-              <li><a href="https://www.cardkingdom.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Card Kingdom</a></li>
-              <li><a href="https://www.tcgplayer.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">TCGPlayer</a></li>
             </ul>
           </div>
 

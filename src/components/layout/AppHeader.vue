@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
@@ -9,7 +9,6 @@ import SvgIcon from '../ui/SvgIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
 
-const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const matchesStore = useMatchesStore()
@@ -78,7 +77,7 @@ const isActive = (path: string) => {
 
 const handleLogout = async () => {
   await authStore.logout()
-  router.push('/login')
+  window.location.href = '/login'
 }
 
 // Global search ref for keyboard shortcut
@@ -188,18 +187,18 @@ onUnmounted(() => {
             >
               <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
             </router-link>
-            <router-link
-                to="/login"
+            <a
+                href="/login"
                 class="px-4 py-2 text-silver-70 hover:text-neon transition-fast rounded text-small font-bold"
             >
               {{ t('header.auth.login') }}
-            </router-link>
-            <router-link
-                to="/register"
+            </a>
+            <a
+                href="/register"
                 class="px-4 py-2 bg-neon text-primary font-bold hover:bg-neon/90 transition-fast rounded text-small"
             >
               {{ t('header.auth.register') }}
-            </router-link>
+            </a>
           </div>
         </div>
       </div>

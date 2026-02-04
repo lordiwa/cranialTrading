@@ -193,15 +193,62 @@
         "description": "Mensajería directa para cerrar trades"
       }
     },
+    "capabilities": {
+      "title": "¿Qué puedes hacer en Cranial Trading?",
+      "items": {
+        "catalog": {
+          "title": "Cataloga tu colección completa",
+          "description": "Agrega cartas escaneando o buscando por nombre. Importa mazos desde Moxfield. Lleva control de condición, idioma y si es foil."
+        },
+        "prices": {
+          "title": "Consulta precios en tiempo real",
+          "description": "Precios de TCGPlayer, Card Kingdom y buylist actualizados. Conoce el valor real de tu colección al instante."
+        },
+        "decks": {
+          "title": "Construye y gestiona mazos",
+          "description": "Crea mazos para Standard, Modern, Commander y más. Ve qué cartas te faltan y cuáles ya tienes."
+        },
+        "trade": {
+          "title": "Intercambia cartas con otros jugadores",
+          "description": "El sistema encuentra automáticamente usuarios que tienen lo que buscas y buscan lo que tienes."
+        },
+        "sell": {
+          "title": "Vende cartas que ya no uses",
+          "description": "Publica tu colección disponible. Otros jugadores pueden contactarte directamente."
+        },
+        "wishlist": {
+          "title": "Crea tu lista de deseos",
+          "description": "Marca las cartas que necesitas. Recibe notificaciones cuando alguien las tenga disponibles."
+        }
+      }
+    },
+    "useCases": {
+      "title": "Ideal para",
+      "casual": "Jugadores casuales que quieren organizar sus cartas",
+      "competitive": "Jugadores competitivos armando mazos de torneo",
+      "collectors": "Coleccionistas buscando piezas específicas",
+      "stores": "Tiendas y vendedores gestionando inventario",
+      "returning": "Jugadores que vuelven al juego después de años"
+    },
+    "cta": {
+      "title": "Empieza gratis hoy",
+      "description": "Sin comisiones, sin límites, sin trucos. Solo Magic."
+    },
     "stats": {
       "free": "Gratis",
       "p2p": "Sin intermediarios",
       "mtg": "Especializado"
     },
+    "helpSection": {
+      "title": "¿Necesitas ayuda?",
+      "description": "Consulta nuestra guía completa con preguntas frecuentes, tutoriales y consejos para aprovechar la plataforma.",
+      "cta": "Ver Centro de Ayuda"
+    },
     "footer": {
       "platform": "PLATAFORMA",
       "resources": "RECURSOS",
-      "legal": "LEGAL"
+      "legal": "LEGAL",
+      "help": "AYUDA"
     }
   },
 

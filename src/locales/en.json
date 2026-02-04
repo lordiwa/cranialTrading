@@ -193,15 +193,62 @@
         "description": "Direct messaging to close trades"
       }
     },
+    "capabilities": {
+      "title": "What can you do on Cranial Trading?",
+      "items": {
+        "catalog": {
+          "title": "Catalog your entire collection",
+          "description": "Add cards by searching or scanning. Import decks from Moxfield. Track condition, language and foil status."
+        },
+        "prices": {
+          "title": "Check real-time prices",
+          "description": "Updated prices from TCGPlayer, Card Kingdom and buylist. Know the real value of your collection instantly."
+        },
+        "decks": {
+          "title": "Build and manage decks",
+          "description": "Create decks for Standard, Modern, Commander and more. See which cards you're missing and which you already own."
+        },
+        "trade": {
+          "title": "Trade cards with other players",
+          "description": "The system automatically finds users who have what you need and need what you have."
+        },
+        "sell": {
+          "title": "Sell cards you no longer use",
+          "description": "List your available collection. Other players can contact you directly."
+        },
+        "wishlist": {
+          "title": "Create your wishlist",
+          "description": "Mark the cards you need. Get notified when someone has them available."
+        }
+      }
+    },
+    "useCases": {
+      "title": "Ideal for",
+      "casual": "Casual players who want to organize their cards",
+      "competitive": "Competitive players building tournament decks",
+      "collectors": "Collectors searching for specific pieces",
+      "stores": "Stores and sellers managing inventory",
+      "returning": "Players returning to the game after years"
+    },
+    "cta": {
+      "title": "Start free today",
+      "description": "No fees, no limits, no tricks. Just Magic."
+    },
     "stats": {
       "free": "Free",
       "p2p": "No middlemen",
       "mtg": "Specialized"
     },
+    "helpSection": {
+      "title": "Need help?",
+      "description": "Check our complete guide with FAQs, tutorials and tips to get the most out of the platform.",
+      "cta": "View Help Center"
+    },
     "footer": {
       "platform": "PLATFORM",
       "resources": "RESOURCES",
-      "legal": "LEGAL"
+      "legal": "LEGAL",
+      "help": "HELP"
     }
   },
 

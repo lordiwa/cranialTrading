@@ -65,6 +65,23 @@ const features = computed(() => [
     description: t('landing.features.connect.description')
   }
 ]);
+
+const capabilities = computed(() => [
+  { key: 'catalog', icon: 'collection' },
+  { key: 'prices', icon: 'money' },
+  { key: 'decks', icon: 'box' },
+  { key: 'trade', icon: 'handshake' },
+  { key: 'sell', icon: 'star' },
+  { key: 'wishlist', icon: 'search' }
+]);
+
+const useCases = computed(() => [
+  'casual',
+  'competitive',
+  'collectors',
+  'stores',
+  'returning'
+]);
 </script>
 
 <template>
@@ -112,7 +129,7 @@ const features = computed(() => [
         </div>
 
         <!-- Stats -->
-        <div class="flex gap-8 text-center">
+        <div class="flex gap-8 text-center mb-12">
           <div>
             <p class="text-h2 font-bold text-neon">100%</p>
             <p class="text-tiny text-silver-50">{{ t('landing.stats.free') }}</p>
@@ -126,6 +143,54 @@ const features = computed(() => [
             <p class="text-tiny text-silver-50">{{ t('landing.stats.mtg') }}</p>
           </div>
         </div>
+
+        <!-- Capabilities Section -->
+        <section class="mb-12">
+          <h2 class="text-h3 font-bold text-silver mb-6">{{ t('landing.capabilities.title') }}</h2>
+          <div class="space-y-4">
+            <article
+                v-for="cap in capabilities"
+                :key="cap.key"
+                class="flex gap-4 p-4 bg-secondary/20 border border-silver-10 rounded-md hover:border-silver-30 transition-all"
+            >
+              <div class="flex-shrink-0 w-10 h-10 bg-neon-10 rounded-full flex items-center justify-center">
+                <SvgIcon :name="cap.icon" size="small" class="text-neon" />
+              </div>
+              <div>
+                <h3 class="text-small font-bold text-silver mb-1">{{ t(`landing.capabilities.items.${cap.key}.title`) }}</h3>
+                <p class="text-tiny text-silver-50">{{ t(`landing.capabilities.items.${cap.key}.description`) }}</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Use Cases -->
+        <section class="mb-12">
+          <h2 class="text-h3 font-bold text-silver mb-4">{{ t('landing.useCases.title') }}</h2>
+          <ul class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <li
+                v-for="useCase in useCases"
+                :key="useCase"
+                class="flex items-center gap-2 text-small text-silver-70"
+            >
+              <span class="text-neon">✓</span>
+              {{ t(`landing.useCases.${useCase}`) }}
+            </li>
+          </ul>
+        </section>
+
+        <!-- Help Section -->
+        <section class="p-6 bg-neon-10 border border-neon-30 rounded-lg">
+          <h2 class="text-h3 font-bold text-neon mb-2">{{ t('landing.helpSection.title') }}</h2>
+          <p class="text-small text-silver-70 mb-4">{{ t('landing.helpSection.description') }}</p>
+          <RouterLink
+              to="/faq"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-neon text-primary font-bold text-small rounded hover:bg-neon/90 transition-fast"
+          >
+            <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+            {{ t('landing.helpSection.cta') }}
+          </RouterLink>
+        </section>
       </div>
 
       <!-- Right Column: Login Form -->
@@ -186,7 +251,7 @@ const features = computed(() => [
     <!-- Footer -->
     <footer class="border-t border-silver-20 bg-secondary/30">
       <div class="max-w-7xl mx-auto px-6 py-8">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
           <!-- Brand -->
           <div class="col-span-2 md:col-span-1">
             <div class="flex items-center gap-2 mb-4">
@@ -219,6 +284,17 @@ const features = computed(() => [
               <li><a href="https://www.moxfield.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Moxfield</a></li>
               <li><a href="https://www.cardkingdom.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">Card Kingdom</a></li>
               <li><a href="https://www.tcgplayer.com" target="_blank" rel="noopener" class="hover:text-neon transition-fast">TCGPlayer</a></li>
+            </ul>
+          </div>
+
+          <!-- Help -->
+          <div>
+            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.help') }}</h4>
+            <ul class="space-y-2 text-tiny text-silver-50">
+              <li><RouterLink to="/faq" class="hover:text-neon transition-fast">FAQ / Preguntas Frecuentes</RouterLink></li>
+              <li><RouterLink to="/faq#getting-started" class="hover:text-neon transition-fast">Guía de Inicio</RouterLink></li>
+              <li><RouterLink to="/faq#trading" class="hover:text-neon transition-fast">Cómo Intercambiar</RouterLink></li>
+              <li><RouterLink to="/faq#safety" class="hover:text-neon transition-fast">Seguridad en Trades</RouterLink></li>
             </ul>
           </div>
 

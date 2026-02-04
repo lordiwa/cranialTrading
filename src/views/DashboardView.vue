@@ -100,9 +100,8 @@ const clearClearDataState = () => {
   }
 }
 
-// Ignored matches (persisted in localStorage)
-const IGNORED_MATCHES_KEY = 'cranial_ignored_matches'
-const ignoredMatchIds = ref<Set<string>>(new Set())
+// Discarded matches (persisted in Firestore matches_eliminados)
+const discardedMatchIds = ref<Set<string>>(new Set())
 
 // Card search
 const searchQuery = ref('')
@@ -120,20 +119,67 @@ const suggestLoading = ref(false)
 const scryfallResults = ref<any[]>([])
 const showScryfallFallback = ref(false)
 
-const loadIgnoredMatches = () => {
+/**
+ * Load discarded match IDs from Firestore matches_eliminados
+ * This ensures discarded matches don't reappear after refresh
+ */
+const loadDiscardedMatches = async () => {
+  if (!authStore.user) return
+
   try {
-    const stored = localStorage.getItem(IGNORED_MATCHES_KEY)
-    if (stored) {
-      ignoredMatchIds.value = new Set(JSON.parse(stored))
+    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
+    const snapshot = await getDocs(discardedRef)
+
+    const ids = new Set<string>()
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data()
+      // Track by otherUserId to prevent matches with same user from reappearing
+      if (data.otherUserId) {
+        ids.add(data.otherUserId)
+      }
     }
-  } catch {
-    ignoredMatchIds.value = new Set()
+    discardedMatchIds.value = ids
+  } catch (err) {
+    console.error('Error loading discarded matches:', err)
+    discardedMatchIds.value = new Set()
   }
 }
 
-const saveIgnoredMatch = (matchId: string) => {
-  ignoredMatchIds.value.add(matchId)
-  localStorage.setItem(IGNORED_MATCHES_KEY, JSON.stringify([...ignoredMatchIds.value]))
+/**
+ * Discard a match by moving it to matches_eliminados in Firestore
+ */
+const discardMatchToFirestore = async (match: any) => {
+  if (!authStore.user) return
+
+  try {
+    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
+    await addDoc(discardedRef, {
+      id: match.id,
+      otherUserId: match.otherUserId,
+      otherUsername: match.otherUsername,
+      otherLocation: match.otherLocation,
+      myCards: match.myCards || [],
+      otherCards: match.otherCards || [],
+      status: 'eliminado',
+      eliminatedAt: new Date(),
+      lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+    })
+
+    // Track by otherUserId to prevent future matches with same user
+    discardedMatchIds.value.add(match.otherUserId)
+
+    // Also remove from matches_nuevos if it exists there
+    const nuevosRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
+    const nuevosSnapshot = await getDocs(nuevosRef)
+    for (const docSnap of nuevosSnapshot.docs) {
+      const data = docSnap.data()
+      if (data.id === match.id || data.otherUserId === match.otherUserId) {
+        await deleteDoc(docSnap.ref)
+      }
+    }
+  } catch (err) {
+    console.error('Error discarding match:', err)
+  }
 }
 
 /**
@@ -166,8 +212,8 @@ onMounted(async () => {
     clearClearDataState()
   }
 
-  // Load ignored matches from localStorage
-  loadIgnoredMatches()
+  // Load discarded matches from Firestore
+  await loadDiscardedMatches()
 
   loading.value = true
   try {
@@ -521,9 +567,9 @@ const calculateMatches = async () => {
       }
     }
 
-    // Ordenar por compatibilidad descendente y filtrar ignorados
+    // Ordenar por compatibilidad descendente y filtrar discardados (por otherUserId)
     foundMatches.sort((a, b) => b.compatibility - a.compatibility)
-    calculatedMatches.value = foundMatches.filter(m => !ignoredMatchIds.value.has(m.id))
+    calculatedMatches.value = foundMatches.filter(m => !discardedMatchIds.value.has(m.otherUserId))
 
     // Persistir matches en Firestore
     if (foundMatches.length > 0) {
@@ -543,6 +589,7 @@ const calculateMatches = async () => {
 /**
  * CAMBIO 3: Guardar matches en Firestore
  * Limpia los matches_nuevos existentes antes de guardar los nuevos
+ * Also notifies the other user so they see the match too (Bug #2 fix)
  */
 const saveMatchesToFirebase = async (matches: any[]) => {
   if (!authStore.user) return
@@ -556,7 +603,7 @@ const saveMatchesToFirebase = async (matches: any[]) => {
       await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
     }
 
-    // Ahora guardar los nuevos
+    // Ahora guardar los nuevos y notificar al otro usuario
     for (const match of matches) {
       await addDoc(matchesRef, {
         id: match.id,
@@ -575,6 +622,25 @@ const saveMatchesToFirebase = async (matches: any[]) => {
         createdAt: match.createdAt,
         lifeExpiresAt: match.lifeExpiresAt,
       })
+
+      // Notify the other user so they see the match in their dashboard
+      // This creates a reciprocal entry in the other user's matches_nuevos
+      await matchesStore.notifyOtherUser({
+        id: match.id,
+        otherUserId: match.otherUserId,
+        otherUsername: match.otherUsername,
+        otherLocation: match.otherLocation,
+        // Swap cards - what I offer becomes what they receive
+        myCards: match.otherCards || [],
+        otherCards: match.myCards || [],
+        myTotalValue: match.theirTotalValue,
+        theirTotalValue: match.myTotalValue,
+        valueDifference: -match.valueDifference,
+        compatibility: match.compatibility,
+        type: match.type,
+        status: 'nuevo',
+        createdAt: match.createdAt,
+      } as any, 'INTERESADO')
     }
 
     console.log(`💾 ${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`)
@@ -608,9 +674,16 @@ const handleSaveMatch = async (match: any) => {
   calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== match.id)
 }
 
-const handleDiscardMatch = (matchId: string) => {
-  saveIgnoredMatch(matchId)
+const handleDiscardMatch = async (matchId: string) => {
+  // Find the match by ID
+  const match = calculatedMatches.value.find(m => m.id === matchId)
+  if (!match) return
+
+  // Save to Firestore matches_eliminados for persistence
+  await discardMatchToFirestore(match)
+  // Remove from UI
   calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
+  toastStore.show(t('matches.messages.deleted'), 'info')
 }
 
 const recalculateMatches = async () => {

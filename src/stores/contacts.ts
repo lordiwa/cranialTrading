@@ -13,6 +13,7 @@ import { db } from '../services/firebase'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { type Contact } from '../types/contact'
+import { t } from '../composables/useI18n'
 
 export const useContactsStore = defineStore('contacts', () => {
     const contacts = ref<Contact[]>([])
@@ -37,11 +38,11 @@ export const useContactsStore = defineStore('contacts', () => {
                 savedAt: new Date(),
             })
 
-            toastStore.show('✓ Contacto guardado', 'success')
+            toastStore.show(t('contacts.messages.saved'), 'success')
             return true
         } catch (error) {
             console.error('Error saving contact:', error)
-            toastStore.show('Error al guardar contacto', 'error')
+            toastStore.show(t('contacts.messages.saveError'), 'error')
             return false
         }
     }
@@ -54,11 +55,11 @@ export const useContactsStore = defineStore('contacts', () => {
             await deleteDoc(contactRef)
 
             contacts.value = contacts.value.filter(c => c.id !== contactId)
-            toastStore.show('Contacto eliminado', 'success')
+            toastStore.show(t('contacts.messages.deleted'), 'success')
             return true
         } catch (error) {
             console.error('Error deleting contact:', error)
-            toastStore.show('Error al eliminar contacto', 'error')
+            toastStore.show(t('contacts.messages.deleteError'), 'error')
             return false
         }
     }
@@ -83,7 +84,7 @@ export const useContactsStore = defineStore('contacts', () => {
                 },
                 (error) => {
                     console.error('Error loading contacts:', error)
-                    toastStore.show('Error al cargar contactos', 'error')
+                    toastStore.show(t('contacts.messages.loadError'), 'error')
                     loading.value = false
                 }
             )

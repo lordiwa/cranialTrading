@@ -890,7 +890,7 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
     await decksStore.deallocateCard(selectedDeck.value.id, ownedCard.cardId, ownedCard.isInSideboard)
   }
 
-  toastStore.show('Carta eliminada del deck', 'success')
+  toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
 }
 
 // Handle quantity update from deck grid
@@ -905,13 +905,13 @@ const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQua
       hydratedCard.isInSideboard,
       newQuantity
     )
-    toastStore.show('Cantidad actualizada', 'success')
+    toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
   }
 }
 
 // Handle add to wishlist from deck grid (card is already in wishlist)
 const handleDeckGridAddToWishlist = (_displayCard: DisplayDeckCard) => {
-  toastStore.show('Esta carta ya está en tu wishlist del deck', 'info')
+  toastStore.show(t('decks.editor.messages.alreadyInWishlist'), 'info')
 }
 
 // Handle toggle commander from deck grid
@@ -1373,9 +1373,9 @@ const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnT
         state.status = 'complete'
         saveDeleteDeckState(state)
         if (progress) {
-          progress.complete('Deck eliminado')
+          progress.complete(t('decks.messages.deleted'))
         } else {
-          toastStore.show('Deck eliminado (cartas conservadas)', 'success')
+          toastStore.show(t('decks.messages.deletedCardsKept'), 'success')
         }
         clearDeleteDeckState()
         isDeleteRunning = false
@@ -1412,9 +1412,9 @@ const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnT
       state.status = 'complete'
       saveDeleteDeckState(state)
       if (progress) {
-        progress.complete(`Deck y ${state.deletedCardIds.length} cartas eliminadas`)
+        progress.complete(t('decks.messages.deletedWithCards', { count: state.deletedCardIds.length }))
       } else {
-        toastStore.show(`Deck y ${state.deletedCardIds.length} cartas eliminadas`, 'success')
+        toastStore.show(t('decks.messages.deletedWithCards', { count: state.deletedCardIds.length }), 'success')
       }
       clearDeleteDeckState()
       isDeleteRunning = false
@@ -1424,9 +1424,9 @@ const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnT
     state.status = 'error'
     saveDeleteDeckState(state)
     if (progress) {
-      progress.error('Error eliminando deck')
+      progress.error(t('decks.messages.deleteError'))
     } else {
-      toastStore.show('Error eliminando deck', 'error')
+      toastStore.show(t('decks.messages.deleteError'), 'error')
     }
     isDeleteRunning = false
   }
@@ -1518,7 +1518,7 @@ const handleToggleDeckPublic = async () => {
 
   const cardIds = deckOwnedCards.value.map(c => c.id)
   if (cardIds.length === 0) {
-    toastStore.show('No hay cartas en el deck', 'info')
+    toastStore.show(t('decks.messages.noCardsInDeck'), 'info')
     return
   }
 
@@ -1529,13 +1529,13 @@ const handleToggleDeckPublic = async () => {
     await collectionStore.batchUpdateCards(cardIds, { public: makePublic })
     toastStore.show(
       makePublic
-        ? `${cardIds.length} cartas ahora son públicas`
-        : `${cardIds.length} cartas ahora son privadas`,
+        ? t('decks.messages.cardsNowPublic', { count: cardIds.length })
+        : t('decks.messages.cardsNowPrivate', { count: cardIds.length }),
       'success'
     )
   } catch (err) {
     console.error('Error actualizando visibilidad:', err)
-    toastStore.show('Error actualizando visibilidad', 'error')
+    toastStore.show(t('cards.grid.visibilityError'), 'error')
   }
 }
 
@@ -1714,7 +1714,7 @@ onMounted(async () => {
       clearDeleteDeckState()
     }
   } catch (err) {
-    toastStore.show('Error cargando datos', 'error')
+    toastStore.show(t('common.messages.loadError'), 'error')
   }
 })
 

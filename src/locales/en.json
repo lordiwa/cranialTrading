@@ -81,6 +81,9 @@
     "empty": {
       "noResults": "No results found",
       "noData": "No data available"
+    },
+    "messages": {
+      "loadError": "Error loading data"
     }
   },
 
@@ -807,7 +810,12 @@
       "commanderRemoved": "{name} is no longer Commander",
       "commanderError": "Error changing commander",
       "deleted": "✓ Deck deleted",
+      "deletedCardsKept": "Deck deleted (cards kept)",
+      "deletedWithCards": "Deck and {count} cards deleted",
       "deleteError": "Error deleting deck",
+      "noCardsInDeck": "No cards in the deck",
+      "cardsNowPublic": "{count} cards are now public",
+      "cardsNowPrivate": "{count} cards are now private",
       "allocated": "{fromCollection} from collection, {toWishlist} to wishlist",
       "allocateError": "Error assigning card",
       "addWishlistError": "Error adding to wishlist",
@@ -1055,7 +1063,11 @@
     "contact": "💬 CONTACT",
     "publicCollection": "Public collection",
     "cards": "cards",
-    "noPublicCards": "This user has no public cards in their collection."
+    "noPublicCards": "This user has no public cards in their collection.",
+    "messages": {
+      "loadError": "Error loading profile",
+      "loadCardsError": "Error loading profile cards"
+    }
   },
 
   "search": {

@@ -5,6 +5,7 @@ import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { type Conversation, type Message } from '../types/message';
+import { t } from '../composables/useI18n';
 
 export const useMessagesStore = defineStore('messages', () => {
     const conversations = ref<Conversation[]>([]);
@@ -34,7 +35,7 @@ export const useMessagesStore = defineStore('messages', () => {
 
         // ✅ Validación: evitar conversación con sí mismo
         if (authStore.user.id === otherUserId) {
-            toastStore.show('No puedes conversar contigo mismo', 'error');
+            toastStore.show(t('messages.errors.selfChat'), 'error');
             return '';
         }
 
@@ -70,7 +71,7 @@ export const useMessagesStore = defineStore('messages', () => {
             return conversationId;
         } catch (error) {
             console.error('❌ Error creando conversación:', error);
-            toastStore.show('Error al crear conversación', 'error');
+            toastStore.show(t('messages.errors.createError'), 'error');
             return '';
         }
     };
@@ -115,7 +116,7 @@ export const useMessagesStore = defineStore('messages', () => {
             return true;
         } catch (error) {
             console.error('❌ Error enviando mensaje:', error);
-            toastStore.show('Error al enviar mensaje', 'error');
+            toastStore.show(t('messages.errors.sendError'), 'error');
             return false;
         }
     };
@@ -153,7 +154,7 @@ export const useMessagesStore = defineStore('messages', () => {
             console.log(`✅ ${conversations.value.length} conversaciones cargadas`);
         } catch (error) {
             console.error('❌ Error cargando conversaciones:', error);
-            toastStore.show('Error al cargar conversaciones', 'error');
+            toastStore.show(t('messages.errors.loadError'), 'error');
         } finally {
             loading.value = false;
         }
@@ -202,7 +203,7 @@ export const useMessagesStore = defineStore('messages', () => {
             },
             (error) => {
                 console.error('❌ Error en listener de mensajes:', error);
-                toastStore.show('Error al escuchar mensajes', 'error');
+                toastStore.show(t('messages.errors.listenError'), 'error');
                 loading.value = false;
             }
         );

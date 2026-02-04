@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { type ScryfallCard, searchAdvanced } from '../services/scryfall'
 import { useToastStore } from './toast'
+import { t } from '../composables/useI18n'
 
 // Cache para búsquedas (5 minutos)
 const searchCache = new Map<string, { results: ScryfallCard[], timestamp: number }>()
@@ -193,7 +194,7 @@ export const useSearchStore = defineStore('search', () => {
             !filters.rarity?.length &&
             !filters.sets?.length &&
             !filters.keywords?.length) {
-            toastStore.show('Define al menos un filtro', 'info')
+            toastStore.show(t('search.messages.defineFilter'), 'info')
             return
         }
 
@@ -232,13 +233,13 @@ export const useSearchStore = defineStore('search', () => {
             currentFilters.value = filters
 
             if (searchResults.length === 0) {
-                toastStore.show('No se encontraron cartas con estos filtros', 'info')
+                toastStore.show(t('search.messages.noResults'), 'info')
             } else {
                 console.log(`✅ ${searchResults.length} cartas encontradas`)
             }
         } catch (err) {
             console.error('Error en búsqueda:', err)
-            toastStore.show('Error al buscar cartas', 'error')
+            toastStore.show(t('search.messages.searchError'), 'error')
         } finally {
             loading.value = false
         }

@@ -99,7 +99,7 @@ const loadProfile = async () => {
     await loadNextPage();
   } catch (err) {
     console.error('Error loading profile:', err);
-    toastStore.show('Error al cargar perfil', 'error');
+    toastStore.show(t('profile.messages.loadError'), 'error');
     userNotFound.value = true;
   } finally {
     loading.value = false;
@@ -140,7 +140,7 @@ const loadNextPage = async () => {
     hasMore.value = snapshot.docs.length === pageSize * 2;
   } catch (err) {
     console.error('Error loading cards:', err);
-    toastStore.show('Error al cargar cartas del perfil', 'error');
+    toastStore.show(t('profile.messages.loadCardsError'), 'error');
   } finally {
     loadingMore.value = false;
   }

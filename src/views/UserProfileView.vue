@@ -166,6 +166,32 @@ const handleInterest = async (card: Card) => {
   if (interestedCards.value.has(cardKey)) return;
 
   try {
+    const scryfallId = card.scryfallId || '';
+    const edition = card.edition || '';
+
+    // Check for existing duplicate match (same sender, receiver, card, and edition)
+    const sharedMatchesRef = collection(db, 'shared_matches');
+    const existingQuery = query(
+      sharedMatchesRef,
+      where('senderId', '==', authStore.user.id),
+      where('receiverId', '==', userId.value),
+      where('card.scryfallId', '==', scryfallId)
+    );
+    const existingSnapshot = await getDocs(existingQuery);
+
+    // Check if any existing match has the same edition (allow different prints)
+    const hasDuplicate = existingSnapshot.docs.some(docSnap => {
+      const data = docSnap.data();
+      return data.card?.edition === edition;
+    });
+
+    if (hasDuplicate) {
+      console.log('[Interest] Duplicate match already exists, skipping');
+      interestedCards.value.add(cardKey);
+      toastStore.show(t('dashboard.interest.sent', { username: userInfo.value?.username ?? '' }), 'info');
+      return;
+    }
+
     const MATCH_LIFETIME_DAYS = 15;
     const getExpirationDate = () => {
       const date = new Date();
@@ -176,9 +202,9 @@ const handleInterest = async (card: Card) => {
     const cardPrice = typeof card.price === 'number' ? card.price : 0;
     const cardData = {
       id: card.id || card.scryfallId,
-      scryfallId: card.scryfallId || '',
+      scryfallId,
       name: card.name || '',
-      edition: card.edition || '',
+      edition,
       quantity: card.quantity || 1,
       condition: card.condition || 'NM',
       foil: card.foil || false,
@@ -215,7 +241,6 @@ const handleInterest = async (card: Card) => {
     };
 
     // Save to shared collection
-    const sharedMatchesRef = collection(db, 'shared_matches');
     await addDoc(sharedMatchesRef, sharedMatchPayload);
 
     // Mark card as interested

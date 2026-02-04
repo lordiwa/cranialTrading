@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
+import BaseModal from '../components/ui/BaseModal.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
@@ -12,7 +13,7 @@ import { useAuthStore } from '../stores/auth'
 import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
 import { useDecksStore } from '../stores/decks'
-import { addDoc, collection, deleteDoc, doc, getDocs } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
@@ -199,6 +200,126 @@ const syncPublicData = async () => {
   } finally {
     syncing.value = false
   }
+}
+
+/**
+ * DEBUG: Check what's in public collections
+ */
+const debugPublicCollections = async () => {
+  console.log('🔍 [DEBUG] Checking public collections...')
+
+  // Check public_cards
+  const cardsRef = collection(db, 'public_cards')
+  const cardsSnap = await getDocs(cardsRef)
+  console.log(`📦 [DEBUG] public_cards: ${cardsSnap.size} total cards`)
+  cardsSnap.docs.forEach(d => {
+    const data = d.data()
+    console.log(`  - ${data.cardName} (${data.status}) by ${data.username}`)
+  })
+
+  // Check public_preferences
+  const prefsRef = collection(db, 'public_preferences')
+  const prefsSnap = await getDocs(prefsRef)
+  console.log(`🔖 [DEBUG] public_preferences: ${prefsSnap.size} total preferences`)
+  prefsSnap.docs.forEach(d => {
+    const data = d.data()
+    console.log(`  - ${data.cardName} wanted by ${data.username}`)
+  })
+}
+
+// Expose to window for debugging
+if (typeof window !== 'undefined') {
+  (window as any).debugPublicCollections = debugPublicCollections
+}
+
+// ========== BLOCKED USERS MANAGEMENT ==========
+interface BlockedUser {
+  odifUserId: string
+  username: string
+  location?: string
+  blockedAt: Date
+  docIds: string[] // All document IDs for this user in matches_eliminados
+}
+
+const showBlockedUsersModal = ref(false)
+const blockedUsers = ref<BlockedUser[]>([])
+const loadingBlockedUsers = ref(false)
+
+/**
+ * Load list of blocked users with their details
+ */
+const loadBlockedUsers = async () => {
+  if (!authStore.user) return
+
+  loadingBlockedUsers.value = true
+  try {
+    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
+    const snapshot = await getDocs(discardedRef)
+
+    // Group by otherUserId
+    const userMap = new Map<string, BlockedUser>()
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data()
+      if (!data.otherUserId) continue
+
+      if (!userMap.has(data.otherUserId)) {
+        userMap.set(data.otherUserId, {
+          odifUserId: data.otherUserId,
+          username: data.otherUsername || 'Unknown',
+          location: data.otherLocation,
+          blockedAt: data.eliminatedAt?.toDate?.() || new Date(),
+          docIds: []
+        })
+      }
+      userMap.get(data.otherUserId)!.docIds.push(docSnap.id)
+    }
+
+    blockedUsers.value = Array.from(userMap.values()).sort((a, b) =>
+      b.blockedAt.getTime() - a.blockedAt.getTime()
+    )
+  } catch (err) {
+    console.error('Error loading blocked users:', err)
+    blockedUsers.value = []
+  } finally {
+    loadingBlockedUsers.value = false
+  }
+}
+
+/**
+ * Unblock a user by removing all their entries from matches_eliminados
+ */
+const unblockUser = async (user: BlockedUser) => {
+  if (!authStore.user) return
+
+  try {
+    // Delete all documents for this user
+    for (const docId of user.docIds) {
+      await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', docId))
+    }
+
+    // Remove from local discarded set
+    discardedMatchIds.value.delete(user.odifUserId)
+
+    // Remove from blocked users list
+    blockedUsers.value = blockedUsers.value.filter(u => u.odifUserId !== user.odifUserId)
+
+    toastStore.show(t('dashboard.userUnblocked', { username: user.username }), 'success')
+
+    // Recalculate matches to show this user again
+    await calculateMatches()
+  } catch (err) {
+    console.error('Error unblocking user:', err)
+    toastStore.show(t('dashboard.unblockError'), 'error')
+  }
+}
+
+/**
+ * Open blocked users modal
+ */
+const openBlockedUsersModal = async () => {
+  showBlockedUsersModal.value = true
+  await loadBlockedUsers()
 }
 
 onMounted(async () => {
@@ -817,6 +938,32 @@ const sendInterestFromSearch = async (card: any) => {
   if (!authStore.user || sentInterestIds.value.has(card.id)) return
 
   try {
+    const scryfallId = card.scryfallId || ''
+    const edition = card.edition || ''
+
+    // Check for existing duplicate match (same sender, receiver, card, and edition)
+    const sharedMatchesRef = collection(db, 'shared_matches')
+    const existingQuery = query(
+      sharedMatchesRef,
+      where('senderId', '==', authStore.user.id),
+      where('receiverId', '==', card.userId),
+      where('card.scryfallId', '==', scryfallId)
+    )
+    const existingSnapshot = await getDocs(existingQuery)
+
+    // Check if any existing match has the same edition (allow different prints)
+    const hasDuplicate = existingSnapshot.docs.some(docSnap => {
+      const data = docSnap.data()
+      return data.card?.edition === edition
+    })
+
+    if (hasDuplicate) {
+      console.log('[Interest] Duplicate match already exists, skipping')
+      sentInterestIds.value.add(card.id)
+      toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'info')
+      return
+    }
+
     const MATCH_LIFETIME_DAYS = 15
     const getExpirationDate = () => {
       const date = new Date()
@@ -826,9 +973,9 @@ const sendInterestFromSearch = async (card: any) => {
 
     const cardData = {
       id: card.cardId || card.id,
-      scryfallId: card.scryfallId || '',
+      scryfallId,
       name: card.cardName || '',
-      edition: card.edition || '',
+      edition,
       quantity: card.quantity || 1,
       condition: card.condition || 'NM',
       foil: card.foil || false,
@@ -857,7 +1004,6 @@ const sendInterestFromSearch = async (card: any) => {
       lifeExpiresAt: getExpirationDate(),
     }
 
-    const sharedMatchesRef = collection(db, 'shared_matches')
     await addDoc(sharedMatchesRef, sharedMatchPayload)
 
     sentInterestIds.value.add(card.id)
@@ -908,6 +1054,17 @@ const sendInterestFromSearch = async (card: any) => {
               {{ syncing ? t('dashboard.syncing') : t('dashboard.sync') }}
             </BaseButton>
             <HelpTooltip :text="t('help.tooltips.dashboard.sync')" :title="t('help.titles.sync')" />
+          </div>
+          <div class="flex items-center gap-1">
+            <BaseButton
+                variant="secondary"
+                size="small"
+                @click="openBlockedUsersModal"
+                class="w-full md:w-auto"
+            >
+              {{ t('dashboard.blockedUsers') }} ({{ discardedMatchIds.size }})
+            </BaseButton>
+            <HelpTooltip :text="t('help.tooltips.dashboard.blockedUsers')" :title="t('help.titles.blockedUsers')" />
           </div>
         </div>
         <!-- Last sync indicator -->
@@ -1093,5 +1250,49 @@ const sendInterestFromSearch = async (card: any) => {
         />
       </div>
     </div>
+
+    <!-- Blocked Users Modal -->
+    <BaseModal
+        :show="showBlockedUsersModal"
+        :title="t('dashboard.blockedUsersModal.title')"
+        @close="showBlockedUsersModal = false"
+    >
+      <div class="min-w-[300px] max-h-[400px] overflow-y-auto">
+        <div v-if="loadingBlockedUsers" class="flex justify-center py-8">
+          <BaseLoader />
+        </div>
+
+        <div v-else-if="blockedUsers.length === 0" class="text-center py-8 text-silver-50">
+          {{ t('dashboard.blockedUsersModal.noBlocked') }}
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+              v-for="user in blockedUsers"
+              :key="user.odifUserId"
+              class="flex items-center justify-between p-3 border border-silver-30 rounded-md"
+          >
+            <div class="flex items-center gap-3">
+              <img
+                  :src="getAvatarUrlForUser(user.odifUserId)"
+                  :alt="user.username"
+                  class="w-10 h-10 rounded-full object-cover"
+              />
+              <div>
+                <p class="text-silver font-medium">{{ user.username }}</p>
+                <p v-if="user.location" class="text-tiny text-silver-50">{{ user.location }}</p>
+              </div>
+            </div>
+            <BaseButton
+                variant="secondary"
+                size="small"
+                @click="unblockUser(user)"
+            >
+              {{ t('dashboard.blockedUsersModal.unblock') }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </BaseModal>
   </AppContainer>
 </template>

@@ -66,6 +66,89 @@ const filterQuery = ref('')
 const sortBy = ref<'recent' | 'name' | 'price'>('recent')
 const viewType = ref<'grid' | 'compact'>('grid')
 
+// ========== STACK VARIANTS (group by card name) ==========
+const stackVariants = ref(false)
+const expandedCardNames = ref<Set<string>>(new Set())
+
+// Interface for stacked card groups
+interface CardGroup {
+  name: string
+  variants: Card[]
+  totalQuantity: number
+  totalValue: number
+  representativeCard: Card  // First variant, used for image
+}
+
+// Toggle expansion of a card group
+const toggleCardGroup = (cardName: string) => {
+  if (expandedCardNames.value.has(cardName)) {
+    expandedCardNames.value.delete(cardName)
+  } else {
+    expandedCardNames.value.add(cardName)
+  }
+  // Force reactivity
+  expandedCardNames.value = new Set(expandedCardNames.value)
+}
+
+// Group cards by name for stacked view
+const stackedCards = computed((): CardGroup[] => {
+  if (!stackVariants.value) return []
+
+  const groups: Record<string, Card[]> = {}
+
+  for (const card of filteredCards.value) {
+    const name = card.name
+    if (!groups[name]) groups[name] = []
+    groups[name].push(card)
+  }
+
+  // Convert to array and calculate totals
+  const result: CardGroup[] = []
+  for (const name in groups) {
+    const variants = groups[name]
+    if (!variants || variants.length === 0) continue
+
+    // Sort variants by price descending
+    variants.sort((a, b) => (b.price || 0) - (a.price || 0))
+
+    const totalQuantity = variants.reduce((sum, c) => sum + c.quantity, 0)
+    const totalValue = variants.reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0)
+
+    result.push({
+      name,
+      variants,
+      totalQuantity,
+      totalValue,
+      representativeCard: variants[0]!
+    })
+  }
+
+  // Sort by sortBy preference
+  switch (sortBy.value) {
+    case 'name':
+      result.sort((a, b) => a.name.localeCompare(b.name))
+      break
+    case 'price':
+      result.sort((a, b) => b.totalValue - a.totalValue)
+      break
+    case 'recent':
+    default:
+      result.sort((a, b) => {
+        const aDate = a.representativeCard.createdAt?.getTime() || 0
+        const bDate = b.representativeCard.createdAt?.getTime() || 0
+        return bDate - aDate
+      })
+  }
+
+  return result
+})
+
+// Count unique card names
+const uniqueCardCount = computed(() => {
+  const names = new Set(filteredCards.value.map(c => c.name))
+  return names.size
+})
+
 // Vista principal: Colección o Mazos
 type ViewMode = 'collection' | 'decks'
 const viewMode = ref<ViewMode>('collection')
@@ -2101,8 +2184,23 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <!-- View type (only in collection mode) -->
-            <div v-if="viewMode === 'collection'" class="flex items-center gap-1">
+            <!-- Stack variants toggle (only in collection mode) -->
+            <div v-if="viewMode === 'collection'" class="flex items-center gap-2">
+              <button
+                  @click="stackVariants = !stackVariants"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1',
+                    stackVariants ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
+                  ]"
+                  :title="t('collection.stack.tooltip')"
+              >
+                <SvgIcon name="stack" size="tiny" />
+                {{ t('collection.stack.label') }}
+              </button>
+            </div>
+
+            <!-- View type (only in collection mode, hidden when stacking) -->
+            <div v-if="viewMode === 'collection' && !stackVariants" class="flex items-center gap-1">
               <button
                   @click="viewType = 'grid'"
                   :class="[
@@ -2131,24 +2229,116 @@ onUnmounted(() => {
         <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-small font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
-            <span class="text-tiny text-silver-50">({{ filteredCards.length }})</span>
+            <span class="text-tiny text-silver-50">
+              ({{ stackVariants ? `${uniqueCardCount} ${t('collection.stack.unique')}` : filteredCards.length }})
+            </span>
           </div>
 
-          <!-- Grouped view -->
-          <div v-for="group in groupedFilteredCards" :key="group.type" class="mb-6">
-            <!-- Category Header (hidden when no grouping) -->
-            <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-silver-20">
-              <h4 class="text-tiny font-bold text-neon uppercase">{{ translateCategory(group.type) }}</h4>
-              <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+          <!-- ========== STACKED VIEW (group by card name) ========== -->
+          <div v-if="stackVariants" class="space-y-2">
+            <div
+                v-for="group in stackedCards"
+                :key="group.name"
+                class="bg-secondary border border-silver-20 rounded overflow-hidden"
+            >
+              <!-- Card Group Header (always visible) -->
+              <div
+                  class="flex items-center gap-3 p-3 cursor-pointer hover:bg-silver-10 transition-colors"
+                  @click="toggleCardGroup(group.name)"
+              >
+                <!-- Card Image Thumbnail -->
+                <div class="w-12 h-16 flex-shrink-0 rounded overflow-hidden border border-silver-30">
+                  <img
+                      v-if="group.representativeCard.image"
+                      :src="typeof group.representativeCard.image === 'string' && group.representativeCard.image.startsWith('{')
+                        ? JSON.parse(group.representativeCard.image)?.card_faces?.[0]?.image_uris?.small || group.representativeCard.image
+                        : group.representativeCard.image"
+                      :alt="group.name"
+                      class="w-full h-full object-cover"
+                  />
+                </div>
+
+                <!-- Card Info -->
+                <div class="flex-1 min-w-0">
+                  <p class="text-small font-bold text-silver truncate">{{ group.name }}</p>
+                  <p class="text-tiny text-silver-50">
+                    {{ group.variants.length }} {{ group.variants.length === 1 ? t('collection.stack.variant') : t('collection.stack.variants') }}
+                    · {{ group.totalQuantity }} {{ t('collection.stack.copies') }}
+                  </p>
+                </div>
+
+                <!-- Total Value -->
+                <div class="text-right flex-shrink-0">
+                  <p class="text-small font-bold text-neon">${{ group.totalValue.toFixed(2) }}</p>
+                </div>
+
+                <!-- Expand/Collapse Icon -->
+                <div class="flex-shrink-0">
+                  <SvgIcon
+                      :name="expandedCardNames.has(group.name) ? 'chevron-up' : 'chevron-down'"
+                      size="small"
+                      class="text-silver-50"
+                  />
+                </div>
+              </div>
+
+              <!-- Expanded Variants List -->
+              <div
+                  v-if="expandedCardNames.has(group.name)"
+                  class="border-t border-silver-20 bg-primary"
+              >
+                <div
+                    v-for="card in group.variants"
+                    :key="card.id"
+                    class="flex items-center gap-3 px-3 py-2 hover:bg-silver-10 transition-colors cursor-pointer border-b border-silver-10 last:border-b-0"
+                    @click="handleCardClick(card)"
+                >
+                  <!-- Variant Details -->
+                  <div class="w-12 flex-shrink-0"></div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-tiny text-silver">
+                      <span class="font-bold">{{ card.edition }}</span>
+                      · {{ card.condition }}
+                      <span v-if="card.foil" class="text-neon ml-1">FOIL</span>
+                    </p>
+                  </div>
+                  <div class="text-tiny text-silver-50 flex-shrink-0">
+                    x{{ card.quantity }}
+                  </div>
+                  <div class="text-tiny font-bold text-neon flex-shrink-0 w-20 text-right">
+                    ${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}
+                  </div>
+                  <div class="flex-shrink-0">
+                    <button
+                        @click.stop="handleDelete(card)"
+                        class="p-1 text-silver-50 hover:text-rust transition-colors"
+                    >
+                      <SvgIcon name="trash" size="tiny" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <CollectionGrid
-                :cards="group.cards"
-                :compact="viewType === 'compact'"
-                :deleting-card-ids="deletingCardIds"
-                @card-click="handleCardClick"
-                @delete="handleDelete"
-            />
           </div>
+
+          <!-- ========== REGULAR GRID VIEW ========== -->
+          <template v-else>
+            <!-- Grouped view -->
+            <div v-for="group in groupedFilteredCards" :key="group.type" class="mb-6">
+              <!-- Category Header (hidden when no grouping) -->
+              <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-silver-20">
+                <h4 class="text-tiny font-bold text-neon uppercase">{{ translateCategory(group.type) }}</h4>
+                <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+              </div>
+              <CollectionGrid
+                  :cards="group.cards"
+                  :compact="viewType === 'compact'"
+                  :deleting-card-ids="deletingCardIds"
+                  @card-click="handleCardClick"
+                  @delete="handleDelete"
+              />
+            </div>
+          </template>
         </div>
 
         <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->

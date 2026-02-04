@@ -289,6 +289,14 @@
       "viewCollection": "VER MI COLECCIÓN",
       "noMatches": "No hay matches disponibles",
       "usersInPlatform": "Hay {count} usuarios en la plataforma..."
+    },
+    "blockedUsers": "BLOQUEADOS",
+    "userUnblocked": "{username} desbloqueado",
+    "unblockError": "Error al desbloquear usuario",
+    "blockedUsersModal": {
+      "title": "Usuarios Bloqueados",
+      "noBlocked": "No hay usuarios bloqueados",
+      "unblock": "DESBLOQUEAR"
     }
   },
 
@@ -322,6 +330,14 @@
     },
     "group": {
       "none": "Ninguno"
+    },
+    "stack": {
+      "label": "Apilar",
+      "tooltip": "Agrupar cartas por nombre para ver todas las variantes juntas",
+      "unique": "cartas únicas",
+      "variant": "variante",
+      "variants": "variantes",
+      "copies": "copias"
     },
     "sections": {
       "myCards": "CARTAS QUE TENGO",
@@ -1275,6 +1291,7 @@
       "sync": "Sincronizar Cartas",
       "deleteData": "Eliminar Datos",
       "searchOthers": "Buscar en Otros Usuarios",
+      "blockedUsers": "Usuarios Bloqueados",
       "statusCollection": "Colección Personal",
       "statusAvailable": "Cartas Disponibles",
       "statusWishlist": "Lista de Deseos",
@@ -1312,7 +1329,8 @@
         "sync": "Actualiza tus cartas públicas en el sistema para que otros usuarios puedan encontrarte en sus búsquedas.",
         "deleteData": "Elimina permanentemente todas tus cartas, mazos, preferencias y matches. Esta acción no se puede deshacer.",
         "searchOthers": "Busca cartas que otros usuarios tienen disponibles para venta o cambio. Si la encuentras, puedes expresar tu interés.",
-        "matchesFound": "Cantidad de usuarios que tienen cartas que buscas, o buscan cartas que tienes."
+        "matchesFound": "Cantidad de usuarios que tienen cartas que buscas, o buscan cartas que tienes.",
+        "blockedUsers": "Los usuarios descartados no aparecerán en futuros matches. Desbloquéalos aquí para ver matches de ellos nuevamente."
       },
       "collection": {
         "statusCollection": "Cartas personales que no están disponibles para venta ni cambio. Solo tú las ves.",

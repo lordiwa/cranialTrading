@@ -353,12 +353,12 @@ export const useMatchesStore = defineStore('matches', () => {
 
     /**
      * Descartar match - mueve de nuevos/guardados a eliminados
+     * Handles both regular matches (in user subcollections) and shared matches (root collection)
      */
     const discardMatch = async (matchId: string, tab: 'new' | 'saved') => {
         if (!authStore.user) return false;
 
         try {
-            const source = tab === 'new' ? 'matches_nuevos' : 'matches_guardados';
             // Search by both docId and id for compatibility
             const match = tab === 'new'
                 ? newMatches.value.find(m => m.docId === matchId || m.id === matchId)
@@ -383,14 +383,25 @@ export const useMatchesStore = defineStore('matches', () => {
             const deletedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados');
             const docRef = await addDoc(deletedRef, payload);
 
-            // Delete from source
-            await deleteDoc(doc(db, 'users', authStore.user.id, source, firestoreDocId));
+            // Delete from source - handle shared matches differently
+            if (match.isSharedMatch) {
+                // Shared matches are in root-level shared_matches collection
+                await deleteDoc(doc(db, 'shared_matches', firestoreDocId));
+            } else {
+                // Regular matches are in user subcollections
+                const source = tab === 'new' ? 'matches_nuevos' : 'matches_guardados';
+                await deleteDoc(doc(db, 'users', authStore.user.id, source, firestoreDocId));
+            }
 
             // Update local state - filter by both docId and id
             if (tab === 'new') {
                 newMatches.value = newMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             } else {
                 savedMatches.value = savedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
+            }
+            // Also remove from sharedMatches if applicable
+            if (match.isSharedMatch) {
+                sharedMatches.value = sharedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
             }
             deletedMatches.value.push({ ...match, docId: docRef.id, status: 'eliminado' });
 
@@ -585,6 +596,65 @@ export const useMatchesStore = defineStore('matches', () => {
         }
     };
 
+    /**
+     * Clean up duplicate shared_matches for current user
+     * Keeps only one match per sender+receiver+scryfallId+edition combination
+     */
+    const cleanupDuplicateMatches = async () => {
+        if (!authStore.user) return 0;
+
+        try {
+            const sharedMatchesRef = collection(db, 'shared_matches');
+            const userQuery = query(
+                sharedMatchesRef,
+                or(
+                    where('senderId', '==', authStore.user.id),
+                    where('receiverId', '==', authStore.user.id)
+                )
+            );
+            const snapshot = await getDocs(userQuery);
+
+            // Group by unique key: senderId_receiverId_scryfallId_edition
+            const groups = new Map<string, { docId: string; createdAt: Date }[]>();
+
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                const key = `${data.senderId}_${data.receiverId}_${data.card?.scryfallId || ''}_${data.card?.edition || ''}`;
+
+                if (!groups.has(key)) {
+                    groups.set(key, []);
+                }
+                groups.get(key)!.push({
+                    docId: docSnap.id,
+                    createdAt: data.createdAt?.toDate?.() || new Date(0)
+                });
+            }
+
+            // Delete duplicates, keeping the oldest one
+            let deletedCount = 0;
+            for (const [_key, matches] of groups) {
+                if (matches.length > 1) {
+                    // Sort by date, keep oldest
+                    matches.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+                    // Delete all but the first (oldest)
+                    for (let i = 1; i < matches.length; i++) {
+                        const matchToDelete = matches[i];
+                        if (matchToDelete) {
+                            await deleteDoc(doc(db, 'shared_matches', matchToDelete.docId));
+                            deletedCount++;
+                        }
+                    }
+                }
+            }
+
+            console.log(`[cleanupDuplicateMatches] Deleted ${deletedCount} duplicate matches`);
+            return deletedCount;
+        } catch (error) {
+            console.error('Error cleaning up duplicate matches:', error);
+            return 0;
+        }
+    };
+
     return {
         newMatches,
         sentMatches,
@@ -605,5 +675,6 @@ export const useMatchesStore = defineStore('matches', () => {
         getTotalByTab,
         getUnseenCount,
         isMatchSaved,
+        cleanupDuplicateMatches,
     };
 });

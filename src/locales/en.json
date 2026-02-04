@@ -289,6 +289,14 @@
       "viewCollection": "VIEW MY COLLECTION",
       "noMatches": "No matches available",
       "usersInPlatform": "There are {count} users on the platform..."
+    },
+    "blockedUsers": "BLOCKED",
+    "userUnblocked": "{username} unblocked",
+    "unblockError": "Error unblocking user",
+    "blockedUsersModal": {
+      "title": "Blocked Users",
+      "noBlocked": "No blocked users",
+      "unblock": "UNBLOCK"
     }
   },
 
@@ -322,6 +330,14 @@
     },
     "group": {
       "none": "None"
+    },
+    "stack": {
+      "label": "Stack",
+      "tooltip": "Group cards by name to see all variants together",
+      "unique": "unique cards",
+      "variant": "variant",
+      "variants": "variants",
+      "copies": "copies"
     },
     "sections": {
       "myCards": "CARDS I OWN",
@@ -1275,6 +1291,7 @@
       "sync": "Sync Cards",
       "deleteData": "Delete Data",
       "searchOthers": "Search Other Users",
+      "blockedUsers": "Blocked Users",
       "statusCollection": "Personal Collection",
       "statusAvailable": "Available Cards",
       "statusWishlist": "Wishlist",
@@ -1312,7 +1329,8 @@
         "sync": "Updates your public cards in the system so other users can find you in their searches.",
         "deleteData": "Permanently deletes all your cards, decks, preferences and matches. This action cannot be undone.",
         "searchOthers": "Search for cards that other users have available for sale or trade. If you find it, you can express your interest.",
-        "matchesFound": "Number of users who have cards you're looking for, or are looking for cards you have."
+        "matchesFound": "Number of users who have cards you're looking for, or are looking for cards you have.",
+        "blockedUsers": "Users you've dismissed won't appear in future matches. Unblock them here to see matches from them again."
       },
       "collection": {
         "statusCollection": "Personal cards that are not available for sale or trade. Only you can see them.",

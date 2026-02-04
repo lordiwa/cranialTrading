@@ -37,7 +37,8 @@
       "Bash(npx eslint:*)",
       "Bash(npx vite build:*)",
       "Bash(git checkout:*)",
-      "Bash(find \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\" -type f -name \"*.vue\" -exec grep -l \"ME INTERESA\\\\|createMatch\\\\|meInteresa\" {} ;)"
+      "Bash(find \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\" -type f -name \"*.vue\" -exec grep -l \"ME INTERESA\\\\|createMatch\\\\|meInteresa\" {} ;)",
+      "Bash(npx husky init)"
     ]
   }
 }

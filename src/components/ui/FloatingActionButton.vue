@@ -14,7 +14,7 @@ const emit = defineEmits<{
 <template>
   <button
       @click="emit('click')"
-      class="fixed bottom-6 right-6 z-40 w-14 h-14 bg-neon text-primary rounded-full shadow-lg flex items-center justify-center hover:bg-neon/90 active:scale-95 transition-all md:hidden"
+      class="fixed bottom-14 right-4 z-50 w-12 h-12 bg-neon text-primary rounded-full shadow-lg flex items-center justify-center hover:bg-neon/90 active:scale-95 transition-all md:hidden"
       :title="label"
   >
     <SvgIcon :name="icon || 'plus'" size="medium" />

@@ -24,6 +24,7 @@ import {
   type PublicPreference,
 } from '../services/publicCards'
 import { getCardSuggestions, searchCards } from '../services/scryfall'
+import { notifyMatchUser } from '../services/cloudFunctions'
 
 const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
@@ -589,7 +590,7 @@ const calculateMatches = async () => {
 /**
  * CAMBIO 3: Guardar matches en Firestore
  * Limpia los matches_nuevos existentes antes de guardar los nuevos
- * Also notifies the other user so they see the match too (Bug #2 fix)
+ * Also notifies the other user via Cloud Function (Bug #2 fix)
  */
 const saveMatchesToFirebase = async (matches: any[]) => {
   if (!authStore.user) return
@@ -623,24 +624,29 @@ const saveMatchesToFirebase = async (matches: any[]) => {
         lifeExpiresAt: match.lifeExpiresAt,
       })
 
-      // Notify the other user so they see the match in their dashboard
-      // This creates a reciprocal entry in the other user's matches_nuevos
-      await matchesStore.notifyOtherUser({
-        id: match.id,
-        otherUserId: match.otherUserId,
-        otherUsername: match.otherUsername,
-        otherLocation: match.otherLocation,
-        // Swap cards - what I offer becomes what they receive
-        myCards: match.otherCards || [],
-        otherCards: match.myCards || [],
-        myTotalValue: match.theirTotalValue,
-        theirTotalValue: match.myTotalValue,
-        valueDifference: -match.valueDifference,
-        compatibility: match.compatibility,
-        type: match.type,
-        status: 'nuevo',
-        createdAt: match.createdAt,
-      } as any, 'INTERESADO')
+      // Notify the other user via Cloud Function
+      // This bypasses security rules to write to their matches_nuevos collection
+      try {
+        await notifyMatchUser({
+          targetUserId: match.otherUserId,
+          matchId: match.id,
+          fromUserId: authStore.user.id,
+          fromUsername: authStore.user.username,
+          fromLocation: authStore.user.location,
+          fromAvatarUrl: authStore.user.avatarUrl,
+          myCards: match.myCards || [],
+          otherCards: match.otherCards || [],
+          myTotalValue: match.myTotalValue,
+          theirTotalValue: match.theirTotalValue,
+          valueDifference: match.valueDifference,
+          compatibility: match.compatibility,
+          type: match.type as 'BIDIRECTIONAL' | 'UNIDIRECTIONAL',
+        })
+        console.log(`📨 Notified ${match.otherUsername} about match`)
+      } catch (notifyErr) {
+        // Log but don't fail the whole operation if notification fails
+        console.warn(`⚠️ Could not notify ${match.otherUsername}:`, notifyErr)
+      }
     }
 
     console.log(`💾 ${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`)

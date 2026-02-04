@@ -20,7 +20,8 @@
       "loadMore": "LOAD MORE",
       "retry": "RETRY",
       "apply": "APPLY",
-      "clear": "CLEAR"
+      "clear": "CLEAR",
+      "searching": "SEARCHING..."
     },
     "labels": {
       "quantity": "Quantity",
@@ -410,6 +411,8 @@
   "cards": {
     "addModal": {
       "title": "ADD CARD",
+      "searchPlaceholder": "Search card name...",
+      "noResults": "No cards found. Try a different search.",
       "editionLabel": "Edition / Print",
       "printsAvailable": "{count} prints available",
       "quantityLabel": "Quantity",

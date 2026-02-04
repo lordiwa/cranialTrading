@@ -20,7 +20,8 @@
       "loadMore": "CARGAR MÁS",
       "retry": "REINTENTAR",
       "apply": "APLICAR",
-      "clear": "LIMPIAR"
+      "clear": "LIMPIAR",
+      "searching": "BUSCANDO..."
     },
     "labels": {
       "quantity": "Cantidad",
@@ -410,6 +411,8 @@
   "cards": {
     "addModal": {
       "title": "AGREGAR CARTA",
+      "searchPlaceholder": "Buscar nombre de carta...",
+      "noResults": "No se encontraron cartas. Intenta otra búsqueda.",
       "editionLabel": "Edición / Print",
       "printsAvailable": "{count} prints disponibles",
       "quantityLabel": "Cantidad",

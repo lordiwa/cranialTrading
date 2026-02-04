@@ -9,21 +9,28 @@ import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useDecksStore } from '../../stores/decks'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards } from '../../services/scryfall'
+import { getCardSuggestions, searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
 import type { CardCondition, CardStatus } from '../../types/card'
-
-const props = defineProps<Props>()
-
-const emit = defineEmits(['close', 'added'])
-
-const { t } = useI18n()
 
 interface Props {
   show: boolean
   scryfallCard?: any
   selectedDeckId?: string
 }
+
+const props = defineProps<Props>()
+const emit = defineEmits(['close', 'added'])
+
+const { t } = useI18n()
+
+// Search state (when no card pre-selected)
+const searchQuery = ref('')
+const searchResults = ref<any[]>([])
+const searching = ref(false)
+const suggestions = ref<string[]>([])
+const showSuggestions = ref(false)
+const suggestLoading = ref(false)
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
@@ -262,6 +269,61 @@ const handleAddCard = async () => {
   }
 }
 
+// Search functions for when no card is pre-selected
+const handleSearchInput = async () => {
+  const query = searchQuery.value.trim()
+  if (query.length < 2) {
+    suggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+
+  suggestLoading.value = true
+  try {
+    const results = await getCardSuggestions(query)
+    suggestions.value = results.slice(0, 8)
+    showSuggestions.value = suggestions.value.length > 0
+  } catch {
+    suggestions.value = []
+  } finally {
+    suggestLoading.value = false
+  }
+}
+
+const selectSuggestion = async (cardName: string) => {
+  searchQuery.value = cardName
+  showSuggestions.value = false
+  await performSearch()
+}
+
+const performSearch = async () => {
+  const query = searchQuery.value.trim()
+  if (!query) return
+
+  searching.value = true
+  showSuggestions.value = false
+  try {
+    const results = await searchCards(`!"${query}"`)
+    searchResults.value = results.slice(0, 12)
+  } catch {
+    searchResults.value = []
+  } finally {
+    searching.value = false
+  }
+}
+
+const selectSearchResult = (card: any) => {
+  selectedPrint.value = card
+  searchResults.value = []
+  searchQuery.value = ''
+}
+
+const hideSuggestionsDelayed = () => {
+  setTimeout(() => {
+    showSuggestions.value = false
+  }, 200)
+}
+
 const handleClose = () => {
   form.quantity = 1
   form.condition = 'NM'
@@ -273,6 +335,11 @@ const handleClose = () => {
   showZoom.value = false
   availablePrints.value = []
   selectedPrint.value = null
+  // Reset search state
+  searchQuery.value = ''
+  searchResults.value = []
+  suggestions.value = []
+  showSuggestions.value = false
   emit('close')
 }
 </script>
@@ -283,8 +350,73 @@ const handleClose = () => {
       <!-- Título -->
       <h2 class="text-xl font-bold text-[#EEEEEE]">{{ t('cards.addModal.title') }}</h2>
 
-      <!-- Datos de la carta -->
-      <div v-if="selectedPrint" class="border border-[#EEEEEE]/30 p-4 space-y-4 rounded">
+      <!-- Search Section (when no card pre-selected) -->
+      <div v-if="!selectedPrint" class="space-y-4">
+        <!-- Search Input -->
+        <div class="relative">
+          <input
+              v-model="searchQuery"
+              type="text"
+              :placeholder="t('cards.addModal.searchPlaceholder')"
+              class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+              @input="handleSearchInput"
+              @keyup.enter="performSearch"
+              @blur="hideSuggestionsDelayed"
+          />
+          <!-- Auto-suggest dropdown -->
+          <div
+              v-if="showSuggestions && suggestions.length > 0"
+              class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-20 rounded"
+          >
+            <div
+                v-for="suggestion in suggestions"
+                :key="suggestion"
+                @mousedown.prevent="selectSuggestion(suggestion)"
+                class="px-4 py-2 hover:bg-silver-10 cursor-pointer text-small text-silver border-b border-silver-30 transition-all"
+            >
+              {{ suggestion }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Button -->
+        <BaseButton
+            variant="secondary"
+            size="small"
+            @click="performSearch"
+            :disabled="searching || !searchQuery.trim()"
+            class="w-full"
+        >
+          {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
+        </BaseButton>
+
+        <!-- Search Results Grid -->
+        <div v-if="searchResults.length > 0" class="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">
+          <button
+              v-for="card in searchResults"
+              :key="card.id"
+              @click="selectSearchResult(card)"
+              class="relative group cursor-pointer rounded overflow-hidden border border-silver-30 hover:border-neon transition-colors"
+          >
+            <img
+                :src="card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small"
+                :alt="card.name"
+                class="w-full aspect-[2/3] object-cover"
+            />
+            <div class="absolute bottom-0 left-0 right-0 bg-primary/80 px-1 py-0.5">
+              <p class="text-tiny text-silver truncate">{{ card.name }}</p>
+            </div>
+          </button>
+        </div>
+
+        <!-- No Results Message -->
+        <p v-if="searchResults.length === 0 && searchQuery && !searching" class="text-center text-silver-50 text-small">
+          {{ t('cards.addModal.noResults') }}
+        </p>
+      </div>
+
+      <!-- Datos de la carta (when card is selected) -->
+      <div v-else class="border border-[#EEEEEE]/30 p-4 space-y-4 rounded">
         <!-- Imagen y Formulario - responsive: columna en móvil, fila en desktop -->
         <div class="flex flex-col md:flex-row gap-4 md:gap-6">
           <!-- IZQUIERDA: Imagen -->

@@ -405,6 +405,13 @@ const handleLogout = async () => {
             {{ t('header.profile.viewPublicProfile') }}
           </router-link>
           <router-link
+              to="/collection?filter=wishlist"
+              @click="closePopover"
+              class="flex items-center gap-2 px-3 py-2 text-tiny text-silver-70 hover:text-neon hover:bg-silver-5 rounded transition-fast"
+          >
+            ⭐ {{ t('header.profile.wishlist') }}
+          </router-link>
+          <router-link
               to="/settings"
               @click="closePopover"
               class="flex items-center gap-2 px-3 py-2 text-tiny text-silver-70 hover:text-neon hover:bg-silver-5 rounded transition-fast"

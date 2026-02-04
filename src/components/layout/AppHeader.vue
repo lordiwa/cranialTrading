@@ -63,15 +63,33 @@ const closeMobileMenu = () => {
   mobileMenuOpen.value = false
 }
 
+// Combined badge for matches section (saved + messages + contacts)
+const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessagesCount.value)
+
 const navigationLinks = computed(() => [
-  { path: '/dashboard', label: t('header.nav.search'), icon: 'search', badge: newMatchesCount.value },
+  { path: '/dashboard', label: t('header.nav.search'), icon: 'search', badge: 0 },
   { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: 0 },
-  { path: '/saved-matches', label: t('header.nav.saved'), icon: 'star', badge: 0 },
-  { path: '/messages', label: t('header.nav.messages'), icon: 'chat', badge: unreadMessagesCount.value },
-  { path: '/contacts', label: t('header.nav.contacts'), icon: 'user', badge: 0 },
+  { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
+  { path: '/saved-matches', label: t('header.nav.matches'), icon: 'handshake', badge: matchesSectionBadge.value },
 ])
 
 const isActive = (path: string) => {
+  // Handle paths with query params like /collection?filter=wishlist
+  if (path.includes('?')) {
+    const parts = path.split('?')
+    const basePath = parts[0] || ''
+    const query = parts[1] || ''
+    if (!route.path.startsWith(basePath)) return false
+    const params = new URLSearchParams(query)
+    for (const [key, value] of params) {
+      if (route.query[key] !== value) return false
+    }
+    return true
+  }
+  // For /collection, only match if no filter query or filter is not wishlist
+  if (path === '/collection' && route.path === '/collection') {
+    return route.query.filter !== 'wishlist'
+  }
   return route.path.startsWith(path)
 }
 

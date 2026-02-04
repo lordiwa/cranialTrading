@@ -210,6 +210,7 @@ const lastUpdated = '27 de Enero, 2025';
           <RouterLink to="/terms" class="hover:text-neon transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
           <RouterLink to="/privacy" class="text-neon">{{ t('legal.footer.privacy') }}</RouterLink>
           <RouterLink to="/cookies" class="hover:text-neon transition-fast">{{ t('legal.footer.cookies') }}</RouterLink>
+          <RouterLink to="/faq" class="hover:text-neon transition-fast">{{ t('legal.footer.faq') }}</RouterLink>
         </div>
       </div>
     </footer>

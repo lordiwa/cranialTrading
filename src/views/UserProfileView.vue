@@ -294,9 +294,18 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Contact button (only if logged in and not own profile) -->
-        <div v-if="authStore.user && !isOwnProfile" class="flex gap-3">
+        <!-- Actions: Contact (for others) or Wishlist (for own profile) -->
+        <div class="flex gap-3">
+          <!-- Own profile: link to wishlist -->
+          <RouterLink v-if="isOwnProfile" to="/collection?filter=wishlist">
+            <BaseButton size="small" variant="secondary">
+              ⭐ {{ t('profile.viewWishlist') }}
+            </BaseButton>
+          </RouterLink>
+
+          <!-- Other profile: contact button -->
           <BaseButton
+              v-if="authStore.user && !isOwnProfile"
               size="small"
               @click="handleContact(userId!, userInfo?.username || '')"
           >

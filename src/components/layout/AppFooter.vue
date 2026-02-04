@@ -6,6 +6,7 @@ const { t, locale, setLocale } = useI18n()
 const languages = [
   { code: 'es' as SupportedLocale, label: 'ES', name: 'Español' },
   { code: 'en' as SupportedLocale, label: 'EN', name: 'English' },
+  { code: 'pt' as SupportedLocale, label: 'PT', name: 'Português' },
 ]
 
 const handleLanguageChange = (code: SupportedLocale) => {
@@ -16,10 +17,15 @@ const handleLanguageChange = (code: SupportedLocale) => {
 <template>
   <footer class="fixed bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur-sm border-t border-silver-20">
     <div class="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
-      <!-- Copyright -->
-      <p class="text-tiny text-silver-50">
-        © 2024 Cranial Trading
-      </p>
+      <!-- Copyright & Links -->
+      <div class="flex items-center gap-4">
+        <p class="text-tiny text-silver-50">
+          © 2024 Cranial Trading
+        </p>
+        <router-link to="/faq" class="text-tiny text-silver-50 hover:text-neon transition-fast hidden sm:inline">
+          {{ t('legal.footer.faq') }}
+        </router-link>
+      </div>
 
       <!-- Language Selector -->
       <div class="flex items-center gap-2">

@@ -1,14 +1,16 @@
 import { computed, ref } from 'vue'
 import esLocale from '../locales/es.json'
 import enLocale from '../locales/en.json'
+import ptLocale from '../locales/pt.json'
 
 // Tipo para los locales soportados
-export type SupportedLocale = 'es' | 'en'
+export type SupportedLocale = 'es' | 'en' | 'pt'
 
 // Locales disponibles
 const locales: Record<SupportedLocale, Record<string, any>> = {
   es: esLocale,
   en: enLocale,
+  pt: ptLocale,
 }
 
 // Estado global del idioma actual

@@ -1,0 +1,1590 @@
+{
+  "common": {
+    "actions": {
+      "save": "SALVAR",
+      "cancel": "CANCELAR",
+      "delete": "EXCLUIR",
+      "edit": "EDITAR",
+      "add": "ADICIONAR",
+      "close": "FECHAR",
+      "search": "BUSCAR",
+      "back": "VOLTAR",
+      "confirm": "CONFIRMAR",
+      "create": "CRIAR",
+      "update": "ATUALIZAR",
+      "import": "IMPORTAR",
+      "export": "EXPORTAR",
+      "loading": "CARREGANDO...",
+      "saving": "SALVANDO...",
+      "sending": "ENVIANDO...",
+      "loadMore": "CARREGAR MAIS",
+      "retry": "TENTAR NOVAMENTE",
+      "apply": "APLICAR",
+      "clear": "LIMPAR",
+      "searching": "BUSCANDO..."
+    },
+    "labels": {
+      "quantity": "Quantidade",
+      "condition": "Condição",
+      "foil": "Foil",
+      "status": "Status",
+      "format": "Formato",
+      "name": "Nome",
+      "description": "Descrição",
+      "location": "Localização",
+      "email": "Email",
+      "password": "Senha",
+      "edition": "Edição",
+      "price": "Preço",
+      "total": "Total",
+      "type": "Tipo",
+      "colors": "Cores",
+      "date": "Data",
+      "user": "Usuário"
+    },
+    "status": {
+      "collection": "Coleção",
+      "sale": "Venda",
+      "trade": "Troca",
+      "wishlist": "Desejado"
+    },
+    "conditions": {
+      "M": "M - Mint",
+      "NM": "NM - Near Mint",
+      "LP": "LP - Light Play",
+      "MP": "MP - Moderate Play",
+      "HP": "HP - Heavy Play",
+      "PO": "PO - Poor"
+    },
+    "formats": {
+      "standard": "Standard",
+      "modern": "Modern",
+      "commander": "Commander / EDH",
+      "vintage": "Vintage",
+      "custom": "Custom / Casual",
+      "pioneer": "Pioneer",
+      "legacy": "Legacy"
+    },
+    "colors": {
+      "white": "Branco",
+      "blue": "Azul",
+      "black": "Preto",
+      "red": "Vermelho",
+      "green": "Verde",
+      "colorless": "Incolor"
+    },
+    "time": {
+      "today": "Hoje",
+      "yesterday": "Ontem",
+      "daysAgo": "há {days} dias",
+      "updated": "Atualizado"
+    },
+    "empty": {
+      "noResults": "Nenhum resultado encontrado",
+      "noData": "Nenhum dado disponível"
+    },
+    "messages": {
+      "loadError": "Erro ao carregar dados"
+    }
+  },
+
+  "auth": {
+    "login": {
+      "title": "ENTRAR",
+      "subtitle": "Magic: The Gathering Trading Platform",
+      "emailPlaceholder": "seu@email.com",
+      "passwordPlaceholder": "Senha",
+      "submit": "ENTRAR",
+      "submitting": "ENTRANDO...",
+      "forgotPassword": "Esqueceu sua senha?",
+      "noAccount": "Não tem conta?",
+      "register": "Cadastrar",
+      "secureConnection": "Conexão segura",
+      "firebaseAuth": "Firebase Auth",
+      "orContinueWith": "ou continue com",
+      "googleButton": "Continuar com Google"
+    },
+    "register": {
+      "title": "CADASTRAR",
+      "subtitle": "CRANIAL TRADING",
+      "emailLabel": "Email",
+      "passwordLabel": "Senha (mínimo 6 caracteres)",
+      "usernameLabel": "Nome de usuário",
+      "locationLabel": "Localização (ex: São Paulo, Brasil)",
+      "submit": "CRIAR CONTA",
+      "submitting": "CRIANDO CONTA...",
+      "hasAccount": "Já tem conta?",
+      "login": "Entrar"
+    },
+    "verify": {
+      "title": "VERIFIQUE SEU EMAIL",
+      "message": "Enviamos um email para",
+      "instruction": "Clique no link para verificar sua conta. Se não encontrar, verifique o spam.",
+      "checkButton": "JÁ VERIFIQUEI",
+      "checking": "VERIFICANDO...",
+      "resend": "REENVIAR EMAIL"
+    },
+    "forgotPassword": {
+      "title": "RECUPERAR SENHA",
+      "instruction": "Digite seu email e enviaremos um link para redefinir sua senha.",
+      "emailPlaceholder": "seu@email.com",
+      "submit": "ENVIAR LINK",
+      "submitting": "ENVIANDO...",
+      "success": "Email enviado",
+      "successMessage": "Verifique seu email para o link de recuperação. Se não encontrar, verifique o spam.",
+      "backToLogin": "Voltar ao login"
+    },
+    "resetPassword": {
+      "title": "NOVA SENHA",
+      "newPasswordPlaceholder": "Nova senha",
+      "confirmPasswordPlaceholder": "Confirmar senha",
+      "passwordMismatch": "As senhas não coincidem",
+      "submit": "REDEFINIR",
+      "submitting": "REDEFININDO...",
+      "invalidLink": "Link inválido",
+      "invalidLinkMessage": "O link de recuperação é inválido ou expirou.",
+      "requestNewLink": "Solicitar novo link",
+      "backToLogin": "Voltar ao login"
+    },
+    "messages": {
+      "accountCreated": "Conta criada. Verifique seu email",
+      "registerError": "Erro ao cadastrar",
+      "loginSuccess": "Sessão iniciada",
+      "googleLoginError": "Erro ao entrar com Google",
+      "verifyEmail": "Por favor verifique seu email",
+      "invalidCredentials": "Email ou senha incorretos",
+      "logoutSuccess": "Sessão encerrada",
+      "logoutError": "Erro ao encerrar sessão",
+      "recoveryEmailSent": "Email de recuperação enviado",
+      "emailNotRegistered": "Email não cadastrado",
+      "sendEmailError": "Erro ao enviar email",
+      "passwordReset": "Senha redefinida",
+      "linkExpired": "Link expirado ou inválido",
+      "weakPassword": "Senha fraca",
+      "resetError": "Erro ao redefinir",
+      "notAuthenticated": "Usuário não autenticado",
+      "wrongCurrentPassword": "Senha atual incorreta",
+      "weakNewPassword": "Nova senha fraca",
+      "changePasswordError": "Erro ao alterar senha",
+      "verificationEmailSent": "Email de verificação enviado",
+      "verifyEmailError": "Erro ao verificar email",
+      "saveUserError": "Erro ao salvar dados do usuário",
+      "loadUserError": "Erro ao carregar dados do usuário",
+      "passwordUpdated": "Senha atualizada"
+    }
+  },
+
+  "landing": {
+    "tagline": "From Trash to Treasures",
+    "subtitle": "Seu bulk não é lixo. É o tesouro de outro colecionador.",
+    "description": "Conectamos traders de Magic para que você transforme aquelas cartas esquecidas em valor real.",
+    "features": {
+      "collection": {
+        "title": "Gerencie sua Coleção",
+        "description": "Organize todas as suas cartas com preços atualizados"
+      },
+      "matches": {
+        "title": "Encontre Matches",
+        "description": "Nosso algoritmo encontra traders compatíveis"
+      },
+      "bulk": {
+        "title": "Monetize seu Bulk",
+        "description": "Aquelas cartas que você acha que não valem, alguém procura"
+      },
+      "connect": {
+        "title": "Conecte com Traders",
+        "description": "Mensagens diretas para fechar trades"
+      }
+    },
+    "capabilities": {
+      "title": "O que você pode fazer no Cranial Trading?",
+      "items": {
+        "catalog": {
+          "title": "Catalogue toda sua coleção",
+          "description": "Adicione cartas buscando por nome. Importe decks do Moxfield. Controle condição, idioma e se é foil."
+        },
+        "prices": {
+          "title": "Consulte preços em tempo real",
+          "description": "Preços do TCGPlayer, Card Kingdom e buylist atualizados. Saiba o valor real da sua coleção instantaneamente."
+        },
+        "decks": {
+          "title": "Construa e gerencie decks",
+          "description": "Crie decks para Standard, Modern, Commander e mais. Veja quais cartas faltam e quais você já tem."
+        },
+        "trade": {
+          "title": "Troque cartas com outros jogadores",
+          "description": "O sistema encontra automaticamente usuários que têm o que você busca e buscam o que você tem."
+        },
+        "sell": {
+          "title": "Venda cartas que não usa mais",
+          "description": "Publique sua coleção disponível. Outros jogadores podem contatar você diretamente."
+        },
+        "wishlist": {
+          "title": "Crie sua lista de desejos",
+          "description": "Marque as cartas que precisa. Receba notificações quando alguém as tiver disponíveis."
+        }
+      }
+    },
+    "useCases": {
+      "title": "Ideal para",
+      "casual": "Jogadores casuais que querem organizar suas cartas",
+      "competitive": "Jogadores competitivos montando decks de torneio",
+      "collectors": "Colecionadores buscando peças específicas",
+      "stores": "Lojas e vendedores gerenciando inventário",
+      "returning": "Jogadores que voltam ao jogo depois de anos"
+    },
+    "cta": {
+      "title": "Comece grátis hoje",
+      "description": "Sem taxas, sem limites, sem truques. Apenas Magic."
+    },
+    "stats": {
+      "free": "Grátis",
+      "p2p": "Sem intermediários",
+      "mtg": "Especializado"
+    },
+    "helpSection": {
+      "title": "Precisa de ajuda?",
+      "description": "Consulte nosso guia completo com perguntas frequentes, tutoriais e dicas para aproveitar a plataforma.",
+      "cta": "Ver Central de Ajuda"
+    },
+    "footer": {
+      "platform": "PLATAFORMA",
+      "resources": "RECURSOS",
+      "legal": "LEGAL",
+      "help": "AJUDA",
+      "faq": "FAQ / Perguntas Frequentes",
+      "gettingStarted": "Guia de Início",
+      "howToTrade": "Como Trocar",
+      "tradeSafety": "Segurança em Trades"
+    }
+  },
+
+  "header": {
+    "nav": {
+      "search": "Buscar",
+      "collection": "Coleção",
+      "saved": "Salvos",
+      "messages": "Mensagens",
+      "contacts": "Contatos",
+      "wishlist": "Wishlist",
+      "matches": "Matches"
+    },
+    "profile": {
+      "myProfile": "Meu Perfil",
+      "viewPublicProfile": "Ver meu perfil público",
+      "wishlist": "Minha Wishlist",
+      "settings": "Configurações",
+      "logout": "Sair"
+    },
+    "auth": {
+      "login": "Entrar",
+      "register": "Cadastrar"
+    },
+    "locationSuggestion": {
+      "message": "Detectamos que você está em {location}. Atualizar sua localização?",
+      "update": "ATUALIZAR"
+    },
+    "search": {
+      "placeholder": "Buscar cartas...",
+      "tabs": {
+        "collection": "Minha coleção",
+        "users": "Outros usuários",
+        "scryfall": "Scryfall"
+      },
+      "noResults": "Sem resultados",
+      "addToCollection": "Adicionar"
+    }
+  },
+
+  "dashboard": {
+    "title": "BUSCAR MATCHES",
+    "matchesFound": "matches encontrados",
+    "calculating": "CALCULANDO...",
+    "recalculate": "RECALCULAR",
+    "syncing": "SINCRONIZANDO...",
+    "sync": "SINCRONIZAR",
+    "lastSync": "Última sincronização",
+    "justNow": "agora mesmo",
+    "minutesAgo": "há {mins} min",
+    "hoursAgo": "há {hours}h",
+    "deleteData": "APAGAR MEUS DADOS",
+    "searchOthers": {
+      "title": "BUSCAR CARTAS DE OUTROS USUÁRIOS",
+      "placeholder": "Nome da carta...",
+      "search": "BUSCAR",
+      "noImage": "Sem imagem",
+      "noOwner": "Sem dono",
+      "addToWishlist": "+ PRECISO",
+      "interested": "TENHO INTERESSE",
+      "sent": "Enviado",
+      "noOwners": "Nenhum usuário tem esta carta disponível. Precisa dela? Adicione à sua lista de desejos:",
+      "notFound": "Nenhuma carta encontrada com esse nome."
+    },
+    "calculatingMatches": {
+      "title": "CALCULANDO MATCHES",
+      "loading": "Carregando dados..."
+    },
+    "clearData": {
+      "title": "Apagar todos os dados",
+      "message": "Apagar TODAS as suas cartas, preferências, matches e decks? Esta ação não pode ser desfeita.",
+      "confirm": "APAGAR TUDO",
+      "progress": "Apagando dados...",
+      "deleting": "Apagando {step}...",
+      "complete": "Todos os dados apagados",
+      "withErrors": "Apagado com {count} erro(s)",
+      "resuming": "Continuando exclusão de dados..."
+    },
+    "interest": {
+      "sent": "Interesse enviado para @{username}",
+      "error": "Erro ao enviar interesse"
+    },
+    "wishlist": {
+      "added": "{name} adicionada à sua lista de desejos"
+    },
+    "empty": {
+      "noCardsOrPrefs": "Você não tem cartas nem preferências",
+      "addCardsOrPrefs": "Adicione cartas à sua coleção ou crie uma preferência para encontrar matches automaticamente.",
+      "viewCollection": "VER MINHA COLEÇÃO",
+      "noMatches": "Sem matches disponíveis",
+      "usersInPlatform": "Existem {count} usuários na plataforma..."
+    },
+    "blockedUsers": "BLOQUEADOS",
+    "userUnblocked": "{username} desbloqueado",
+    "unblockError": "Erro ao desbloquear usuário",
+    "blockedUsersModal": {
+      "title": "Usuários Bloqueados",
+      "noBlocked": "Nenhum usuário bloqueado",
+      "unblock": "DESBLOQUEAR"
+    }
+  },
+
+  "collection": {
+    "title": "MINHA COLEÇÃO",
+    "subtitle": "{owned} cartas próprias",
+    "wishlistCount": "{count} na wishlist",
+    "tabs": {
+      "collection": "MINHA COLEÇÃO",
+      "decks": "DECKS"
+    },
+    "fab": {
+      "addCard": "Adicionar carta"
+    },
+    "filters": {
+      "all": "TODAS",
+      "owned": "TENHO",
+      "available": "DISPONÍVEL",
+      "wishlist": "PRECISO",
+      "searchPlaceholder": "Buscar por nome..."
+    },
+    "sort": {
+      "label": "Ordenar",
+      "recent": "Recentes",
+      "name": "Nome",
+      "price": "Preço"
+    },
+    "view": {
+      "grid": "Visualização em grade",
+      "compact": "Visualização compacta"
+    },
+    "group": {
+      "none": "Nenhum"
+    },
+    "stack": {
+      "label": "Empilhar",
+      "tooltip": "Agrupar cartas por nome para ver todas as variantes juntas",
+      "unique": "cartas únicas",
+      "variant": "variante",
+      "variants": "variantes",
+      "copies": "cópias"
+    },
+    "sections": {
+      "myCards": "CARTAS QUE TENHO",
+      "mainboard": "DECK PRINCIPAL",
+      "sideboard": "SIDEBOARD",
+      "myWishlist": "MINHA WISHLIST"
+    },
+    "empty": {
+      "deckEmpty": "Deck vazio",
+      "deckNoCards": "Este deck não tem cartas atribuídas",
+      "noCards": "Sem cartas",
+      "searchToAdd": "Busque cartas acima para adicioná-las"
+    },
+    "deckStats": {
+      "have": "Tenho",
+      "need": "Preciso",
+      "total": "Total",
+      "valueHave": "Valor Tenho",
+      "valueNeed": "Valor Preciso",
+      "valueTotal": "Valor Total",
+      "completed": "Completo",
+      "groupBy": "Agrupar por:",
+      "type": "Tipo",
+      "mana": "Mana",
+      "color": "Cor"
+    },
+    "visibility": {
+      "public": "PÚBLICO",
+      "private": "PRIVADO"
+    },
+    "actions": {
+      "newDeck": "+ NOVO DECK",
+      "import": "IMPORTAR",
+      "createDeck": "+ CRIAR DECK",
+      "new": "+ NOVO"
+    },
+    "searchResults": {
+      "title": "RESULTADOS DA BUSCA",
+      "subtitle": "{count} cartas encontradas - Clique para adicionar",
+      "back": "VOLTAR"
+    },
+    "noDecks": "Você não tem decks criados.",
+    "totals": {
+      "title": "VALOR DA COLEÇÃO",
+      "update": "ATUALIZAR",
+      "loading": "Carregando preços... {progress}%",
+      "headers": {
+        "collection": "COLEÇÃO",
+        "wishlist": "WISHLIST",
+        "forSale": "À VENDA",
+        "total": "TOTAL"
+      }
+    },
+    "messages": {
+      "loadError": "Erro ao carregar coleção",
+      "addError": "Erro ao adicionar carta",
+      "updateError": "Erro ao atualizar carta",
+      "deleteError": "Erro ao excluir carta",
+      "allDeleted": "Todas as cartas foram excluídas",
+      "deleteAllError": "Erro ao excluir cartas",
+      "batchUpdateError": "Erro ao atualizar cartas",
+      "batchDeleteError": "Erro ao excluir cartas",
+      "imported": "{count} cartas importadas",
+      "importError": "Erro ao importar cartas",
+      "synced": "Cartas sincronizadas para matches",
+      "syncError": "Erro sincronizando cartas"
+    }
+  },
+
+  "cards": {
+    "addModal": {
+      "title": "ADICIONAR CARTA",
+      "searchPlaceholder": "Buscar nome da carta...",
+      "noResults": "Nenhuma carta encontrada. Tente outra busca.",
+      "editionLabel": "Edição / Print",
+      "printsAvailable": "{count} prints disponíveis",
+      "quantityLabel": "Quantidade",
+      "conditionLabel": "Condição",
+      "foilLabel": "Foil",
+      "statusLabel": "Status",
+      "statusOptions": {
+        "collection": "Coleção Pessoal",
+        "sale": "À Venda",
+        "trade": "Disponível para Troca",
+        "wishlist": "Procuro / Wishlist"
+      },
+      "publishLabel": "Publicar no meu perfil",
+      "publishHint": "Visível em /@{username}",
+      "assignDeck": "Atribuir ao Deck",
+      "priceTCG": "TCG: ${price}",
+      "priceCK": "CK: {price}",
+      "priceBuylist": "BL: {price}",
+      "submit": "ADICIONAR",
+      "submitting": "SALVANDO...",
+      "success": "✓ {name} adicionada",
+      "splitCardSide": "Lado {current} de {total}"
+    },
+    "editModal": {
+      "title": "EDITAR CARTA",
+      "subtitle": "Modifique os detalhes da sua carta",
+      "loadingPrices": "Carregando preços CK...",
+      "loadingPrints": "Carregando prints...",
+      "allocations": {
+        "title": "ATRIBUÍDA EM DECKS",
+        "inDeck": "{qty} em {deckName}",
+        "sideboard": "(SB)",
+        "total": "Total: {allocated} atribuída(s), {available} disponível(is)"
+      },
+      "quantityWarning": "{excess} cópia(s) para wishlist",
+      "note": "As alterações serão refletidas em todos os decks que usam esta carta.",
+      "submit": "SALVAR ALTERAÇÕES"
+    },
+    "statusModal": {
+      "title": "MUDAR STATUS",
+      "subtitle": "Gerencie o status desta carta",
+      "prices": "Preços:",
+      "loadingCKPrices": "Carregando preços CK...",
+      "currentStatus": "Status atual:",
+      "newStatus": "Novo status",
+      "statusOptions": {
+        "collection": "Na coleção",
+        "sale": "À venda",
+        "trade": "Para troca",
+        "wishlist": "Desejado"
+      },
+      "statusInfo": {
+        "collection": {
+          "icon": "✓",
+          "label": "COLEÇÃO",
+          "description": "Cartas que você tem"
+        },
+        "sale": {
+          "icon": "💰",
+          "label": "VENDA",
+          "description": "Cartas para vender"
+        },
+        "trade": {
+          "icon": "🔄",
+          "label": "TROCA",
+          "description": "Cartas para trocar"
+        },
+        "wishlist": {
+          "icon": "⭐",
+          "label": "DESEJADO",
+          "description": "Cartas que você procura"
+        }
+      },
+      "publishLabel": "Publicar no meu perfil",
+      "publishHint": "Visível para outros usuários no seu perfil público",
+      "submit": "✓ MUDAR"
+    },
+    "detailModal": {
+      "title": "DETALHE DA CARTA",
+      "subtitle": "Gerencie sua carta e distribua por status",
+      "distribution": "DISTRIBUIÇÃO POR STATUS",
+      "totalLabel": "Total: {qty}",
+      "properties": "PROPRIEDADES",
+      "conditionLabel": "Condição",
+      "foilLabel": "Foil",
+      "assignToDecks": "ATRIBUIR A DECKS",
+      "available": "{qty} disponível(is)",
+      "deckFormat": "{format}",
+      "sideboardToggle": {
+        "sideboard": "SB",
+        "mainboard": "MB"
+      },
+      "totalAssigned": "Total atribuído: {qty}",
+      "noImage": "Sem imagem",
+      "allocatedIn": "ATRIBUÍDA EM DECKS",
+      "quantityMin": "Quantidade deve ser pelo menos 1",
+      "validationMinCopy": "Você deve ter pelo menos 1 cópia",
+      "allocationWarning": "{excess} carta(s) atribuídas a decks passarão para wishlist",
+      "loadingPrints": "Carregando prints...",
+      "printsAvailable": "{count} prints disponíveis",
+      "editionPrintLabel": "Edição / Print",
+      "updated": "Carta atualizada",
+      "saveError": "Erro ao salvar alterações"
+    },
+    "grid": {
+      "perUnit": "${price} cada",
+      "total": "${price}",
+      "clickToEdit": "CLIQUE PARA EDITAR",
+      "available": "disp",
+      "inDecks": "{qty} em decks",
+      "interestSent": "✓ INTERESSE ENVIADO",
+      "interested": "⭐ TENHO INTERESSE",
+      "noImage": "Sem imagem",
+      "noImg": "Sem img",
+      "delete": "EXCLUIR",
+      "deleting": "EXCLUINDO...",
+      "visibleInProfile": "Carta visível no perfil",
+      "hiddenFromProfile": "Carta oculta do perfil",
+      "visibilityError": "Erro ao mudar visibilidade",
+      "visibleTitle": "Visível no perfil (clique para ocultar)",
+      "hiddenTitle": "Oculto do perfil (clique para mostrar)",
+      "flipTitle": "Clique para ver o outro lado",
+      "availableOf": "{available} disponíveis de {total} ({allocated} em decks)",
+      "copiesInCollection": "{qty} cópias na coleção",
+      "inDeck": "{qty}x em {deckName}",
+      "public": "PÚBLICO",
+      "private": "PRIVADO",
+      "deleteTitle": "Excluir carta",
+      "statusChanged": "Status mudado para {status}",
+      "statusError": "Erro ao mudar status"
+    }
+  },
+
+  "decks": {
+    "title": "MEUS DECKS",
+    "subtitle": "{count} decks criados",
+    "actions": {
+      "newDeck": "+ NOVO DECK",
+      "import": "IMPORTAR",
+      "editDeck": "EDITAR DECK"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar por nome ou descrição...",
+      "format": "Formato",
+      "all": "TODOS"
+    },
+    "empty": {
+      "noDecks": "Sem decks",
+      "createFirst": "Crie seu primeiro deck para começar",
+      "noResults": "Nenhum deck encontrado com estes filtros",
+      "createButton": "CRIAR PRIMEIRO DECK"
+    },
+    "card": {
+      "noDescription": "Sem descrição",
+      "stats": {
+        "cards": "CARTAS",
+        "cost": "CUSTO",
+        "collection": "COLEÇ."
+      },
+      "updated": "Atualizado: {date}",
+      "edit": "EDITAR",
+      "delete": "EXCLUIR"
+    },
+    "createModal": {
+      "title": "CRIAR NOVO DECK",
+      "subtitle": "Defina os detalhes básicos do seu deck",
+      "nameLabel": "Nome do Deck *",
+      "namePlaceholder": "Ex: RDW Modern",
+      "formatLabel": "Formato",
+      "descriptionLabel": "Descrição",
+      "descriptionPlaceholder": "Descreva sua estratégia, meta, anotações...",
+      "cardListLabel": "Lista de cartas (opcional)",
+      "cardListPlaceholder": "Cole sua lista aqui: 4 Lightning Bolt...",
+      "colorsLabel": "Cores",
+      "preview": "{total} cartas detectadas",
+      "previewDetail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
+      "validation": {
+        "nameRequired": "O nome do deck é obrigatório"
+      },
+      "submit": "CRIAR DECK"
+    },
+    "importModal": {
+      "title": "IMPORTAR DECK",
+      "inputLabel": "Link do Moxfield ou texto do deck",
+      "inputPlaceholder": "https://moxfield.com/decks/... ou 3 Arid Mesa...",
+      "analyze": "ANALISAR",
+      "analyzing": "ANALISANDO...",
+      "moxfieldDetected": {
+        "title": "Link do Moxfield detectado",
+        "instruction": "O Moxfield não permite importar diretamente. Siga estes passos:",
+        "step1": "1. Abra o deck no Moxfield",
+        "step2": "2. Clique em Export (canto superior direito)",
+        "step3": "3. Clique em Copy to Clipboard",
+        "step4": "4. Cole o texto aqui"
+      },
+      "preview": {
+        "total": "Total: {total} cartas",
+        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}"
+      },
+      "options": {
+        "conditionLabel": "Condição padrão",
+        "includeSideboard": "Incluir sideboard",
+        "deckNameLabel": "Nome do deck (opcional)",
+        "deckNamePlaceholder": "Deixe vazio para gerar um nome aleatório",
+        "formatLabel": "Formato",
+        "commanderLabel": "Comandante",
+        "commanderPlaceholder": "Nome do comandante...",
+        "commanderHint": "Digite o nome ou selecione das cartas importadas",
+        "makePublic": "Tornar todas estas cartas públicas"
+      },
+      "submit": "IMPORTAR {count} CARTAS"
+    },
+    "editDeckCard": {
+      "titleWishlist": "EDITAR WISHLIST",
+      "titleOwned": "EDITAR CARTA",
+      "subtitleOwned": "Modificar esta carta atualizará sua coleção",
+      "subtitleWishlist": "Modifique os detalhes da carta na wishlist",
+      "loadingCKPrices": "Carregando preços CK...",
+      "inYourCollection": "NA SUA COLEÇÃO",
+      "copiesTotal": "{qty} cópias totais,",
+      "available": "{qty} disponíveis",
+      "usedIn": "Usado em:",
+      "editionPrint": "Edição / Print",
+      "printsAvailable": "{count} prints disponíveis",
+      "loadingPrints": "Carregando prints...",
+      "quantityAssigned": "Quantidade atribuída",
+      "quantityDesired": "Quantidade desejada",
+      "maxQty": "(máx: {max})",
+      "conditionLabel": "Condição",
+      "foilLabel": "Foil",
+      "infoMessage": "Alterações de print, condição e foil atualizarão a carta na sua coleção. Apenas a quantidade atribuída é específica deste deck.",
+      "submit": "SALVAR ALTERAÇÕES",
+      "onlyAvailable": "Apenas {max} disponíveis",
+      "quantityMin": "A quantidade deve ser pelo menos 1"
+    },
+    "addToDeck": {
+      "title": "ADICIONAR CARTA AO DECK",
+      "subtitle": "Busque e selecione uma carta",
+      "searchLabel": "Buscar Carta",
+      "searchPlaceholder": "Ex: Black Lotus, Ragavan, Counterspell...",
+      "searchError": "Erro na busca",
+      "noResults": "Nenhum resultado encontrado para \"{query}\"",
+      "resultsCount": "{count} resultados - Clique para adicionar",
+      "noImage": "Sem imagem",
+      "emptyState": "Digite o nome de uma carta para buscar",
+      "addTo": "ADICIONAR AO {section}",
+      "configureAdd": "Configure como deseja adicionar esta carta",
+      "cardSource": "FONTE DA CARTA",
+      "noCardInCollection": "Você não tem esta carta na sua coleção",
+      "addToWishlist": "+ Adicionar à Wishlist (não tenho)",
+      "addToCollectionFirst": "+ Adicionar à minha coleção primeiro",
+      "wishlistOption": "Wishlist",
+      "addToCollection": "Adicionar à Coleção",
+      "quantityLabel": "Quantidade",
+      "availableDisp": "{available} / {total} disp.",
+      "selectCard": "Selecione uma carta",
+      "assignFromCollection": "ATRIBUIR DA COLEÇÃO",
+      "addToCollectionAndDeck": "ADICIONAR À COLEÇÃO E DECK",
+      "addToWishlistBtn": "ADICIONAR À WISHLIST",
+      "goBack": "← VOLTAR",
+      "noFoil": "Não Foil"
+    },
+    "cardsList": {
+      "uniqueCards": "CARTAS ÚNICAS",
+      "totalCards": "TOTAL DE CARTAS",
+      "inCollection": "NA COLEÇÃO",
+      "wishlist": "WISHLIST",
+      "noCardsIn": "Não há cartas em {section}",
+      "headers": {
+        "qty": "QTD",
+        "card": "CARTA",
+        "edition": "EDIÇÃO",
+        "status": "STATUS",
+        "price": "PREÇO",
+        "actions": "AÇÕES"
+      },
+      "perUnit": "cada",
+      "available": "disp.",
+      "inCollectionCount": "{total} na coleção ({available} disp.)",
+      "edit": "EDITAR",
+      "editTitle": "Editar",
+      "remove": "REMOVER",
+      "removeTitle": "Remover do deck",
+      "legend": {
+        "inCollection": "Na coleção",
+        "wishlist": "Wishlist (precisa comprar)"
+      }
+    },
+    "editor": {
+      "title": "EDITOR: {name}",
+      "complete": "completo",
+      "save": "SALVAR",
+      "back": "← VOLTAR",
+      "stats": {
+        "format": "FORMATO",
+        "cards": "CARTAS",
+        "inCollection": "NA COLEÇÃO",
+        "wishlist": "WISHLIST"
+      },
+      "colors": "CORES",
+      "noColors": "Sem cores definidas",
+      "sections": {
+        "mainboard": "MAINBOARD",
+        "sideboard": "SIDEBOARD"
+      },
+      "addCard": "+ ADICIONAR CARTA",
+      "removeFromDeck": "Remover do deck",
+      "confirmRemove": "Remover \"{name}\" do deck?",
+      "messages": {
+        "cardRemoved": "Carta removida do deck",
+        "cardUpdated": "Carta atualizada",
+        "cardAdded": "Carta adicionada ao {section}",
+        "cardAddedToCollection": "Carta adicionada à coleção e {section}",
+        "cardAddedToWishlist": "Carta adicionada à wishlist do {section}",
+        "quantityUpdated": "Quantidade atualizada",
+        "alreadyInWishlist": "Esta carta já está na wishlist do deck",
+        "nameRequired": "O nome do deck é obrigatório",
+        "saved": "Deck salvo",
+        "notFound": "Deck não encontrado"
+      }
+    },
+    "detail": {
+      "stats": {
+        "total": "TOTAL",
+        "inCollection": "NA COLEÇÃO",
+        "wishlist": "WISHLIST",
+        "totalCost": "CUSTO TOTAL"
+      },
+      "sections": {
+        "mainboard": "MAINBOARD",
+        "sideboard": "SIDEBOARD",
+        "stats": "ESTATÍSTICAS"
+      },
+      "edit": "EDITAR",
+      "back": "← VOLTAR",
+      "updated": "Atualizado:",
+      "notFound": "Deck não encontrado",
+      "backToDecks": "VOLTAR AOS DECKS"
+    },
+    "manageModal": {
+      "title": "ATRIBUIR A DECKS",
+      "subtitle": "Gerencie em quais decks esta carta está",
+      "totalCopies": "{qty} cópias total",
+      "unassigned": "{qty} sem atribuição",
+      "sideToggle": {
+        "side": "SIDE",
+        "main": "MAIN"
+      },
+      "noDecks": "Você não tem decks criados",
+      "allocationsUpdated": "Atribuições atualizadas",
+      "saveError": "Erro ao salvar",
+      "onlyAvailable": "Você tem apenas {qty} cópias disponíveis"
+    },
+    "importResult": {
+      "title": "RESULTADOS DA IMPORTAÇÃO",
+      "total": "TOTAL",
+      "success": "SUCESSO",
+      "failed": "FALHOU",
+      "successRate": "Taxa de sucesso:",
+      "notFound": "CARTAS NÃO ENCONTRADAS",
+      "confirmMessage": "Deseja adicionar as",
+      "correctCards": "{count} cartas corretas",
+      "toCollection": "à sua coleção?",
+      "notAddedNote": "As cartas não encontradas não serão adicionadas. Você pode tentar importá-las manualmente depois.",
+      "addCards": "ADICIONAR {count} CARTAS"
+    },
+    "editorGrid": {
+      "noImage": "Sem imagem",
+      "tcg": "TCG:",
+      "total": "Total:",
+      "noCardsInCollection": "Você não tem esta carta na coleção",
+      "noCards": "Sem cartas",
+      "emptyBoard": "Não há cartas neste board",
+      "removeCommander": "★ REMOVER COMMANDER",
+      "makeCommander": "☆ TORNAR COMMANDER",
+      "wishlist": "+ WISHLIST",
+      "advanced": "AVANÇADO",
+      "categories": {
+        "all": "Todas",
+        "Commander": "Comandante",
+        "Creatures": "Criaturas",
+        "Instants": "Instantâneos",
+        "Sorceries": "Feitiços",
+        "Enchantments": "Encantamentos",
+        "Artifacts": "Artefatos",
+        "Planeswalkers": "Planeswalkers",
+        "Lands": "Terrenos",
+        "Other": "Outros",
+        "White": "Branco",
+        "Blue": "Azul",
+        "Black": "Preto",
+        "Red": "Vermelho",
+        "Green": "Verde",
+        "Multicolor": "Multicolorido",
+        "Colorless": "Incolor",
+        "0": "0",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "4": "4",
+        "5": "5",
+        "6": "6",
+        "7+": "7+"
+      }
+    },
+    "messages": {
+      "loadError": "Erro ao carregar decks",
+      "notFound": "Deck não encontrado",
+      "loadDeckError": "Erro ao carregar deck",
+      "created": "✓ Deck \"{name}\" criado",
+      "createError": "Erro ao criar deck",
+      "updateError": "Erro ao atualizar deck",
+      "commanderSet": "{name} agora é Comandante",
+      "commanderRemoved": "{name} não é mais Comandante",
+      "commanderError": "Erro ao mudar comandante",
+      "deleted": "✓ Deck excluído",
+      "deletedCardsKept": "Deck excluído (cartas mantidas)",
+      "deletedWithCards": "Deck e {count} cartas excluídas",
+      "deleteError": "Erro ao excluir deck",
+      "noCardsInDeck": "Não há cartas no deck",
+      "cardsNowPublic": "{count} cartas agora são públicas",
+      "cardsNowPrivate": "{count} cartas agora são privadas",
+      "allocated": "{fromCollection} da coleção, {toWishlist} para wishlist",
+      "allocateError": "Erro ao atribuir carta",
+      "addWishlistError": "Erro ao adicionar à wishlist",
+      "deallocateError": "Erro ao desatribuir carta",
+      "removeWishlistError": "Erro ao remover da wishlist",
+      "maxAvailable": "Apenas {max} disponíveis",
+      "updateQuantityError": "Erro ao atualizar quantidade"
+    }
+  },
+
+  "matches": {
+    "title": "MEUS MATCHES",
+    "subtitle": "novos, enviados, salvos",
+    "tabs": {
+      "new": "NOVOS",
+      "sent": "ENVIADOS",
+      "saved": "SALVOS",
+      "deleted": "EXCLUÍDOS"
+    },
+    "controls": {
+      "groupByUser": "Agrupar por usuário",
+      "saveAllToday": "Salvar todos de hoje ({count})",
+      "matchesCount": "matches"
+    },
+    "empty": {
+      "new": {
+        "title": "Você não tem matches novos",
+        "message": "Quando alguém se interessar pelas suas cartas, aparecerá aqui."
+      },
+      "sent": {
+        "title": "Você não enviou matches",
+        "message": "Quando expressar interesse em cartas de outros com 'TENHO INTERESSE', aparecerão aqui."
+      },
+      "saved": {
+        "title": "Você não tem matches salvos",
+        "message": "Os matches que salvar e enviar aparecerão aqui."
+      },
+      "deleted": {
+        "title": "Você não tem matches excluídos",
+        "message": "Os matches excluídos serão removidos permanentemente após 15 dias."
+      }
+    },
+    "card": {
+      "header": "MATCH #{index} - COMPATIBILIDADE: {compatibility}%",
+      "with": "Com @{username} • 📍 {location}",
+      "youOffer": "Você Oferece",
+      "youReceive": "Você Recebe",
+      "noSpecificCards": "Sem cartas específicas (doando valor)",
+      "totalValue": "Valor total",
+      "priceDifference": "Diferença de preço:",
+      "youReceiveAdvantage": "Você recebe vantagem",
+      "otherReceivesAdvantage": "O outro recebe vantagem",
+      "bidirectional": "BIDIRECIONAL",
+      "unidirectional": "→ UNIDIRECIONAL"
+    },
+    "actions": {
+      "interested": "TENHO INTERESSE",
+      "message": "MENSAGEM",
+      "ignore": "IGNORAR",
+      "contact": "CONTATO",
+      "completed": "CONCLUÍDO",
+      "delete": "EXCLUIR",
+      "recover": "RECUPERAR"
+    },
+    "contactModal": {
+      "title": "VER CONTATO",
+      "user": "Usuário",
+      "location": "Localização",
+      "email": "Email",
+      "copyEmail": "COPIAR EMAIL",
+      "saveContact": "SALVAR CONTATO",
+      "close": "FECHAR",
+      "emailCopied": "✓ Email copiado",
+      "contactSaved": "✓ Contato salvo: @{username}"
+    },
+    "countdown": {
+      "new": "NOVO",
+      "days": "dias"
+    },
+    "detailModal": {
+      "title": "DETALHES DO MATCH",
+      "user": "USUÁRIO",
+      "youHave": "VOCÊ TEM",
+      "wants": "QUER",
+      "youSearch": "VOCÊ PROCURA",
+      "has": "TEM",
+      "qty": "Qtd",
+      "cond": "Cond",
+      "contact": "CONTATAR"
+    },
+    "savedCard": {
+      "noLocation": "Localização não disponível",
+      "saved": "Salvo",
+      "daysAgo": "há {days}d",
+      "weWant": "QUEREMOS",
+      "theyOffer": "OFERECEM"
+    },
+    "messages": {
+      "loadError": "Erro ao carregar matches",
+      "saved": "Match salvo ✓",
+      "saveError": "Erro ao salvar match",
+      "notFound": "Match não encontrado",
+      "deleted": "Match excluído. Será removido em 15 dias",
+      "deleteError": "Erro ao excluir match",
+      "completed": "Match concluído ✓",
+      "completeError": "Erro ao concluir match",
+      "recovered": "Match recuperado",
+      "recoverError": "Erro ao recuperar match",
+      "permanentlyDeleted": "Excluído permanentemente",
+      "permanentDeleteError": "Erro ao excluir"
+    }
+  },
+
+  "messages": {
+    "title": "MENSAGENS",
+    "subtitle": "conversas ativas",
+    "searchPlaceholder": "Buscar por usuário...",
+    "empty": {
+      "noResults": "Nenhuma conversa encontrada",
+      "noMessages": "Você não tem mensagens ainda",
+      "tryAnother": "Tente outro nome",
+      "whenContact": "Quando contatar usuários, aparecerão aqui"
+    },
+    "chat": {
+      "title": "Chat com @{username}",
+      "noMessages": "Nenhuma mensagem ainda. Seja o primeiro a escrever!",
+      "inputPlaceholder": "Escreva uma mensagem..."
+    },
+    "errors": {
+      "selfChat": "Você não pode conversar consigo mesmo",
+      "createError": "Erro ao criar conversa",
+      "sendError": "Erro ao enviar mensagem",
+      "loadError": "Erro ao carregar conversas",
+      "listenError": "Erro ao escutar mensagens"
+    }
+  },
+
+  "contacts": {
+    "title": "MEUS CONTATOS SALVOS",
+    "subtitle": "{count} contatos",
+    "empty": {
+      "title": "Você não tem contatos salvos",
+      "message": "Salve contatos dos matches para acesso rápido",
+      "action": "VER MEUS MATCHES"
+    },
+    "messages": {
+      "saved": "✓ Contato salvo",
+      "saveError": "Erro ao salvar contato",
+      "deleted": "Contato excluído",
+      "deleteError": "Erro ao excluir contato",
+      "loadError": "Erro ao carregar contatos"
+    }
+  },
+
+  "settings": {
+    "title": "CONFIGURAÇÕES",
+    "sections": {
+      "emailVerification": {
+        "title": "VERIFICAÇÃO DE EMAIL",
+        "email": "Email:",
+        "verified": "Verificado",
+        "notVerified": "Não verificado",
+        "sendEmail": "ENVIAR EMAIL",
+        "checkStatus": "VERIFICAR STATUS"
+      },
+      "changePassword": {
+        "title": "ALTERAR SENHA",
+        "change": "ALTERAR",
+        "currentPlaceholder": "Senha atual",
+        "newPlaceholder": "Nova senha",
+        "confirmPlaceholder": "Confirmar senha",
+        "mismatch": "As senhas não coincidem",
+        "hint": "Mantenha sua senha segura e única."
+      },
+      "accountInfo": {
+        "title": "INFORMAÇÕES DA CONTA",
+        "username": "Nome de usuário",
+        "location": "Localização",
+        "created": "Conta criada"
+      }
+    },
+    "logout": "SAIR",
+    "changeUsername": {
+      "button": "ALTERAR",
+      "placeholder": "Novo nome de usuário",
+      "formatHint": "3-20 caracteres. Apenas letras, números e underscore (_).",
+      "suggestions": "Nome de usuário não disponível. Tente com:",
+      "nextChange": "Você poderá alterar seu nome de usuário em {time}.",
+      "invalidFormat": "O nome de usuário deve ter 3-20 caracteres (letras, números, _).",
+      "rateLimited": "Você só pode alterar seu nome de usuário uma vez por mês. Próxima alteração: {date}.",
+      "taken": "Este nome de usuário já está em uso.",
+      "success": "Nome de usuário atualizado com sucesso.",
+      "error": "Erro ao alterar nome de usuário. Tente novamente."
+    },
+    "changeLocation": {
+      "button": "ALTERAR",
+      "placeholder": "Cidade, País",
+      "detect": "📍 Detectar automaticamente",
+      "detecting": "Detectando...",
+      "detected": "Localização detectada:",
+      "notSet": "Não configurada",
+      "success": "Localização atualizada com sucesso.",
+      "error": "Erro ao alterar localização. Tente novamente.",
+      "detectError": "Não foi possível detectar sua localização. Digite manualmente."
+    },
+    "changeAvatar": {
+      "edit": "Alterar",
+      "upload": "📷 ENVIAR IMAGEM",
+      "placeholder": "...ou cole URL da imagem",
+      "hint": "Envie uma imagem ou cole uma URL. Deixe vazio e salve para usar avatar gerado.",
+      "reset": "RESETAR",
+      "custom": "Avatar personalizado",
+      "generated": "Avatar gerado automaticamente",
+      "tooLarge": "A imagem é muito grande. Use uma imagem menor.",
+      "success": "Avatar atualizado com sucesso.",
+      "error": "Erro ao alterar avatar. Tente novamente."
+    },
+    "dangerZone": {
+      "title": "ZONA DE PERIGO",
+      "description": "As ações nesta seção são irreversíveis. Proceda com cuidado.",
+      "deleteData": {
+        "label": "Excluir todos os meus dados",
+        "hint": "Exclui permanentemente cartas, decks, matches e contatos.",
+        "title": "Excluir todos os seus dados?",
+        "message": "Esta ação excluirá permanentemente todas as suas cartas, decks, matches salvos e contatos. Esta ação NÃO pode ser desfeita.",
+        "confirm": "SIM, EXCLUIR TUDO",
+        "progress": "Excluindo dados...",
+        "success": "Todos os dados foram excluídos",
+        "error": "Erro ao excluir dados. Tente novamente."
+      },
+      "logout": {
+        "label": "Sair",
+        "hint": "Encerra sua sessão atual neste dispositivo."
+      }
+    }
+  },
+
+  "profile": {
+    "notFound": {
+      "title": "404 - Usuário não encontrado",
+      "message": "@{username} não existe ou seu perfil é privado.",
+      "backToDashboard": "VOLTAR AO DASHBOARD",
+      "login": "ENTRAR"
+    },
+    "contact": "💬 CONTATAR",
+    "viewWishlist": "Minha Wishlist",
+    "publicCollection": "Coleção pública",
+    "cards": "cartas",
+    "noPublicCards": "Este usuário não tem cartas públicas na sua coleção.",
+    "messages": {
+      "loadError": "Erro ao carregar perfil",
+      "loadCardsError": "Erro ao carregar cartas do perfil"
+    }
+  },
+
+  "search": {
+    "owned": "x{count} tenho",
+    "filterPanel": {
+      "placeholder": "Buscar carta por nome...",
+      "searchButton": "BUSCAR",
+      "moreFilters": "MAIS",
+      "clear": "✕ LIMPAR",
+      "autoSearch": "Os filtros serão aplicados automaticamente em 0.5 segundos",
+      "filterSearchPlaceholder": "Buscar filtro... (ex: flying, trample, cascade)",
+      "noFilterResults": "Nenhum filtro encontrado para \"{query}\"",
+      "onlyReleased": "Apenas lançadas",
+      "setSearchPlaceholder": "Buscar edição... (ex: Dominaria, MH3)",
+      "noSetsFound": "Nenhuma edição encontrada"
+    },
+    "modal": {
+      "title": "FILTROS AVANÇADOS",
+      "apply": "APLICAR FILTROS",
+      "sections": {
+        "types": "Tipos",
+        "manaValue": "Mana Value",
+        "priceUSD": "Preço USD",
+        "power": "Power",
+        "toughness": "Toughness",
+        "format": "Formato",
+        "specialTypes": "Tipos Especiais"
+      },
+      "options": {
+        "foilOnly": "Apenas Foil",
+        "fullArt": "Full Art"
+      }
+    },
+    "accordions": {
+      "combat": "Habilidades de Combate",
+      "effects": "Efeitos Comuns",
+      "triggers": "Triggers",
+      "setMechanics": "Mecânicas de Set",
+      "sets": "Edições / Sets"
+    },
+    "effectCategories": {
+      "removal": "Remoção",
+      "cardAdvantage": "Card Advantage",
+      "tokens": "Tokens",
+      "counters": "Contadores",
+      "control": "Controle"
+    },
+    "mechanicCategories": {
+      "meta": "Meta / Competitivas",
+      "popular": "Clássicas Populares",
+      "recent": "Recentes (2023-2025)",
+      "other": "Outras"
+    },
+    "results": {
+      "noCardsFound": "📭 Nenhuma carta encontrada",
+      "adjustFilters": "Tente ajustar os filtros ou fazer uma busca mais geral",
+      "configureFilters": "🔍 Configure os filtros e busque cartas",
+      "cardsFound": "{count} cartas encontradas",
+      "showingRelevant": "Mostrando os resultados mais relevantes",
+      "addButton": "➕ ADICIONAR",
+      "preferenceButton": "⭐ PREFERÊNCIA",
+      "showingOf": "Mostrando {count} dos resultados mais relevantes"
+    },
+    "bar": {
+      "placeholder": "Busque uma carta (ex: Black Lotus, Counterspell...)",
+      "searchButton": "BUSCAR",
+      "noCardsFound": "Nenhuma carta encontrada com esse nome",
+      "searchError": "Erro ao buscar cartas",
+      "selectEdition": "Selecione a edição de {name}"
+    },
+    "messages": {
+      "defineFilter": "Defina pelo menos um filtro",
+      "noResults": "Nenhuma carta encontrada com estes filtros",
+      "searchError": "Erro ao buscar cartas"
+    }
+  },
+
+  "notFound": {
+    "title": "404",
+    "userNotFound": "Usuário não encontrado",
+    "message": "O usuário que você procura não existe ou o perfil é privado.",
+    "backToDashboard": "VOLTAR AO DASHBOARD",
+    "viewCollection": "VER MINHA COLEÇÃO",
+    "needHelp": "Precisa de ajuda?",
+    "contactUs": "Entre em contato pelas configurações"
+  },
+
+  "legal": {
+    "terms": {
+      "title": "Termos de Uso",
+      "sections": {
+        "service": "1. Descrição do Serviço",
+        "account": "2. Registro e Conta de Usuário",
+        "acceptableUse": "3. Uso Aceitável",
+        "transactions": "4. Transações entre Usuários",
+        "ip": "5. Propriedade Intelectual",
+        "privacy": "6. Privacidade e Dados",
+        "liability": "7. Limitação de Responsabilidade",
+        "modifications": "8. Modificações",
+        "termination": "9. Encerramento",
+        "contact": "10. Contato"
+      },
+      "disclaimers": {
+        "noIntermediary": "Não somos intermediários:",
+        "noPayments": "Não processamos pagamentos:",
+        "noGuarantee": "Não garantimos transações:",
+        "noCustody": "Não guardamos cartas:",
+        "recommendation": "Recomendação:"
+      }
+    },
+    "privacy": {
+      "title": "Política de Privacidade",
+      "sections": {
+        "responsible": "1. Responsável pelo Tratamento",
+        "dataCollected": "2. Dados que Coletamos",
+        "dataUse": "3. Como Usamos seus Dados",
+        "publicInfo": "4. Informações Públicas",
+        "sharing": "5. Com Quem Compartilhamos Dados",
+        "security": "6. Segurança dos Dados",
+        "retention": "7. Retenção de Dados",
+        "rights": "8. Seus Direitos",
+        "minors": "9. Menores de Idade",
+        "changes": "10. Alterações nesta Política",
+        "contact": "11. Contato"
+      },
+      "control": "Controle:"
+    },
+    "cookies": {
+      "title": "Política de Cookies",
+      "lastUpdated": "Última atualização:",
+      "sections": {
+        "what": "1. O que são Cookies?",
+        "types": "2. Cookies que Utilizamos",
+        "essential": "2.1 Cookies Essenciais",
+        "performance": "2.2 Cookies de Desempenho",
+        "localStorage": "2.3 Armazenamento Local",
+        "thirdParty": "3. Cookies de Terceiros",
+        "manage": "4. Como Gerenciar os Cookies",
+        "browserSettings": "4.1 Configurações do Navegador",
+        "optOut": "4.2 Ferramentas de Opt-out",
+        "updates": "5. Atualizações desta Política",
+        "moreInfo": "6. Mais Informações"
+      },
+      "table": {
+        "cookie": "Cookie",
+        "purpose": "Finalidade",
+        "duration": "Duração"
+      }
+    },
+    "footer": {
+      "copyright": "© 2024 Cranial Trading",
+      "terms": "Termos",
+      "privacy": "Privacidade",
+      "cookies": "Cookies",
+      "faq": "FAQ"
+    },
+    "backToHome": "← Voltar ao início"
+  },
+
+  "preferences": {
+    "card": {
+      "orBetter": "ou melhor",
+      "added": "Adicionada",
+      "matches": "Correspondências"
+    },
+    "newModal": {
+      "title": "NOVA PREFERÊNCIA",
+      "searchPlaceholder": "Buscar carta...",
+      "minCondition": "Condição mínima",
+      "changeCard": "TROCAR CARTA"
+    },
+    "importModal": {
+      "title": "IMPORTAR COMO PROCURO",
+      "inputLabel": "Link do Moxfield ou texto do deck",
+      "placeholder": "https://moxfield.com/decks/...\nou\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n...",
+      "analyzing": "ANALISANDO...",
+      "analyze": "ANALISAR",
+      "moxfieldDetected": {
+        "title": "Link do Moxfield detectado",
+        "instruction": "O Moxfield não permite importar diretamente. Siga estes passos:",
+        "step1": "Abra o deck no Moxfield",
+        "step2": "Clique em Export (canto superior direito)",
+        "step3": "Clique em Copy to Clipboard",
+        "step4": "Cole o texto aqui"
+      },
+      "total": "Total",
+      "cards": "cartas",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "minCondition": "Condição mínima desejada",
+      "includeSideboard": "Incluir sideboard",
+      "infoMessage": "💡 Serão criadas {count} preferências PROCURO automaticamente.",
+      "importButton": "IMPORTAR {count} COMO PROCURO"
+    }
+  },
+
+  "confirm": {
+    "defaultConfirm": "CONFIRMAR",
+    "defaultCancel": "CANCELAR"
+  },
+
+  "help": {
+    "titles": {
+      "matchesFound": "Matches Encontrados",
+      "recalculate": "Recalcular Matches",
+      "sync": "Sincronizar Cartas",
+      "deleteData": "Excluir Dados",
+      "searchOthers": "Buscar em Outros Usuários",
+      "blockedUsers": "Usuários Bloqueados",
+      "statusCollection": "Coleção Pessoal",
+      "statusAvailable": "Cartas Disponíveis",
+      "statusWishlist": "Lista de Desejos",
+      "deckVisibility": "Visibilidade do Deck",
+      "importDeck": "Importar Deck",
+      "compatibility": "Compatibilidade",
+      "matchType": "Tipo de Match",
+      "tabNew": "Matches Novos",
+      "tabSent": "Matches Enviados",
+      "tabSaved": "Matches Salvos",
+      "tabDeleted": "Matches Excluídos",
+      "emailVerification": "Verificação de Email",
+      "password": "Senha",
+      "username": "Nome de Usuário",
+      "location": "Localização",
+      "avatar": "Avatar",
+      "sets": "Edições",
+      "manaValue": "Mana Value",
+      "onlyReleased": "Apenas Lançadas",
+      "types": "Tipos de Carta",
+      "priceUSD": "Preço USD",
+      "power": "Poder",
+      "toughness": "Resistência",
+      "format": "Formato Legal",
+      "combat": "Habilidades de Combate",
+      "effects": "Efeitos Comuns",
+      "triggers": "Triggers",
+      "setMechanics": "Mecânicas de Set",
+      "specialTypes": "Tipos Especiais",
+      "foilFullArt": "Foil / Full Art"
+    },
+    "tooltips": {
+      "dashboard": {
+        "recalculate": "Busca novos matches comparando suas cartas à venda/troca com a wishlist de outros usuários, e vice-versa.",
+        "sync": "Atualiza suas cartas públicas no sistema para que outros usuários possam encontrar você nas buscas.",
+        "deleteData": "Exclui permanentemente todas as suas cartas, decks, preferências e matches. Esta ação não pode ser desfeita.",
+        "searchOthers": "Busca cartas que outros usuários têm disponíveis para venda ou troca. Se encontrar, pode expressar seu interesse.",
+        "matchesFound": "Quantidade de usuários que têm cartas que você procura, ou procuram cartas que você tem.",
+        "blockedUsers": "Os usuários descartados não aparecerão em matches futuros. Desbloqueie-os aqui para ver matches deles novamente."
+      },
+      "collection": {
+        "statusCollection": "Cartas pessoais que não estão disponíveis para venda nem troca. Só você as vê.",
+        "statusSale": "Cartas que você quer vender. Aparecem no seu perfil público e outros usuários podem contatar você.",
+        "statusTrade": "Cartas disponíveis para troca por outras. O sistema buscará matches automaticamente.",
+        "statusWishlist": "Cartas que você está procurando. O sistema encontrará usuários que as tenham disponíveis.",
+        "publicCard": "Esta carta é visível no seu perfil público. Outros usuários podem vê-la e contatar você.",
+        "privateCard": "Esta carta é privada. Só você pode vê-la na sua coleção.",
+        "deckPublic": "Todas as cartas do deck serão visíveis no seu perfil público.",
+        "deckPrivate": "As cartas do deck serão privadas e não aparecerão no seu perfil.",
+        "importDeck": "Importe um deck do Moxfield ou colando uma lista de cartas. Serão adicionadas à sua coleção automaticamente."
+      },
+      "matches": {
+        "compatibility": "Percentual que indica quão bem suas necessidades coincidem com as do outro usuário. Maior % = melhor match.",
+        "bidirectional": "Match bidirecional: ambos têm algo que o outro procura. Ideal para trocas diretas.",
+        "unidirectional": "Match unidirecional: apenas um tem o que o outro procura. Pode exigir pagamento ou negociação.",
+        "tabNew": "Matches recém-calculados que você ainda não revisou.",
+        "tabSent": "Matches onde você expressou interesse. Aguardando resposta do outro usuário.",
+        "tabSaved": "Matches que você salvou para contatar depois.",
+        "tabDeleted": "Matches excluídos. São removidos permanentemente após 15 dias."
+      },
+      "conditions": {
+        "M": "Mint - Perfeita, como recém-aberta do booster. Sem nenhum defeito visível.",
+        "NM": "Near Mint - Quase perfeita, pode ter mínimo desgaste nas bordas apenas perceptível.",
+        "LP": "Light Play - Jogada levemente. Pequenas marcas ou desgaste menor visível.",
+        "MP": "Moderate Play - Desgaste moderado visível. Marcas, pequenas dobras ou descoloração.",
+        "HP": "Heavy Play - Muito jogada. Dano evidente mas a carta ainda é legal para torneio.",
+        "PO": "Poor - Mau estado significativo. Apenas para coleção casual ou proxies."
+      },
+      "cards": {
+        "foil": "Carta com acabamento holográfico/brilhante. Geralmente mais valiosa que a versão normal.",
+        "price": "Preço de referência em USD segundo TCGPlayer. Pode variar conforme vendedor e condição.",
+        "edition": "Set/edição de Magic onde esta carta foi impressa. Afeta o preço e legalidade em formatos."
+      },
+      "decks": {
+        "mainboard": "As 60 cartas principais do deck (99 em Commander).",
+        "sideboard": "15 cartas opcionais para trocar entre partidas em torneios.",
+        "commander": "O comandante é a carta líder do seu deck Commander/EDH.",
+        "completion": "Percentual de cartas do deck que você já tem na sua coleção."
+      },
+      "settings": {
+        "emailVerification": "Verificar seu email permite que outros usuários contatem você e dá acesso a todas as funcionalidades da plataforma.",
+        "password": "Sua senha deve ter pelo menos 8 caracteres. Use uma combinação de letras, números e símbolos para maior segurança.",
+        "username": "Seu nome de usuário único na plataforma. É exibido no seu perfil público e quando outros usuários procuram você. Só pode alterá-lo ocasionalmente.",
+        "location": "Sua localização ajuda a encontrar traders próximos para trocas presenciais. Pode detectá-la automaticamente ou digitá-la manualmente.",
+        "avatar": "Sua foto de perfil. Por padrão é gerada automaticamente com base no seu nome de usuário, mas você pode usar uma URL de imagem personalizada."
+      },
+      "search": {
+        "sets": "Filtre por edição/set de Magic. Pode selecionar múltiplas edições. Os sets estão ordenados por data de lançamento.",
+        "manaValue": "Custo de mana convertido. Selecione um ou mais valores. O 10+ inclui cartas de mana 10 ou superior.",
+        "onlyReleased": "Exclui cartas de sets que ainda não foram lançados (previews/spoilers).",
+        "types": "Tipo de carta: Criatura, Instantâneo, Feitiço, Encantamento, Artefato, Planeswalker ou Terreno.",
+        "priceUSD": "Faixa de preço em dólares segundo TCGPlayer. Útil para buscar cartas dentro do seu orçamento.",
+        "power": "Poder de criaturas. Valores numéricos (0-15+). Algumas cartas têm poder variável (*) ou indefinido.",
+        "toughness": "Resistência de criaturas. Valores numéricos (0-15+). Algumas cartas têm resistência variável.",
+        "format": "Filtre cartas legais em formatos específicos: Standard, Modern, Pioneer, Legacy, Vintage ou Commander.",
+        "combat": "Habilidades que afetam o combate: Flying, Trample, First Strike, Deathtouch, Lifelink, etc.",
+        "effects": "Efeitos comuns: Destruir, Exilar, Comprar cartas, Criar tokens, Contadores +1/+1, etc.",
+        "triggers": "Habilidades que ativam por eventos: ETB (ao entrar), LTB (ao sair), Ataque, Morte, etc.",
+        "setMechanics": "Mecânicas específicas de sets: Cascade, Convoke, Delve, Flashback, Madness, etc.",
+        "specialTypes": "Tipos especiais de cartas: Lendárias, Saga, Equipamento, Aura, Veículo, etc.",
+        "foilFullArt": "Filtrar por cartas Foil (holográficas) ou Full Art (arte estendida sem borda)."
+      }
+    },
+    "guides": {
+      "gettingStarted": {
+        "title": "Como começar",
+        "step1": {
+          "title": "1. Adicione suas cartas",
+          "description": "Busque cartas e adicione-as à sua coleção. Marque como 'Venda' ou 'Troca' as que quiser trocar."
+        },
+        "step2": {
+          "title": "2. Crie sua wishlist",
+          "description": "Adicione as cartas que procura com status 'Desejado'. O sistema buscará usuários que as tenham."
+        },
+        "step3": {
+          "title": "3. Encontre matches",
+          "description": "Vá ao Dashboard e calcule matches. O sistema encontrará usuários compatíveis automaticamente."
+        },
+        "step4": {
+          "title": "4. Contate e negocie",
+          "description": "Use o chat interno para combinar a troca. Cranial apenas conecta, você decide como fazer o trade."
+        }
+      },
+      "tradeSafety": {
+        "title": "Trading seguro",
+        "tips": [
+          "Verifique o perfil e reputação do usuário antes de combinar um trade",
+          "Use métodos de pagamento com proteção ao comprador quando possível",
+          "Comece com trocas pequenas para construir confiança",
+          "Documente tudo: fotos, mensagens, combinados",
+          "Para envios, use serviços com rastreamento"
+        ]
+      }
+    },
+    "faq": {
+      "title": "Perguntas Frequentes",
+      "questions": [
+        {
+          "q": "O que é um match?",
+          "a": "Um match ocorre quando há compatibilidade entre suas cartas e as de outro usuário. Exemplo: Você tem uma 'Lightning Bolt' à venda e João tem 'Lightning Bolt' na wishlist dele → Match! O sistema os calcula automaticamente comparando sua coleção com a de todos os usuários."
+        },
+        {
+          "q": "Quais tipos de matches existem?",
+          "a": "Há dois tipos principais: BIDIRECIONAL e UNIDIRECIONAL. O bidirecional é quando ambos os usuários têm algo que o outro procura (ideal para trocas). O unidirecional é quando apenas um tem o que o outro precisa (geralmente requer pagamento)."
+        },
+        {
+          "q": "O que é um match BIDIRECIONAL?",
+          "a": "É o match perfeito para trocas. Exemplo: Você tem 'Counterspell' à venda e procura 'Sol Ring'. Maria tem 'Sol Ring' à venda e procura 'Counterspell'. Ambos têm o que o outro precisa! Podem trocar diretamente sem dinheiro envolvido."
+        },
+        {
+          "q": "O que é um match UNIDIRECIONAL?",
+          "a": "Ocorre quando apenas uma parte tem o que a outra procura. Exemplo: Você tem 'Black Lotus' à venda, Pedro quer, mas Pedro não tem nada que você precise. Pedro teria que comprar de você com dinheiro em vez de trocar cartas."
+        },
+        {
+          "q": "Qual é a diferença entre os status de carta?",
+          "a": "COLEÇÃO: Cartas pessoais, não disponíveis para trade (privadas). VENDA: Cartas que você vende por dinheiro (públicas). TROCA: Cartas para trocar por outras (públicas). WISHLIST: Cartas que você quer conseguir. Exemplo: Sua 'Mox Diamond' em COLEÇÃO não aparecerá em matches, mas se mudar para VENDA, outros usuários poderão encontrá-la."
+        },
+        {
+          "q": "Como funciona o percentual de compatibilidade?",
+          "a": "Mede quão equilibrada é a troca baseando-se no valor total das cartas. Exemplo: Se você oferece cartas de $50 e recebe cartas de $48, a compatibilidade será alta (~96%). Se oferece $100 e recebe $30, será baixa (~30%). 100% significa valores exatamente iguais."
+        },
+        {
+          "q": "O que significam as abas em Matches?",
+          "a": "NOVOS: Matches recém-calculados não revisados. ENVIADOS: Matches onde você expressou interesse, aguardando resposta. SALVOS: Matches que você salvou para contatar depois. EXCLUÍDOS: Matches descartados (excluídos em 15 dias). Exemplo: Vê um match interessante → salva → contata o usuário → completam o trade → marca como concluído."
+        },
+        {
+          "q": "O que significa uma carta ser 'Pública'?",
+          "a": "As cartas públicas aparecem no seu perfil (/@seuusuario) e outros usuários podem encontrá-las buscando. As privadas só você vê. Exemplo: Sua 'Force of Will' em VENDA é pública e aparecerá quando alguém buscar essa carta. Sua 'Island' em COLEÇÃO é privada."
+        },
+        {
+          "q": "Como os matches são calculados?",
+          "a": "O sistema compara: 1) Suas cartas em VENDA/TROCA com a WISHLIST de outros usuários, 2) Sua WISHLIST com as cartas em VENDA/TROCA de outros. Exemplo: Você tem 3 cartas à venda e 5 na wishlist. O sistema as compara com as coleções de 1000 usuários e encontra 12 matches potenciais."
+        },
+        {
+          "q": "Posso importar minha coleção de outro site?",
+          "a": "Sim. Você pode: 1) Importar do Moxfield colando a URL do deck, 2) Colar listas em formato MTGO/Arena. Exemplo de formato: '4 Lightning Bolt' ou '4x Lightning Bolt [M10]'. O sistema reconhece quantidade, nome e opcionalmente o set."
+        },
+        {
+          "q": "O que significam as condições de carta (M, NM, LP...)?",
+          "a": "M (Mint): Perfeita, sem uso. NM (Near Mint): Quase perfeita, mínimo desgaste. LP (Light Play): Pequenas marcas visíveis. MP (Moderate Play): Desgaste moderado, dobras menores. HP (Heavy Play): Dano evidente mas jogável. PO (Poor): Mau estado significativo. Exemplo: Uma carta recém-aberta é M/NM, uma jogada em torneios sem sleeves provavelmente é LP/MP."
+        },
+        {
+          "q": "Com que frequência os preços são atualizados?",
+          "a": "Os preços são obtidos do Scryfall/TCGPlayer ao adicionar ou editar uma carta. Para atualizar preços em massa, use o botão 'Sincronizar' no Dashboard. Os preços podem variar ±10% do mercado real conforme a edição e condição."
+        },
+        {
+          "q": "O Cranial Trading cobra comissão?",
+          "a": "Não. A plataforma é 100% gratuita. Apenas conectamos usuários interessados em trocar cartas. As negociações, métodos de pagamento e envios são combinados diretamente entre vocês."
+        },
+        {
+          "q": "Como contato outro usuário?",
+          "a": "De um match você pode: 1) Enviar mensagem interna pelo chat do app, 2) Ver o email dele (se completou o match), 3) Visitar o perfil público dele. Exemplo: Encontra um bom match → clica em 'Mensagem' → combina a troca pelo chat → trocam dados de envio."
+        },
+        {
+          "q": "E se eu for enganado?",
+          "a": "Cranial não intermedia em transações físicas nem pagamentos. Recomendações: 1) Verifique o perfil e antiguidade do usuário, 2) Use PayPal Goods & Services ou outro método com proteção, 3) Comece com trades pequenos (<$20), 4) Peça fotos/vídeos das cartas, 5) Use envio com rastreamento. Denuncie usuários suspeitos."
+        },
+        {
+          "q": "Posso fazer trades internacionais?",
+          "a": "Sim, mas considere: 1) Custos de envio internacional ($15-30 USD tipicamente), 2) Tempos de entrega (2-4 semanas), 3) Possíveis taxas alfandegárias, 4) Risco de perda em trânsito. Recomendação: Para trades internacionais, certifique-se de que o valor justifique os custos de envio."
+        }
+      ]
+    },
+    "emptyStates": {
+      "noCards": {
+        "title": "Sua coleção está vazia",
+        "message": "Busque cartas acima para começar a adicioná-las à sua coleção.",
+        "hint": "Dica: Use 'Importar' para adicionar um deck completo do Moxfield rapidamente."
+      },
+      "noMatches": {
+        "title": "Sem matches por enquanto",
+        "message": "O sistema não encontrou usuários compatíveis com suas cartas e wishlist.",
+        "hint": "Dica: Adicione mais cartas à venda/troca ou mais cartas à sua wishlist para aumentar as chances."
+      },
+      "noDecks": {
+        "title": "Você não tem decks",
+        "message": "Crie seu primeiro deck para organizar suas cartas por formato.",
+        "hint": "Dica: Você pode importar um deck completo do Moxfield com um clique."
+      },
+      "noContacts": {
+        "title": "Sem contatos salvos",
+        "message": "Quando salvar um contato de um match, aparecerá aqui para acesso rápido."
+      },
+      "noMessages": {
+        "title": "Sem conversas",
+        "message": "Quando contatar um usuário de um match, a conversa aparecerá aqui."
+      }
+    }
+  },
+
+  "footer": {
+    "language": "Idioma"
+  }
+}

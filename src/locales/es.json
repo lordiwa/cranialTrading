@@ -265,11 +265,14 @@
       "collection": "Colección",
       "saved": "Guardados",
       "messages": "Mensajes",
-      "contacts": "Contactos"
+      "contacts": "Contactos",
+      "wishlist": "Wishlist",
+      "matches": "Matches"
     },
     "profile": {
       "myProfile": "Mi Perfil",
       "viewPublicProfile": "Ver mi perfil público",
+      "wishlist": "Mi Wishlist",
       "settings": "Configuración",
       "logout": "Cerrar sesión"
     },
@@ -1134,6 +1137,7 @@
       "login": "INICIAR SESIÓN"
     },
     "contact": "💬 CONTACTAR",
+    "viewWishlist": "Mi Wishlist",
     "publicCollection": "Colección pública",
     "cards": "cartas",
     "noPublicCards": "Este usuario no tiene cartas públicas en su colección.",
@@ -1294,7 +1298,8 @@
       "copyright": "© 2024 Cranial Trading",
       "terms": "Términos",
       "privacy": "Privacidad",
-      "cookies": "Cookies"
+      "cookies": "Cookies",
+      "faq": "FAQ"
     },
     "backToHome": "← Volver al inicio"
   },

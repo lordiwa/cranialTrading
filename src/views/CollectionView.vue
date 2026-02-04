@@ -1813,14 +1813,21 @@ watch(() => route.query.deck, (newDeckId) => {
 // Ref for wishlist section to scroll to
 const wishlistSectionRef = ref<HTMLElement | null>(null)
 
-// Watch for filter query parameter (from wishlist links)
-watch(() => route.query.filter, (newFilter) => {
+// Watch for filter query parameter (from navigation links)
+watch(() => route.query.filter, (newFilter, oldFilter) => {
   if (newFilter === 'wishlist') {
+    // Wishlist: select wishlist filter and scroll to wishlist section
     statusFilter.value = 'wishlist'
     viewMode.value = 'collection'
-    // Scroll to wishlist section after DOM updates
     setTimeout(() => {
       wishlistSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  } else if (oldFilter === 'wishlist' && !newFilter) {
+    // Coming from wishlist to collection: reset to all and scroll to top
+    statusFilter.value = 'all'
+    viewMode.value = 'collection'
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }, 100)
   }
 }, { immediate: true })

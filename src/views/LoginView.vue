@@ -88,8 +88,78 @@ const useCases = computed(() => [
   <div class="min-h-screen flex flex-col">
     <!-- Main Content -->
     <main class="flex-1 flex flex-col lg:flex-row">
-      <!-- Left Column: Institutional Info -->
-      <div class="flex-1 flex flex-col justify-center px-6 py-12 lg:px-12 xl:px-20 border-b lg:border-b-0 lg:border-r border-silver-20">
+      <!-- Right Column: Login Form (appears first on mobile, sticky on desktop) -->
+      <div class="w-full lg:w-[400px] xl:w-[440px] flex-shrink-0 order-first lg:order-last lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto border-b lg:border-b-0 lg:border-l border-silver-20 bg-primary">
+        <div class="flex items-center justify-center px-6 py-8 lg:py-12 lg:px-8 lg:min-h-screen">
+          <div class="w-full max-w-sm">
+            <!-- Logo on mobile only -->
+            <div class="lg:hidden flex items-center justify-center gap-3 mb-6">
+              <svg class="w-12 h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
+                <use href="/icons.svg#cranial-logo" />
+              </svg>
+              <span class="text-h3 font-bold text-neon">CRANIAL TRADING</span>
+            </div>
+
+            <div class="bg-primary/95 border border-silver-30 p-6 lg:p-8 rounded-lg">
+              <h2 class="text-h3 lg:text-h2 font-bold text-silver mb-6">{{ t('auth.login.title') }}</h2>
+
+              <form @submit.prevent="handleLogin" class="space-y-md">
+                <BaseInput
+                    v-model="email"
+                    type="email"
+                    :placeholder="t('common.labels.email')"
+                />
+
+                <BaseInput
+                    v-model="password"
+                    type="password"
+                    :placeholder="t('common.labels.password')"
+                />
+
+                <BaseButton
+                    type="submit"
+                    class="w-full"
+                    :disabled="loading || !email || !password"
+                >
+                  {{ loading ? t('auth.login.submitting') : t('auth.login.submit') }}
+                </BaseButton>
+              </form>
+
+              <div class="mt-6 space-y-sm text-center">
+                <RouterLink
+                    to="/forgot-password"
+                    class="block text-small text-silver-70 hover:text-neon transition-fast"
+                >
+                  {{ t('auth.login.forgotPassword') }}
+                </RouterLink>
+                <div class="text-silver-50 text-tiny">o</div>
+                <RouterLink
+                    to="/register"
+                    class="block text-small text-silver hover:text-neon transition-fast"
+                >
+                  {{ t('auth.login.noAccount') }} {{ t('auth.login.register') }}
+                </RouterLink>
+              </div>
+            </div>
+
+            <!-- Trust badges -->
+            <div class="mt-4 flex items-center justify-center gap-4 text-tiny text-silver-50">
+              <span class="flex items-center gap-1"><SvgIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
+              <span>•</span>
+              <span class="flex items-center gap-1"><SvgIcon name="fire" size="tiny" /> {{ t('auth.login.firebaseAuth') }}</span>
+            </div>
+
+            <!-- CTA -->
+            <div class="mt-6 p-4 bg-neon-10 border border-neon-30 rounded-lg text-center">
+              <p class="text-small font-bold text-neon">{{ t('landing.cta.title') }}</p>
+              <p class="text-tiny text-silver-50">{{ t('landing.cta.description') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Left Column: Content (scrollable) -->
+      <div class="flex-1 px-6 py-12 lg:px-12 xl:px-16 overflow-y-auto">
         <!-- Logo & Tagline -->
         <div class="mb-10">
           <div class="flex items-center gap-4 mb-6">
@@ -191,60 +261,6 @@ const useCases = computed(() => [
             {{ t('landing.helpSection.cta') }}
           </RouterLink>
         </section>
-      </div>
-
-      <!-- Right Column: Login Form -->
-      <div class="w-full lg:w-[420px] xl:w-[480px] flex items-center justify-center px-6 py-12 lg:px-12">
-        <div class="w-full max-w-sm">
-          <div class="bg-primary/95 border border-silver-30 p-8 rounded-lg">
-            <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.login.title') }}</h2>
-
-            <form @submit.prevent="handleLogin" class="space-y-md">
-              <BaseInput
-                  v-model="email"
-                  type="email"
-                  :placeholder="t('common.labels.email')"
-              />
-
-              <BaseInput
-                  v-model="password"
-                  type="password"
-                  :placeholder="t('common.labels.password')"
-              />
-
-              <BaseButton
-                  type="submit"
-                  class="w-full"
-                  :disabled="loading || !email || !password"
-              >
-                {{ loading ? t('auth.login.submitting') : t('auth.login.submit') }}
-              </BaseButton>
-            </form>
-
-            <div class="mt-6 space-y-sm text-center">
-              <RouterLink
-                  to="/forgot-password"
-                  class="block text-small text-silver-70 hover:text-neon transition-fast"
-              >
-                {{ t('auth.login.forgotPassword') }}
-              </RouterLink>
-              <div class="text-silver-50 text-tiny">o</div>
-              <RouterLink
-                  to="/register"
-                  class="block text-small text-silver hover:text-neon transition-fast"
-              >
-                {{ t('auth.login.noAccount') }} {{ t('auth.login.register') }}
-              </RouterLink>
-            </div>
-          </div>
-
-          <!-- Trust badges -->
-          <div class="mt-6 flex items-center justify-center gap-4 text-tiny text-silver-50">
-            <span class="flex items-center gap-1"><SvgIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
-            <span>•</span>
-            <span class="flex items-center gap-1"><SvgIcon name="fire" size="tiny" /> {{ t('auth.login.firebaseAuth') }}</span>
-          </div>
-        </div>
       </div>
     </main>
 
@@ -348,5 +364,8 @@ const useCases = computed(() => [
 <style scoped>
 .border-neon-30 {
   border-color: rgba(204, 255, 0, 0.3);
+}
+.bg-neon-10 {
+  background-color: rgba(204, 255, 0, 0.1);
 }
 </style>

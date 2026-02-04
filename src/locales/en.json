@@ -100,7 +100,9 @@
       "noAccount": "Don't have an account?",
       "register": "Register",
       "secureConnection": "Secure connection",
-      "firebaseAuth": "Firebase Auth"
+      "firebaseAuth": "Firebase Auth",
+      "orContinueWith": "or continue with",
+      "googleButton": "Continue with Google"
     },
     "register": {
       "title": "REGISTER",
@@ -148,6 +150,7 @@
       "accountCreated": "Account created. Verify your email",
       "registerError": "Registration error",
       "loginSuccess": "Signed in",
+      "googleLoginError": "Error signing in with Google",
       "verifyEmail": "Please verify your email",
       "invalidCredentials": "Invalid email or password",
       "logoutSuccess": "Signed out",

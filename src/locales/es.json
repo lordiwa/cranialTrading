@@ -100,7 +100,9 @@
       "noAccount": "¿No tienes cuenta?",
       "register": "Registrarse",
       "secureConnection": "Conexión segura",
-      "firebaseAuth": "Firebase Auth"
+      "firebaseAuth": "Firebase Auth",
+      "orContinueWith": "o continúa con",
+      "googleButton": "Continuar con Google"
     },
     "register": {
       "title": "REGISTRARSE",
@@ -148,6 +150,7 @@
       "accountCreated": "Cuenta creada. Verifica tu email",
       "registerError": "Error al registrar",
       "loginSuccess": "Sesión iniciada",
+      "googleLoginError": "Error al iniciar sesión con Google",
       "verifyEmail": "Por favor verifica tu email",
       "invalidCredentials": "Email o contraseña incorrectos",
       "logoutSuccess": "Sesión cerrada",

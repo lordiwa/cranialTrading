@@ -4,10 +4,12 @@ import {
     confirmPasswordReset,
     createUserWithEmailAndPassword,
     type User as FirebaseUser,
+    GoogleAuthProvider,
     onAuthStateChanged,
     sendEmailVerification,
     sendPasswordResetEmail,
     signInWithEmailAndPassword,
+    signInWithPopup,
     signOut,
     updatePassword
 } from 'firebase/auth';
@@ -129,6 +131,45 @@ export const useAuthStore = defineStore('auth', () => {
             return true;
         } catch {
             toastStore.show(t('auth.messages.invalidCredentials'), 'error');
+            return false;
+        }
+    };
+
+    const loginWithGoogle = async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const userCredential = await signInWithPopup(auth, provider);
+            const firebaseUser = userCredential.user;
+
+            // Check if user document exists
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+
+            if (!userDoc.exists()) {
+                // Create new user document for Google user
+                const username = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+                    || firebaseUser.email?.split('@')[0]
+                    || 'user';
+
+                await setDoc(doc(db, 'users', firebaseUser.uid), {
+                    email: firebaseUser.email,
+                    username,
+                    location: '',
+                    createdAt: new Date(),
+                    avatarUrl: firebaseUser.photoURL || null,
+                });
+            }
+
+            await loadUserData(firebaseUser.uid);
+            emailVerified.value = true; // Google accounts are always verified
+            toastStore.show(t('auth.messages.loginSuccess'), 'success');
+            return true;
+        } catch (error: any) {
+            console.error('Google login error:', error);
+            if (error.code === 'auth/popup-closed-by-user') {
+                // User closed popup, no error message needed
+                return false;
+            }
+            toastStore.show(t('auth.messages.googleLoginError'), 'error');
             return false;
         }
     };
@@ -604,6 +645,7 @@ export const useAuthStore = defineStore('auth', () => {
         initAuth,
         register,
         login,
+        loginWithGoogle,
         logout,
         sendResetPasswordEmail,
         resetPassword,

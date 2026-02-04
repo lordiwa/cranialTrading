@@ -1810,6 +1810,21 @@ watch(() => route.query.deck, (newDeckId) => {
   }
 })
 
+// Ref for wishlist section to scroll to
+const wishlistSectionRef = ref<HTMLElement | null>(null)
+
+// Watch for filter query parameter (from wishlist links)
+watch(() => route.query.filter, (newFilter) => {
+  if (newFilter === 'wishlist') {
+    statusFilter.value = 'wishlist'
+    viewMode.value = 'collection'
+    // Scroll to wishlist section after DOM updates
+    setTimeout(() => {
+      wishlistSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
+}, { immediate: true })
+
 // Watch for addCard query parameter (from GlobalSearch)
 watch(() => route.query.addCard, async (cardName) => {
   if (cardName && typeof cardName === 'string') {
@@ -2387,7 +2402,7 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== WISHLIST GENERAL (solo en modo colección) ========== -->
-        <div v-if="viewMode === 'collection' && wishlistCards.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mt-8">
+        <div ref="wishlistSectionRef" v-if="viewMode === 'collection' && wishlistCards.length > 0 && (statusFilter === 'all' || statusFilter === 'wishlist')" class="mt-8">
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-small font-bold text-yellow-400">{{ t('collection.sections.myWishlist') }}</h3>
             <span class="text-tiny text-silver-50">({{ wishlistCount }})</span>

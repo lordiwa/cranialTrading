@@ -248,7 +248,11 @@
       "platform": "PLATAFORMA",
       "resources": "RECURSOS",
       "legal": "LEGAL",
-      "help": "AYUDA"
+      "help": "AYUDA",
+      "faq": "FAQ / Preguntas Frecuentes",
+      "gettingStarted": "Guía de Inicio",
+      "howToTrade": "Cómo Intercambiar",
+      "tradeSafety": "Seguridad en Trades"
     }
   },
 

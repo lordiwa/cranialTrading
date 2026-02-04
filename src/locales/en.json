@@ -248,7 +248,11 @@
       "platform": "PLATFORM",
       "resources": "RESOURCES",
       "legal": "LEGAL",
-      "help": "HELP"
+      "help": "HELP",
+      "faq": "FAQ / Frequently Asked Questions",
+      "gettingStarted": "Getting Started Guide",
+      "howToTrade": "How to Trade",
+      "tradeSafety": "Trading Safety"
     }
   },
 

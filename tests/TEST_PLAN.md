@@ -1,4 +1,19 @@
-# Test Plan - Match System
+# Test Plan - Cranial Trading
+
+## Test Suites
+
+| Suite | File | Tests | Coverage |
+|-------|------|-------|----------|
+| Match System | `matches.test.ts` | 8 | Match persistence, CRUD, security |
+| Collection System | `collection.test.ts` | 10 | Card CRUD, public sync, status transitions |
+| Deck System | `decks.test.ts` | 11 | Deck CRUD, allocations, wishlist, formats |
+| Messages System | `messages.test.ts` | 11 | Conversations, messaging, cross-user chat |
+
+**Total: 40 tests**
+
+---
+
+# Match System Tests
 
 ## Overview
 
@@ -153,3 +168,261 @@ TEST_USER_B_USERNAME=<username>
 ## Known Warnings
 
 **BloomFilter Error:** You may see `BloomFilterError: Invalid hash count: 0` in stderr. This is a harmless Firebase SDK warning that occurs when collections are emptied during cleanup. It does not affect test results.
+
+---
+
+# Collection System Tests
+
+## Overview
+
+Tests the card collection functionality which is the core of the application. Users must be able to reliably add, edit, and delete cards, and those cards must correctly sync to public collections for the matching algorithm to work.
+
+## Test Coverage
+
+### 1. Card CRUD Operations
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should add a card to collection` | Creates a card with full data, retrieves and verifies all fields | Card creation, data integrity |
+| `should update a card` | Creates card, updates quantity/condition/price, verifies changes | Update operations |
+| `should delete a card` | Creates card, deletes it, verifies it no longer exists | Delete operations |
+| `should handle multiple cards` | Creates 5 cards, verifies all retrievable | Handling multiple documents |
+
+### 2. Public Sync - Trade/Sale Cards
+
+**Purpose:** Cards marked as `trade` or `sale` must appear in `public_cards` for the matching algorithm.
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should sync trade card to public_cards` | Creates trade card, syncs, verifies in public_cards | Trade cards visible to matching |
+| `should sync sale card to public_cards` | Creates sale card, syncs, verifies in public_cards | Sale cards visible to matching |
+| `should NOT sync collection card to public_cards` | Creates collection card, verifies NOT in public_cards | Private cards stay private |
+
+### 3. Public Sync - Wishlist Cards
+
+**Purpose:** Cards marked as `wishlist` must appear in `public_preferences` so other users can find potential trades.
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should sync wishlist card to public_preferences` | Creates wishlist card, syncs, verifies in public_preferences | Wishlist visible for matching |
+
+### 4. Card Status Transitions
+
+**Purpose:** When a card's status changes, public collections must update accordingly.
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should update public_cards when status changes` | Card starts as collection, changes to trade, verifies now in public_cards | Status change triggers sync |
+
+### 5. Smoke Tests
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should have Firestore access` | Reads cards collection | Basic connectivity |
+
+## Data Flow Tested
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Card Lifecycle                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  USER'S PRIVATE COLLECTION                                      │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │          /users/{userId}/cards/{cardId}              │      │
+│  │                                                      │      │
+│  │  status: 'collection' | 'sale' | 'trade' | 'wishlist'│      │
+│  └──────────────────────────────────────────────────────┘      │
+│              │                           │                      │
+│              │ status='trade'|'sale'     │ status='wishlist'   │
+│              ▼                           ▼                      │
+│  ┌─────────────────────┐    ┌─────────────────────────┐        │
+│  │   /public_cards     │    │  /public_preferences    │        │
+│  │                     │    │                         │        │
+│  │ Cards other users   │    │ Cards user is looking   │        │
+│  │ can potentially     │    │ for (wishlist items)    │        │
+│  │ trade/buy           │    │                         │        │
+│  └─────────────────────┘    └─────────────────────────┘        │
+│              │                           │                      │
+│              └───────────┬───────────────┘                      │
+│                          ▼                                      │
+│                 ┌─────────────────┐                             │
+│                 │ MATCH ALGORITHM │                             │
+│                 │                 │                             │
+│                 │ Finds users who │                             │
+│                 │ want what you   │                             │
+│                 │ have & vice     │                             │
+│                 │ versa           │                             │
+│                 └─────────────────┘                             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Firestore Collections Tested
+
+| Collection | Path | Purpose |
+|------------|------|---------|
+| `cards` | `users/{userId}/cards` | User's private card inventory |
+| `public_cards` | `public_cards` | Global searchable trade/sale inventory |
+| `public_preferences` | `public_preferences` | Global searchable wishlist |
+
+## Card Statuses
+
+| Status | Stored In | Visible To Others | Used For |
+|--------|-----------|-------------------|----------|
+| `collection` | cards only | No | Personal inventory tracking |
+| `trade` | cards + public_cards | Yes | Finding trade partners |
+| `sale` | cards + public_cards | Yes | Finding buyers |
+| `wishlist` | cards + public_preferences | Yes | Finding sellers/traders |
+
+---
+
+# Deck System Tests
+
+## Overview
+
+Tests deck management including creation, card allocations from collection, and wishlist tracking for cards not yet owned.
+
+## Test Coverage
+
+### 1. Deck CRUD Operations
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should create a deck` | Creates deck with name, format, colors | Deck creation |
+| `should update a deck` | Updates name, format, colors | Update operations |
+| `should delete a deck` | Deletes deck, verifies removal | Delete operations |
+| `should handle multiple decks` | Creates 4 decks with different formats | Multiple documents |
+
+### 2. Card Allocations
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should allocate a card to a deck` | Links collection card to deck | Basic allocation |
+| `should allocate cards to sideboard` | Allocates with `isInSideboard: true` | Sideboard tracking |
+| `should handle multiple allocations` | Allocates 2 cards to same deck | Multiple allocations |
+
+### 3. Wishlist Management
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should add card to deck wishlist` | Adds card user doesn't own | Wishlist creation |
+| `should handle mixed allocations and wishlist` | Both owned and wanted cards | Mixed deck state |
+
+### 4. Deck Formats
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should support all deck formats` | Creates decks for all 5 formats | Format validation |
+
+## Data Flow Tested
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Deck Structure                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  /users/{userId}/decks/{deckId}                                │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │  name, format, colors, commander                     │      │
+│  │                                                      │      │
+│  │  allocations: [                                      │      │
+│  │    { cardId, quantity, isInSideboard }  ←── Links   │      │
+│  │  ]                                       to cards    │      │
+│  │                                                      │      │
+│  │  wishlist: [                                         │      │
+│  │    { scryfallId, name, quantity... }  ←── Cards     │      │
+│  │  ]                                     not owned     │      │
+│  │                                                      │      │
+│  │  stats: { totalCards, ownedCards, completionPct }   │      │
+│  └──────────────────────────────────────────────────────┘      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# Messages System Tests
+
+## Overview
+
+Tests the real-time chat functionality between users.
+
+## Test Coverage
+
+### 1. Conversation Creation
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should create a conversation` | Creates conversation with 2 participants | Conversation creation |
+| `should generate consistent ID` | Same ID regardless of who initiates | Deduplication |
+| `should store participant names` | Names stored for display | Participant metadata |
+
+### 2. Message Sending
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should send a message` | Sends message, verifies content | Message creation |
+| `should update lastMessage` | Conversation shows latest message | Preview updates |
+| `should handle multiple messages in order` | Messages maintain chronological order | Ordering |
+
+### 3. Cross-User Messaging
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should allow both users to send` | User A and B both send messages | Bidirectional |
+| `should be visible to both participants` | Both users see the conversation | Visibility |
+
+### 4. Message Properties
+
+| Test | Description | Validates |
+|------|-------------|-----------|
+| `should mark messages as unread` | New messages have `read: false` | Unread tracking |
+| `should store sender information` | senderId, senderUsername stored | Sender metadata |
+
+## Data Flow Tested
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Messaging Structure                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  /conversations/{conversationId}                               │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │  id: "userA_userB" (alphabetically sorted)           │      │
+│  │  participantIds: [userA, userB]                      │      │
+│  │  participantNames: { userA: "name", userB: "name" }  │      │
+│  │  lastMessage: "preview text"                         │      │
+│  │  lastMessageTime: timestamp                          │      │
+│  └──────────────────────────────────────────────────────┘      │
+│         │                                                       │
+│         ▼                                                       │
+│  /conversations/{id}/messages/{messageId}                      │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │  senderId, senderUsername                            │      │
+│  │  recipientId                                         │      │
+│  │  content: "message text"                             │      │
+│  │  createdAt: timestamp                                │      │
+│  │  read: false                                         │      │
+│  └──────────────────────────────────────────────────────┘      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# Running Tests
+
+## Rate Limiting
+
+Firebase has authentication rate limits. If you see `auth/quota-exceeded`:
+- **Wait 5 minutes** before running tests again
+- Run individual test suites instead of all at once
+
+```bash
+# Run specific suite to avoid rate limits
+npm run test:integration -- tests/integration/matches.test.ts
+npm run test:integration -- tests/integration/collection.test.ts
+npm run test:integration -- tests/integration/decks.test.ts
+npm run test:integration -- tests/integration/messages.test.ts
+```

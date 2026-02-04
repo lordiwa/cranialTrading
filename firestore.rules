@@ -91,6 +91,9 @@ service cloud.firestore {
       // Permitir a usuarios autenticados crear y leer conversaciones donde participan
       allow create: if request.auth != null;
       allow read, update: if request.auth != null;
+      // Allow delete only if user is a participant
+      allow delete: if request.auth != null
+        && request.auth.uid in resource.data.participantIds;
 
       // Mensajes dentro de la conversación
       match /messages/{messageId} {

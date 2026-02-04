@@ -82,14 +82,34 @@ export function initFirebase() {
   return { app, auth, db }
 }
 
+// Cache current user to avoid redundant logins
+let currentUserKey: 'userA' | 'userB' | null = null
+
 /**
- * Login as a test user and return their user object
+ * Login as a test user and return their user object.
+ * Caches auth state to avoid redundant login calls (reduces rate limit issues).
  */
 export async function loginAs(userKey: 'userA' | 'userB'): Promise<{ user: User; userId: string }> {
   const { auth } = initFirebase()
-  const credentials = TEST_USERS[userKey]
 
+  // If already logged in as this user, return current user
+  if (currentUserKey === userKey && auth.currentUser) {
+    return {
+      user: auth.currentUser,
+      userId: auth.currentUser.uid
+    }
+  }
+
+  // If logged in as different user, logout first
+  if (auth.currentUser && currentUserKey !== userKey) {
+    await signOut(auth)
+    currentUserKey = null
+  }
+
+  const credentials = TEST_USERS[userKey]
   const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password)
+  currentUserKey = userKey
+
   return {
     user: userCredential.user,
     userId: userCredential.user.uid
@@ -101,7 +121,19 @@ export async function loginAs(userKey: 'userA' | 'userB'): Promise<{ user: User;
  */
 export async function logout() {
   const { auth } = initFirebase()
+  if (auth.currentUser) {
+    await signOut(auth)
+    currentUserKey = null
+  }
+}
+
+/**
+ * Force logout (resets cached state)
+ */
+export async function forceLogout() {
+  const { auth } = initFirebase()
   await signOut(auth)
+  currentUserKey = null
 }
 
 /**
@@ -201,6 +233,28 @@ export async function syncCardToPublic(userId: string, username: string, card: T
       updatedAt: Timestamp.now()
     })
   }
+}
+
+/**
+ * Get public cards for a user
+ */
+export async function getPublicCards(userId: string): Promise<any[]> {
+  const db = getDb()
+  const publicCardsRef = collection(db, 'public_cards')
+  const cardsQuery = query(publicCardsRef, where('userId', '==', userId))
+  const snapshot = await getDocs(cardsQuery)
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+/**
+ * Get public preferences (wishlist) for a user
+ */
+export async function getPublicPreferences(userId: string): Promise<any[]> {
+  const db = getDb()
+  const publicPrefsRef = collection(db, 'public_preferences')
+  const prefsQuery = query(publicPrefsRef, where('userId', '==', userId))
+  const snapshot = await getDocs(prefsQuery)
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
 /**

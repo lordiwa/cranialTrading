@@ -17,6 +17,7 @@ const { t, locale, setLocale } = useI18n();
 const languages = [
   { code: 'es' as SupportedLocale, label: 'ES', name: 'Español' },
   { code: 'en' as SupportedLocale, label: 'EN', name: 'English' },
+  { code: 'pt' as SupportedLocale, label: 'PT', name: 'Português' },
 ];
 
 const email = ref('');

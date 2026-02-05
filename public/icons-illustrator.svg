@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cranial Trading SVG Icons - Adobe Illustrator Compatible -->
+<!-- Grid: 6 columns x 5 rows, 120px per icon with 20px padding -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     version="1.1"
+     width="840"
+     height="700"
+     viewBox="0 0 840 700">
+
+  <defs>
+    <style type="text/css">
+      .icon-stroke { fill: none; stroke: #CCFF00; }
+      .icon-fill { fill: #CCFF00; stroke: none; }
+      .icon-both { fill: #CCFF00; stroke: #CCFF00; }
+      .icon-dark { fill: #000000; stroke: none; }
+      .icon-dark-stroke { fill: none; stroke: #000000; }
+      text { font-family: monospace; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="840" height="700" fill="#000000"/>
+
+  <!-- Labels row -->
+  <text x="70" y="30" fill="#666666" font-size="10" text-anchor="middle">search</text>
+  <text x="210" y="30" fill="#666666" font-size="10" text-anchor="middle">collection</text>
+  <text x="350" y="30" fill="#666666" font-size="10" text-anchor="middle">stack</text>
+  <text x="490" y="30" fill="#666666" font-size="10" text-anchor="middle">star</text>
+  <text x="630" y="30" fill="#666666" font-size="10" text-anchor="middle">chat</text>
+  <text x="770" y="30" fill="#666666" font-size="10" text-anchor="middle">user</text>
+
+  <!-- ROW 1: Navigation Icons -->
+
+  <!-- search (0,0) -->
+  <g id="icon-search" transform="translate(20, 40)">
+    <circle cx="40" cy="40" r="22" class="icon-stroke" stroke-width="6"/>
+    <line x1="56" y1="56" x2="82" y2="82" class="icon-stroke" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="40" cy="40" r="10" class="icon-stroke" stroke-width="3"/>
+    <line x1="40" y1="26" x2="40" y2="32" class="icon-stroke" stroke-width="3"/>
+    <line x1="40" y1="48" x2="40" y2="54" class="icon-stroke" stroke-width="3"/>
+    <line x1="26" y1="40" x2="32" y2="40" class="icon-stroke" stroke-width="3"/>
+    <line x1="48" y1="40" x2="54" y2="40" class="icon-stroke" stroke-width="3"/>
+  </g>
+
+  <!-- collection (1,0) -->
+  <g id="icon-collection" transform="translate(160, 40)">
+    <rect x="22" y="18" width="42" height="58" rx="3" class="icon-stroke" stroke-width="4"/>
+    <line x1="30" y1="28" x2="56" y2="28" class="icon-stroke" stroke-width="2"/>
+    <line x1="30" y1="38" x2="50" y2="38" class="icon-stroke" stroke-width="2"/>
+    <line x1="30" y1="48" x2="54" y2="48" class="icon-stroke" stroke-width="2"/>
+    <rect x="36" y="26" width="42" height="58" rx="3" class="icon-stroke" stroke-width="5"/>
+    <path d="M57 42 L52 54 L57 66 L62 54 Z" class="icon-stroke" stroke-width="3"/>
+    <line x1="57" y1="48" x2="57" y2="60" class="icon-stroke" stroke-width="2"/>
+  </g>
+
+  <!-- stack (2,0) -->
+  <g id="icon-stack" transform="translate(300, 40)">
+    <rect x="28" y="12" width="44" height="56" rx="4" class="icon-stroke" stroke-width="4"/>
+    <rect x="22" y="20" width="44" height="56" rx="4" class="icon-stroke" stroke-width="4"/>
+    <rect x="16" y="28" width="44" height="56" rx="4" class="icon-stroke" stroke-width="5"/>
+    <circle cx="70" cy="30" r="14" class="icon-fill"/>
+    <text x="70" y="35" text-anchor="middle" font-size="16" font-weight="bold" class="icon-dark">3</text>
+  </g>
+
+  <!-- star (3,0) -->
+  <g id="icon-star" transform="translate(440, 40)">
+    <polygon points="50,8 58,38 88,38 64,56 72,86 50,68 28,86 36,56 12,38 42,38" class="icon-both" stroke-width="2"/>
+  </g>
+
+  <!-- chat (4,0) -->
+  <g id="icon-chat" transform="translate(580, 40)">
+    <path d="M18 22 Q18 12 33 12 L67 12 Q82 12 82 22 L82 55 Q82 65 67 65 L42 65 L25 82 L30 65 L33 65 Q18 65 18 55 Z" class="icon-stroke" stroke-width="5"/>
+    <circle cx="35" cy="38" r="5" class="icon-fill"/>
+    <circle cx="50" cy="38" r="5" class="icon-fill"/>
+    <circle cx="65" cy="38" r="5" class="icon-fill"/>
+  </g>
+
+  <!-- user (5,0) -->
+  <g id="icon-user" transform="translate(720, 40)">
+    <path d="M30 32 Q30 12 50 12 Q70 12 70 32 L70 48 Q70 54 64 54 L36 54 Q30 54 30 48 Z" class="icon-stroke" stroke-width="5"/>
+    <line x1="36" y1="35" x2="64" y2="35" class="icon-stroke" stroke-width="4"/>
+    <path d="M24 58 L34 54 L34 78 L24 72 Z" class="icon-fill"/>
+    <path d="M76 58 L66 54 L66 78 L76 72 Z" class="icon-fill"/>
+    <path d="M34 54 L34 85 L66 85 L66 54" class="icon-stroke" stroke-width="4"/>
+    <line x1="50" y1="60" x2="50" y2="78" class="icon-stroke" stroke-width="3"/>
+  </g>
+
+  <!-- Labels row 2 -->
+  <text x="70" y="170" fill="#666666" font-size="10" text-anchor="middle">settings</text>
+  <text x="210" y="170" fill="#666666" font-size="10" text-anchor="middle">check</text>
+  <text x="350" y="170" fill="#666666" font-size="10" text-anchor="middle">x-mark</text>
+  <text x="490" y="170" fill="#666666" font-size="10" text-anchor="middle">trash</text>
+  <text x="630" y="170" fill="#666666" font-size="10" text-anchor="middle">flip</text>
+  <text x="770" y="170" fill="#666666" font-size="10" text-anchor="middle">recover</text>
+
+  <!-- ROW 2: Settings & Actions -->
+
+  <!-- settings (0,1) -->
+  <g id="icon-settings" transform="translate(20, 180)">
+    <circle cx="50" cy="50" r="32" class="icon-stroke" stroke-width="5"/>
+    <circle cx="50" cy="50" r="14" class="icon-stroke" stroke-width="5"/>
+    <line x1="50" y1="8" x2="50" y2="22" class="icon-stroke" stroke-width="8"/>
+    <line x1="50" y1="78" x2="50" y2="92" class="icon-stroke" stroke-width="8"/>
+    <line x1="8" y1="50" x2="22" y2="50" class="icon-stroke" stroke-width="8"/>
+    <line x1="78" y1="50" x2="92" y2="50" class="icon-stroke" stroke-width="8"/>
+    <line x1="20" y1="20" x2="30" y2="30" class="icon-stroke" stroke-width="6"/>
+    <line x1="70" y1="70" x2="80" y2="80" class="icon-stroke" stroke-width="6"/>
+    <line x1="80" y1="20" x2="70" y2="30" class="icon-stroke" stroke-width="6"/>
+    <line x1="30" y1="70" x2="20" y2="80" class="icon-stroke" stroke-width="6"/>
+  </g>
+
+  <!-- check (1,1) -->
+  <g id="icon-check" transform="translate(160, 180)">
+    <polyline points="18,52 38,72 82,24" class="icon-stroke" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- x-mark (2,1) -->
+  <g id="icon-x-mark" transform="translate(300, 180)">
+    <line x1="20" y1="20" x2="80" y2="80" class="icon-stroke" stroke-width="10" stroke-linecap="round"/>
+    <line x1="80" y1="20" x2="20" y2="80" class="icon-stroke" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <!-- trash (3,1) -->
+  <g id="icon-trash" transform="translate(440, 180)">
+    <rect x="24" y="18" width="52" height="10" rx="2" class="icon-fill"/>
+    <rect x="38" y="10" width="24" height="12" rx="2" class="icon-stroke" stroke-width="3"/>
+    <path d="M28 28 L32 85 L68 85 L72 28" class="icon-stroke" stroke-width="5"/>
+    <line x1="40" y1="38" x2="40" y2="75" class="icon-stroke" stroke-width="4"/>
+    <line x1="50" y1="38" x2="50" y2="75" class="icon-stroke" stroke-width="4"/>
+    <line x1="60" y1="38" x2="60" y2="75" class="icon-stroke" stroke-width="4"/>
+  </g>
+
+  <!-- flip (4,1) -->
+  <g id="icon-flip" transform="translate(580, 180)">
+    <path d="M72 32 A24 24 0 0 0 28 32" class="icon-stroke" stroke-width="5"/>
+    <polygon points="28,20 16,38 40,38" class="icon-fill"/>
+    <path d="M28 58 A24 24 0 0 0 72 58" class="icon-stroke" stroke-width="5"/>
+    <polygon points="72,70 84,52 60,52" class="icon-fill"/>
+  </g>
+
+  <!-- recover (5,1) -->
+  <g id="icon-recover" transform="translate(720, 180)">
+    <path d="M50 18 A32 32 0 1 1 22 42" class="icon-stroke" stroke-width="6" stroke-linecap="round"/>
+    <polygon points="50,6 62,24 38,24" class="icon-fill"/>
+    <circle cx="50" cy="50" r="6" class="icon-fill"/>
+  </g>
+
+  <!-- Labels row 3 -->
+  <text x="70" y="310" fill="#666666" font-size="10" text-anchor="middle">plus</text>
+  <text x="210" y="310" fill="#666666" font-size="10" text-anchor="middle">eye-open</text>
+  <text x="350" y="310" fill="#666666" font-size="10" text-anchor="middle">eye-closed</text>
+  <text x="490" y="310" fill="#666666" font-size="10" text-anchor="middle">loading</text>
+  <text x="630" y="310" fill="#666666" font-size="10" text-anchor="middle">warning</text>
+  <text x="770" y="310" fill="#666666" font-size="10" text-anchor="middle">dot</text>
+
+  <!-- ROW 3: Status Icons -->
+
+  <!-- plus (0,2) -->
+  <g id="icon-plus" transform="translate(20, 320)">
+    <line x1="50" y1="15" x2="50" y2="85" class="icon-stroke" stroke-width="12" stroke-linecap="round"/>
+    <line x1="15" y1="50" x2="85" y2="50" class="icon-stroke" stroke-width="12" stroke-linecap="round"/>
+  </g>
+
+  <!-- eye-open (1,2) -->
+  <g id="icon-eye-open" transform="translate(160, 320)">
+    <ellipse cx="50" cy="50" rx="38" ry="24" class="icon-stroke" stroke-width="5"/>
+    <circle cx="50" cy="50" r="16" class="icon-stroke" stroke-width="4"/>
+    <circle cx="50" cy="50" r="7" class="icon-fill"/>
+  </g>
+
+  <!-- eye-closed (2,2) -->
+  <g id="icon-eye-closed" transform="translate(300, 320)">
+    <path d="M12 50 Q50 75 88 50" class="icon-stroke" stroke-width="5"/>
+    <line x1="22" y1="28" x2="78" y2="72" class="icon-stroke" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <!-- loading (3,2) -->
+  <g id="icon-loading" transform="translate(440, 320)">
+    <rect x="22" y="12" width="56" height="10" rx="2" class="icon-fill"/>
+    <rect x="22" y="78" width="56" height="10" rx="2" class="icon-fill"/>
+    <path d="M28 22 L28 38 L50 54 L72 38 L72 22" class="icon-stroke" stroke-width="4"/>
+    <path d="M28 78 L28 62 L50 46 L72 62 L72 78" class="icon-stroke" stroke-width="4"/>
+    <line x1="50" y1="46" x2="50" y2="58" class="icon-stroke" stroke-width="3"/>
+  </g>
+
+  <!-- warning (4,2) -->
+  <g id="icon-warning" transform="translate(580, 320)">
+    <polygon points="50,8 92,88 8,88" class="icon-stroke" stroke-width="6" stroke-linejoin="round"/>
+    <line x1="50" y1="34" x2="50" y2="58" class="icon-stroke" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="50" cy="74" r="6" class="icon-fill"/>
+  </g>
+
+  <!-- dot (5,2) -->
+  <g id="icon-dot" transform="translate(720, 320)">
+    <circle cx="50" cy="50" r="28" class="icon-stroke" stroke-width="4"/>
+    <circle cx="50" cy="50" r="14" class="icon-stroke" stroke-width="3"/>
+    <circle cx="50" cy="50" r="5" class="icon-fill"/>
+  </g>
+
+  <!-- Labels row 4 -->
+  <text x="70" y="450" fill="#666666" font-size="10" text-anchor="middle">money</text>
+  <text x="210" y="450" fill="#666666" font-size="10" text-anchor="middle">box</text>
+  <text x="350" y="450" fill="#666666" font-size="10" text-anchor="middle">handshake</text>
+  <text x="490" y="450" fill="#666666" font-size="10" text-anchor="middle">hand</text>
+  <text x="630" y="450" fill="#666666" font-size="10" text-anchor="middle">lock</text>
+  <text x="770" y="450" fill="#666666" font-size="10" text-anchor="middle">fire</text>
+
+  <!-- ROW 4: Commerce & Security -->
+
+  <!-- money (0,3) -->
+  <g id="icon-money" transform="translate(20, 460)">
+    <path d="M30 32 Q24 44 24 60 Q24 82 50 82 Q76 82 76 60 Q76 44 70 32 Z" class="icon-stroke" stroke-width="5"/>
+    <path d="M35 32 Q50 22 65 32" class="icon-stroke" stroke-width="4"/>
+    <ellipse cx="50" cy="24" rx="10" ry="6" class="icon-stroke" stroke-width="3"/>
+    <text x="50" y="62" text-anchor="middle" font-size="30" font-weight="bold" font-family="monospace" class="icon-fill">$</text>
+  </g>
+
+  <!-- box (1,3) -->
+  <g id="icon-box" transform="translate(160, 460)">
+    <path d="M12 38 L12 85 L88 85 L88 38" class="icon-stroke" stroke-width="5"/>
+    <path d="M12 38 L2 26 L32 26 L50 14 L68 26 L98 26 L88 38" class="icon-stroke" stroke-width="4"/>
+    <rect x="24" y="46" width="22" height="32" rx="2" class="icon-fill"/>
+    <rect x="42" y="42" width="22" height="32" rx="2" class="icon-stroke" stroke-width="3"/>
+  </g>
+
+  <!-- handshake (2,3) -->
+  <g id="icon-handshake" transform="translate(300, 460)">
+    <path d="M12 48 L28 48 L44 36 L56 42" class="icon-stroke" stroke-width="5" stroke-linecap="round"/>
+    <path d="M88 48 L72 48 L56 42 L44 48" class="icon-stroke" stroke-width="5" stroke-linecap="round"/>
+    <ellipse cx="50" cy="44" rx="14" ry="10" class="icon-stroke" stroke-width="3"/>
+    <line x1="12" y1="48" x2="12" y2="72" class="icon-stroke" stroke-width="6"/>
+    <line x1="88" y1="48" x2="88" y2="72" class="icon-stroke" stroke-width="6"/>
+  </g>
+
+  <!-- hand (3,3) -->
+  <g id="icon-hand" transform="translate(440, 460)">
+    <rect x="28" y="48" width="44" height="38" rx="6" class="icon-stroke" stroke-width="4"/>
+    <rect x="32" y="18" width="10" height="34" rx="4" class="icon-stroke" stroke-width="3"/>
+    <rect x="45" y="12" width="10" height="40" rx="4" class="icon-stroke" stroke-width="3"/>
+    <rect x="58" y="18" width="10" height="34" rx="4" class="icon-stroke" stroke-width="3"/>
+    <rect x="16" y="54" width="16" height="10" rx="4" class="icon-stroke" stroke-width="3"/>
+  </g>
+
+  <!-- lock (4,3) -->
+  <g id="icon-lock" transform="translate(580, 460)">
+    <rect x="22" y="44" width="56" height="44" rx="6" class="icon-fill"/>
+    <path d="M32 44 L32 28 Q50 10 68 28 L68 44" class="icon-stroke" stroke-width="7"/>
+  </g>
+
+  <!-- fire (5,3) -->
+  <g id="icon-fire" transform="translate(720, 460)">
+    <path d="M50 6 Q74 28 68 50 Q80 56 74 74 Q68 90 50 90 Q32 90 26 74 Q20 56 32 50 Q26 28 50 6" class="icon-both" stroke-width="2"/>
+  </g>
+
+  <!-- Labels row 5 -->
+  <text x="70" y="590" fill="#666666" font-size="10" text-anchor="middle">chevron-up</text>
+  <text x="210" y="590" fill="#666666" font-size="10" text-anchor="middle">chevron-down</text>
+  <text x="350" y="590" fill="#666666" font-size="10" text-anchor="middle">chevron-left</text>
+  <text x="490" y="590" fill="#666666" font-size="10" text-anchor="middle">chevron-right</text>
+  <text x="630" y="590" fill="#666666" font-size="10" text-anchor="middle">cranial-logo</text>
+
+  <!-- ROW 5: Chevrons & Brand -->
+
+  <!-- chevron-up (0,4) -->
+  <g id="icon-chevron-up" transform="translate(20, 600)">
+    <polyline points="20,65 50,35 80,65" class="icon-stroke" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- chevron-down (1,4) -->
+  <g id="icon-chevron-down" transform="translate(160, 600)">
+    <polyline points="20,35 50,65 80,35" class="icon-stroke" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- chevron-left (2,4) -->
+  <g id="icon-chevron-left" transform="translate(300, 600)">
+    <polyline points="65,20 35,50 65,80" class="icon-stroke" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- chevron-right (3,4) -->
+  <g id="icon-chevron-right" transform="translate(440, 600)">
+    <polyline points="35,20 65,50 35,80" class="icon-stroke" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- cranial-logo (4,4) -->
+  <g id="cranial-logo" transform="translate(580, 600)">
+    <!-- Main helmet shell -->
+    <path d="M20 38 Q20 20 50 12 Q80 20 80 38 L78 48 L72 48 L70 38 Q70 28 50 22 Q30 28 30 38 L28 48 L22 48 Z" class="icon-fill"/>
+    <!-- Helmet spikes -->
+    <polygon points="30,20 26,2 34,18" class="icon-fill"/>
+    <polygon points="42,14 40,0 48,12" class="icon-fill"/>
+    <polygon points="54,12 52,0 60,12" class="icon-fill"/>
+    <polygon points="66,14 68,0 74,16" class="icon-fill"/>
+    <polygon points="78,22 86,6 82,20" class="icon-fill"/>
+    <!-- Helmet ridge/visor -->
+    <path d="M22 42 L78 42" stroke="#CCFF00" stroke-width="4"/>
+    <path d="M26 48 L74 48" stroke="#CCFF00" stroke-width="3"/>
+    <!-- Skull face -->
+    <path d="M24 50 L24 65 Q24 80 36 85 L40 92 L44 85 L50 90 L56 85 L60 92 L64 85 Q76 80 76 65 L76 50" class="icon-fill"/>
+    <!-- Left eye socket -->
+    <ellipse cx="36" cy="60" rx="8" ry="10" class="icon-dark"/>
+    <!-- Right eye socket -->
+    <ellipse cx="64" cy="60" rx="8" ry="10" class="icon-dark"/>
+    <!-- Nose hole -->
+    <polygon points="50,68 45,78 55,78" class="icon-dark"/>
+    <!-- Teeth row -->
+    <path d="M36 85 L38 92 L42 85 L46 92 L50 85 L54 92 L58 85 L62 92 L64 85" class="icon-dark-stroke" stroke-width="2" stroke-linecap="round"/>
+    <!-- Skull cracks -->
+    <path d="M30 55 L26 62" stroke="#000000" stroke-width="1.5"/>
+    <path d="M70 55 L74 62" stroke="#000000" stroke-width="1.5"/>
+  </g>
+
+</svg>

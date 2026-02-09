@@ -449,6 +449,17 @@
         "total": "TOTAL"
       }
     },
+    "bulkDelete": {
+      "toggle": "Toggle selection mode",
+      "select": "Select",
+      "selected": "{count} selected",
+      "selectAll": "Select all",
+      "clearSelection": "Clear",
+      "deleteSelected": "DELETE {count}",
+      "title": "Delete cards",
+      "confirm": "Delete {count} selected cards? This cannot be undone.",
+      "success": "{count} cards deleted"
+    },
     "messages": {
       "loadError": "Error loading collection",
       "addError": "Error adding card",
@@ -678,9 +689,14 @@
         "commanderLabel": "Commander",
         "commanderPlaceholder": "Commander name...",
         "commanderHint": "Type the name or select from imported cards",
-        "makePublic": "Make all these cards public"
+        "makePublic": "Make all these cards public",
+        "statusLabel": "Card status"
       },
-      "submit": "IMPORT {count} CARDS"
+      "submit": "IMPORT {count} CARDS",
+      "csvUpload": "or upload CSV file",
+      "csvDetected": "ManaBox CSV detected",
+      "csvConditionNote": "Conditions will be imported per card from the CSV",
+      "csvCards": "{count} cards found in CSV"
     },
     "editDeckCard": {
       "titleWishlist": "EDIT WISHLIST",
@@ -889,6 +905,7 @@
       "deletedCardsKept": "Deck deleted (cards kept)",
       "deletedWithCards": "Deck and {count} cards deleted",
       "deleteError": "Error deleting deck",
+      "deletingDeck": "Deleting deck...",
       "noCardsInDeck": "No cards in the deck",
       "cardsNowPublic": "{count} cards are now public",
       "cardsNowPrivate": "{count} cards are now private",
@@ -988,6 +1005,21 @@
       "daysAgo": "{days}d ago",
       "weWant": "WE WANT",
       "theyOffer": "THEY OFFER"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "newSingular": "new",
+      "newPlural": "new",
+      "wantsYourCard": "wants your card {card}",
+      "hasCardYouWant": "has the card {card} you're looking for",
+      "justNow": "just now",
+      "minutesAgo": "{n}m ago",
+      "hoursAgo": "{n}h ago",
+      "daysAgo": "{n}d ago",
+      "sell": "SELL",
+      "buy": "BUY",
+      "empty": "No new alerts",
+      "goToMatches": "Go to my matches"
     },
     "messages": {
       "loadError": "Error loading matches",

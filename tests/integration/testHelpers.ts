@@ -19,8 +19,11 @@ import {
   addDoc,
   deleteDoc,
   getDocs,
+  getDoc,
+  setDoc,
   query,
   where,
+  or,
   Timestamp,
   type Firestore
 } from 'firebase/firestore'
@@ -400,6 +403,90 @@ export async function notifyOtherUser(
   return docRef.id
 }
 
+// ============ SHARED MATCHES OPERATIONS ============
+
+export interface SharedMatchInput {
+  senderId: string
+  senderUsername: string
+  receiverId: string
+  receiverUsername: string
+  card: {
+    name: string
+    edition: string
+    condition: string
+    price: number
+  }
+  senderStatus: string
+  status: string
+}
+
+/**
+ * Create a shared match in the root `shared_matches` collection.
+ * Simulates the "ME INTERESA" action.
+ */
+export async function createSharedMatch(input: SharedMatchInput): Promise<string> {
+  const db = getDb()
+  const sharedMatchesRef = collection(db, 'shared_matches')
+
+  const docRef = await addDoc(sharedMatchesRef, {
+    senderId: input.senderId,
+    senderUsername: input.senderUsername,
+    receiverId: input.receiverId,
+    receiverUsername: input.receiverUsername,
+    card: input.card,
+    senderStatus: input.senderStatus,
+    status: input.status,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  })
+
+  return docRef.id
+}
+
+/**
+ * Get all shared_matches involving a user (as sender or receiver).
+ */
+export async function getSharedMatchesForUser(userId: string): Promise<any[]> {
+  const db = getDb()
+  const sharedMatchesRef = collection(db, 'shared_matches')
+  const q = query(
+    sharedMatchesRef,
+    or(
+      where('senderId', '==', userId),
+      where('receiverId', '==', userId)
+    )
+  )
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+/**
+ * Clear all shared_matches for a user (sender or receiver).
+ */
+export async function clearSharedMatches(userId: string): Promise<void> {
+  const matches = await getSharedMatchesForUser(userId)
+  const db = getDb()
+  for (const match of matches) {
+    await deleteDoc(doc(db, 'shared_matches', match.id))
+  }
+}
+
+/**
+ * Delete a single public_cards document by ID.
+ */
+export async function deletePublicCardById(docId: string): Promise<void> {
+  const db = getDb()
+  await deleteDoc(doc(db, 'public_cards', docId))
+}
+
+/**
+ * Delete a single public_preferences document by ID.
+ */
+export async function deletePublicPrefById(docId: string): Promise<void> {
+  const db = getDb()
+  await deleteDoc(doc(db, 'public_preferences', docId))
+}
+
 // ============ CLEANUP ============
 
 /**
@@ -408,6 +495,7 @@ export async function notifyOtherUser(
 export async function cleanupTestUser(userId: string): Promise<void> {
   await clearAllMatches(userId)
   await clearPublicData(userId)
+  await clearSharedMatches(userId)
 
   // Delete test cards (cards with name starting with "TEST_")
   const db = getDb()

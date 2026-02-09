@@ -204,6 +204,13 @@
   <polyline points="35,20 65,50 35,80" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 </symbol>
 
+<!-- ==================== NOTIFICATIONS ==================== -->
+
+<symbol id="icon-bell" viewBox="0 0 100 100">
+  <path d="M50 10 C50 10 48 10 48 14 L48 18 C34 20 24 32 24 48 L24 62 L16 72 L84 72 L76 62 L76 48 C76 32 66 20 52 18 L52 14 C52 10 50 10 50 10 Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M38 72 Q38 88 50 88 Q62 88 62 72" fill="none" stroke="currentColor" stroke-width="5"/>
+</symbol>
+
 <!-- ==================== BRAND ==================== -->
 
 <symbol id="cranial-logo" viewBox="0 0 100 100">

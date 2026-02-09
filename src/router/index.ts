@@ -6,7 +6,7 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            redirect: '/dashboard',
+            redirect: '/saved-matches',
         },
         {
             path: '/contacts',
@@ -40,9 +40,7 @@ const router = createRouter({
         },
         {
             path: '/dashboard',
-            name: 'dashboard',
-            component: () => import('../views/DashboardView.vue'),
-            meta: { requiresAuth: true },
+            redirect: '/saved-matches',
         },
         {
             path: '/collection',
@@ -147,7 +145,7 @@ router.beforeEach(async (to, _from, next) => {
     }
 
     if (requiresGuest && isAuthenticated) {
-        next('/dashboard'); return;
+        next('/saved-matches'); return;
     }
 
     next();

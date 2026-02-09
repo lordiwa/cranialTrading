@@ -321,7 +321,7 @@ watch(() => props.cards, () => {
 <template>
   <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative" @click.self="closePopup">
     <!-- Left Panel: Card Preview (Sticky) - Hidden on mobile -->
-    <div class="hidden md:block w-[280px] flex-shrink-0 sticky top-4 self-start">
+    <div class="hidden md:block w-[280px] flex-shrink-0 sticky top-[88px] self-start">
       <div v-if="previewCard" class="space-y-3">
         <!-- Card Image -->
         <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden">

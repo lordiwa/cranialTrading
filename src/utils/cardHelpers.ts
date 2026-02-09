@@ -2,6 +2,8 @@
  * Shared card helper utilities
  */
 
+import type { CardCondition } from '../types/card'
+
 /**
  * Clean card name by removing foil indicators, set codes, and collector numbers
  * Examples:
@@ -111,4 +113,125 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
     .trim()
 
   return { quantity, cardName, setCode, isFoil }
+}
+
+// ============ CSV (ManaBox) IMPORT ============
+
+/**
+ * Map ManaBox condition strings to app's CardCondition type
+ */
+export const mapCsvCondition = (condition: string): CardCondition => {
+  switch (condition?.toLowerCase().trim()) {
+    case 'mint': return 'M'
+    case 'near_mint': return 'NM'
+    case 'excellent': return 'LP'
+    case 'good': return 'LP'
+    case 'light_played': return 'MP'
+    case 'played': return 'HP'
+    case 'poor': return 'PO'
+    default: return 'NM'
+  }
+}
+
+/**
+ * Parse a CSV line handling quoted fields (e.g. card names with commas)
+ */
+export const parseCsvLine = (line: string): string[] => {
+  const fields: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+        current += '"'
+        i++ // skip escaped quote
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      fields.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  fields.push(current)
+  return fields
+}
+
+/**
+ * Parsed CSV card result
+ */
+export interface ParsedCsvCard {
+  name: string
+  setCode: string
+  quantity: number
+  foil: boolean
+  scryfallId: string
+  price: number
+  condition: CardCondition
+}
+
+/**
+ * Detect if text is a ManaBox CSV export
+ */
+export const isCsvFormat = (text: string): boolean => {
+  const firstLine = text.split('\n')[0]?.trim() || ''
+  return firstLine.includes('Name,Set code') || firstLine.includes('Scryfall ID')
+}
+
+/**
+ * Parse ManaBox CSV text into structured card data
+ */
+export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
+  const lines = csvText.split('\n').filter(l => l.trim())
+  if (lines.length < 2) return []
+
+  // Parse header to get column indices (flexible ordering)
+  const headerLine = lines[0]
+  if (!headerLine) return []
+  const headers = parseCsvLine(headerLine)
+  const colIndex = new Map<string, number>()
+  headers.forEach((h, i) => { colIndex.set(h.trim(), i) })
+
+  const nameIdx = colIndex.get('Name')
+  const setCodeIdx = colIndex.get('Set code')
+  const quantityIdx = colIndex.get('Quantity')
+  const foilIdx = colIndex.get('Foil')
+  const scryfallIdx = colIndex.get('Scryfall ID')
+  const priceIdx = colIndex.get('Purchase price')
+  const conditionIdx = colIndex.get('Condition')
+
+  if (nameIdx === undefined || quantityIdx === undefined) return []
+
+  const getField = (fields: string[], idx: number | undefined): string => {
+    if (idx === undefined) return ''
+    return fields[idx] ?? ''
+  }
+
+  const cards: ParsedCsvCard[] = []
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line) continue
+    const fields = parseCsvLine(line)
+    const name = getField(fields, nameIdx).trim()
+    const quantity = Number.parseInt(getField(fields, quantityIdx) || '0')
+
+    if (!name || !quantity || quantity <= 0) continue
+
+    cards.push({
+      name,
+      setCode: getField(fields, setCodeIdx).trim(),
+      quantity,
+      foil: getField(fields, foilIdx).trim().toLowerCase() === 'foil',
+      scryfallId: getField(fields, scryfallIdx).trim(),
+      price: Number.parseFloat(getField(fields, priceIdx) || '0') || 0,
+      condition: mapCsvCondition(getField(fields, conditionIdx)),
+    })
+  }
+
+  return cards
 }

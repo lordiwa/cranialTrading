@@ -15,18 +15,23 @@ const props = withDefaults(defineProps<{
   showInterest?: boolean
   isInterested?: boolean
   isBeingDeleted?: boolean
+  selectionMode?: boolean
+  isSelected?: boolean
 }>(), {
   compact: false,
   readonly: false,
   showInterest: false,
   isInterested: false,
-  isBeingDeleted: false
+  isBeingDeleted: false,
+  selectionMode: false,
+  isSelected: false,
 })
 
 const emit = defineEmits<{
   cardClick: [card: Card]
   delete: [card: Card]
   interest: [card: Card]
+  toggleSelect: [cardId: string]
 }>()
 
 const { t } = useI18n()
@@ -268,13 +273,32 @@ const getStatusIconName = (status: string) => {
 
     <!-- Card Image Container -->
     <div
-        class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden transition-all rounded"
+        class="relative aspect-[3/4] bg-secondary border overflow-hidden transition-all rounded"
         :class="[
-          isBeingDeleted ? 'border-rust animate-pulse' : (isCardAllocated ? 'border-neon-30' : 'group-hover:border-neon')
+          selectionMode && isSelected ? 'border-neon border-2' : '',
+          !selectionMode && isBeingDeleted ? 'border-rust animate-pulse border' : '',
+          !selectionMode && !isBeingDeleted ? (isCardAllocated ? 'border-neon-30 border' : 'border-silver-30 border group-hover:border-neon') : '',
+          selectionMode && !isSelected ? 'border-silver-30 border' : '',
         ]"
         :style="swipeStyle"
-        @click="!isBeingDeleted && !isSwiping && emit('cardClick', card)"
+        @click="selectionMode ? emit('toggleSelect', card.id) : (!isBeingDeleted && !isSwiping && emit('cardClick', card))"
     >
+      <!-- Selection checkbox overlay -->
+      <div
+          v-if="selectionMode"
+          class="absolute top-2 left-2 z-20"
+          @click.stop="emit('toggleSelect', card.id)"
+      >
+        <div
+            class="w-6 h-6 rounded border-2 flex items-center justify-center transition-all"
+            :class="isSelected ? 'bg-neon border-neon' : 'bg-primary/80 border-silver-50'"
+        >
+          <svg v-if="isSelected" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      </div>
+
       <img
           v-if="getCardImage(card)"
           :src="getCardImage(card)"

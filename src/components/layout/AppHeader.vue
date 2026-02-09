@@ -7,6 +7,7 @@ import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
+import MatchNotificationsDropdown from './MatchNotificationsDropdown.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
 
 const route = useRoute()
@@ -67,11 +68,11 @@ const closeMobileMenu = () => {
 const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessagesCount.value)
 
 const navigationLinks = computed(() => [
-  { path: '/dashboard', label: t('header.nav.search'), icon: 'search', badge: 0 },
   { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: 0 },
   { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
-  { path: '/saved-matches', label: t('header.nav.matches'), icon: 'handshake', badge: matchesSectionBadge.value },
 ])
+
+const isMatchesActive = computed(() => route.path.startsWith('/saved-matches'))
 
 const isActive = (path: string) => {
   // Handle paths with query params like /collection?filter=wishlist
@@ -129,7 +130,7 @@ onUnmounted(() => {
     <div class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16 md:h-20">
         <!-- Logo -->
-        <router-link to="/dashboard" class="flex items-center gap-2 flex-shrink-0">
+        <router-link to="/saved-matches" class="flex items-center gap-2 flex-shrink-0">
           <svg class="w-10 h-10 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
@@ -151,15 +152,11 @@ onUnmounted(() => {
           >
             <span class="relative">
               <SvgIcon :name="link.icon" size="small" />
-              <span
-                  v-if="link.badge > 0"
-                  class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
-              >
-                {{ link.badge > 9 ? '9+' : link.badge }}
-              </span>
             </span>
             {{ link.label }}
           </router-link>
+          <!-- Matches dropdown (replaces simple nav link) -->
+          <MatchNotificationsDropdown :active="isMatchesActive" />
         </nav>
 
         <!-- Global Search (Desktop) -->
@@ -249,6 +246,28 @@ onUnmounted(() => {
             </span>
           </span>
           {{ link.label }}
+        </router-link>
+        <!-- Matches (mobile - direct link) -->
+        <router-link
+            to="/saved-matches"
+            :class="[
+              'flex items-center gap-3 px-4 py-3 text-small font-bold transition-fast',
+              isMatchesActive
+                ? 'bg-neon-10 border-l-2 border-neon text-neon'
+                : 'text-silver-70 hover:text-silver'
+            ]"
+            @click="closeMobileMenu"
+        >
+          <span class="relative">
+            <SvgIcon name="handshake" size="small" />
+            <span
+                v-if="matchesSectionBadge > 0"
+                class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
+            >
+              {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
+            </span>
+          </span>
+          {{ t('header.nav.matches') }}
         </router-link>
         <!-- Mi Perfil (mobile) -->
         <router-link

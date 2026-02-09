@@ -6,9 +6,10 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import { useI18n } from '../../composables/useI18n'
-import { type CardCondition } from '../../types/card'
+import { type CardCondition, type CardStatus } from '../../types/card'
 import { type DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
+import { isCsvFormat, parseCsvDeckImport, type ParsedCsvCard } from '../../utils/cardHelpers'
 
 defineProps<{
   show: boolean
@@ -16,8 +17,9 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'import', deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string): void
-  (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition, makePublic?: boolean, format?: DeckFormat, commander?: string): void
+  (e: 'import', deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus): void
+  (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus): void
+  (e: 'importCsv', cards: ParsedCsvCard[], deckName: string | undefined, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus): void
 }>()
 
 const { t } = useI18n()
@@ -30,11 +32,31 @@ const preview = ref<{ total: number; mainboard: number; sideboard: number; name?
 const errorMsg = ref('')
 const isLink = ref(false)
 const moxfieldDeckData = ref<any>(null)
+const isCsv = ref(false)
+const csvParsedCards = ref<ParsedCsvCard[]>([])
+const csvFileInput = ref<HTMLInputElement | null>(null)
 
 // NEW: deck name input (optional). Prefill with preview.name when available
 const deckNameInput = ref('')
 // option to make all imported cards public
 const makeAllPublic = ref(false)
+
+// Import status
+const importStatus = ref<CardStatus>('collection')
+
+const statusOptions = computed(() => [
+  { value: 'collection', label: t('common.status.collection') },
+  { value: 'sale', label: t('common.status.sale') },
+  { value: 'trade', label: t('common.status.trade') },
+  { value: 'wishlist', label: t('common.status.wishlist') },
+])
+
+// Auto-enable makeAllPublic when status is sale or trade
+watch(importStatus, (newStatus) => {
+  if (newStatus === 'sale' || newStatus === 'trade') {
+    makeAllPublic.value = true
+  }
+})
 
 // Formato del deck
 const deckFormat = ref<DeckFormat>('modern')
@@ -71,6 +93,8 @@ const handleParse = async () => {
   parsing.value = true
   errorMsg.value = ''
   moxfieldDeckData.value = null
+  isCsv.value = false
+  csvParsedCards.value = []
 
   // Detectar si es link o ID de Moxfield
   const deckId = extractDeckId(inputText.value)
@@ -117,6 +141,22 @@ const handleParse = async () => {
         const firstCommander = Object.values(commanderCards)[0] as any
         commanderName.value = firstCommander?.card?.name || ''
       }
+    }
+  } else if (isCsvFormat(inputText.value)) {
+    // CSV de ManaBox
+    isLink.value = false
+    isCsv.value = true
+    const cards = parseCsvDeckImport(inputText.value)
+    csvParsedCards.value = cards
+
+    const totalQty = cards.reduce((sum, c) => sum + c.quantity, 0)
+    const cardNames = cards.map(c => c.name)
+
+    preview.value = {
+      total: totalQty,
+      mainboard: totalQty,
+      sideboard: 0,
+      cards: cardNames,
     }
   } else {
     // Es texto normal (lista de cartas o export de Moxfield)
@@ -166,13 +206,18 @@ const handleImport = () => {
   const nameToSend = deckNameInput.value?.trim() || undefined
   const commanderToSend = isCommander.value ? commanderName.value?.trim() || undefined : undefined
 
-  if (isLink.value && moxfieldDeckData.value) {
+  const statusToSend = importStatus.value !== 'collection' ? importStatus.value : undefined
+
+  if (isCsv.value && csvParsedCards.value.length > 0) {
+    // Importación desde CSV de ManaBox
+    emit('importCsv', csvParsedCards.value, nameToSend, makeAllPublic.value, deckFormat.value, commanderToSend, statusToSend)
+  } else if (isLink.value && moxfieldDeckData.value) {
     // Importación directa desde API de Moxfield
     const cards = moxfieldToCardList(moxfieldDeckData.value, includeSideboard.value)
-    emit('importDirect', cards, nameToSend, condition.value, makeAllPublic.value, deckFormat.value, commanderToSend)
+    emit('importDirect', cards, nameToSend, condition.value, makeAllPublic.value, deckFormat.value, commanderToSend, statusToSend)
   } else {
     // Importación desde texto
-    emit('import', inputText.value, condition.value, includeSideboard.value, nameToSend, makeAllPublic.value, deckFormat.value, commanderToSend)
+    emit('import', inputText.value, condition.value, includeSideboard.value, nameToSend, makeAllPublic.value, deckFormat.value, commanderToSend, statusToSend)
   }
 }
 
@@ -187,7 +232,21 @@ const handleClose = () => {
   errorMsg.value = ''
   isLink.value = false
   moxfieldDeckData.value = null
+  isCsv.value = false
+  csvParsedCards.value = []
+  importStatus.value = 'collection'
   emit('close')
+}
+
+const handleCsvFile = (event: Event) => {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    inputText.value = (e.target?.result as string) || ''
+    preview.value = null
+  }
+  reader.readAsText(file)
 }
 </script>
 
@@ -201,11 +260,25 @@ const handleClose = () => {
         <textarea
             id="import-deck-input"
             v-model="inputText"
-            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;..."
+            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;...&#10;o&#10;CSV de ManaBox"
             class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-mono"
             rows="8"
             @input="preview = null"
         />
+        <input
+            ref="csvFileInput"
+            type="file"
+            accept=".csv"
+            class="hidden"
+            @change="handleCsvFile"
+        />
+        <button
+            type="button"
+            class="mt-2 text-tiny text-silver-50 hover:text-neon transition-fast underline"
+            @click="csvFileInput?.click()"
+        >
+          {{ t('decks.importModal.csvUpload') }}
+        </button>
       </div>
 
       <BaseButton
@@ -235,6 +308,12 @@ const handleClose = () => {
         <p class="text-small text-rust">{{ errorMsg }}</p>
       </div>
 
+      <!-- CSV detected indicator -->
+      <div v-if="preview && isCsv" class="border border-neon bg-neon/10 p-md">
+        <p class="text-small text-neon font-bold">{{ t('decks.importModal.csvDetected') }}</p>
+        <p class="text-small text-silver mt-1">{{ t('decks.importModal.csvCards', { count: csvParsedCards.length }) }}</p>
+      </div>
+
       <div v-if="preview" class="border border-silver-30 p-md space-y-xs">
         <p v-if="preview.name" class="text-body font-bold text-neon mb-3">
           {{ preview.name }}
@@ -247,13 +326,17 @@ const handleClose = () => {
         </p>
       </div>
 
-      <div v-if="preview">
+      <!-- Condition selector (not shown for CSV — conditions come from CSV) -->
+      <div v-if="preview && !isCsv">
         <label for="import-deck-condition" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.conditionLabel') }}</label>
         <BaseSelect
             id="import-deck-condition"
             v-model="condition"
             :options="conditionOptions"
         />
+      </div>
+      <div v-if="preview && isCsv">
+        <p class="text-tiny text-silver-50">{{ t('decks.importModal.csvConditionNote') }}</p>
       </div>
 
       <div v-if="preview && preview.sideboard > 0">
@@ -280,6 +363,16 @@ const handleClose = () => {
             id="import-deck-format"
             v-model="deckFormat"
             :options="formatOptions"
+        />
+      </div>
+
+      <!-- Import status selector -->
+      <div v-if="preview">
+        <label for="import-deck-status" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.statusLabel') }}</label>
+        <BaseSelect
+            id="import-deck-status"
+            v-model="importStatus"
+            :options="statusOptions"
         />
       </div>
 

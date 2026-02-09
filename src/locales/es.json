@@ -449,6 +449,17 @@
         "total": "TOTAL"
       }
     },
+    "bulkDelete": {
+      "toggle": "Activar modo selección",
+      "select": "Seleccionar",
+      "selected": "{count} seleccionadas",
+      "selectAll": "Seleccionar todas",
+      "clearSelection": "Limpiar",
+      "deleteSelected": "ELIMINAR {count}",
+      "title": "Eliminar cartas",
+      "confirm": "¿Eliminar {count} cartas seleccionadas? Esta acción no se puede deshacer.",
+      "success": "{count} cartas eliminadas"
+    },
     "messages": {
       "loadError": "Error al cargar colección",
       "addError": "Error al agregar carta",
@@ -678,9 +689,14 @@
         "commanderLabel": "Comandante",
         "commanderPlaceholder": "Nombre del comandante...",
         "commanderHint": "Escribe el nombre o selecciona de las cartas importadas",
-        "makePublic": "Hacer todas estas cartas públicas"
+        "makePublic": "Hacer todas estas cartas públicas",
+        "statusLabel": "Estado de las cartas"
       },
-      "submit": "IMPORTAR {count} CARTAS"
+      "submit": "IMPORTAR {count} CARTAS",
+      "csvUpload": "o subir archivo CSV",
+      "csvDetected": "CSV de ManaBox detectado",
+      "csvConditionNote": "Las condiciones se importarán por carta desde el CSV",
+      "csvCards": "{count} cartas encontradas en el CSV"
     },
     "editDeckCard": {
       "titleWishlist": "EDITAR WISHLIST",
@@ -889,6 +905,7 @@
       "deletedCardsKept": "Deck eliminado (cartas conservadas)",
       "deletedWithCards": "Deck y {count} cartas eliminadas",
       "deleteError": "Error al eliminar deck",
+      "deletingDeck": "Eliminando deck...",
       "noCardsInDeck": "No hay cartas en el deck",
       "cardsNowPublic": "{count} cartas ahora son públicas",
       "cardsNowPrivate": "{count} cartas ahora son privadas",
@@ -988,6 +1005,21 @@
       "daysAgo": "hace {days}d",
       "weWant": "QUEREMOS",
       "theyOffer": "OFRECEN"
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "newSingular": "nuevo",
+      "newPlural": "nuevos",
+      "wantsYourCard": "quiere tu carta {card}",
+      "hasCardYouWant": "tiene la carta {card} que buscas",
+      "justNow": "ahora",
+      "minutesAgo": "hace {n}m",
+      "hoursAgo": "hace {n}h",
+      "daysAgo": "hace {n}d",
+      "sell": "VENTA",
+      "buy": "BUSCA",
+      "empty": "No tienes alertas nuevas",
+      "goToMatches": "Ir a mis matches"
     },
     "messages": {
       "loadError": "Error al cargar matches",

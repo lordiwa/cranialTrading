@@ -4,9 +4,10 @@ import { useRouter } from 'vue-router'
 import { useCollectionStore } from '../../stores/collection'
 import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
-import { collection, getDocs } from 'firebase/firestore'
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useAuthStore } from '../../stores/auth'
+import { useToastStore } from '../../stores/toast'
 import { getAvatarUrlForUser } from '../../utils/avatar'
 import SvgIcon from './SvgIcon.vue'
 import ManaCost from './ManaCost.vue'
@@ -14,6 +15,7 @@ import ManaCost from './ManaCost.vue'
 const router = useRouter()
 const collectionStore = useCollectionStore()
 const authStore = useAuthStore()
+const toastStore = useToastStore()
 const { t } = useI18n()
 
 const searchQuery = ref('')
@@ -162,6 +164,91 @@ const goToScryfall = (card: any) => {
   router.push({ path: '/collection', query: { addCard: card.name } })
 }
 
+// ME INTERESA - send interest from search results
+const sentInterestIds = ref<Set<string>>(new Set())
+const sendingInterest = ref(false)
+
+const sendInterestFromSearch = async (card: any) => {
+  if (!authStore.user || sentInterestIds.value.has(card.id) || sendingInterest.value) return
+
+  sendingInterest.value = true
+  try {
+    const scryfallId = card.scryfallId || ''
+    const edition = card.edition || ''
+
+    // Check for existing duplicate match
+    const sharedMatchesRef = collection(db, 'shared_matches')
+    const existingQuery = query(
+      sharedMatchesRef,
+      where('senderId', '==', authStore.user.id),
+      where('receiverId', '==', card.userId),
+      where('card.scryfallId', '==', scryfallId)
+    )
+    const existingSnapshot = await getDocs(existingQuery)
+
+    const hasDuplicate = existingSnapshot.docs.some(docSnap => {
+      const data = docSnap.data()
+      return data.card?.edition === edition
+    })
+
+    if (hasDuplicate) {
+      sentInterestIds.value.add(card.id)
+      toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'info')
+      return
+    }
+
+    const MATCH_LIFETIME_DAYS = 15
+    const getExpirationDate = () => {
+      const date = new Date()
+      date.setDate(date.getDate() + MATCH_LIFETIME_DAYS)
+      return date
+    }
+
+    const cardData = {
+      id: card.cardId || card.id,
+      scryfallId,
+      name: card.cardName || '',
+      edition,
+      quantity: card.quantity || 1,
+      condition: card.condition || 'NM',
+      foil: card.foil || false,
+      price: card.price || 0,
+      image: card.image || '',
+      status: card.status || 'sale',
+    }
+
+    const totalValue = (card.price || 0) * (card.quantity || 1)
+
+    const sharedMatchPayload = {
+      senderId: authStore.user.id,
+      senderUsername: authStore.user.username,
+      senderLocation: authStore.user.location || '',
+      senderEmail: authStore.user.email || '',
+      receiverId: card.userId,
+      receiverUsername: card.username || '',
+      receiverLocation: card.location || '',
+      card: cardData,
+      cardType: card.status || 'sale',
+      totalValue,
+      status: 'pending',
+      senderStatus: 'interested',
+      receiverStatus: 'new',
+      createdAt: new Date(),
+      lifeExpiresAt: getExpirationDate(),
+    }
+
+    await addDoc(sharedMatchesRef, sharedMatchPayload)
+
+    sentInterestIds.value.add(card.id)
+    toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'success')
+  } catch (error) {
+    console.error('Error sending interest:', error)
+    toastStore.show(t('dashboard.interest.error'), 'error')
+  } finally {
+    sendingInterest.value = false
+  }
+}
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
@@ -287,19 +374,19 @@ defineExpose({
           <div v-if="usersResults.length === 0" class="p-4 text-center text-small text-silver-50">
             {{ t('header.search.noResults') }}
           </div>
-          <button
+          <div
             v-for="card in usersResults"
             :key="card.id"
-            @click="goToUserCard(card)"
-            class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
+            class="px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors border-b border-silver-20 last:border-0"
           >
             <img
               v-if="card.image"
               :src="card.image"
               :alt="card.cardName"
-              class="w-10 h-14 object-cover rounded"
+              class="w-10 h-14 object-cover rounded cursor-pointer"
+              @click="goToUserCard(card)"
             />
-            <div class="flex-1 min-w-0">
+            <div class="flex-1 min-w-0 cursor-pointer" @click="goToUserCard(card)">
               <p class="text-small font-bold text-silver truncate">{{ card.cardName }}</p>
               <p class="text-tiny text-silver-50 flex items-center gap-1">
                 <img
@@ -309,8 +396,19 @@ defineExpose({
                 @{{ card.username }} · {{ card.status }}
               </p>
             </div>
-            <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) || 'N/A' }}</span>
-          </button>
+            <div class="flex flex-col items-end gap-1 flex-shrink-0">
+              <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) || 'N/A' }}</span>
+              <button
+                v-if="!sentInterestIds.has(card.id)"
+                @click.stop="sendInterestFromSearch(card)"
+                :disabled="sendingInterest"
+                class="px-2 py-0.5 bg-neon-10 border border-neon text-neon text-[10px] font-bold hover:bg-neon-20 transition-all rounded whitespace-nowrap"
+              >
+                ME INTERESA
+              </button>
+              <span v-else class="text-[10px] text-silver-50 whitespace-nowrap">{{ t('dashboard.searchOthers.sent') }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- Scryfall Results -->

@@ -280,7 +280,7 @@ export const useCollectionStore = defineStore('collection', () => {
      * Delete multiple cards efficiently using Firestore batch
      * Optimistic UI: removes from UI immediately, then syncs with Firebase
      */
-    const batchDeleteCards = async (cardIds: string[]): Promise<boolean> => {
+    const batchDeleteCards = async (cardIds: string[], onProgress?: (percent: number) => void): Promise<boolean> => {
         if (!authStore.user || cardIds.length === 0) return false
 
         // Save cards for potential restore on error
@@ -305,23 +305,49 @@ export const useCollectionStore = defineStore('collection', () => {
             const BATCH_SIZE = 400
             const userId = authStore.user.id
 
-            // Delete in batches of 400 (Firestore limit is 500)
+            // Only sale/trade cards exist in public_cards
+            const publicCardIds = deletedCards
+                .filter(({ card }) => card.status === 'sale' || card.status === 'trade')
+                .map(({ card }) => card.id)
+
+            const totalBatches = Math.ceil(cardIds.length / BATCH_SIZE) + Math.ceil(publicCardIds.length / BATCH_SIZE)
+            let completedBatches = 0
+
+            // Phase 1: Delete user cards in batches of 400
             for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
                 const batch = writeBatch(db)
                 const chunk = cardIds.slice(i, i + BATCH_SIZE)
 
                 for (const cardId of chunk) {
-                    const cardRef = doc(db, 'users', userId, 'cards', cardId)
-                    batch.delete(cardRef)
+                    batch.delete(doc(db, 'users', userId, 'cards', cardId))
                 }
 
                 await batch.commit()
+                completedBatches++
+                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
+
+                if (i + BATCH_SIZE < cardIds.length) {
+                    await new Promise(resolve => setTimeout(resolve, 200))
+                }
             }
 
-            // Remove from public_cards collection
-            await Promise.all(cardIds.map(cardId =>
-                removeCardFromPublic(cardId, authStore.user!.id).catch(() => {})
-            ))
+            // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
+            for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
+                const batch = writeBatch(db)
+                const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
+
+                for (const cardId of chunk) {
+                    batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
+                }
+
+                await batch.commit()
+                completedBatches++
+                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
+
+                if (i + BATCH_SIZE < publicCardIds.length) {
+                    await new Promise(resolve => setTimeout(resolve, 200))
+                }
+            }
 
             return true
         } catch (error) {
@@ -399,25 +425,51 @@ export const useCollectionStore = defineStore('collection', () => {
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
-            const addPromises: Promise<any>[] = []
 
-            for (const card of cardsToSave) {
-                // Remove any local id before saving
-                const { id: _id, ...cardWithoutId } = card as any
-                addPromises.push(
-                    addDoc(colRef, {
-                        ...cardWithoutId,
+            // Process in batches of 50 to avoid overwhelming Firestore
+            const BATCH_SIZE = 50
+            const createdIds: string[] = []
+            let failCount = 0
+
+            for (let i = 0; i < cardsToSave.length; i += BATCH_SIZE) {
+                const batch = cardsToSave.slice(i, i + BATCH_SIZE)
+                const addPromises = batch.map(async card => {
+                    const { id: _id, ...cardWithoutId } = card as any
+                    // Strip undefined values that Firestore rejects
+                    const cleanData: Record<string, any> = {}
+                    for (const [key, value] of Object.entries(cardWithoutId)) {
+                        if (value !== undefined) cleanData[key] = value
+                    }
+                    return addDoc(colRef, {
+                        ...cleanData,
                         createdAt: Timestamp.now(),
                         updatedAt: Timestamp.now(),
                     })
-                )
+                })
+
+                const results = await Promise.allSettled(addPromises)
+                for (const result of results) {
+                    if (result.status === 'fulfilled') {
+                        createdIds.push(result.value.id)
+                    } else {
+                        failCount++
+                        console.error('Error saving card:', result.reason)
+                    }
+                }
+
+                // Throttle between batches to avoid exhausting Firestore write stream
+                if (i + BATCH_SIZE < cardsToSave.length) {
+                    await new Promise(resolve => setTimeout(resolve, 200))
+                }
             }
 
-            const docRefs = await Promise.all(addPromises)
-            const createdIds = docRefs.map(ref => ref.id)
             await loadCollection()
             if (!silent) {
-                toastStore.show(t('collection.messages.imported', { count: cardsToSave.length }), 'success')
+                if (failCount > 0) {
+                    toastStore.show(t('collection.messages.imported', { count: createdIds.length }) + ` (${failCount} fallaron)`, 'info')
+                } else {
+                    toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')
+                }
             }
             return createdIds
         } catch (error) {

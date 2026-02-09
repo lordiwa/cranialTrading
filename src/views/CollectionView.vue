@@ -29,7 +29,7 @@ import { useDecksStore } from '../stores/decks'
 import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { getCardsByIds, searchCards } from '../services/scryfall'
-import { cleanCardName } from '../utils/cardHelpers'
+import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
 import FilterPanel from '../components/search/FilterPanel.vue'
 import SearchResultCard from '../components/search/SearchResultCard.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
@@ -192,7 +192,13 @@ const importProgress = ref<ImportState | null>(null)
 // localStorage helpers
 const saveImportState = (state: ImportState) => {
   try {
-    localStorage.setItem(IMPORT_STORAGE_KEY, JSON.stringify(state))
+    // Don't persist cards/cardMeta arrays — they're too large for localStorage
+    const { cards: _c, cardMeta: _m, ...lightweight } = state
+    localStorage.setItem(IMPORT_STORAGE_KEY, JSON.stringify({
+      ...lightweight,
+      cards: [],
+      cardMeta: [],
+    }))
     importProgress.value = state
   } catch (e) {
     console.warn('[Import] Failed to save state to localStorage:', e)
@@ -239,21 +245,32 @@ const getImportProgress = (deckId: string): number => {
 interface DeleteDeckState {
   deckId: string
   deckName: string
-  status: 'deleting_deck' | 'deleting_cards' | 'complete' | 'error'
+  status: 'deleting_cards' | 'deleting_deck' | 'complete' | 'error'
   deleteCards: boolean
-  cardIds: string[]
-  deletedCardIds: string[]
+  cardCount: number
 }
 
 const DELETE_DECK_STORAGE_KEY = 'cranial_delete_deck_progress'
 const deleteDeckProgress = ref<DeleteDeckState | null>(null)
+const isDeletingDeck = ref(false)
+const deleteProgress = ref(0)
 
 const saveDeleteDeckState = (state: DeleteDeckState) => {
   try {
     localStorage.setItem(DELETE_DECK_STORAGE_KEY, JSON.stringify(state))
     deleteDeckProgress.value = state
   } catch (e) {
+    // If quota exceeded, clear stale import state and retry
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      try {
+        localStorage.removeItem(IMPORT_STORAGE_KEY)
+        localStorage.setItem(DELETE_DECK_STORAGE_KEY, JSON.stringify(state))
+        deleteDeckProgress.value = state
+        return
+      } catch { /* ignore */ }
+    }
     console.warn('[DeleteDeck] Failed to save state:', e)
+    deleteDeckProgress.value = state
   }
 }
 
@@ -822,14 +839,7 @@ const deckTotalCost = computed(() => {
 
 // Card IDs currently being deleted (for disabling UI)
 const deletingCardIds = computed(() => {
-  if (!deleteDeckProgress.value || deleteDeckProgress.value.status === 'complete') {
-    return new Set<string>()
-  }
-  // Return all card IDs that are pending deletion (not yet deleted)
-  const pendingIds = deleteDeckProgress.value.cardIds.filter(
-    id => !deleteDeckProgress.value!.deletedCardIds.includes(id)
-  )
-  return new Set(pendingIds)
+  return new Set<string>()
 })
 
 // ¿Todas las cartas del deck son públicas?
@@ -851,6 +861,64 @@ const deckOwnedCount = computed(() => {
 const deckWishlistCount = computed(() => {
   return deckWishlistCards.value.reduce((sum, item) => sum + item.quantity, 0)
 })
+
+// ========== BULK SELECTION ==========
+const selectionMode = ref(false)
+const selectedCardIds = ref<Set<string>>(new Set())
+
+const toggleSelectionMode = () => {
+  selectionMode.value = !selectionMode.value
+  if (!selectionMode.value) {
+    selectedCardIds.value = new Set()
+  }
+}
+
+const toggleCardSelection = (cardId: string) => {
+  const next = new Set(selectedCardIds.value)
+  if (next.has(cardId)) {
+    next.delete(cardId)
+  } else {
+    next.add(cardId)
+  }
+  selectedCardIds.value = next
+}
+
+const selectAllFiltered = () => {
+  const ids = new Set(selectedCardIds.value)
+  for (const card of filteredCards.value) {
+    ids.add(card.id)
+  }
+  for (const card of wishlistCards.value) {
+    ids.add(card.id)
+  }
+  selectedCardIds.value = ids
+}
+
+const clearSelection = () => {
+  selectedCardIds.value = new Set()
+}
+
+const handleBulkDelete = async () => {
+  if (selectedCardIds.value.size === 0) return
+
+  const confirmed = await confirmStore.show({
+    title: t('collection.bulkDelete.title'),
+    message: t('collection.bulkDelete.confirm', { count: selectedCardIds.value.size }),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
+
+  const ids = [...selectedCardIds.value]
+  const success = await collectionStore.batchDeleteCards(ids)
+  if (success) {
+    toastStore.show(t('collection.bulkDelete.success', { count: ids.length }), 'success')
+    selectedCardIds.value = new Set()
+    selectionMode.value = false
+  }
+}
 
 // ========== METHODS ==========
 
@@ -1072,7 +1140,8 @@ const handleImport = async (
   deckName?: string,
   makePublic?: boolean,
   format?: DeckFormat,
-  commander?: string
+  commander?: string,
+  status?: CardStatus
 ) => {
   const finalDeckName = deckName || `Deck${Date.now()}`
   showImportDeckModal.value = false
@@ -1111,7 +1180,7 @@ const handleImport = async (
       foil: isFoil,
       price: scryfallData?.price || 0,
       image: scryfallData?.image || '',
-      status: 'collection',
+      status: status || 'collection',
       public: makePublic || false,
       isInSideboard: inSideboard,
       cmc: scryfallData?.cmc,
@@ -1161,7 +1230,8 @@ const handleImportDirect = async (
   condition: CardCondition,
   makePublic?: boolean,
   format?: DeckFormat,
-  commander?: string
+  commander?: string,
+  status?: CardStatus
 ) => {
   // Prevent duplicate executions
   if (isImportRunning) {
@@ -1281,7 +1351,7 @@ const handleImportDirect = async (
         foil: isFoil,
         price,
         image,
-        status: 'collection',
+        status: status || 'collection',
         public: makePublic || false,
         cmc,
         type_line,
@@ -1431,8 +1501,132 @@ const handleImportDirect = async (
   }
 }
 
+// Importar desde CSV de ManaBox (batch Scryfall lookup)
+const handleImportCsv = async (
+  cards: ParsedCsvCard[],
+  deckName?: string,
+  makePublic?: boolean,
+  format?: DeckFormat,
+  commander?: string,
+  status?: CardStatus
+) => {
+  const finalDeckName = deckName || `CSV Import ${Date.now()}`
+  showImportDeckModal.value = false
+
+  // Progress toast like handleImport
+  const progressToast = toastStore.showProgress(`Importando "${finalDeckName}"...`, 0)
+
+  try {
+    // PASO 1: Crear deck
+    progressToast.update(5, `Creando deck "${finalDeckName}"...`)
+    const deckId = await decksStore.createDeck({
+      name: finalDeckName,
+      format: format || 'custom',
+      description: '',
+      colors: [],
+      commander: commander || '',
+    })
+
+    if (!deckId) {
+      progressToast.error('Error al crear el deck')
+      return
+    }
+
+    viewMode.value = 'decks'
+    deckFilter.value = deckId
+
+    // PASO 2: Batch fetch Scryfall data
+    progressToast.update(10, `Obteniendo datos de ${cards.length} cartas...`)
+    const identifiers = cards
+      .filter(c => c.scryfallId)
+      .map(c => ({ id: c.scryfallId }))
+    const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
+
+    const scryfallDataMap = new Map<string, any>()
+    if (uniqueIds.length > 0) {
+      const scryfallCards = await getCardsByIds(uniqueIds)
+      for (const sc of scryfallCards) {
+        scryfallDataMap.set(sc.id, sc)
+      }
+    }
+    progressToast.update(25, `Procesando ${cards.length} cartas...`)
+
+    // PASO 3: Build collection cards
+    const collectionCardsToAdd: any[] = []
+    const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i]!
+      const sc = scryfallDataMap.get(card.scryfallId)
+      let image = sc?.image_uris?.normal || ''
+      if (!image && sc?.card_faces?.length > 0) {
+        image = sc.card_faces[0]?.image_uris?.normal || ''
+      }
+      const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
+
+      const cardData: any = {
+        scryfallId: card.scryfallId || '',
+        name: card.name,
+        edition: sc?.set_name || card.setCode || 'Unknown',
+        quantity: card.quantity,
+        condition: card.condition,
+        foil: card.foil,
+        price,
+        image,
+        status: status || 'collection',
+        public: makePublic || false,
+        cmc: sc?.cmc,
+        type_line: sc?.type_line,
+        colors: sc?.colors || [],
+      }
+      if (card.setCode) {
+        cardData.setCode = card.setCode.toUpperCase()
+      }
+      collectionCardsToAdd.push(cardData)
+      cardMeta.push({ quantity: card.quantity, isInSideboard: false })
+
+      // Update progress (25-45% range)
+      if (i % 50 === 0) {
+        const pct = 25 + Math.round((i / cards.length) * 20)
+        progressToast.update(pct, `Procesando ${i + 1}/${cards.length}...`)
+      }
+    }
+
+    // PASO 4: Guardar en colección
+    progressToast.update(50, `Guardando ${collectionCardsToAdd.length} cartas...`)
+    let allocatedCount = 0
+
+    if (collectionCardsToAdd.length > 0) {
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      progressToast.update(60, `Asignando cartas al deck...`)
+
+      // PASO 5: Asignar al deck
+      for (let i = 0; i < createdCardIds.length; i++) {
+        const cardId = createdCardIds[i]
+        const meta = cardMeta[i]
+        if (cardId && meta) {
+          const result = await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
+          allocatedCount += result.allocated
+
+          if (i % 20 === 0) {
+            const pct = 60 + Math.round((i / createdCardIds.length) * 35)
+            progressToast.update(pct, `Asignando ${i + 1}/${createdCardIds.length}...`)
+          }
+        }
+      }
+    }
+
+    // PASO 6: Completar
+    await decksStore.loadDecks()
+    progressToast.complete(`"${finalDeckName}" importado con ${allocatedCount} cartas`)
+  } catch (error) {
+    console.error('[CSV Import] Error:', error)
+    progressToast.error('Error al importar CSV')
+  }
+}
+
 // Execute delete deck with progress tracking (can resume)
-const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnType<typeof toastStore.showProgress>, isResume = false) => {
+const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isResume = false) => {
   // Prevent duplicate executions (only check if not a resume with existing toast)
   if (!isResume && isDeleteRunning) {
     console.log('[DeleteDeck] Already running, skipping...')
@@ -1440,78 +1634,48 @@ const executeDeleteDeck = async (state: DeleteDeckState, progressToast?: ReturnT
   }
   isDeleteRunning = true
 
-  // Create progress toast if not provided (new operation vs resume)
-  const progress = progressToast || (state.deleteCards && state.cardIds.length > 0
-    ? toastStore.showProgress(`Eliminando "${state.deckName}"...`, 0)
-    : null)
+  isDeletingDeck.value = true
+  deleteProgress.value = 0
 
   try {
-    // Step 1: Delete deck (if not already done)
-    if (state.status === 'deleting_deck') {
-      await decksStore.deleteDeck(state.deckId)
-      deckFilter.value = 'all'
-
-      // If no cards to delete, we're done
-      if (!state.deleteCards || state.cardIds.length === 0) {
-        state.status = 'complete'
-        saveDeleteDeckState(state)
-        if (progress) {
-          progress.complete(t('decks.messages.deleted'))
-        } else {
-          toastStore.show(t('decks.messages.deletedCardsKept'), 'success')
-        }
-        clearDeleteDeckState()
-        isDeleteRunning = false
-        return
+    // Step 1: Delete cards FIRST using batch (atomic, prevents orphans)
+    if (state.status === 'deleting_cards' && cardIds.length > 0) {
+      const success = await collectionStore.batchDeleteCards(cardIds, (percent) => {
+        // Cards deletion is 0-90% of total progress
+        deleteProgress.value = Math.round(percent * 0.9)
+      })
+      if (!success) {
+        throw new Error('Batch delete cards failed')
       }
-
-      // Move to deleting cards
-      state.status = 'deleting_cards'
-      saveDeleteDeckState(state)
     }
 
-    // Step 2: Delete cards one by one with progress tracking
-    if (state.status === 'deleting_cards') {
-      const totalCards = state.cardIds.length
-      const remainingCardIds = state.cardIds.filter(id => !state.deletedCardIds.includes(id))
+    // Step 2: Delete the deck
+    deleteProgress.value = 90
+    state.status = 'deleting_deck'
+    saveDeleteDeckState(state)
+    await decksStore.deleteDeck(state.deckId)
+    deckFilter.value = 'all'
 
-      for (const cardId of remainingCardIds) {
-        try {
-          await collectionStore.deleteCard(cardId)
-          state.deletedCardIds.push(cardId)
-          saveDeleteDeckState(state)
+    state.status = 'complete'
+    deleteProgress.value = 100
+    clearDeleteDeckState()
 
-          // Update progress toast
-          if (progress) {
-            const percent = Math.round((state.deletedCardIds.length / totalCards) * 100)
-            progress.update(percent, `Eliminando cartas... ${state.deletedCardIds.length}/${totalCards}`)
-          }
-        } catch (e) {
-          console.error(`[DeleteDeck] Error deleting card ${cardId}:`, e)
-          // Continue with other cards
-        }
-      }
-
-      state.status = 'complete'
-      saveDeleteDeckState(state)
-      if (progress) {
-        progress.complete(t('decks.messages.deletedWithCards', { count: state.deletedCardIds.length }))
-      } else {
-        toastStore.show(t('decks.messages.deletedWithCards', { count: state.deletedCardIds.length }), 'success')
-      }
-      clearDeleteDeckState()
-      isDeleteRunning = false
+    if (state.deleteCards && cardIds.length > 0) {
+      toastStore.show(t('decks.messages.deletedWithCards', { count: cardIds.length }), 'success')
+    } else {
+      toastStore.show(t('decks.messages.deletedCardsKept'), 'success')
     }
+    isDeleteRunning = false
+    isDeletingDeck.value = false
+    deleteProgress.value = 0
   } catch (err) {
     console.error('[DeleteDeck] Error:', err)
     state.status = 'error'
     saveDeleteDeckState(state)
-    if (progress) {
-      progress.error(t('decks.messages.deleteError'))
-    } else {
-      toastStore.show(t('decks.messages.deleteError'), 'error')
-    }
+    toastStore.show(t('decks.messages.deleteError'), 'error')
     isDeleteRunning = false
+    isDeletingDeck.value = false
+    deleteProgress.value = 0
   }
 }
 
@@ -1530,26 +1694,19 @@ const resumeDeleteDeck = async (savedState: DeleteDeckState) => {
     return
   }
 
-  if (savedState.status === 'error') {
-    savedState.status = savedState.deletedCardIds.length > 0 ? 'deleting_cards' : 'deleting_deck'
+  // On resume: if crashed during card deletion, deck still exists → just retry deck deletion
+  // If crashed during deck deletion, just retry that
+  if (savedState.status === 'error' || savedState.status === 'deleting_cards') {
+    savedState.status = 'deleting_deck'
   }
 
-  // Calculate initial progress for resume
-  const initialProgress = savedState.cardIds.length > 0
-    ? Math.round((savedState.deletedCardIds.length / savedState.cardIds.length) * 100)
-    : 0
-
-  const progress = toastStore.showProgress(
-    `Continuando eliminación de "${savedState.deckName}"...`,
-    initialProgress
-  )
-
-  await executeDeleteDeck(savedState, progress, true)
+  // No cardIds on resume — cards were either batch-deleted or not
+  await executeDeleteDeck(savedState, [], true)
 }
 
 // Eliminar deck
 const handleDeleteDeck = async () => {
-  if (!selectedDeck.value) return
+  if (!selectedDeck.value || isDeletingDeck.value) return
 
   // Guardar referencias ANTES de cualquier operación (el computed puede cambiar)
   const deckId = selectedDeck.value.id
@@ -1581,18 +1738,18 @@ const handleDeleteDeck = async () => {
     })
   }
 
-  // Initialize state and execute
+  // Initialize state (lightweight — no cardIds stored in localStorage)
   const state: DeleteDeckState = {
     deckId,
     deckName,
-    status: 'deleting_deck',
+    status: deleteCards && cardIds.length > 0 ? 'deleting_cards' : 'deleting_deck',
     deleteCards,
-    cardIds: deleteCards ? cardIds : [],
-    deletedCardIds: []
+    cardCount: deleteCards ? cardIds.length : 0,
   }
   saveDeleteDeckState(state)
 
-  await executeDeleteDeck(state)
+  // Pass cardIds as param (not stored in localStorage to avoid QuotaExceeded)
+  await executeDeleteDeck(state, deleteCards ? cardIds : [])
 }
 
 // Toggle visibilidad de todas las cartas del deck
@@ -2065,10 +2222,28 @@ onUnmounted(() => {
                 </BaseButton>
                 <HelpTooltip :text="isDeckPublic ? t('help.tooltips.collection.deckPublic') : t('help.tooltips.collection.deckPrivate')" :title="t('help.titles.deckVisibility')" />
               </div>
-              <BaseButton size="small" variant="secondary" @click="handleDeleteDeck">
-                <span class="hidden sm:inline">ELIMINAR</span>
-                <span class="sm:hidden">🗑️</span>
+              <BaseButton size="small" variant="secondary" @click="handleDeleteDeck" :disabled="isDeletingDeck">
+                <template v-if="isDeletingDeck">
+                  <span class="animate-spin inline-block">⏳</span>
+                </template>
+                <template v-else>
+                  <span class="hidden sm:inline">ELIMINAR</span>
+                  <span class="sm:hidden">🗑️</span>
+                </template>
               </BaseButton>
+            </div>
+          </div>
+          <!-- Delete progress bar -->
+          <div v-if="isDeletingDeck" class="w-full">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-tiny text-silver-50">{{ t('decks.messages.deletingDeck') }}</span>
+              <span class="text-tiny text-neon font-bold">{{ deleteProgress }}%</span>
+            </div>
+            <div class="w-full h-2 bg-primary border border-silver-50/30 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-neon rounded-full transition-all duration-300"
+                :style="{ width: `${deleteProgress}%` }"
+              ></div>
             </div>
           </div>
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -2113,8 +2288,7 @@ onUnmounted(() => {
               <span class="text-tiny text-neon font-bold">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
             </div>
           </div>
-
-                  </div>
+</div>
 
         <!-- ========== STATUS FILTERS (solo en modo colección) ========== -->
         <div v-if="viewMode === 'collection'" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
@@ -2221,6 +2395,21 @@ onUnmounted(() => {
               </button>
             </div>
 
+            <!-- Bulk select toggle (only in collection mode) -->
+            <div v-if="viewMode === 'collection'" class="flex items-center gap-2">
+              <button
+                  @click="toggleSelectionMode"
+                  :class="[
+                    'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1',
+                    selectionMode ? 'bg-rust/20 text-rust' : 'text-silver-50 hover:text-silver'
+                  ]"
+                  :title="t('collection.bulkDelete.toggle')"
+              >
+                <SvgIcon name="check" size="tiny" />
+                {{ t('collection.bulkDelete.select') }}
+              </button>
+            </div>
+
             <!-- View type (only in collection mode, hidden when stacking) -->
             <div v-if="viewMode === 'collection' && !stackVariants" class="flex items-center gap-1">
               <button
@@ -2244,6 +2433,41 @@ onUnmounted(() => {
                 <SvgIcon name="settings" size="small" />
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- ========== BULK SELECTION ACTION BAR ========== -->
+        <div v-if="selectionMode && viewMode === 'collection'" class="bg-rust/10 border border-rust p-3 mb-4 flex flex-wrap items-center justify-between gap-3 rounded">
+          <div class="flex items-center gap-3">
+            <span class="text-small font-bold text-silver">
+              {{ t('collection.bulkDelete.selected', { count: selectedCardIds.size }) }}
+            </span>
+            <button
+                @click="selectAllFiltered"
+                class="text-tiny text-neon hover:text-neon/80 underline transition-colors"
+            >
+              {{ t('collection.bulkDelete.selectAll') }}
+            </button>
+            <button
+                v-if="selectedCardIds.size > 0"
+                @click="clearSelection"
+                class="text-tiny text-silver-50 hover:text-silver underline transition-colors"
+            >
+              {{ t('collection.bulkDelete.clearSelection') }}
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <BaseButton
+                size="small"
+                variant="danger"
+                :disabled="selectedCardIds.size === 0"
+                @click="handleBulkDelete"
+            >
+              {{ t('collection.bulkDelete.deleteSelected', { count: selectedCardIds.size }) }}
+            </BaseButton>
+            <BaseButton size="small" variant="secondary" @click="toggleSelectionMode">
+              {{ t('common.actions.cancel') }}
+            </BaseButton>
           </div>
         </div>
 
@@ -2356,8 +2580,11 @@ onUnmounted(() => {
                   :cards="group.cards"
                   :compact="viewType === 'compact'"
                   :deleting-card-ids="deletingCardIds"
+                  :selection-mode="selectionMode"
+                  :selected-card-ids="selectedCardIds"
                   @card-click="handleCardClick"
                   @delete="handleDelete"
+                  @toggle-select="toggleCardSelection"
               />
             </div>
           </template>
@@ -2426,8 +2653,11 @@ onUnmounted(() => {
                 :cards="group.cards"
                 :compact="viewType === 'compact'"
                 :deleting-card-ids="deletingCardIds"
+                :selection-mode="selectionMode"
+                :selected-card-ids="selectedCardIds"
                 @card-click="handleCardClick"
                 @delete="handleDelete"
+                @toggle-select="toggleCardSelection"
             />
           </div>
         </div>
@@ -2489,6 +2719,7 @@ onUnmounted(() => {
         @close="showImportDeckModal = false"
         @import="handleImport"
         @import-direct="handleImportDirect"
+        @import-csv="handleImportCsv"
     />
 
     <!-- Floating Action Button (mobile) -->

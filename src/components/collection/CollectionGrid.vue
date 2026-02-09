@@ -9,16 +9,20 @@ const props = withDefaults(defineProps<{
   showInterest?: boolean
   interestedCards?: Set<string>
   deletingCardIds?: Set<string>
+  selectionMode?: boolean
+  selectedCardIds?: Set<string>
 }>(), {
   compact: false,
   readonly: false,
-  showInterest: false
+  showInterest: false,
+  selectionMode: false,
 })
 
 const emit = defineEmits<{
   cardClick: [card: Card]
   delete: [card: Card]
   interest: [card: Card]
+  toggleSelect: [cardId: string]
 }>()
 </script>
 
@@ -36,9 +40,12 @@ const emit = defineEmits<{
         :show-interest="props.showInterest"
         :is-interested="props.interestedCards?.has(card.scryfallId || card.id) || false"
         :is-being-deleted="props.deletingCardIds?.has(card.id) || false"
-        @card-click="emit('cardClick', $event)"
+        :selection-mode="props.selectionMode"
+        :is-selected="props.selectedCardIds?.has(card.id) || false"
+        @card-click="selectionMode ? emit('toggleSelect', $event.id) : emit('cardClick', $event)"
         @delete="emit('delete', $event)"
         @interest="emit('interest', $event)"
+        @toggle-select="emit('toggleSelect', $event)"
     />
   </div>
 </template>

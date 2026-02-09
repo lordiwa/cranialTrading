@@ -15,9 +15,9 @@ import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import { type CardCondition } from '../types/card'
-import { getCardById, searchCards } from '../services/scryfall'
+import { getCardById, getCardsByIds, searchCards } from '../services/scryfall'
 import type { DeckFormat } from '../types/deck'
-import { parseDeckLine } from '../utils/cardHelpers'
+import { type ParsedCsvCard, parseDeckLine } from '../utils/cardHelpers'
 
 const router = useRouter()
 const decksStore = useDecksStore()
@@ -495,6 +495,94 @@ const handleImportDirect = async (
   }
 }
 
+// Importar desde CSV de ManaBox (batch Scryfall lookup)
+const handleImportCsv = async (
+  cards: ParsedCsvCard[],
+  deckName?: string,
+  makePublic?: boolean,
+  format?: DeckFormat,
+  commander?: string
+) => {
+  const finalDeckName = deckName || `CSV Import ${Date.now()}`
+  showImportModal.value = false
+  toastStore.show(t('decks.importModal.analyzing'), 'info')
+
+  // 1. Create deck
+  const deckId = await decksStore.createDeck({
+    name: finalDeckName,
+    format: format || 'custom',
+    description: '',
+    colors: [],
+    commander: commander || '',
+  })
+
+  // 2. Batch fetch Scryfall data using IDs from CSV
+  const identifiers = cards
+    .filter(c => c.scryfallId)
+    .map(c => ({ id: c.scryfallId }))
+  // Deduplicate
+  const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
+
+  const scryfallDataMap = new Map<string, any>()
+  if (uniqueIds.length > 0) {
+    const scryfallCards = await getCardsByIds(uniqueIds)
+    for (const sc of scryfallCards) {
+      scryfallDataMap.set(sc.id, sc)
+    }
+  }
+
+  // 3. Build collection cards
+  const collectionCards: any[] = []
+  for (const card of cards) {
+    const sc = scryfallDataMap.get(card.scryfallId)
+    let image = sc?.image_uris?.normal || ''
+    if (!image && sc?.card_faces?.length > 0) {
+      image = sc.card_faces[0]?.image_uris?.normal || ''
+    }
+    const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
+
+    const cardData: any = {
+      scryfallId: card.scryfallId || '',
+      name: card.name,
+      edition: sc?.set_name || card.setCode || 'Unknown',
+      quantity: card.quantity,
+      condition: card.condition,
+      foil: card.foil,
+      price,
+      image,
+      status: 'collection',
+      public: makePublic || false,
+    }
+    if (card.setCode) {
+      cardData.setCode = card.setCode.toUpperCase()
+    }
+    collectionCards.push(cardData)
+  }
+
+  // 4. Save to collection and allocate to deck
+  if (collectionCards.length > 0) {
+    await collectionStore.confirmImport(collectionCards)
+    await collectionStore.loadCollection()
+
+    if (deckId) {
+      for (const cardData of collectionCards) {
+        const collectionCard = collectionStore.cards.find(
+          c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+        )
+        if (collectionCard) {
+          await decksStore.allocateCardToDeck(deckId, collectionCard.id, cardData.quantity, false)
+        }
+      }
+    }
+  }
+
+  toastStore.show(t('decks.messages.created', { name: finalDeckName }), 'success')
+
+  if (deckId) {
+    await router.push(`/decks/${deckId}/edit`)
+  }
+}
+
 onMounted(async () => {
   await decksStore.loadDecks()
 })
@@ -620,6 +708,7 @@ onMounted(async () => {
           @close="showImportModal = false"
           @import="handleImport"
           @import-direct="handleImportDirect"
+          @import-csv="handleImportCsv"
       />
     </div>
   </AppContainer>

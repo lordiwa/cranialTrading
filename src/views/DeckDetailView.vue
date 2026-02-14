@@ -3,18 +3,23 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDecksStore } from '../stores/decks'
 import { useCollectionStore } from '../stores/collection'
+import { useToastStore } from '../stores/toast'
 import { useI18n } from '../composables/useI18n'
+import { useCardFilter } from '../composables/useCardFilter'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
+import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import DeckCardsList from '../components/decks/DeckCardsList.vue'
 import DeckCompletionCheck from '../components/decks/DeckCompletionCheck.vue'
+import { buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
 
 const router = useRouter()
 const route = useRoute()
 const decksStore = useDecksStore()
 const collectionStore = useCollectionStore()
+const toastStore = useToastStore()
 const { t } = useI18n()
 
 const activeTab = ref<'mainboard' | 'sideboard' | 'stats'>('mainboard')
@@ -37,6 +42,23 @@ const mainboardCards = computed(() =>
 const sideboardCards = computed(() =>
     allCards.value.filter(c => c.isInSideboard)
 )
+
+// Active tab cards for filtering
+const activeTabCards = computed(() =>
+    activeTab.value === 'mainboard' ? mainboardCards.value :
+    activeTab.value === 'sideboard' ? sideboardCards.value : []
+)
+
+// Card filter composable
+const {
+  filterQuery,
+  sortBy,
+  groupBy,
+  selectedColors,
+  selectedManaValues,
+  selectedTypes,
+  filteredCards: activeFilteredCards,
+} = useCardFilter(activeTabCards)
 
 // Type guard and helper to get quantity from either type
 const getCardQuantity = (card: typeof allCards.value[number]): number => {
@@ -74,6 +96,104 @@ const handleBack = () => {
   router.push('/decks')
 }
 
+const handleExport = async () => {
+  if (!deck.value) return
+
+  const setCodeMap = new Map<string, string>()
+  for (const c of collectionStore.cards) {
+    if (c.setCode) setCodeMap.set(c.id, c.setCode)
+  }
+
+  const getSet = (card: typeof allCards.value[number]): string => {
+    if (!card.isWishlist) {
+      const code = setCodeMap.get((card as any).cardId)
+      if (code) return code.toUpperCase()
+    }
+    return card.edition
+  }
+
+  const lines: string[] = []
+  const isCommander = deck.value.format === 'commander'
+  const commanderName = deck.value.commander
+
+  if (isCommander && commanderName) {
+    const commanderCards = mainboardCards.value.filter(c => c.name === commanderName)
+    if (commanderCards.length > 0) {
+      lines.push('Commander')
+      for (const card of commanderCards) {
+        lines.push(`${getCardQuantity(card)} ${card.name} (${getSet(card)})`)
+      }
+      lines.push('')
+    }
+  }
+
+  const deckCards = isCommander && commanderName
+      ? mainboardCards.value.filter(c => c.name !== commanderName)
+      : mainboardCards.value
+
+  if (deckCards.length > 0) {
+    if (isCommander && commanderName) {
+      lines.push('Deck')
+    }
+    for (const card of deckCards) {
+      lines.push(`${getCardQuantity(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  if (sideboardCards.value.length > 0) {
+    lines.push('')
+    lines.push('Sideboard')
+    for (const card of sideboardCards.value) {
+      lines.push(`${getCardQuantity(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  const text = lines.join('\n')
+
+  try {
+    await navigator.clipboard.writeText(text)
+    toastStore.show(t('decks.detail.exportCopied'), 'success')
+  } catch {
+    toastStore.show(t('decks.detail.exportError'), 'error')
+  }
+}
+
+const handleExportCsv = async () => {
+  if (!deck.value) return
+
+  const cardMap = new Map<string, typeof collectionStore.cards[number]>()
+  for (const c of collectionStore.cards) {
+    cardMap.set(c.id, c)
+  }
+
+  const csvCards: Parameters<typeof buildMoxfieldCsv>[0] = []
+
+  for (const card of allCards.value) {
+    const qty = card.isWishlist ? card.requestedQuantity : (card as any).allocatedQuantity
+    let setCode = card.edition
+    if (!card.isWishlist) {
+      const col = cardMap.get((card as any).cardId)
+      if (col?.setCode) setCode = col.setCode.toUpperCase()
+    }
+
+    csvCards.push({
+      name: card.name,
+      setCode,
+      quantity: qty,
+      foil: card.foil,
+      scryfallId: card.scryfallId,
+      price: card.price,
+      condition: card.condition,
+      language: card.language,
+    })
+  }
+
+  const csv = buildMoxfieldCsv(csvCards)
+  const filename = `${deck.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+  downloadAsFile(csv, filename)
+  toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
+}
+
 onMounted(async () => {
   loading.value = true
   await collectionStore.loadCollection()
@@ -104,6 +224,8 @@ onMounted(async () => {
 
         <div class="flex flex-col gap-2">
           <BaseButton size="small" @click="handleEdit">{{ t('decks.detail.edit') }}</BaseButton>
+          <BaseButton variant="secondary" size="small" @click="handleExport">{{ t('decks.detail.export') }}</BaseButton>
+          <BaseButton variant="secondary" size="small" @click="handleExportCsv">CSV</BaseButton>
           <BaseButton variant="secondary" size="small" @click="handleBack">{{ t('decks.detail.back') }}</BaseButton>
         </div>
       </div>
@@ -167,12 +289,23 @@ onMounted(async () => {
         </button>
       </div>
 
+      <!-- Filter bar (only for mainboard/sideboard tabs) -->
+      <CardFilterBar
+          v-if="activeTab !== 'stats'"
+          v-model:filter-query="filterQuery"
+          v-model:sort-by="sortBy"
+          v-model:group-by="groupBy"
+          v-model:selected-colors="selectedColors"
+          v-model:selected-mana-values="selectedManaValues"
+          v-model:selected-types="selectedTypes"
+      />
+
       <!-- Content -->
       <div>
         <!-- Mainboard -->
         <DeckCardsList
             v-if="activeTab === 'mainboard'"
-            :cards="mainboardCards"
+            :cards="activeFilteredCards"
             :deck-id="deckId"
             title="MAINBOARD"
         />
@@ -180,7 +313,7 @@ onMounted(async () => {
         <!-- Sideboard -->
         <DeckCardsList
             v-else-if="activeTab === 'sideboard'"
-            :cards="sideboardCards"
+            :cards="activeFilteredCards"
             :deck-id="deckId"
             title="SIDEBOARD"
         />

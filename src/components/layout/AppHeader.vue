@@ -143,6 +143,7 @@ onUnmounted(() => {
               v-for="link in navigationLinks"
               :key="link.path + link.label"
               :to="link.path"
+              :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
               :class="[
                 'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative',
                 isActive(link.path)
@@ -156,11 +157,11 @@ onUnmounted(() => {
             {{ link.label }}
           </router-link>
           <!-- Matches dropdown (replaces simple nav link) -->
-          <MatchNotificationsDropdown :active="isMatchesActive" />
+          <MatchNotificationsDropdown data-tour="nav-matches" :active="isMatchesActive" />
         </nav>
 
         <!-- Global Search (Desktop) -->
-        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" class="hidden md:block flex-shrink-0" />
+        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="hidden md:block flex-shrink-0" />
 
         <!-- Right side: User & Settings -->
         <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">

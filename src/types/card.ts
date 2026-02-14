@@ -12,6 +12,7 @@ export interface Card {
     quantity: number;           // Total copies owned
     condition: CardCondition;
     foil: boolean;
+    language?: string;
     price: number;
     image: string;
     status: CardStatus;

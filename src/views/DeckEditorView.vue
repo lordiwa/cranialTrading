@@ -6,14 +6,17 @@ import { useCollectionStore } from '../stores/collection'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
+import { useCardFilter } from '../composables/useCardFilter'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
+import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import AddCardToDeckModal from '../components/decks/AddCardToDeckModal.vue'
 import EditDeckCardModal from '../components/decks/EditDeckCardModal.vue'
 import type { DisplayDeckCard, HydratedDeckCard } from '../types/deck'
+import { buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
 
 const router = useRouter()
 const route = useRoute()
@@ -47,6 +50,22 @@ const mainboardCards = computed(() =>
 const sideboardCards = computed(() =>
     allCards.value.filter(c => c.isInSideboard)
 )
+
+// Active tab cards for filtering
+const activeTabCards = computed(() =>
+    activeTab.value === 'mainboard' ? mainboardCards.value : sideboardCards.value
+)
+
+// Card filter composable
+const {
+  filterQuery,
+  sortBy,
+  groupBy,
+  selectedColors,
+  selectedManaValues,
+  selectedTypes,
+  filteredCards: activeFilteredCards,
+} = useCardFilter(activeTabCards)
 
 // Type guard and helper to get quantity from either type
 const getCardQuantity = (card: DisplayDeckCard): number => {
@@ -131,23 +150,26 @@ const handleAddCard = async (cardData: {
       toastStore.show(t('decks.editor.messages.cardAddedToCollection', { section: activeTab.value }), 'success')
     }
   } else {
-    // Add directly to wishlist (not in collection)
-    await decksStore.addToWishlist(deckId, {
+    // Not in collection → create wishlist card in collection + allocate to deck
+    const wishCardId = await collectionStore.ensureCollectionWishlistCard({
       scryfallId: cardData.scryfallId,
       name: cardData.name,
       edition: cardData.edition,
       quantity: cardData.quantity,
-      isInSideboard,
-      price: cardData.price,
-      image: cardData.image,
       condition: cardData.condition as any,
       foil: cardData.foil,
+      price: cardData.price,
+      image: cardData.image,
       cmc: cardData.cmc,
       type_line: cardData.type_line,
       colors: cardData.colors,
     })
-    showAddCardModal.value = false
-    toastStore.show(t('decks.editor.messages.cardAddedToWishlist', { section: activeTab.value }), 'info')
+
+    if (wishCardId) {
+      await decksStore.allocateCardToDeck(deckId, wishCardId, cardData.quantity, isInSideboard)
+      showAddCardModal.value = false
+      toastStore.show(t('decks.editor.messages.cardAddedToWishlist', { section: activeTab.value }), 'info')
+    }
   }
 }
 
@@ -167,8 +189,11 @@ const handleRemoveCard = async (card: DisplayDeckCard) => {
 
   if (!confirmed) return
 
-  if (card.isWishlist) {
-    // Remove from wishlist
+  if (card.isWishlist && card.cardId) {
+    // Wishlist card backed by collection — deallocate from deck
+    await decksStore.deallocateCard(deckId, card.cardId, card.isInSideboard)
+  } else if (card.isWishlist) {
+    // Legacy wishlist item (no cardId) — remove from deck wishlist array
     await decksStore.removeFromWishlist(
         deckId,
         card.scryfallId,
@@ -179,8 +204,7 @@ const handleRemoveCard = async (card: DisplayDeckCard) => {
     )
   } else {
     // Deallocate from deck (card stays in collection)
-    const ownedCard = card
-    await decksStore.deallocateCard(deckId, ownedCard.cardId, ownedCard.isInSideboard)
+    await decksStore.deallocateCard(deckId, card.cardId, card.isInSideboard)
   }
 
   toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
@@ -269,6 +293,105 @@ const handleBack = () => {
   router.push('/decks')
 }
 
+const handleExport = async () => {
+  if (!deck.value) return
+
+  const setCodeMap = new Map<string, string>()
+  for (const c of collectionStore.cards) {
+    if (c.setCode) setCodeMap.set(c.id, c.setCode)
+  }
+
+  const getSet = (card: DisplayDeckCard): string => {
+    if (!card.isWishlist && 'cardId' in card) {
+      const code = setCodeMap.get((card as any).cardId)
+      if (code) return code.toUpperCase()
+    }
+    return card.edition
+  }
+
+  const lines: string[] = []
+  const isCommander = deck.value.format === 'commander'
+  const commanderName = deck.value.commander
+
+  if (isCommander && commanderName) {
+    const commanderCards = mainboardCards.value.filter(c => c.name === commanderName)
+    if (commanderCards.length > 0) {
+      lines.push('Commander')
+      for (const card of commanderCards) {
+        lines.push(`${getCardQuantity(card)} ${card.name} (${getSet(card)})`)
+      }
+      lines.push('')
+    }
+  }
+
+  const deckCards = isCommander && commanderName
+      ? mainboardCards.value.filter(c => c.name !== commanderName)
+      : mainboardCards.value
+
+  if (deckCards.length > 0) {
+    if (isCommander && commanderName) {
+      lines.push('Deck')
+    }
+    for (const card of deckCards) {
+      lines.push(`${getCardQuantity(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  if (sideboardCards.value.length > 0) {
+    lines.push('')
+    lines.push('Sideboard')
+    for (const card of sideboardCards.value) {
+      lines.push(`${getCardQuantity(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  const text = lines.join('\n')
+
+  try {
+    await navigator.clipboard.writeText(text)
+    toastStore.show(t('decks.detail.exportCopied'), 'success')
+  } catch {
+    toastStore.show(t('decks.detail.exportError'), 'error')
+  }
+}
+
+const handleExportCsv = async () => {
+  if (!deck.value) return
+
+  const cardMap = new Map<string, typeof collectionStore.cards[number]>()
+  for (const c of collectionStore.cards) {
+    cardMap.set(c.id, c)
+  }
+
+  const allCards = [...mainboardCards.value, ...sideboardCards.value]
+  const csvCards: Parameters<typeof buildMoxfieldCsv>[0] = []
+
+  for (const card of allCards) {
+    const qty = card.isWishlist ? card.requestedQuantity : (card as any).allocatedQuantity
+    let setCode = card.edition
+    if (!card.isWishlist && 'cardId' in card) {
+      const col = cardMap.get((card as any).cardId)
+      if (col?.setCode) setCode = col.setCode.toUpperCase()
+    }
+
+    csvCards.push({
+      name: card.name,
+      setCode,
+      quantity: qty,
+      foil: card.foil,
+      scryfallId: card.scryfallId,
+      price: card.price,
+      condition: card.condition,
+      language: card.language,
+    })
+  }
+
+  const csv = buildMoxfieldCsv(csvCards)
+  const filename = `${deck.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+  downloadAsFile(csv, filename)
+  toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
+}
+
 onMounted(async () => {
   loading.value = true
 
@@ -310,6 +433,8 @@ onMounted(async () => {
 
         <div class="flex flex-col gap-2">
           <BaseButton size="small" @click="handleSave">{{ t('decks.editor.save') }}</BaseButton>
+          <BaseButton variant="secondary" size="small" @click="handleExport">{{ t('decks.detail.export') }}</BaseButton>
+          <BaseButton variant="secondary" size="small" @click="handleExportCsv">CSV</BaseButton>
           <BaseButton variant="secondary" size="small" @click="handleBack">{{ t('decks.editor.back') }}</BaseButton>
         </div>
       </div>
@@ -384,10 +509,25 @@ onMounted(async () => {
         {{ t('decks.editor.addCard') }}
       </BaseButton>
 
+      <!-- Filter bar -->
+      <CardFilterBar
+          v-model:filter-query="filterQuery"
+          v-model:sort-by="sortBy"
+          v-model:group-by="groupBy"
+          v-model:selected-colors="selectedColors"
+          v-model:selected-mana-values="selectedManaValues"
+          v-model:selected-types="selectedTypes"
+      />
+
       <!-- Cards Grid (Visual Editor) -->
       <DeckEditorGrid
-          :cards="activeTab === 'mainboard' ? mainboardCards : sideboardCards"
+          :cards="activeFilteredCards"
           :deck-id="deckId"
+          :group-by="groupBy"
+          :sort-by="sortBy"
+          :selected-colors="selectedColors"
+          :selected-mana-values="selectedManaValues"
+          :selected-types="selectedTypes"
           @edit="handleEditCard"
           @remove="handleRemoveCard"
           @update-quantity="handleUpdateQuantity"

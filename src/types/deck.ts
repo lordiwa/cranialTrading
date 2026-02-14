@@ -42,6 +42,7 @@ export interface HydratedDeckCard {
     edition: string
     condition: CardCondition
     foil: boolean
+    language?: string
     price: number
     image: string
     cmc?: number              // Mana value for grouping
@@ -62,22 +63,27 @@ export interface HydratedDeckCard {
 
 // Hydrated wishlist card for UI display
 export interface HydratedWishlistCard {
+    cardId: string            // Reference to Card.id in collection (wishlist cards are now in collection)
     scryfallId: string
     name: string
     edition: string
     condition: CardCondition
     foil: boolean
+    language?: string
     price: number
     image: string
     cmc?: number              // Mana value for grouping
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
     requestedQuantity: number
+    allocatedQuantity: number // Same as requestedQuantity (for unified access)
     isInSideboard: boolean
     notes?: string
     addedAt: Date
 
     isWishlist: true
+    availableInCollection: number
+    totalInCollection: number
 }
 
 // Union type for displaying deck cards (both owned and wishlist)

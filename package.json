@@ -23,6 +23,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "driver.js": "^1.4.0",
     "firebase": "^11.0.0",
     "firebase-admin": "^13.6.0",
     "lodash-es": "^4.17.22",

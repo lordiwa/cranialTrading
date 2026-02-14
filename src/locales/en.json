@@ -384,7 +384,10 @@
     },
     "view": {
       "grid": "Grid view",
-      "compact": "Compact view"
+      "compact": "Compact view",
+      "stack": "Stack",
+      "visual": "Visual",
+      "texto": "Text"
     },
     "group": {
       "none": "None"
@@ -417,7 +420,7 @@
       "valueNeed": "Value Needed",
       "valueTotal": "Total Value",
       "completed": "Completed",
-      "groupBy": "Group by:",
+      "groupBy": "Group by",
       "type": "Type",
       "mana": "Mana",
       "color": "Color"
@@ -436,6 +439,16 @@
       "title": "SEARCH RESULTS",
       "subtitle": "{count} cards found - Click to add",
       "back": "BACK"
+    },
+    "suggestions": {
+      "localSection": "In my collection",
+      "scryfallSection": "Not in collection",
+      "addLabel": "Add",
+      "advancedSearch": "Advanced search"
+    },
+    "quickAdd": {
+      "allocated": "{name} added to deck",
+      "wishlisted": "{name} added to wishlist"
     },
     "noDecks": "You have no decks created.",
     "totals": {
@@ -820,6 +833,10 @@
         "stats": "STATISTICS"
       },
       "edit": "EDIT",
+      "export": "EXPORT",
+      "exportCopied": "Decklist copied to clipboard",
+      "exportCsvDownloaded": "CSV downloaded",
+      "exportError": "Error copying decklist",
       "back": "← BACK",
       "updated": "Updated:",
       "notFound": "Deck not found",
@@ -888,7 +905,11 @@
         "4": "4",
         "5": "5",
         "6": "6",
-        "7+": "7+"
+        "7": "7",
+        "7+": "7+",
+        "8": "8",
+        "9": "9",
+        "10+": "10+"
       }
     },
     "messages": {
@@ -904,6 +925,7 @@
       "deleted": "✓ Deck deleted",
       "deletedCardsKept": "Deck deleted (cards kept)",
       "deletedWithCards": "Deck and {count} cards deleted",
+      "deletedWithCardWarning": "Deck deleted. {deleted} cards removed, {failed} cards could not be deleted",
       "deleteError": "Error deleting deck",
       "deletingDeck": "Deleting deck...",
       "noCardsInDeck": "No cards in the deck",
@@ -1141,6 +1163,11 @@
       "success": "Avatar updated successfully.",
       "error": "Error changing avatar. Try again."
     },
+    "restartTour": {
+      "label": "Guided tour",
+      "hint": "Replay the onboarding tour that shows you around the app.",
+      "button": "RESTART TOUR"
+    },
     "dangerZone": {
       "title": "DANGER ZONE",
       "description": "Actions in this section are irreversible. Proceed with caution.",
@@ -1180,6 +1207,10 @@
   },
 
   "search": {
+    "view": {
+      "title": "ADVANCED SEARCH",
+      "backToCollection": "Back"
+    },
     "owned": "x{count} owned",
     "filterPanel": {
       "placeholder": "Search card by name...",
@@ -1197,6 +1228,8 @@
       "title": "ADVANCED FILTERS",
       "apply": "APPLY FILTERS",
       "sections": {
+        "colors": "Colors",
+        "rarity": "Rarity",
         "types": "Types",
         "manaValue": "Mana Value",
         "priceUSD": "Price USD",
@@ -1613,6 +1646,46 @@
         "title": "No conversations",
         "message": "When you contact a user from a match, the conversation will appear here."
       }
+    }
+  },
+
+  "tour": {
+    "welcome": {
+      "title": "WELCOME TO CRANIAL TRADING",
+      "subtitle": "Let us show you around. In a few steps you'll know everything you need to start trading.",
+      "startButton": "START TOUR",
+      "skipButton": "Skip, I'll explore on my own"
+    },
+    "steps": {
+      "collection": {
+        "title": "Collection",
+        "description": "This is where all your cards live — organized by status. Start by adding cards here."
+      },
+      "statuses": {
+        "title": "Card Statuses",
+        "description": "Organize your cards: Collection (keep), Available (sale/trade), and Wishlist (cards you want)."
+      },
+      "addCard": {
+        "title": "Add a Card",
+        "description": "Search any Magic card and add it to your collection. You can also import entire decks."
+      },
+      "decks": {
+        "title": "Decks",
+        "description": "Group your cards into decks — Standard, Modern, Commander and more."
+      },
+      "matches": {
+        "title": "Matches",
+        "description": "We find traders who want what you have and have what you want. Automatically."
+      },
+      "search": {
+        "title": "Search",
+        "description": "Search across your entire collection, other users, or the Scryfall database."
+      }
+    },
+    "nav": {
+      "next": "NEXT",
+      "prev": "BACK",
+      "done": "LET'S GO!"
     }
   },
 

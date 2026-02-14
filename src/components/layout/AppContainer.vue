@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppHeader from './AppHeader.vue';
 import HelpCarouselModal from '../ui/HelpCarouselModal.vue';
+import WelcomeModal from '../ui/WelcomeModal.vue';
 </script>
 
 <template>
@@ -12,5 +13,8 @@ import HelpCarouselModal from '../ui/HelpCarouselModal.vue';
 
     <!-- Global Help Carousel Modal -->
     <HelpCarouselModal />
+
+    <!-- Onboarding Tour Welcome -->
+    <WelcomeModal />
   </div>
 </template>

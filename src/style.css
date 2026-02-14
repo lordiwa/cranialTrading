@@ -281,6 +281,68 @@
     }
 }
 
+/* Driver.js tour theme overrides */
+.cranial-tour-popover.driver-popover {
+    background: #000000;
+    border: 1px solid #CCFF00;
+    color: #EEEEEE;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+.cranial-tour-popover .driver-popover-title {
+    color: #CCFF00;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.cranial-tour-popover .driver-popover-description {
+    color: #EEEEEE;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+}
+
+.cranial-tour-popover .driver-popover-progress-text {
+    color: rgba(238, 238, 238, 0.5);
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+.cranial-tour-popover .driver-popover-next-btn,
+.cranial-tour-popover .driver-popover-close-btn {
+    background: #CCFF00;
+    color: #000000;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    border: none;
+    text-shadow: none;
+}
+
+.cranial-tour-popover .driver-popover-next-btn:hover,
+.cranial-tour-popover .driver-popover-close-btn:hover {
+    background: rgba(204, 255, 0, 0.9);
+}
+
+.cranial-tour-popover .driver-popover-prev-btn {
+    background: transparent;
+    color: #EEEEEE;
+    border: 1px solid rgba(238, 238, 238, 0.3);
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    text-shadow: none;
+}
+
+.cranial-tour-popover .driver-popover-prev-btn:hover {
+    border-color: #EEEEEE;
+    color: #FFFFFF;
+}
+
+.cranial-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow,
+.cranial-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow,
+.cranial-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow,
+.cranial-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+    border-color: #CCFF00;
+}
+
 @media (max-width: 768px) {
     .h1 {
         @apply text-h2;

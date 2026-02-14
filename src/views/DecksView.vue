@@ -556,6 +556,9 @@ const handleImportCsv = async (
     if (card.setCode) {
       cardData.setCode = card.setCode.toUpperCase()
     }
+    if (card.language) {
+      cardData.language = card.language
+    }
     collectionCards.push(cardData)
   }
 
@@ -565,14 +568,16 @@ const handleImportCsv = async (
     await collectionStore.loadCollection()
 
     if (deckId) {
-      for (const cardData of collectionCards) {
-        const collectionCard = collectionStore.cards.find(
-          c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
-        )
-        if (collectionCard) {
-          await decksStore.allocateCardToDeck(deckId, collectionCard.id, cardData.quantity, false)
-        }
-      }
+      const bulkItems = collectionCards
+        .map(cardData => {
+          const collectionCard = collectionStore.cards.find(
+            c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+          )
+          return collectionCard ? { cardId: collectionCard.id, quantity: cardData.quantity, isInSideboard: false } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+
+      await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems)
     }
   }
 

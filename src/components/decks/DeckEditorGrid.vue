@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import type { DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../../types/deck'
-import BaseButton from '../ui/BaseButton.vue'
+import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardTypeCategory, manaOrder, typeOrder } from '../../composables/useCardFilter'
+import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
 
 const props = defineProps<{
   cards: DisplayDeckCard[]
@@ -10,6 +10,9 @@ const props = defineProps<{
   commanderNames?: string[]
   groupBy?: 'none' | 'type' | 'mana' | 'color'
   sortBy?: 'recent' | 'name' | 'price'
+  selectedColors?: Set<string>
+  selectedManaValues?: Set<string>
+  selectedTypes?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -26,17 +29,6 @@ const { t } = useI18n()
 const hoveredCard = ref<DisplayDeckCard | null>(null)
 const previewCard = computed(() => hoveredCard.value || props.cards[0] || null)
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
-
-// Popup state
-const showPopup = ref(false)
-const popupCard = ref<DisplayDeckCard | null>(null)
-const popupPosition = ref({ x: 0, y: 0 })
-
-// Check if mobile (for popup positioning)
-const isMobile = computed(() => {
-  if (typeof window === 'undefined') return false
-  return window.innerWidth < 768
-})
 
 // Type guard
 const isWishlistCard = (card: DisplayDeckCard): card is HydratedWishlistCard => {
@@ -55,72 +47,26 @@ const isCommander = (card: DisplayDeckCard): boolean => {
   return props.commanderNames.some(name => name.toLowerCase() === cardNameLower)
 }
 
-// Get card type category for grouping
+// Commander-aware category wrappers (delegate to shared helpers)
 const getTypeCategory = (card: DisplayDeckCard): string => {
-  // Check for commander first
   if (isCommander(card)) return 'Commander'
-
-  const typeLine = card.type_line?.toLowerCase() || ''
-  if (typeLine.includes('creature')) return 'Creatures'
-  if (typeLine.includes('instant')) return 'Instants'
-  if (typeLine.includes('sorcery')) return 'Sorceries'
-  if (typeLine.includes('enchantment')) return 'Enchantments'
-  if (typeLine.includes('artifact')) return 'Artifacts'
-  if (typeLine.includes('planeswalker')) return 'Planeswalkers'
-  if (typeLine.includes('land')) return 'Lands'
-  return 'Other'
+  return getCardTypeCategory(card)
 }
 
-// Get mana value category for grouping
 const getManaCategory = (card: DisplayDeckCard): string => {
   if (isCommander(card)) return 'Commander'
-
-  const typeLine = card.type_line?.toLowerCase() || ''
-  if (typeLine.includes('land')) return 'Lands'
-
-  const cmc = card.cmc ?? 0
-  if (cmc >= 7) return '7+'
-  return String(cmc)
+  return getCardManaCategory(card)
 }
 
-// Get color category for grouping
 const getColorCategory = (card: DisplayDeckCard): string => {
   if (isCommander(card)) return 'Commander'
-
-  const typeLine = card.type_line?.toLowerCase() || ''
-
-  // Lands are always in their own category (at the end)
-  if (typeLine.includes('land')) return 'Lands'
-
-  // Get colors from the card - colors array only contains actual colors (W, U, B, R, G)
-  // Colorless mana doesn't count as a color
-  const cardAny = card as any
-  const colors = cardAny.colors || cardAny.color_identity || []
-
-  // Filter to only actual colors (in case there's any invalid data)
-  const validColors = colors.filter((c: string) => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
-
-  // No colors = colorless (artifacts, eldrazi, etc.)
-  if (validColors.length === 0) return 'Colorless'
-
-  // 2+ colors = multicolor
-  if (validColors.length >= 2) return 'Multicolor'
-
-  // Single color
-  const color = validColors[0]?.toUpperCase()
-  if (color === 'W') return 'White'
-  if (color === 'U') return 'Blue'
-  if (color === 'B') return 'Black'
-  if (color === 'R') return 'Red'
-  if (color === 'G') return 'Green'
-
-  return 'Colorless'
+  return getCardColorCategory(card)
 }
 
-// Category orders for different grouping modes
-const typeOrder = ['Commander', 'Creatures', 'Instants', 'Sorceries', 'Enchantments', 'Artifacts', 'Planeswalkers', 'Lands', 'Other']
-const manaOrder = ['Commander', '0', '1', '2', '3', '4', '5', '6', '7+', 'Lands']
-const colorOrder = ['Commander', 'White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Colorless', 'Lands']
+// Extended orders with Commander prepended
+const deckTypeOrder = ['Commander', ...typeOrder]
+const deckManaOrder = ['Commander', ...manaOrder]
+const deckColorOrder = ['Commander', ...colorOrder]
 
 // Get category based on current grouping mode
 const getCategory = (card: DisplayDeckCard): string => {
@@ -134,15 +80,15 @@ const getCategory = (card: DisplayDeckCard): string => {
 // Get order based on current grouping mode
 const getCategoryOrder = (): string[] => {
   switch (props.groupBy) {
-    case 'mana': return manaOrder
-    case 'color': return colorOrder
-    default: return typeOrder
+    case 'mana': return deckManaOrder
+    case 'color': return deckColorOrder
+    default: return deckTypeOrder
   }
 }
 
 // Translate category name
-const translateCategory = (category: string): string => {
-  return t(`decks.editorGrid.categories.${category}`) || category
+const translateCategoryLabel = (category: string): string => {
+  return baseTranslateCategory(category, t)
 }
 
 // Sort function based on sortBy prop
@@ -167,18 +113,43 @@ const sortCards = (cards: DisplayDeckCard[]): DisplayDeckCard[] => {
   return sorted
 }
 
+// Check if a card passes all three cross-filters
+const passesFilters = (card: DisplayDeckCard): boolean => {
+  if (props.selectedColors && props.selectedColors.size < deckColorOrder.length) {
+    const color = getColorCategory(card)
+    if (!props.selectedColors.has(color)) return false
+  }
+  if (props.selectedManaValues && props.selectedManaValues.size < deckManaOrder.length) {
+    const mana = getManaCategory(card)
+    if (!props.selectedManaValues.has(mana)) return false
+  }
+  if (props.selectedTypes && props.selectedTypes.size < deckTypeOrder.length) {
+    const type = getTypeCategory(card)
+    if (!props.selectedTypes.has(type)) return false
+  }
+  return true
+}
+
+const hasActiveFilters = computed(() => {
+  return (props.selectedColors && props.selectedColors.size < deckColorOrder.length)
+    || (props.selectedManaValues && props.selectedManaValues.size < deckManaOrder.length)
+    || (props.selectedTypes && props.selectedTypes.size < deckTypeOrder.length)
+})
+
 // Group cards by selected mode
 const groupedCards = computed(() => {
+  const source = hasActiveFilters.value ? props.cards.filter(passesFilters) : props.cards
+
   // If groupBy is 'none', return flat sorted list
   if (props.groupBy === 'none') {
-    const sortedCards = sortCards(props.cards)
+    const sortedCards = sortCards(source)
     return [{ type: 'all', cards: sortedCards }]
   }
 
   const groups: Record<string, DisplayDeckCard[]> = {}
   const order = getCategoryOrder()
 
-  for (const card of props.cards) {
+  for (const card of source) {
     const category = getCategory(card)
     if (!groups[category]) groups[category] = []
     groups[category].push(card)
@@ -192,7 +163,6 @@ const groupedCards = computed(() => {
     }
   }
 
-  // Build sorted groups array
   const sortedGroups: { type: string; cards: DisplayDeckCard[] }[] = []
 
   for (const category of order) {
@@ -233,54 +203,9 @@ const handleMouseLeave = () => {
   hoverTimeout = null
 }
 
-// Click handler for popup
-const handleCardClick = (card: DisplayDeckCard, event: MouseEvent) => {
-  popupCard.value = card
-
-  // Position popup near the click - check if near bottom of screen
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const popupHeight = 180 // Approximate popup height
-  const viewportHeight = window.innerHeight
-  const spaceBelow = viewportHeight - rect.bottom
-  const showAbove = spaceBelow < popupHeight + 20
-
-  popupPosition.value = {
-    x: rect.left + rect.width / 2,
-    y: showAbove ? rect.top - popupHeight - 8 : rect.bottom + 8
-  }
-  showPopup.value = true
-}
-
-// Close popup when clicking outside
-const closePopup = () => {
-  showPopup.value = false
-  popupCard.value = null
-}
-
-// Quantity adjustment
-const adjustQuantity = (delta: number) => {
-  if (!popupCard.value) return
-  const currentQty = getQuantity(popupCard.value)
-  const newQty = Math.max(0, currentQty + delta)
-
-  if (newQty === 0) {
-    emit('remove', popupCard.value)
-    closePopup()
-  } else if (!popupCard.value.isWishlist && delta > 0) {
-    // Check if exceeding available in collection
-    const hydratedCard = popupCard.value as HydratedDeckCard
-    const maxAvailable = hydratedCard.totalInCollection
-
-    if (newQty > maxAvailable) {
-      // Open advanced panel instead
-      emit('edit', popupCard.value)
-      closePopup()
-    } else {
-      emit('updateQuantity', popupCard.value, newQty)
-    }
-  } else {
-    emit('updateQuantity', popupCard.value, newQty)
-  }
+// Click handler - open card detail directly
+const handleCardClick = (card: DisplayDeckCard) => {
+  emit('edit', card)
 }
 
 // Get card image
@@ -312,14 +237,10 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
   return card.image?.replace('/normal/', '/small/') || ''
 }
 
-// Close popup on scroll
-watch(() => props.cards, () => {
-  closePopup()
-})
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative" @click.self="closePopup">
+  <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative">
     <!-- Left Panel: Card Preview (Sticky) - Hidden on mobile -->
     <div class="hidden md:block w-[280px] flex-shrink-0 sticky top-[88px] self-start">
       <div v-if="previewCard" class="space-y-3">
@@ -386,7 +307,7 @@ watch(() => props.cards, () => {
           class="text-tiny font-bold uppercase"
           :class="group.type === 'Commander' ? 'text-purple-400' : 'text-silver-70'"
         >
-          {{ translateCategory(group.type) }} ({{ getTypeCount(group.type) }})
+          {{ translateCategoryLabel(group.type) }} ({{ getTypeCount(group.type) }})
         </h3>
 
         <!-- All cards in this category -->
@@ -398,7 +319,7 @@ watch(() => props.cards, () => {
             :class="{ 'opacity-60': card.isWishlist }"
             @mouseenter="handleMouseEnter(card)"
             @mouseleave="handleMouseLeave"
-            @click="handleCardClick(card, $event)"
+            @click="handleCardClick(card)"
           >
             <!-- Card miniature - ONLY image -->
             <div
@@ -426,97 +347,6 @@ watch(() => props.cards, () => {
       </div>
     </div>
 
-    <!-- Quantity Popup -->
-    <Teleport to="body">
-      <div
-        v-if="showPopup && popupCard"
-        class="fixed inset-0 z-50 flex items-center justify-center md:items-start md:justify-start p-4 md:p-0"
-        :style="isMobile ? {} : {
-          left: `${popupPosition.x}px`,
-          top: `${popupPosition.y}px`,
-          transform: 'translateX(-50%)',
-          position: 'fixed',
-          inset: 'auto'
-        }"
-      >
-        <!-- Backdrop -->
-        <div class="fixed inset-0 bg-primary/50 md:bg-transparent" @click="closePopup"></div>
-
-        <!-- Popup content -->
-        <div class="relative bg-primary border border-silver-30 p-4 md:p-3 shadow-lg w-full max-w-[280px] md:min-w-[200px]">
-          <!-- Mobile: Show card image -->
-          <div class="md:hidden mb-3">
-            <img
-              v-if="getCardImageSmall(popupCard)"
-              :src="getCardImageSmall(popupCard)"
-              :alt="popupCard.name"
-              class="w-24 h-auto mx-auto border border-silver-30"
-            />
-          </div>
-
-          <p class="text-small md:text-tiny font-bold text-silver mb-3 md:mb-2 text-center md:text-left truncate">{{ popupCard.name }}</p>
-
-          <!-- Quantity controls -->
-          <div class="flex items-center justify-center gap-4 md:gap-3 mb-4 md:mb-3">
-            <button
-              @click="adjustQuantity(-1)"
-              class="w-12 h-12 md:w-8 md:h-8 bg-rust/20 border border-rust text-rust font-bold text-h3 md:text-body hover:bg-rust/40 transition-all"
-            >
-              -
-            </button>
-            <span class="text-h2 md:text-h3 font-bold text-neon min-w-[50px] md:min-w-[40px] text-center">
-              {{ getQuantity(popupCard) }}
-            </span>
-            <button
-              @click="adjustQuantity(1)"
-              class="w-12 h-12 md:w-8 md:h-8 bg-neon/20 border border-neon text-neon font-bold text-h3 md:text-body hover:bg-neon/40 transition-all"
-            >
-              +
-            </button>
-          </div>
-
-          <!-- Commander toggle button -->
-          <BaseButton
-            size="small"
-            :variant="isCommander(popupCard) ? 'primary' : 'secondary'"
-            class="w-full text-tiny mb-2"
-            :class="isCommander(popupCard) ? 'bg-purple-400/20 border-purple-400 text-purple-400' : ''"
-            @click="emit('toggleCommander', popupCard); closePopup()"
-          >
-            {{ isCommander(popupCard) ? t('decks.editorGrid.removeCommander') : t('decks.editorGrid.makeCommander') }}
-          </BaseButton>
-
-          <!-- Action buttons -->
-          <div class="flex gap-2">
-            <BaseButton
-              v-if="popupCard.isWishlist"
-              size="small"
-              variant="secondary"
-              class="flex-1 text-tiny"
-              @click="emit('addToWishlist', popupCard); closePopup()"
-            >
-              {{ t('decks.editorGrid.wishlist') }}
-            </BaseButton>
-            <BaseButton
-              size="small"
-              variant="secondary"
-              class="flex-1 text-tiny"
-              @click="emit('edit', popupCard); closePopup()"
-            >
-              {{ t('decks.editorGrid.advanced') }}
-            </BaseButton>
-          </div>
-
-          <!-- Close button for mobile -->
-          <button
-            class="md:hidden absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-silver-50 hover:text-silver"
-            @click="closePopup"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 

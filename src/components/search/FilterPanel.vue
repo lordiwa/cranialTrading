@@ -541,6 +541,7 @@ const activeFilterCount = () => {
   return count
 }
 
+
 // Contar keywords seleccionadas por categoría
 const countSelectedInCategory = (categoryKeywords: { value: string }[]) => {
   if (!filters.keywords?.length) return 0

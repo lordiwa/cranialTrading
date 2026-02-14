@@ -384,7 +384,10 @@
     },
     "view": {
       "grid": "Vista cuadrícula",
-      "compact": "Vista compacta"
+      "compact": "Vista compacta",
+      "stack": "Apilar",
+      "visual": "Visual",
+      "texto": "Texto"
     },
     "group": {
       "none": "Ninguno"
@@ -417,7 +420,7 @@
       "valueNeed": "Valor Necesito",
       "valueTotal": "Valor Total",
       "completed": "Completado",
-      "groupBy": "Agrupar por:",
+      "groupBy": "Agrupar por",
       "type": "Tipo",
       "mana": "Mana",
       "color": "Color"
@@ -436,6 +439,16 @@
       "title": "RESULTADOS DE BÚSQUEDA",
       "subtitle": "{count} cartas encontradas - Click para agregar",
       "back": "VOLVER"
+    },
+    "suggestions": {
+      "localSection": "En mi colección",
+      "scryfallSection": "No en colección",
+      "addLabel": "Añadir",
+      "advancedSearch": "Búsqueda avanzada"
+    },
+    "quickAdd": {
+      "allocated": "{name} agregada al mazo",
+      "wishlisted": "{name} agregada a wishlist"
     },
     "noDecks": "No tienes mazos creados.",
     "totals": {
@@ -820,6 +833,10 @@
         "stats": "ESTADÍSTICAS"
       },
       "edit": "EDITAR",
+      "export": "EXPORTAR",
+      "exportCopied": "Lista de cartas copiada al portapapeles",
+      "exportCsvDownloaded": "CSV descargado",
+      "exportError": "Error al copiar lista de cartas",
       "back": "← VOLVER",
       "updated": "Actualizado:",
       "notFound": "No se encontró el mazo",
@@ -888,7 +905,11 @@
         "4": "4",
         "5": "5",
         "6": "6",
-        "7+": "7+"
+        "7": "7",
+        "7+": "7+",
+        "8": "8",
+        "9": "9",
+        "10+": "10+"
       }
     },
     "messages": {
@@ -904,6 +925,7 @@
       "deleted": "✓ Deck eliminado",
       "deletedCardsKept": "Deck eliminado (cartas conservadas)",
       "deletedWithCards": "Deck y {count} cartas eliminadas",
+      "deletedWithCardWarning": "Deck eliminado. {deleted} cartas borradas, {failed} no se pudieron eliminar",
       "deleteError": "Error al eliminar deck",
       "deletingDeck": "Eliminando deck...",
       "noCardsInDeck": "No hay cartas en el deck",
@@ -1141,6 +1163,11 @@
       "success": "Avatar actualizado correctamente.",
       "error": "Error al cambiar el avatar. Intenta de nuevo."
     },
+    "restartTour": {
+      "label": "Tour guiado",
+      "hint": "Repite el tour de bienvenida que te muestra la plataforma.",
+      "button": "REINICIAR TOUR"
+    },
     "dangerZone": {
       "title": "ZONA DE PELIGRO",
       "description": "Las acciones en esta sección son irreversibles. Procede con cuidado.",
@@ -1180,6 +1207,10 @@
   },
 
   "search": {
+    "view": {
+      "title": "BÚSQUEDA AVANZADA",
+      "backToCollection": "Volver"
+    },
     "owned": "x{count} tengo",
     "filterPanel": {
       "placeholder": "Buscar carta por nombre...",
@@ -1197,6 +1228,8 @@
       "title": "FILTROS AVANZADOS",
       "apply": "APLICAR FILTROS",
       "sections": {
+        "colors": "Colores",
+        "rarity": "Rareza",
         "types": "Tipos",
         "manaValue": "Mana Value",
         "priceUSD": "Precio USD",
@@ -1613,6 +1646,46 @@
         "title": "Sin conversaciones",
         "message": "Cuando contactes a un usuario desde un match, la conversación aparecerá aquí."
       }
+    }
+  },
+
+  "tour": {
+    "welcome": {
+      "title": "BIENVENIDO A CRANIAL TRADING",
+      "subtitle": "Te mostramos la plataforma. En unos pasos sabrás todo lo necesario para empezar a tradear.",
+      "startButton": "INICIAR TOUR",
+      "skipButton": "Saltar, prefiero explorar solo"
+    },
+    "steps": {
+      "collection": {
+        "title": "Colección",
+        "description": "Aquí viven todas tus cartas, organizadas por estado. Empieza agregando cartas aquí."
+      },
+      "statuses": {
+        "title": "Estados de Cartas",
+        "description": "Organiza tus cartas: Colección (guardar), Disponibles (venta/cambio) y Wishlist (las que buscas)."
+      },
+      "addCard": {
+        "title": "Agregar Carta",
+        "description": "Busca cualquier carta de Magic y agrégala a tu colección. También puedes importar mazos completos."
+      },
+      "decks": {
+        "title": "Mazos",
+        "description": "Agrupa tus cartas en mazos — Standard, Modern, Commander y más."
+      },
+      "matches": {
+        "title": "Matches",
+        "description": "Encontramos traders que quieren lo que tienes y tienen lo que buscas. Automáticamente."
+      },
+      "search": {
+        "title": "Búsqueda",
+        "description": "Busca en toda tu colección, otros usuarios o la base de datos de Scryfall."
+      }
+    },
+    "nav": {
+      "next": "SIGUIENTE",
+      "prev": "ATRÁS",
+      "done": "¡VAMOS!"
     }
   },
 

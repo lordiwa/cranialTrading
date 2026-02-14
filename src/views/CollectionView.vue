@@ -21,26 +21,23 @@ import CollectionTotalsPanel from '../components/collection/CollectionTotalsPane
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
-import BaseInput from '../components/ui/BaseInput.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
-import type { DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
+import type { DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
 import { useDecksStore } from '../stores/decks'
-import { useSearchStore } from '../stores/search'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { getCardsByIds, searchCards } from '../services/scryfall'
-import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
-import FilterPanel from '../components/search/FilterPanel.vue'
-import SearchResultCard from '../components/search/SearchResultCard.vue'
+import { buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
+import CardFilterBar from '../components/ui/CardFilterBar.vue'
+import { colorOrder, getCardColorCategory, getCardManaCategory, getCardTypeCategory, manaOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 
 const route = useRoute()
 const router = useRouter()
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
-const searchStore = useSearchStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
 const { t } = useI18n()
@@ -62,12 +59,10 @@ const selectedScryfallCard = ref<any>(null)
 // ✅ Filtros de COLECCIÓN (no Scryfall)
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
 const deckFilter = ref<string>('all')
-const filterQuery = ref('')
-const sortBy = ref<'recent' | 'name' | 'price'>('recent')
-const viewType = ref<'grid' | 'compact'>('grid')
+const viewType = ref<'stack' | 'visual' | 'texto'>('visual')
 
 // ========== STACK VARIANTS (group by card name) ==========
-const stackVariants = ref(false)
+const stackVariants = computed(() => viewType.value === 'stack')
 const expandedCardNames = ref<Set<string>>(new Set())
 
 // Interface for stacked card groups
@@ -392,10 +387,21 @@ const deckOwnedCards = computed(() => {
   })
 })
 
-// Wishlist del deck actual
+// Wishlist del deck actual (legacy DeckWishlistItem[])
 const deckWishlistCards = computed(() => {
   if (!selectedDeck.value) return []
   return selectedDeck.value.wishlist || []
+})
+
+// Wishlist cards del nuevo modelo: allocations que apuntan a cartas de colección con status='wishlist'
+const deckAllocWishlistCards = computed((): { card: Card; alloc: DeckCardAllocation }[] => {
+  if (!selectedDeck.value?.allocations) return []
+  const results: { card: Card; alloc: DeckCardAllocation }[] = []
+  for (const alloc of selectedDeck.value.allocations) {
+    const card = collectionCards.value.find(c => c.id === alloc.cardId && c.status === 'wishlist')
+    if (card) results.push({ card, alloc })
+  }
+  return results
 })
 
 // Es formato Commander?
@@ -477,58 +483,71 @@ const sideboardOwnedCount = computed(() => {
 })
 
 const mainboardWishlistCount = computed(() => {
-  return deckMainboardWishlist.value.reduce((sum, item) => sum + item.quantity, 0)
+  const legacy = deckMainboardWishlist.value.reduce((sum, item) => sum + item.quantity, 0)
+  const alloc = deckAllocWishlistCards.value
+      .filter(({ alloc }) => !alloc.isInSideboard)
+      .reduce((sum, { alloc }) => sum + alloc.quantity, 0)
+  return legacy + alloc
 })
 
 const sideboardWishlistCount = computed(() => {
-  return deckSideboardWishlist.value.reduce((sum, item) => sum + item.quantity, 0)
+  const legacy = deckSideboardWishlist.value.reduce((sum, item) => sum + item.quantity, 0)
+  const alloc = deckAllocWishlistCards.value
+      .filter(({ alloc }) => alloc.isInSideboard)
+      .reduce((sum, { alloc }) => sum + alloc.quantity, 0)
+  return legacy + alloc
 })
 
-// Deck grouping
-type DeckGroupOption = 'none' | 'type' | 'mana' | 'color'
-const deckGroupBy = ref<DeckGroupOption>('none')
+// ========== COLLECTION FILTER (composable) ==========
 
-// ========== COLLECTION GROUPING ==========
+// Pre-filter: status + deck (collection-specific, before composable)
+const statusFilteredCards = computed(() => {
+  let cards = collectionCards.value
 
-// Category helper functions for collection cards
-const getCardTypeCategory = (card: Card): string => {
-  const typeLine = card.type_line?.toLowerCase() || ''
-  if (typeLine.includes('creature')) return 'Creatures'
-  if (typeLine.includes('instant')) return 'Instants'
-  if (typeLine.includes('sorcery')) return 'Sorceries'
-  if (typeLine.includes('enchantment')) return 'Enchantments'
-  if (typeLine.includes('artifact')) return 'Artifacts'
-  if (typeLine.includes('planeswalker')) return 'Planeswalkers'
-  if (typeLine.includes('land')) return 'Lands'
-  return 'Other'
-}
+  // Status filter
+  if (statusFilter.value === 'owned') {
+    cards = cards.filter(c => c.status !== 'wishlist')
+  } else if (statusFilter.value === 'available') {
+    cards = cards.filter(c => c.status === 'sale' || c.status === 'trade')
+  } else if (statusFilter.value !== 'all') {
+    cards = cards.filter(c => c.status === statusFilter.value)
+  }
 
-const getCardManaCategory = (card: Card): string => {
-  const typeLine = card.type_line?.toLowerCase() || ''
-  if (typeLine.includes('land')) return 'Lands'
-  const cmc = card.cmc ?? 0
-  if (cmc >= 7) return '7+'
-  return String(cmc)
-}
+  // Deck filter (using allocations) — only for owned cards
+  if (deckFilter.value !== 'all') {
+    cards = cards.filter(c => {
+      if (c.status === 'wishlist') return false
+      const allocations = getAllocationsForCard(c.id)
+      return allocations.some(a => a.deckId === deckFilter.value)
+    })
+  }
 
-const getCardColorCategory = (card: Card): string => {
-  const typeLine = card.type_line?.toLowerCase() || ''
-  if (typeLine.includes('land')) return 'Lands'
+  return cards
+})
 
-  const colors = card.colors || []
-  const validColors = colors.filter((c: string) => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+// Shared filter composable (text search, sort, group, chip filters)
+const {
+  filterQuery,
+  sortBy,
+  groupBy: deckGroupBy,
+  selectedColors,
+  selectedManaValues,
+  selectedTypes,
+  hasActiveFilters,
+  filteredCards,
+  groupedCards: groupedFilteredCards,
+  translateCategory,
+} = useCardFilter(statusFilteredCards)
 
-  if (validColors.length === 0) return 'Colorless'
-  if (validColors.length >= 2) return 'Multicolor'
-
-  const color = validColors[0]?.toUpperCase()
-  if (color === 'W') return 'White'
-  if (color === 'U') return 'Blue'
-  if (color === 'B') return 'Black'
-  if (color === 'R') return 'Red'
-  if (color === 'G') return 'Green'
-
-  return 'Colorless'
+// Wishlist grouping — reuses the same filter state from the main composable
+const passesChipFilters = (card: Card): boolean => {
+  const color = getCardColorCategory(card)
+  if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !selectedColors.value.has(color)) return false
+  const mana = getCardManaCategory(card)
+  if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
+  const type = getCardTypeCategory(card)
+  if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !selectedTypes.value.has(type)) return false
+  return true
 }
 
 const getCardCategory = (card: Card): string => {
@@ -540,11 +559,6 @@ const getCardCategory = (card: Card): string => {
   }
 }
 
-// Category orders
-const typeOrder = ['Creatures', 'Instants', 'Sorceries', 'Enchantments', 'Artifacts', 'Planeswalkers', 'Lands', 'Other']
-const manaOrder = ['0', '1', '2', '3', '4', '5', '6', '7+', 'Lands']
-const colorOrder = ['White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Colorless', 'Lands']
-
 const getCategoryOrder = (): string[] => {
   switch (deckGroupBy.value) {
     case 'mana': return manaOrder
@@ -554,90 +568,29 @@ const getCategoryOrder = (): string[] => {
   }
 }
 
-// Translate category name
-const translateCategory = (category: string): string => {
-  const translations: Record<string, string> = {
-    'Creatures': 'Criaturas',
-    'Instants': 'Instantáneos',
-    'Sorceries': 'Conjuros',
-    'Enchantments': 'Encantamientos',
-    'Artifacts': 'Artefactos',
-    'Planeswalkers': 'Planeswalkers',
-    'Lands': 'Tierras',
-    'Other': 'Otros',
-    'White': 'Blanco',
-    'Blue': 'Azul',
-    'Black': 'Negro',
-    'Red': 'Rojo',
-    'Green': 'Verde',
-    'Multicolor': 'Multicolor',
-    'Colorless': 'Incoloro',
-  }
-  return translations[category] || category
-}
-
-// Grouped cards for collection view
-const groupedFilteredCards = computed(() => {
-  if (deckGroupBy.value === 'none') {
-    return [{ type: 'all', cards: filteredCards.value }]
-  }
-
-  const groups: Record<string, Card[]> = {}
-  const order = getCategoryOrder()
-
-  for (const card of filteredCards.value) {
-    const category = getCardCategory(card)
-    if (!groups[category]) groups[category] = []
-    groups[category].push(card)
-  }
-
-  // Build sorted groups array
-  const sortedGroups: { type: string; cards: Card[] }[] = []
-
-  for (const category of order) {
-    const group = groups[category]
-    if (group && group.length > 0) {
-      sortedGroups.push({ type: category, cards: group })
-    }
-  }
-
-  // Add any categories not in the order
-  for (const category in groups) {
-    const group = groups[category]
-    if (!order.includes(category) && group && group.length > 0) {
-      sortedGroups.push({ type: category, cards: group })
-    }
-  }
-
-  return sortedGroups
-})
-
-// Grouped wishlist cards
 const groupedWishlistCards = computed(() => {
+  const source = hasActiveFilters.value ? wishlistCards.value.filter(passesChipFilters) : wishlistCards.value
+
   if (deckGroupBy.value === 'none') {
-    return [{ type: 'all', cards: wishlistCards.value }]
+    return [{ type: 'all', cards: source }]
   }
 
   const groups: Record<string, Card[]> = {}
   const order = getCategoryOrder()
 
-  for (const card of wishlistCards.value) {
+  for (const card of source) {
     const category = getCardCategory(card)
     if (!groups[category]) groups[category] = []
     groups[category].push(card)
   }
 
-  // Build sorted groups array
   const sortedGroups: { type: string; cards: Card[] }[] = []
-
   for (const category of order) {
     const group = groups[category]
     if (group && group.length > 0) {
       sortedGroups.push({ type: category, cards: group })
     }
   }
-
-  // Add any categories not in the order
   for (const category in groups) {
     const group = groups[category]
     if (!order.includes(category) && group && group.length > 0) {
@@ -689,8 +642,9 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
     }
   })
 
-  // Convert wishlist items to HydratedWishlistCard format
+  // Convert legacy wishlist items to HydratedWishlistCard format
   const wishlistDisplay: HydratedWishlistCard[] = deckMainboardWishlist.value.map(item => ({
+    cardId: '',
     scryfallId: item.scryfallId,
     name: item.name,
     edition: item.edition,
@@ -702,13 +656,41 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
     type_line: item.type_line,
     colors: (item as any).colors,
     requestedQuantity: item.quantity,
+    allocatedQuantity: item.quantity,
     isInSideboard: false,
     notes: item.notes,
     addedAt: item.addedAt,
     isWishlist: true as const,
+    availableInCollection: 0,
+    totalInCollection: 0,
   }))
 
-  return [...ownedDisplay, ...wishlistDisplay]
+  // Convert new-model wishlist allocation cards (collection cards with status='wishlist')
+  const allocWishlistDisplay: HydratedWishlistCard[] = deckAllocWishlistCards.value
+      .filter(({ alloc }) => !alloc.isInSideboard)
+      .map(({ card, alloc }) => ({
+        cardId: card.id,
+        scryfallId: card.scryfallId,
+        name: card.name,
+        edition: card.edition,
+        condition: card.condition,
+        foil: card.foil,
+        price: card.price,
+        image: card.image,
+        cmc: card.cmc,
+        type_line: card.type_line,
+        colors: card.colors,
+        requestedQuantity: alloc.quantity,
+        allocatedQuantity: alloc.quantity,
+        isInSideboard: false,
+        notes: alloc.notes,
+        addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
+        isWishlist: true as const,
+        availableInCollection: 0,
+        totalInCollection: card.quantity,
+      }))
+
+  return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
 })
 
 const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
@@ -740,8 +722,9 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
     }
   })
 
-  // Convert wishlist items to HydratedWishlistCard format
+  // Convert legacy wishlist items to HydratedWishlistCard format
   const wishlistDisplay: HydratedWishlistCard[] = deckSideboardWishlist.value.map(item => ({
+    cardId: '',
     scryfallId: item.scryfallId,
     name: item.name,
     edition: item.edition,
@@ -753,66 +736,44 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
     type_line: item.type_line,
     colors: (item as any).colors,
     requestedQuantity: item.quantity,
+    allocatedQuantity: item.quantity,
     isInSideboard: true,
     notes: item.notes,
     addedAt: item.addedAt,
     isWishlist: true as const,
+    availableInCollection: 0,
+    totalInCollection: 0,
   }))
 
-  return [...ownedDisplay, ...wishlistDisplay]
+  // Convert new-model wishlist allocation cards (collection cards with status='wishlist')
+  const allocWishlistDisplay: HydratedWishlistCard[] = deckAllocWishlistCards.value
+      .filter(({ alloc }) => alloc.isInSideboard)
+      .map(({ card, alloc }) => ({
+        cardId: card.id,
+        scryfallId: card.scryfallId,
+        name: card.name,
+        edition: card.edition,
+        condition: card.condition,
+        foil: card.foil,
+        price: card.price,
+        image: card.image,
+        cmc: card.cmc,
+        type_line: card.type_line,
+        colors: card.colors,
+        requestedQuantity: alloc.quantity,
+        allocatedQuantity: alloc.quantity,
+        isInSideboard: true,
+        notes: alloc.notes,
+        addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
+        isWishlist: true as const,
+        availableInCollection: 0,
+        totalInCollection: card.quantity,
+      }))
+
+  return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
 })
 
-// Filtrados según criterios
-const filteredCards = computed(() => {
-  let cards = collectionCards.value
-
-  // Filtro por status
-  if (statusFilter.value === 'owned') {
-    cards = cards.filter(c => c.status !== 'wishlist')
-  } else if (statusFilter.value === 'available') {
-    // 'available' incluye tanto 'sale' como 'trade'
-    cards = cards.filter(c => c.status === 'sale' || c.status === 'trade')
-  } else if (statusFilter.value !== 'all') {
-    cards = cards.filter(c => c.status === statusFilter.value)
-  }
-
-  // Filtro por deck (usando allocaciones) - solo para cartas owned
-  if (deckFilter.value !== 'all') {
-    cards = cards.filter(c => {
-      if (c.status === 'wishlist') return false // wishlist se muestra aparte
-      const allocations = getAllocationsForCard(c.id)
-      return allocations.some(a => a.deckId === deckFilter.value)
-    })
-  }
-
-  // Filtro por búsqueda (nombre)
-  if (filterQuery.value.trim()) {
-    const q = filterQuery.value.toLowerCase()
-    cards = cards.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        c.edition.toLowerCase().includes(q)
-    )
-  }
-
-  // Sort
-  switch (sortBy.value) {
-    case 'recent':
-      cards = [...cards].sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-        return dateB - dateA
-      })
-      break
-    case 'name':
-      cards = [...cards].sort((a, b) => a.name.localeCompare(b.name))
-      break
-    case 'price':
-      cards = [...cards].sort((a, b) => (b.price || 0) - (a.price || 0))
-      break
-  }
-
-  return cards
-})
+// filteredCards is provided by useCardFilter composable (text search + sort + chip filters)
 
 // Precio de cartas owned en el deck
 const deckOwnedCost = computed(() => {
@@ -824,12 +785,16 @@ const deckOwnedCost = computed(() => {
   }, 0)
 })
 
-// Precio de cartas wishlist en el deck
+// Precio de cartas wishlist en el deck (legacy + nuevo modelo)
 const deckWishlistCost = computed(() => {
   if (deckFilter.value === 'all') return 0
-  return deckWishlistCards.value.reduce((sum, item) =>
+  const legacyCost = deckWishlistCards.value.reduce((sum, item) =>
     sum + (item.price || 0) * item.quantity, 0
   )
+  const allocCost = deckAllocWishlistCards.value.reduce((sum, { card, alloc }) =>
+    sum + (card.price || 0) * alloc.quantity, 0
+  )
+  return legacyCost + allocCost
 })
 
 // Precio total del deck actual (owned + wishlist)
@@ -857,9 +822,11 @@ const deckOwnedCount = computed(() => {
   }, 0)
 })
 
-// Cantidad de cartas wishlist en el deck
+// Cantidad de cartas wishlist en el deck (legacy + nuevo modelo)
 const deckWishlistCount = computed(() => {
-  return deckWishlistCards.value.reduce((sum, item) => sum + item.quantity, 0)
+  const legacyCount = deckWishlistCards.value.reduce((sum, item) => sum + item.quantity, 0)
+  const allocCount = deckAllocWishlistCards.value.reduce((sum, { alloc }) => sum + alloc.quantity, 0)
+  return legacyCount + allocCount
 })
 
 // ========== BULK SELECTION ==========
@@ -912,8 +879,8 @@ const handleBulkDelete = async () => {
   if (!confirmed) return
 
   const ids = [...selectedCardIds.value]
-  const success = await collectionStore.batchDeleteCards(ids)
-  if (success) {
+  const result = await collectionStore.batchDeleteCards(ids)
+  if (result.success) {
     toastStore.show(t('collection.bulkDelete.success', { count: ids.length }), 'success')
     selectedCardIds.value = new Set()
     selectionMode.value = false
@@ -923,18 +890,47 @@ const handleBulkDelete = async () => {
 // ========== METHODS ==========
 
 // Get how many copies of a card the user owns (by name, any edition)
-const getOwnedCount = (scryfallCard: any): number => {
-  const cardName = scryfallCard.name?.toLowerCase()
-  if (!cardName) return 0
-  return collectionStore.cards
-    .filter(c => c.name.toLowerCase() === cardName)
-    .reduce((sum, c) => sum + c.quantity, 0)
+// Click on local card suggestion
+const handleLocalCardSelect = (card: Card) => {
+  if (viewMode.value === 'decks' && deckFilter.value !== 'all') {
+    quickAllocateCardToDeck(card)
+  } else {
+    selectedCard.value = card
+    showCardDetailModal.value = true
+  }
 }
 
-// Cuando selecciona una carta de búsqueda para agregar
-const handleCardSelected = (card: any) => {
-  selectedScryfallCard.value = card
-  showAddCardModal.value = true
+// Quick add to deck (1 copy, mainboard)
+const quickAllocateCardToDeck = async (card: Card) => {
+  if (deckFilter.value === 'all') return
+  const result = await decksStore.allocateCardToDeck(deckFilter.value, card.id, 1, false)
+  if (result.allocated > 0) {
+    toastStore.show(t('collection.quickAdd.allocated', { name: card.name }), 'success')
+  } else if (result.wishlisted > 0) {
+    toastStore.show(t('collection.quickAdd.wishlisted', { name: card.name }), 'info')
+  }
+}
+
+// Click on Scryfall suggestion → search card and open AddCardModal
+const handleScryfallSuggestionSelect = async (cardName: string) => {
+  try {
+    const results = await searchCards(`!"${cardName}"`)
+    if (results.length > 0) {
+      selectedScryfallCard.value = results[0]
+      showAddCardModal.value = true
+    }
+  } catch (err) {
+    console.error('Error searching card:', err)
+  }
+}
+
+// Click on "Advanced search" → navigate to /search
+const handleOpenAdvancedSearch = () => {
+  const query: Record<string, string> = {}
+  if (deckFilter.value !== 'all') {
+    query.deck = deckFilter.value
+  }
+  router.push({ path: '/search', query })
 }
 
 // Cerrar modal de agregar carta y limpiar URL
@@ -999,13 +995,23 @@ const handleCardDetailClosed = () => {
 // ========== DECK EDITOR GRID HANDLERS ==========
 
 // Handle edit from deck grid
-const handleDeckGridEdit = (displayCard: DisplayDeckCard) => {
+const handleDeckGridEdit = async (displayCard: DisplayDeckCard) => {
   if (!displayCard.isWishlist) {
-    const hydratedCard = displayCard
-    const card = collectionStore.cards.find(c => c.id === hydratedCard.cardId)
+    const card = collectionStore.cards.find(c => c.id === displayCard.cardId)
     if (card) {
       selectedCard.value = card
       showCardDetailModal.value = true
+    }
+  } else {
+    // Wishlist card: search on Scryfall and offer to add to collection
+    try {
+      const results = await searchCards(`!"${displayCard.name}" set:${displayCard.edition}`)
+      if (results.length > 0) {
+        selectedScryfallCard.value = results[0]
+        showAddCardModal.value = true
+      }
+    } catch (err) {
+      console.error('Error searching wishlist card:', err)
     }
   }
 }
@@ -1026,15 +1032,20 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
   if (!confirmed) return
 
   if (displayCard.isWishlist) {
-    // Remove from wishlist
-    await decksStore.removeFromWishlist(
-      selectedDeck.value.id,
-      displayCard.scryfallId,
-      displayCard.edition,
-      displayCard.condition,
-      displayCard.foil,
-      displayCard.isInSideboard
-    )
+    if (displayCard.cardId) {
+      // New model: wishlist card is an allocation → deallocate
+      await decksStore.deallocateCard(selectedDeck.value.id, displayCard.cardId, displayCard.isInSideboard)
+    } else {
+      // Legacy: remove from wishlist array
+      await decksStore.removeFromWishlist(
+        selectedDeck.value.id,
+        displayCard.scryfallId,
+        displayCard.edition,
+        displayCard.condition,
+        displayCard.foil,
+        displayCard.isInSideboard
+      )
+    }
   } else {
     // Deallocate from deck (card stays in collection)
     const ownedCard = displayCard
@@ -1048,15 +1059,18 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
 const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQuantity: number) => {
   if (!selectedDeck.value) return
 
-  if (!displayCard.isWishlist) {
-    const hydratedCard = displayCard
-    await decksStore.updateAllocation(
-      selectedDeck.value.id,
-      hydratedCard.cardId,
-      hydratedCard.isInSideboard,
-      newQuantity
-    )
-    toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+  if (!displayCard.isWishlist || displayCard.cardId) {
+    // Owned cards and new-model wishlist cards both use allocations
+    const cardId = displayCard.cardId
+    if (cardId) {
+      await decksStore.updateAllocation(
+        selectedDeck.value.id,
+        cardId,
+        displayCard.isInSideboard,
+        newQuantity
+      )
+      toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+    }
   }
 }
 
@@ -1206,14 +1220,16 @@ const handleImport = async (
     await collectionStore.loadCollection()
 
     if (deckId) {
-      for (const cardData of collectionCardsToAdd) {
-        const collectionCard = collectionStore.cards.find(
-          c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
-        )
-        if (collectionCard) {
-          await decksStore.allocateCardToDeck(deckId, collectionCard.id, cardData.quantity, cardData.isInSideboard)
-        }
-      }
+      const bulkItems = collectionCardsToAdd
+        .map(cardData => {
+          const collectionCard = collectionStore.cards.find(
+            c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+          )
+          return collectionCard ? { cardId: collectionCard.id, quantity: cardData.quantity, isInSideboard: cardData.isInSideboard } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+
+      await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems)
     }
   }
 
@@ -1443,29 +1459,28 @@ const handleImportDirect = async (
         allocatedCount: 0,
       })
 
-      for (let i = 0; i < createdCardIds.length; i++) {
-        const cardId = createdCardIds[i]
-        const meta = cardMeta[i]
-        if (cardId && meta) {
-          const result = await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
-          allocatedCount += result.allocated
+      const bulkItems = createdCardIds
+        .map((cardId, i) => {
+          const meta = cardMeta[i]
+          return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
 
-          // Update progress for each allocation (60-95% range)
-          const allocPercent = 60 + Math.round((i / createdCardIds.length) * 35)
-          progressToast.update(allocPercent, `Asignando ${i + 1}/${createdCardIds.length}...`)
-          saveImportState({
-            deckId,
-            deckName: finalDeckName,
-            status: 'allocating',
-            totalCards: createdCardIds.length,
-            currentCard: i + 1,
-            cards: collectionCardsToAdd,
-            cardMeta,
-            createdCardIds,
-            allocatedCount,
-          })
-        }
-      }
+      progressToast.update(65, `Asignando ${bulkItems.length} cartas al deck...`)
+      const bulkResult = await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems)
+      allocatedCount = bulkResult.allocated
+
+      saveImportState({
+        deckId,
+        deckName: finalDeckName,
+        status: 'allocating',
+        totalCards: createdCardIds.length,
+        currentCard: createdCardIds.length,
+        cards: collectionCardsToAdd,
+        cardMeta,
+        createdCardIds,
+        allocatedCount,
+      })
     }
 
     // PASO 8: Completar importación
@@ -1582,6 +1597,9 @@ const handleImportCsv = async (
       if (card.setCode) {
         cardData.setCode = card.setCode.toUpperCase()
       }
+      if (card.language) {
+        cardData.language = card.language
+      }
       collectionCardsToAdd.push(cardData)
       cardMeta.push({ quantity: card.quantity, isInSideboard: false })
 
@@ -1600,20 +1618,19 @@ const handleImportCsv = async (
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
       progressToast.update(60, `Asignando cartas al deck...`)
 
-      // PASO 5: Asignar al deck
-      for (let i = 0; i < createdCardIds.length; i++) {
-        const cardId = createdCardIds[i]
-        const meta = cardMeta[i]
-        if (cardId && meta) {
-          const result = await decksStore.allocateCardToDeck(deckId, cardId, meta.quantity, meta.isInSideboard)
-          allocatedCount += result.allocated
+      // PASO 5: Asignar al deck (bulk — single Firestore write)
+      const bulkItems = createdCardIds
+        .map((cardId, i) => {
+          const meta = cardMeta[i]
+          return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
 
-          if (i % 20 === 0) {
-            const pct = 60 + Math.round((i / createdCardIds.length) * 35)
-            progressToast.update(pct, `Asignando ${i + 1}/${createdCardIds.length}...`)
-          }
-        }
-      }
+      const bulkResult = await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems, (current, total) => {
+        const pct = 60 + Math.round((current / total) * 35)
+        progressToast.update(pct, `Asignando ${current}/${total}...`)
+      })
+      allocatedCount = bulkResult.allocated
     }
 
     // PASO 6: Completar
@@ -1638,33 +1655,40 @@ const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isRe
   deleteProgress.value = 0
 
   try {
-    // Step 1: Delete cards FIRST using batch (atomic, prevents orphans)
-    if (state.status === 'deleting_cards' && cardIds.length > 0) {
-      const success = await collectionStore.batchDeleteCards(cardIds, (percent) => {
-        // Cards deletion is 0-90% of total progress
-        deleteProgress.value = Math.round(percent * 0.9)
-      })
-      if (!success) {
-        throw new Error('Batch delete cards failed')
-      }
+    // Step 1: Delete the deck FIRST (single fast operation — guarantees deck is always removed)
+    if (state.status === 'deleting_cards' || state.status === 'deleting_deck') {
+      deleteProgress.value = 5
+      state.status = 'deleting_deck'
+      saveDeleteDeckState(state)
+      await decksStore.deleteDeck(state.deckId, true)
+      deckFilter.value = 'all'
     }
 
-    // Step 2: Delete the deck
-    deleteProgress.value = 90
-    state.status = 'deleting_deck'
-    saveDeleteDeckState(state)
-    await decksStore.deleteDeck(state.deckId)
-    deckFilter.value = 'all'
+    // Step 2: Delete cards in batches (deck is already gone)
+    console.log(`[DeleteDeck] Step 2: deleteCards=${state.deleteCards}, cardIds=${cardIds.length}`)
+    if (state.deleteCards && cardIds.length > 0) {
+      state.status = 'deleting_cards'
+      saveDeleteDeckState(state)
+      const result = await collectionStore.batchDeleteCards(cardIds, (percent) => {
+        // Cards deletion is 10-95% of total progress
+        deleteProgress.value = 10 + Math.round(percent * 0.85)
+      })
+
+      console.log(`[DeleteDeck] batchDelete result: deleted=${result.deleted}, failed=${result.failed}`)
+      if (result.failed > 0) {
+        console.warn(`[DeleteDeck] ${result.failed} cards failed to delete (orphaned)`)
+        toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+      } else {
+        toastStore.show(t('decks.messages.deletedWithCards', { count: cardIds.length }), 'success')
+      }
+    } else {
+      toastStore.show(t('decks.messages.deletedCardsKept'), 'success')
+    }
 
     state.status = 'complete'
     deleteProgress.value = 100
     clearDeleteDeckState()
 
-    if (state.deleteCards && cardIds.length > 0) {
-      toastStore.show(t('decks.messages.deletedWithCards', { count: cardIds.length }), 'success')
-    } else {
-      toastStore.show(t('decks.messages.deletedCardsKept'), 'success')
-    }
     isDeleteRunning = false
     isDeletingDeck.value = false
     deleteProgress.value = 0
@@ -1779,6 +1803,110 @@ const handleToggleDeckPublic = async () => {
   }
 }
 
+const handleExportDeck = async () => {
+  if (!selectedDeck.value) return
+
+  // Build cardId → setCode map for fast lookup
+  const setCodeMap = new Map<string, string>()
+  for (const c of collectionStore.cards) {
+    if (c.setCode) setCodeMap.set(c.id, c.setCode)
+  }
+
+  const getQty = (card: DisplayDeckCard): number => {
+    return card.isWishlist ? card.requestedQuantity : (card as any).allocatedQuantity
+  }
+
+  const getSet = (card: DisplayDeckCard): string => {
+    if (!card.isWishlist) {
+      const code = setCodeMap.get((card as any).cardId)
+      if (code) return code.toUpperCase()
+    }
+    return card.edition
+  }
+
+  const lines: string[] = []
+  const isCommander = selectedDeck.value.format === 'commander'
+  const commanderName = selectedDeck.value.commander
+
+  if (isCommander && commanderName) {
+    const commanderCards = mainboardDisplayCards.value.filter(c => c.name === commanderName)
+    if (commanderCards.length > 0) {
+      lines.push('Commander')
+      for (const card of commanderCards) {
+        lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
+      }
+      lines.push('')
+    }
+  }
+
+  const deckCards = isCommander && commanderName
+      ? mainboardDisplayCards.value.filter(c => c.name !== commanderName)
+      : mainboardDisplayCards.value
+
+  if (deckCards.length > 0) {
+    if (isCommander && commanderName) {
+      lines.push('Deck')
+    }
+    for (const card of deckCards) {
+      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  if (sideboardDisplayCards.value.length > 0) {
+    lines.push('')
+    lines.push('Sideboard')
+    for (const card of sideboardDisplayCards.value) {
+      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  const text = lines.join('\n')
+
+  try {
+    await navigator.clipboard.writeText(text)
+    toastStore.show(t('decks.detail.exportCopied'), 'success')
+  } catch {
+    toastStore.show(t('decks.detail.exportError'), 'error')
+  }
+}
+
+const handleExportDeckCsv = async () => {
+  if (!selectedDeck.value) return
+
+  const cardMap = new Map<string, typeof collectionStore.cards[number]>()
+  for (const c of collectionStore.cards) {
+    cardMap.set(c.id, c)
+  }
+
+  const allCards = [...mainboardDisplayCards.value, ...sideboardDisplayCards.value]
+  const csvCards: Parameters<typeof buildMoxfieldCsv>[0] = []
+
+  for (const card of allCards) {
+    const qty = card.isWishlist ? card.requestedQuantity : (card as any).allocatedQuantity
+    let setCode = card.edition
+    if (!card.isWishlist) {
+      const col = cardMap.get((card as any).cardId)
+      if (col?.setCode) setCode = col.setCode.toUpperCase()
+    }
+
+    csvCards.push({
+      name: card.name,
+      setCode,
+      quantity: qty,
+      foil: card.foil,
+      scryfallId: card.scryfallId,
+      price: card.price,
+      condition: card.condition,
+      language: card.language,
+    })
+  }
+
+  const csv = buildMoxfieldCsv(csvCards)
+  const filename = `${selectedDeck.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+  downloadAsFile(csv, filename)
+  toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
+}
+
 // ========== RESUME IMPORT ==========
 
 const resumeImport = async (savedState: ImportState) => {
@@ -1831,25 +1959,19 @@ const resumeImport = async (savedState: ImportState) => {
   try {
     // Si estaba en 'allocating', continuar desde donde quedó
     if (savedState.status === 'allocating' && savedState.createdCardIds.length > 0) {
-      let allocatedCount = savedState.allocatedCount
       const startIndex = savedState.currentCard
+      const remaining = savedState.createdCardIds.slice(startIndex)
 
-      for (let i = startIndex; i < savedState.createdCardIds.length; i++) {
-        const cardId = savedState.createdCardIds[i]
-        const meta = savedState.cardMeta[i]
-        if (cardId && meta) {
-          const result = await decksStore.allocateCardToDeck(savedState.deckId, cardId, meta.quantity, meta.isInSideboard)
-          allocatedCount += result.allocated
+      const bulkItems = remaining
+        .map((cardId, i) => {
+          const meta = savedState.cardMeta[startIndex + i]
+          return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
 
-          const allocPercent = 60 + Math.round((i / savedState.createdCardIds.length) * 35)
-          progressToast.update(allocPercent, `Asignando ${i + 1}/${savedState.createdCardIds.length}...`)
-          saveImportState({
-            ...savedState,
-            currentCard: i + 1,
-            allocatedCount,
-          })
-        }
-      }
+      progressToast.update(65, `Asignando ${bulkItems.length} cartas al deck...`)
+      const bulkResult = await decksStore.bulkAllocateCardsToDeck(savedState.deckId, bulkItems)
+      const allocatedCount = savedState.allocatedCount + bulkResult.allocated
 
       // Completar
       await decksStore.loadDecks()
@@ -1875,27 +1997,17 @@ const resumeImport = async (savedState: ImportState) => {
         createdCardIds,
       })
 
-      // Continuar con allocations
-      let allocatedCount = 0
-      for (let i = 0; i < createdCardIds.length; i++) {
-        const cardId = createdCardIds[i]
-        const meta = savedState.cardMeta[i]
-        if (cardId && meta) {
-          const result = await decksStore.allocateCardToDeck(savedState.deckId, cardId, meta.quantity, meta.isInSideboard)
-          allocatedCount += result.allocated
+      // Continuar con allocations (bulk — single Firestore write)
+      const bulkItems = createdCardIds
+        .map((cardId, i) => {
+          const meta = savedState.cardMeta[i]
+          return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
 
-          const allocPercent = 60 + Math.round((i / createdCardIds.length) * 35)
-          progressToast.update(allocPercent, `Asignando ${i + 1}/${createdCardIds.length}...`)
-          saveImportState({
-            ...savedState,
-            status: 'allocating',
-            totalCards: createdCardIds.length,
-            currentCard: i + 1,
-            createdCardIds,
-            allocatedCount,
-          })
-        }
-      }
+      progressToast.update(65, `Asignando ${bulkItems.length} cartas al deck...`)
+      const bulkResult = await decksStore.bulkAllocateCardsToDeck(savedState.deckId, bulkItems)
+      const allocatedCount = bulkResult.allocated
 
       await decksStore.loadDecks()
       saveImportState({ ...savedState, status: 'complete', currentCard: savedState.totalCards, allocatedCount })
@@ -1989,19 +2101,10 @@ watch(() => route.query.filter, (newFilter, oldFilter) => {
   }
 }, { immediate: true })
 
-// Watch for addCard query parameter (from GlobalSearch)
-watch(() => route.query.addCard, async (cardName) => {
+// Watch for addCard query parameter (from GlobalSearch) — redirect to search view
+watch(() => route.query.addCard, (cardName) => {
   if (cardName && typeof cardName === 'string') {
-    try {
-      // Search for the card in Scryfall
-      const results = await searchCards(`!"${cardName}"`)
-      if (results.length > 0) {
-        selectedScryfallCard.value = results[0]
-        showAddCardModal.value = true
-      }
-    } catch (err) {
-      console.error('Error searching card:', err)
-    }
+    router.replace({ path: '/search', query: { q: cardName } })
   }
 }, { immediate: true })
 
@@ -2077,7 +2180,7 @@ onUnmounted(() => {
           <span v-if="wishlistTotalCount > 0" class="text-yellow-400">• {{ t('collection.wishlistCount', { count: wishlistTotalCount }) }}</span>
         </p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2" data-tour="add-card-btn">
         <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">
           {{ t('collection.actions.import') }}
         </BaseButton>
@@ -2087,38 +2190,9 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- ========== BARRA DE BÚSQUEDA HORIZONTAL ========== -->
-    <FilterPanel />
-
     <!-- ========== CONTENIDO PRINCIPAL ========== -->
     <div class="mt-6">
-      <!-- Resultados de búsqueda Scryfall (cuando hay resultados) -->
-      <div v-if="searchStore.hasResults" class="space-y-4">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-h3 font-bold text-neon">{{ t('collection.searchResults.title') }}</h2>
-            <p class="text-small text-silver-70">
-              {{ t('collection.searchResults.subtitle', { count: searchStore.totalResults }) }}
-            </p>
-          </div>
-          <BaseButton size="small" variant="secondary" @click="searchStore.clearSearch()">
-            {{ t('collection.searchResults.back') }}
-          </BaseButton>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <SearchResultCard
-              v-for="card in searchStore.results"
-              :key="card.id"
-              :card="card"
-              :owned-count="getOwnedCount(card)"
-              @click="handleCardSelected(card)"
-          />
-        </div>
-      </div>
-
-      <!-- Vista de colección (cuando NO hay resultados de búsqueda) -->
-      <div v-else>
+      <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
           <div class="flex gap-1 mb-4">
@@ -2134,6 +2208,7 @@ onUnmounted(() => {
               {{ t('collection.tabs.collection') }}
             </button>
             <button
+                data-tour="deck-tab"
                 @click="switchToDecks()"
                 :class="[
                   'px-6 py-3 text-body font-bold transition-150 border-2',
@@ -2222,6 +2297,14 @@ onUnmounted(() => {
                 </BaseButton>
                 <HelpTooltip :text="isDeckPublic ? t('help.tooltips.collection.deckPublic') : t('help.tooltips.collection.deckPrivate')" :title="t('help.titles.deckVisibility')" />
               </div>
+              <BaseButton size="small" variant="secondary" @click="handleExportDeck">
+                <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
+                <span class="sm:hidden">📋</span>
+              </BaseButton>
+              <BaseButton size="small" variant="secondary" @click="handleExportDeckCsv">
+                <span class="hidden sm:inline">CSV</span>
+                <span class="sm:hidden">CSV</span>
+              </BaseButton>
               <BaseButton size="small" variant="secondary" @click="handleDeleteDeck" :disabled="isDeletingDeck">
                 <template v-if="isDeletingDeck">
                   <span class="animate-spin inline-block">⏳</span>
@@ -2291,7 +2374,7 @@ onUnmounted(() => {
 </div>
 
         <!-- ========== STATUS FILTERS (solo en modo colección) ========== -->
-        <div v-if="viewMode === 'collection'" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
+        <div v-if="viewMode === 'collection'" data-tour="status-filters" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
           <div
               v-for="(count, status) in {
                 'all': collectionCards.length,
@@ -2333,108 +2416,21 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== SEARCH + SORT + VIEW ========== -->
-        <div class="mb-6 space-y-3">
-          <BaseInput
-              v-model="filterQuery"
-              :placeholder="t('collection.filters.searchPlaceholder')"
-              type="text"
-              clearable
-          />
-
-          <!-- Sort & View controls -->
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <!-- Sort -->
-            <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">{{ t('collection.sort.label') }}:</span>
-              <button
-                  v-for="opt in ['recent', 'name', 'price']"
-                  :key="opt"
-                  @click="sortBy = opt as 'recent' | 'name' | 'price'"
-                  :class="[
-                    'px-2 py-1 text-tiny font-bold rounded transition-colors',
-                    sortBy === opt ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
-                  ]"
-              >
-                {{ t(`collection.sort.${opt}`) }}
-              </button>
-            </div>
-
-            <!-- Group by -->
-            <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">{{ t('collection.deckStats.groupBy') }}:</span>
-              <button
-                  v-for="opt in [
-                    { value: 'none', label: t('collection.group.none') },
-                    { value: 'type', label: t('collection.deckStats.type') },
-                    { value: 'mana', label: t('collection.deckStats.mana') },
-                    { value: 'color', label: t('collection.deckStats.color') }
-                  ]"
-                  :key="opt.value"
-                  @click="deckGroupBy = opt.value as DeckGroupOption"
-                  :class="[
-                    'px-2 py-1 text-tiny font-bold rounded transition-colors',
-                    deckGroupBy === opt.value ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
-                  ]"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-
-            <!-- Stack variants toggle (only in collection mode) -->
-            <div v-if="viewMode === 'collection'" class="flex items-center gap-2">
-              <button
-                  @click="stackVariants = !stackVariants"
-                  :class="[
-                    'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1',
-                    stackVariants ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
-                  ]"
-                  :title="t('collection.stack.tooltip')"
-              >
-                <SvgIcon name="stack" size="tiny" />
-                {{ t('collection.stack.label') }}
-              </button>
-            </div>
-
-            <!-- Bulk select toggle (only in collection mode) -->
-            <div v-if="viewMode === 'collection'" class="flex items-center gap-2">
-              <button
-                  @click="toggleSelectionMode"
-                  :class="[
-                    'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1',
-                    selectionMode ? 'bg-rust/20 text-rust' : 'text-silver-50 hover:text-silver'
-                  ]"
-                  :title="t('collection.bulkDelete.toggle')"
-              >
-                <SvgIcon name="check" size="tiny" />
-                {{ t('collection.bulkDelete.select') }}
-              </button>
-            </div>
-
-            <!-- View type (only in collection mode, hidden when stacking) -->
-            <div v-if="viewMode === 'collection' && !stackVariants" class="flex items-center gap-1">
-              <button
-                  @click="viewType = 'grid'"
-                  :class="[
-                    'p-2 rounded transition-colors',
-                    viewType === 'grid' ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
-                  ]"
-                  :title="t('collection.view.grid')"
-              >
-                <SvgIcon name="collection" size="small" />
-              </button>
-              <button
-                  @click="viewType = 'compact'"
-                  :class="[
-                    'p-2 rounded transition-colors',
-                    viewType === 'compact' ? 'bg-neon-10 text-neon' : 'text-silver-50 hover:text-silver'
-                  ]"
-                  :title="t('collection.view.compact')"
-              >
-                <SvgIcon name="settings" size="small" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <CardFilterBar
+            v-model:filter-query="filterQuery"
+            v-model:sort-by="sortBy"
+            v-model:group-by="deckGroupBy"
+            :view-mode="viewMode"
+            :show-bulk-select="viewMode === 'collection'"
+            :selection-mode="selectionMode"
+            :show-view-type="viewMode === 'collection'"
+            :view-type="viewType"
+            @toggle-bulk-select="toggleSelectionMode"
+            @change-view-type="viewType = $event"
+            @select-local-card="handleLocalCardSelect"
+            @select-scryfall-card="handleScryfallSuggestionSelect"
+            @open-advanced-search="handleOpenAdvancedSearch"
+        />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->
         <div v-if="selectionMode && viewMode === 'collection'" class="bg-rust/10 border border-rust p-3 mb-4 flex flex-wrap items-center justify-between gap-3 rounded">
@@ -2578,7 +2574,7 @@ onUnmounted(() => {
               </div>
               <CollectionGrid
                   :cards="group.cards"
-                  :compact="viewType === 'compact'"
+                  :compact="viewType === 'texto'"
                   :deleting-card-ids="deletingCardIds"
                   :selection-mode="selectionMode"
                   :selected-card-ids="selectedCardIds"
@@ -2602,6 +2598,9 @@ onUnmounted(() => {
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
               :sort-by="sortBy"
+              :selected-colors="selectedColors"
+              :selected-mana-values="selectedManaValues"
+              :selected-types="selectedTypes"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
@@ -2627,6 +2626,9 @@ onUnmounted(() => {
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
               :sort-by="sortBy"
+              :selected-colors="selectedColors"
+              :selected-mana-values="selectedManaValues"
+              :selected-types="selectedTypes"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
@@ -2651,7 +2653,7 @@ onUnmounted(() => {
             </div>
             <CollectionGrid
                 :cards="group.cards"
-                :compact="viewType === 'compact'"
+                :compact="viewType === 'texto'"
                 :deleting-card-ids="deletingCardIds"
                 :selection-mode="selectionMode"
                 :selected-card-ids="selectedCardIds"

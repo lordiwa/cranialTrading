@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useCollectionStore } from '../../stores/collection'
@@ -40,6 +40,9 @@ const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
 const togglingPublic = ref(false)
 const showMobileMenu = ref(false)
+
+// Refs for IntersectionObserver
+const compactCardRef = ref<HTMLElement | null>(null)
 
 // Swipe state
 const cardRef = ref<HTMLElement | null>(null)
@@ -136,40 +139,60 @@ const {
   () => props.card.setCode
 )
 
-// Fetch CK prices on mount (useCardPrices handles missing setCode by fetching from Scryfall)
+// Lazy fetch CK prices when card scrolls into viewport
+let priceObserver: IntersectionObserver | null = null
+
 onMounted(() => {
-  if (props.card.scryfallId) {
+  if (!props.card.scryfallId) return
+  const el = cardRef.value || compactCardRef.value
+  if (!el) {
     fetchCKPrices()
+    return
   }
+  priceObserver = new IntersectionObserver((entries) => {
+    if (entries[0]?.isIntersecting) {
+      fetchCKPrices()
+      priceObserver?.disconnect()
+      priceObserver = null
+    }
+  }, { rootMargin: '200px' })
+  priceObserver.observe(el)
+})
+
+onUnmounted(() => {
+  priceObserver?.disconnect()
+  priceObserver = null
 })
 
 // Estado para controlar qué lado mostrar en split cards
 const cardFaceIndex = ref(0)
 
-const getCardImage = (card: Card): string => {
-  if (card.image && typeof card.image === 'string') {
+// Cache parsed image JSON to avoid repeated JSON.parse calls
+const parsedImage = computed(() => {
+  if (props.card.image && typeof props.card.image === 'string') {
     try {
-      const parsed = JSON.parse(card.image)
-      if (parsed.card_faces && parsed.card_faces.length > 0) {
-        return parsed.card_faces[cardFaceIndex.value]?.image_uris?.normal || parsed.card_faces[0]?.image_uris?.normal || ''
-      }
+      const parsed = JSON.parse(props.card.image)
+      if (parsed.card_faces) return parsed
     } catch {
-      return card.image
+      // Not valid JSON — plain URL string
+    }
+  }
+  return null
+})
+
+const getCardImage = (card: Card): string => {
+  if (parsedImage.value) {
+    const faces = parsedImage.value.card_faces
+    if (faces && faces.length > 0) {
+      return faces[cardFaceIndex.value]?.image_uris?.normal || faces[0]?.image_uris?.normal || ''
     }
   }
   return card.image || ''
 }
 
 const isSplitCard = computed((): boolean => {
-  if (props.card.image && typeof props.card.image === 'string') {
-    try {
-      const parsed = JSON.parse(props.card.image)
-      return parsed.card_faces && parsed.card_faces.length > 1
-    } catch {
-      return false
-    }
-  }
-  return false
+  const parsed = parsedImage.value
+  return !!(parsed?.card_faces && parsed.card_faces.length > 1)
 })
 
 const toggleCardFace = () => {
@@ -214,7 +237,7 @@ const getStatusIconName = (status: string) => {
 
 <template>
   <!-- COMPACT MODE: For deck view -->
-  <div v-if="compact" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
+  <div v-if="compact" ref="compactCardRef" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
     <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded">
       <img
           v-if="getCardImage(card)"

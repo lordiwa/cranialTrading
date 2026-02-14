@@ -41,7 +41,9 @@
       "Bash(npx husky init)",
       "Bash(git status:*)",
       "Bash(npx vitest:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(node convert-icons.js:*)",
+      "Bash(test:*)"
     ]
   }
 }

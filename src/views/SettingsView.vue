@@ -9,6 +9,7 @@ import { useDecksStore } from '../stores/decks';
 import { useMatchesStore } from '../stores/matches';
 import { useContactsStore } from '../stores/contacts';
 import { useI18n } from '../composables/useI18n';
+import { useTour } from '../composables/useTour';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
@@ -24,6 +25,7 @@ const decksStore = useDecksStore();
 const matchesStore = useMatchesStore();
 const contactsStore = useContactsStore();
 const { t } = useI18n();
+const { startTour } = useTour();
 
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -367,6 +369,13 @@ const handleDeleteAllData = async () => {
   } finally {
     deletingData.value = false;
   }
+};
+
+const handleRestartTour = () => {
+  localStorage.removeItem('cranial_tour_completed');
+  router.push('/collection').then(() => {
+    setTimeout(() => { startTour(); }, 500);
+  });
 };
 </script>
 
@@ -798,6 +807,19 @@ const handleDeleteAllData = async () => {
               {{ authStore.user?.createdAt.toLocaleDateString() }}
             </p>
           </div>
+        </div>
+      </div>
+
+      <!-- Restart Tour -->
+      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-small font-bold text-silver">{{ t('settings.restartTour.label') }}</p>
+            <p class="text-tiny text-silver-50">{{ t('settings.restartTour.hint') }}</p>
+          </div>
+          <BaseButton variant="secondary" size="small" @click="handleRestartTour">
+            {{ t('settings.restartTour.button') }}
+          </BaseButton>
         </div>
       </div>
 

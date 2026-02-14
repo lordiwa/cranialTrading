@@ -115,7 +115,7 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
   return { quantity, cardName, setCode, isFoil }
 }
 
-// ============ CSV (ManaBox) IMPORT ============
+// ============ CSV (ManaBox) IMPORT/EXPORT ============
 
 /**
  * Map ManaBox condition strings to app's CardCondition type
@@ -131,6 +131,80 @@ export const mapCsvCondition = (condition: string): CardCondition => {
     case 'poor': return 'PO'
     default: return 'NM'
   }
+}
+
+/**
+ * Map app's CardCondition to Moxfield condition string (for CSV export)
+ */
+export const conditionToCsv = (condition: CardCondition): string => {
+  switch (condition) {
+    case 'M': return 'Near Mint'
+    case 'NM': return 'Near Mint'
+    case 'LP': return 'Lightly Played'
+    case 'MP': return 'Moderately Played'
+    case 'HP': return 'Heavily Played'
+    case 'PO': return 'Damaged'
+    default: return 'Near Mint'
+  }
+}
+
+/**
+ * Download a string as a file
+ */
+export const downloadAsFile = (content: string, filename: string, mimeType = 'text/csv') => {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Escape a CSV field value (wrap in quotes if it contains commas or quotes)
+ */
+const escapeCsvField = (value: string): string => {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+/**
+ * Build Moxfield-compatible CSV from card data.
+ */
+export const buildMoxfieldCsv = (cards: {
+  name: string
+  setCode: string
+  quantity: number
+  foil: boolean
+  scryfallId: string
+  price: number
+  condition: CardCondition
+  language?: string
+}[]): string => {
+  const header = 'Count,Name,Edition,Condition,Language,Foil,Collector Number,Alter,Proxy,Purchase Price'
+  const lines = [header]
+
+  for (const card of cards) {
+    lines.push([
+      String(card.quantity),          // Count
+      escapeCsvField(card.name),      // Name
+      card.setCode,                   // Edition
+      conditionToCsv(card.condition), // Condition
+      (card.language || 'en').toUpperCase(), // Language
+      card.foil ? 'foil' : '',        // Foil
+      '',                             // Collector Number (not stored)
+      '',                             // Alter
+      '',                             // Proxy
+      card.price ? card.price.toFixed(2) : '', // Purchase Price
+    ].join(','))
+  }
+
+  return lines.join('\n')
 }
 
 /**
@@ -169,6 +243,7 @@ export interface ParsedCsvCard {
   setCode: string
   quantity: number
   foil: boolean
+  language?: string
   scryfallId: string
   price: number
   condition: CardCondition
@@ -203,6 +278,7 @@ export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
   const scryfallIdx = colIndex.get('Scryfall ID')
   const priceIdx = colIndex.get('Purchase price')
   const conditionIdx = colIndex.get('Condition')
+  const languageIdx = colIndex.get('Language')
 
   if (nameIdx === undefined || quantityIdx === undefined) return []
 
@@ -222,11 +298,13 @@ export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
 
     if (!name || !quantity || quantity <= 0) continue
 
+    const lang = getField(fields, languageIdx).trim().toLowerCase()
     cards.push({
       name,
       setCode: getField(fields, setCodeIdx).trim(),
       quantity,
       foil: getField(fields, foilIdx).trim().toLowerCase() === 'foil',
+      language: lang || undefined,
       scryfallId: getField(fields, scryfallIdx).trim(),
       price: Number.parseFloat(getField(fields, priceIdx) || '0') || 0,
       condition: mapCsvCondition(getField(fields, conditionIdx)),

@@ -280,8 +280,8 @@ export const useCollectionStore = defineStore('collection', () => {
      * Delete multiple cards efficiently using Firestore batch
      * Optimistic UI: removes from UI immediately, then syncs with Firebase
      */
-    const batchDeleteCards = async (cardIds: string[], onProgress?: (percent: number) => void): Promise<boolean> => {
-        if (!authStore.user || cardIds.length === 0) return false
+    const batchDeleteCards = async (cardIds: string[], onProgress?: (percent: number) => void): Promise<{ success: boolean; deleted: number; failed: number }> => {
+        if (!authStore.user || cardIds.length === 0) return { success: true, deleted: 0, failed: 0 }
 
         // Save cards for potential restore on error
         const deletedCards: { card: Card; index: number }[] = []
@@ -301,67 +301,92 @@ export const useCollectionStore = defineStore('collection', () => {
             cards.value.splice(index, 1)
         }
 
-        try {
-            const BATCH_SIZE = 400
-            const userId = authStore.user.id
+        const BATCH_SIZE = 200
+        const MAX_RETRIES = 2
+        const userId = authStore.user.id
+        let totalDeleted = 0
+        let totalFailed = 0
 
-            // Only sale/trade cards exist in public_cards
-            const publicCardIds = deletedCards
-                .filter(({ card }) => card.status === 'sale' || card.status === 'trade')
-                .map(({ card }) => card.id)
+        // Only sale/trade cards exist in public_cards
+        const publicCardIds = deletedCards
+            .filter(({ card }) => card.status === 'sale' || card.status === 'trade')
+            .map(({ card }) => card.id)
 
-            const totalBatches = Math.ceil(cardIds.length / BATCH_SIZE) + Math.ceil(publicCardIds.length / BATCH_SIZE)
-            let completedBatches = 0
+        const totalBatches = Math.ceil(cardIds.length / BATCH_SIZE) + Math.ceil(publicCardIds.length / BATCH_SIZE)
+        let completedBatches = 0
 
-            // Phase 1: Delete user cards in batches of 400
-            for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
+        // Helper: commit a batch with retry logic
+        const commitWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>): Promise<boolean> => {
+            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    const batch = batchFn()
+                    await batch.commit()
+                    return true
+                } catch (error) {
+                    console.warn(`Batch commit failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}):`, error)
+                    if (attempt < MAX_RETRIES) {
+                        await new Promise(resolve => setTimeout(resolve, 500))
+                    }
+                }
+            }
+            return false
+        }
+
+        // Phase 1: Delete user cards in batches
+        for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
+            const chunk = cardIds.slice(i, i + BATCH_SIZE)
+
+            const ok = await commitWithRetry(() => {
                 const batch = writeBatch(db)
-                const chunk = cardIds.slice(i, i + BATCH_SIZE)
-
                 for (const cardId of chunk) {
                     batch.delete(doc(db, 'users', userId, 'cards', cardId))
                 }
+                return batch
+            })
 
-                await batch.commit()
-                completedBatches++
-                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
-
-                if (i + BATCH_SIZE < cardIds.length) {
-                    await new Promise(resolve => setTimeout(resolve, 200))
-                }
+            if (ok) {
+                totalDeleted += chunk.length
+            } else {
+                totalFailed += chunk.length
             }
 
-            // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
-            for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
-                const batch = writeBatch(db)
-                const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
+            completedBatches++
+            if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
 
+            if (i + BATCH_SIZE < cardIds.length) {
+                await new Promise(resolve => setTimeout(resolve, 200))
+            }
+        }
+
+        // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
+        for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
+            const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
+
+            const ok = await commitWithRetry(() => {
+                const batch = writeBatch(db)
                 for (const cardId of chunk) {
                     batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
                 }
+                return batch
+            })
 
-                await batch.commit()
-                completedBatches++
-                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
-
-                if (i + BATCH_SIZE < publicCardIds.length) {
-                    await new Promise(resolve => setTimeout(resolve, 200))
-                }
+            if (!ok) {
+                console.warn(`Failed to delete ${chunk.length} public_cards after retries`)
             }
 
-            return true
-        } catch (error) {
-            console.error('Error batch deleting cards:', error)
+            completedBatches++
+            if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
 
-            // Restore cards on error (reverse order)
-            deletedCards.reverse()
-            for (const { card, index } of deletedCards) {
-                cards.value.splice(index, 0, card)
+            if (i + BATCH_SIZE < publicCardIds.length) {
+                await new Promise(resolve => setTimeout(resolve, 200))
             }
-
-            toastStore.show(t('collection.messages.batchDeleteError'), 'error')
-            return false
         }
+
+        if (totalFailed > 0) {
+            console.warn(`Batch delete: ${totalDeleted} deleted, ${totalFailed} failed`)
+        }
+
+        return { success: totalFailed === 0, deleted: totalDeleted, failed: totalFailed }
     }
 
     // ========================================================================
@@ -411,6 +436,66 @@ export const useCollectionStore = defineStore('collection', () => {
             card.condition === criteria.condition &&
             card.foil === criteria.foil
         )
+    }
+
+    // ========================================================================
+    // WISHLIST SYNC (Collection ↔ Deck)
+    // ========================================================================
+
+    /**
+     * Ensure a wishlist card exists in collection for deck sync.
+     * If a matching wishlist card exists (same scryfallId + edition + condition + foil),
+     * increments its quantity. Otherwise creates a new card with status='wishlist'.
+     * Returns the card ID.
+     */
+    const ensureCollectionWishlistCard = async (cardData: {
+        scryfallId: string
+        name: string
+        edition: string
+        setCode?: string
+        quantity: number
+        condition: CardCondition
+        foil: boolean
+        price: number
+        image: string
+        cmc?: number
+        type_line?: string
+        colors?: string[]
+    }): Promise<string | null> => {
+        // Look for existing wishlist card with same identity
+        const existing = cards.value.find(c =>
+            c.status === 'wishlist' &&
+            c.scryfallId === cardData.scryfallId &&
+            c.edition === cardData.edition &&
+            c.condition === cardData.condition &&
+            c.foil === cardData.foil
+        )
+
+        if (existing) {
+            // Increment quantity on existing wishlist card
+            const ok = await updateCard(existing.id, {
+                quantity: existing.quantity + cardData.quantity,
+            })
+            return ok ? existing.id : null
+        }
+
+        // Create new wishlist card — strip undefined fields (Firestore rejects them)
+        const newCard: Omit<Card, 'id' | 'updatedAt'> = {
+            scryfallId: cardData.scryfallId,
+            name: cardData.name,
+            edition: cardData.edition,
+            quantity: cardData.quantity,
+            condition: cardData.condition,
+            foil: cardData.foil,
+            price: cardData.price,
+            image: cardData.image,
+            status: 'wishlist' as CardStatus,
+        }
+        if (cardData.setCode !== undefined) newCard.setCode = cardData.setCode
+        if (cardData.cmc !== undefined) newCard.cmc = cardData.cmc
+        if (cardData.type_line !== undefined) newCard.type_line = cardData.type_line
+        if (cardData.colors !== undefined) newCard.colors = cardData.colors
+        return addCard(newCard)
     }
 
     // ========================================================================
@@ -586,6 +671,9 @@ export const useCollectionStore = defineStore('collection', () => {
         getCardById,
         findCards,
         findExactMatch,
+
+        // Wishlist sync
+        ensureCollectionWishlistCard,
 
         // Import
         confirmImport,

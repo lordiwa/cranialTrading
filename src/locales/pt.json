@@ -384,7 +384,10 @@
     },
     "view": {
       "grid": "Visualização em grade",
-      "compact": "Visualização compacta"
+      "compact": "Visualização compacta",
+      "stack": "Empilhar",
+      "visual": "Visual",
+      "texto": "Texto"
     },
     "group": {
       "none": "Nenhum"
@@ -417,7 +420,7 @@
       "valueNeed": "Valor Preciso",
       "valueTotal": "Valor Total",
       "completed": "Completo",
-      "groupBy": "Agrupar por:",
+      "groupBy": "Agrupar por",
       "type": "Tipo",
       "mana": "Mana",
       "color": "Cor"
@@ -436,6 +439,16 @@
       "title": "RESULTADOS DA BUSCA",
       "subtitle": "{count} cartas encontradas - Clique para adicionar",
       "back": "VOLTAR"
+    },
+    "suggestions": {
+      "localSection": "Na minha coleção",
+      "scryfallSection": "Não na coleção",
+      "addLabel": "Adicionar",
+      "advancedSearch": "Busca avançada"
+    },
+    "quickAdd": {
+      "allocated": "{name} adicionada ao deck",
+      "wishlisted": "{name} adicionada à wishlist"
     },
     "noDecks": "Você não tem decks criados.",
     "totals": {
@@ -820,6 +833,10 @@
         "stats": "ESTATÍSTICAS"
       },
       "edit": "EDITAR",
+      "export": "EXPORTAR",
+      "exportCopied": "Lista de cartas copiada para a área de transferência",
+      "exportCsvDownloaded": "CSV baixado",
+      "exportError": "Erro ao copiar lista de cartas",
       "back": "← VOLTAR",
       "updated": "Atualizado:",
       "notFound": "Deck não encontrado",
@@ -888,7 +905,11 @@
         "4": "4",
         "5": "5",
         "6": "6",
-        "7+": "7+"
+        "7": "7",
+        "7+": "7+",
+        "8": "8",
+        "9": "9",
+        "10+": "10+"
       }
     },
     "messages": {
@@ -904,6 +925,7 @@
       "deleted": "✓ Deck excluído",
       "deletedCardsKept": "Deck excluído (cartas mantidas)",
       "deletedWithCards": "Deck e {count} cartas excluídas",
+      "deletedWithCardWarning": "Deck excluído. {deleted} cartas removidas, {failed} não puderam ser excluídas",
       "deleteError": "Erro ao excluir deck",
       "deletingDeck": "Excluindo deck...",
       "noCardsInDeck": "Não há cartas no deck",
@@ -1141,6 +1163,11 @@
       "success": "Avatar atualizado com sucesso.",
       "error": "Erro ao alterar avatar. Tente novamente."
     },
+    "restartTour": {
+      "label": "Tour guiado",
+      "hint": "Repita o tour de boas-vindas que mostra a plataforma.",
+      "button": "REINICIAR TOUR"
+    },
     "dangerZone": {
       "title": "ZONA DE PERIGO",
       "description": "As ações nesta seção são irreversíveis. Proceda com cuidado.",
@@ -1180,6 +1207,10 @@
   },
 
   "search": {
+    "view": {
+      "title": "BUSCA AVANÇADA",
+      "backToCollection": "Voltar"
+    },
     "owned": "x{count} tenho",
     "filterPanel": {
       "placeholder": "Buscar carta por nome...",
@@ -1197,6 +1228,8 @@
       "title": "FILTROS AVANÇADOS",
       "apply": "APLICAR FILTROS",
       "sections": {
+        "colors": "Cores",
+        "rarity": "Raridade",
         "types": "Tipos",
         "manaValue": "Mana Value",
         "priceUSD": "Preço USD",
@@ -1613,6 +1646,46 @@
         "title": "Sem conversas",
         "message": "Quando contatar um usuário de um match, a conversa aparecerá aqui."
       }
+    }
+  },
+
+  "tour": {
+    "welcome": {
+      "title": "BEM-VINDO AO CRANIAL TRADING",
+      "subtitle": "Vamos mostrar a plataforma. Em poucos passos você saberá tudo para começar a trocar cartas.",
+      "startButton": "INICIAR TOUR",
+      "skipButton": "Pular, prefiro explorar sozinho"
+    },
+    "steps": {
+      "collection": {
+        "title": "Coleção",
+        "description": "Aqui ficam todas as suas cartas, organizadas por status. Comece adicionando cartas aqui."
+      },
+      "statuses": {
+        "title": "Status das Cartas",
+        "description": "Organize suas cartas: Coleção (guardar), Disponíveis (venda/troca) e Wishlist (as que procura)."
+      },
+      "addCard": {
+        "title": "Adicionar Carta",
+        "description": "Busque qualquer carta de Magic e adicione à sua coleção. Também pode importar decks completos."
+      },
+      "decks": {
+        "title": "Decks",
+        "description": "Agrupe suas cartas em decks — Standard, Modern, Commander e mais."
+      },
+      "matches": {
+        "title": "Matches",
+        "description": "Encontramos jogadores que querem o que você tem e têm o que você procura. Automaticamente."
+      },
+      "search": {
+        "title": "Busca",
+        "description": "Busque em toda sua coleção, outros usuários ou no banco de dados do Scryfall."
+      }
+    },
+    "nav": {
+      "next": "PRÓXIMO",
+      "prev": "VOLTAR",
+      "done": "VAMOS LÁ!"
     }
   },
 

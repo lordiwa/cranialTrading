@@ -15,6 +15,9 @@ const setCodeCache = new Map<string, string>()
 // Track cards we've already tried to fix (to avoid repeated attempts)
 const fixAttemptedCache = new Set<string>()
 
+// Shared card prices map (by card ID) — shared across all composable instances
+const sharedCardPrices = ref<Map<string, CardPrices | null>>(new Map())
+
 export interface CollectionTotals {
   // TCGPlayer totals
   tcgCollection: number
@@ -43,8 +46,8 @@ export function useCollectionTotals(cards: () => Card[]) {
   const totalCards = ref(0)
   const processedCards = ref(0)
 
-  // Store prices by card ID
-  const cardPrices = ref<Map<string, CardPrices | null>>(new Map())
+  // Use shared prices map
+  const cardPrices = sharedCardPrices
 
   // Auto-fix card with missing scryfallId by searching Scryfall
   const autoFixCard = async (card: Card): Promise<string | null> => {
@@ -251,6 +254,7 @@ export function useCollectionTotals(cards: () => Card[]) {
     totalCards,
     processedCards,
     totals,
+    cardPrices,
     fetchAllPrices,
     formatPrice,
   }

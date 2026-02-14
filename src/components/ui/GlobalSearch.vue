@@ -300,6 +300,15 @@ defineExpose({
         /
       </span>
     </div>
+    <!-- Advanced search link -->
+    <div class="flex justify-end mt-1">
+      <button
+          @click="isOpen = false; router.push('/search')"
+          class="text-tiny text-silver-50 hover:text-neon transition-colors"
+      >
+        {{ t('common.actions.advancedSearch') }} →
+      </button>
+    </div>
 
     <!-- Results Dropdown -->
     <div

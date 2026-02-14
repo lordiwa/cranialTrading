@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { type FilterOptions, useSearchStore } from '../../stores/search'
 import { getAllSets, getCardSuggestions, type ScryfallSet } from '../../services/scryfall'
@@ -109,6 +109,8 @@ const filters = reactive<FilterOptions>({
 // Sugerencias de nombres
 const suggestions = ref<string[]>([])
 const showSuggestions = ref(false)
+const suppressSuggestions = ref(false)
+const nameInputContainer = ref<HTMLElement | null>(null)
 let suggestionTimeout: ReturnType<typeof setTimeout>
 
 // Debounce para auto-búsqueda (2 segundos)
@@ -150,6 +152,7 @@ watch(
 
 const handleNameInput = async (value: string) => {
   filters.name = value
+  suppressSuggestions.value = false
 
   // Limpiar timeout anterior
   clearTimeout(suggestionTimeout)
@@ -166,7 +169,7 @@ const handleNameInput = async (value: string) => {
       try {
         const results = await getCardSuggestions(value)
         suggestions.value = results.slice(0, 8)
-        showSuggestions.value = true
+        showSuggestions.value = !suppressSuggestions.value && suggestions.value.length > 0
       } catch (err) {
         console.error('Error obteniendo sugerencias:', err)
         suggestions.value = []
@@ -177,11 +180,26 @@ const handleNameInput = async (value: string) => {
 
 const selectSuggestion = (suggestion: string) => {
   filters.name = suggestion
+  suppressSuggestions.value = true
   showSuggestions.value = false
   suggestions.value = []
   // Trigger search immediately when selecting suggestion
   handleSearch()
 }
+
+const handleClickOutside = (e: MouseEvent) => {
+  if (nameInputContainer.value && !nameInputContainer.value.contains(e.target as Node)) {
+    showSuggestions.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 // Opciones predefinidas
 const colorOptions = [
@@ -500,6 +518,8 @@ const toggleKeyword = (keyword: string) => {
 }
 
 const handleSearch = async () => {
+  suppressSuggestions.value = true
+  showSuggestions.value = false
   await searchStore.search(filters)
 }
 
@@ -630,7 +650,7 @@ const removeFilter = (type: string, value?: string) => {
     <div class="bg-primary border border-silver-30 p-4 rounded-md">
       <!-- Fila 1: Input + Botón Buscar -->
       <div class="flex gap-3 mb-4">
-        <div class="relative flex-1">
+        <div ref="nameInputContainer" class="relative flex-1">
           <input
               :value="filters.name"
               @input="handleNameInput(($event.target as HTMLInputElement).value)"

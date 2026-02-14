@@ -393,7 +393,6 @@ export const useDecksStore = defineStore('decks', () => {
             )
 
             decks.value = migratedDecks
-            console.log(`Loaded ${decks.value.length} decks`)
         } catch (error) {
             console.error('Error loading decks:', error)
             toastStore.show(t('decks.messages.loadError'), 'error')

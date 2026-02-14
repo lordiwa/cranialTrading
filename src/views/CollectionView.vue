@@ -33,6 +33,7 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardTypeCategory, manaOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
+import { useCollectionTotals } from '../composables/useCollectionTotals'
 
 const route = useRoute()
 const router = useRouter()
@@ -775,32 +776,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
 
 // filteredCards is provided by useCardFilter composable (text search + sort + chip filters)
 
-// Precio de cartas owned en el deck
-const deckOwnedCost = computed(() => {
-  if (deckFilter.value === 'all') return 0
-  return deckOwnedCards.value.reduce((sum, card) => {
-    const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + (card.price || 0) * (deckAlloc?.quantity || 0)
-  }, 0)
-})
-
-// Precio de cartas wishlist en el deck (legacy + nuevo modelo)
-const deckWishlistCost = computed(() => {
-  if (deckFilter.value === 'all') return 0
-  const legacyCost = deckWishlistCards.value.reduce((sum, item) =>
-    sum + (item.price || 0) * item.quantity, 0
-  )
-  const allocCost = deckAllocWishlistCards.value.reduce((sum, { card, alloc }) =>
-    sum + (card.price || 0) * alloc.quantity, 0
-  )
-  return legacyCost + allocCost
-})
-
-// Precio total del deck actual (owned + wishlist)
-const deckTotalCost = computed(() => {
-  return deckOwnedCost.value + deckWishlistCost.value
-})
+// Deck costs are now calculated in the DECK PRICE SOURCE section below (deckOwnedCostBySource, etc.)
 
 // Card IDs currently being deleted (for disabling UI)
 const deletingCardIds = computed(() => {
@@ -827,6 +803,51 @@ const deckWishlistCount = computed(() => {
   const legacyCount = deckWishlistCards.value.reduce((sum, item) => sum + item.quantity, 0)
   const allocCount = deckAllocWishlistCards.value.reduce((sum, { alloc }) => sum + alloc.quantity, 0)
   return legacyCount + allocCount
+})
+
+// ========== DECK PRICE SOURCE ==========
+type DeckPriceSource = 'tcg' | 'ck' | 'buylist'
+const deckPriceSource = ref<DeckPriceSource>('tcg')
+
+// Access shared card prices from useCollectionTotals (populated by CollectionTotalsPanel)
+const { cardPrices: sharedCardPrices } = useCollectionTotals(() => collectionStore.cards)
+
+const getCardPriceBySource = (cardId: string, cardPrice: number, source: DeckPriceSource): number => {
+  if (source === 'tcg') return cardPrice || 0
+  const prices = sharedCardPrices.value.get(cardId)
+  if (!prices) return cardPrice || 0
+  if (source === 'ck') return prices.cardKingdom?.retail || cardPrice || 0
+  return prices.cardKingdom?.buylist || 0
+}
+
+const deckOwnedCostBySource = computed(() => {
+  if (deckFilter.value === 'all') return 0
+  return deckOwnedCards.value.reduce((sum, card) => {
+    const allocations = getAllocationsForCard(card.id)
+    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
+    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * (deckAlloc?.quantity || 0)
+  }, 0)
+})
+
+const deckWishlistCostBySource = computed(() => {
+  if (deckFilter.value === 'all') return 0
+  const legacyCost = deckWishlistCards.value.reduce((sum, item) =>
+    sum + (item.price || 0) * item.quantity, 0
+  )
+  const allocCost = deckAllocWishlistCards.value.reduce((sum, { card, alloc }) =>
+    sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * alloc.quantity, 0
+  )
+  return legacyCost + allocCost
+})
+
+const deckTotalCostBySource = computed(() => {
+  return deckOwnedCostBySource.value + deckWishlistCostBySource.value
+})
+
+const deckSourceColor = computed(() => {
+  if (deckPriceSource.value === 'ck') return 'text-[#4CAF50]'
+  if (deckPriceSource.value === 'buylist') return 'text-[#FF9800]'
+  return 'text-neon'
 })
 
 // ========== BULK SELECTION ==========
@@ -1251,7 +1272,6 @@ const handleImportDirect = async (
 ) => {
   // Prevent duplicate executions
   if (isImportRunning) {
-    console.log('[Import] Already running, skipping...')
     return
   }
   isImportRunning = true
@@ -1646,7 +1666,6 @@ const handleImportCsv = async (
 const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isResume = false) => {
   // Prevent duplicate executions (only check if not a resume with existing toast)
   if (!isResume && isDeleteRunning) {
-    console.log('[DeleteDeck] Already running, skipping...')
     return
   }
   isDeleteRunning = true
@@ -1665,7 +1684,6 @@ const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isRe
     }
 
     // Step 2: Delete cards in batches (deck is already gone)
-    console.log(`[DeleteDeck] Step 2: deleteCards=${state.deleteCards}, cardIds=${cardIds.length}`)
     if (state.deleteCards && cardIds.length > 0) {
       state.status = 'deleting_cards'
       saveDeleteDeckState(state)
@@ -1674,7 +1692,6 @@ const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isRe
         deleteProgress.value = 10 + Math.round(percent * 0.85)
       })
 
-      console.log(`[DeleteDeck] batchDelete result: deleted=${result.deleted}, failed=${result.failed}`)
       if (result.failed > 0) {
         console.warn(`[DeleteDeck] ${result.failed} cards failed to delete (orphaned)`)
         toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
@@ -1705,11 +1722,8 @@ const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isRe
 
 // Resume incomplete delete deck operation
 const resumeDeleteDeck = async (savedState: DeleteDeckState) => {
-  console.log('[DeleteDeck] Resuming delete operation for:', savedState.deckName)
-
   // Prevent duplicate executions
   if (isDeleteRunning) {
-    console.log('[DeleteDeck] Already running, skipping resume...')
     return
   }
 
@@ -1910,11 +1924,8 @@ const handleExportDeckCsv = async () => {
 // ========== RESUME IMPORT ==========
 
 const resumeImport = async (savedState: ImportState) => {
-  console.log('[Import] Resuming import:', savedState.deckName, 'status:', savedState.status)
-
   // Prevent duplicate executions
   if (isImportRunning) {
-    console.log('[Import] Already running, skipping resume...')
     return
   }
 
@@ -2191,7 +2202,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ========== CONTENIDO PRINCIPAL ========== -->
-    <div class="mt-6">
+    <div :class="['mt-6', viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) ? 'pb-20' : '']">
       <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
@@ -2273,12 +2284,9 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Totals Panel (solo en modo colección) -->
-        <CollectionTotalsPanel v-if="viewMode === 'collection'" />
-
-        <!-- ========== DECK STATS (cuando hay deck seleccionado en modo mazos) ========== -->
+        <!-- ========== DECK HEADER (cuando hay deck seleccionado en modo mazos) ========== -->
         <div v-if="viewMode === 'decks' && selectedDeck" class="bg-neon/10 border-2 border-neon p-3 md:p-4 mb-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 class="text-body md:text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
               <p class="text-tiny text-silver-50">{{ selectedDeck.format?.toUpperCase() }}</p>
@@ -2327,48 +2335,6 @@ onUnmounted(() => {
                 class="h-full bg-neon rounded-full transition-all duration-300"
                 :style="{ width: `${deleteProgress}%` }"
               ></div>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div>
-              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.have') }}</p>
-              <p class="text-h3 font-bold text-neon">{{ deckOwnedCount }}</p>
-            </div>
-            <div>
-              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.need') }}</p>
-              <p class="text-h3 font-bold text-yellow-400">{{ deckWishlistCount }}</p>
-            </div>
-            <div>
-              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.total') }}</p>
-              <p class="text-h3 font-bold text-silver">
-                <span class="text-neon">{{ deckOwnedCount }}</span>
-                <span class="text-silver-50">/</span>
-                <span>{{ deckOwnedCount + deckWishlistCount }}</span>
-              </p>
-            </div>
-            <div>
-              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.valueHave') }}</p>
-              <p class="text-body font-bold text-neon">TCG: ${{ deckOwnedCost.toFixed(2) }}</p>
-            </div>
-            <div>
-              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.valueNeed') }}</p>
-              <p class="text-body font-bold text-yellow-400">TCG: ${{ deckWishlistCost.toFixed(2) }}</p>
-            </div>
-            <div>
-              <p class="text-tiny text-silver-50">{{ t('collection.deckStats.valueTotal') }}</p>
-              <p class="text-body font-bold text-silver">TCG: ${{ deckTotalCost.toFixed(2) }}</p>
-            </div>
-          </div>
-          <div v-if="selectedDeckStats" class="mt-4 pt-4 border-t border-neon/30">
-            <div class="flex items-center gap-2">
-              <span class="text-tiny text-silver-50">{{ t('collection.deckStats.completed') }}:</span>
-              <div class="flex-1 h-2 bg-primary rounded overflow-hidden">
-                <div
-                    class="h-full bg-neon transition-all"
-                    :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"
-                ></div>
-              </div>
-              <span class="text-tiny text-neon font-bold">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
             </div>
           </div>
 </div>
@@ -2729,8 +2695,109 @@ onUnmounted(() => {
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
+        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) ? '!bottom-28' : ''"
     />
+
   </AppContainer>
+
+  <!-- ========== DECK STATS FOOTER (fijo abajo cuando hay deck seleccionado) ========== -->
+  <Teleport to="body">
+    <div v-if="viewMode === 'decks' && selectedDeck"
+         class="fixed bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t-2 border-neon">
+      <div class="container mx-auto max-w-7xl px-4 py-2">
+        <!-- Desktop: fila única -->
+        <div class="hidden md:flex items-center gap-4 text-tiny">
+          <!-- Price source selector -->
+          <div class="flex items-center gap-1 border-r border-silver-30 pr-4">
+            <span class="text-silver-50">{{ t('collection.totals.priceSource') }}:</span>
+            <button
+                v-for="src in (['tcg', 'ck', 'buylist'] as DeckPriceSource[])"
+                :key="src"
+                @click="deckPriceSource = src"
+                :class="[
+                  'px-2 py-0.5 font-bold rounded transition-colors uppercase',
+                  deckPriceSource === src
+                    ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
+                    : 'text-silver-50 hover:text-silver hover:bg-silver-5'
+                ]"
+            >
+              {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'Buylist' }}
+            </button>
+          </div>
+
+          <span class="text-silver-50">{{ t('collection.deckStats.have') }} <span class="font-bold text-neon text-small">{{ deckOwnedCount }}</span></span>
+          <span class="text-silver-30">|</span>
+          <span class="text-silver-50">{{ t('collection.deckStats.need') }} <span class="font-bold text-yellow-400 text-small">{{ deckWishlistCount }}</span></span>
+          <span class="text-silver-30">|</span>
+          <span class="text-silver-50">{{ t('collection.deckStats.total') }} <span class="font-bold text-small"><span class="text-neon">{{ deckOwnedCount }}</span><span class="text-silver-30">/</span>{{ deckOwnedCount + deckWishlistCount }}</span></span>
+          <span class="text-silver-30">|</span>
+          <span class="text-silver-50">{{ t('collection.deckStats.valueHave') }} <span class="font-bold" :class="deckSourceColor">${{ deckOwnedCostBySource.toFixed(2) }}</span></span>
+          <span class="text-silver-30">|</span>
+          <span class="text-silver-50">{{ t('collection.deckStats.valueNeed') }} <span class="font-bold text-yellow-400">${{ deckWishlistCostBySource.toFixed(2) }}</span></span>
+          <span class="text-silver-30">|</span>
+          <span class="text-silver-50">{{ t('collection.deckStats.valueTotal') }} <span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span></span>
+          <div v-if="selectedDeckStats" class="flex items-center gap-2 flex-1 ml-2">
+            <div class="flex-1 h-2 bg-primary rounded overflow-hidden border border-silver-30/30">
+              <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"></div>
+            </div>
+            <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
+          </div>
+        </div>
+        <!-- Mobile: 2 filas compactas -->
+        <div class="md:hidden">
+          <!-- Price source selector -->
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-1">
+              <button
+                  v-for="src in (['tcg', 'ck', 'buylist'] as DeckPriceSource[])"
+                  :key="src"
+                  @click="deckPriceSource = src"
+                  :class="[
+                    'px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors uppercase',
+                    deckPriceSource === src
+                      ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
+                      : 'text-silver-50 hover:text-silver hover:bg-silver-5'
+                  ]"
+              >
+                {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
+              </button>
+            </div>
+            <span class="text-tiny text-silver-50">
+              <span class="text-neon font-bold">{{ deckOwnedCount }}</span> / {{ deckOwnedCount + deckWishlistCount }}
+            </span>
+          </div>
+          <div class="grid grid-cols-4 gap-2 text-center text-tiny">
+            <div>
+              <span class="text-silver-50 block text-[10px]">{{ t('collection.deckStats.have') }}</span>
+              <span class="font-bold" :class="deckSourceColor">${{ deckOwnedCostBySource.toFixed(2) }}</span>
+            </div>
+            <div>
+              <span class="text-silver-50 block text-[10px]">{{ t('collection.deckStats.need') }}</span>
+              <span class="font-bold text-yellow-400">${{ deckWishlistCostBySource.toFixed(2) }}</span>
+            </div>
+            <div>
+              <span class="text-silver-50 block text-[10px]">Total</span>
+              <span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span>
+            </div>
+            <div v-if="selectedDeckStats">
+              <span class="text-silver-50 block text-[10px]">%</span>
+              <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
+            </div>
+          </div>
+          <div v-if="selectedDeckStats" class="flex items-center gap-2 mt-1">
+            <div class="flex-1 h-1.5 bg-primary rounded overflow-hidden border border-silver-30/30">
+              <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- ========== COLLECTION STATS FOOTER (fijo abajo en modo colección) ========== -->
+  <Teleport to="body">
+    <CollectionTotalsPanel v-if="viewMode === 'collection'" />
+  </Teleport>
 </template>
 
 <style scoped>

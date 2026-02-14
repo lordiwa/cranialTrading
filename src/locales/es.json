@@ -21,7 +21,8 @@
       "retry": "REINTENTAR",
       "apply": "APLICAR",
       "clear": "LIMPIAR",
-      "searching": "BUSCANDO..."
+      "searching": "BUSCANDO...",
+      "advancedSearch": "Búsqueda avanzada"
     },
     "labels": {
       "quantity": "Cantidad",
@@ -414,10 +415,10 @@
     },
     "deckStats": {
       "have": "Tengo",
-      "need": "Necesito",
+      "need": "Wishlist",
       "total": "Total",
       "valueHave": "Valor Tengo",
-      "valueNeed": "Valor Necesito",
+      "valueNeed": "Valor Wishlist",
       "valueTotal": "Valor Total",
       "completed": "Completado",
       "groupBy": "Agrupar por",
@@ -455,10 +456,14 @@
       "title": "VALOR DE COLECCION",
       "update": "ACTUALIZAR",
       "loading": "Cargando precios... {progress}%",
+      "priceSource": "Fuente",
+      "cards": "Cartas",
+      "unique": "Únicas",
       "headers": {
         "collection": "COLECCION",
         "wishlist": "WISHLIST",
         "forSale": "EN VENTA",
+        "forTrade": "CAMBIO",
         "total": "TOTAL"
       }
     },
@@ -1412,6 +1417,15 @@
   },
 
   "help": {
+    "menu": {
+      "faq": "Preguntas frecuentes",
+      "restartTour": "Repetir tour guiado",
+      "tourRestarted": "Tour reiniciado. Recarga la página para verlo.",
+      "terms": "Términos de uso",
+      "privacy": "Privacidad",
+      "cookies": "Cookies",
+      "language": "Idioma"
+    },
     "titles": {
       "matchesFound": "Matches Encontrados",
       "recalculate": "Recalcular Matches",
@@ -1594,7 +1608,7 @@
         },
         {
           "q": "¿Puedo importar mi colección de otro sitio?",
-          "a": "Sí. Puedes: 1) Importar desde Moxfield pegando la URL del mazo, 2) Pegar listas en formato MTGO/Arena. Ejemplo de formato: '4 Lightning Bolt' o '4x Lightning Bolt [M10]'. El sistema reconoce cantidad, nombre y opcionalmente el set."
+          "a": "Sí. Puedes: 1) Importar desde Moxfield pegando la URL del mazo, 2) Pegar listas en formato MTGO/Arena (ej: '4 Lightning Bolt' o '4x Lightning Bolt [M10]'), 3) Subir un archivo CSV (formato ManaBox compatible). El sistema reconoce cantidad, nombre y opcionalmente el set."
         },
         {
           "q": "¿Qué significan las condiciones de carta (M, NM, LP...)?",
@@ -1619,6 +1633,26 @@
         {
           "q": "¿Puedo hacer trades internacionales?",
           "a": "Sí, pero considera: 1) Costos de envío internacional ($15-30 USD típicamente), 2) Tiempos de entrega (2-4 semanas), 3) Posibles impuestos de aduana, 4) Riesgo de pérdida en tránsito. Recomendación: Para trades internacionales, asegúrate que el valor justifique los costos de envío."
+        },
+        {
+          "q": "¿Puedo exportar mi colección o mazo?",
+          "a": "Sí. Desde el panel del mazo puedes: 1) Copiar la lista al portapapeles en formato MTGO/Arena, 2) Descargar un archivo CSV compatible con ManaBox y otras apps. Esto te permite mover tus datos entre plataformas fácilmente."
+        },
+        {
+          "q": "¿Puedo hacer mis mazos públicos o privados?",
+          "a": "Sí. Cada mazo tiene un botón de visibilidad (ojo) en su panel. Los mazos públicos aparecen en tu perfil y otros usuarios pueden verlos. Los privados solo tú los ves. Por defecto los mazos son privados."
+        },
+        {
+          "q": "¿Cómo funciona el chat de mensajes?",
+          "a": "Cuando encuentras un match interesante, puedes enviar un mensaje al otro usuario directamente desde la app. Las conversaciones se guardan y puedes acceder a ellas desde la sección de Mensajes. Recibirás notificaciones cuando te respondan."
+        },
+        {
+          "q": "¿Qué son los contactos guardados?",
+          "a": "Cuando completas un trade exitoso o quieres recordar a un usuario, puedes guardarlo como contacto. Tus contactos guardados aparecen en la sección de Contactos para acceso rápido sin necesidad de buscar matches nuevamente."
+        },
+        {
+          "q": "¿Qué es la búsqueda avanzada?",
+          "a": "La búsqueda avanzada te permite filtrar cartas por múltiples criterios: nombre, colores, tipo de carta, valor de maná, rareza, set, y más. Accede desde el enlace 'Búsqueda avanzada' debajo del buscador o desde la sección de Búsqueda en el menú."
         }
       ]
     },
@@ -1666,8 +1700,8 @@
         "description": "Organiza tus cartas: Colección (guardar), Disponibles (venta/cambio) y Wishlist (las que buscas)."
       },
       "addCard": {
-        "title": "Agregar Carta",
-        "description": "Busca cualquier carta de Magic y agrégala a tu colección. También puedes importar mazos completos."
+        "title": "Importar y Crear",
+        "description": "Importa mazos desde Moxfield, listas de texto o CSV. Crea mazos nuevos para organizar tu colección. Para agregar cartas individuales, usa el botón + abajo."
       },
       "decks": {
         "title": "Mazos",

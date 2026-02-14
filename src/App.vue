@@ -37,11 +37,12 @@ onMounted(() => {
     <BaseLoader size="large" />
   </div>
 
-  <div v-else class="pb-10">
-    <RouterView />
+  <div v-else class="min-h-screen flex flex-col">
+    <div class="flex-1">
+      <RouterView />
+    </div>
+    <AppFooter v-if="showFooter" />
   </div>
-
-  <AppFooter v-if="showFooter" />
 
   <BaseToast />
   <ConfirmModal />

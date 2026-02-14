@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { getCardSuggestions, searchCards } from '../../services/scryfall'
 import { useToastStore } from '../../stores/toast'
@@ -17,11 +17,14 @@ const searchQuery = ref('')
 const suggestions = ref<string[]>([])
 const loading = ref(false)
 const showSuggestions = ref(false)
+const suppressSuggestions = ref(false)
+const searchContainer = ref<HTMLElement | null>(null)
 
 // Obtener sugerencias mientras escribes
 const handleInput = async (value: string | number) => {
   const strValue = String(value)
   searchQuery.value = strValue
+  suppressSuggestions.value = false
 
   if (strValue.length < 2) {
     suggestions.value = []
@@ -33,7 +36,7 @@ const handleInput = async (value: string | number) => {
   try {
     const results = await getCardSuggestions(strValue)
     suggestions.value = results.slice(0, 10) // Top 10
-    showSuggestions.value = true
+    showSuggestions.value = !suppressSuggestions.value
   } catch (err) {
     console.error('Error al obtener sugerencias:', err)
     suggestions.value = []
@@ -45,6 +48,7 @@ const handleInput = async (value: string | number) => {
 // Seleccionar sugerencia
 const selectSuggestion = async (cardName: string) => {
   searchQuery.value = cardName
+  suppressSuggestions.value = true
   showSuggestions.value = false
   await handleSearch()
 }
@@ -53,6 +57,8 @@ const selectSuggestion = async (cardName: string) => {
 const handleSearch = async () => {
   if (!searchQuery.value.trim()) return
 
+  suppressSuggestions.value = true
+  showSuggestions.value = false
   loading.value = true
   try {
     const results = await searchCards(searchQuery.value)
@@ -72,6 +78,20 @@ const handleSearch = async () => {
   }
 }
 
+const handleClickOutside = (e: MouseEvent) => {
+  if (searchContainer.value && !searchContainer.value.contains(e.target as Node)) {
+    showSuggestions.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
 // Modal para seleccionar edición
 const showSelectCardModal = ref(false)
 const availableCards = ref<any[]>([])
@@ -87,7 +107,7 @@ const selectCard = (card: any) => {
 <template>
   <div class="space-y-4">
     <!-- Buscador principal -->
-    <div class="relative">
+    <div ref="searchContainer" class="relative">
       <div class="flex gap-2">
         <div class="flex-1 relative">
           <BaseInput

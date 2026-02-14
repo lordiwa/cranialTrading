@@ -21,7 +21,8 @@
       "retry": "RETRY",
       "apply": "APPLY",
       "clear": "CLEAR",
-      "searching": "SEARCHING..."
+      "searching": "SEARCHING...",
+      "advancedSearch": "Advanced search"
     },
     "labels": {
       "quantity": "Quantity",
@@ -414,10 +415,10 @@
     },
     "deckStats": {
       "have": "Have",
-      "need": "Need",
+      "need": "Wishlist",
       "total": "Total",
       "valueHave": "Value Owned",
-      "valueNeed": "Value Needed",
+      "valueNeed": "Value Wishlist",
       "valueTotal": "Total Value",
       "completed": "Completed",
       "groupBy": "Group by",
@@ -455,10 +456,14 @@
       "title": "COLLECTION VALUE",
       "update": "UPDATE",
       "loading": "Loading prices... {progress}%",
+      "priceSource": "Source",
+      "cards": "Cards",
+      "unique": "Unique",
       "headers": {
         "collection": "COLLECTION",
         "wishlist": "WISHLIST",
         "forSale": "FOR SALE",
+        "forTrade": "TRADE",
         "total": "TOTAL"
       }
     },
@@ -1412,6 +1417,15 @@
   },
 
   "help": {
+    "menu": {
+      "faq": "Frequently asked questions",
+      "restartTour": "Restart guided tour",
+      "tourRestarted": "Tour restarted. Reload the page to see it.",
+      "terms": "Terms of use",
+      "privacy": "Privacy",
+      "cookies": "Cookies",
+      "language": "Language"
+    },
     "titles": {
       "matchesFound": "Matches Found",
       "recalculate": "Recalculate Matches",
@@ -1594,7 +1608,7 @@
         },
         {
           "q": "Can I import my collection from another site?",
-          "a": "Yes. You can: 1) Import from Moxfield by pasting the deck URL, 2) Paste lists in MTGO/Arena format. Format example: '4 Lightning Bolt' or '4x Lightning Bolt [M10]'. The system recognizes quantity, name and optionally the set."
+          "a": "Yes. You can: 1) Import from Moxfield by pasting the deck URL, 2) Paste lists in MTGO/Arena format (e.g., '4 Lightning Bolt' or '4x Lightning Bolt [M10]'), 3) Upload a CSV file (ManaBox compatible format). The system recognizes quantity, name and optionally the set."
         },
         {
           "q": "What do card conditions (M, NM, LP...) mean?",
@@ -1619,6 +1633,26 @@
         {
           "q": "Can I do international trades?",
           "a": "Yes, but consider: 1) International shipping costs ($15-30 USD typically), 2) Delivery times (2-4 weeks), 3) Possible customs taxes, 4) Risk of loss in transit. Recommendation: For international trades, make sure the value justifies shipping costs."
+        },
+        {
+          "q": "Can I export my collection or deck?",
+          "a": "Yes. From the deck panel you can: 1) Copy the list to clipboard in MTGO/Arena format, 2) Download a CSV file compatible with ManaBox and other apps. This allows you to easily move your data between platforms."
+        },
+        {
+          "q": "Can I make my decks public or private?",
+          "a": "Yes. Each deck has a visibility button (eye icon) in its panel. Public decks appear on your profile and other users can see them. Private decks are only visible to you. Decks are private by default."
+        },
+        {
+          "q": "How does the messaging chat work?",
+          "a": "When you find an interesting match, you can send a message to the other user directly from the app. Conversations are saved and you can access them from the Messages section. You'll receive notifications when you get a reply."
+        },
+        {
+          "q": "What are saved contacts?",
+          "a": "When you complete a successful trade or want to remember a user, you can save them as a contact. Your saved contacts appear in the Contacts section for quick access without needing to search for new matches."
+        },
+        {
+          "q": "What is advanced search?",
+          "a": "Advanced search lets you filter cards by multiple criteria: name, colors, card type, mana value, rarity, set, and more. Access it from the 'Advanced search' link below the search bar or from the Search section in the menu."
         }
       ]
     },
@@ -1666,8 +1700,8 @@
         "description": "Organize your cards: Collection (keep), Available (sale/trade), and Wishlist (cards you want)."
       },
       "addCard": {
-        "title": "Add a Card",
-        "description": "Search any Magic card and add it to your collection. You can also import entire decks."
+        "title": "Import & Create",
+        "description": "Import decks from Moxfield, text lists, or CSV. Create new decks to organize your collection. To add individual cards, use the + button below."
       },
       "decks": {
         "title": "Decks",

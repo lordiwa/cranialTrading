@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseButton from '../ui/BaseButton.vue'
@@ -8,6 +8,7 @@ import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useDecksStore } from '../../stores/decks'
+import { useRouter } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { getCardSuggestions, searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
@@ -23,6 +24,7 @@ const props = defineProps<Props>()
 const emit = defineEmits(['close', 'added'])
 
 const { t } = useI18n()
+const router = useRouter()
 
 // Search state (when no card pre-selected)
 const searchQuery = ref('')
@@ -31,6 +33,8 @@ const searching = ref(false)
 const suggestions = ref<string[]>([])
 const showSuggestions = ref(false)
 const suggestLoading = ref(false)
+const suppressSuggestions = ref(false)
+const searchContainer = ref<HTMLElement | null>(null)
 
 const collectionStore = useCollectionStore()
 const toastStore = useToastStore()
@@ -208,14 +212,6 @@ const handleAddCard = async () => {
 
     const imageToSave = currentCardImage.value || ''
 
-    console.log('✅ GUARDANDO CARTA:', {
-      name: cardName,
-      image: imageToSave,
-      isSplitCard: isSplitCard.value,
-      cardFaceIndex: cardFaceIndex.value,
-      edition: selectedPrint.value.set_name,
-    })
-
     const cardId = await collectionStore.addCard({
       scryfallId: selectedPrint.value.id,
       name: cardName,
@@ -241,7 +237,6 @@ const handleAddCard = async () => {
         form.quantity,
         false  // isInSideboard
       )
-      console.log(`✅ Carta asignada al deck: ${form.deckName}`)
     }
 
     // Si es wishlist, crear preferencia BUSCO automáticamente
@@ -255,7 +250,6 @@ const handleAddCard = async () => {
         edition: selectedPrint.value.set_name,
         image: imageToSave,
       })
-      console.log('✅ Preferencia BUSCO creada automáticamente')
     }
 
     toastStore.show(t('cards.addModal.success', { name: selectedPrint.value.name }), 'success')
@@ -271,6 +265,7 @@ const handleAddCard = async () => {
 
 // Search functions for when no card is pre-selected
 const handleSearchInput = async () => {
+  suppressSuggestions.value = false
   const query = searchQuery.value.trim()
   if (query.length < 2) {
     suggestions.value = []
@@ -282,7 +277,7 @@ const handleSearchInput = async () => {
   try {
     const results = await getCardSuggestions(query)
     suggestions.value = results.slice(0, 8)
-    showSuggestions.value = suggestions.value.length > 0
+    showSuggestions.value = !suppressSuggestions.value && suggestions.value.length > 0
   } catch {
     suggestions.value = []
   } finally {
@@ -292,6 +287,7 @@ const handleSearchInput = async () => {
 
 const selectSuggestion = async (cardName: string) => {
   searchQuery.value = cardName
+  suppressSuggestions.value = true
   showSuggestions.value = false
   await performSearch()
 }
@@ -301,6 +297,7 @@ const performSearch = async () => {
   if (!query) return
 
   searching.value = true
+  suppressSuggestions.value = true
   showSuggestions.value = false
   try {
     const results = await searchCards(`!"${query}"`)
@@ -318,11 +315,19 @@ const selectSearchResult = (card: any) => {
   searchQuery.value = ''
 }
 
-const hideSuggestionsDelayed = () => {
-  setTimeout(() => {
+const handleClickOutside = (e: MouseEvent) => {
+  if (searchContainer.value && !searchContainer.value.contains(e.target as Node)) {
     showSuggestions.value = false
-  }, 200)
+  }
 }
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 const handleClose = () => {
   form.quantity = 1
@@ -353,7 +358,7 @@ const handleClose = () => {
       <!-- Search Section (when no card pre-selected) -->
       <div v-if="!selectedPrint" class="space-y-4">
         <!-- Search Input -->
-        <div class="relative">
+        <div ref="searchContainer" class="relative">
           <input
               v-model="searchQuery"
               type="text"
@@ -361,7 +366,6 @@ const handleClose = () => {
               class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
               @input="handleSearchInput"
               @keyup.enter="performSearch"
-              @blur="hideSuggestionsDelayed"
           />
           <!-- Auto-suggest dropdown -->
           <div
@@ -379,16 +383,24 @@ const handleClose = () => {
           </div>
         </div>
 
-        <!-- Search Button -->
-        <BaseButton
-            variant="secondary"
-            size="small"
-            @click="performSearch"
-            :disabled="searching || !searchQuery.trim()"
-            class="w-full"
-        >
-          {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
-        </BaseButton>
+        <!-- Search Button + Advanced Search -->
+        <div class="flex items-center gap-2">
+          <BaseButton
+              variant="secondary"
+              size="small"
+              @click="performSearch"
+              :disabled="searching || !searchQuery.trim()"
+              class="flex-1"
+          >
+            {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
+          </BaseButton>
+          <button
+              @click="handleClose(); router.push('/search')"
+              class="text-tiny text-silver-50 hover:text-neon transition-colors whitespace-nowrap"
+          >
+            {{ t('common.actions.advancedSearch') }} →
+          </button>
+        </div>
 
         <!-- Search Results Grid -->
         <div v-if="searchResults.length > 0" class="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">

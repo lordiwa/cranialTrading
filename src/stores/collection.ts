@@ -64,7 +64,6 @@ export const useCollectionStore = defineStore('collection', () => {
                 createdAt: doc.data().createdAt?.toDate() || new Date(),
             })) as Card[]
 
-            console.log(`✅ ${cards.value.length} cartas cargadas en colección`)
         } catch (error) {
             console.error('Error loading collection:', error)
             toastStore.show(t('collection.messages.loadError'), 'error')
@@ -103,7 +102,6 @@ export const useCollectionStore = defineStore('collection', () => {
                     .catch((err: unknown) => { console.error('[PublicSync] Error syncing card:', err); })
             }
 
-            console.log(`✅ Carta agregada: ${cardData.name}`)
             return docRef.id
         } catch (error) {
             console.error('Error adding card:', error)
@@ -146,7 +144,6 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
-            console.log(`✅ Carta actualizada: ${cardId}`)
             return true
         } catch (error) {
             console.error('Error updating card:', error)
@@ -205,7 +202,6 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
-            console.log(`✅ ${cardIds.length} cartas actualizadas en batch`)
             return true
         } catch (error) {
             console.error('Error batch updating cards:', error)
@@ -238,7 +234,6 @@ export const useCollectionStore = defineStore('collection', () => {
             removeCardFromPublic(cardId, authStore.user.id)
                 .catch((err: unknown) => { console.error('[PublicSync] Error removing card:', err); })
 
-            console.log(`✅ Carta eliminada: ${cardId}`)
             return true
         } catch (error) {
             // Restore card on failure
@@ -580,7 +575,6 @@ export const useCollectionStore = defineStore('collection', () => {
         try {
             // Reload collection first to get latest statuses
             await loadCollection()
-            console.log(`[PublicSync] Syncing ${cards.value.length} cards...`)
 
             // Sync sale/trade cards to public_cards
             await syncAllUserCards(
@@ -594,7 +588,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
             // Sync wishlist cards to public_preferences (lo que BUSCO)
             const wishlistCards = cards.value.filter(c => c.status === 'wishlist')
-            console.log(`[PublicSync] Syncing ${wishlistCards.length} wishlist cards as preferences...`)
 
             // Convert wishlist cards to preference format
             const wishlistAsPrefs = wishlistCards.map(c => ({

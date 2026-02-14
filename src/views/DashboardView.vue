@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -27,6 +28,7 @@ import {
 import { getCardSuggestions, searchCards } from '../services/scryfall'
 import { notifyMatchUser } from '../services/cloudFunctions'
 
+const router = useRouter()
 const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
@@ -115,6 +117,8 @@ const sentInterestIds = ref<Set<string>>(new Set())
 // Auto-suggest
 const suggestions = ref<string[]>([])
 const showSuggestions = ref(false)
+const suppressSuggestions = ref(false)
+const searchContainer = ref<HTMLElement | null>(null)
 const suggestLoading = ref(false)
 
 // Scryfall fallback results (when no public_cards found)
@@ -323,6 +327,7 @@ const openBlockedUsersModal = async () => {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', handleClickOutside)
   if (!authStore.user) return
 
   // Check for incomplete clear data operation and resume if needed
@@ -359,6 +364,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 /**
@@ -819,6 +828,7 @@ const recalculateMatches = async () => {
 
 // Handle search input for auto-suggest
 const handleSearchInput = async () => {
+  suppressSuggestions.value = false
   const query = searchQuery.value.trim()
 
   if (query.length < 2) {
@@ -831,7 +841,7 @@ const handleSearchInput = async () => {
   try {
     const results = await getCardSuggestions(query)
     suggestions.value = results.slice(0, 8)
-    showSuggestions.value = suggestions.value.length > 0
+    showSuggestions.value = !suppressSuggestions.value && suggestions.value.length > 0
   } catch (err) {
     console.error('Error getting suggestions:', err)
     suggestions.value = []
@@ -843,16 +853,17 @@ const handleSearchInput = async () => {
 // Select a suggestion from dropdown
 const selectSuggestion = (cardName: string) => {
   searchQuery.value = cardName
+  suppressSuggestions.value = true
   showSuggestions.value = false
   suggestions.value = []
   searchPublicCards()
 }
 
-// Hide suggestions with delay (for click events)
-const hideSuggestionsDelayed = () => {
-  setTimeout(() => {
+// Click outside to close suggestions
+const handleClickOutside = (e: MouseEvent) => {
+  if (searchContainer.value && !searchContainer.value.contains(e.target as Node)) {
     showSuggestions.value = false
-  }, 200)
+  }
 }
 
 // Search for cards in public_cards collection, fallback to Scryfall if none found
@@ -860,6 +871,7 @@ const searchPublicCards = async () => {
   if (!searchQuery.value.trim() || !authStore.user) return
 
   // Hide suggestions
+  suppressSuggestions.value = true
   showSuggestions.value = false
   suggestions.value = []
 
@@ -1079,7 +1091,7 @@ const sendInterestFromSearch = async (card: any) => {
           <h3 class="text-body font-bold text-silver">{{ t('dashboard.searchOthers.title') }}</h3>
           <HelpTooltip :text="t('help.tooltips.dashboard.searchOthers')" :title="t('help.titles.searchOthers')" />
         </div>
-        <div class="relative mb-4">
+        <div ref="searchContainer" class="relative mb-4">
           <div class="flex gap-2">
             <div class="flex-1 relative">
               <input
@@ -1089,7 +1101,6 @@ const sendInterestFromSearch = async (card: any) => {
                   class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
                   @input="handleSearchInput"
                   @keyup.enter="searchPublicCards"
-                  @blur="hideSuggestionsDelayed"
               />
               <!-- Auto-suggest dropdown -->
               <div
@@ -1109,6 +1120,14 @@ const sendInterestFromSearch = async (card: any) => {
             <BaseButton size="small" @click="searchPublicCards" :disabled="searching || !searchQuery.trim()">
               {{ searching ? '...' : t('dashboard.searchOthers.search') }}
             </BaseButton>
+          </div>
+          <div class="flex justify-end mt-1">
+            <button
+                @click="router.push('/search')"
+                class="text-tiny text-silver-50 hover:text-neon transition-colors"
+            >
+              {{ t('common.actions.advancedSearch') }} →
+            </button>
           </div>
         </div>
 

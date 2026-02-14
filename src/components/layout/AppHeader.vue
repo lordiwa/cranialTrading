@@ -1,20 +1,66 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
-import { useI18n } from '../../composables/useI18n'
+import { type SupportedLocale, useI18n } from '../../composables/useI18n'
+import { useTour } from '../../composables/useTour'
 import SvgIcon from '../ui/SvgIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import MatchNotificationsDropdown from './MatchNotificationsDropdown.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const matchesStore = useMatchesStore()
 const messagesStore = useMessagesStore()
-const { t } = useI18n()
+const { t, locale, setLocale } = useI18n()
+
+const languages = [
+  { code: 'es' as SupportedLocale, label: 'ES' },
+  { code: 'en' as SupportedLocale, label: 'EN' },
+  { code: 'pt' as SupportedLocale, label: 'PT' },
+]
+const { startTour } = useTour()
+
+// Help menu
+const showHelpMenu = ref(false)
+const helpMenuRef = ref<HTMLElement | null>(null)
+
+const toggleHelpMenu = () => {
+  showHelpMenu.value = !showHelpMenu.value
+}
+
+const closeHelpMenu = () => {
+  showHelpMenu.value = false
+}
+
+const goToFaq = () => {
+  closeHelpMenu()
+  closeMobileMenu()
+  router.push('/faq')
+}
+
+const restartTour = async () => {
+  closeHelpMenu()
+  closeMobileMenu()
+  localStorage.removeItem('cranial_tour_completed')
+  // Navigate to collection page first, then start tour
+  if (route.path !== '/collection') {
+    await router.push('/collection')
+    setTimeout(() => void startTour(), 500)
+  } else {
+    void startTour()
+  }
+}
+
+const handleHelpClickOutside = (e: MouseEvent) => {
+  if (helpMenuRef.value && !helpMenuRef.value.contains(e.target as Node)) {
+    showHelpMenu.value = false
+  }
+}
 
 const isAuthenticated = computed(() => !!authStore.user)
 
@@ -118,10 +164,12 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
+  document.addEventListener('click', handleHelpClickOutside)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('click', handleHelpClickOutside)
 })
 </script>
 
@@ -181,14 +229,79 @@ onUnmounted(() => {
 
             <!-- User actions -->
             <div class="flex items-center gap-2">
-              <!-- Help/FAQ -->
-              <router-link
-                  to="/faq"
-                  class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
-                  title="Ayuda / FAQ"
-              >
-                <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
-              </router-link>
+              <!-- Help Menu -->
+              <div ref="helpMenuRef" class="relative">
+                <button
+                    @click="toggleHelpMenu"
+                    class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
+                    :title="t('help.menu.faq')"
+                >
+                  <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
+                </button>
+                <div
+                    v-if="showHelpMenu"
+                    class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-md shadow-lg z-50 overflow-hidden"
+                >
+                  <button
+                      @click="goToFaq"
+                      class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
+                  >
+                    <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
+                    {{ t('help.menu.faq') }}
+                  </button>
+                  <button
+                      v-if="isAuthenticated"
+                      @click="restartTour"
+                      class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left border-t border-silver-20"
+                  >
+                    <SvgIcon name="eye-open" size="tiny" class="flex-shrink-0" />
+                    {{ t('help.menu.restartTour') }}
+                  </button>
+                  <!-- Legal links -->
+                  <div class="border-t border-silver-20 px-4 py-2 flex flex-col gap-1">
+                    <router-link
+                        to="/terms"
+                        @click="closeHelpMenu"
+                        class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast"
+                    >
+                      {{ t('help.menu.terms') }}
+                    </router-link>
+                    <router-link
+                        to="/privacy"
+                        @click="closeHelpMenu"
+                        class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast"
+                    >
+                      {{ t('help.menu.privacy') }}
+                    </router-link>
+                    <router-link
+                        to="/cookies"
+                        @click="closeHelpMenu"
+                        class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast"
+                    >
+                      {{ t('help.menu.cookies') }}
+                    </router-link>
+                  </div>
+                  <!-- Language selector -->
+                  <div class="border-t border-silver-20 px-4 py-2 flex items-center gap-2">
+                    <span class="text-tiny text-silver-50">{{ t('help.menu.language') }}:</span>
+                    <div class="flex items-center gap-1">
+                      <button
+                          v-for="lang in languages"
+                          :key="lang.code"
+                          @click="setLocale(lang.code)"
+                          :class="[
+                            'px-2 py-0.5 text-tiny font-bold rounded transition-colors',
+                            locale === lang.code
+                              ? 'bg-neon text-primary'
+                              : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                          ]"
+                      >
+                        {{ lang.label }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <!-- User Popover (avatar only, dropdown has logout) -->
               <UserPopover class="hidden md:block" />
             </div>
@@ -196,13 +309,59 @@ onUnmounted(() => {
 
           <!-- Auth Links (Logged out) -->
           <div v-else class="flex items-center gap-3">
-            <router-link
-                to="/faq"
-                class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
-                title="Ayuda / FAQ"
-            >
-              <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
-            </router-link>
+            <!-- Help Menu (logged out) -->
+            <div ref="helpMenuRef" class="relative">
+              <button
+                  @click="toggleHelpMenu"
+                  class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
+                  :title="t('help.menu.faq')"
+              >
+                <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
+              </button>
+              <div
+                  v-if="showHelpMenu"
+                  class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-md shadow-lg z-50 overflow-hidden"
+              >
+                <button
+                    @click="goToFaq"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
+                >
+                  <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
+                  {{ t('help.menu.faq') }}
+                </button>
+                <!-- Legal links -->
+                <div class="border-t border-silver-20 px-4 py-2 flex flex-col gap-1">
+                  <router-link to="/terms" @click="closeHelpMenu" class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast">
+                    {{ t('help.menu.terms') }}
+                  </router-link>
+                  <router-link to="/privacy" @click="closeHelpMenu" class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast">
+                    {{ t('help.menu.privacy') }}
+                  </router-link>
+                  <router-link to="/cookies" @click="closeHelpMenu" class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast">
+                    {{ t('help.menu.cookies') }}
+                  </router-link>
+                </div>
+                <!-- Language selector -->
+                <div class="border-t border-silver-20 px-4 py-2 flex items-center gap-2">
+                  <span class="text-tiny text-silver-50">{{ t('help.menu.language') }}:</span>
+                  <div class="flex items-center gap-1">
+                    <button
+                        v-for="lang in languages"
+                        :key="lang.code"
+                        @click="setLocale(lang.code)"
+                        :class="[
+                          'px-2 py-0.5 text-tiny font-bold rounded transition-colors',
+                          locale === lang.code
+                            ? 'bg-neon text-primary'
+                            : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                        ]"
+                    >
+                      {{ lang.label }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
             <a
                 href="/login"
                 class="px-4 py-2 text-silver-70 hover:text-neon transition-fast rounded text-small font-bold"
@@ -285,14 +444,21 @@ onUnmounted(() => {
           {{ t('header.profile.myProfile') }} (@{{ authStore.user.username }})
         </router-link>
         <!-- FAQ (mobile) -->
-        <router-link
-            to="/faq"
-            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
-            @click="closeMobileMenu"
+        <button
+            @click="goToFaq"
+            class="w-full flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast text-left"
         >
           <span class="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
-          Ayuda / FAQ
-        </router-link>
+          {{ t('help.menu.faq') }}
+        </button>
+        <!-- Restart Tour (mobile) -->
+        <button
+            @click="restartTour"
+            class="w-full flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast text-left"
+        >
+          <SvgIcon name="eye-open" size="small" />
+          {{ t('help.menu.restartTour') }}
+        </button>
         <!-- Settings (mobile) -->
         <router-link
             to="/settings"
@@ -302,6 +468,39 @@ onUnmounted(() => {
           <SvgIcon name="settings" size="small" />
           {{ t('header.profile.settings') }}
         </router-link>
+        <!-- Legal links (mobile) -->
+        <div class="flex items-center gap-3 px-4 py-2 border-t border-silver-20">
+          <router-link to="/terms" @click="closeMobileMenu" class="text-tiny text-silver-50 hover:text-silver transition-fast">
+            {{ t('help.menu.terms') }}
+          </router-link>
+          <span class="text-silver-30">·</span>
+          <router-link to="/privacy" @click="closeMobileMenu" class="text-tiny text-silver-50 hover:text-silver transition-fast">
+            {{ t('help.menu.privacy') }}
+          </router-link>
+          <span class="text-silver-30">·</span>
+          <router-link to="/cookies" @click="closeMobileMenu" class="text-tiny text-silver-50 hover:text-silver transition-fast">
+            {{ t('help.menu.cookies') }}
+          </router-link>
+        </div>
+        <!-- Language selector (mobile) -->
+        <div class="flex items-center gap-2 px-4 py-2">
+          <span class="text-tiny text-silver-50">{{ t('help.menu.language') }}:</span>
+          <div class="flex items-center gap-1">
+            <button
+                v-for="lang in languages"
+                :key="`mobile-lang-${lang.code}`"
+                @click="setLocale(lang.code)"
+                :class="[
+                  'px-2 py-0.5 text-tiny font-bold rounded transition-colors',
+                  locale === lang.code
+                    ? 'bg-neon text-primary'
+                    : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                ]"
+            >
+              {{ lang.label }}
+            </button>
+          </div>
+        </div>
         <!-- Logout (mobile) -->
         <button
             @click="handleLogout(); closeMobileMenu()"

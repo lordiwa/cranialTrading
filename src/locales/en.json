@@ -465,6 +465,11 @@
         "forSale": "FOR SALE",
         "forTrade": "TRADE",
         "total": "TOTAL"
+      },
+      "history": {
+        "title": "Value History",
+        "noData": "Not enough data yet. Check back tomorrow!",
+        "days": "{count} days"
       }
     },
     "bulkDelete": {
@@ -601,7 +606,11 @@
       "printsAvailable": "{count} prints available",
       "editionPrintLabel": "Edition / Print",
       "updated": "Card updated",
-      "saveError": "Error saving changes"
+      "saveError": "Error saving changes",
+      "priceHistory": {
+        "toggle": "Price history",
+        "noData": "Not enough data yet"
+      }
     },
     "grid": {
       "perUnit": "${price} ea",

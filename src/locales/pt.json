@@ -465,6 +465,11 @@
         "forSale": "À VENDA",
         "forTrade": "TROCA",
         "total": "TOTAL"
+      },
+      "history": {
+        "title": "Histórico de Valor",
+        "noData": "Dados insuficientes ainda. Volte amanhã!",
+        "days": "{count} dias"
       }
     },
     "bulkDelete": {
@@ -601,7 +606,11 @@
       "printsAvailable": "{count} prints disponíveis",
       "editionPrintLabel": "Edição / Print",
       "updated": "Carta atualizada",
-      "saveError": "Erro ao salvar alterações"
+      "saveError": "Erro ao salvar alterações",
+      "priceHistory": {
+        "toggle": "Histórico de preço",
+        "noData": "Dados insuficientes ainda"
+      }
     },
     "grid": {
       "perUnit": "${price} cada",

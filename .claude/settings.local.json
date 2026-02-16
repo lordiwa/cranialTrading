@@ -43,7 +43,10 @@
       "Bash(npx vitest:*)",
       "Bash(git stash:*)",
       "Bash(node convert-icons.js:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(awk:*)",
+      "Bash(del \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\\\\views\\\\DeckEditorView.vue\")",
+      "Bash(del \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\\\\views\\\\DeckDetailView.vue\")"
     ]
   }
 }

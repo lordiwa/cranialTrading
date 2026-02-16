@@ -5,6 +5,7 @@ import { useDecksStore } from '../../stores/decks'
 import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useI18n } from '../../composables/useI18n'
 import { searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
@@ -71,6 +72,93 @@ const {
   () => selectedPrint.value?.id || props.card?.scryfallId,
   () => selectedPrint.value?.set || props.card?.setCode
 )
+
+// ========== PRICE HISTORY CHART ==========
+const { loadCardHistory } = usePriceHistory()
+const showPriceChart = ref(false)
+const chartHistory = ref<CardHistoryPoint[]>([])
+const chartLoading = ref(false)
+type ChartSource = 'tcg' | 'ck' | 'buylist'
+const chartSource = ref<ChartSource>('tcg')
+
+const chartHasData = computed(() => chartHistory.value.length >= 2)
+
+const chartSourceColor = computed(() => {
+  if (chartSource.value === 'ck') return '#4CAF50'
+  if (chartSource.value === 'buylist') return '#FF9800'
+  return '#CCFF00'
+})
+
+const chartData = computed(() => {
+  return chartHistory.value.map(p => ({
+    date: p.date,
+    value: chartSource.value === 'ck' ? p.ck : chartSource.value === 'buylist' ? p.buylist : p.tcg,
+  }))
+})
+
+const chartMinMax = computed(() => {
+  if (!chartHasData.value) return { min: 0, max: 100 }
+  const values = chartData.value.map(d => d.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const padding = (max - min) * 0.1 || 1
+  return { min: min - padding, max: max + padding }
+})
+
+const chartSvgW = 300
+const chartSvgH = 100
+const chartPad = { top: 8, right: 8, bottom: 16, left: 8 }
+
+const chartPolyline = computed(() => {
+  if (!chartHasData.value) return ''
+  const { min, max } = chartMinMax.value
+  const plotW = chartSvgW - chartPad.left - chartPad.right
+  const plotH = chartSvgH - chartPad.top - chartPad.bottom
+  const data = chartData.value
+  return data.map((d, i) => {
+    const x = chartPad.left + (i / (data.length - 1)) * plotW
+    const y = chartPad.top + plotH - ((d.value - min) / (max - min)) * plotH
+    return `${x},${y}`
+  }).join(' ')
+})
+
+const chartFirstDate = computed(() => {
+  const first = chartData.value[0]
+  if (!first) return ''
+  const [, m, d] = first.date.split('-')
+  return `${m}/${d}`
+})
+
+const chartLastDate = computed(() => {
+  const last = chartData.value[chartData.value.length - 1]
+  if (!last) return ''
+  const [, m, d] = last.date.split('-')
+  return `${m}/${d}`
+})
+
+const chartLastValue = computed(() => {
+  const last = chartData.value[chartData.value.length - 1]
+  if (!last) return ''
+  return `$${last.value.toFixed(2)}`
+})
+
+async function togglePriceChart() {
+  if (showPriceChart.value) {
+    showPriceChart.value = false
+    return
+  }
+  if (chartHistory.value.length === 0 && props.card?.scryfallId) {
+    chartLoading.value = true
+    try {
+      chartHistory.value = await loadCardHistory(props.card.scryfallId)
+    } catch {
+      // silent
+    } finally {
+      chartLoading.value = false
+    }
+  }
+  showPriceChart.value = true
+}
 
 // ========== COMPUTED ==========
 
@@ -437,6 +525,9 @@ const handleClose = () => {
   relatedCards.value = []
   deckAllocations.value = {}
   showZoom.value = false
+  showPriceChart.value = false
+  chartHistory.value = []
+  chartSource.value = 'tcg'
   emit('close')
 }
 
@@ -509,6 +600,81 @@ watch(selectedPrint, (print) => {
                 <span class="text-tiny text-silver-70">BL:</span>
                 <span v-if="cardKingdomBuylist" class="text-body font-bold text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
                 <span v-else class="text-small text-silver-50">-</span>
+              </div>
+            </div>
+
+            <!-- Price History Toggle -->
+            <div class="mt-2">
+              <button
+                @click="togglePriceChart"
+                class="flex items-center gap-1 text-tiny text-silver-50 hover:text-silver transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span>{{ t('cards.detailModal.priceHistory.toggle') }}</span>
+                <span class="text-[10px]">{{ showPriceChart ? '▲' : '▼' }}</span>
+              </button>
+
+              <!-- Chart panel -->
+              <div v-if="showPriceChart" class="mt-2">
+                <div v-if="chartLoading" class="flex items-center justify-center h-[60px]">
+                  <span class="text-tiny text-silver-50 animate-pulse">...</span>
+                </div>
+                <div v-else-if="!chartHasData" class="text-tiny text-silver-50 py-2">
+                  {{ t('cards.detailModal.priceHistory.noData') }}
+                </div>
+                <div v-else>
+                  <!-- Source selector -->
+                  <div class="flex items-center gap-1 mb-1">
+                    <button
+                      v-for="src in (['tcg', 'ck', 'buylist'] as ChartSource[])"
+                      :key="src"
+                      @click="chartSource = src"
+                      :class="[
+                        'px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors uppercase',
+                        chartSource === src
+                          ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
+                          : 'text-silver-50 hover:text-silver hover:bg-silver-5'
+                      ]"
+                    >
+                      {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
+                    </button>
+                  </div>
+
+                  <!-- SVG Chart -->
+                  <svg
+                    :viewBox="`0 0 ${chartSvgW} ${chartSvgH}`"
+                    class="w-full h-[100px]"
+                    preserveAspectRatio="none"
+                  >
+                    <line
+                      :x1="chartPad.left" :y1="chartPad.top"
+                      :x2="chartSvgW - chartPad.right" :y2="chartPad.top"
+                      stroke="#333" stroke-width="0.5"
+                    />
+                    <line
+                      :x1="chartPad.left" :y1="chartSvgH - chartPad.bottom"
+                      :x2="chartSvgW - chartPad.right" :y2="chartSvgH - chartPad.bottom"
+                      stroke="#333" stroke-width="0.5"
+                    />
+                    <polyline
+                      :points="chartPolyline"
+                      fill="none"
+                      :stroke="chartSourceColor"
+                      stroke-width="2"
+                      stroke-linejoin="round"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+
+                  <!-- Labels -->
+                  <div class="flex items-center justify-between text-[10px] text-silver-50 -mt-1">
+                    <span>{{ chartFirstDate }}</span>
+                    <span class="font-bold" :style="{ color: chartSourceColor }">{{ chartLastValue }}</span>
+                    <span>{{ chartLastDate }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

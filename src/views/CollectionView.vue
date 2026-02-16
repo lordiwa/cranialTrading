@@ -2703,7 +2703,7 @@ onUnmounted(() => {
   <!-- ========== DECK STATS FOOTER (fijo abajo cuando hay deck seleccionado) ========== -->
   <Teleport to="body">
     <div v-if="viewMode === 'decks' && selectedDeck"
-         class="fixed bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t-2 border-neon">
+         class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t-2 border-neon">
       <div class="container mx-auto max-w-7xl px-4 py-2">
         <!-- Desktop: fila única -->
         <div class="hidden md:flex items-center gap-4 text-tiny">

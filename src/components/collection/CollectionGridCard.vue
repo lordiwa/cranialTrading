@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
@@ -139,6 +140,25 @@ const {
   () => props.card.setCode
 )
 
+// Per-card price history sparkline
+const { loadCardHistory } = usePriceHistory()
+const cardHistory = ref<CardHistoryPoint[]>([])
+
+const sparklinePoints = computed(() => {
+  if (cardHistory.value.length < 2) return ''
+  const values = cardHistory.value.map(p => p.tcg)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const w = 100
+  const h = 24
+  return cardHistory.value.map((_, i) => {
+    const x = (i / (values.length - 1)) * w
+    const y = h - (((values[i] ?? 0) - min) / range) * (h - 2) - 1
+    return `${x},${y}`
+  }).join(' ')
+})
+
 // Lazy fetch CK prices when card scrolls into viewport
 let priceObserver: IntersectionObserver | null = null
 
@@ -147,11 +167,17 @@ onMounted(() => {
   const el = cardRef.value || compactCardRef.value
   if (!el) {
     fetchCKPrices()
+    if (!props.compact) {
+      loadCardHistory(props.card.scryfallId).then(h => { cardHistory.value = h }).catch(() => {})
+    }
     return
   }
   priceObserver = new IntersectionObserver((entries) => {
     if (entries[0]?.isIntersecting) {
       fetchCKPrices()
+      if (!props.compact && props.card.scryfallId) {
+        loadCardHistory(props.card.scryfallId).then(h => { cardHistory.value = h }).catch(() => {})
+      }
       priceObserver?.disconnect()
       priceObserver = null
     }
@@ -538,6 +564,23 @@ const getStatusIconName = (status: string) => {
         </p>
         <p v-else class="text-tiny text-silver-50">BL: -</p>
       </div>
+
+      <!-- Sparkline -->
+      <svg
+        v-if="cardHistory.length >= 2"
+        :viewBox="`0 0 100 24`"
+        class="w-full h-[24px] mt-1"
+        preserveAspectRatio="none"
+      >
+        <polyline
+          :points="sparklinePoints"
+          fill="none"
+          stroke="#CCFF00"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      </svg>
     </div>
 
 

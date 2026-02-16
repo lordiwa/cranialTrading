@@ -69,7 +69,6 @@ const newMatchesCount = computed(() => matchesStore.getUnseenCount())
 const unreadMessagesCount = computed(() => {
   return messagesStore.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
 })
-const mobileMenuOpen = ref(false)
 const detectedLocation = ref<string | null>(null)
 const showLocationSuggestion = ref(false)
 
@@ -102,12 +101,8 @@ const dismissLocationSuggestion = () => {
   showLocationSuggestion.value = false
 }
 
-const toggleMobileMenu = () => {
-  mobileMenuOpen.value = !mobileMenuOpen.value
-}
-
 const closeMobileMenu = () => {
-  mobileMenuOpen.value = false
+  // noop — kept for help menu/tour handlers that call it
 }
 
 // Combined badge for matches section (saved + messages + contacts)
@@ -138,11 +133,6 @@ const isActive = (path: string) => {
     return route.query.filter !== 'wishlist'
   }
   return route.path.startsWith(path)
-}
-
-const handleLogout = async () => {
-  await authStore.logout()
-  window.location.href = '/login'
 }
 
 // Global search ref for keyboard shortcut
@@ -176,10 +166,10 @@ onUnmounted(() => {
 <template>
   <header class="bg-primary border-b border-silver-20 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16 md:h-20">
+      <div class="flex items-center justify-between h-14 md:h-20">
         <!-- Logo -->
         <router-link to="/saved-matches" class="flex items-center gap-2 flex-shrink-0">
-          <svg class="w-10 h-10 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
+          <svg class="w-8 h-8 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
           <span class="hidden sm:inline text-h3 font-bold text-neon">CRANIAL TRADING</span>
@@ -213,15 +203,6 @@ onUnmounted(() => {
 
         <!-- Right side: User & Settings -->
         <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
-          <!-- Mobile Menu Button -->
-          <button
-              v-if="isAuthenticated"
-              class="md:hidden px-3 py-2 border border-silver-30 text-silver hover:border-neon hover:text-neon transition-fast rounded"
-              @click="toggleMobileMenu"
-          >
-            {{ mobileMenuOpen ? '✕' : '☰' }}
-          </button>
-
           <!-- User Menu -->
           <div v-if="isAuthenticated" class="flex items-center">
             <!-- Divider -->
@@ -303,7 +284,7 @@ onUnmounted(() => {
                 </div>
               </div>
               <!-- User Popover (avatar only, dropdown has logout) -->
-              <UserPopover class="hidden md:block" />
+              <UserPopover />
             </div>
           </div>
 
@@ -378,138 +359,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Mobile Navigation Menu -->
-      <nav
-          v-if="isAuthenticated && mobileMenuOpen"
-          aria-label="Mobile navigation"
-          class="md:hidden border-t border-silver-20 pb-2"
-      >
-        <router-link
-            v-for="link in navigationLinks"
-            :key="`mobile-${ link.path}`"
-            :to="link.path"
-            :class="[
-              'flex items-center gap-3 px-4 py-3 text-small font-bold transition-fast',
-              isActive(link.path)
-                ? 'bg-neon-10 border-l-2 border-neon text-neon'
-                : 'text-silver-70 hover:text-silver'
-            ]"
-            @click="closeMobileMenu"
-        >
-          <span class="relative">
-            <SvgIcon :name="link.icon" size="small" />
-            <span
-                v-if="link.badge > 0"
-                class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
-            >
-              {{ link.badge > 9 ? '9+' : link.badge }}
-            </span>
-          </span>
-          {{ link.label }}
-        </router-link>
-        <!-- Matches (mobile - direct link) -->
-        <router-link
-            to="/saved-matches"
-            :class="[
-              'flex items-center gap-3 px-4 py-3 text-small font-bold transition-fast',
-              isMatchesActive
-                ? 'bg-neon-10 border-l-2 border-neon text-neon'
-                : 'text-silver-70 hover:text-silver'
-            ]"
-            @click="closeMobileMenu"
-        >
-          <span class="relative">
-            <SvgIcon name="handshake" size="small" />
-            <span
-                v-if="matchesSectionBadge > 0"
-                class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
-            >
-              {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
-            </span>
-          </span>
-          {{ t('header.nav.matches') }}
-        </router-link>
-        <!-- Mi Perfil (mobile) -->
-        <router-link
-            v-if="authStore.user?.username"
-            :to="`/@${authStore.user.username}`"
-            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
-            @click="closeMobileMenu"
-        >
-          <img
-              :src="authStore.getAvatarUrl(24)"
-              alt=""
-              class="w-6 h-6 rounded-full object-cover"
-          />
-          {{ t('header.profile.myProfile') }} (@{{ authStore.user.username }})
-        </router-link>
-        <!-- FAQ (mobile) -->
-        <button
-            @click="goToFaq"
-            class="w-full flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast text-left"
-        >
-          <span class="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
-          {{ t('help.menu.faq') }}
-        </button>
-        <!-- Restart Tour (mobile) -->
-        <button
-            @click="restartTour"
-            class="w-full flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast text-left"
-        >
-          <SvgIcon name="eye-open" size="small" />
-          {{ t('help.menu.restartTour') }}
-        </button>
-        <!-- Settings (mobile) -->
-        <router-link
-            to="/settings"
-            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-neon transition-fast"
-            @click="closeMobileMenu"
-        >
-          <SvgIcon name="settings" size="small" />
-          {{ t('header.profile.settings') }}
-        </router-link>
-        <!-- Legal links (mobile) -->
-        <div class="flex items-center gap-3 px-4 py-2 border-t border-silver-20">
-          <router-link to="/terms" @click="closeMobileMenu" class="text-tiny text-silver-50 hover:text-silver transition-fast">
-            {{ t('help.menu.terms') }}
-          </router-link>
-          <span class="text-silver-30">·</span>
-          <router-link to="/privacy" @click="closeMobileMenu" class="text-tiny text-silver-50 hover:text-silver transition-fast">
-            {{ t('help.menu.privacy') }}
-          </router-link>
-          <span class="text-silver-30">·</span>
-          <router-link to="/cookies" @click="closeMobileMenu" class="text-tiny text-silver-50 hover:text-silver transition-fast">
-            {{ t('help.menu.cookies') }}
-          </router-link>
-        </div>
-        <!-- Language selector (mobile) -->
-        <div class="flex items-center gap-2 px-4 py-2">
-          <span class="text-tiny text-silver-50">{{ t('help.menu.language') }}:</span>
-          <div class="flex items-center gap-1">
-            <button
-                v-for="lang in languages"
-                :key="`mobile-lang-${lang.code}`"
-                @click="setLocale(lang.code)"
-                :class="[
-                  'px-2 py-0.5 text-tiny font-bold rounded transition-colors',
-                  locale === lang.code
-                    ? 'bg-neon text-primary'
-                    : 'text-silver-50 hover:text-neon hover:bg-silver-5'
-                ]"
-            >
-              {{ lang.label }}
-            </button>
-          </div>
-        </div>
-        <!-- Logout (mobile) -->
-        <button
-            @click="handleLogout(); closeMobileMenu()"
-            class="flex items-center gap-3 px-4 py-3 text-small font-bold text-silver-70 hover:text-rust transition-fast w-full text-left"
-        >
-          <SvgIcon name="x-mark" size="small" />
-          {{ t('header.profile.logout') }}
-        </button>
-      </nav>
     </div>
 
     <!-- Location suggestion banner -->
@@ -538,11 +387,75 @@ onUnmounted(() => {
       </div>
     </div>
   </header>
+
+  <!-- Bottom Tab Bar (mobile only) -->
+  <nav v-if="isAuthenticated" class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-primary border-t border-silver-20 tab-bar-safe">
+    <div class="flex items-center justify-around h-14 px-2">
+      <!-- Collection -->
+      <router-link
+          to="/collection"
+          :class="[
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            isActive('/collection') ? 'text-neon' : 'text-silver-50'
+          ]"
+      >
+        <SvgIcon name="collection" size="small" />
+        <span class="text-[10px] font-bold">{{ t('header.nav.collection') }}</span>
+      </router-link>
+      <!-- Matches -->
+      <router-link
+          to="/saved-matches"
+          :class="[
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast relative',
+            isMatchesActive ? 'text-neon' : 'text-silver-50'
+          ]"
+      >
+        <span class="relative">
+          <SvgIcon name="handshake" size="small" />
+          <span
+              v-if="matchesSectionBadge > 0"
+              class="absolute -top-1 -right-2 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
+          >
+            {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
+          </span>
+        </span>
+        <span class="text-[10px] font-bold">{{ t('header.nav.matches') }}</span>
+      </router-link>
+      <!-- Wishlist -->
+      <router-link
+          to="/collection?filter=wishlist"
+          :class="[
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            isActive('/collection?filter=wishlist') ? 'text-neon' : 'text-silver-50'
+          ]"
+      >
+        <SvgIcon name="star" size="small" />
+        <span class="text-[10px] font-bold">{{ t('header.nav.wishlist') }}</span>
+      </router-link>
+      <!-- Profile -->
+      <router-link
+          v-if="authStore.user?.username"
+          :to="`/@${authStore.user.username}`"
+          :class="[
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            route.path === `/@${authStore.user.username}` ? 'text-neon' : 'text-silver-50'
+          ]"
+      >
+        <img :src="authStore.getAvatarUrl(20)" alt="" class="w-5 h-5 rounded-full object-cover" />
+        <span class="text-[10px] font-bold">{{ t('header.profile.myProfile') }}</span>
+      </router-link>
+    </div>
+  </nav>
 </template>
 
 <style scoped>
 /* Smooth transitions para links activos */
 .router-link-exact-active {
   @apply text-neon;
+}
+
+/* Safe area for iPhones with home indicator */
+.tab-bar-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 </style>

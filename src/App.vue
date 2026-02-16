@@ -38,7 +38,7 @@ onMounted(() => {
   </div>
 
   <div v-else class="min-h-screen flex flex-col">
-    <div class="flex-1">
+    <div :class="['flex-1', authStore.user ? 'pb-14 md:pb-0' : '']">
       <RouterView />
     </div>
     <AppFooter v-if="showFooter" />

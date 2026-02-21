@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardTypeCategory, manaOrder, typeOrder } from '../../composables/useCardFilter'
+import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, rarityOrder, typeOrder } from '../../composables/useCardFilter'
 import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
 
 const props = defineProps<{
@@ -13,6 +13,7 @@ const props = defineProps<{
   selectedColors?: Set<string>
   selectedManaValues?: Set<string>
   selectedTypes?: Set<string>
+  selectedRarities?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -127,6 +128,10 @@ const passesFilters = (card: DisplayDeckCard): boolean => {
     const type = getTypeCategory(card)
     if (!props.selectedTypes.has(type)) return false
   }
+  if (props.selectedRarities && props.selectedRarities.size < rarityOrder.length) {
+    const rarity = getCardRarityCategory(card)
+    if (!props.selectedRarities.has(rarity)) return false
+  }
   return true
 }
 
@@ -134,6 +139,7 @@ const hasActiveFilters = computed(() => {
   return (props.selectedColors && props.selectedColors.size < deckColorOrder.length)
     || (props.selectedManaValues && props.selectedManaValues.size < deckManaOrder.length)
     || (props.selectedTypes && props.selectedTypes.size < deckTypeOrder.length)
+    || (props.selectedRarities && props.selectedRarities.size < rarityOrder.length)
 })
 
 // Group cards by selected mode

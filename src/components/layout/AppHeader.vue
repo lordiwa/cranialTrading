@@ -111,6 +111,7 @@ const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessage
 const navigationLinks = computed(() => [
   { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: 0 },
   { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
+  { path: '/market', label: t('header.nav.market'), icon: 'fire', badge: 0 },
 ])
 
 const isMatchesActive = computed(() => route.path.startsWith('/saved-matches'))
@@ -431,6 +432,17 @@ onUnmounted(() => {
       >
         <SvgIcon name="star" size="small" />
         <span class="text-[10px] font-bold">{{ t('header.nav.wishlist') }}</span>
+      </router-link>
+      <!-- Market -->
+      <router-link
+          to="/market"
+          :class="[
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            isActive('/market') ? 'text-neon' : 'text-silver-50'
+          ]"
+      >
+        <SvgIcon name="fire" size="small" />
+        <span class="text-[10px] font-bold">{{ t('header.nav.market') }}</span>
       </router-link>
       <!-- Profile -->
       <router-link

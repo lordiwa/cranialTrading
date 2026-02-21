@@ -21,6 +21,7 @@ export interface Card {
     cmc?: number;               // Converted mana cost (mana value)
     type_line?: string;         // Card type (e.g., "Creature — Human Wizard")
     colors?: string[];          // Card colors (W, U, B, R, G)
+    rarity?: string;            // Rarity (common, uncommon, rare, mythic)
     createdAt?: Date;
     updatedAt: Date;
 }

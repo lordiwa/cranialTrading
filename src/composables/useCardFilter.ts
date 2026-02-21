@@ -9,12 +9,22 @@ export interface FilterableCard {
   cmc?: number
   type_line?: string
   colors?: string[]
+  rarity?: string
   condition?: string
   foil?: boolean
   createdAt?: Date
 }
 
 // ========== Category helpers ==========
+
+export const getCardRarityCategory = (card: FilterableCard): string => {
+  const rarity = card.rarity?.toLowerCase() || ''
+  if (rarity === 'common') return 'Common'
+  if (rarity === 'uncommon') return 'Uncommon'
+  if (rarity === 'rare') return 'Rare'
+  if (rarity === 'mythic') return 'Mythic'
+  return 'Unknown'
+}
 
 export const getCardTypeCategory = (card: FilterableCard): string => {
   const typeLine = card.type_line?.toLowerCase() || ''
@@ -62,6 +72,8 @@ export const typeOrder = ['Creatures', 'Instants', 'Sorceries', 'Enchantments', 
 export const manaOrder = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10+', 'Lands']
 export const colorOrder = ['White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Colorless', 'Lands']
 
+export const rarityOrder = ['Common', 'Uncommon', 'Rare', 'Mythic', 'Unknown']
+
 export const colorIconMap: Record<string, string> = {
   'White': 'W', 'Blue': 'U', 'Black': 'B', 'Red': 'R', 'Green': 'G',
   'Multicolor': 'G/W', 'Colorless': 'C', 'Lands': 'Y'
@@ -91,6 +103,7 @@ export function useCardFilter<T extends FilterableCard>(
   const selectedColors = ref<Set<string>>(new Set(colorOrder))
   const selectedManaValues = ref<Set<string>>(new Set(manaOrder))
   const selectedTypes = ref<Set<string>>(new Set(typeOrder))
+  const selectedRarities = ref<Set<string>>(new Set(rarityOrder))
 
   // Reset chip filters when groupBy goes to 'none'
   watch(groupBy, (val) => {
@@ -98,6 +111,7 @@ export function useCardFilter<T extends FilterableCard>(
       selectedColors.value = new Set(colorOrder)
       selectedManaValues.value = new Set(manaOrder)
       selectedTypes.value = new Set(typeOrder)
+      selectedRarities.value = new Set(rarityOrder)
     }
   })
 
@@ -111,6 +125,7 @@ export function useCardFilter<T extends FilterableCard>(
   const toggleColor = (cat: string) => { selectedColors.value = toggleSet(selectedColors.value, cat) }
   const toggleMana = (cat: string) => { selectedManaValues.value = toggleSet(selectedManaValues.value, cat) }
   const toggleType = (cat: string) => { selectedTypes.value = toggleSet(selectedTypes.value, cat) }
+  const toggleRarity = (cat: string) => { selectedRarities.value = toggleSet(selectedRarities.value, cat) }
 
   // --- Chip filter check ---
   const passesChipFilters = (card: T): boolean => {
@@ -120,6 +135,8 @@ export function useCardFilter<T extends FilterableCard>(
     if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
     const type = getCardTypeCategory(card)
     if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !selectedTypes.value.has(type)) return false
+    const rarity = getCardRarityCategory(card)
+    if (selectedRarities.value.size > 0 && selectedRarities.value.size < rarityOrder.length && !selectedRarities.value.has(rarity)) return false
     return true
   }
 
@@ -127,6 +144,7 @@ export function useCardFilter<T extends FilterableCard>(
     return selectedColors.value.size < colorOrder.length
       || selectedManaValues.value.size < manaOrder.length
       || selectedTypes.value.size < typeOrder.length
+      || selectedRarities.value.size < rarityOrder.length
   })
 
   // --- Sort ---
@@ -247,11 +265,13 @@ export function useCardFilter<T extends FilterableCard>(
     selectedColors,
     selectedManaValues,
     selectedTypes,
+    selectedRarities,
 
     // Toggles
     toggleColor,
     toggleMana,
     toggleType,
+    toggleRarity,
 
     // Computed
     hasActiveFilters,

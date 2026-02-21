@@ -268,7 +268,8 @@
       "messages": "Mensagens",
       "contacts": "Contatos",
       "wishlist": "Wishlist",
-      "matches": "Matches"
+      "matches": "Matches",
+      "market": "Mercado"
     },
     "profile": {
       "myProfile": "Meu Perfil",
@@ -365,7 +366,8 @@
     "wishlistCount": "{count} na wishlist",
     "tabs": {
       "collection": "MINHA COLEÇÃO",
-      "decks": "DECKS"
+      "decks": "DECKS",
+      "binders": "PASTAS"
     },
     "fab": {
       "addCard": "Adicionar carta"
@@ -1729,6 +1731,130 @@
       "next": "PRÓXIMO",
       "prev": "VOLTAR",
       "done": "VAMOS LÁ!"
+    }
+  },
+
+  "market": {
+    "title": "MERCADO",
+    "subtitle": "Movimentos de preço, staples por formato e tendências",
+    "tabs": {
+      "movers": "MOVIMENTOS",
+      "staples": "STAPLES",
+      "portfolio": "MINHAS CARTAS"
+    },
+    "movers": {
+      "winners": "ALTAS",
+      "losers": "BAIXAS",
+      "types": {
+        "average_regular": "Média Regular",
+        "average_foil": "Média Foil",
+        "market_regular": "Mercado Regular",
+        "market_foil": "Mercado Foil"
+      },
+      "table": {
+        "rank": "#",
+        "card": "Carta",
+        "set": "Edição",
+        "was": "Antes",
+        "now": "Agora",
+        "change": "Var."
+      },
+      "empty": "Sem dados de movimentos ainda. Atualiza a cada 6 horas.",
+      "typeLabel": "Tipo de preço"
+    },
+    "staples": {
+      "categories": {
+        "overall": "Geral",
+        "creatures": "Criaturas",
+        "spells": "Feitiços",
+        "lands": "Terrenos"
+      },
+      "formats": {
+        "standard": "Standard",
+        "modern": "Modern",
+        "pioneer": "Pioneer",
+        "legacy": "Legacy",
+        "vintage": "Vintage",
+        "pauper": "Pauper",
+        "commander": "Commander"
+      },
+      "table": {
+        "rank": "#",
+        "card": "Carta",
+        "percentDecks": "% Decks",
+        "avgCopies": "Cópias Méd."
+      },
+      "empty": "Sem dados de staples ainda. Atualiza a cada 12 horas.",
+      "formatLabel": "Formato",
+      "categoryLabel": "Categoria"
+    },
+    "search": "Buscar cartas...",
+    "sort": {
+      "label": "Ordenar por",
+      "change": "% Varia\u00e7\u00e3o",
+      "price": "Pre\u00e7o"
+    },
+    "setFilter": {
+      "all": "Todas as edi\u00e7\u00f5es",
+      "label": "Edi\u00e7\u00e3o"
+    },
+    "pagination": {
+      "showing": "Mostrando {from}\u2013{to} de {total}",
+      "page": "{current} / {total}"
+    },
+    "lastUpdated": "Atualizado: {date}",
+    "portfolio": {
+      "totalChange": "Impacto no portfólio",
+      "affected": "{count} cartas afetadas",
+      "up": "{count} subiram",
+      "down": "{count} caíram",
+      "empty": "Nenhuma das suas cartas corresponde aos movimentos de preço atuais.",
+      "sortImpact": "$ Impacto",
+      "sortPercent": "% Variação",
+      "table": {
+        "card": "Carta",
+        "set": "Edição",
+        "qty": "Qtd",
+        "was": "Antes",
+        "now": "Agora",
+        "change": "% Var.",
+        "impact": "Impacto"
+      },
+      "loginRequired": "Faça login para ver como os movimentos de preço afetam sua coleção."
+    },
+    "errors": {
+      "loadMovers": "Erro ao carregar movimentos de preço",
+      "loadStaples": "Erro ao carregar staples do formato"
+    }
+  },
+
+  "binders": {
+    "create": {
+      "title": "NOVA PASTA",
+      "subtitle": "Organize suas cartas em uma pasta",
+      "name": "Nome da pasta",
+      "namePlaceholder": "Minha Pasta",
+      "description": "Descrição",
+      "descPlaceholder": "O que tem nesta pasta?",
+      "submit": "CRIAR",
+      "cancel": "CANCELAR"
+    },
+    "header": {
+      "delete": "EXCLUIR",
+      "confirmDelete": "Excluir pasta \"{name}\"? As cartas permanecerão na sua coleção.",
+      "public": "PÚBLICA",
+      "forSale": "À VENDA"
+    },
+    "empty": "Nenhuma carta nesta pasta ainda. Pesquise e adicione cartas acima.",
+    "noBinders": "Você não tem pastas ainda. Crie uma para começar a organizar suas cartas.",
+    "deleted": "Pasta excluída",
+    "created": "Pasta \"{name}\" criada",
+    "cardAdded": "Carta adicionada à pasta",
+    "cardRemoved": "Carta removida da pasta",
+    "errors": {
+      "load": "Erro ao carregar pastas",
+      "create": "Erro ao criar pasta",
+      "delete": "Erro ao excluir pasta"
     }
   },
 

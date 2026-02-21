@@ -55,6 +55,12 @@ const router = createRouter({
             meta: { requiresAuth: true },
         },
         {
+            path: '/market',
+            name: 'market',
+            component: () => import('../views/MarketView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
             path: '/saved-matches',
             name: 'savedMatches',
             component: () => import('../views/SavedMatchesView.vue'),

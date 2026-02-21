@@ -268,7 +268,8 @@
       "messages": "Mensajes",
       "contacts": "Contactos",
       "wishlist": "Wishlist",
-      "matches": "Matches"
+      "matches": "Matches",
+      "market": "Mercado"
     },
     "profile": {
       "myProfile": "Mi Perfil",
@@ -365,7 +366,8 @@
     "wishlistCount": "{count} en wishlist",
     "tabs": {
       "collection": "MI COLECCIÓN",
-      "decks": "MAZOS"
+      "decks": "MAZOS",
+      "binders": "CARPETAS"
     },
     "fab": {
       "addCard": "Agregar carta"
@@ -1729,6 +1731,130 @@
       "next": "SIGUIENTE",
       "prev": "ATRÁS",
       "done": "¡VAMOS!"
+    }
+  },
+
+  "market": {
+    "title": "MERCADO",
+    "subtitle": "Movimientos de precio, staples por formato y tendencias",
+    "tabs": {
+      "movers": "MOVIMIENTOS",
+      "staples": "STAPLES",
+      "portfolio": "MIS CARTAS"
+    },
+    "movers": {
+      "winners": "SUBIDAS",
+      "losers": "BAJADAS",
+      "types": {
+        "average_regular": "Promedio Regular",
+        "average_foil": "Promedio Foil",
+        "market_regular": "Mercado Regular",
+        "market_foil": "Mercado Foil"
+      },
+      "table": {
+        "rank": "#",
+        "card": "Carta",
+        "set": "Edición",
+        "was": "Antes",
+        "now": "Ahora",
+        "change": "Cambio"
+      },
+      "empty": "No hay datos de movimientos aún. Se actualizan cada 6 horas.",
+      "typeLabel": "Tipo de precio"
+    },
+    "staples": {
+      "categories": {
+        "overall": "General",
+        "creatures": "Criaturas",
+        "spells": "Hechizos",
+        "lands": "Tierras"
+      },
+      "formats": {
+        "standard": "Standard",
+        "modern": "Modern",
+        "pioneer": "Pioneer",
+        "legacy": "Legacy",
+        "vintage": "Vintage",
+        "pauper": "Pauper",
+        "commander": "Commander"
+      },
+      "table": {
+        "rank": "#",
+        "card": "Carta",
+        "percentDecks": "% Mazos",
+        "avgCopies": "Copias Prom."
+      },
+      "empty": "No hay datos de staples aún. Se actualizan cada 12 horas.",
+      "formatLabel": "Formato",
+      "categoryLabel": "Categoría"
+    },
+    "search": "Buscar cartas...",
+    "sort": {
+      "label": "Ordenar por",
+      "change": "% Cambio",
+      "price": "Precio"
+    },
+    "setFilter": {
+      "all": "Todas las ediciones",
+      "label": "Edici\u00f3n"
+    },
+    "pagination": {
+      "showing": "Mostrando {from}\u2013{to} de {total}",
+      "page": "{current} / {total}"
+    },
+    "lastUpdated": "Actualizado: {date}",
+    "portfolio": {
+      "totalChange": "Impacto en portafolio",
+      "affected": "{count} cartas afectadas",
+      "up": "{count} subieron",
+      "down": "{count} bajaron",
+      "empty": "Ninguna de tus cartas coincide con los movimientos de precio actuales.",
+      "sortImpact": "$ Impacto",
+      "sortPercent": "% Cambio",
+      "table": {
+        "card": "Carta",
+        "set": "Edición",
+        "qty": "Cant",
+        "was": "Antes",
+        "now": "Ahora",
+        "change": "% Cambio",
+        "impact": "Impacto"
+      },
+      "loginRequired": "Inicia sesión para ver cómo los movimientos de precio afectan tu colección."
+    },
+    "errors": {
+      "loadMovers": "Error al cargar movimientos de precio",
+      "loadStaples": "Error al cargar staples del formato"
+    }
+  },
+
+  "binders": {
+    "create": {
+      "title": "NUEVA CARPETA",
+      "subtitle": "Organiza tus cartas en una carpeta",
+      "name": "Nombre de la carpeta",
+      "namePlaceholder": "Mi Carpeta",
+      "description": "Descripción",
+      "descPlaceholder": "¿Qué hay en esta carpeta?",
+      "submit": "CREAR",
+      "cancel": "CANCELAR"
+    },
+    "header": {
+      "delete": "ELIMINAR",
+      "confirmDelete": "¿Eliminar carpeta \"{name}\"? Las cartas permanecerán en tu colección.",
+      "public": "PÚBLICA",
+      "forSale": "EN VENTA"
+    },
+    "empty": "No hay cartas en esta carpeta aún. Busca y agrega cartas arriba.",
+    "noBinders": "No tienes carpetas aún. Crea una para empezar a organizar tus cartas.",
+    "deleted": "Carpeta eliminada",
+    "created": "Carpeta \"{name}\" creada",
+    "cardAdded": "Carta agregada a la carpeta",
+    "cardRemoved": "Carta removida de la carpeta",
+    "errors": {
+      "load": "Error al cargar carpetas",
+      "create": "Error al crear carpeta",
+      "delete": "Error al eliminar carpeta"
     }
   },
 

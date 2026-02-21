@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { useBindersStore } from '../stores/binders'
 import { useCollectionStore } from '../stores/collection'
 import { useDecksStore } from '../stores/decks'
 import type { Card, CardCondition, CardWithAllocation, DeckAllocation } from '../types/card'
@@ -19,11 +20,12 @@ export interface CardMatchCriteria {
 }
 
 export function useCardAllocation() {
+    const bindersStore = useBindersStore()
     const collectionStore = useCollectionStore()
     const decksStore = useDecksStore()
 
     /**
-     * Memoized allocation index - builds once when decks change, O(1) lookups after
+     * Memoized allocation index - builds once when decks/binders change, O(1) lookups after
      * Key: cardId, Value: array of DeckAllocation
      */
     const allocationIndex = computed((): Map<string, DeckAllocation[]> => {
@@ -39,6 +41,21 @@ export function useCardAllocation() {
                     deckName: deck.name,
                     quantity: alloc.quantity,
                     isInSideboard: alloc.isInSideboard,
+                })
+                index.set(alloc.cardId, existing)
+            }
+        }
+
+        for (const binder of bindersStore.binders) {
+            if (!binder.allocations) continue
+
+            for (const alloc of binder.allocations) {
+                const existing = index.get(alloc.cardId) || []
+                existing.push({
+                    deckId: binder.id,
+                    deckName: binder.name,
+                    quantity: alloc.quantity,
+                    isInSideboard: false,
                 })
                 index.set(alloc.cardId, existing)
             }

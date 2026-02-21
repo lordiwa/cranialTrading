@@ -268,7 +268,8 @@
       "messages": "Messages",
       "contacts": "Contacts",
       "wishlist": "Wishlist",
-      "matches": "Matches"
+      "matches": "Matches",
+      "market": "Market"
     },
     "profile": {
       "myProfile": "My Profile",
@@ -365,7 +366,8 @@
     "wishlistCount": "{count} in wishlist",
     "tabs": {
       "collection": "MY COLLECTION",
-      "decks": "DECKS"
+      "decks": "DECKS",
+      "binders": "BINDERS"
     },
     "fab": {
       "addCard": "Add card"
@@ -1729,6 +1731,130 @@
       "next": "NEXT",
       "prev": "BACK",
       "done": "LET'S GO!"
+    }
+  },
+
+  "market": {
+    "title": "MARKET INSIGHTS",
+    "subtitle": "Price movers, format staples, and market trends",
+    "tabs": {
+      "movers": "MOVERS",
+      "staples": "STAPLES",
+      "portfolio": "MY CARDS"
+    },
+    "movers": {
+      "winners": "WINNERS",
+      "losers": "LOSERS",
+      "types": {
+        "average_regular": "Avg Regular",
+        "average_foil": "Avg Foil",
+        "market_regular": "Market Regular",
+        "market_foil": "Market Foil"
+      },
+      "table": {
+        "rank": "#",
+        "card": "Card",
+        "set": "Set",
+        "was": "Was",
+        "now": "Now",
+        "change": "Chg"
+      },
+      "empty": "No price movers available yet. Data updates every 6 hours.",
+      "typeLabel": "Price type"
+    },
+    "staples": {
+      "categories": {
+        "overall": "Overall",
+        "creatures": "Creatures",
+        "spells": "Spells",
+        "lands": "Lands"
+      },
+      "formats": {
+        "standard": "Standard",
+        "modern": "Modern",
+        "pioneer": "Pioneer",
+        "legacy": "Legacy",
+        "vintage": "Vintage",
+        "pauper": "Pauper",
+        "commander": "Commander"
+      },
+      "table": {
+        "rank": "#",
+        "card": "Card",
+        "percentDecks": "% Decks",
+        "avgCopies": "Avg Copies"
+      },
+      "empty": "No staples data available yet. Data updates every 12 hours.",
+      "formatLabel": "Format",
+      "categoryLabel": "Category"
+    },
+    "search": "Search cards...",
+    "sort": {
+      "label": "Sort by",
+      "change": "% Change",
+      "price": "Price"
+    },
+    "setFilter": {
+      "all": "All sets",
+      "label": "Set"
+    },
+    "pagination": {
+      "showing": "Showing {from}\u2013{to} of {total}",
+      "page": "{current} / {total}"
+    },
+    "lastUpdated": "Last updated: {date}",
+    "portfolio": {
+      "totalChange": "Portfolio impact",
+      "affected": "{count} cards affected",
+      "up": "{count} up",
+      "down": "{count} down",
+      "empty": "None of your cards match current price movers. Load your collection and check back later.",
+      "sortImpact": "$ Impact",
+      "sortPercent": "% Change",
+      "table": {
+        "card": "Card",
+        "set": "Set",
+        "qty": "Qty",
+        "was": "Was",
+        "now": "Now",
+        "change": "% Chg",
+        "impact": "Impact"
+      },
+      "loginRequired": "Log in to see how price movements affect your collection."
+    },
+    "errors": {
+      "loadMovers": "Failed to load price movers",
+      "loadStaples": "Failed to load format staples"
+    }
+  },
+
+  "binders": {
+    "create": {
+      "title": "NEW BINDER",
+      "subtitle": "Organize your cards into a binder",
+      "name": "Binder name",
+      "namePlaceholder": "My Binder",
+      "description": "Description",
+      "descPlaceholder": "What's in this binder?",
+      "submit": "CREATE",
+      "cancel": "CANCEL"
+    },
+    "header": {
+      "delete": "DELETE",
+      "confirmDelete": "Delete binder \"{name}\"? Cards will stay in your collection.",
+      "public": "PUBLIC",
+      "forSale": "FOR SALE"
+    },
+    "empty": "No cards in this binder yet. Search and add cards above.",
+    "noBinders": "You have no binders yet. Create one to start organizing your cards.",
+    "deleted": "Binder deleted",
+    "created": "Binder \"{name}\" created",
+    "cardAdded": "Card added to binder",
+    "cardRemoved": "Card removed from binder",
+    "errors": {
+      "load": "Failed to load binders",
+      "create": "Failed to create binder",
+      "delete": "Failed to delete binder"
     }
   },
 

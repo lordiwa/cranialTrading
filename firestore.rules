@@ -79,6 +79,12 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
+
+      // Binders del usuario
+      match /binders/{binderId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
     }
 
     // ========== COLECCIONES PÚBLICAS PARA MATCHES OPTIMIZADOS ==========
@@ -144,6 +150,16 @@ service cloud.firestore {
     match /contactos_guardados/{userId}/{contactId} {
       allow read: if request.auth != null;
       allow write: if request.auth.uid == userId;
+    }
+
+    // ========== MARKET DATA (read-only, populated by Cloud Functions) ==========
+    match /market_data/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /{subcol}/{subDocId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
     }
 
     // Denegar todo lo demás por defecto

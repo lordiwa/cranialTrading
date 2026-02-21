@@ -32,7 +32,9 @@ const handleCardSelected = (card: any) => {
   showAddCardModal.value = true
 }
 
-const handleBack = () => { router.push('/collection') }
+const handleBack = () => {
+  router.push({ path: '/collection' })
+}
 </script>
 
 <template>

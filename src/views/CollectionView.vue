@@ -19,11 +19,14 @@ import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import CollectionGrid from '../components/collection/CollectionGrid.vue'
 import CollectionTotalsPanel from '../components/collection/CollectionTotalsPanel.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
+import CreateBinderModal from '../components/binders/CreateBinderModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
+import type { CreateBinderInput } from '../types/binder'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import type { DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
+import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { getCardsByIds, searchCards } from '../services/scryfall'
@@ -32,13 +35,15 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
-import { colorOrder, getCardColorCategory, getCardManaCategory, getCardTypeCategory, manaOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
+import LocalFilterModal from '../components/ui/LocalFilterModal.vue'
+import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { useCollectionTotals } from '../composables/useCollectionTotals'
 
 const route = useRoute()
 const router = useRouter()
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
+const binderStore = useBindersStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
 const { t } = useI18n()
@@ -51,7 +56,10 @@ const showAddCardModal = ref(false)
 const showCardDetailModal = ref(false)
 const showManageDecksModal = ref(false)
 const showCreateDeckModal = ref(false)
+const showCreateBinderModal = ref(false)
 const showImportDeckModal = ref(false)
+const showImportBinderModal = ref(false)
+const showLocalFilters = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
@@ -145,8 +153,8 @@ const uniqueCardCount = computed(() => {
   return names.size
 })
 
-// Vista principal: Colección o Mazos
-type ViewMode = 'collection' | 'decks'
+// Vista principal: Colección, Mazos o Carpetas
+type ViewMode = 'collection' | 'decks' | 'binders'
 const viewMode = ref<ViewMode>('collection')
 
 // Cambiar a modo mazos y seleccionar un deck
@@ -168,6 +176,34 @@ const switchToCollection = () => {
   viewMode.value = 'collection'
   deckFilter.value = 'all'
 }
+
+// ========== BINDER STATE ==========
+const binderFilter = ref<string>('all')
+const isDeletingBinder = ref(false)
+
+const switchToBinders = (binderId?: string) => {
+  viewMode.value = 'binders'
+  if (binderId) {
+    binderFilter.value = binderId
+  } else {
+    const first = binderStore.binders[0]
+    if (first && binderFilter.value === 'all') {
+      binderFilter.value = first.id
+    }
+  }
+}
+
+const bindersList = computed(() => binderStore.binders)
+
+const selectedBinder = computed(() => {
+  if (binderFilter.value === 'all') return null
+  return binderStore.binders.find(b => b.id === binderFilter.value) || null
+})
+
+const binderDisplayCards = computed(() => {
+  if (!selectedBinder.value) return []
+  return binderStore.hydrateBinderCards(selectedBinder.value, collectionStore.cards)
+})
 
 // ========== IMPORT PROGRESS STATE ==========
 interface ImportState {
@@ -534,11 +570,33 @@ const {
   selectedColors,
   selectedManaValues,
   selectedTypes,
+  selectedRarities,
+  toggleColor,
+  toggleMana,
+  toggleType,
+  toggleRarity,
   hasActiveFilters,
   filteredCards,
   groupedCards: groupedFilteredCards,
   translateCategory,
 } = useCardFilter(statusFilteredCards)
+
+// Active chip filter count for badge
+const activeChipFilterCount = computed(() => {
+  let count = 0
+  if (selectedColors.value.size < colorOrder.length) count++
+  if (selectedManaValues.value.size < manaOrder.length) count++
+  if (selectedTypes.value.size < typeOrder.length) count++
+  if (selectedRarities.value.size < rarityOrder.length) count++
+  return count
+})
+
+const resetAllChipFilters = () => {
+  selectedColors.value = new Set(colorOrder)
+  selectedManaValues.value = new Set(manaOrder)
+  selectedTypes.value = new Set(typeOrder)
+  selectedRarities.value = new Set(rarityOrder)
+}
 
 // Wishlist grouping — reuses the same filter state from the main composable
 const passesChipFilters = (card: Card): boolean => {
@@ -548,6 +606,8 @@ const passesChipFilters = (card: Card): boolean => {
   if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
   const type = getCardTypeCategory(card)
   if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !selectedTypes.value.has(type)) return false
+  const rarity = getCardRarityCategory(card)
+  if (selectedRarities.value.size > 0 && selectedRarities.value.size < rarityOrder.length && !selectedRarities.value.has(rarity)) return false
   return true
 }
 
@@ -774,6 +834,31 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
   return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
 })
 
+// Text-search filtered versions of deck/binder display cards (filterQuery is handled by useCardFilter for collection mode only)
+const filteredMainboardDisplayCards = computed(() => {
+  if (!filterQuery.value.trim()) return mainboardDisplayCards.value
+  const q = filterQuery.value.toLowerCase()
+  return mainboardDisplayCards.value.filter(c =>
+    c.name.toLowerCase().includes(q) || c.edition.toLowerCase().includes(q)
+  )
+})
+
+const filteredSideboardDisplayCards = computed(() => {
+  if (!filterQuery.value.trim()) return sideboardDisplayCards.value
+  const q = filterQuery.value.toLowerCase()
+  return sideboardDisplayCards.value.filter(c =>
+    c.name.toLowerCase().includes(q) || c.edition.toLowerCase().includes(q)
+  )
+})
+
+const filteredBinderDisplayCards = computed(() => {
+  if (!filterQuery.value.trim()) return binderDisplayCards.value
+  const q = filterQuery.value.toLowerCase()
+  return binderDisplayCards.value.filter(c =>
+    c.name.toLowerCase().includes(q) || c.edition.toLowerCase().includes(q)
+  )
+})
+
 // filteredCards is provided by useCardFilter composable (text search + sort + chip filters)
 
 // Deck costs are now calculated in the DECK PRICE SOURCE section below (deckOwnedCostBySource, etc.)
@@ -915,6 +1000,8 @@ const handleBulkDelete = async () => {
 const handleLocalCardSelect = (card: Card) => {
   if (viewMode.value === 'decks' && deckFilter.value !== 'all') {
     quickAllocateCardToDeck(card)
+  } else if (viewMode.value === 'binders' && binderFilter.value !== 'all') {
+    quickAllocateCardToBinder(card)
   } else {
     selectedCard.value = card
     showCardDetailModal.value = true
@@ -945,13 +1032,9 @@ const handleScryfallSuggestionSelect = async (cardName: string) => {
   }
 }
 
-// Click on "Advanced search" → navigate to /search
+// Click on "Advanced search" → navigate to /search (collection mode only)
 const handleOpenAdvancedSearch = () => {
-  const query: Record<string, string> = {}
-  if (deckFilter.value !== 'all') {
-    query.deck = deckFilter.value
-  }
-  router.push({ path: '/search', query })
+  router.push({ path: '/search' })
 }
 
 // Cerrar modal de agregar carta y limpiar URL
@@ -1104,6 +1187,99 @@ const handleDeckGridAddToWishlist = (_displayCard: DisplayDeckCard) => {
 const handleDeckGridToggleCommander = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
   await decksStore.toggleCommander(selectedDeck.value.id, displayCard.name)
+}
+
+// ========== BINDER EVENT HANDLERS ==========
+
+const handleCreateBinder = async (data: CreateBinderInput) => {
+  const binderId = await binderStore.createBinder(data)
+  if (binderId) {
+    showCreateBinderModal.value = false
+    viewMode.value = 'binders'
+    binderFilter.value = binderId
+  }
+}
+
+const toggleBinderPublic = async () => {
+  if (!selectedBinder.value) return
+  await binderStore.updateBinder(selectedBinder.value.id, { isPublic: !selectedBinder.value.isPublic })
+}
+
+const toggleBinderForSale = async () => {
+  if (!selectedBinder.value) return
+  await binderStore.updateBinder(selectedBinder.value.id, { forSale: !selectedBinder.value.forSale })
+}
+
+const handleDeleteBinder = async () => {
+  if (!selectedBinder.value) return
+
+  const confirmed = await confirmStore.show({
+    title: t('binders.header.delete'),
+    message: t('binders.header.confirmDelete', { name: selectedBinder.value.name }),
+    confirmText: t('binders.header.delete'),
+    cancelText: t('binders.create.cancel'),
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
+
+  isDeletingBinder.value = true
+  const binderId = selectedBinder.value.id
+  const success = await binderStore.deleteBinder(binderId)
+  isDeletingBinder.value = false
+
+  if (success) {
+    const remaining = binderStore.binders
+    if (remaining.length > 0) {
+      binderFilter.value = remaining[0]!.id
+    } else {
+      binderFilter.value = 'all'
+    }
+  }
+}
+
+const handleBinderGridEdit = async (displayCard: DisplayDeckCard) => {
+  if (!displayCard.isWishlist) {
+    const card = collectionStore.cards.find(c => c.id === displayCard.cardId)
+    if (card) {
+      selectedCard.value = card
+      showCardDetailModal.value = true
+    }
+  }
+}
+
+const handleBinderGridRemove = async (displayCard: DisplayDeckCard) => {
+  if (!selectedBinder.value) return
+
+  const confirmed = await confirmStore.show({
+    title: t('binders.cardRemoved'),
+    message: `Remove "${displayCard.name}" from binder?`,
+    confirmText: t('binders.header.delete'),
+    cancelText: t('binders.create.cancel'),
+    confirmVariant: 'danger'
+  })
+
+  if (!confirmed) return
+
+  await binderStore.deallocateCard(selectedBinder.value.id, displayCard.cardId)
+  toastStore.show(t('binders.cardRemoved'), 'success')
+}
+
+const handleBinderGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQuantity: number) => {
+  if (!selectedBinder.value) return
+
+  const cardId = displayCard.cardId
+  if (cardId) {
+    await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity)
+  }
+}
+
+const quickAllocateCardToBinder = async (card: Card) => {
+  if (binderFilter.value === 'all') return
+  const allocated = await binderStore.allocateCardToBinder(binderFilter.value, card.id, 1)
+  if (allocated > 0) {
+    toastStore.show(t('binders.cardAdded'), 'success')
+  }
 }
 
 // ========== DECK MANAGEMENT ==========
@@ -1662,6 +1838,375 @@ const handleImportCsv = async (
   }
 }
 
+// ========== BINDER IMPORT HANDLERS ==========
+
+// Import binder from text list
+const handleImportBinder = async (
+  deckText: string,
+  condition: CardCondition,
+  includeSideboard: boolean,
+  deckName?: string,
+  _makePublic?: boolean,
+  _format?: DeckFormat,
+  _commander?: string,
+  status?: CardStatus
+) => {
+  const finalName = deckName || `Binder${Date.now()}`
+  showImportBinderModal.value = false
+  toastStore.show(`Importing "${finalName}"...`, 'info')
+
+  const lines = deckText.split('\n').filter(l => l.trim())
+  const collectionCardsToAdd: any[] = []
+  let inSideboard = false
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    if (trimmed.toLowerCase().includes('sideboard')) { inSideboard = true; continue }
+
+    const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
+    const matchQty = match?.[1]
+    const matchName = match?.[2]
+    if (!match || !matchQty || !matchName) continue
+
+    const quantity = Number.parseInt(matchQty)
+    let cardName = matchName.trim()
+    const setCode = match[3] || null
+    const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
+
+    cardName = cleanCardName(cardName)
+    if (inSideboard && !includeSideboard) continue
+
+    const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
+
+    const cardData: any = {
+      scryfallId: scryfallData?.scryfallId || '',
+      name: cardName,
+      edition: scryfallData?.edition || setCode || 'Unknown',
+      quantity,
+      condition,
+      foil: isFoil,
+      price: scryfallData?.price || 0,
+      image: scryfallData?.image || '',
+      status: status || 'collection',
+      public: false,
+      cmc: scryfallData?.cmc,
+      type_line: scryfallData?.type_line,
+      colors: scryfallData?.colors || [],
+    }
+    if (scryfallData?.setCode || setCode) {
+      cardData.setCode = scryfallData?.setCode || setCode
+    }
+    collectionCardsToAdd.push(cardData)
+  }
+
+  const binderId = await binderStore.createBinder({ name: finalName, description: '' })
+
+  if (collectionCardsToAdd.length > 0) {
+    await collectionStore.confirmImport(collectionCardsToAdd)
+    await collectionStore.loadCollection()
+
+    if (binderId) {
+      const bulkItems = collectionCardsToAdd
+        .map(cardData => {
+          const collectionCard = collectionStore.cards.find(
+            c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+          )
+          return collectionCard ? { cardId: collectionCard.id, quantity: cardData.quantity } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+
+      await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+    }
+  }
+
+  toastStore.show(`Binder "${finalName}" imported with ${collectionCardsToAdd.length} cards`, 'success')
+  if (binderId) {
+    viewMode.value = 'binders'
+    binderFilter.value = binderId
+  }
+}
+
+// Import binder from Moxfield (batch API)
+const handleImportBinderDirect = async (
+  cards: any[],
+  deckName: string | undefined,
+  condition: CardCondition,
+  _makePublic?: boolean,
+  _format?: DeckFormat,
+  _commander?: string,
+  status?: CardStatus
+) => {
+  const finalName = deckName || `Binder${Date.now()}`
+  showImportBinderModal.value = false
+
+  const progressToast = toastStore.showProgress(`Importing "${finalName}"...`, 0)
+
+  try {
+    // Create binder
+    progressToast.update(5, `Creating binder "${finalName}"...`)
+    const binderId = await binderStore.createBinder({ name: finalName, description: '' })
+
+    if (!binderId) {
+      progressToast.error('Error creating binder')
+      return
+    }
+
+    viewMode.value = 'binders'
+    binderFilter.value = binderId
+
+    // Batch fetch Scryfall data
+    progressToast.update(10, `Fetching ${cards.length} cards...`)
+    const identifiers: { id: string }[] = []
+    const cardIndexMap = new Map<string, number[]>()
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i]
+      if (card.scryfallId) {
+        if (!cardIndexMap.has(card.scryfallId)) {
+          cardIndexMap.set(card.scryfallId, [])
+          identifiers.push({ id: card.scryfallId })
+        }
+        cardIndexMap.get(card.scryfallId)!.push(i)
+      }
+    }
+
+    progressToast.update(15, `Fetching data for ${identifiers.length} cards...`)
+    const scryfallDataMap = new Map<string, any>()
+    if (identifiers.length > 0) {
+      const scryfallCards = await getCardsByIds(identifiers)
+      for (const sc of scryfallCards) {
+        scryfallDataMap.set(sc.id, sc)
+      }
+    }
+    progressToast.update(25, `Processing cards...`)
+
+    // Process each card
+    const collectionCardsToAdd: any[] = []
+    const cardsNeedingSearch: number[] = []
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i]
+      let cardName = card.name
+      const isFoil = /\*[fF]\*?\s*$/.test(cardName)
+      if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+
+      let image = ''
+      let price = 0
+      const finalScryfallId = card.scryfallId || ''
+      let finalEdition = card.setCode || 'Unknown'
+      let cmc: number | undefined = undefined
+      let type_line: string | undefined = undefined
+      let colors: string[] = []
+
+      if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
+        const scryfallCard = scryfallDataMap.get(card.scryfallId)
+        image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
+        price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
+        finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
+        cmc = scryfallCard.cmc
+        type_line = scryfallCard.type_line
+        colors = scryfallCard.colors || []
+      }
+
+      if (price === 0 || !image) {
+        cardsNeedingSearch.push(i)
+      }
+
+      collectionCardsToAdd.push({
+        scryfallId: finalScryfallId,
+        name: cardName,
+        edition: finalEdition,
+        quantity: card.quantity,
+        condition,
+        foil: isFoil,
+        price,
+        image,
+        status: status || 'collection',
+        public: false,
+        cmc,
+        type_line,
+        colors,
+      })
+
+      const processPercent = 25 + Math.round((i / cards.length) * 20)
+      progressToast.update(processPercent, `Processing ${i + 1}/${cards.length}...`)
+    }
+
+    // Search for cards missing price/image
+    progressToast.update(45, `Fetching additional prices...`)
+    if (cardsNeedingSearch.length > 0) {
+      for (const idx of cardsNeedingSearch) {
+        const cardData = collectionCardsToAdd[idx]
+        try {
+          const results = await searchCards(`!"${cardData.name}"`)
+          const printWithPrice = results.find(r =>
+            r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
+            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+          ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
+
+          if (printWithPrice?.prices?.usd) {
+            cardData.scryfallId = printWithPrice.id
+            cardData.edition = printWithPrice.set.toUpperCase()
+            cardData.price = Number.parseFloat(printWithPrice.prices.usd)
+            cardData.image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
+            cardData.cmc = printWithPrice.cmc
+            cardData.type_line = printWithPrice.type_line
+            cardData.colors = printWithPrice.colors || []
+          } else if (results.length > 0 && !cardData.image) {
+            const anyPrint = results[0]
+            if (anyPrint) {
+              cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
+              if (!cardData.scryfallId) cardData.scryfallId = anyPrint.id
+              if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
+              cardData.cmc = anyPrint.cmc
+              cardData.type_line = anyPrint.type_line
+              cardData.colors = anyPrint.colors || []
+            }
+          }
+        } catch (e) {
+          console.warn(`[Binder Import] Failed to search for "${cardData.name}":`, e)
+        }
+      }
+    }
+
+    // Import cards to collection
+    progressToast.update(50, `Saving ${collectionCardsToAdd.length} cards...`)
+    let allocatedCount = 0
+
+    if (collectionCardsToAdd.length > 0) {
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      progressToast.update(60, `Allocating cards to binder...`)
+
+      const bulkItems = createdCardIds
+        .map((cardId, i) => {
+          const meta = collectionCardsToAdd[i]
+          return cardId && meta ? { cardId, quantity: meta.quantity } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+
+      progressToast.update(65, `Allocating ${bulkItems.length} cards to binder...`)
+      allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+    }
+
+    await binderStore.loadBinders()
+    progressToast.complete(`"${finalName}" imported with ${allocatedCount} cards`)
+  } catch (error) {
+    console.error('[Binder Import] Error:', error)
+    progressToast.error('Error importing binder')
+  }
+}
+
+// Import binder from CSV
+const handleImportBinderCsv = async (
+  cards: ParsedCsvCard[],
+  deckName?: string,
+  _makePublic?: boolean,
+  _format?: DeckFormat,
+  _commander?: string,
+  status?: CardStatus
+) => {
+  const finalName = deckName || `Binder CSV ${Date.now()}`
+  showImportBinderModal.value = false
+
+  const progressToast = toastStore.showProgress(`Importing "${finalName}"...`, 0)
+
+  try {
+    // Create binder
+    progressToast.update(5, `Creating binder "${finalName}"...`)
+    const binderId = await binderStore.createBinder({ name: finalName, description: '' })
+
+    if (!binderId) {
+      progressToast.error('Error creating binder')
+      return
+    }
+
+    viewMode.value = 'binders'
+    binderFilter.value = binderId
+
+    // Batch fetch Scryfall data
+    progressToast.update(10, `Fetching data for ${cards.length} cards...`)
+    const identifiers = cards
+      .filter(c => c.scryfallId)
+      .map(c => ({ id: c.scryfallId }))
+    const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
+
+    const scryfallDataMap = new Map<string, any>()
+    if (uniqueIds.length > 0) {
+      const scryfallCards = await getCardsByIds(uniqueIds)
+      for (const sc of scryfallCards) {
+        scryfallDataMap.set(sc.id, sc)
+      }
+    }
+    progressToast.update(25, `Processing ${cards.length} cards...`)
+
+    // Build collection cards
+    const collectionCardsToAdd: any[] = []
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i]!
+      const sc = scryfallDataMap.get(card.scryfallId)
+      let image = sc?.image_uris?.normal || ''
+      if (!image && sc?.card_faces?.length > 0) {
+        image = sc.card_faces[0]?.image_uris?.normal || ''
+      }
+      const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
+
+      const cardData: any = {
+        scryfallId: card.scryfallId || '',
+        name: card.name,
+        edition: sc?.set_name || card.setCode || 'Unknown',
+        quantity: card.quantity,
+        condition: card.condition,
+        foil: card.foil,
+        price,
+        image,
+        status: status || 'collection',
+        public: false,
+        cmc: sc?.cmc,
+        type_line: sc?.type_line,
+        colors: sc?.colors || [],
+      }
+      if (card.setCode) {
+        cardData.setCode = card.setCode.toUpperCase()
+      }
+      if (card.language) {
+        cardData.language = card.language
+      }
+      collectionCardsToAdd.push(cardData)
+
+      if (i % 50 === 0) {
+        const pct = 25 + Math.round((i / cards.length) * 20)
+        progressToast.update(pct, `Processing ${i + 1}/${cards.length}...`)
+      }
+    }
+
+    // Save to collection
+    progressToast.update(50, `Saving ${collectionCardsToAdd.length} cards...`)
+    let allocatedCount = 0
+
+    if (collectionCardsToAdd.length > 0) {
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      progressToast.update(60, `Allocating cards to binder...`)
+
+      const bulkItems = createdCardIds
+        .map((cardId, i) => {
+          const meta = collectionCardsToAdd[i]
+          return cardId && meta ? { cardId, quantity: meta.quantity } : null
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+
+      allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+    }
+
+    await binderStore.loadBinders()
+    progressToast.complete(`"${finalName}" imported with ${allocatedCount} cards`)
+  } catch (error) {
+    console.error('[Binder CSV Import] Error:', error)
+    progressToast.error('Error importing CSV')
+  }
+}
+
 // Execute delete deck with progress tracking (can resume)
 const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isResume = false) => {
   // Prevent duplicate executions (only check if not a resume with existing toast)
@@ -2048,13 +2593,30 @@ onMounted(async () => {
   try {
     await Promise.all([
       collectionStore.loadCollection(),
-      decksStore.loadDecks()
+      decksStore.loadDecks(),
+      binderStore.loadBinders()
     ])
+
+    // Check for view mode query param (from search redirect)
+    const fromParam = route.query.from as string
+    if (fromParam === 'decks') {
+      viewMode.value = 'decks'
+    } else if (fromParam === 'binders') {
+      viewMode.value = 'binders'
+    }
 
     // Check for deck query param (from redirected deck routes)
     const deckParam = route.query.deck as string
     if (deckParam && decksStore.decks.some(d => d.id === deckParam)) {
+      viewMode.value = 'decks'
       deckFilter.value = deckParam
+    }
+
+    // Check for binder query param (from search redirect)
+    const binderParam = route.query.binder as string
+    if (binderParam && binderStore.binders.some(b => b.id === binderParam)) {
+      viewMode.value = 'binders'
+      binderFilter.value = binderParam
     }
 
     // Check for incomplete imports
@@ -2167,6 +2729,8 @@ const handleKeyboardShortcut = (e: KeyboardEvent) => {
       showCreateDeckModal.value = false
     } else if (showImportDeckModal.value) {
       showImportDeckModal.value = false
+    } else if (showImportBinderModal.value) {
+      showImportBinderModal.value = false
     }
   }
 }
@@ -2202,7 +2766,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ========== CONTENIDO PRINCIPAL ========== -->
-    <div :class="['mt-6', viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) ? 'pb-20' : '']">
+    <div :class="['mt-6', viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? 'pb-20' : '']">
       <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
@@ -2230,6 +2794,18 @@ onUnmounted(() => {
             >
               {{ t('collection.tabs.decks') }}
               <span class="ml-1 opacity-70">{{ decksList.length }}</span>
+            </button>
+            <button
+                @click="switchToBinders()"
+                :class="[
+                  'px-6 py-3 text-body font-bold transition-150 border-2',
+                  viewMode === 'binders'
+                    ? 'bg-neon text-primary border-neon'
+                    : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
+                ]"
+            >
+              {{ t('collection.tabs.binders') }}
+              <span class="ml-1 opacity-70">{{ bindersList.length }}</span>
             </button>
           </div>
 
@@ -2280,6 +2856,40 @@ onUnmounted(() => {
             <div class="flex gap-2 mt-3">
               <BaseButton size="small" @click="showCreateDeckModal = true">{{ t('collection.actions.createDeck') }}</BaseButton>
               <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">{{ t('collection.actions.import') }}</BaseButton>
+            </div>
+          </div>
+
+          <!-- ========== BINDER SUB-TABS (solo en modo binders) ========== -->
+          <div v-if="viewMode === 'binders'" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon">
+            <button
+                v-for="binder in bindersList"
+                :key="binder.id"
+                @click="binderFilter = binder.id"
+                class="px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2"
+                :class="[
+                  binderFilter === binder.id
+                    ? 'bg-neon text-primary border-neon'
+                    : 'bg-primary border-silver-30 text-silver-70 hover:border-neon/70'
+                ]"
+            >
+              {{ binder.name }}
+              <span class="ml-1 opacity-70">{{ binder.stats?.totalCards || 0 }}</span>
+            </button>
+            <!-- Botón nueva carpeta -->
+            <button
+                @click="showCreateBinderModal = true"
+                class="px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2 border-dashed border-silver-30 text-silver-50 hover:border-neon hover:text-neon"
+            >
+              {{ t('collection.actions.new') }}
+            </button>
+          </div>
+
+          <!-- Mensaje si no hay binders -->
+          <div v-if="viewMode === 'binders' && bindersList.length === 0" class="pl-4 border-l-4 border-neon py-4">
+            <p class="text-silver-50 text-small">{{ t('binders.noBinders') }}</p>
+            <div class="flex gap-2 mt-3">
+              <BaseButton size="small" @click="showCreateBinderModal = true">{{ t('binders.create.submit') }}</BaseButton>
+              <BaseButton size="small" variant="secondary" @click="showImportBinderModal = true">{{ t('collection.actions.import') }}</BaseButton>
             </div>
           </div>
         </div>
@@ -2339,6 +2949,49 @@ onUnmounted(() => {
           </div>
 </div>
 
+        <!-- ========== BINDER HEADER (cuando hay binder seleccionado) ========== -->
+        <div v-if="viewMode === 'binders' && selectedBinder" class="bg-neon/10 border-2 border-neon p-3 md:p-4 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="text-body md:text-h3 font-bold text-silver">{{ selectedBinder.name }}</h2>
+              <p v-if="selectedBinder.description" class="text-tiny text-silver-50">{{ selectedBinder.description }}</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- Public toggle -->
+              <button
+                  @click="toggleBinderPublic"
+                  class="flex items-center gap-1 px-2 py-1 text-tiny border transition-150"
+                  :class="selectedBinder.isPublic ? 'border-neon text-neon bg-neon/10' : 'border-silver-30 text-silver-50'"
+              >
+                <span>{{ selectedBinder.isPublic ? '&#x1F441;' : '&#x1F512;' }}</span>
+                {{ t('binders.header.public') }}
+              </button>
+              <!-- For Sale toggle -->
+              <button
+                  @click="toggleBinderForSale"
+                  class="flex items-center gap-1 px-2 py-1 text-tiny border transition-150"
+                  :class="selectedBinder.forSale ? 'border-neon text-neon bg-neon/10' : 'border-silver-30 text-silver-50'"
+              >
+                <span>{{ selectedBinder.forSale ? '&#x1F4B0;' : '&#x1F6AB;' }}</span>
+                {{ t('binders.header.forSale') }}
+              </button>
+              <span class="text-silver-30">|</span>
+              <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards || 0 }} cards</span>
+              <span class="text-silver-30">|</span>
+              <span class="text-tiny text-silver-50">${{ (selectedBinder.stats?.totalPrice || 0).toFixed(2) }}</span>
+              <BaseButton size="small" variant="secondary" @click="handleDeleteBinder" :disabled="isDeletingBinder">
+                <template v-if="isDeletingBinder">
+                  <span class="animate-spin inline-block">&#x23F3;</span>
+                </template>
+                <template v-else>
+                  <span class="hidden sm:inline">{{ t('binders.header.delete') }}</span>
+                  <span class="sm:hidden">&#x1F5D1;&#xFE0F;</span>
+                </template>
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+
         <!-- ========== STATUS FILTERS (solo en modo colección) ========== -->
         <div v-if="viewMode === 'collection'" data-tour="status-filters" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
           <div
@@ -2391,11 +3044,27 @@ onUnmounted(() => {
             :selection-mode="selectionMode"
             :show-view-type="viewMode === 'collection'"
             :view-type="viewType"
+            :active-filter-count="activeChipFilterCount"
             @toggle-bulk-select="toggleSelectionMode"
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
             @open-advanced-search="handleOpenAdvancedSearch"
+            @open-filters="showLocalFilters = true"
+        />
+
+        <LocalFilterModal
+            :show="showLocalFilters"
+            :selected-colors="selectedColors"
+            :selected-mana-values="selectedManaValues"
+            :selected-types="selectedTypes"
+            :selected-rarities="selectedRarities"
+            @close="showLocalFilters = false"
+            @toggle-color="toggleColor"
+            @toggle-mana="toggleMana"
+            @toggle-type="toggleType"
+            @toggle-rarity="toggleRarity"
+            @reset-all="resetAllChipFilters"
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->
@@ -2553,13 +3222,13 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->
-        <div v-if="viewMode === 'decks' && selectedDeck && mainboardDisplayCards.length > 0" class="mb-6">
+        <div v-if="viewMode === 'decks' && selectedDeck && filteredMainboardDisplayCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-neon">
             <h3 class="text-small font-bold text-neon">{{ t('collection.sections.mainboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ mainboardOwnedCount + mainboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid
-              :cards="mainboardDisplayCards"
+              :cards="filteredMainboardDisplayCards"
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
@@ -2567,6 +3236,7 @@ onUnmounted(() => {
               :selected-colors="selectedColors"
               :selected-mana-values="selectedManaValues"
               :selected-types="selectedTypes"
+              :selected-rarities="selectedRarities"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
@@ -2576,18 +3246,18 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== SEPARADOR SIDEBOARD ========== -->
-        <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="my-8">
+        <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && filteredSideboardDisplayCards.length > 0" class="my-8">
           <div class="border-t-2 border-dashed border-blue-400/50"></div>
         </div>
 
         <!-- ========== DECK VIEW: SIDEBOARD (Visual Grid) - solo no-commander ========== -->
-        <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && sideboardDisplayCards.length > 0" class="mb-6">
+        <div v-if="viewMode === 'decks' && selectedDeck && !isCommanderFormat && filteredSideboardDisplayCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b border-blue-400/30">
             <h3 class="text-small font-bold text-blue-400">{{ t('collection.sections.sideboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ sideboardOwnedCount + sideboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid
-              :cards="sideboardDisplayCards"
+              :cards="filteredSideboardDisplayCards"
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
@@ -2595,6 +3265,7 @@ onUnmounted(() => {
               :selected-colors="selectedColors"
               :selected-mana-values="selectedManaValues"
               :selected-types="selectedTypes"
+              :selected-rarities="selectedRarities"
               @edit="handleDeckGridEdit"
               @remove="handleDeckGridRemove"
               @update-quantity="handleDeckGridQuantityUpdate"
@@ -2631,10 +3302,34 @@ onUnmounted(() => {
         </div>
 
         <!-- Empty State: Deck sin cartas -->
-        <div v-if="viewMode === 'decks' && selectedDeck && mainboardDisplayCards.length === 0 && sideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
+        <div v-if="viewMode === 'decks' && selectedDeck && filteredMainboardDisplayCards.length === 0 && filteredSideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">{{ t('collection.empty.deckEmpty') }}</p>
             <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.deckNoCards') }}</p>
+          </div>
+        </div>
+
+        <!-- ========== BINDER VIEW: Card Grid ========== -->
+        <div v-if="viewMode === 'binders' && selectedBinder && filteredBinderDisplayCards.length > 0" class="mb-6">
+          <DeckEditorGrid
+              :cards="filteredBinderDisplayCards"
+              :deck-id="selectedBinder.id"
+              :group-by="deckGroupBy"
+              :sort-by="sortBy"
+              :selected-colors="selectedColors"
+              :selected-mana-values="selectedManaValues"
+              :selected-types="selectedTypes"
+              :selected-rarities="selectedRarities"
+              @edit="handleBinderGridEdit"
+              @remove="handleBinderGridRemove"
+              @update-quantity="handleBinderGridQuantityUpdate"
+          />
+        </div>
+
+        <!-- Empty State: Binder sin cartas -->
+        <div v-if="viewMode === 'binders' && selectedBinder && filteredBinderDisplayCards.length === 0" class="flex justify-center items-center h-64">
+          <div class="text-center">
+            <p class="text-small text-silver-70">{{ t('binders.empty') }}</p>
           </div>
         </div>
 
@@ -2681,6 +3376,13 @@ onUnmounted(() => {
         @create="handleCreateDeck"
     />
 
+    <!-- Create Binder Modal -->
+    <CreateBinderModal
+        :show="showCreateBinderModal"
+        @close="showCreateBinderModal = false"
+        @create="handleCreateBinder"
+    />
+
     <!-- Import Deck Modal -->
     <ImportDeckModal
         :show="showImportDeckModal"
@@ -2690,12 +3392,21 @@ onUnmounted(() => {
         @import-csv="handleImportCsv"
     />
 
+    <!-- Import Binder Modal -->
+    <ImportDeckModal
+        :show="showImportBinderModal"
+        @close="showImportBinderModal = false"
+        @import="handleImportBinder"
+        @import-direct="handleImportBinderDirect"
+        @import-csv="handleImportBinderCsv"
+    />
+
     <!-- Floating Action Button (mobile) -->
     <FloatingActionButton
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
-        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) ? '!bottom-28' : ''"
+        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-28' : ''"
     />
 
   </AppContainer>

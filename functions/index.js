@@ -8,8 +8,10 @@
 
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest, onCall, HttpsError} = require("firebase-functions/https");
+const {onSchedule} = require("firebase-functions/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const cheerio = require("cheerio");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -148,5 +150,239 @@ exports.notifyMatchUser = onCall({ cors: true }, async (request) => {
   } catch (error) {
     logger.error('Error in notifyMatchUser:', error);
     throw new HttpsError('internal', 'Failed to create match notification');
+  }
+});
+
+// ========== MARKET DATA FUNCTIONS ==========
+
+const FORMATS = ['standard', 'modern', 'pioneer', 'legacy', 'vintage', 'pauper', 'commander'];
+const MTGSTOCKS_ENDPOINTS = [
+  { type: 'average_regular', url: 'https://api.mtgstocks.com/interests/average/regular' },
+  { type: 'average_foil', url: 'https://api.mtgstocks.com/interests/average/foil' },
+  { type: 'market_regular', url: 'https://api.mtgstocks.com/interests/market/regular' },
+  { type: 'market_foil', url: 'https://api.mtgstocks.com/interests/market/foil' },
+];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Parse MTGGoldfish format-staples page for a given format.
+ * Returns { overall, creatures, spells, lands } arrays.
+ */
+/**
+ * Parse a single MTGGoldfish staples table page.
+ * Works for both the summary page and /full/ pages.
+ */
+function parseStaplesTable($, table) {
+  const cards = [];
+  $(table).find('tr').each((_idx, row) => {
+    const cols = $(row).find('td');
+    if (cols.length === 0) return; // skip thead row
+
+    // td[0]=rank, td[1]=card name (in <a> tag), td[2]=mana cost, td[3]=% decks, td[4]=# played
+    // Lands table has no mana cost column: td[0]=rank, td[1]=name, td[2]=% decks, td[3]=# played
+    const name = $(cols[1]).find('a').first().text().trim();
+    const hasCostCol = cols.length >= 5;
+    const pctCol = hasCostCol ? 3 : 2;
+    const copiesCol = hasCostCol ? 4 : 3;
+
+    const percentDecks = parseFloat($(cols[pctCol]).text().replace('%', '').trim()) || 0;
+    const avgCopies = parseFloat($(cols[copiesCol]).text().trim()) || 0;
+
+    if (name) {
+      cards.push({ name, percentDecks, avgCopies, rank: cards.length + 1 });
+    }
+  });
+  return cards;
+}
+
+async function parseFormatStaples(format) {
+  const categoryKeys = ['all', 'creatures', 'spells', 'lands'];
+  const categoryNames = ['overall', 'creatures', 'spells', 'lands'];
+  const categories = {};
+
+  for (let i = 0; i < categoryKeys.length; i++) {
+    const url = `https://www.mtggoldfish.com/format-staples/${format}/full/${categoryKeys[i]}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html',
+      },
+    });
+
+    if (!res.ok) {
+      logger.warn(`MTGGoldfish returned ${res.status} for ${format}/${categoryKeys[i]}`);
+      categories[categoryNames[i]] = [];
+      continue;
+    }
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const table = $('table.table-striped').first();
+    categories[categoryNames[i]] = table.length ? parseStaplesTable($, table).slice(0, 50) : [];
+
+    // Rate limit between requests
+    if (i < categoryKeys.length - 1) await sleep(500);
+  }
+
+  return {
+    overall: categories.overall || [],
+    creatures: categories.creatures || [],
+    spells: categories.spells || [],
+    lands: categories.lands || [],
+  };
+}
+
+/**
+ * Fetch price movers from MTGStocks for a given endpoint.
+ * Returns { winners, losers } arrays (top 50 each).
+ */
+async function fetchMoversFromEndpoint(endpoint) {
+  const res = await fetch(endpoint.url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`MTGStocks returned ${res.status} for ${endpoint.type}`);
+  }
+
+  const data = await res.json();
+  const interests = data.interests || [];
+
+  const mapped = interests.map((item) => ({
+    name: item.print?.name || 'Unknown',
+    setName: item.print?.set_name || '',
+    rarity: item.print?.rarity || '',
+    image: item.print?.image || '',
+    pastPrice: item.past_price || 0,
+    presentPrice: item.present_price || 0,
+    percentChange: item.percentage || 0,
+    foil: !!item.foil,
+  }));
+
+  const MIN_DOLLAR_CHANGE = 1.50;
+
+  const winners = mapped
+    .filter((c) => c.percentChange > 0 && (c.presentPrice - c.pastPrice) >= MIN_DOLLAR_CHANGE)
+    .sort((a, b) => b.percentChange - a.percentChange);
+
+  const losers = mapped
+    .filter((c) => c.percentChange < 0 && (c.pastPrice - c.presentPrice) >= MIN_DOLLAR_CHANGE)
+    .sort((a, b) => a.percentChange - b.percentChange);
+
+  return { winners, losers };
+}
+
+/**
+ * scrapeFormatStaples — Scheduled every 12 hours.
+ * Fetches format staples from MTGGoldfish and writes to Firestore.
+ */
+exports.scrapeFormatStaples = onSchedule(
+  { schedule: 'every 12 hours', maxInstances: 1, timeoutSeconds: 300 },
+  async () => {
+    logger.info('Starting scrapeFormatStaples...');
+
+    for (const format of FORMATS) {
+      try {
+        const categories = await parseFormatStaples(format);
+        await db.doc(`market_data/staples/formats/${format}`).set({
+          format,
+          categories,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        logger.info(`Scraped staples for ${format}: ${categories.overall.length} overall cards`);
+      } catch (err) {
+        logger.error(`Failed to scrape ${format}:`, err.message);
+      }
+
+      await sleep(1000);
+    }
+
+    logger.info('scrapeFormatStaples completed.');
+  },
+);
+
+/**
+ * fetchPriceMovers — Scheduled every 6 hours.
+ * Fetches price winners/losers from MTGStocks and writes to Firestore.
+ */
+exports.fetchPriceMovers = onSchedule(
+  { schedule: 'every 6 hours', maxInstances: 1, timeoutSeconds: 60 },
+  async () => {
+    logger.info('Starting fetchPriceMovers...');
+
+    for (const endpoint of MTGSTOCKS_ENDPOINTS) {
+      try {
+        const { winners, losers } = await fetchMoversFromEndpoint(endpoint);
+        await db.doc(`market_data/movers/types/${endpoint.type}`).set({
+          winners,
+          losers,
+          sourceDate: new Date().toISOString().split('T')[0],
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        logger.info(`Fetched movers for ${endpoint.type}: ${winners.length} winners, ${losers.length} losers`);
+      } catch (err) {
+        logger.error(`Failed to fetch ${endpoint.type}:`, err.message);
+      }
+
+      await sleep(500);
+    }
+
+    logger.info('fetchPriceMovers completed.');
+  },
+);
+
+/**
+ * refreshMarketData — HTTP trigger for manual refresh.
+ * Query param: ?type=staples|movers|all
+ */
+exports.refreshMarketData = onRequest({ cors: true, maxInstances: 1, timeoutSeconds: 540 }, async (request, response) => {
+  const type = request.query.type || 'all';
+
+  try {
+    if (type === 'staples' || type === 'all') {
+      logger.info('Manual refresh: staples');
+      for (const format of FORMATS) {
+        try {
+          const categories = await parseFormatStaples(format);
+          await db.doc(`market_data/staples/formats/${format}`).set({
+            format,
+            categories,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          logger.info(`Refreshed staples for ${format}`);
+        } catch (err) {
+          logger.error(`Failed to refresh ${format}:`, err.message);
+        }
+        await sleep(1000);
+      }
+    }
+
+    if (type === 'movers' || type === 'all') {
+      logger.info('Manual refresh: movers');
+      for (const endpoint of MTGSTOCKS_ENDPOINTS) {
+        try {
+          const { winners, losers } = await fetchMoversFromEndpoint(endpoint);
+          await db.doc(`market_data/movers/types/${endpoint.type}`).set({
+            winners,
+            losers,
+            sourceDate: new Date().toISOString().split('T')[0],
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          logger.info(`Refreshed movers for ${endpoint.type}`);
+        } catch (err) {
+          logger.error(`Failed to refresh ${endpoint.type}:`, err.message);
+        }
+        await sleep(500);
+      }
+    }
+
+    response.json({ success: true, type, timestamp: new Date().toISOString() });
+  } catch (error) {
+    logger.error('refreshMarketData error:', error);
+    response.status(500).json({ error: 'Failed to refresh market data' });
   }
 });

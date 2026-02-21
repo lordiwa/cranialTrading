@@ -4,6 +4,7 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useCollectionStore } from '../../stores/collection'
+import { useMarketStore } from '../../stores/market'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
@@ -38,6 +39,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const collectionStore = useCollectionStore()
+const marketStore = useMarketStore()
 const toastStore = useToastStore()
 const togglingPublic = ref(false)
 const showMobileMenu = ref(false)
@@ -259,6 +261,16 @@ const getStatusIconName = (status: string) => {
   }
   return icons[status as keyof typeof icons] || 'check'
 }
+
+// Price mover badge
+const priceChangeData = computed(() => {
+  if (!marketStore.movers) return null
+  const movers = marketStore.moverLookup.get(props.card.name.toLowerCase())
+  if (!movers?.length) return null
+  const isFoilType = marketStore.selectedMoverType.includes('foil')
+  if (isFoilType !== props.card.foil) return null
+  return { percentChange: movers[0]!.percentChange, isPositive: movers[0]!.percentChange > 0 }
+})
 </script>
 
 <template>
@@ -550,9 +562,18 @@ const getStatusIconName = (status: string) => {
       <!-- Multi-source Prices -->
       <div class="space-y-0.5 min-h-[48px]">
         <!-- TCGPlayer Price -->
-        <p class="text-tiny font-bold text-neon">
-          TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
-        </p>
+        <div class="flex items-center gap-1">
+          <p class="text-tiny font-bold text-neon">
+            TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
+          </p>
+          <span
+              v-if="priceChangeData"
+              class="text-[10px] font-bold px-1 rounded"
+              :class="priceChangeData.isPositive ? 'text-neon bg-neon/10' : 'text-rust bg-rust/10'"
+          >
+            {{ priceChangeData.isPositive ? '\u25B2' : '\u25BC' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
+          </span>
+        </div>
         <!-- Card Kingdom Price -->
         <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
           CK: {{ formatPrice(cardKingdomRetail) }}

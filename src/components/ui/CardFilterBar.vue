@@ -10,13 +10,15 @@ const props = withDefaults(defineProps<{
   filterQuery: string
   sortBy: string
   groupBy: string
-  viewMode?: 'collection' | 'decks'
+  viewMode?: 'collection' | 'decks' | 'binders'
   showBulkSelect?: boolean
   selectionMode?: boolean
   showViewType?: boolean
   viewType?: 'stack' | 'visual' | 'texto'
+  activeFilterCount?: number
 }>(), {
   viewMode: 'collection',
+  activeFilterCount: 0,
 })
 
 const emit = defineEmits<{
@@ -28,6 +30,7 @@ const emit = defineEmits<{
   'select-local-card': [card: Card]
   'select-scryfall-card': [cardName: string]
   'open-advanced-search': []
+  'open-filters': []
 }>()
 
 const { t } = useI18n()
@@ -94,8 +97,8 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
           </button>
         </div>
 
-        <!-- Advanced search link -->
-        <button @click="emit('open-advanced-search'); clearSuggestions(); dropdownDismissed = true"
+        <!-- Advanced search link (collection mode only) -->
+        <button v-if="viewMode === 'collection'" @click="emit('open-advanced-search'); clearSuggestions(); dropdownDismissed = true"
           class="w-full px-3 py-2 text-small text-neon hover:bg-neon-10 border-t border-silver-30 flex items-center gap-1">
           <SvgIcon name="search" size="tiny" />
           {{ t('collection.suggestions.advancedSearch') }} →
@@ -126,6 +129,21 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <option value="mana">{{ t('collection.deckStats.mana') }}</option>
         <option value="color">{{ t('collection.deckStats.color') }}</option>
       </select>
+
+      <!-- Local filters button -->
+      <button
+          @click="emit('open-filters')"
+          :class="[
+            'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1 border',
+            activeFilterCount > 0
+              ? 'bg-neon-10 border-neon text-neon'
+              : 'border-silver-30 text-silver-50 hover:text-silver hover:border-neon'
+          ]"
+      >
+        <SvgIcon name="settings" size="tiny" />
+        {{ t('search.filterPanel.moreFilters') }}
+        <span v-if="activeFilterCount > 0" class="bg-neon text-primary px-1 rounded text-tiny">{{ activeFilterCount }}</span>
+      </button>
 
       <!-- View type dropdown -->
       <select

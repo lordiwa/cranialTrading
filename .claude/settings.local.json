@@ -46,7 +46,12 @@
       "Bash(test:*)",
       "Bash(awk:*)",
       "Bash(del \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\\\\views\\\\DeckEditorView.vue\")",
-      "Bash(del \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\\\\views\\\\DeckDetailView.vue\")"
+      "Bash(del \"C:\\\\Users\\\\ASUS\\\\WebstormProjects\\\\cranialTrading\\\\src\\\\views\\\\DeckDetailView.vue\")",
+      "WebFetch(domain:www.mtgstocks.com)",
+      "WebFetch(domain:www.mtggoldfish.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:justtcg.com)"
     ]
   }
 }

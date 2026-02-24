@@ -8,6 +8,7 @@ import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useDecksStore } from '../../stores/decks'
+import { useBindersStore } from '../../stores/binders'
 import { useRouter } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { getCardSuggestions, searchCards } from '../../services/scryfall'
@@ -18,6 +19,7 @@ interface Props {
   show: boolean
   scryfallCard?: any
   selectedDeckId?: string
+  selectedBinderId?: string
 }
 
 const props = defineProps<Props>()
@@ -41,6 +43,7 @@ const toastStore = useToastStore()
 const authStore = useAuthStore()
 const preferencesStore = usePreferencesStore()
 const decksStore = useDecksStore()
+const bindersStore = useBindersStore()
 
 const loading = ref(false)
 
@@ -236,6 +239,15 @@ const handleAddCard = async () => {
         cardId,
         form.quantity,
         false  // isInSideboard
+      )
+    }
+
+    // Si estamos en una carpeta, asignar la carta a la carpeta
+    if (cardId && props.selectedBinderId) {
+      await bindersStore.allocateCardToBinder(
+        props.selectedBinderId,
+        cardId,
+        form.quantity
       )
     }
 

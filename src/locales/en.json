@@ -434,6 +434,7 @@
     },
     "actions": {
       "newDeck": "+ NEW DECK",
+      "newBinder": "+ NEW FOLDER",
       "import": "IMPORT",
       "createDeck": "+ CREATE DECK",
       "new": "+ NEW"
@@ -1841,13 +1842,19 @@
     },
     "header": {
       "delete": "DELETE",
-      "confirmDelete": "Delete binder \"{name}\"? Cards will stay in your collection.",
+      "confirmDelete": "Delete binder \"{name}\"?",
+      "deleteCardsTitle": "Delete cards too?",
+      "deleteCardsMessage": "YES = Delete binder and cards from collection\nNO = Only delete binder (cards stay)",
+      "deleteCardsConfirm": "YES, DELETE CARDS",
+      "deleteCardsCancel": "NO, KEEP THEM",
       "public": "PUBLIC",
       "forSale": "FOR SALE"
     },
     "empty": "No cards in this binder yet. Search and add cards above.",
     "noBinders": "You have no binders yet. Create one to start organizing your cards.",
     "deleted": "Binder deleted",
+    "deletedWithCards": "Binder and {count} cards deleted",
+    "deletedWithCardWarning": "Binder deleted. {deleted} cards removed, {failed} could not be deleted",
     "created": "Binder \"{name}\" created",
     "cardAdded": "Card added to binder",
     "cardRemoved": "Card removed from binder",

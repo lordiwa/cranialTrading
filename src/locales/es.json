@@ -434,6 +434,7 @@
     },
     "actions": {
       "newDeck": "+ NUEVO DECK",
+      "newBinder": "+ NUEVA CARPETA",
       "import": "IMPORTAR",
       "createDeck": "+ CREAR MAZO",
       "new": "+ NUEVO"
@@ -1841,13 +1842,19 @@
     },
     "header": {
       "delete": "ELIMINAR",
-      "confirmDelete": "¿Eliminar carpeta \"{name}\"? Las cartas permanecerán en tu colección.",
+      "confirmDelete": "¿Eliminar carpeta \"{name}\"?",
+      "deleteCardsTitle": "¿Eliminar cartas también?",
+      "deleteCardsMessage": "SÍ = Eliminar carpeta y cartas de la colección\nNO = Solo eliminar carpeta (cartas permanecen)",
+      "deleteCardsConfirm": "SÍ, ELIMINAR CARTAS",
+      "deleteCardsCancel": "NO, CONSERVAR",
       "public": "PÚBLICA",
       "forSale": "EN VENTA"
     },
     "empty": "No hay cartas en esta carpeta aún. Busca y agrega cartas arriba.",
     "noBinders": "No tienes carpetas aún. Crea una para empezar a organizar tus cartas.",
     "deleted": "Carpeta eliminada",
+    "deletedWithCards": "Carpeta y {count} cartas eliminadas",
+    "deletedWithCardWarning": "Carpeta eliminada. {deleted} cartas borradas, {failed} no se pudieron eliminar",
     "created": "Carpeta \"{name}\" creada",
     "cardAdded": "Carta agregada a la carpeta",
     "cardRemoved": "Carta removida de la carpeta",

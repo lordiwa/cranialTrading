@@ -1213,9 +1213,16 @@ const toggleBinderForSale = async () => {
 const handleDeleteBinder = async () => {
   if (!selectedBinder.value) return
 
+  // Capture references BEFORE any async operation (computed may change)
+  const binderId = selectedBinder.value.id
+  const binderName = selectedBinder.value.name
+  const cardIds = selectedBinder.value.allocations?.length > 0
+    ? [...new Set(selectedBinder.value.allocations.map(a => a.cardId))]
+    : []
+
   const confirmed = await confirmStore.show({
     title: t('binders.header.delete'),
-    message: t('binders.header.confirmDelete', { name: selectedBinder.value.name }),
+    message: t('binders.header.confirmDelete', { name: binderName }),
     confirmText: t('binders.header.delete'),
     cancelText: t('binders.create.cancel'),
     confirmVariant: 'danger'
@@ -1223,12 +1230,32 @@ const handleDeleteBinder = async () => {
 
   if (!confirmed) return
 
+  // Ask if user also wants to delete cards from collection
+  let deleteCards = false
+  if (cardIds.length > 0) {
+    deleteCards = await confirmStore.show({
+      title: t('binders.header.deleteCardsTitle'),
+      message: t('binders.header.deleteCardsMessage'),
+      confirmText: t('binders.header.deleteCardsConfirm'),
+      cancelText: t('binders.header.deleteCardsCancel'),
+      confirmVariant: 'danger'
+    })
+  }
+
   isDeletingBinder.value = true
-  const binderId = selectedBinder.value.id
   const success = await binderStore.deleteBinder(binderId)
-  isDeletingBinder.value = false
 
   if (success) {
+    // Delete cards from collection if requested
+    if (deleteCards && cardIds.length > 0) {
+      const result = await collectionStore.batchDeleteCards(cardIds)
+      if (result.failed > 0) {
+        toastStore.show(t('binders.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+      } else {
+        toastStore.show(t('binders.deletedWithCards', { count: cardIds.length }), 'success')
+      }
+    }
+
     const remaining = binderStore.binders
     if (remaining.length > 0) {
       binderFilter.value = remaining[0]!.id
@@ -1236,6 +1263,7 @@ const handleDeleteBinder = async () => {
       binderFilter.value = 'all'
     }
   }
+  isDeletingBinder.value = false
 }
 
 const handleBinderGridEdit = async (displayCard: DisplayDeckCard) => {
@@ -2756,10 +2784,13 @@ onUnmounted(() => {
         </p>
       </div>
       <div class="flex gap-2" data-tour="add-card-btn">
-        <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">
+        <BaseButton size="small" variant="secondary" @click="viewMode === 'binders' ? showImportBinderModal = true : showImportDeckModal = true">
           {{ t('collection.actions.import') }}
         </BaseButton>
-        <BaseButton size="small" @click="showCreateDeckModal = true">
+        <BaseButton v-if="viewMode === 'binders'" size="small" @click="showCreateBinderModal = true">
+          {{ t('collection.actions.newBinder') }}
+        </BaseButton>
+        <BaseButton v-else size="small" @click="showCreateDeckModal = true">
           {{ t('collection.actions.newDeck') }}
         </BaseButton>
       </div>
@@ -3350,6 +3381,7 @@ onUnmounted(() => {
         :show="showAddCardModal"
         :scryfall-card="selectedScryfallCard"
         :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
+        :selected-binder-id="viewMode === 'binders' && binderFilter !== 'all' ? binderFilter : undefined"
         @close="handleAddCardModalClose"
         @added="handleAddCardModalClose"
     />

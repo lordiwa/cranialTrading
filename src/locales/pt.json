@@ -434,6 +434,7 @@
     },
     "actions": {
       "newDeck": "+ NOVO DECK",
+      "newBinder": "+ NOVA PASTA",
       "import": "IMPORTAR",
       "createDeck": "+ CRIAR DECK",
       "new": "+ NOVO"
@@ -1841,13 +1842,19 @@
     },
     "header": {
       "delete": "EXCLUIR",
-      "confirmDelete": "Excluir pasta \"{name}\"? As cartas permanecerão na sua coleção.",
+      "confirmDelete": "Excluir pasta \"{name}\"?",
+      "deleteCardsTitle": "Excluir cartas também?",
+      "deleteCardsMessage": "SIM = Excluir pasta e cartas da coleção\nNÃO = Apenas excluir pasta (cartas permanecem)",
+      "deleteCardsConfirm": "SIM, EXCLUIR CARTAS",
+      "deleteCardsCancel": "NÃO, MANTER",
       "public": "PÚBLICA",
       "forSale": "À VENDA"
     },
     "empty": "Nenhuma carta nesta pasta ainda. Pesquise e adicione cartas acima.",
     "noBinders": "Você não tem pastas ainda. Crie uma para começar a organizar suas cartas.",
     "deleted": "Pasta excluída",
+    "deletedWithCards": "Pasta e {count} cartas excluídas",
+    "deletedWithCardWarning": "Pasta excluída. {deleted} cartas removidas, {failed} não puderam ser excluídas",
     "created": "Pasta \"{name}\" criada",
     "cardAdded": "Carta adicionada à pasta",
     "cardRemoved": "Carta removida da pasta",

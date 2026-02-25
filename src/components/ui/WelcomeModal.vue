@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useTour } from '../../composables/useTour'
 import { useAuthStore } from '../../stores/auth'
 import BaseButton from './BaseButton.vue'
 
+const router = useRouter()
 const { t } = useI18n()
 const { isTourCompleted, startTour, skipTour } = useTour()
 const authStore = useAuthStore()
@@ -17,17 +19,24 @@ onMounted(() => {
   }
 })
 
-const handleStartTour = () => {
+const handleStartTour = async () => {
   show.value = false
-  // Small delay to let modal close before tour starts
+  // Navigate to collection page first since tour elements are there
+  if (router.currentRoute.value.path !== '/collection') {
+    await router.push('/collection')
+  }
   setTimeout(() => {
     startTour()
-  }, 300)
+  }, 500)
 }
 
-const handleSkip = () => {
+const handleSkip = async () => {
   skipTour()
   show.value = false
+  // Navigate to collection page so the user has a clear starting point
+  if (router.currentRoute.value.path !== '/collection') {
+    await router.push('/collection')
+  }
 }
 </script>
 

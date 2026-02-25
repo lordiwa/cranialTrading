@@ -23,7 +23,7 @@ const languages = [
   { code: 'en' as SupportedLocale, label: 'EN' },
   { code: 'pt' as SupportedLocale, label: 'PT' },
 ]
-const { startTour } = useTour()
+const { startTour, resetTour } = useTour()
 
 // Help menu
 const showHelpMenu = ref(false)
@@ -46,7 +46,7 @@ const goToFaq = () => {
 const restartTour = async () => {
   closeHelpMenu()
   closeMobileMenu()
-  localStorage.removeItem('cranial_tour_completed')
+  resetTour()
   // Navigate to collection page first, then start tour
   if (route.path !== '/collection') {
     await router.push('/collection')

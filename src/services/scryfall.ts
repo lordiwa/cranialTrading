@@ -51,6 +51,10 @@ export interface ScryfallCard {
             border_crop?: string
         }
     }[]
+    oracle_text?: string
+    keywords?: string[]
+    legalities?: Record<string, string>
+    full_art?: boolean
     prices?: {
         usd?: string
         usd_foil?: string

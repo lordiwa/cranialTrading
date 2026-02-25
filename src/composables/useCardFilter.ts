@@ -5,6 +5,7 @@ import { useI18n } from './useI18n'
 export interface FilterableCard {
   name: string
   edition: string
+  setCode?: string
   price?: number
   cmc?: number
   type_line?: string
@@ -13,6 +14,12 @@ export interface FilterableCard {
   condition?: string
   foil?: boolean
   createdAt?: Date
+  power?: string
+  toughness?: string
+  oracle_text?: string
+  keywords?: string[]
+  legalities?: Record<string, string>
+  full_art?: boolean
 }
 
 // ========== Category helpers ==========
@@ -105,6 +112,19 @@ export function useCardFilter<T extends FilterableCard>(
   const selectedTypes = ref<Set<string>>(new Set(typeOrder))
   const selectedRarities = ref<Set<string>>(new Set(rarityOrder))
 
+  // --- Advanced filter state ---
+  const advPriceMin = ref<number | undefined>(undefined)
+  const advPriceMax = ref<number | undefined>(undefined)
+  const advFoilFilter = ref<'any' | 'foil' | 'nonfoil'>('any')
+  const advSelectedSets = ref<string[]>([])
+  const advSelectedKeywords = ref<string[]>([])
+  const advSelectedFormats = ref<string[]>([])
+  const advFullArtOnly = ref(false)
+  const advPowerMin = ref<number | undefined>(undefined)
+  const advPowerMax = ref<number | undefined>(undefined)
+  const advToughnessMin = ref<number | undefined>(undefined)
+  const advToughnessMax = ref<number | undefined>(undefined)
+
   // Reset chip filters when groupBy goes to 'none'
   watch(groupBy, (val) => {
     if (val === 'none') {
@@ -116,16 +136,35 @@ export function useCardFilter<T extends FilterableCard>(
   })
 
   // --- Toggle helpers ---
-  const toggleSet = (set: Set<string>, cat: string): Set<string> => {
+  const toggleSetHelper = (set: Set<string>, cat: string): Set<string> => {
     const s = new Set(set)
     if (s.has(cat)) s.delete(cat)
     else s.add(cat)
     return s
   }
-  const toggleColor = (cat: string) => { selectedColors.value = toggleSet(selectedColors.value, cat) }
-  const toggleMana = (cat: string) => { selectedManaValues.value = toggleSet(selectedManaValues.value, cat) }
-  const toggleType = (cat: string) => { selectedTypes.value = toggleSet(selectedTypes.value, cat) }
-  const toggleRarity = (cat: string) => { selectedRarities.value = toggleSet(selectedRarities.value, cat) }
+  const toggleColor = (cat: string) => { selectedColors.value = toggleSetHelper(selectedColors.value, cat) }
+  const toggleMana = (cat: string) => { selectedManaValues.value = toggleSetHelper(selectedManaValues.value, cat) }
+  const toggleType = (cat: string) => { selectedTypes.value = toggleSetHelper(selectedTypes.value, cat) }
+  const toggleRarity = (cat: string) => { selectedRarities.value = toggleSetHelper(selectedRarities.value, cat) }
+
+  // --- Advanced toggle helpers ---
+  const toggleAdvSet = (setCode: string) => {
+    const idx = advSelectedSets.value.indexOf(setCode)
+    if (idx > -1) advSelectedSets.value.splice(idx, 1)
+    else advSelectedSets.value.push(setCode)
+  }
+
+  const toggleAdvKeyword = (keyword: string) => {
+    const idx = advSelectedKeywords.value.indexOf(keyword)
+    if (idx > -1) advSelectedKeywords.value.splice(idx, 1)
+    else advSelectedKeywords.value.push(keyword)
+  }
+
+  const toggleAdvFormat = (format: string) => {
+    const idx = advSelectedFormats.value.indexOf(format)
+    if (idx > -1) advSelectedFormats.value.splice(idx, 1)
+    else advSelectedFormats.value.push(format)
+  }
 
   // --- Chip filter check ---
   const passesChipFilters = (card: T): boolean => {
@@ -140,12 +179,122 @@ export function useCardFilter<T extends FilterableCard>(
     return true
   }
 
+  // --- Advanced filter check ---
+  const passesAdvancedFilters = (card: T): boolean => {
+    // Price range
+    if (advPriceMin.value !== undefined && (card.price === undefined || card.price < advPriceMin.value)) return false
+    if (advPriceMax.value !== undefined && (card.price === undefined || card.price > advPriceMax.value)) return false
+
+    // Foil filter
+    if (advFoilFilter.value === 'foil' && !card.foil) return false
+    if (advFoilFilter.value === 'nonfoil' && card.foil) return false
+
+    // Sets
+    if (advSelectedSets.value.length > 0) {
+      const cardSet = card.setCode?.toLowerCase() || ''
+      if (!advSelectedSets.value.some(s => s.toLowerCase() === cardSet)) return false
+    }
+
+    // Keywords - check oracle_text and keywords array
+    if (advSelectedKeywords.value.length > 0) {
+      const oracleText = card.oracle_text?.toLowerCase() || ''
+      const cardKeywords = card.keywords?.map(k => k.toLowerCase()) || []
+      const typeLine = card.type_line?.toLowerCase() || ''
+      for (const kw of advSelectedKeywords.value) {
+        const kwLower = kw.toLowerCase()
+        if (!oracleText.includes(kwLower) && !cardKeywords.includes(kwLower) && !typeLine.includes(kwLower)) return false
+      }
+    }
+
+    // Format legality
+    if (advSelectedFormats.value.length > 0) {
+      if (!card.legalities) return false
+      for (const fmt of advSelectedFormats.value) {
+        if (card.legalities[fmt] !== 'legal') return false
+      }
+    }
+
+    // Full art
+    if (advFullArtOnly.value && !card.full_art) return false
+
+    // Power range
+    if (advPowerMin.value !== undefined || advPowerMax.value !== undefined) {
+      const pow = card.power !== undefined ? Number.parseFloat(card.power) : NaN
+      if (Number.isNaN(pow)) return false
+      if (advPowerMin.value !== undefined && pow < advPowerMin.value) return false
+      if (advPowerMax.value !== undefined && pow > advPowerMax.value) return false
+    }
+
+    // Toughness range
+    if (advToughnessMin.value !== undefined || advToughnessMax.value !== undefined) {
+      const tou = card.toughness !== undefined ? Number.parseFloat(card.toughness) : NaN
+      if (Number.isNaN(tou)) return false
+      if (advToughnessMin.value !== undefined && tou < advToughnessMin.value) return false
+      if (advToughnessMax.value !== undefined && tou > advToughnessMax.value) return false
+    }
+
+    return true
+  }
+
   const hasActiveFilters = computed(() => {
     return selectedColors.value.size < colorOrder.length
       || selectedManaValues.value.size < manaOrder.length
       || selectedTypes.value.size < typeOrder.length
       || selectedRarities.value.size < rarityOrder.length
   })
+
+  const hasActiveAdvancedFilters = computed(() => {
+    return advPriceMin.value !== undefined
+      || advPriceMax.value !== undefined
+      || advFoilFilter.value !== 'any'
+      || advSelectedSets.value.length > 0
+      || advSelectedKeywords.value.length > 0
+      || advSelectedFormats.value.length > 0
+      || advFullArtOnly.value
+      || advPowerMin.value !== undefined
+      || advPowerMax.value !== undefined
+      || advToughnessMin.value !== undefined
+      || advToughnessMax.value !== undefined
+  })
+
+  const advancedFilterCount = computed(() => {
+    let count = 0
+    if (advPriceMin.value !== undefined || advPriceMax.value !== undefined) count++
+    if (advFoilFilter.value !== 'any') count++
+    if (advSelectedSets.value.length > 0) count++
+    if (advSelectedKeywords.value.length > 0) count++
+    if (advSelectedFormats.value.length > 0) count++
+    if (advFullArtOnly.value) count++
+    if (advPowerMin.value !== undefined || advPowerMax.value !== undefined) count++
+    if (advToughnessMin.value !== undefined || advToughnessMax.value !== undefined) count++
+    return count
+  })
+
+  // Unique sets from the user's cards
+  const collectionSets = computed(() => {
+    const setMap = new Map<string, { code: string; name: string }>()
+    for (const card of cards.value) {
+      const code = card.setCode?.toUpperCase()
+      if (code && !setMap.has(code)) {
+        setMap.set(code, { code, name: card.edition })
+      }
+    }
+    return [...setMap.values()].sort((a, b) => a.name.localeCompare(b.name))
+  })
+
+  const resetAdvancedFilters = () => {
+    advPriceMin.value = undefined
+    advPriceMax.value = undefined
+    advFoilFilter.value = 'any'
+    advSelectedSets.value = []
+    advSelectedKeywords.value = []
+    advSelectedFormats.value = []
+    advFullArtOnly.value = false
+    advPowerMin.value = undefined
+    advPowerMax.value = undefined
+    advToughnessMin.value = undefined
+    advToughnessMax.value = undefined
+  }
 
   // --- Sort ---
   const sortCards = (list: T[]): T[] => {
@@ -168,7 +317,7 @@ export function useCardFilter<T extends FilterableCard>(
     return sorted
   }
 
-  // --- Filtered cards (text search + sort + chip filters) ---
+  // --- Filtered cards (text search + sort + chip filters + advanced filters) ---
   const filteredCards = computed(() => {
     let result = cards.value
 
@@ -184,6 +333,11 @@ export function useCardFilter<T extends FilterableCard>(
     // Chip filters
     if (hasActiveFilters.value) {
       result = result.filter(passesChipFilters)
+    }
+
+    // Advanced filters
+    if (hasActiveAdvancedFilters.value) {
+      result = result.filter(passesAdvancedFilters)
     }
 
     // Sort
@@ -273,10 +427,34 @@ export function useCardFilter<T extends FilterableCard>(
     toggleType,
     toggleRarity,
 
+    // Advanced filter state
+    advPriceMin,
+    advPriceMax,
+    advFoilFilter,
+    advSelectedSets,
+    advSelectedKeywords,
+    advSelectedFormats,
+    advFullArtOnly,
+    advPowerMin,
+    advPowerMax,
+    advToughnessMin,
+    advToughnessMax,
+
+    // Advanced toggles
+    toggleAdvSet,
+    toggleAdvKeyword,
+    toggleAdvFormat,
+
     // Computed
     hasActiveFilters,
+    hasActiveAdvancedFilters,
+    advancedFilterCount,
+    collectionSets,
     filteredCards,
     groupedCards,
+
+    // Advanced reset
+    resetAdvancedFilters,
 
     // Translation
     translateCategory: translate,

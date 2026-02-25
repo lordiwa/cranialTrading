@@ -22,6 +22,12 @@ export interface Card {
     type_line?: string;         // Card type (e.g., "Creature — Human Wizard")
     colors?: string[];          // Card colors (W, U, B, R, G)
     rarity?: string;            // Rarity (common, uncommon, rare, mythic)
+    power?: string;             // Creature power (e.g., "3", "*")
+    toughness?: string;         // Creature toughness (e.g., "4", "*")
+    oracle_text?: string;       // Rules text
+    keywords?: string[];        // Keyword abilities (e.g., ["flying", "trample"])
+    legalities?: Record<string, string>; // Format legality (e.g., { standard: "legal", modern: "legal" })
+    full_art?: boolean;         // Whether the card is full art
     createdAt?: Date;
     updatedAt: Date;
 }

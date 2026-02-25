@@ -67,12 +67,22 @@ let priceDataCache: Record<string, MTGJSONPriceFormats> | null = null
 let scryfallToUuidMap = new Map<string, string>()
 let dbInstance: IDBDatabase | null = null
 
-// One-time cleanup of old localStorage keys (migrating to IndexedDB)
+// One-time cleanup of old/bloated localStorage keys (migrating to IndexedDB)
 ;(() => {
   try {
     localStorage.removeItem('mtgjson_prices')
     localStorage.removeItem('mtgjson_prices_date')
     localStorage.removeItem('mtgjson_scryfall_mapping')
+
+    // Clean up accumulated set caches that can fill localStorage quota
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(SET_CACHE_PREFIX)) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach(key => { localStorage.removeItem(key) })
   } catch {
     // Ignore errors during cleanup
   }
@@ -322,22 +332,6 @@ async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
  * Fetch set data from MTGJSON and build scryfallId -> uuid mapping
  */
 async function fetchSetMapping(setCode: string): Promise<void> {
-  const cacheKey = `${SET_CACHE_PREFIX}${setCode.toUpperCase()}`
-
-  // Check if we already have mapping for cards from this set in localStorage (small data)
-  try {
-    const cachedMapping = localStorage.getItem(cacheKey)
-    if (cachedMapping) {
-      const mapping = JSON.parse(cachedMapping) as Record<string, string>
-      for (const [scryfallId, uuid] of Object.entries(mapping)) {
-        scryfallToUuidMap.set(scryfallId, uuid)
-      }
-      return
-    }
-  } catch {
-    // Ignore localStorage errors
-  }
-
   console.log(`Fetching MTGJSON set data for ${setCode}...`)
 
   try {
@@ -345,24 +339,15 @@ async function fetchSetMapping(setCode: string): Promise<void> {
       `${MTGJSON_API}/${setCode.toUpperCase()}.json.gz`
     )
 
-    const setMapping: Record<string, string> = {}
-
+    let count = 0
     for (const card of response.data.cards || []) {
       if (card.uuid && card.identifiers?.scryfallId) {
         scryfallToUuidMap.set(card.identifiers.scryfallId, card.uuid)
-        setMapping[card.identifiers.scryfallId] = card.uuid
+        count++
       }
     }
 
-    // Cache the set mapping to localStorage (set data is small enough)
-    try {
-      localStorage.setItem(cacheKey, JSON.stringify(setMapping))
-    } catch (e) {
-      // If localStorage is full, just skip caching
-      console.warn('Could not cache set mapping to localStorage:', e)
-    }
-
-    console.log(`Loaded ${Object.keys(setMapping).length} cards from ${setCode}`)
+    console.log(`Loaded ${count} cards from ${setCode}`)
   } catch (error) {
     console.error(`Error fetching set ${setCode}:`, error)
     // Don't throw - just log the error and continue

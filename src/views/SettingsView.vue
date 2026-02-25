@@ -25,7 +25,7 @@ const decksStore = useDecksStore();
 const matchesStore = useMatchesStore();
 const contactsStore = useContactsStore();
 const { t } = useI18n();
-const { startTour } = useTour();
+const { startTour, resetTour } = useTour();
 
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -372,7 +372,7 @@ const handleDeleteAllData = async () => {
 };
 
 const handleRestartTour = () => {
-  localStorage.removeItem('cranial_tour_completed');
+  resetTour();
   router.push('/collection').then(() => {
     setTimeout(() => { startTour(); }, 500);
   });

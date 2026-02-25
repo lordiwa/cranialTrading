@@ -22,10 +22,12 @@
       "apply": "APLICAR",
       "clear": "LIMPAR",
       "searching": "BUSCANDO...",
-      "advancedSearch": "Busca avançada"
+      "advancedSearch": "Busca avançada",
+      "backToSearch": "Voltar para busca"
     },
     "labels": {
       "quantity": "Quantidade",
+      "results": "resultados",
       "condition": "Condição",
       "foil": "Foil",
       "status": "Status",
@@ -1257,7 +1259,10 @@
       },
       "options": {
         "foilOnly": "Apenas Foil",
-        "fullArt": "Full Art"
+        "fullArt": "Full Art",
+        "foilAny": "Todos",
+        "foilFoil": "Foil",
+        "foilNonFoil": "Não Foil"
       }
     },
     "accordions": {

@@ -230,6 +230,13 @@ const handleAddCard = async () => {
       cmc: selectedPrint.value.cmc,
       type_line: selectedPrint.value.type_line,
       colors: selectedPrint.value.colors || [],
+      rarity: selectedPrint.value.rarity,
+      power: selectedPrint.value.power,
+      toughness: selectedPrint.value.toughness,
+      oracle_text: selectedPrint.value.oracle_text,
+      keywords: selectedPrint.value.keywords || [],
+      legalities: selectedPrint.value.legalities,
+      full_art: selectedPrint.value.full_art || false,
     })
 
     // Si se seleccionó un deck, asignar la carta al deck

@@ -35,7 +35,7 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
-import LocalFilterModal from '../components/ui/LocalFilterModal.vue'
+import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { useCollectionTotals } from '../composables/useCollectionTotals'
 
@@ -571,15 +571,68 @@ const {
   selectedManaValues,
   selectedTypes,
   selectedRarities,
-  toggleColor,
-  toggleMana,
-  toggleType,
-  toggleRarity,
   hasActiveFilters,
   filteredCards,
   groupedCards: groupedFilteredCards,
   translateCategory,
+  // Advanced filters
+  advPriceMin,
+  advPriceMax,
+  advFoilFilter,
+  advSelectedSets,
+  advSelectedKeywords,
+  advSelectedFormats,
+  advFullArtOnly,
+  advPowerMin,
+  advPowerMax,
+  advToughnessMin,
+  advToughnessMax,
+  advancedFilterCount,
+  collectionSets,
+  resetAdvancedFilters,
 } = useCardFilter(statusFilteredCards)
+
+// Bridge: individual refs <-> AdvancedFilters for the shared modal
+const localAdvancedFilters = computed<AdvancedFilters>(() => ({
+  colors: [...selectedColors.value],
+  types: [...selectedTypes.value],
+  manaValue: { min: undefined, max: undefined, values: undefined },
+  rarity: [...selectedRarities.value],
+  sets: advSelectedSets.value,
+  power: { min: advPowerMin.value, max: advPowerMax.value },
+  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
+  formatLegal: advSelectedFormats.value,
+  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
+  keywords: advSelectedKeywords.value,
+  isFoil: advFoilFilter.value === 'foil',
+  isFullArt: advFullArtOnly.value,
+}))
+
+const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
+  // Sync sets
+  advSelectedSets.value = [...updated.sets]
+  // Sync keywords
+  advSelectedKeywords.value = [...updated.keywords]
+  // Sync formats
+  advSelectedFormats.value = [...updated.formatLegal]
+  // Sync price
+  advPriceMin.value = updated.priceUSD.min
+  advPriceMax.value = updated.priceUSD.max
+  // Sync power/toughness
+  advPowerMin.value = updated.power.min
+  advPowerMax.value = updated.power.max
+  advToughnessMin.value = updated.toughness.min
+  advToughnessMax.value = updated.toughness.max
+  // Sync foil
+  advFoilFilter.value = updated.isFoil ? 'foil' : 'any'
+  // Sync full art
+  advFullArtOnly.value = updated.isFullArt
+  // Sync chip filters (colors, types, rarity) — AdvancedFilterModal manages these as arrays
+  // Convert arrays to Sets for chip filters
+  selectedColors.value = new Set(updated.colors.length > 0 ? updated.colors : colorOrder)
+  selectedTypes.value = new Set(updated.types.length > 0 ? updated.types : typeOrder)
+  selectedRarities.value = new Set(updated.rarity.length > 0 ? updated.rarity : rarityOrder)
+}
 
 // Active chip filter count for badge
 const activeChipFilterCount = computed(() => {
@@ -588,6 +641,7 @@ const activeChipFilterCount = computed(() => {
   if (selectedManaValues.value.size < manaOrder.length) count++
   if (selectedTypes.value.size < typeOrder.length) count++
   if (selectedRarities.value.size < rarityOrder.length) count++
+  count += advancedFilterCount.value
   return count
 })
 
@@ -596,6 +650,7 @@ const resetAllChipFilters = () => {
   selectedManaValues.value = new Set(manaOrder)
   selectedTypes.value = new Set(typeOrder)
   selectedRarities.value = new Set(rarityOrder)
+  resetAdvancedFilters()
 }
 
 // Wishlist grouping — reuses the same filter state from the main composable
@@ -1351,6 +1406,13 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
             cmc: card.cmc,
             type_line: card.type_line,
             colors: card.colors || [],
+            rarity: card.rarity,
+            power: card.power,
+            toughness: card.toughness,
+            oracle_text: card.oracle_text,
+            keywords: card.keywords || [],
+            legalities: card.legalities,
+            full_art: card.full_art || false,
           }
         }
       }
@@ -1372,6 +1434,13 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         cmc: printWithPrice.cmc,
         type_line: printWithPrice.type_line,
         colors: printWithPrice.colors || [],
+        rarity: printWithPrice.rarity,
+        power: printWithPrice.power,
+        toughness: printWithPrice.toughness,
+        oracle_text: printWithPrice.oracle_text,
+        keywords: printWithPrice.keywords || [],
+        legalities: printWithPrice.legalities,
+        full_art: printWithPrice.full_art || false,
       }
     }
   } catch (e) {
@@ -1434,6 +1503,13 @@ const handleImport = async (
       cmc: scryfallData?.cmc,
       type_line: scryfallData?.type_line,
       colors: scryfallData?.colors || [],
+      rarity: scryfallData?.rarity,
+      power: scryfallData?.power,
+      toughness: scryfallData?.toughness,
+      oracle_text: scryfallData?.oracle_text,
+      keywords: scryfallData?.keywords || [],
+      legalities: scryfallData?.legalities,
+      full_art: scryfallData?.full_art || false,
     }
     if (scryfallData?.setCode || setCode) {
       cardData.setCode = scryfallData?.setCode || setCode
@@ -1576,6 +1652,13 @@ const handleImportDirect = async (
       let cmc: number | undefined = undefined
       let type_line: string | undefined = undefined
       let colors: string[] = []
+      let rarity: string | undefined = undefined
+      let power: string | undefined = undefined
+      let toughness: string | undefined = undefined
+      let oracle_text: string | undefined = undefined
+      let keywords: string[] = []
+      let legalities: Record<string, string> | undefined = undefined
+      let full_art = false
 
       if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
         const scryfallCard = scryfallDataMap.get(card.scryfallId)
@@ -1585,6 +1668,13 @@ const handleImportDirect = async (
         cmc = scryfallCard.cmc
         type_line = scryfallCard.type_line
         colors = scryfallCard.colors || []
+        rarity = scryfallCard.rarity
+        power = scryfallCard.power
+        toughness = scryfallCard.toughness
+        oracle_text = scryfallCard.oracle_text
+        keywords = scryfallCard.keywords || []
+        legalities = scryfallCard.legalities
+        full_art = scryfallCard.full_art || false
       }
 
       if (price === 0 || !image) {
@@ -1605,6 +1695,13 @@ const handleImportDirect = async (
         cmc,
         type_line,
         colors,
+        rarity,
+        power,
+        toughness,
+        oracle_text,
+        keywords,
+        legalities,
+        full_art,
       })
       cardMeta.push({
         quantity: card.quantity,
@@ -1643,6 +1740,13 @@ const handleImportDirect = async (
             cardData.cmc = printWithPrice.cmc
             cardData.type_line = printWithPrice.type_line
             cardData.colors = printWithPrice.colors || []
+            cardData.rarity = printWithPrice.rarity
+            cardData.power = printWithPrice.power
+            cardData.toughness = printWithPrice.toughness
+            cardData.oracle_text = printWithPrice.oracle_text
+            cardData.keywords = printWithPrice.keywords || []
+            cardData.legalities = printWithPrice.legalities
+            cardData.full_art = printWithPrice.full_art || false
           } else if (results.length > 0 && !cardData.image) {
             const anyPrint = results[0]
             if (anyPrint) {
@@ -1652,6 +1756,13 @@ const handleImportDirect = async (
               cardData.cmc = anyPrint.cmc
               cardData.type_line = anyPrint.type_line
               cardData.colors = anyPrint.colors || []
+              cardData.rarity = anyPrint.rarity
+              cardData.power = anyPrint.power
+              cardData.toughness = anyPrint.toughness
+              cardData.oracle_text = anyPrint.oracle_text
+              cardData.keywords = anyPrint.keywords || []
+              cardData.legalities = anyPrint.legalities
+              cardData.full_art = anyPrint.full_art || false
             }
           }
         } catch (e) {
@@ -1826,6 +1937,13 @@ const handleImportCsv = async (
         cmc: sc?.cmc,
         type_line: sc?.type_line,
         colors: sc?.colors || [],
+        rarity: sc?.rarity,
+        power: sc?.power,
+        toughness: sc?.toughness,
+        oracle_text: sc?.oracle_text,
+        keywords: sc?.keywords || [],
+        legalities: sc?.legalities,
+        full_art: sc?.full_art || false,
       }
       if (card.setCode) {
         cardData.setCode = card.setCode.toUpperCase()
@@ -1930,6 +2048,13 @@ const handleImportBinder = async (
       cmc: scryfallData?.cmc,
       type_line: scryfallData?.type_line,
       colors: scryfallData?.colors || [],
+      rarity: scryfallData?.rarity,
+      power: scryfallData?.power,
+      toughness: scryfallData?.toughness,
+      oracle_text: scryfallData?.oracle_text,
+      keywords: scryfallData?.keywords || [],
+      legalities: scryfallData?.legalities,
+      full_art: scryfallData?.full_art || false,
     }
     if (scryfallData?.setCode || setCode) {
       cardData.setCode = scryfallData?.setCode || setCode
@@ -2035,6 +2160,13 @@ const handleImportBinderDirect = async (
       let cmc: number | undefined = undefined
       let type_line: string | undefined = undefined
       let colors: string[] = []
+      let rarity: string | undefined = undefined
+      let power: string | undefined = undefined
+      let toughness: string | undefined = undefined
+      let oracle_text: string | undefined = undefined
+      let keywords: string[] = []
+      let legalities: Record<string, string> | undefined = undefined
+      let full_art = false
 
       if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
         const scryfallCard = scryfallDataMap.get(card.scryfallId)
@@ -2044,6 +2176,13 @@ const handleImportBinderDirect = async (
         cmc = scryfallCard.cmc
         type_line = scryfallCard.type_line
         colors = scryfallCard.colors || []
+        rarity = scryfallCard.rarity
+        power = scryfallCard.power
+        toughness = scryfallCard.toughness
+        oracle_text = scryfallCard.oracle_text
+        keywords = scryfallCard.keywords || []
+        legalities = scryfallCard.legalities
+        full_art = scryfallCard.full_art || false
       }
 
       if (price === 0 || !image) {
@@ -2064,6 +2203,13 @@ const handleImportBinderDirect = async (
         cmc,
         type_line,
         colors,
+        rarity,
+        power,
+        toughness,
+        oracle_text,
+        keywords,
+        legalities,
+        full_art,
       })
 
       const processPercent = 25 + Math.round((i / cards.length) * 20)
@@ -2090,6 +2236,13 @@ const handleImportBinderDirect = async (
             cardData.cmc = printWithPrice.cmc
             cardData.type_line = printWithPrice.type_line
             cardData.colors = printWithPrice.colors || []
+            cardData.rarity = printWithPrice.rarity
+            cardData.power = printWithPrice.power
+            cardData.toughness = printWithPrice.toughness
+            cardData.oracle_text = printWithPrice.oracle_text
+            cardData.keywords = printWithPrice.keywords || []
+            cardData.legalities = printWithPrice.legalities
+            cardData.full_art = printWithPrice.full_art || false
           } else if (results.length > 0 && !cardData.image) {
             const anyPrint = results[0]
             if (anyPrint) {
@@ -2099,6 +2252,13 @@ const handleImportBinderDirect = async (
               cardData.cmc = anyPrint.cmc
               cardData.type_line = anyPrint.type_line
               cardData.colors = anyPrint.colors || []
+              cardData.rarity = anyPrint.rarity
+              cardData.power = anyPrint.power
+              cardData.toughness = anyPrint.toughness
+              cardData.oracle_text = anyPrint.oracle_text
+              cardData.keywords = anyPrint.keywords || []
+              cardData.legalities = anyPrint.legalities
+              cardData.full_art = anyPrint.full_art || false
             }
           }
         } catch (e) {
@@ -2203,6 +2363,13 @@ const handleImportBinderCsv = async (
         cmc: sc?.cmc,
         type_line: sc?.type_line,
         colors: sc?.colors || [],
+        rarity: sc?.rarity,
+        power: sc?.power,
+        toughness: sc?.toughness,
+        oracle_text: sc?.oracle_text,
+        keywords: sc?.keywords || [],
+        legalities: sc?.legalities,
+        full_art: sc?.full_art || false,
       }
       if (card.setCode) {
         cardData.setCode = card.setCode.toUpperCase()
@@ -3093,18 +3260,14 @@ onUnmounted(() => {
             @open-filters="showLocalFilters = true"
         />
 
-        <LocalFilterModal
+        <AdvancedFilterModal
             :show="showLocalFilters"
-            :selected-colors="selectedColors"
-            :selected-mana-values="selectedManaValues"
-            :selected-types="selectedTypes"
-            :selected-rarities="selectedRarities"
+            :filters="localAdvancedFilters"
+            mode="local"
+            :local-sets="collectionSets"
             @close="showLocalFilters = false"
-            @toggle-color="toggleColor"
-            @toggle-mana="toggleMana"
-            @toggle-type="toggleType"
-            @toggle-rarity="toggleRarity"
-            @reset-all="resetAllChipFilters"
+            @update:filters="handleLocalFiltersUpdate"
+            @reset="resetAllChipFilters"
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->

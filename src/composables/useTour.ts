@@ -1,8 +1,24 @@
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useI18n } from './useI18n'
+import { useAuthStore } from '../stores/auth'
 
-const TOUR_STORAGE_KEY = 'cranial_tour_completed'
+const TOUR_STORAGE_KEY_PREFIX = 'cranial_tour_completed'
+
+function getTourKey(userId?: string): string {
+  return userId ? `${TOUR_STORAGE_KEY_PREFIX}_${userId}` : TOUR_STORAGE_KEY_PREFIX
+}
+
+function cleanupMtgjsonSetCaches() {
+  const keysToRemove: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key?.startsWith('mtgjson_set_')) {
+      keysToRemove.push(key)
+    }
+  }
+  keysToRemove.forEach(key => { localStorage.removeItem(key) })
+}
 
 function isMobile(): boolean {
   return window.innerWidth < 768
@@ -10,17 +26,43 @@ function isMobile(): boolean {
 
 export function useTour() {
   const { t } = useI18n()
+  const authStore = useAuthStore()
 
   const isTourCompleted = (): boolean => {
-    return localStorage.getItem(TOUR_STORAGE_KEY) === 'true'
+    const userId = authStore.user?.id
+    try {
+      return localStorage.getItem(getTourKey(userId)) === 'true'
+    } catch {
+      return false
+    }
   }
 
   const markTourCompleted = () => {
-    localStorage.setItem(TOUR_STORAGE_KEY, 'true')
+    const userId = authStore.user?.id
+    try {
+      localStorage.setItem(getTourKey(userId), 'true')
+    } catch {
+      // QuotaExceededError — clean up mtgjson set caches to free space and retry
+      try {
+        cleanupMtgjsonSetCaches()
+        localStorage.setItem(getTourKey(userId), 'true')
+      } catch {
+        console.warn('Could not save tour completion to localStorage')
+      }
+    }
   }
 
   const skipTour = () => {
     markTourCompleted()
+  }
+
+  const resetTour = () => {
+    const userId = authStore.user?.id
+    try {
+      localStorage.removeItem(getTourKey(userId))
+    } catch {
+      // ignore
+    }
   }
 
   const openMobileMenu = (): Promise<void> => {
@@ -197,5 +239,6 @@ export function useTour() {
     isTourCompleted,
     startTour,
     skipTour,
+    resetTour,
   }
 }

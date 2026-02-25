@@ -367,7 +367,7 @@ const handleClose = () => {
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                 </svg>
                 <span>{{ t('cards.detailModal.priceHistory.toggle') }}</span>
-                <span class="text-[10px]">{{ showPriceChart ? '▲' : '▼' }}</span>
+                <span class="text-[14px]">{{ showPriceChart ? '▲' : '▼' }}</span>
               </button>
 
               <!-- Chart panel -->
@@ -386,7 +386,7 @@ const handleClose = () => {
                       :key="src"
                       @click="chartSource = src"
                       :class="[
-                        'px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors uppercase',
+                        'px-1.5 py-0.5 text-[14px] font-bold rounded transition-colors uppercase',
                         chartSource === src
                           ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
                           : 'text-silver-50 hover:text-silver hover:bg-silver-5'
@@ -423,7 +423,7 @@ const handleClose = () => {
                   </svg>
 
                   <!-- Labels -->
-                  <div class="flex items-center justify-between text-[10px] text-silver-50 -mt-1">
+                  <div class="flex items-center justify-between text-[14px] text-silver-50 -mt-1">
                     <span>{{ chartFirstDate }}</span>
                     <span class="font-bold" :style="{ color: chartSourceColor }">{{ chartLastValue }}</span>
                     <span>{{ chartLastDate }}</span>
@@ -440,7 +440,7 @@ const handleClose = () => {
                 id="edit-print-select"
                 :value="selectedPrint?.id"
                 @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150 rounded"
+                class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150 rounded"
             >
               <option
                   v-for="print in availablePrints"

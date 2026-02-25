@@ -33,7 +33,7 @@ const condition = ref<CardCondition>('NM');
 const searching = ref(false);
 
 const typeOptions: { value: PreferenceType; label: string; variant: 'busco' | 'cambio' | 'vendo' }[] = [
-  { value: 'BUSCO', label: 'BUSCO', variant: 'busco' },
+  { value: 'BUSCO', label: 'WISHLIST', variant: 'busco' },
   { value: 'CAMBIO', label: 'CAMBIO', variant: 'cambio' },
   { value: 'VENDO', label: 'VENDO', variant: 'vendo' },
 ];

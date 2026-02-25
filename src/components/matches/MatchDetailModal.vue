@@ -62,14 +62,14 @@ const getVisualFor = (obj: any): { badge: BadgeVariant; border: string; label: s
     const t = String(obj.type).toUpperCase();
     if (t === 'VENDO') return { badge: 'vendo', border: 'border-rust', label: 'VENDO' };
     if (t === 'CAMBIO') return { badge: 'cambio', border: 'border-silver', label: 'CAMBIO' };
-    if (t === 'BUSCO') return { badge: 'busco', border: 'border-neon', label: 'BUSCO' };
+    if (t === 'BUSCO') return { badge: 'busco', border: 'border-neon', label: 'WISHLIST' };
   }
 
   if (obj.status) {
     const s = String(obj.status).toLowerCase();
     if (s === 'sell') return { badge: 'vendo', border: 'border-rust', label: 'VENDO' };
     if (s === 'trade') return { badge: 'cambio', border: 'border-silver', label: 'CAMBIO' };
-    if (s === 'busco') return { badge: 'busco', border: 'border-neon', label: 'BUSCO' };
+    if (s === 'busco') return { badge: 'busco', border: 'border-neon', label: 'WISHLIST' };
     if (s === 'collection') return { badge: 'solo', border: 'border-silver-20', label: 'COLECCIÓN' };
   }
 

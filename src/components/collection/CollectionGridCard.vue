@@ -285,7 +285,7 @@ const priceChangeData = computed(() => {
           class="w-full h-full object-cover"
       />
       <div v-else class="w-full h-full flex items-center justify-center bg-primary">
-        <span class="text-[10px] text-silver-50">{{ t('cards.grid.noImg') }}</span>
+        <span class="text-[14px] text-silver-50">{{ t('cards.grid.noImg') }}</span>
       </div>
 
       <!-- Qty Badge - BIGGER for compact -->
@@ -296,11 +296,11 @@ const priceChangeData = computed(() => {
 
     <!-- Minimal Card Info -->
     <div class="mt-1 min-h-[50px]">
-      <p class="text-[10px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
+      <p class="text-[14px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
         {{ card.name }}
       </p>
-      <p class="text-[10px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
-      <p class="text-[10px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
+      <p class="text-[14px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
+      <p class="text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
     </div>
   </div>
 
@@ -457,7 +457,7 @@ const priceChangeData = computed(() => {
             class="bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
             :title="t('cards.grid.inDeck', { qty: alloc.quantity, deckName: alloc.deckName }) + (alloc.isInSideboard ? ' (SB)' : '')"
         >
-          <p class="text-[10px] font-bold text-neon truncate max-w-[50px]">
+          <p class="text-[14px] font-bold text-neon truncate max-w-[50px]">
             {{ alloc.quantity }}x {{ alloc.deckName.slice(0, 5) }}..
           </p>
         </div>
@@ -465,7 +465,7 @@ const priceChangeData = computed(() => {
             v-if="allocationInfo.allocations.length > 2"
             class="bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
         >
-          <p class="text-[10px] font-bold text-neon">+{{ allocationInfo.allocations.length - 2 }}</p>
+          <p class="text-[14px] font-bold text-neon">+{{ allocationInfo.allocations.length - 2 }}</p>
         </div>
       </div>
 
@@ -534,7 +534,7 @@ const priceChangeData = computed(() => {
           v-if="isCardAllocated"
           class="md:hidden absolute bottom-2 left-2 bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
       >
-        <p class="text-[10px] font-bold text-neon">
+        <p class="text-[14px] font-bold text-neon">
           {{ t('cards.grid.inDecks', { qty: allocationInfo.allocated }) }}
         </p>
       </div>
@@ -568,7 +568,7 @@ const priceChangeData = computed(() => {
           </p>
           <span
               v-if="priceChangeData"
-              class="text-[10px] font-bold px-1 rounded"
+              class="text-[14px] font-bold px-1 rounded"
               :class="priceChangeData.isPositive ? 'text-neon bg-neon/10' : 'text-rust bg-rust/10'"
           >
             {{ priceChangeData.isPositive ? '\u25B2' : '\u25BC' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%

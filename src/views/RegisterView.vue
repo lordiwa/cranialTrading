@@ -63,7 +63,7 @@ onMounted(() => {
         <svg class="w-24 h-24 mb-4 text-neon" viewBox="0 0 100 100" fill="currentColor">
           <use href="/icons.svg#cranial-logo" />
         </svg>
-        <h1 class="text-h1 font-bold text-neon text-center tracking-wider">CRANIAL TRADING</h1>
+        <h1 class="text-h1 font-bold text-neon text-center tracking-wider font-brother">CRANIAL TRADING</h1>
       </div>
 
       <!-- Verification screen -->

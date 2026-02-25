@@ -517,7 +517,7 @@
         "collection": "Colección Personal",
         "sale": "A la Venta",
         "trade": "Disponible para Cambio",
-        "wishlist": "Busco / Wishlist"
+        "wishlist": "Wishlist"
       },
       "publishLabel": "Publicar en mi perfil",
       "publishHint": "Visible en /@{username}",
@@ -1399,7 +1399,7 @@
       "changeCard": "CAMBIAR CARTA"
     },
     "importModal": {
-      "title": "IMPORTAR COMO BUSCO",
+      "title": "IMPORTAR COMO WISHLIST",
       "inputLabel": "Link de Moxfield o texto del mazo",
       "placeholder": "https://moxfield.com/decks/...\no\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n...",
       "analyzing": "ANALIZANDO...",
@@ -1418,8 +1418,8 @@
       "sideboard": "Sideboard",
       "minCondition": "Condición mínima deseada",
       "includeSideboard": "Incluir sideboard",
-      "infoMessage": "💡 Se crearán {count} preferencias BUSCO automáticamente.",
-      "importButton": "IMPORTAR {count} COMO BUSCO"
+      "infoMessage": "💡 Se crearán {count} preferencias Wishlist automáticamente.",
+      "importButton": "IMPORTAR {count} COMO WISHLIST"
     }
   },
 

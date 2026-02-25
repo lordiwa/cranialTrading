@@ -411,11 +411,11 @@ defineExpose({
                 v-if="!sentInterestIds.has(card.id)"
                 @click.stop="sendInterestFromSearch(card)"
                 :disabled="sendingInterest"
-                class="px-2 py-0.5 bg-neon-10 border border-neon text-neon text-[10px] font-bold hover:bg-neon-20 transition-all rounded whitespace-nowrap"
+                class="px-2 py-0.5 bg-neon-10 border border-neon text-neon text-[14px] font-bold hover:bg-neon-20 transition-all rounded whitespace-nowrap"
               >
                 ME INTERESA
               </button>
-              <span v-else class="text-[10px] text-silver-50 whitespace-nowrap">{{ t('dashboard.searchOthers.sent') }}</span>
+              <span v-else class="text-[14px] text-silver-50 whitespace-nowrap">{{ t('dashboard.searchOthers.sent') }}</span>
             </div>
           </div>
         </div>

@@ -405,7 +405,7 @@ watch(() => props.show, (newVal) => {
                           id="add-deck-print-select"
                           :value="selectedCard.id"
                           @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                          class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
+                          class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150"
                       >
                         <option v-for="print in availablePrints" :key="print.id" :value="print.id">
                           {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
@@ -519,7 +519,7 @@ watch(() => props.show, (newVal) => {
                             type="number"
                             min="1"
                             :max="maxQuantity"
-                            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-mono text-small focus:outline-none focus:border-neon transition-150"
+                            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150"
                         />
                       </div>
 

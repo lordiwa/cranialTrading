@@ -152,7 +152,7 @@ watch(() => props.show, (show) => {
               id="create-deck-description"
               v-model="form.description"
               :placeholder="t('decks.createModal.descriptionPlaceholder')"
-              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-small focus:outline-none focus:border-neon transition-150 resize-none h-20"
+              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-small focus:outline-none focus:border-neon transition-150 resize-none h-20"
           />
         </div>
 
@@ -165,7 +165,7 @@ watch(() => props.show, (show) => {
               id="create-deck-list"
               v-model="deckList"
               :placeholder="t('decks.createModal.cardListPlaceholder')"
-              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-mono text-tiny focus:outline-none focus:border-neon transition-150 resize-none h-32"
+              class="w-full px-4 py-3 bg-secondary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-tiny focus:outline-none focus:border-neon transition-150 resize-none h-32"
           />
           <!-- Preview -->
           <div v-if="deckListPreview" class="mt-2 p-2 border border-silver-30 bg-primary">

@@ -173,7 +173,7 @@ onUnmounted(() => {
           <svg class="w-8 h-8 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
-          <span class="hidden sm:inline text-h3 font-bold text-neon">CRANIAL TRADING</span>
+          <span class="hidden sm:inline text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
         </router-link>
 
         <!-- Navigation Links (Desktop) -->
@@ -184,7 +184,7 @@ onUnmounted(() => {
               :to="link.path"
               :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
               :class="[
-                'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative',
+                'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
                 isActive(link.path)
                   ? 'bg-neon-10 border-b-2 border-neon text-neon'
                   : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
@@ -391,23 +391,23 @@ onUnmounted(() => {
 
   <!-- Bottom Tab Bar (mobile only) -->
   <nav v-if="isAuthenticated" class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-primary border-t border-silver-20 tab-bar-safe">
-    <div class="flex items-center justify-around h-14 px-2">
+    <div class="flex items-center justify-around h-14 px-1">
       <!-- Collection -->
       <router-link
           to="/collection"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
             isActive('/collection') ? 'text-neon' : 'text-silver-50'
           ]"
       >
         <SvgIcon name="collection" size="small" />
-        <span class="text-[10px] font-bold">{{ t('header.nav.collection') }}</span>
+        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.collection') }}</span>
       </router-link>
       <!-- Matches -->
       <router-link
           to="/saved-matches"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast relative',
+            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast relative min-w-0',
             isMatchesActive ? 'text-neon' : 'text-silver-50'
           ]"
       >
@@ -415,46 +415,34 @@ onUnmounted(() => {
           <SvgIcon name="handshake" size="small" />
           <span
               v-if="matchesSectionBadge > 0"
-              class="absolute -top-1 -right-2 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
+              class="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-0.5"
           >
             {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
           </span>
         </span>
-        <span class="text-[10px] font-bold">{{ t('header.nav.matches') }}</span>
+        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.matches') }}</span>
       </router-link>
       <!-- Wishlist -->
       <router-link
           to="/collection?filter=wishlist"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
             isActive('/collection?filter=wishlist') ? 'text-neon' : 'text-silver-50'
           ]"
       >
         <SvgIcon name="star" size="small" />
-        <span class="text-[10px] font-bold">{{ t('header.nav.wishlist') }}</span>
+        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.wishlist') }}</span>
       </router-link>
       <!-- Market -->
       <router-link
           to="/market"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
+            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
             isActive('/market') ? 'text-neon' : 'text-silver-50'
           ]"
       >
         <SvgIcon name="fire" size="small" />
-        <span class="text-[10px] font-bold">{{ t('header.nav.market') }}</span>
-      </router-link>
-      <!-- Profile -->
-      <router-link
-          v-if="authStore.user?.username"
-          :to="`/@${authStore.user.username}`"
-          :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-3 transition-fast',
-            route.path === `/@${authStore.user.username}` ? 'text-neon' : 'text-silver-50'
-          ]"
-      >
-        <img :src="authStore.getAvatarUrl(20)" alt="" class="w-5 h-5 rounded-full object-cover" />
-        <span class="text-[10px] font-bold">{{ t('header.profile.myProfile') }}</span>
+        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.market') }}</span>
       </router-link>
     </div>
   </nav>

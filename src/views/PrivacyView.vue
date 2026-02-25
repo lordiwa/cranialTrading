@@ -14,7 +14,7 @@ const lastUpdated = '27 de Enero, 2025';
           <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
-          <span class="text-h3 font-bold text-neon">CRANIAL TRADING</span>
+          <span class="text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
         </RouterLink>
       </div>
     </header>

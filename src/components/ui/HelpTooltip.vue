@@ -51,7 +51,7 @@ const handleClick = () => {
     <span
         :class="[
           'inline-flex items-center justify-center rounded-full border cursor-pointer transition-colors',
-          size === 'small' ? 'w-4 h-4 text-[10px]' : 'w-5 h-5 text-tiny',
+          size === 'small' ? 'w-4 h-4 text-[14px]' : 'w-5 h-5 text-tiny',
           'border-silver-50 text-silver-50 hover:border-neon hover:text-neon hover:bg-neon/10'
         ]"
     >

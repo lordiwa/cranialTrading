@@ -935,6 +935,15 @@ const deckSourceColor = computed(() => {
   return 'text-neon'
 })
 
+const deckStatsExpanded = ref(false)
+
+const deckActiveSourceLabel = computed(() => {
+  if (deckPriceSource.value === 'ck') return 'CK'
+  if (deckPriceSource.value === 'buylist') return 'BUY'
+  return 'TCG'
+})
+
+
 // ========== BULK SELECTION ==========
 const selectionMode = ref(false)
 const selectedCardIds = ref<Set<string>>(new Set())
@@ -2801,11 +2810,11 @@ onUnmounted(() => {
       <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
-          <div class="flex gap-1 mb-4">
+          <div class="flex gap-1 mb-4 overflow-x-auto">
             <button
                 @click="switchToCollection"
                 :class="[
-                  'px-6 py-3 text-body font-bold transition-150 border-2',
+                  'px-4 md:px-6 py-3 text-body font-bold transition-150 border-2 whitespace-nowrap',
                   viewMode === 'collection'
                     ? 'bg-neon text-primary border-neon'
                     : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
@@ -2817,7 +2826,7 @@ onUnmounted(() => {
                 data-tour="deck-tab"
                 @click="switchToDecks()"
                 :class="[
-                  'px-6 py-3 text-body font-bold transition-150 border-2',
+                  'px-4 md:px-6 py-3 text-body font-bold transition-150 border-2 whitespace-nowrap',
                   viewMode === 'decks'
                     ? 'bg-neon text-primary border-neon'
                     : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
@@ -2829,7 +2838,7 @@ onUnmounted(() => {
             <button
                 @click="switchToBinders()"
                 :class="[
-                  'px-6 py-3 text-body font-bold transition-150 border-2',
+                  'px-4 md:px-6 py-3 text-body font-bold transition-150 border-2 whitespace-nowrap',
                   viewMode === 'binders'
                     ? 'bg-neon text-primary border-neon'
                     : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
@@ -2841,7 +2850,7 @@ onUnmounted(() => {
           </div>
 
           <!-- ========== DECK SUB-TABS (solo en modo mazos) ========== -->
-          <div v-if="viewMode === 'decks'" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon">
+          <div v-if="viewMode === 'decks'" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon min-w-0 max-w-full">
             <button
                 v-for="deck in decksList"
                 :key="deck.id"
@@ -2891,7 +2900,7 @@ onUnmounted(() => {
           </div>
 
           <!-- ========== BINDER SUB-TABS (solo en modo binders) ========== -->
-          <div v-if="viewMode === 'binders'" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon">
+          <div v-if="viewMode === 'binders'" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon min-w-0 max-w-full">
             <button
                 v-for="binder in bindersList"
                 :key="binder.id"
@@ -3438,7 +3447,7 @@ onUnmounted(() => {
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
-        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-28' : ''"
+        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[90px]' : ''"
     />
 
   </AppContainer>
@@ -3446,11 +3455,10 @@ onUnmounted(() => {
   <!-- ========== DECK STATS FOOTER (fijo abajo cuando hay deck seleccionado) ========== -->
   <Teleport to="body">
     <div v-if="viewMode === 'decks' && selectedDeck"
-         class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t-2 border-neon">
-      <div class="container mx-auto max-w-7xl px-4 py-2">
-        <!-- Desktop: fila única -->
-        <div class="hidden md:flex items-center gap-4 text-tiny">
-          <!-- Price source selector -->
+         class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden">
+      <div class="container mx-auto max-w-7xl">
+        <!-- Desktop: fila única (unchanged) -->
+        <div class="hidden md:flex items-center gap-4 text-tiny px-4 py-2">
           <div class="flex items-center gap-1 border-r border-silver-30 pr-4">
             <span class="text-silver-50">{{ t('collection.totals.priceSource') }}:</span>
             <button
@@ -3467,7 +3475,6 @@ onUnmounted(() => {
               {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'Buylist' }}
             </button>
           </div>
-
           <span class="text-silver-50">{{ t('collection.deckStats.have') }} <span class="font-bold text-neon text-small">{{ deckOwnedCount }}</span></span>
           <span class="text-silver-30">|</span>
           <span class="text-silver-50">{{ t('collection.deckStats.need') }} <span class="font-bold text-yellow-400 text-small">{{ deckWishlistCount }}</span></span>
@@ -3486,50 +3493,65 @@ onUnmounted(() => {
             <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
           </div>
         </div>
-        <!-- Mobile: 2 filas compactas -->
+        <!-- Mobile: thin collapsed bar + expandable detail -->
         <div class="md:hidden">
-          <!-- Price source selector -->
-          <div class="flex items-center justify-between mb-1">
-            <div class="flex items-center gap-1">
-              <button
-                  v-for="src in (['tcg', 'ck', 'buylist'] as DeckPriceSource[])"
-                  :key="src"
-                  @click="deckPriceSource = src"
-                  :class="[
-                    'px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors uppercase',
-                    deckPriceSource === src
-                      ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
-                      : 'text-silver-50 hover:text-silver hover:bg-silver-5'
-                  ]"
-              >
-                {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
-              </button>
+          <!-- Collapsed handle: minimal height -->
+          <button
+            @click="deckStatsExpanded = !deckStatsExpanded"
+            class="w-full flex items-center justify-between px-4 py-1"
+          >
+            <div class="flex items-center gap-1.5 text-[11px]">
+              <span class="font-bold uppercase" :class="deckSourceColor">{{ deckActiveSourceLabel }}</span>
+              <span class="text-silver-30">|</span>
+              <span class="text-neon font-bold">{{ deckOwnedCount }}</span><span class="text-silver-50 text-[11px]">/{{ deckOwnedCount + deckWishlistCount }}</span>
+              <span class="text-silver-30">|</span>
+              <span class="text-silver-50">${{ deckTotalCostBySource.toFixed(2) }}</span>
+              <span v-if="selectedDeckStats" class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
             </div>
-            <span class="text-tiny text-silver-50">
-              <span class="text-neon font-bold">{{ deckOwnedCount }}</span> / {{ deckOwnedCount + deckWishlistCount }}
-            </span>
-          </div>
-          <div class="grid grid-cols-4 gap-2 text-center text-tiny">
-            <div>
-              <span class="text-silver-50 block text-[10px]">{{ t('collection.deckStats.have') }}</span>
-              <span class="font-bold" :class="deckSourceColor">${{ deckOwnedCostBySource.toFixed(2) }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="text-silver-50 transition-transform duration-200" :class="deckStatsExpanded ? 'rotate-180' : ''">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+          </button>
+
+          <!-- Expanded detail panel -->
+          <div v-if="deckStatsExpanded" class="px-4 pb-1.5 space-y-1.5">
+            <!-- Row 1: source buttons + counts -->
+            <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1">
+                <button
+                    v-for="src in (['tcg', 'ck', 'buylist'] as DeckPriceSource[])"
+                    :key="src"
+                    @click.stop="deckPriceSource = src"
+                    :class="[
+                      'px-1.5 py-0.5 text-[11px] font-bold rounded transition-colors uppercase',
+                      deckPriceSource === src
+                        ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
+                        : 'text-silver-50'
+                    ]"
+                >
+                  {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
+                </button>
+              </div>
+              <span class="text-silver-30">|</span>
+              <span class="text-[11px]"><span class="text-silver-50">Have </span><span class="text-neon font-bold">{{ deckOwnedCount }}</span></span>
+              <span class="text-silver-30">|</span>
+              <span class="text-[11px]"><span class="text-silver-50">Need </span><span class="text-yellow-400 font-bold">{{ deckWishlistCount }}</span></span>
             </div>
-            <div>
-              <span class="text-silver-50 block text-[10px]">{{ t('collection.deckStats.need') }}</span>
-              <span class="font-bold text-yellow-400">${{ deckWishlistCostBySource.toFixed(2) }}</span>
+            <!-- Row 2: price breakdowns -->
+            <div class="flex items-center gap-2 text-[11px]">
+              <span><span class="text-silver-50">Have </span><span class="font-bold" :class="deckSourceColor">${{ deckOwnedCostBySource.toFixed(2) }}</span></span>
+              <span class="text-silver-30">|</span>
+              <span><span class="text-silver-50">Need </span><span class="font-bold text-yellow-400">${{ deckWishlistCostBySource.toFixed(2) }}</span></span>
+              <span class="text-silver-30">|</span>
+              <span><span class="text-silver-50">Total </span><span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span></span>
             </div>
-            <div>
-              <span class="text-silver-50 block text-[10px]">Total</span>
-              <span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span>
-            </div>
-            <div v-if="selectedDeckStats">
-              <span class="text-silver-50 block text-[10px]">%</span>
-              <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
-            </div>
-          </div>
-          <div v-if="selectedDeckStats" class="flex items-center gap-2 mt-1">
-            <div class="flex-1 h-1.5 bg-primary rounded overflow-hidden border border-silver-30/30">
-              <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"></div>
+            <!-- Progress bar -->
+            <div v-if="selectedDeckStats" class="flex items-center gap-2">
+              <div class="flex-1 h-1.5 bg-primary rounded overflow-hidden border border-silver-30/30">
+                <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"></div>
+              </div>
+              <span class="text-[11px] font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
             </div>
           </div>
         </div>

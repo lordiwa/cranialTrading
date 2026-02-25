@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+/* Fonts loaded via @font-face in style.css */
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +10,7 @@
     }
 
     html {
-        @apply bg-primary text-silver font-mono;
+        @apply bg-primary text-silver font-sans;
     }
 
     body {
@@ -20,7 +20,7 @@
     input,
     textarea,
     select {
-        @apply font-mono;
+        @apply font-sans;
     }
 }
 

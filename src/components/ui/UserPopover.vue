@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useI18n } from '../../composables/useI18n'
+import { version as appVersion } from '../../../package.json'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 import SvgIcon from './SvgIcon.vue'
@@ -424,6 +425,9 @@ const handleLogout = async () => {
           >
             {{ t('header.profile.logout') }}
           </button>
+          <div class="border-t border-silver-10 mt-1 pt-1 px-3 pb-1">
+            <span class="text-[11px] text-silver-30">v{{ appVersion }}</span>
+          </div>
         </div>
       </div>
     </Transition>

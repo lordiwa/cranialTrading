@@ -1,4 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+@font-face {
+    font-family: 'Open Sans';
+    src: url('/Fonts/Open-Sans/static/OpenSans-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url('/Fonts/Open-Sans/static/OpenSans-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url('/Fonts/Open-Sans/static/OpenSans-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url('/Fonts/Open-Sans/static/OpenSans-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Brother';
+    src: url('/Fonts/Brother/BROTHER-Bold.otf') format('opentype'),
+         url('/Fonts/Brother/BROTHER-Bold.ttf') format('truetype');
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +49,7 @@
     }
 
     html {
-        @apply bg-primary text-silver font-mono;
+        @apply bg-primary text-silver font-sans;
     }
 
     body {
@@ -33,7 +72,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: rgba(0, 0, 0, 0.7);
+        background-color: rgba(0, 0, 0, 0.93);
         z-index: 0;
         pointer-events: none;
     }
@@ -46,7 +85,7 @@
     input,
     textarea,
     select {
-        @apply font-mono rounded;
+        @apply font-sans rounded;
     }
 
     ::-webkit-scrollbar {
@@ -69,7 +108,7 @@
 
 @layer components {
     .btn-base {
-        @apply font-bold cursor-pointer min-h-[44px] flex items-center justify-center border rounded;
+        @apply font-bold cursor-pointer min-h-[44px] flex items-center justify-center border rounded uppercase;
         transition: all 150ms ease-out;
     }
 
@@ -127,7 +166,7 @@
     }
 
     .input-base {
-        @apply w-full bg-primary border px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-mono rounded;
+        @apply w-full bg-primary border px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-sans rounded;
         border-color: #EEEEEE;
         transition: all 150ms ease-out;
     }
@@ -186,6 +225,14 @@
 }
 
 @layer utilities {
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
     .transition-fast {
         transition: all 150ms ease-out;
     }
@@ -286,32 +333,32 @@
     background: #000000;
     border: 1px solid #CCFF00;
     color: #EEEEEE;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
 }
 
 .cranial-tour-popover .driver-popover-title {
     color: #CCFF00;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .cranial-tour-popover .driver-popover-description {
     color: #EEEEEE;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 16px;
 }
 
 .cranial-tour-popover .driver-popover-progress-text {
     color: rgba(238, 238, 238, 0.5);
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
 }
 
 .cranial-tour-popover .driver-popover-next-btn,
 .cranial-tour-popover .driver-popover-close-btn {
     background: #CCFF00;
     color: #000000;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-weight: 700;
     border: none;
     text-shadow: none;
@@ -326,7 +373,7 @@
     background: transparent;
     color: #EEEEEE;
     border: 1px solid rgba(238, 238, 238, 0.3);
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-weight: 700;
     text-shadow: none;
 }
@@ -344,18 +391,6 @@
 }
 
 @media (max-width: 768px) {
-    .h1 {
-        @apply text-h2;
-    }
-
-    .text-body {
-        @apply text-small;
-    }
-
-    .text-small {
-        @apply text-tiny;
-    }
-
     .px-lg {
         @apply px-md;
     }

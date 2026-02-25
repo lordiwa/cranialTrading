@@ -57,7 +57,7 @@ const getCardImage = (card: any): string => {
       <!-- Owned badge -->
       <div
           v-if="ownedCount > 0"
-          class="absolute top-2 right-2 bg-neon text-primary text-[10px] font-bold px-1.5 py-0.5 rounded"
+          class="absolute top-2 right-2 bg-neon text-primary text-[14px] font-bold px-1.5 py-0.5 rounded"
       >
         {{ t('search.owned', { count: ownedCount }) }}
       </div>

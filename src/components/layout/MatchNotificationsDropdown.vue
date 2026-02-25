@@ -109,7 +109,7 @@ const goToMatch = (match: any) => {
     <button
         @click.stop="toggleDropdown"
         :class="[
-          'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative',
+          'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
           active
             ? 'bg-neon-10 border-b-2 border-neon text-neon'
             : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
@@ -176,13 +176,13 @@ const goToMatch = (match: any) => {
                 <span class="font-bold text-neon">@{{ match.otherUsername }}</span>
                 {{ getAlertDescription(match) }}
               </p>
-              <p class="text-[10px] text-silver-40 mt-1">{{ timeAgo(match.createdAt) }}</p>
+              <p class="text-[14px] text-silver-40 mt-1">{{ timeAgo(match.createdAt) }}</p>
             </div>
 
             <!-- Match type indicator -->
             <span
                 :class="[
-                  'text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5',
+                  'text-[11px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5',
                   match.type === 'VENDO' ? 'bg-neon-10 text-neon' : 'bg-rust/20 text-rust'
                 ]"
             >

@@ -111,7 +111,7 @@ const useCases = computed(() => [
               <svg class="w-12 h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
                 <use href="/icons.svg#cranial-logo" />
               </svg>
-              <span class="text-h3 font-bold text-neon">CRANIAL TRADING</span>
+              <span class="text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
             </div>
 
             <div class="bg-primary/95 border border-silver-30 p-6 lg:p-8 rounded-lg">
@@ -203,7 +203,7 @@ const useCases = computed(() => [
               <use href="/icons.svg#cranial-logo" />
             </svg>
             <div>
-              <h1 class="text-h2 lg:text-h1 font-bold text-neon tracking-wider">CRANIAL TRADING</h1>
+              <h1 class="text-h2 lg:text-h1 font-bold text-neon tracking-wider font-brother">CRANIAL TRADING</h1>
               <p class="text-small text-silver-70">{{ t('auth.login.subtitle') }}</p>
             </div>
           </div>
@@ -310,7 +310,7 @@ const useCases = computed(() => [
               <svg class="w-8 h-8 text-neon" viewBox="0 0 100 100" fill="currentColor">
                 <use href="/icons.svg#cranial-logo" />
               </svg>
-              <span class="text-small font-bold text-neon">CRANIAL</span>
+              <span class="text-small font-bold text-neon font-brother">CRANIAL TRADING</span>
             </div>
             <p class="text-tiny text-silver-50">
               {{ t('landing.description') }}

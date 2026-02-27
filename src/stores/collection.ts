@@ -22,6 +22,29 @@ import {
 } from '../services/publicCards'
 import { t } from '../composables/useI18n'
 
+/**
+ * Commit a Firestore batch with retry logic (skips retries for permission errors)
+ */
+const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>, maxRetries = 2): Promise<boolean> => {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const batch = batchFn()
+            await batch.commit()
+            return true
+        } catch (error: unknown) {
+            console.warn(`Batch commit failed (attempt ${attempt + 1}/${maxRetries + 1}):`, error)
+            const msg = error instanceof Error ? error.message : String(error)
+            if (msg.includes('permission') || msg.includes('Permission')) {
+                return false
+            }
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 500))
+            }
+        }
+    }
+    return false
+}
+
 export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -299,7 +322,6 @@ export const useCollectionStore = defineStore('collection', () => {
         cards.value = remaining
 
         const BATCH_SIZE = 200
-        const MAX_RETRIES = 2
         const userId = authStore.user.id
         let totalDeleted = 0
         let totalFailed = 0
@@ -312,33 +334,11 @@ export const useCollectionStore = defineStore('collection', () => {
         const totalBatches = Math.ceil(cardIds.length / BATCH_SIZE) + Math.ceil(publicCardIds.length / BATCH_SIZE)
         let completedBatches = 0
 
-        // Helper: commit a batch with retry logic (skips retries for permission errors)
-        const commitWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>): Promise<boolean> => {
-            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-                try {
-                    const batch = batchFn()
-                    await batch.commit()
-                    return true
-                } catch (error: unknown) {
-                    console.warn(`Batch commit failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}):`, error)
-                    // Don't retry permission errors — they'll never succeed
-                    const msg = error instanceof Error ? error.message : String(error)
-                    if (msg.includes('permission') || msg.includes('Permission')) {
-                        return false
-                    }
-                    if (attempt < MAX_RETRIES) {
-                        await new Promise(resolve => setTimeout(resolve, 500))
-                    }
-                }
-            }
-            return false
-        }
-
         // Phase 1: Delete user cards in batches
         for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
             const chunk = cardIds.slice(i, i + BATCH_SIZE)
 
-            const ok = await commitWithRetry(() => {
+            const ok = await commitBatchWithRetry(() => {
                 const batch = writeBatch(db)
                 for (const cardId of chunk) {
                     batch.delete(doc(db, 'users', userId, 'cards', cardId))
@@ -361,28 +361,30 @@ export const useCollectionStore = defineStore('collection', () => {
         }
 
         // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
-        // If first batch fails (e.g. permission error), skip remaining batches
-        let publicCardsBlocked = false
+        // If any batch fails (e.g. permission error), skip remaining batches
         for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
-            if (!publicCardsBlocked) {
-                const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
-                const ok = await commitWithRetry(() => {
-                    const batch = writeBatch(db)
-                    for (const cardId of chunk) {
-                        batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
-                    }
-                    return batch
-                })
-                if (!ok) {
-                    console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
-                    publicCardsBlocked = true
+            const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
+            const ok = await commitBatchWithRetry(() => {
+                const batch = writeBatch(db)
+                for (const cardId of chunk) {
+                    batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
                 }
-            }
+                return batch
+            })
 
             completedBatches++
             if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
 
-            if (!publicCardsBlocked && i + BATCH_SIZE < publicCardIds.length) {
+            if (!ok) {
+                console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
+                // Count remaining batches for progress reporting
+                const remainingBatches = Math.ceil((publicCardIds.length - i - BATCH_SIZE) / BATCH_SIZE)
+                completedBatches += Math.max(0, remainingBatches)
+                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
+                break
+            }
+
+            if (i + BATCH_SIZE < publicCardIds.length) {
                 await new Promise(resolve => setTimeout(resolve, 200))
             }
         }

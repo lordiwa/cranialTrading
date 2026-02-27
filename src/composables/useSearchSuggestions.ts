@@ -32,6 +32,22 @@ export function useSearchSuggestions(query: Ref<string>) {
     localMatches.value = matches
   }
 
+  // Scryfall: fetch and filter suggestions (called after debounce)
+  const fetchScryfallSuggestions = async (q: string) => {
+    try {
+      const results = await getCardSuggestions(q)
+      const localNames = new Set(localMatches.value.map(c => c.name.toLowerCase()))
+      scryfallSuggestions.value = results
+        .filter(name => !localNames.has(name.toLowerCase()))
+        .slice(0, 5)
+    } catch (err) {
+      console.error('Error fetching suggestions:', err)
+      scryfallSuggestions.value = []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   // Scryfall: debounced API call, filtering out names already in local
   const updateScryfallSuggestions = (q: string) => {
     if (debounceTimeout) clearTimeout(debounceTimeout)
@@ -43,23 +59,7 @@ export function useSearchSuggestions(query: Ref<string>) {
     }
 
     isLoading.value = true
-    debounceTimeout = setTimeout(() => {
-      void (async () => {
-        try {
-          const results = await getCardSuggestions(q)
-          // Filter out names that are already in local matches
-          const localNames = new Set(localMatches.value.map(c => c.name.toLowerCase()))
-          scryfallSuggestions.value = results
-            .filter(name => !localNames.has(name.toLowerCase()))
-            .slice(0, 5)
-        } catch (err) {
-          console.error('Error fetching suggestions:', err)
-          scryfallSuggestions.value = []
-        } finally {
-          isLoading.value = false
-        }
-      })()
-    }, 300)
+    debounceTimeout = setTimeout(() => { void fetchScryfallSuggestions(q) }, 300)
   }
 
   watch(query, (q) => {

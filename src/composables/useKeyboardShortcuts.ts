@@ -15,14 +15,18 @@ function isInInputField(target: HTMLElement): boolean {
   return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 }
 
+function modifiersMatch(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
+  const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !event.ctrlKey && !event.metaKey
+  const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey
+  const altMatch = shortcut.alt ? event.altKey : !event.altKey
+  return ctrlMatch && shiftMatch && altMatch
+}
+
 function findMatchingShortcut(event: KeyboardEvent, shortcuts: KeyboardShortcut[]): KeyboardShortcut | null {
   const inInput = isInInputField(event.target as HTMLElement)
   for (const shortcut of shortcuts) {
-    const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase()
-    const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !event.ctrlKey && !event.metaKey
-    const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey
-    const altMatch = shortcut.alt ? event.altKey : !event.altKey
-    if (!keyMatch || !ctrlMatch || !shiftMatch || !altMatch) continue
+    if (event.key.toLowerCase() !== shortcut.key.toLowerCase()) continue
+    if (!modifiersMatch(event, shortcut)) continue
     if (shortcut.key.toLowerCase() !== 'escape' && inInput) continue
     return shortcut
   }

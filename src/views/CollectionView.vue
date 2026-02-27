@@ -1362,7 +1362,7 @@ const executeBinderDeletion = async (binderId: string, cardIds: string[], delete
 
 /** Parse a single text line into card data for import (shared by deck and binder text import) */
 const parseTextImportLine = (trimmed: string): { quantity: number; cardName: string; setCode: string | null; isFoil: boolean } | null => {
-  const match = /^(\d+)x?\s+(.+?)(?:\s+\(([a-z0-9]+)\))?(?:\s+[\w-]+)?(?:\s+\*f\*?)?$/i.exec(trimmed)
+  const match = /^(\d+)x?\s+(.+?)(?:\s+\((\w+)\))?(?:\s+[\w-]+)?(?:\s+\*f\*?)?$/i.exec(trimmed)
   const matchQty = match?.[1]
   const matchName = match?.[2]
   if (!match || !matchQty || !matchName) return null

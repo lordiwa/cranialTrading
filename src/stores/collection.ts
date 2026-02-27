@@ -384,7 +384,6 @@ export const useCollectionStore = defineStore('collection', () => {
         // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
         const progress = { completed: completedBatches, total: totalBatches, onProgress }
         await deletePublicCardBatches(publicCardIds, userId, BATCH_SIZE, progress)
-        completedBatches = progress.completed
 
         if (totalFailed > 0) {
             console.warn(`Batch delete: ${totalDeleted} deleted, ${totalFailed} failed`)

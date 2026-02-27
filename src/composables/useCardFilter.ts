@@ -22,6 +22,14 @@ export interface FilterableCard {
   full_art?: boolean
 }
 
+/** Get a card's timestamp for sorting by date (handles createdAt or addedAt fields) */
+const getCardTimestamp = (card: FilterableCard): number => {
+  if (card.createdAt) return new Date(card.createdAt).getTime()
+  const addedAt = (card as any).addedAt
+  if (addedAt) return new Date(addedAt).getTime()
+  return 0
+}
+
 // ========== Category helpers ==========
 
 export const getCardRarityCategory = (card: FilterableCard): string => {
@@ -306,8 +314,8 @@ export function useCardFilter<T extends FilterableCard>(
     switch (sortBy.value) {
       case 'recent':
         sorted.sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : ((a as any).addedAt ? new Date((a as any).addedAt).getTime() : 0)
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : ((b as any).addedAt ? new Date((b as any).addedAt).getTime() : 0)
+          const dateA = getCardTimestamp(a)
+          const dateB = getCardTimestamp(b)
           return dateB - dateA
         })
         break

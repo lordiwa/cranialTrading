@@ -16,11 +16,11 @@ const route = useRoute();
 initI18n();
 
 // Pages where footer should NOT appear
-const noFooterRoutes = ['login', 'register', 'forgot-password', 'reset-password', 'verify-email'];
+const noFooterRoutes = new Set(['login', 'register', 'forgot-password', 'reset-password', 'verify-email']);
 
 const showFooter = computed(() => {
   const routeName = route.name as string;
-  return !noFooterRoutes.includes(routeName);
+  return !noFooterRoutes.has(routeName);
 });
 
 onMounted(() => {

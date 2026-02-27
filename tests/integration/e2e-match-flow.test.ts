@@ -423,7 +423,6 @@ describe('E2E Match Flow', () => {
 
     // Verify conversation metadata
     const db = getDb()
-    const convRef = doc(db, 'conversations', conversationId)
     const convSnap = await getDocs(query(
       collection(db, 'conversations'),
       where('participantIds', 'array-contains', userAId)

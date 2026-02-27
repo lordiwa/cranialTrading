@@ -77,8 +77,8 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
 
   // Clean card name: remove foil indicators and (SET) suffix
   const cardName = remainder
-    .replaceAll(/\s*\*[fF]\*?\s*/gi, '')
-    .replace(/\s+\([A-Za-z0-9]+\).*$/i, '')
+    .replaceAll(/\s*\*f\*?\s*/gi, '')
+    .replace(/\s+\([a-z0-9]+\).*$/i, '')
     .trim()
 
   return { quantity, cardName, setCode, isFoil }
@@ -158,7 +158,7 @@ export const downloadAsFile = (content: string, filename: string, mimeType = 'te
   a.download = filename
   document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
+  a.remove()
   URL.revokeObjectURL(url)
 }
 

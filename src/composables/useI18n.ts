@@ -45,6 +45,26 @@ function interpolate(template: string, params: Record<string, string | number>):
 }
 
 /**
+ * Cambia el idioma actual
+ * @param newLocale - Nuevo idioma
+ */
+function setLocale(newLocale: SupportedLocale) {
+  if (locales[newLocale]) {
+    currentLocale.value = newLocale
+    localStorage.setItem('cranial_locale', newLocale)
+  } else {
+    console.warn(`[i18n] Locale '${newLocale}' not supported`)
+  }
+}
+
+/**
+ * Obtiene todos los idiomas disponibles
+ */
+function getAvailableLocales(): SupportedLocale[] {
+  return Object.keys(locales) as SupportedLocale[]
+}
+
+/**
  * Composable para internacionalización
  */
 export function useI18n() {
@@ -70,27 +90,6 @@ export function useI18n() {
     }
 
     return value
-  }
-
-  /**
-   * Cambia el idioma actual
-   * @param newLocale - Nuevo idioma
-   */
-  function setLocale(newLocale: SupportedLocale) {
-    if (locales[newLocale]) {
-      currentLocale.value = newLocale
-      // Guardar preferencia en localStorage
-      localStorage.setItem('cranial_locale', newLocale)
-    } else {
-      console.warn(`[i18n] Locale '${newLocale}' not supported`)
-    }
-  }
-
-  /**
-   * Obtiene todos los idiomas disponibles
-   */
-  function getAvailableLocales(): SupportedLocale[] {
-    return Object.keys(locales) as SupportedLocale[]
   }
 
   /**

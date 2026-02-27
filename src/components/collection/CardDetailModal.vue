@@ -89,10 +89,16 @@ const chartSourceColor = computed(() => {
   return '#CCFF00'
 })
 
+const getChartValue = (p: { ck: number; buylist: number; tcg: number }) => {
+  if (chartSource.value === 'ck') return p.ck
+  if (chartSource.value === 'buylist') return p.buylist
+  return p.tcg
+}
+
 const chartData = computed(() => {
   return chartHistory.value.map(p => ({
     date: p.date,
-    value: chartSource.value === 'ck' ? p.ck : chartSource.value === 'buylist' ? p.buylist : p.tcg,
+    value: getChartValue(p),
   }))
 })
 

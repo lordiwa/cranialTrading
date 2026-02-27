@@ -4,8 +4,8 @@
  * This setup allows testing Firebase operations directly without the UI.
  * Uses real Firebase credentials from .env.local
  */
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // Manually load .env.local since dotenv has issues in vitest
 const envPath = resolve(__dirname, '../.env.local')

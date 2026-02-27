@@ -1362,7 +1362,7 @@ const executeBinderDeletion = async (binderId: string, cardIds: string[], delete
 
 /** Parse a single text line into card data for import (shared by deck and binder text import) */
 const parseTextImportLine = (trimmed: string): { quantity: number; cardName: string; setCode: string | null; isFoil: boolean } | null => {
-  const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
+  const match = /^(\d+)x?\s+(.+?)(?:\s+\(([a-z0-9]+)\))?(?:\s+[\w-]+)?(?:\s+\*f\*?)?$/i.exec(trimmed)
   const matchQty = match?.[1]
   const matchName = match?.[2]
   if (!match || !matchQty || !matchName) return null
@@ -1376,7 +1376,7 @@ const parseTextImportLine = (trimmed: string): { quantity: number; cardName: str
 }
 
 /** Build a collection card object from text import line data + Scryfall results */
-const buildCollectionCardFromScryfall = (
+const buildCollectionCardFromScryfall = (opts: {
   cardName: string,
   quantity: number,
   condition: CardCondition,
@@ -1386,7 +1386,8 @@ const buildCollectionCardFromScryfall = (
   status: CardStatus | undefined,
   makePublic: boolean,
   isInSideboard: boolean,
-): any => {
+}): any => {
+  const { cardName, quantity, condition, isFoil, setCode, scryfallData, status, makePublic, isInSideboard } = opts
   const cardData: any = {
     scryfallId: scryfallData?.scryfallId || '',
     name: cardName,
@@ -1767,16 +1768,11 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
 }
 
 // Importar deck desde texto
-const handleImport = async (
-  deckText: string,
-  condition: CardCondition,
-  includeSideboard: boolean,
-  deckName?: string,
-  makePublic?: boolean,
-  format?: DeckFormat,
-  commander?: string,
-  status?: CardStatus
-) => {
+const handleImport = async (opts: {
+  deckText: string, condition: CardCondition, includeSideboard: boolean,
+  deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
+}) => {
+  const { deckText, condition, includeSideboard, deckName, makePublic, format, commander, status } = opts
   const finalDeckName = deckName || `Deck${Date.now()}`
   showImportDeckModal.value = false
   toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
@@ -1795,10 +1791,10 @@ const handleImport = async (
     if (inSideboard && !includeSideboard) continue
 
     const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode || undefined)
-    const cardData = buildCollectionCardFromScryfall(
-      parsed.cardName, parsed.quantity, condition, parsed.isFoil, parsed.setCode,
-      scryfallData, status, makePublic || false, inSideboard,
-    )
+    const cardData = buildCollectionCardFromScryfall({
+      cardName: parsed.cardName, quantity: parsed.quantity, condition, isFoil: parsed.isFoil, setCode: parsed.setCode,
+      scryfallData, status, makePublic: makePublic || false, isInSideboard: inSideboard,
+    })
     collectionCardsToAdd.push(cardData)
   }
 
@@ -2138,16 +2134,11 @@ const handleImportCsv = async (
 // ========== BINDER IMPORT HANDLERS ==========
 
 // Import binder from text list
-const handleImportBinder = async (
-  deckText: string,
-  condition: CardCondition,
-  includeSideboard: boolean,
-  deckName?: string,
-  _makePublic?: boolean,
-  _format?: DeckFormat,
-  _commander?: string,
-  status?: CardStatus
-) => {
+const handleImportBinder = async (opts: {
+  deckText: string, condition: CardCondition, includeSideboard: boolean,
+  deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
+}) => {
+  const { deckText, condition, includeSideboard, deckName, status } = opts
   const finalName = deckName || `Binder${Date.now()}`
   showImportBinderModal.value = false
   toastStore.show(`Importing "${finalName}"...`, 'info')
@@ -2166,10 +2157,10 @@ const handleImportBinder = async (
     if (inSideboard && !includeSideboard) continue
 
     const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode || undefined)
-    const cardData = buildCollectionCardFromScryfall(
-      parsed.cardName, parsed.quantity, condition, parsed.isFoil, parsed.setCode,
-      scryfallData, status, false, false,
-    )
+    const cardData = buildCollectionCardFromScryfall({
+      cardName: parsed.cardName, quantity: parsed.quantity, condition, isFoil: parsed.isFoil, setCode: parsed.setCode,
+      scryfallData, status, makePublic: false, isInSideboard: false,
+    })
     collectionCardsToAdd.push(cardData)
   }
 

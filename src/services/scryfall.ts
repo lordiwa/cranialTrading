@@ -529,9 +529,9 @@ export const getAllSets = async (): Promise<ScryfallSet[]> => {
         const allSets: ScryfallSet[] = data.data || []
 
         // Filtrar solo sets relevantes (excluir tokens, memorabilia, etc.)
-        const relevantTypes = ['core', 'expansion', 'masters', 'draft_innovation', 'commander', 'starter', 'reprint', 'box', 'from_the_vault', 'premium_deck', 'duel_deck', 'archenemy', 'planechase', 'conspiracy']
+        const relevantTypes = new Set(['core', 'expansion', 'masters', 'draft_innovation', 'commander', 'starter', 'reprint', 'box', 'from_the_vault', 'premium_deck', 'duel_deck', 'archenemy', 'planechase', 'conspiracy'])
         const filteredSets = allSets.filter(set =>
-            relevantTypes.includes(set.set_type) &&
+            relevantTypes.has(set.set_type) &&
             set.card_count > 0
         )
 

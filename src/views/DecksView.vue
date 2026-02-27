@@ -14,7 +14,7 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
-import { type CardCondition } from '../types/card'
+import { type CardCondition, type CardStatus } from '../types/card'
 import { getCardById, getCardsByIds, searchCards } from '../services/scryfall'
 import type { DeckFormat } from '../types/deck'
 import { type ParsedCsvCard, parseDeckLine } from '../utils/cardHelpers'
@@ -325,15 +325,11 @@ const handleDeleteDeck = async (deckId: string) => {
 }
 
 // Importar desde texto (lista de cartas)
-const handleImport = async (
-  deckText: string,
-  condition: CardCondition,
-  includeSideboard: boolean,
-  deckName?: string,
-  makePublic?: boolean,
-  format?: DeckFormat,
-  commander?: string
-) => {
+const handleImport = async (opts: {
+  deckText: string, condition: CardCondition, includeSideboard: boolean,
+  deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
+}) => {
+  const { deckText, condition, includeSideboard, deckName, makePublic, format, commander } = opts
   const finalDeckName = deckName || `Deck${Date.now()}`
 
   // Close modal immediately and show background toast

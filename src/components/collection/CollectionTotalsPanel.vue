@@ -118,10 +118,16 @@ const sourceStrokeColor = computed(() => {
   return '#CCFF00'
 })
 
+const getPriceValue = (s: { ck: number; buylist: number; tcg: number }) => {
+  if (priceSource.value === 'ck') return s.ck
+  if (priceSource.value === 'buylist') return s.buylist
+  return s.tcg
+}
+
 const chartData = computed(() => {
   return history.value.map(s => ({
     date: s.date,
-    value: priceSource.value === 'ck' ? s.ck : priceSource.value === 'buylist' ? s.buylist : s.tcg,
+    value: getPriceValue(s),
   }))
 })
 

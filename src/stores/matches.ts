@@ -190,7 +190,7 @@ export const useMatchesStore = defineStore('matches', () => {
         return {
             id: docId,
             docId,
-            type: data.cardType === 'sale' ? (isSender ? 'BUSCO' : 'VENDO') : 'BUSCO',
+            type: (data.cardType === 'sale' && !isSender) ? 'VENDO' : 'BUSCO',
             otherUserId: isSender ? data.receiverId : data.senderId,
             otherUsername: isSender ? data.receiverUsername : data.senderUsername,
             otherLocation: isSender ? data.receiverLocation : data.senderLocation,

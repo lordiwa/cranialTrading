@@ -58,106 +58,30 @@ const formats = computed(() => {
   return Array.from(set).sort()
 })
 
-const handleCreateDeck = async (deckData: any) => {
-  const { deckList, ...deckInfo } = deckData
+// --- Shared helpers to reduce cognitive complexity ---
 
-  const deckId = await decksStore.createDeck(deckInfo)
-  if (deckId) {
-    // Si hay una lista de cartas, importarla
-    if (deckList) {
-      toastStore.show(t('common.actions.loading'), 'info')
+// Extract image from a Scryfall card, handling split/dual-faced cards
+const extractScryfallImage = (card: any): string => {
+  return card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ''
+}
 
-      const lines = deckList.split('\n').filter((l: string) => l.trim())
-      const collectionCards: any[] = []
-      let inSideboard = false
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-
-        if (trimmed.toLowerCase().includes('sideboard')) {
-          inSideboard = true
-          continue
-        }
-
-        const parsed = parseDeckLine(trimmed)
-        if (!parsed) continue
-
-        const { quantity, cardName, setCode, isFoil } = parsed
-
-        // Buscar en Scryfall
-        const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
-
-        // Build card data - only include setCode if it has a value
-        const cardData: any = {
-          scryfallId: scryfallData?.scryfallId || '',
-          name: cardName,
-          edition: scryfallData?.edition || setCode || 'Unknown',
-          quantity,
-          condition: 'NM' as CardCondition,
-          foil: isFoil,
-          price: scryfallData?.price || 0,
-          image: scryfallData?.image || '',
-          status: 'collection',
-          isInSideboard: inSideboard,
-        }
-
-        const finalSetCode = scryfallData?.setCode || setCode
-        if (finalSetCode) {
-          cardData.setCode = finalSetCode
-        }
-
-        collectionCards.push(cardData)
-      }
-
-      // Guardar en colección primero
-      if (collectionCards.length > 0) {
-        await collectionStore.confirmImport(collectionCards)
-
-        // Recargar colección para obtener los IDs
-        await collectionStore.loadCollection()
-
-        // Ahora asignar al deck usando allocations
-        for (const cardData of collectionCards) {
-          // Buscar la carta en la colección por scryfallId
-          const collectionCard = collectionStore.cards.find(
-            c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
-          )
-          if (collectionCard) {
-            await decksStore.allocateCardToDeck(
-              deckId,
-              collectionCard.id,
-              cardData.quantity,
-              cardData.isInSideboard
-            )
-          }
-        }
-
-        toastStore.show(t('collection.messages.imported', { count: collectionCards.length }), 'success')
-      }
-    }
-
-    showCreateModal.value = false
-    await router.push(`/decks/${deckId}/edit`)
+// Extract standardized card data from a Scryfall card object
+const extractCardData = (card: any) => {
+  return {
+    scryfallId: card.id,
+    image: extractScryfallImage(card),
+    price: card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0,
+    edition: card.set_name,
+    setCode: card.set.toUpperCase(),
   }
 }
 
-const handleEditDeck = (deckId: string) => {
-  router.push(`/decks/${deckId}/edit`)
-}
-
-const handleDeleteDeck = async (deckId: string) => {
-  const confirmed = await confirmStore.show({
-    title: t('decks.card.delete'),
-    message: t('decks.messages.deleteError'),
-    confirmText: t('common.actions.delete'),
-    cancelText: t('common.actions.cancel'),
-    confirmVariant: 'danger'
-  })
-
-  if (confirmed) {
-    await decksStore.deleteDeck(deckId)
-  }
+// Find a print with price from a list of Scryfall results, preferring one with both price and image
+const findPrintWithPrice = (results: any[]) => {
+  return results.find(r =>
+    r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
+    (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+  ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 }
 
 // Helper: Buscar carta en Scryfall y obtener datos completos
@@ -173,63 +97,26 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
       const results = await searchCards(query)
       const card = results[0]
       if (card) {
-        let image = card.image_uris?.normal || ''
-        if (!image && card.card_faces && card.card_faces.length > 0) {
-          image = card.card_faces[0]?.image_uris?.normal || ''
-        }
-        const price = card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0
-
-        // If this print has price, use it
-        if (price > 0 && image) {
-          return {
-            scryfallId: card.id,
-            image,
-            price,
-            edition: card.set_name,
-            setCode: card.set.toUpperCase(),
-          }
+        const data = extractCardData(card)
+        if (data.price > 0 && data.image) {
+          return data
         }
       }
     }
 
     // Search all prints and find one with price
     const allResults = await searchCards(`!"${cleanName}"`)
-    if (allResults.length > 0) {
-      // Find print with both price and image
-      const printWithPrice = allResults.find(r =>
-          r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-          (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-      ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
+    if (allResults.length === 0) return null
 
-      if (printWithPrice?.prices?.usd) {
-        let image = printWithPrice.image_uris?.normal || ''
-        if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
-          image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
-        }
-        return {
-          scryfallId: printWithPrice.id,
-          image,
-          price: Number.parseFloat(printWithPrice.prices.usd),
-          edition: printWithPrice.set_name,
-          setCode: printWithPrice.set.toUpperCase(),
-        }
-      }
+    const printWithPrice = findPrintWithPrice(allResults)
+    if (printWithPrice?.prices?.usd) {
+      return extractCardData(printWithPrice)
+    }
 
-      // Fallback: at least return image from first result
-      const firstCard = allResults[0]
-      if (firstCard) {
-        let image = firstCard.image_uris?.normal || ''
-        if (!image && firstCard.card_faces && firstCard.card_faces.length > 0) {
-          image = firstCard.card_faces[0]?.image_uris?.normal || ''
-        }
-        return {
-          scryfallId: firstCard.id,
-          image,
-          price: firstCard.prices?.usd ? Number.parseFloat(firstCard.prices.usd) : 0,
-          edition: firstCard.set_name,
-          setCode: firstCard.set.toUpperCase(),
-        }
-      }
+    // Fallback: at least return image from first result
+    const firstCard = allResults[0]
+    if (firstCard) {
+      return extractCardData(firstCard)
     }
   } catch {
     console.warn(`No se pudo obtener datos de Scryfall para: ${cardName}`)
@@ -237,24 +124,13 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
   return null
 }
 
-// Importar desde texto (lista de cartas)
-const handleImport = async (
-  deckText: string,
+// Parse deck lines into collection card data objects
+const parseLinesIntoCards = async (
+  lines: string[],
   condition: CardCondition,
-  includeSideboard: boolean,
-  deckName?: string,
-  makePublic?: boolean,
-  format?: DeckFormat,
-  commander?: string
+  makePublic: boolean,
+  includeSideboard: boolean
 ) => {
-  const finalDeckName = deckName || `Deck${Date.now()}`
-
-  // Close modal immediately and show background toast
-  showImportModal.value = false
-  toastStore.show(t('decks.importModal.analyzing'), 'info')
-
-  // Parsear el texto
-  const lines = deckText.split('\n').filter(l => l.trim())
   const collectionCards: any[] = []
   let inSideboard = false
 
@@ -275,10 +151,8 @@ const handleImport = async (
     // Skip sideboard if not included
     if (inSideboard && !includeSideboard) continue
 
-    // Buscar en Scryfall para obtener imagen y datos
     const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
 
-    // Build card data - only include setCode if it has a value (Firebase rejects undefined)
     const cardData: any = {
       scryfallId: scryfallData?.scryfallId || '',
       name: cardName,
@@ -289,11 +163,10 @@ const handleImport = async (
       price: scryfallData?.price || 0,
       image: scryfallData?.image || '',
       status: 'collection',
-      public: makePublic || false,
+      public: makePublic,
       isInSideboard: inSideboard,
     }
 
-    // Only add setCode if we have one (Firebase doesn't accept undefined)
     const finalSetCode = scryfallData?.setCode || setCode
     if (finalSetCode) {
       cardData.setCode = finalSetCode
@@ -301,6 +174,175 @@ const handleImport = async (
 
     collectionCards.push(cardData)
   }
+
+  return collectionCards
+}
+
+// Allocate parsed collection cards to a deck by matching scryfallId+edition
+const allocateCollectionCardsToDeck = async (deckId: string, collectionCards: any[]) => {
+  await collectionStore.loadCollection()
+  for (const cardData of collectionCards) {
+    const collectionCard = collectionStore.cards.find(
+      c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
+    )
+    if (collectionCard) {
+      await decksStore.allocateCardToDeck(
+        deckId,
+        collectionCard.id,
+        cardData.quantity,
+        cardData.isInSideboard
+      )
+    }
+  }
+}
+
+// Enrich a single card with Scryfall data (used in handleImportDirect)
+const enrichCardFromScryfall = async (card: any) => {
+  let image = ''
+  let price = 0
+  const finalScryfallId = card.scryfallId || ''
+  const finalEdition = card.setCode || 'Unknown'
+  let cmc: number | undefined = undefined
+  let type_line: string | undefined = undefined
+  let colors: string[] = []
+
+  if (card.scryfallId) {
+    const scryfallCard = await getCardById(card.scryfallId)
+    if (scryfallCard) {
+      image = extractScryfallImage(scryfallCard)
+      price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
+      cmc = scryfallCard.cmc
+      type_line = scryfallCard.type_line
+      colors = scryfallCard.colors || []
+    }
+  }
+
+  return { image, price, finalScryfallId, finalEdition, cmc, type_line, colors }
+}
+
+// Fallback search for a better print when price=0 or image is missing
+const findBestPrintFallback = async (
+  cardName: string,
+  current: { image: string; price: number; finalScryfallId: string; finalEdition: string; cmc: number | undefined; type_line: string | undefined; colors: string[] }
+) => {
+  const result = { ...current }
+  try {
+    const results = await searchCards(`!"${cardName}"`)
+    const printWithPrice = findPrintWithPrice(results)
+
+    if (printWithPrice?.prices?.usd) {
+      result.finalScryfallId = printWithPrice.id
+      result.finalEdition = printWithPrice.set.toUpperCase()
+      result.price = Number.parseFloat(printWithPrice.prices.usd)
+      result.image = extractScryfallImage(printWithPrice)
+      result.cmc = printWithPrice.cmc
+      result.type_line = printWithPrice.type_line
+      result.colors = printWithPrice.colors || []
+    } else if (!result.image && results[0]) {
+      const anyPrint = results[0]
+      result.image = extractScryfallImage(anyPrint)
+      if (!result.finalScryfallId) result.finalScryfallId = anyPrint.id
+      if (result.finalEdition === 'Unknown') result.finalEdition = anyPrint.set.toUpperCase()
+      result.cmc = anyPrint.cmc
+      result.type_line = anyPrint.type_line
+      result.colors = anyPrint.colors || []
+    }
+  } catch {
+    console.warn(`Could not find alternate print for: ${cardName}`)
+  }
+  return result
+}
+
+// Build a single collection card data object from CSV card + Scryfall data map
+const buildCsvCardData = (card: ParsedCsvCard, scryfallDataMap: Map<string, any>, makePublic: boolean) => {
+  const sc = scryfallDataMap.get(card.scryfallId)
+  const image = extractScryfallImage(sc)
+  const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
+
+  const cardData: any = {
+    scryfallId: card.scryfallId || '',
+    name: card.name,
+    edition: sc?.set_name || card.setCode || 'Unknown',
+    quantity: card.quantity,
+    condition: card.condition,
+    foil: card.foil,
+    price,
+    image,
+    status: 'collection',
+    public: makePublic,
+  }
+  if (card.setCode) {
+    cardData.setCode = card.setCode.toUpperCase()
+  }
+  if (card.language) {
+    cardData.language = card.language
+  }
+  return cardData
+}
+
+// --- End shared helpers ---
+
+const handleCreateDeck = async (deckData: any) => {
+  const { deckList, ...deckInfo } = deckData
+
+  const deckId = await decksStore.createDeck(deckInfo)
+  if (!deckId) return
+
+  // Si hay una lista de cartas, importarla
+  if (deckList) {
+    toastStore.show(t('common.actions.loading'), 'info')
+
+    const lines = deckList.split('\n').filter((l: string) => l.trim())
+    const collectionCards = await parseLinesIntoCards(lines, 'NM' as CardCondition, false, true)
+
+    if (collectionCards.length > 0) {
+      await collectionStore.confirmImport(collectionCards)
+      await allocateCollectionCardsToDeck(deckId, collectionCards)
+      toastStore.show(t('collection.messages.imported', { count: collectionCards.length }), 'success')
+    }
+  }
+
+  showCreateModal.value = false
+  await router.push(`/decks/${deckId}/edit`)
+}
+
+const handleEditDeck = (deckId: string) => {
+  router.push(`/decks/${deckId}/edit`)
+}
+
+const handleDeleteDeck = async (deckId: string) => {
+  const confirmed = await confirmStore.show({
+    title: t('decks.card.delete'),
+    message: t('decks.messages.deleteError'),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
+    confirmVariant: 'danger'
+  })
+
+  if (confirmed) {
+    await decksStore.deleteDeck(deckId)
+  }
+}
+
+// Importar desde texto (lista de cartas)
+const handleImport = async (
+  deckText: string,
+  condition: CardCondition,
+  includeSideboard: boolean,
+  deckName?: string,
+  makePublic?: boolean,
+  format?: DeckFormat,
+  commander?: string
+) => {
+  const finalDeckName = deckName || `Deck${Date.now()}`
+
+  // Close modal immediately and show background toast
+  showImportModal.value = false
+  toastStore.show(t('decks.importModal.analyzing'), 'info')
+
+  // Parsear el texto
+  const lines = deckText.split('\n').filter(l => l.trim())
+  const collectionCards = await parseLinesIntoCards(lines, condition, makePublic || false, includeSideboard)
 
   // 1. Crear el deck
   const deckId = await decksStore.createDeck({
@@ -311,28 +353,11 @@ const handleImport = async (
     commander: commander || '',
   })
 
-  // 2. Agregar cartas a la colección primero
+  // 2. Agregar cartas a la colección y asignar al deck
   if (collectionCards.length > 0) {
     await collectionStore.confirmImport(collectionCards)
-
-    // Recargar colección para obtener los IDs
-    await collectionStore.loadCollection()
-
-    // 3. Asignar al deck usando allocations
     if (deckId) {
-      for (const cardData of collectionCards) {
-        const collectionCard = collectionStore.cards.find(
-          c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
-        )
-        if (collectionCard) {
-          await decksStore.allocateCardToDeck(
-            deckId,
-            collectionCard.id,
-            cardData.quantity,
-            cardData.isInSideboard
-          )
-        }
-      }
+      await allocateCollectionCardsToDeck(deckId, collectionCards)
     }
   }
 
@@ -379,70 +404,16 @@ const handleImportDirect = async (
     }
 
     // Obtener imagen y precio desde Scryfall
-    let image = ''
-    let price = 0
-    let finalScryfallId = card.scryfallId || ''
-    let finalEdition = card.setCode || 'Unknown'
-    let cmc: number | undefined = undefined
-    let type_line: string | undefined = undefined
-    let colors: string[] = []
-
-    if (card.scryfallId) {
-      const scryfallCard = await getCardById(card.scryfallId)
-      if (scryfallCard) {
-        image = scryfallCard.image_uris?.normal || ''
-        if (!image && scryfallCard.card_faces && scryfallCard.card_faces.length > 0) {
-          image = scryfallCard.card_faces[0]?.image_uris?.normal || ''
-        }
-        price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
-        cmc = scryfallCard.cmc
-        type_line = scryfallCard.type_line
-        colors = scryfallCard.colors || []
-      }
-    }
+    let enriched = await enrichCardFromScryfall(card)
 
     // If no price or no image, search for another print with price
-    if (price === 0 || !image) {
-      try {
-        const results = await searchCards(`!"${cardName}"`)
-        // Find a print with price, preferring one with both price and image
-        const printWithPrice = results.find(r =>
-            r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-        ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
-
-        if (printWithPrice?.prices?.usd) {
-          finalScryfallId = printWithPrice.id
-          finalEdition = printWithPrice.set.toUpperCase()
-          price = Number.parseFloat(printWithPrice.prices.usd)
-          image = printWithPrice.image_uris?.normal || ''
-          if (!image && printWithPrice.card_faces && printWithPrice.card_faces.length > 0) {
-            image = printWithPrice.card_faces[0]?.image_uris?.normal || ''
-          }
-          cmc = printWithPrice.cmc
-          type_line = printWithPrice.type_line
-          colors = printWithPrice.colors || []
-        } else if (!image) {
-          // At least get an image from any print
-          const anyPrint = results[0]
-          if (anyPrint) {
-            image = anyPrint.image_uris?.normal || ''
-            if (!image && anyPrint.card_faces && anyPrint.card_faces.length > 0) {
-              image = anyPrint.card_faces[0]?.image_uris?.normal || ''
-            }
-            if (!finalScryfallId) finalScryfallId = anyPrint.id
-            if (finalEdition === 'Unknown') finalEdition = anyPrint.set.toUpperCase()
-            cmc = anyPrint.cmc
-            type_line = anyPrint.type_line
-            colors = anyPrint.colors || []
-          }
-        }
-      } catch {
-        console.warn(`Could not find alternate print for: ${cardName}`)
-      }
+    if (enriched.price === 0 || !enriched.image) {
+      enriched = await findBestPrintFallback(cardName, enriched)
     }
 
-    // Agregar al wishlist del deck (se convertirá a allocation cuando se guarde en colección)
+    const { image, price, finalScryfallId, finalEdition, cmc, type_line, colors } = enriched
+
+    // Agregar al wishlist del deck
     if (deckId) {
       await decksStore.addToWishlist(deckId, {
         scryfallId: finalScryfallId,
@@ -532,35 +503,7 @@ const handleImportCsv = async (
   }
 
   // 3. Build collection cards
-  const collectionCards: any[] = []
-  for (const card of cards) {
-    const sc = scryfallDataMap.get(card.scryfallId)
-    let image = sc?.image_uris?.normal || ''
-    if (!image && sc?.card_faces?.length > 0) {
-      image = sc.card_faces[0]?.image_uris?.normal || ''
-    }
-    const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
-
-    const cardData: any = {
-      scryfallId: card.scryfallId || '',
-      name: card.name,
-      edition: sc?.set_name || card.setCode || 'Unknown',
-      quantity: card.quantity,
-      condition: card.condition,
-      foil: card.foil,
-      price,
-      image,
-      status: 'collection',
-      public: makePublic || false,
-    }
-    if (card.setCode) {
-      cardData.setCode = card.setCode.toUpperCase()
-    }
-    if (card.language) {
-      cardData.language = card.language
-    }
-    collectionCards.push(cardData)
-  }
+  const collectionCards = cards.map(card => buildCsvCardData(card, scryfallDataMap, makePublic || false))
 
   // 4. Save to collection and allocate to deck
   if (collectionCards.length > 0) {

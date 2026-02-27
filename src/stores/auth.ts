@@ -589,46 +589,50 @@ export const useAuthStore = defineStore('auth', () => {
     /**
      * Compress and resize image to base64
      */
-    const compressImage = (file: File, maxSize: number, quality: number): Promise<string> => {
+    const readFileAsDataURL = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    // Scale down if larger than maxSize
-                    if (width > maxSize || height > maxSize) {
-                        if (width > height) {
-                            height = (height / width) * maxSize;
-                            width = maxSize;
-                        } else {
-                            width = (width / height) * maxSize;
-                            height = maxSize;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) {
-                        reject(new Error('Could not get canvas context'));
-                        return;
-                    }
-
-                    ctx.drawImage(img, 0, 0, width, height);
-                    const base64 = canvas.toDataURL('image/jpeg', quality);
-                    resolve(base64);
-                };
-                img.onerror = reject;
-                img.src = e.target?.result as string;
-            };
+            reader.onload = (e) => { resolve(e.target?.result as string); };
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    };
+
+    const loadImage = (src: string): Promise<HTMLImageElement> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => { resolve(img); };
+            img.onerror = reject;
+            img.src = src;
+        });
+    };
+
+    const compressImage = async (file: File, maxSize: number, quality: number): Promise<string> => {
+        const dataUrl = await readFileAsDataURL(file);
+        const img = await loadImage(dataUrl);
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxSize || height > maxSize) {
+            if (width > height) {
+                height = (height / width) * maxSize;
+                width = maxSize;
+            } else {
+                width = (width / height) * maxSize;
+                height = maxSize;
+            }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get canvas context');
+
+        ctx.drawImage(img, 0, 0, width, height);
+        return canvas.toDataURL('image/jpeg', quality);
     };
 
     return {

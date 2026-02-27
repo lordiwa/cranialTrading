@@ -216,6 +216,30 @@ export async function syncAllUserCards(
 /**
  * Bulk sync all user's preferences to public collection
  */
+function buildPreferenceData(
+  pref: any,
+  userId: string,
+  username: string,
+  userAvatarUrl?: string | null,
+  userLocation?: string,
+  userEmail?: string
+): Record<string, any> {
+  const data: Record<string, any> = {
+    prefId: pref.id,
+    userId,
+    username,
+    avatarUrl: userAvatarUrl || null,
+    cardName: pref.cardName || pref.name || '',
+    scryfallId: pref.scryfallId || '',
+    updatedAt: Timestamp.now(),
+  }
+  if (pref.maxPrice !== undefined) data.maxPrice = pref.maxPrice
+  if (pref.minCondition !== undefined) data.minCondition = pref.minCondition
+  if (userLocation) data.location = userLocation
+  if (userEmail) data.email = userEmail
+  return data
+}
+
 export async function syncAllUserPreferences(
   preferences: any[],
   userId: string,
@@ -250,21 +274,7 @@ export async function syncAllUserPreferences(
     for (const pref of chunk) {
       const publicPrefId = `${userId}_${pref.id}`
       const publicPrefRef = doc(db, 'public_preferences', publicPrefId)
-      // Filter out undefined values (Firestore doesn't accept them)
-      const data: Record<string, any> = {
-        prefId: pref.id,
-        userId,
-        username,
-        avatarUrl: userAvatarUrl || null,
-        cardName: pref.cardName || pref.name || '',
-        scryfallId: pref.scryfallId || '',
-        updatedAt: Timestamp.now(),
-      }
-      if (pref.maxPrice !== undefined) data.maxPrice = pref.maxPrice
-      if (pref.minCondition !== undefined) data.minCondition = pref.minCondition
-      if (userLocation) data.location = userLocation
-      if (userEmail) data.email = userEmail
-      batch.set(publicPrefRef, data)
+      batch.set(publicPrefRef, buildPreferenceData(pref, userId, username, userAvatarUrl, userLocation, userEmail))
     }
     await batch.commit()
   }

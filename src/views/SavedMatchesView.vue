@@ -499,6 +499,44 @@ const clearAllData = async () => {
 
 // ========== CALCULATE MATCHES ==========
 
+const groupMatchesByUser = (matchingCards: PublicCard[], matchingPrefs: PublicPreference[]) => {
+  const userMatches = new Map<string, {
+    cards: PublicCard[],
+    prefs: PublicPreference[],
+    username: string,
+    location: string,
+    email: string
+  }>()
+
+  for (const card of matchingCards) {
+    if (!userMatches.has(card.userId)) {
+      userMatches.set(card.userId, {
+        cards: [],
+        prefs: [],
+        username: card.username,
+        location: card.location || 'Unknown',
+        email: card.email || ''
+      })
+    }
+    userMatches.get(card.userId)!.cards.push(card)
+  }
+
+  for (const pref of matchingPrefs) {
+    if (!userMatches.has(pref.userId)) {
+      userMatches.set(pref.userId, {
+        cards: [],
+        prefs: [],
+        username: pref.username,
+        location: pref.location || 'Unknown',
+        email: pref.email || ''
+      })
+    }
+    userMatches.get(pref.userId)!.prefs.push(pref)
+  }
+
+  return userMatches
+}
+
 const calculateMatches = async () => {
   if (!authStore.user) return
 
@@ -538,39 +576,7 @@ const calculateMatches = async () => {
     const matchingPrefs = await findPreferencesMatchingCards(myCards, authStore.user.id)
 
     // Agrupar por usuario
-    const userMatches = new Map<string, {
-      cards: PublicCard[],
-      prefs: PublicPreference[],
-      username: string,
-      location: string,
-      email: string
-    }>()
-
-    for (const card of matchingCards) {
-      if (!userMatches.has(card.userId)) {
-        userMatches.set(card.userId, {
-          cards: [],
-          prefs: [],
-          username: card.username,
-          location: card.location || 'Unknown',
-          email: card.email || ''
-        })
-      }
-      userMatches.get(card.userId)!.cards.push(card)
-    }
-
-    for (const pref of matchingPrefs) {
-      if (!userMatches.has(pref.userId)) {
-        userMatches.set(pref.userId, {
-          cards: [],
-          prefs: [],
-          username: pref.username,
-          location: pref.location || 'Unknown',
-          email: pref.email || ''
-        })
-      }
-      userMatches.get(pref.userId)!.prefs.push(pref)
-    }
+    const userMatches = groupMatchesByUser(matchingCards, matchingPrefs)
 
     // Crear matches por usuario
     progressTotal.value = userMatches.size + 2

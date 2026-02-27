@@ -364,25 +364,19 @@ export const useCollectionStore = defineStore('collection', () => {
         // If first batch fails (e.g. permission error), skip remaining batches
         let publicCardsBlocked = false
         for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
-            if (publicCardsBlocked) {
-                completedBatches++
-                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
-                continue
-            }
-
-            const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
-
-            const ok = await commitWithRetry(() => {
-                const batch = writeBatch(db)
-                for (const cardId of chunk) {
-                    batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
+            if (!publicCardsBlocked) {
+                const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
+                const ok = await commitWithRetry(() => {
+                    const batch = writeBatch(db)
+                    for (const cardId of chunk) {
+                        batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
+                    }
+                    return batch
+                })
+                if (!ok) {
+                    console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
+                    publicCardsBlocked = true
                 }
-                return batch
-            })
-
-            if (!ok) {
-                console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
-                publicCardsBlocked = true
             }
 
             completedBatches++

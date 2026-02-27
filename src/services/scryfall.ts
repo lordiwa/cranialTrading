@@ -439,6 +439,49 @@ export const getCardsByPowerToughness = async (
  * ✅ NUEVO: Obtener múltiples cartas en un solo request (hasta 75 por batch)
  * Usa el endpoint /cards/collection de Scryfall
  */
+async function fetchCollectionBatch(
+    batch: ({ id: string } | { name: string })[]
+): Promise<ScryfallCard[]> {
+    let retries = 3
+
+    while (retries > 0) {
+        try {
+            const now = Date.now()
+            const elapsed = now - lastRequestTime
+            if (elapsed < MIN_REQUEST_INTERVAL) {
+                await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - elapsed))
+            }
+            lastRequestTime = Date.now()
+
+            const response = await fetch(`${SCRYFALL_API}/cards/collection`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifiers: batch }),
+            })
+
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After')
+                const delay = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000
+                await new Promise(resolve => setTimeout(resolve, delay))
+                retries--
+                continue
+            }
+
+            if (!response.ok) {
+                console.error(`Scryfall collection API error: ${response.status}`)
+                return []
+            }
+
+            const data = await response.json()
+            return data.data || []
+        } catch (error) {
+            console.error('Error en getCardsByIds batch:', error)
+            retries--
+        }
+    }
+    return []
+}
+
 export const getCardsByIds = async (
     identifiers: ({ id: string } | { name: string })[]
 ): Promise<ScryfallCard[]> => {
@@ -447,53 +490,11 @@ export const getCardsByIds = async (
     const results: ScryfallCard[] = []
     const BATCH_SIZE = 75
 
-    // Procesar en batches de 75
     for (let i = 0; i < identifiers.length; i += BATCH_SIZE) {
         const batch = identifiers.slice(i, i + BATCH_SIZE)
-        let retries = 3
+        const batchResults = await fetchCollectionBatch(batch)
+        results.push(...batchResults)
 
-        while (retries > 0) {
-            try {
-                // Respect rate limit
-                const now = Date.now()
-                const elapsed = now - lastRequestTime
-                if (elapsed < MIN_REQUEST_INTERVAL) {
-                    await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - elapsed))
-                }
-                lastRequestTime = Date.now()
-
-                const response = await fetch(`${SCRYFALL_API}/cards/collection`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ identifiers: batch }),
-                })
-
-                if (!response.ok) {
-                    if (response.status === 429) {
-                        const retryAfter = response.headers.get('Retry-After')
-                        const delay = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000
-                        await new Promise(resolve => setTimeout(resolve, delay))
-                        retries--
-                        continue
-                    }
-                    console.error(`Scryfall collection API error: ${response.status}`)
-                    break
-                }
-
-                const data = await response.json()
-                if (data.data) {
-                    results.push(...data.data)
-                }
-                break // Success, exit retry loop
-            } catch (error) {
-                console.error('Error en getCardsByIds batch:', error)
-                retries--
-            }
-        }
-
-        // Pequeña pausa entre batches para evitar rate limiting
         if (i + BATCH_SIZE < identifiers.length) {
             await new Promise(resolve => setTimeout(resolve, 50))
         }

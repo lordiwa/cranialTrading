@@ -1309,6 +1309,349 @@ const toggleBinderForSale = async () => {
   await binderStore.updateBinder(selectedBinder.value.id, { forSale: !selectedBinder.value.forSale })
 }
 
+// ========== SHARED HELPERS (reduce cognitive complexity) ==========
+
+/** Extract the normal image URL from a Scryfall card object */
+const extractScryfallImage = (card: any): string => {
+  return card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ''
+}
+
+/** Extract all relevant card data fields from a Scryfall result */
+const extractScryfallCardData = (card: any) => {
+  return {
+    scryfallId: card.id,
+    image: extractScryfallImage(card),
+    price: card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0,
+    edition: card.set_name,
+    setCode: card.set.toUpperCase(),
+    cmc: card.cmc,
+    type_line: card.type_line,
+    colors: card.colors || [],
+    rarity: card.rarity,
+    power: card.power,
+    toughness: card.toughness,
+    oracle_text: card.oracle_text,
+    keywords: card.keywords || [],
+    legalities: card.legalities,
+    full_art: card.full_art || false,
+  }
+}
+
+/** Execute the actual binder deletion (card deletion + binder doc deletion) */
+const executeBinderDeletion = async (binderId: string, cardIds: string[], deleteCards: boolean) => {
+  if (deleteCards && cardIds.length > 0) {
+    try {
+      const result = await collectionStore.batchDeleteCards(cardIds)
+      if (result.failed > 0) {
+        toastStore.show(t('binders.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+      } else {
+        toastStore.show(t('binders.deletedWithCards', { count: cardIds.length }), 'success')
+      }
+    } catch (cardErr) {
+      console.warn('[DeleteBinder] Card deletion failed, proceeding to delete binder:', cardErr)
+      toastStore.show(t('binders.deletedWithCardWarning', { deleted: 0, failed: cardIds.length }), 'error')
+    }
+  }
+
+  const success = await binderStore.deleteBinder(binderId)
+  if (success) {
+    const remaining = binderStore.binders
+    binderFilter.value = remaining.length > 0 ? remaining[0]!.id : 'all'
+  }
+}
+
+/** Parse a single text line into card data for import (shared by deck and binder text import) */
+const parseTextImportLine = (trimmed: string): { quantity: number; cardName: string; setCode: string | null; isFoil: boolean } | null => {
+  const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
+  const matchQty = match?.[1]
+  const matchName = match?.[2]
+  if (!match || !matchQty || !matchName) return null
+
+  return {
+    quantity: Number.parseInt(matchQty),
+    cardName: cleanCardName(matchName.trim()),
+    setCode: match[3] || null,
+    isFoil: /\*[fF]\*?\s*$/.test(trimmed),
+  }
+}
+
+/** Build a collection card object from text import line data + Scryfall results */
+const buildCollectionCardFromScryfall = (
+  cardName: string,
+  quantity: number,
+  condition: CardCondition,
+  isFoil: boolean,
+  setCode: string | null,
+  scryfallData: { scryfallId: string; image: string; price: number; edition: string; setCode: string; cmc: any; type_line: any; colors: string[]; rarity: any; power: any; toughness: any; oracle_text: any; keywords: string[]; legalities: any; full_art: boolean } | null | undefined,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+  isInSideboard: boolean,
+): any => {
+  const cardData: any = {
+    scryfallId: scryfallData?.scryfallId || '',
+    name: cardName,
+    edition: scryfallData?.edition || setCode || 'Unknown',
+    quantity,
+    condition,
+    foil: isFoil,
+    price: scryfallData?.price || 0,
+    image: scryfallData?.image || '',
+    status: status || 'collection',
+    public: makePublic,
+    isInSideboard,
+    cmc: scryfallData?.cmc,
+    type_line: scryfallData?.type_line,
+    colors: scryfallData?.colors || [],
+    rarity: scryfallData?.rarity,
+    power: scryfallData?.power,
+    toughness: scryfallData?.toughness,
+    oracle_text: scryfallData?.oracle_text,
+    keywords: scryfallData?.keywords || [],
+    legalities: scryfallData?.legalities,
+    full_art: scryfallData?.full_art || false,
+  }
+  if (scryfallData?.setCode || setCode) {
+    cardData.setCode = scryfallData?.setCode || setCode
+  }
+  return cardData
+}
+
+/** Process a single card from Moxfield import into a collection card object (shared by deck and binder) */
+const processImportCard = (
+  card: any,
+  scryfallDataMap: Map<string, any>,
+  condition: CardCondition,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+): { cardData: any; needsSearch: boolean } => {
+  let cardName = card.name
+  const isFoil = /\*[fF]\*?\s*$/.test(cardName)
+  if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+
+  let image = ''
+  let price = 0
+  const finalScryfallId = card.scryfallId || ''
+  let finalEdition = card.setCode || 'Unknown'
+  let cmc: number | undefined = undefined
+  let type_line: string | undefined = undefined
+  let colors: string[] = []
+  let rarity: string | undefined = undefined
+  let power: string | undefined = undefined
+  let toughness: string | undefined = undefined
+  let oracle_text: string | undefined = undefined
+  let keywords: string[] = []
+  let legalities: Record<string, string> | undefined = undefined
+  let full_art = false
+
+  if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
+    const scryfallCard = scryfallDataMap.get(card.scryfallId)
+    image = extractScryfallImage(scryfallCard)
+    price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
+    finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
+    cmc = scryfallCard.cmc
+    type_line = scryfallCard.type_line
+    colors = scryfallCard.colors || []
+    rarity = scryfallCard.rarity
+    power = scryfallCard.power
+    toughness = scryfallCard.toughness
+    oracle_text = scryfallCard.oracle_text
+    keywords = scryfallCard.keywords || []
+    legalities = scryfallCard.legalities
+    full_art = scryfallCard.full_art || false
+  }
+
+  const cardData = {
+    scryfallId: finalScryfallId,
+    name: cardName,
+    edition: finalEdition,
+    quantity: card.quantity,
+    condition,
+    foil: isFoil,
+    price,
+    image,
+    status: status || 'collection',
+    public: makePublic,
+    cmc,
+    type_line,
+    colors,
+    rarity,
+    power,
+    toughness,
+    oracle_text,
+    keywords,
+    legalities,
+    full_art,
+  }
+
+  return { cardData, needsSearch: price === 0 || !image }
+}
+
+/** Enrich collection cards that are missing price/image with fallback Scryfall search */
+const enrichCardsWithFallbackSearch = async (collectionCardsToAdd: any[], cardsNeedingSearch: number[]) => {
+  for (const idx of cardsNeedingSearch) {
+    const cardData = collectionCardsToAdd[idx]
+    try {
+      const results = await searchCards(`!"${cardData.name}"`)
+      const printWithPrice = results.find(r =>
+        r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
+        (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+      ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
+
+      if (printWithPrice?.prices?.usd) {
+        const extracted = extractScryfallCardData(printWithPrice)
+        Object.assign(cardData, {
+          scryfallId: extracted.scryfallId,
+          edition: extracted.setCode,
+          price: extracted.price,
+          image: extracted.image,
+          cmc: extracted.cmc,
+          type_line: extracted.type_line,
+          colors: extracted.colors,
+          rarity: extracted.rarity,
+          power: extracted.power,
+          toughness: extracted.toughness,
+          oracle_text: extracted.oracle_text,
+          keywords: extracted.keywords,
+          legalities: extracted.legalities,
+          full_art: extracted.full_art,
+        })
+      } else if (results.length > 0 && !cardData.image) {
+        const anyPrint = results[0]
+        if (anyPrint) {
+          const extracted = extractScryfallCardData(anyPrint)
+          cardData.image = extracted.image
+          if (!cardData.scryfallId) cardData.scryfallId = extracted.scryfallId
+          if (cardData.edition === 'Unknown') cardData.edition = extracted.setCode
+          cardData.cmc = extracted.cmc
+          cardData.type_line = extracted.type_line
+          cardData.colors = extracted.colors
+          cardData.rarity = extracted.rarity
+          cardData.power = extracted.power
+          cardData.toughness = extracted.toughness
+          cardData.oracle_text = extracted.oracle_text
+          cardData.keywords = extracted.keywords
+          cardData.legalities = extracted.legalities
+          cardData.full_art = extracted.full_art
+        }
+      }
+    } catch (e) {
+      console.warn(`[Import] Failed to search for "${cardData.name}":`, e)
+    }
+  }
+}
+
+/** Build a collection card from CSV import data + Scryfall batch data (shared by deck and binder) */
+const buildCsvCollectionCard = (
+  card: ParsedCsvCard,
+  scryfallDataMap: Map<string, any>,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+): any => {
+  const sc = scryfallDataMap.get(card.scryfallId)
+  const image = extractScryfallImage(sc)
+  const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
+
+  const cardData: any = {
+    scryfallId: card.scryfallId || '',
+    name: card.name,
+    edition: sc?.set_name || card.setCode || 'Unknown',
+    quantity: card.quantity,
+    condition: card.condition,
+    foil: card.foil,
+    price,
+    image,
+    status: status || 'collection',
+    public: makePublic,
+    cmc: sc?.cmc,
+    type_line: sc?.type_line,
+    colors: sc?.colors || [],
+    rarity: sc?.rarity,
+    power: sc?.power,
+    toughness: sc?.toughness,
+    oracle_text: sc?.oracle_text,
+    keywords: sc?.keywords || [],
+    legalities: sc?.legalities,
+    full_art: sc?.full_art || false,
+  }
+  if (card.setCode) {
+    cardData.setCode = card.setCode.toUpperCase()
+  }
+  if (card.language) {
+    cardData.language = card.language
+  }
+  return cardData
+}
+
+/** Execute the card deletion step of deck deletion (shared logic extracted from executeDeleteDeck) */
+const executeCardDeletionStep = async (
+  state: DeleteDeckState,
+  isResume: boolean,
+  onProgress: (percent: number) => void,
+): Promise<void> => {
+  if (!state.deleteCards || state.cardIds.length === 0) return
+
+  saveDeleteDeckState(state)
+  const result = await collectionStore.batchDeleteCards(state.cardIds, (percent) => {
+    onProgress(5 + Math.round(percent * 0.80))
+  })
+
+  if (result.failed > 0) {
+    console.warn(`[DeleteDeck] ${result.failed} cards failed to delete`)
+    toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+    if (!isResume) {
+      throw new Error(`Card deletion incomplete: ${result.failed} failed`)
+    }
+  } else {
+    toastStore.show(t('decks.messages.deletedWithCards', { count: state.cardIds.length }), 'success')
+  }
+}
+
+/** Build export lines for deck text export (shared logic extracted from handleExportDeck) */
+const buildExportLines = (
+  mainboardCards: DisplayDeckCard[],
+  sideboardCards: DisplayDeckCard[],
+  isCommander: boolean,
+  commanderName: string | undefined,
+  getQty: (card: DisplayDeckCard) => number,
+  getSet: (card: DisplayDeckCard) => string,
+): string[] => {
+  const lines: string[] = []
+
+  if (isCommander && commanderName) {
+    const commanderCards = mainboardCards.filter(c => c.name === commanderName)
+    if (commanderCards.length > 0) {
+      lines.push('Commander')
+      for (const card of commanderCards) {
+        lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
+      }
+      lines.push('')
+    }
+  }
+
+  const deckCards = isCommander && commanderName
+    ? mainboardCards.filter(c => c.name !== commanderName)
+    : mainboardCards
+
+  if (deckCards.length > 0) {
+    if (isCommander && commanderName) {
+      lines.push('Deck')
+    }
+    for (const card of deckCards) {
+      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  if (sideboardCards.length > 0) {
+    lines.push('')
+    lines.push('Sideboard')
+    for (const card of sideboardCards) {
+      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
+    }
+  }
+
+  return lines
+}
+
 const handleDeleteBinder = async () => {
   if (!selectedBinder.value) return
 
@@ -1348,31 +1691,7 @@ const handleDeleteBinder = async () => {
   binderFilter.value = 'all'
 
   try {
-    // Step 1: Delete cards first (binder doc still in Firestore as recovery reference)
-    if (deleteCards && cardIds.length > 0) {
-      try {
-        const result = await collectionStore.batchDeleteCards(cardIds)
-        if (result.failed > 0) {
-          toastStore.show(t('binders.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
-        } else {
-          toastStore.show(t('binders.deletedWithCards', { count: cardIds.length }), 'success')
-        }
-      } catch (cardErr) {
-        console.warn('[DeleteBinder] Card deletion failed, proceeding to delete binder:', cardErr)
-        toastStore.show(t('binders.deletedWithCardWarning', { deleted: 0, failed: cardIds.length }), 'error')
-      }
-    }
-
-    // Step 2: Delete the binder document
-    const success = await binderStore.deleteBinder(binderId)
-    if (success) {
-      const remaining = binderStore.binders
-      if (remaining.length > 0) {
-        binderFilter.value = remaining[0]!.id
-      } else {
-        binderFilter.value = 'all'
-      }
-    }
+    await executeBinderDeletion(binderId, cardIds, deleteCards)
   } catch (err) {
     console.error('[DeleteBinder] Error:', err)
     toastStore.show(t('common.messages.loadError'), 'error')
@@ -1445,26 +1764,9 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
       const results = await searchCards(`"${cleanName}" e:${setCode}`)
       const card = results[0]
       if (card) {
-        const image = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
-        const price = card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0
-        if (price > 0 && image) {
-          return {
-            scryfallId: card.id,
-            image,
-            price,
-            edition: card.set_name,
-            setCode: card.set.toUpperCase(),
-            cmc: card.cmc,
-            type_line: card.type_line,
-            colors: card.colors || [],
-            rarity: card.rarity,
-            power: card.power,
-            toughness: card.toughness,
-            oracle_text: card.oracle_text,
-            keywords: card.keywords || [],
-            legalities: card.legalities,
-            full_art: card.full_art || false,
-          }
+        const extracted = extractScryfallCardData(card)
+        if (extracted.price > 0 && extracted.image) {
+          return extracted
         }
       }
     }
@@ -1475,24 +1777,7 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
         (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
       ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || allResults[0]
       if (!printWithPrice) return null
-      const image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
-      return {
-        scryfallId: printWithPrice.id,
-        image,
-        price: printWithPrice.prices?.usd ? Number.parseFloat(printWithPrice.prices.usd) : 0,
-        edition: printWithPrice.set_name,
-        setCode: printWithPrice.set.toUpperCase(),
-        cmc: printWithPrice.cmc,
-        type_line: printWithPrice.type_line,
-        colors: printWithPrice.colors || [],
-        rarity: printWithPrice.rarity,
-        power: printWithPrice.power,
-        toughness: printWithPrice.toughness,
-        oracle_text: printWithPrice.oracle_text,
-        keywords: printWithPrice.keywords || [],
-        legalities: printWithPrice.legalities,
-        full_art: printWithPrice.full_art || false,
-      }
+      return extractScryfallCardData(printWithPrice)
     }
   } catch (e) {
     console.warn(`No se pudo obtener datos de Scryfall para: ${cardName}`)
@@ -1524,47 +1809,15 @@ const handleImport = async (
     if (!trimmed) continue
     if (trimmed.toLowerCase().includes('sideboard')) { inSideboard = true; continue }
 
-    const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
-    const matchQty = match?.[1]
-    const matchName = match?.[2]
-    if (!match || !matchQty || !matchName) continue
-
-    const quantity = Number.parseInt(matchQty)
-    let cardName = matchName.trim()
-    const setCode = match[3] || null
-    const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
-
-    cardName = cleanCardName(cardName)
+    const parsed = parseTextImportLine(trimmed)
+    if (!parsed) continue
     if (inSideboard && !includeSideboard) continue
 
-    const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
-
-    const cardData: any = {
-      scryfallId: scryfallData?.scryfallId || '',
-      name: cardName,
-      edition: scryfallData?.edition || setCode || 'Unknown',
-      quantity,
-      condition,
-      foil: isFoil,
-      price: scryfallData?.price || 0,
-      image: scryfallData?.image || '',
-      status: status || 'collection',
-      public: makePublic || false,
-      isInSideboard: inSideboard,
-      cmc: scryfallData?.cmc,
-      type_line: scryfallData?.type_line,
-      colors: scryfallData?.colors || [],
-      rarity: scryfallData?.rarity,
-      power: scryfallData?.power,
-      toughness: scryfallData?.toughness,
-      oracle_text: scryfallData?.oracle_text,
-      keywords: scryfallData?.keywords || [],
-      legalities: scryfallData?.legalities,
-      full_art: scryfallData?.full_art || false,
-    }
-    if (scryfallData?.setCode || setCode) {
-      cardData.setCode = scryfallData?.setCode || setCode
-    }
+    const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode || undefined)
+    const cardData = buildCollectionCardFromScryfall(
+      parsed.cardName, parsed.quantity, condition, parsed.isFoil, parsed.setCode,
+      scryfallData, status, makePublic || false, inSideboard,
+    )
     collectionCardsToAdd.push(cardData)
   }
 
@@ -1692,68 +1945,13 @@ const handleImportDirect = async (
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
-      let cardName = card.name
-      const isFoil = /\*[fF]\*?\s*$/.test(cardName)
-      if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, makePublic || false)
 
-      let image = ''
-      let price = 0
-      const finalScryfallId = card.scryfallId || ''
-      let finalEdition = card.setCode || 'Unknown'
-      let cmc: number | undefined = undefined
-      let type_line: string | undefined = undefined
-      let colors: string[] = []
-      let rarity: string | undefined = undefined
-      let power: string | undefined = undefined
-      let toughness: string | undefined = undefined
-      let oracle_text: string | undefined = undefined
-      let keywords: string[] = []
-      let legalities: Record<string, string> | undefined = undefined
-      let full_art = false
-
-      if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
-        const scryfallCard = scryfallDataMap.get(card.scryfallId)
-        image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
-        price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
-        finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
-        cmc = scryfallCard.cmc
-        type_line = scryfallCard.type_line
-        colors = scryfallCard.colors || []
-        rarity = scryfallCard.rarity
-        power = scryfallCard.power
-        toughness = scryfallCard.toughness
-        oracle_text = scryfallCard.oracle_text
-        keywords = scryfallCard.keywords || []
-        legalities = scryfallCard.legalities
-        full_art = scryfallCard.full_art || false
-      }
-
-      if (price === 0 || !image) {
+      if (needsSearch) {
         cardsNeedingSearch.push(i)
       }
 
-      collectionCardsToAdd.push({
-        scryfallId: finalScryfallId,
-        name: cardName,
-        edition: finalEdition,
-        quantity: card.quantity,
-        condition,
-        foil: isFoil,
-        price,
-        image,
-        status: status || 'collection',
-        public: makePublic || false,
-        cmc,
-        type_line,
-        colors,
-        rarity,
-        power,
-        toughness,
-        oracle_text,
-        keywords,
-        legalities,
-        full_art,
-      })
+      collectionCardsToAdd.push(cardData)
       cardMeta.push({
         quantity: card.quantity,
         isInSideboard: card.isInSideboard || false
@@ -1773,54 +1971,7 @@ const handleImportDirect = async (
 
     // PASO 5: Búsqueda individual para cartas sin precio/imagen
     progressToast.update(45, `Buscando precios adicionales...`)
-    if (cardsNeedingSearch.length > 0) {
-      for (const idx of cardsNeedingSearch) {
-        const cardData = collectionCardsToAdd[idx]
-        try {
-          const results = await searchCards(`!"${cardData.name}"`)
-          const printWithPrice = results.find(r =>
-            r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-          ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
-
-          if (printWithPrice?.prices?.usd) {
-            cardData.scryfallId = printWithPrice.id
-            cardData.edition = printWithPrice.set.toUpperCase()
-            cardData.price = Number.parseFloat(printWithPrice.prices.usd)
-            cardData.image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
-            cardData.cmc = printWithPrice.cmc
-            cardData.type_line = printWithPrice.type_line
-            cardData.colors = printWithPrice.colors || []
-            cardData.rarity = printWithPrice.rarity
-            cardData.power = printWithPrice.power
-            cardData.toughness = printWithPrice.toughness
-            cardData.oracle_text = printWithPrice.oracle_text
-            cardData.keywords = printWithPrice.keywords || []
-            cardData.legalities = printWithPrice.legalities
-            cardData.full_art = printWithPrice.full_art || false
-          } else if (results.length > 0 && !cardData.image) {
-            const anyPrint = results[0]
-            if (anyPrint) {
-              cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
-              if (!cardData.scryfallId) cardData.scryfallId = anyPrint.id
-              if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
-              cardData.cmc = anyPrint.cmc
-              cardData.type_line = anyPrint.type_line
-              cardData.colors = anyPrint.colors || []
-              cardData.rarity = anyPrint.rarity
-              cardData.power = anyPrint.power
-              cardData.toughness = anyPrint.toughness
-              cardData.oracle_text = anyPrint.oracle_text
-              cardData.keywords = anyPrint.keywords || []
-              cardData.legalities = anyPrint.legalities
-              cardData.full_art = anyPrint.full_art || false
-            }
-          }
-        } catch (e) {
-          console.warn(`[Import] Failed to search for "${cardData.name}":`, e)
-        }
-      }
-    }
+    await enrichCardsWithFallbackSearch(collectionCardsToAdd, cardsNeedingSearch)
 
     // PASO 6: Importar cartas a la colección
     progressToast.update(50, `Guardando ${collectionCardsToAdd.length} cartas...`)
@@ -1967,41 +2118,7 @@ const handleImportCsv = async (
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]!
-      const sc = scryfallDataMap.get(card.scryfallId)
-      let image = sc?.image_uris?.normal || ''
-      if (!image && sc?.card_faces?.length > 0) {
-        image = sc.card_faces[0]?.image_uris?.normal || ''
-      }
-      const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
-
-      const cardData: any = {
-        scryfallId: card.scryfallId || '',
-        name: card.name,
-        edition: sc?.set_name || card.setCode || 'Unknown',
-        quantity: card.quantity,
-        condition: card.condition,
-        foil: card.foil,
-        price,
-        image,
-        status: status || 'collection',
-        public: makePublic || false,
-        cmc: sc?.cmc,
-        type_line: sc?.type_line,
-        colors: sc?.colors || [],
-        rarity: sc?.rarity,
-        power: sc?.power,
-        toughness: sc?.toughness,
-        oracle_text: sc?.oracle_text,
-        keywords: sc?.keywords || [],
-        legalities: sc?.legalities,
-        full_art: sc?.full_art || false,
-      }
-      if (card.setCode) {
-        cardData.setCode = card.setCode.toUpperCase()
-      }
-      if (card.language) {
-        cardData.language = card.language
-      }
+      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, makePublic || false)
       collectionCardsToAdd.push(cardData)
       cardMeta.push({ quantity: card.quantity, isInSideboard: false })
 
@@ -2070,46 +2187,15 @@ const handleImportBinder = async (
     if (!trimmed) continue
     if (trimmed.toLowerCase().includes('sideboard')) { inSideboard = true; continue }
 
-    const match = /^(\d+)x?\s+(.+?)(?:\s+\(([A-Z0-9]+)\))?(?:\s+[\dA-Z]+-?\d*[a-z]?)?(?:\s+\*[fF]\*?)?$/i.exec(trimmed)
-    const matchQty = match?.[1]
-    const matchName = match?.[2]
-    if (!match || !matchQty || !matchName) continue
-
-    const quantity = Number.parseInt(matchQty)
-    let cardName = matchName.trim()
-    const setCode = match[3] || null
-    const isFoil = /\*[fF]\*?\s*$/.test(trimmed)
-
-    cardName = cleanCardName(cardName)
+    const parsed = parseTextImportLine(trimmed)
+    if (!parsed) continue
     if (inSideboard && !includeSideboard) continue
 
-    const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
-
-    const cardData: any = {
-      scryfallId: scryfallData?.scryfallId || '',
-      name: cardName,
-      edition: scryfallData?.edition || setCode || 'Unknown',
-      quantity,
-      condition,
-      foil: isFoil,
-      price: scryfallData?.price || 0,
-      image: scryfallData?.image || '',
-      status: status || 'collection',
-      public: false,
-      cmc: scryfallData?.cmc,
-      type_line: scryfallData?.type_line,
-      colors: scryfallData?.colors || [],
-      rarity: scryfallData?.rarity,
-      power: scryfallData?.power,
-      toughness: scryfallData?.toughness,
-      oracle_text: scryfallData?.oracle_text,
-      keywords: scryfallData?.keywords || [],
-      legalities: scryfallData?.legalities,
-      full_art: scryfallData?.full_art || false,
-    }
-    if (scryfallData?.setCode || setCode) {
-      cardData.setCode = scryfallData?.setCode || setCode
-    }
+    const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode || undefined)
+    const cardData = buildCollectionCardFromScryfall(
+      parsed.cardName, parsed.quantity, condition, parsed.isFoil, parsed.setCode,
+      scryfallData, status, false, false,
+    )
     collectionCardsToAdd.push(cardData)
   }
 
@@ -2200,68 +2286,13 @@ const handleImportBinderDirect = async (
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
-      let cardName = card.name
-      const isFoil = /\*[fF]\*?\s*$/.test(cardName)
-      if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, false)
 
-      let image = ''
-      let price = 0
-      const finalScryfallId = card.scryfallId || ''
-      let finalEdition = card.setCode || 'Unknown'
-      let cmc: number | undefined = undefined
-      let type_line: string | undefined = undefined
-      let colors: string[] = []
-      let rarity: string | undefined = undefined
-      let power: string | undefined = undefined
-      let toughness: string | undefined = undefined
-      let oracle_text: string | undefined = undefined
-      let keywords: string[] = []
-      let legalities: Record<string, string> | undefined = undefined
-      let full_art = false
-
-      if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
-        const scryfallCard = scryfallDataMap.get(card.scryfallId)
-        image = scryfallCard.image_uris?.normal || scryfallCard.card_faces?.[0]?.image_uris?.normal || ''
-        price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
-        finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
-        cmc = scryfallCard.cmc
-        type_line = scryfallCard.type_line
-        colors = scryfallCard.colors || []
-        rarity = scryfallCard.rarity
-        power = scryfallCard.power
-        toughness = scryfallCard.toughness
-        oracle_text = scryfallCard.oracle_text
-        keywords = scryfallCard.keywords || []
-        legalities = scryfallCard.legalities
-        full_art = scryfallCard.full_art || false
-      }
-
-      if (price === 0 || !image) {
+      if (needsSearch) {
         cardsNeedingSearch.push(i)
       }
 
-      collectionCardsToAdd.push({
-        scryfallId: finalScryfallId,
-        name: cardName,
-        edition: finalEdition,
-        quantity: card.quantity,
-        condition,
-        foil: isFoil,
-        price,
-        image,
-        status: status || 'collection',
-        public: false,
-        cmc,
-        type_line,
-        colors,
-        rarity,
-        power,
-        toughness,
-        oracle_text,
-        keywords,
-        legalities,
-        full_art,
-      })
+      collectionCardsToAdd.push(cardData)
 
       const processPercent = 25 + Math.round((i / cards.length) * 20)
       progressToast.update(processPercent, `Processing ${i + 1}/${cards.length}...`)
@@ -2269,54 +2300,7 @@ const handleImportBinderDirect = async (
 
     // Search for cards missing price/image
     progressToast.update(45, `Fetching additional prices...`)
-    if (cardsNeedingSearch.length > 0) {
-      for (const idx of cardsNeedingSearch) {
-        const cardData = collectionCardsToAdd[idx]
-        try {
-          const results = await searchCards(`!"${cardData.name}"`)
-          const printWithPrice = results.find(r =>
-            r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-            (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-          ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
-
-          if (printWithPrice?.prices?.usd) {
-            cardData.scryfallId = printWithPrice.id
-            cardData.edition = printWithPrice.set.toUpperCase()
-            cardData.price = Number.parseFloat(printWithPrice.prices.usd)
-            cardData.image = printWithPrice.image_uris?.normal || printWithPrice.card_faces?.[0]?.image_uris?.normal || ''
-            cardData.cmc = printWithPrice.cmc
-            cardData.type_line = printWithPrice.type_line
-            cardData.colors = printWithPrice.colors || []
-            cardData.rarity = printWithPrice.rarity
-            cardData.power = printWithPrice.power
-            cardData.toughness = printWithPrice.toughness
-            cardData.oracle_text = printWithPrice.oracle_text
-            cardData.keywords = printWithPrice.keywords || []
-            cardData.legalities = printWithPrice.legalities
-            cardData.full_art = printWithPrice.full_art || false
-          } else if (results.length > 0 && !cardData.image) {
-            const anyPrint = results[0]
-            if (anyPrint) {
-              cardData.image = anyPrint.image_uris?.normal || anyPrint.card_faces?.[0]?.image_uris?.normal || ''
-              if (!cardData.scryfallId) cardData.scryfallId = anyPrint.id
-              if (cardData.edition === 'Unknown') cardData.edition = anyPrint.set.toUpperCase()
-              cardData.cmc = anyPrint.cmc
-              cardData.type_line = anyPrint.type_line
-              cardData.colors = anyPrint.colors || []
-              cardData.rarity = anyPrint.rarity
-              cardData.power = anyPrint.power
-              cardData.toughness = anyPrint.toughness
-              cardData.oracle_text = anyPrint.oracle_text
-              cardData.keywords = anyPrint.keywords || []
-              cardData.legalities = anyPrint.legalities
-              cardData.full_art = anyPrint.full_art || false
-            }
-          }
-        } catch (e) {
-          console.warn(`[Binder Import] Failed to search for "${cardData.name}":`, e)
-        }
-      }
-    }
+    await enrichCardsWithFallbackSearch(collectionCardsToAdd, cardsNeedingSearch)
 
     // Import cards to collection
     progressToast.update(50, `Saving ${collectionCardsToAdd.length} cards...`)
@@ -2393,41 +2377,7 @@ const handleImportBinderCsv = async (
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]!
-      const sc = scryfallDataMap.get(card.scryfallId)
-      let image = sc?.image_uris?.normal || ''
-      if (!image && sc?.card_faces?.length > 0) {
-        image = sc.card_faces[0]?.image_uris?.normal || ''
-      }
-      const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
-
-      const cardData: any = {
-        scryfallId: card.scryfallId || '',
-        name: card.name,
-        edition: sc?.set_name || card.setCode || 'Unknown',
-        quantity: card.quantity,
-        condition: card.condition,
-        foil: card.foil,
-        price,
-        image,
-        status: status || 'collection',
-        public: false,
-        cmc: sc?.cmc,
-        type_line: sc?.type_line,
-        colors: sc?.colors || [],
-        rarity: sc?.rarity,
-        power: sc?.power,
-        toughness: sc?.toughness,
-        oracle_text: sc?.oracle_text,
-        keywords: sc?.keywords || [],
-        legalities: sc?.legalities,
-        full_art: sc?.full_art || false,
-      }
-      if (card.setCode) {
-        cardData.setCode = card.setCode.toUpperCase()
-      }
-      if (card.language) {
-        cardData.language = card.language
-      }
+      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, false)
       collectionCardsToAdd.push(cardData)
 
       if (i % 50 === 0) {
@@ -2482,25 +2432,9 @@ const executeDeleteDeck = async (state: DeleteDeckState, isResume = false) => {
   try {
     // Step 1: Delete cards (if pending)
     if (state.status === 'deleting_cards') {
-      if (state.deleteCards && cardIds.length > 0) {
-        saveDeleteDeckState(state)
-        const result = await collectionStore.batchDeleteCards(cardIds, (percent) => {
-          deleteProgress.value = 5 + Math.round(percent * 0.80)
-        })
-
-        if (result.failed > 0) {
-          console.warn(`[DeleteDeck] ${result.failed} cards failed to delete`)
-          // On first attempt: save error to allow resume/retry on next load
-          // On resume: advance anyway to avoid infinite retry loop
-          if (!isResume) {
-            toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
-            throw new Error(`Card deletion incomplete: ${result.failed} failed`)
-          }
-          toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
-        } else {
-          toastStore.show(t('decks.messages.deletedWithCards', { count: cardIds.length }), 'success')
-        }
-      }
+      await executeCardDeletionStep(state, isResume, (percent) => {
+        deleteProgress.value = percent
+      })
       // Advance to deleting_deck (also handles resume with empty cardIds)
       state.status = 'deleting_deck'
       saveDeleteDeckState(state)
@@ -2660,41 +2594,17 @@ const handleExportDeck = async () => {
     return card.edition
   }
 
-  const lines: string[] = []
   const isCommander = selectedDeck.value.format === 'commander'
   const commanderName = selectedDeck.value.commander
 
-  if (isCommander && commanderName) {
-    const commanderCards = mainboardDisplayCards.value.filter(c => c.name === commanderName)
-    if (commanderCards.length > 0) {
-      lines.push('Commander')
-      for (const card of commanderCards) {
-        lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
-      }
-      lines.push('')
-    }
-  }
-
-  const deckCards = isCommander && commanderName
-      ? mainboardDisplayCards.value.filter(c => c.name !== commanderName)
-      : mainboardDisplayCards.value
-
-  if (deckCards.length > 0) {
-    if (isCommander && commanderName) {
-      lines.push('Deck')
-    }
-    for (const card of deckCards) {
-      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
-    }
-  }
-
-  if (sideboardDisplayCards.value.length > 0) {
-    lines.push('')
-    lines.push('Sideboard')
-    for (const card of sideboardDisplayCards.value) {
-      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
-    }
-  }
+  const lines = buildExportLines(
+    mainboardDisplayCards.value,
+    sideboardDisplayCards.value,
+    isCommander,
+    commanderName,
+    getQty,
+    getSet,
+  )
 
   const text = lines.join('\n')
 

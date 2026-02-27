@@ -523,6 +523,51 @@ if (import.meta.env.DEV) {
 }
 
 /**
+ * Groups matching cards and preferences by userId into a single Map.
+ * Each entry contains that user's matched cards, preferences, and profile info.
+ */
+const groupMatchesByUser = (
+  matchingCards: PublicCard[],
+  matchingPrefs: PublicPreference[]
+): Map<string, { cards: PublicCard[], prefs: PublicPreference[], username: string, location: string, email: string }> => {
+  const userMatches = new Map<string, {
+    cards: PublicCard[],
+    prefs: PublicPreference[],
+    username: string,
+    location: string,
+    email: string
+  }>()
+
+  for (const card of matchingCards) {
+    if (!userMatches.has(card.userId)) {
+      userMatches.set(card.userId, {
+        cards: [],
+        prefs: [],
+        username: card.username,
+        location: card.location || 'Unknown',
+        email: card.email || ''
+      })
+    }
+    userMatches.get(card.userId)!.cards.push(card)
+  }
+
+  for (const pref of matchingPrefs) {
+    if (!userMatches.has(pref.userId)) {
+      userMatches.set(pref.userId, {
+        cards: [],
+        prefs: [],
+        username: pref.username,
+        location: pref.location || 'Unknown',
+        email: pref.email || ''
+      })
+    }
+    userMatches.get(pref.userId)!.prefs.push(pref)
+  }
+
+  return userMatches
+}
+
+/**
  * OPTIMIZED: Calcular matches usando colecciones públicas indexadas
  * En vez de O(n) usuarios, hace queries directas por scryfallId
  */
@@ -581,41 +626,7 @@ const calculateMatches = async () => {
     console.log(`🔎 Encontradas ${matchingPrefs.length} personas buscando mis cartas`)
 
     // Agrupar por usuario
-    const userMatches = new Map<string, {
-      cards: PublicCard[],
-      prefs: PublicPreference[],
-      username: string,
-      location: string,
-      email: string
-    }>()
-
-    // Procesar cartas encontradas
-    for (const card of matchingCards) {
-      if (!userMatches.has(card.userId)) {
-        userMatches.set(card.userId, {
-          cards: [],
-          prefs: [],
-          username: card.username,
-          location: card.location || 'Unknown',
-          email: card.email || ''
-        })
-      }
-      userMatches.get(card.userId)!.cards.push(card)
-    }
-
-    // Procesar preferencias encontradas
-    for (const pref of matchingPrefs) {
-      if (!userMatches.has(pref.userId)) {
-        userMatches.set(pref.userId, {
-          cards: [],
-          prefs: [],
-          username: pref.username,
-          location: pref.location || 'Unknown',
-          email: pref.email || ''
-        })
-      }
-      userMatches.get(pref.userId)!.prefs.push(pref)
-    }
+    const userMatches = groupMatchesByUser(matchingCards, matchingPrefs)
 
     // Crear matches por usuario
     progressTotal.value = userMatches.size + 2

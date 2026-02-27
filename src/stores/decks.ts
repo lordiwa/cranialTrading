@@ -40,6 +40,30 @@ const processFirestoreDates = <T extends { addedAt?: any }>(items: any[]): T[] =
     })) as T[]
 }
 
+// Upsert an allocation entry: increment existing or push new
+const upsertAllocation = (
+    allocations: DeckCardAllocation[],
+    cardId: string,
+    quantity: number,
+    isInSideboard: boolean,
+    notes?: string
+) => {
+    const existing = allocations.find(
+        a => a.cardId === cardId && a.isInSideboard === isInSideboard
+    )
+    if (existing) {
+        existing.quantity += quantity
+    } else {
+        allocations.push(removeUndefined({
+            cardId,
+            quantity,
+            isInSideboard,
+            notes,
+            addedAt: new Date(),
+        }))
+    }
+}
+
 // Deep-copy a Deck so that shallowRef assignment always triggers reactivity
 const snapshotDeck = (deck: Deck): Deck => ({
     ...deck,
@@ -567,21 +591,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             // Add allocation if we have cards available
             if (toAllocate > 0) {
-                // Check if allocation already exists for this card
-                const existingAlloc = deck.allocations.find(
-                    a => a.cardId === cardId && a.isInSideboard === isInSideboard
-                )
-                if (existingAlloc) {
-                    existingAlloc.quantity += toAllocate
-                } else {
-                    deck.allocations.push(removeUndefined({
-                        cardId,
-                        quantity: toAllocate,
-                        isInSideboard,
-                        notes,
-                        addedAt: new Date(),
-                    }))
-                }
+                upsertAllocation(deck.allocations, cardId, toAllocate, isInSideboard, notes)
             }
 
             // Add overflow to wishlist via collection
@@ -600,20 +610,7 @@ export const useDecksStore = defineStore('decks', () => {
                     colors: card.colors,
                 })
                 if (wishCardId) {
-                    const existingWishAlloc = deck.allocations.find(
-                        a => a.cardId === wishCardId && a.isInSideboard === isInSideboard
-                    )
-                    if (existingWishAlloc) {
-                        existingWishAlloc.quantity += toWishlist
-                    } else {
-                        deck.allocations.push(removeUndefined({
-                            cardId: wishCardId,
-                            quantity: toWishlist,
-                            isInSideboard,
-                            notes,
-                            addedAt: new Date(),
-                        }))
-                    }
+                    upsertAllocation(deck.allocations, wishCardId, toWishlist, isInSideboard, notes)
                 }
             }
 
@@ -679,19 +676,7 @@ export const useDecksStore = defineStore('decks', () => {
                 const toWishlist = item.quantity - toAllocate
 
                 if (toAllocate > 0) {
-                    const existing = deck.allocations.find(
-                        a => a.cardId === item.cardId && a.isInSideboard === item.isInSideboard
-                    )
-                    if (existing) {
-                        existing.quantity += toAllocate
-                    } else {
-                        deck.allocations.push(removeUndefined({
-                            cardId: item.cardId,
-                            quantity: toAllocate,
-                            isInSideboard: item.isInSideboard,
-                            addedAt: new Date(),
-                        }))
-                    }
+                    upsertAllocation(deck.allocations, item.cardId, toAllocate, item.isInSideboard)
                     totalAllocated += toAllocate
                 }
 
@@ -710,19 +695,7 @@ export const useDecksStore = defineStore('decks', () => {
                         colors: card.colors,
                     })
                     if (wishCardId) {
-                        const existingWishAlloc = deck.allocations.find(
-                            a => a.cardId === wishCardId && a.isInSideboard === item.isInSideboard
-                        )
-                        if (existingWishAlloc) {
-                            existingWishAlloc.quantity += toWishlist
-                        } else {
-                            deck.allocations.push(removeUndefined({
-                                cardId: wishCardId,
-                                quantity: toWishlist,
-                                isInSideboard: item.isInSideboard,
-                                addedAt: new Date(),
-                            }))
-                        }
+                        upsertAllocation(deck.allocations, wishCardId, toWishlist, item.isInSideboard)
                     }
                     totalWishlisted += toWishlist
                 }
@@ -1142,20 +1115,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             // Add new allocations pointing to wishlist card
             for (const alloc of allocs) {
-                const existingWishAlloc = deck.allocations.find(
-                    a => a.cardId === wishCardId && a.isInSideboard === alloc.isInSideboard
-                )
-                if (existingWishAlloc) {
-                    existingWishAlloc.quantity += alloc.quantity
-                } else {
-                    deck.allocations.push(removeUndefined({
-                        cardId: wishCardId,
-                        quantity: alloc.quantity,
-                        isInSideboard: alloc.isInSideboard,
-                        notes: alloc.notes,
-                        addedAt: new Date(),
-                    }))
-                }
+                upsertAllocation(deck.allocations, wishCardId, alloc.quantity, alloc.isInSideboard, alloc.notes)
             }
 
             // Recalculate stats

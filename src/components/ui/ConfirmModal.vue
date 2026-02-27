@@ -16,12 +16,8 @@ const getConfirmButtonClass = () => {
 }
 
 const getIconName = () => {
-  switch (confirmStore.options.confirmVariant) {
-    case 'danger':
-      return 'warning'
-    default:
-      return 'check'
-  }
+  if (confirmStore.options.confirmVariant === 'danger') return 'warning'
+  return 'check'
 }
 </script>
 

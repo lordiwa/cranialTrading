@@ -120,7 +120,7 @@ async function deleteBinder(userId: string, binderId: string): Promise<void> {
   await deleteDoc(doc(db, 'users', userId, 'binders', binderId))
 }
 
-async function getCard(userId: string, cardId: string): Promise<any | null> {
+async function getCard(userId: string, cardId: string): Promise<any> {
   const db = getDb()
   const cardDoc = await getDoc(doc(db, 'users', userId, 'cards', cardId))
   if (!cardDoc.exists()) return null
@@ -207,7 +207,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 2.50,
+        price: 2.5,
       })
       const card2Id = await addCardToCollection(userAId, {
         scryfallId: 'test-del-counter',
@@ -217,7 +217,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 1.00,
+        price: 1,
       })
       console.log(`   Created cards: ${card1Id}, ${card2Id}`)
 
@@ -279,7 +279,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 5.00,
+        price: 5,
       })
 
       // Create deck with allocation
@@ -320,7 +320,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 1.00,
+        price: 1,
       })
 
       // Same card in mainboard AND sideboard (duplicate cardId)
@@ -386,7 +386,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 3.00,
+        price: 3,
       })
       const card2Id = await addCardToCollection(userAId, {
         scryfallId: 'test-del-bcard2',
@@ -396,7 +396,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'LP',
         foil: true,
         status: 'trade',
-        price: 10.00,
+        price: 10,
       })
       console.log(`   Created cards: ${card1Id}, ${card2Id}`)
 
@@ -454,7 +454,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 2.00,
+        price: 2,
       })
 
       const binderId = await createBinder(userAId, {
@@ -493,7 +493,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 1.00,
+        price: 1,
       })
       const card2Id = await addCardToCollection(userAId, {
         scryfallId: 'test-del-buniq2',
@@ -503,7 +503,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 2.00,
+        price: 2,
       })
 
       const binderId = await createBinder(userAId, {
@@ -566,7 +566,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 5.00,
+        price: 5,
       })
 
       // Create two decks both using the same card
@@ -616,7 +616,7 @@ describe('Deck & Binder Deletion with Card Cleanup', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 3.00,
+        price: 3,
       })
 
       const deckId = await createDeck(userAId, {

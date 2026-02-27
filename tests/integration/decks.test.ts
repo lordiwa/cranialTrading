@@ -11,7 +11,6 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import {
-  TEST_USERS,
   initFirebase,
   loginAs,
   logout,
@@ -274,7 +273,7 @@ describe('Deck System Integration Tests', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 2.50,
+        price: 2.5,
       })
       console.log(`   ✅ Created card: ${cardId}`)
 
@@ -318,7 +317,7 @@ describe('Deck System Integration Tests', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 5.00,
+        price: 5,
       })
 
       const deckId = await createDeck(userAId, {
@@ -356,7 +355,7 @@ describe('Deck System Integration Tests', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 1.00,
+        price: 1,
       })
 
       const card2Id = await addCardToCollection(userAId, {
@@ -367,7 +366,7 @@ describe('Deck System Integration Tests', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 2.00,
+        price: 2,
       })
 
       const deckId = await createDeck(userAId, {
@@ -438,7 +437,7 @@ describe('Deck System Integration Tests', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 5.00,
+        price: 5,
       })
 
       const deckId = await createDeck(userAId, {
@@ -459,7 +458,7 @@ describe('Deck System Integration Tests', () => {
           edition: 'MH2',
           quantity: 4,
           isInSideboard: false,
-          price: 50.00,
+          price: 50,
           condition: 'NM',
           foil: false,
           addedAt: Timestamp.now(),

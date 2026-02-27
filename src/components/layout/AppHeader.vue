@@ -48,11 +48,11 @@ const restartTour = async () => {
   closeMobileMenu()
   resetTour()
   // Navigate to collection page first, then start tour
-  if (route.path !== '/collection') {
+  if (route.path === '/collection') {
+    void startTour()
+  } else {
     await router.push('/collection')
     setTimeout(() => void startTour(), 500)
-  } else {
-    void startTour()
   }
 }
 
@@ -154,12 +154,12 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
+  globalThis.addEventListener('keydown', handleKeydown)
   document.addEventListener('click', handleHelpClickOutside)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  globalThis.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleHelpClickOutside)
 })
 </script>

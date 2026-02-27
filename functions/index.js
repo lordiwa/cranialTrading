@@ -263,7 +263,7 @@ async function fetchMoversFromEndpoint(endpoint) {
     foil: !!item.foil,
   }));
 
-  const MIN_DOLLAR_CHANGE = 1.50;
+  const MIN_DOLLAR_CHANGE = 1.5;
 
   const winners = mapped
     .filter((c) => c.percentChange > 0 && (c.presentPrice - c.pastPrice) >= MIN_DOLLAR_CHANGE)

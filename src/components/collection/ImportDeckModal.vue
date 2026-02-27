@@ -187,7 +187,7 @@ const handleImport = () => {
   const nameToSend = deckNameInput.value?.trim() || undefined
   const commanderToSend = isCommander.value ? commanderName.value?.trim() || undefined : undefined
 
-  const statusToSend = importStatus.value !== 'collection' ? importStatus.value : undefined
+  const statusToSend = importStatus.value === 'collection' ? undefined : importStatus.value
 
   if (isCsv.value && csvParsedCards.value.length > 0) {
     // Importación desde CSV (ManaBox / Moxfield)
@@ -219,15 +219,11 @@ const handleClose = () => {
   emit('close')
 }
 
-const handleCsvFile = (event: Event) => {
+const handleCsvFile = async (event: Event) => {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    inputText.value = (e.target?.result as string) || ''
-    preview.value = null
-  }
-  reader.readAsText(file)
+  inputText.value = await file.text()
+  preview.value = null
 }
 </script>
 

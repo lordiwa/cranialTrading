@@ -91,7 +91,7 @@ describe('Collection System Integration Tests', () => {
         condition: 'NM',
         foil: false,
         status: 'collection',
-        price: 2.50,
+        price: 2.5,
       }
 
       const cardId = await addCardToCollection(userAId, testCard)
@@ -125,7 +125,7 @@ describe('Collection System Integration Tests', () => {
         condition: 'LP',
         foil: false,
         status: 'collection',
-        price: 1.00,
+        price: 1,
       })
 
       // Update the card
@@ -133,7 +133,7 @@ describe('Collection System Integration Tests', () => {
       await updateDoc(doc(db, 'users', userAId, 'cards', cardId), {
         quantity: 4,
         condition: 'NM',
-        price: 3.50,
+        price: 3.5,
         updatedAt: Timestamp.now(),
       })
       console.log(`   ✅ Updated card: ${cardId}`)
@@ -144,7 +144,7 @@ describe('Collection System Integration Tests', () => {
 
       expect(updatedCard?.quantity).toBe(4)
       expect(updatedCard?.condition).toBe('NM')
-      expect(updatedCard?.price).toBe(3.50)
+      expect(updatedCard?.price).toBe(3.5)
       console.log(`   ✅ Update verified`)
 
       await logout()
@@ -164,7 +164,7 @@ describe('Collection System Integration Tests', () => {
         condition: 'MP',
         foil: false,
         status: 'collection',
-        price: 0.50,
+        price: 0.5,
       })
       console.log(`   ✅ Created card: ${cardId}`)
 

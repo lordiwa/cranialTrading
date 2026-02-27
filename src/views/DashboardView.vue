@@ -232,8 +232,8 @@ const debugPublicCollections = async () => {
 }
 
 // Expose to window for debugging
-if (typeof window !== 'undefined') {
-  (window as any).debugPublicCollections = debugPublicCollections
+if (typeof globalThis.window !== 'undefined') {
+  (globalThis as any).debugPublicCollections = debugPublicCollections
 }
 
 // ========== BLOCKED USERS MANAGEMENT ==========

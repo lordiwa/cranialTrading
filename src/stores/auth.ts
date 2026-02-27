@@ -374,7 +374,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         // Validate username format
-        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        const usernameRegex = /^\w{3,20}$/;
         if (!usernameRegex.test(newUsername)) {
             toastStore.show(t('settings.changeUsername.invalidFormat'), 'error');
             return { success: false };

@@ -229,7 +229,7 @@ export function useCardFilter<T extends FilterableCard>(
 
   const passesStatRange = (value: string | undefined, min?: number, max?: number): boolean => {
     if (min === undefined && max === undefined) return true
-    const parsed = value !== undefined ? Number.parseFloat(value) : Number.NaN
+    const parsed = value === undefined ? Number.NaN : Number.parseFloat(value)
     if (Number.isNaN(parsed)) return false
     if (min !== undefined && parsed < min) return false
     if (max !== undefined && parsed > max) return false
@@ -390,7 +390,7 @@ export function useCardFilter<T extends FilterableCard>(
 
     for (const card of source) {
       const category = getCardCategory(card)
-      if (!groups[category]) groups[category] = []
+      groups[category] ??= []
       groups[category].push(card)
     }
 

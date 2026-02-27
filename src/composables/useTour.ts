@@ -67,7 +67,7 @@ export function useTour() {
 
   const openMobileMenu = (): Promise<void> => {
     return new Promise((resolve) => {
-      const menuBtn = document.querySelector<HTMLButtonElement>('.md\\:hidden[class*="border-silver"]')
+      const menuBtn = document.querySelector<HTMLButtonElement>(String.raw`.md\:hidden[class*="border-silver"]`)
       if (menuBtn && menuBtn.textContent?.trim() === '☰') {
         menuBtn.click()
         setTimeout(resolve, 300)
@@ -78,7 +78,7 @@ export function useTour() {
   }
 
   const closeMobileMenu = () => {
-    const menuBtn = document.querySelector<HTMLButtonElement>('.md\\:hidden[class*="border-silver"]')
+    const menuBtn = document.querySelector<HTMLButtonElement>(String.raw`.md\:hidden[class*="border-silver"]`)
     if (menuBtn && menuBtn.textContent?.trim() === '✕') {
       menuBtn.click()
     }

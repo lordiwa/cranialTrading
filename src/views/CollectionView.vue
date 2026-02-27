@@ -1199,13 +1199,7 @@ const handleCardDetailClosed = () => {
 
 // Handle edit from deck grid
 const handleDeckGridEdit = async (displayCard: DisplayDeckCard) => {
-  if (!displayCard.isWishlist) {
-    const card = collectionStore.cards.find(c => c.id === displayCard.cardId)
-    if (card) {
-      selectedCard.value = card
-      showCardDetailModal.value = true
-    }
-  } else {
+  if (displayCard.isWishlist) {
     // Wishlist card: search on Scryfall and offer to add to collection
     try {
       const results = await searchCards(`!"${displayCard.name}" set:${displayCard.edition}`)
@@ -1215,6 +1209,12 @@ const handleDeckGridEdit = async (displayCard: DisplayDeckCard) => {
       }
     } catch (err) {
       console.error('Error searching wishlist card:', err)
+    }
+  } else {
+    const card = collectionStore.cards.find(c => c.id === displayCard.cardId)
+    if (card) {
+      selectedCard.value = card
+      showCardDetailModal.value = true
     }
   }
 }
@@ -1584,7 +1584,7 @@ const executeCardDeletionStep = async (
 
   saveDeleteDeckState(state)
   const result = await collectionStore.batchDeleteCards(state.cardIds, (percent) => {
-    onProgress(5 + Math.round(percent * 0.80))
+    onProgress(5 + Math.round(percent * 0.8))
   })
 
   if (result.failed > 0) {
@@ -2960,11 +2960,11 @@ const handleKeyboardShortcut = (e: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeyboardShortcut)
+  globalThis.addEventListener('keydown', handleKeyboardShortcut)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyboardShortcut)
+  globalThis.removeEventListener('keydown', handleKeyboardShortcut)
 })
 </script>
 

@@ -143,7 +143,7 @@ const TEST_CARD = {
   quantity: 4,
   condition: 'NM',
   foil: false,
-  price: 2.50,
+  price: 2.5,
 }
 
 // ============ E2E TEST ============
@@ -291,7 +291,7 @@ describe('E2E Match Flow', () => {
     )
     const cardsSnapshot = await getDocs(cardsQuery)
     const matchingCards = cardsSnapshot.docs
-      .map(d => ({ id: d.id, ...d.data() } as any))
+      .map(d => ({ id: d.id, ...d.data() }))
       .filter((c: any) => c.userId !== userBId)
 
     expect(matchingCards.length).toBeGreaterThan(0)
@@ -305,7 +305,7 @@ describe('E2E Match Flow', () => {
     )
     const prefsSnapshot = await getDocs(prefsQuery)
     const matchingPrefs = prefsSnapshot.docs
-      .map(d => ({ id: d.id, ...d.data() } as any))
+      .map(d => ({ id: d.id, ...d.data() }))
       .filter((p: any) => p.userId !== userAId)
 
     expect(matchingPrefs.length).toBeGreaterThan(0)

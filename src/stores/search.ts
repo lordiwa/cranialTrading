@@ -102,13 +102,15 @@ export const useSearchStore = defineStore('search', () => {
         const mvQuery = buildManaValueQuery(filters.manaValue)
         if (mvQuery) parts.push(mvQuery)
 
-        parts.push(...buildArrayQuery(filters.rarity, 'r:'))
-        parts.push(...buildArrayQuery(filters.sets, 'e:'))
-        parts.push(...buildRangeQuery(filters.power, 'pow'))
-        parts.push(...buildRangeQuery(filters.toughness, 'tou'))
-        parts.push(...buildArrayQuery(filters.formatLegal, 'f:'))
-        parts.push(...buildRangeQuery(filters.priceUSD, 'usd'))
-        parts.push(...buildKeywordsQuery(filters.keywords))
+        parts.push(
+          ...buildArrayQuery(filters.rarity, 'r:'),
+          ...buildArrayQuery(filters.sets, 'e:'),
+          ...buildRangeQuery(filters.power, 'pow'),
+          ...buildRangeQuery(filters.toughness, 'tou'),
+          ...buildArrayQuery(filters.formatLegal, 'f:'),
+          ...buildRangeQuery(filters.priceUSD, 'usd'),
+          ...buildKeywordsQuery(filters.keywords),
+        )
 
         if (filters.isFoil) parts.push('is:foil')
         if (filters.isFullArt) parts.push('is:full')

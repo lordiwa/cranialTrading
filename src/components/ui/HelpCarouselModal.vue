@@ -19,11 +19,11 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
+  globalThis.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  globalThis.removeEventListener('keydown', handleKeydown)
 })
 
 // Prevent body scroll when modal is open

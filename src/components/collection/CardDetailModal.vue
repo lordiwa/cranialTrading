@@ -389,7 +389,7 @@ const upsertStatusCard = async (
       scryfallId: cardData.scryfallId, edition: cardData.edition, setCode: cardData.setCode,
       image: cardData.image, price: cardData.price, public: cardData.isPublic,
     })
-    return status !== 'wishlist' ? existingCard.id : null
+    return status === 'wishlist' ? null : existingCard.id
   }
   const newCardId = await collectionStore.addCard({
     scryfallId: cardData.scryfallId, name: cardData.name, edition: cardData.edition,

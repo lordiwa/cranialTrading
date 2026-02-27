@@ -46,11 +46,11 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
   const handleKeyDown = (event: KeyboardEvent) => { handleShortcutEvent(event, shortcuts) }
 
   onMounted(() => {
-    window.addEventListener('keydown', handleKeyDown)
+    globalThis.addEventListener('keydown', handleKeyDown)
   })
 
   onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown)
+    globalThis.removeEventListener('keydown', handleKeyDown)
   })
 
   return {
@@ -68,17 +68,17 @@ export function registerGlobalShortcuts(shortcuts: KeyboardShortcut[]) {
   globalShortcuts.value = shortcuts
 
   if (globalListener) {
-    window.removeEventListener('keydown', globalListener)
+    globalThis.removeEventListener('keydown', globalListener)
   }
 
   globalListener = (event: KeyboardEvent) => { handleShortcutEvent(event, globalShortcuts.value) }
 
-  window.addEventListener('keydown', globalListener)
+  globalThis.addEventListener('keydown', globalListener)
 }
 
 export function unregisterGlobalShortcuts() {
   if (globalListener) {
-    window.removeEventListener('keydown', globalListener)
+    globalThis.removeEventListener('keydown', globalListener)
     globalListener = null
   }
   globalShortcuts.value = []

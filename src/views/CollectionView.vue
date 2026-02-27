@@ -1486,54 +1486,45 @@ const processImportCard = (
   return { cardData, needsSearch: price === 0 || !image }
 }
 
+/** Apply best search result to a card's data (used by enrichCardsWithFallbackSearch) */
+const applySearchResultToCard = (cardData: any, results: any[]) => {
+  const printWithPrice = results.find(r =>
+    r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
+    (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
+  ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
+
+  if (printWithPrice?.prices?.usd) {
+    Object.assign(cardData, extractScryfallCardData(printWithPrice))
+    return
+  }
+
+  if (results.length === 0 || cardData.image) return
+  const anyPrint = results[0]
+  if (!anyPrint) return
+
+  const extracted = extractScryfallCardData(anyPrint)
+  cardData.image = extracted.image
+  if (!cardData.scryfallId) cardData.scryfallId = extracted.scryfallId
+  if (cardData.edition === 'Unknown') cardData.edition = extracted.setCode
+  cardData.cmc = extracted.cmc
+  cardData.type_line = extracted.type_line
+  cardData.colors = extracted.colors
+  cardData.rarity = extracted.rarity
+  cardData.power = extracted.power
+  cardData.toughness = extracted.toughness
+  cardData.oracle_text = extracted.oracle_text
+  cardData.keywords = extracted.keywords
+  cardData.legalities = extracted.legalities
+  cardData.full_art = extracted.full_art
+}
+
 /** Enrich collection cards that are missing price/image with fallback Scryfall search */
 const enrichCardsWithFallbackSearch = async (collectionCardsToAdd: any[], cardsNeedingSearch: number[]) => {
   for (const idx of cardsNeedingSearch) {
     const cardData = collectionCardsToAdd[idx]
     try {
       const results = await searchCards(`!"${cardData.name}"`)
-      const printWithPrice = results.find(r =>
-        r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-        (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-      ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
-
-      if (printWithPrice?.prices?.usd) {
-        const extracted = extractScryfallCardData(printWithPrice)
-        Object.assign(cardData, {
-          scryfallId: extracted.scryfallId,
-          edition: extracted.setCode,
-          price: extracted.price,
-          image: extracted.image,
-          cmc: extracted.cmc,
-          type_line: extracted.type_line,
-          colors: extracted.colors,
-          rarity: extracted.rarity,
-          power: extracted.power,
-          toughness: extracted.toughness,
-          oracle_text: extracted.oracle_text,
-          keywords: extracted.keywords,
-          legalities: extracted.legalities,
-          full_art: extracted.full_art,
-        })
-      } else if (results.length > 0 && !cardData.image) {
-        const anyPrint = results[0]
-        if (anyPrint) {
-          const extracted = extractScryfallCardData(anyPrint)
-          cardData.image = extracted.image
-          if (!cardData.scryfallId) cardData.scryfallId = extracted.scryfallId
-          if (cardData.edition === 'Unknown') cardData.edition = extracted.setCode
-          cardData.cmc = extracted.cmc
-          cardData.type_line = extracted.type_line
-          cardData.colors = extracted.colors
-          cardData.rarity = extracted.rarity
-          cardData.power = extracted.power
-          cardData.toughness = extracted.toughness
-          cardData.oracle_text = extracted.oracle_text
-          cardData.keywords = extracted.keywords
-          cardData.legalities = extracted.legalities
-          cardData.full_art = extracted.full_art
-        }
-      }
+      applySearchResultToCard(cardData, results)
     } catch (e) {
       console.warn(`[Import] Failed to search for "${cardData.name}":`, e)
     }
@@ -1616,15 +1607,13 @@ const buildExportLines = (
   getSet: (card: DisplayDeckCard) => string,
 ): string[] => {
   const lines: string[] = []
+  const formatCards = (cards: DisplayDeckCard[]) =>
+    cards.map(c => `${getQty(c)} ${c.name} (${getSet(c)})`)
 
   if (isCommander && commanderName) {
     const commanderCards = mainboardCards.filter(c => c.name === commanderName)
     if (commanderCards.length > 0) {
-      lines.push('Commander')
-      for (const card of commanderCards) {
-        lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
-      }
-      lines.push('')
+      lines.push('Commander', ...formatCards(commanderCards), '')
     }
   }
 
@@ -1633,20 +1622,12 @@ const buildExportLines = (
     : mainboardCards
 
   if (deckCards.length > 0) {
-    if (isCommander && commanderName) {
-      lines.push('Deck')
-    }
-    for (const card of deckCards) {
-      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
-    }
+    if (isCommander && commanderName) lines.push('Deck')
+    lines.push(...formatCards(deckCards))
   }
 
   if (sideboardCards.length > 0) {
-    lines.push('')
-    lines.push('Sideboard')
-    for (const card of sideboardCards) {
-      lines.push(`${getQty(card)} ${card.name} (${getSet(card)})`)
-    }
+    lines.push('', 'Sideboard', ...formatCards(sideboardCards))
   }
 
   return lines
@@ -1912,27 +1893,20 @@ const handleImportDirect = async (
     // PASO 2: Recolectar todos los scryfallIds para batch request
     progressToast.update(10, `Preparando ${cards.length} cartas...`)
     const identifiers: { id: string }[] = []
-    const cardIndexMap = new Map<string, number[]>()
-
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i]
-      if (card.scryfallId) {
-        if (!cardIndexMap.has(card.scryfallId)) {
-          cardIndexMap.set(card.scryfallId, [])
-          identifiers.push({ id: card.scryfallId })
-        }
-        cardIndexMap.get(card.scryfallId)!.push(i)
-      }
-    }
+    cards.forEach((card) => {
+      if (!card.scryfallId) return
+      identifiers.push({ id: card.scryfallId })
+    })
+    // Deduplicate identifiers
+    const uniqueIds = [...new Set(identifiers.map(id => id.id))]
+    const dedupedIdentifiers = uniqueIds.map(id => ({ id }))
 
     // PASO 3: Obtener todos los datos de Scryfall en batch
-    progressToast.update(15, `Obteniendo datos de ${identifiers.length} cartas...`)
+    progressToast.update(15, `Obteniendo datos de ${dedupedIdentifiers.length} cartas...`)
     const scryfallDataMap = new Map<string, any>()
-    if (identifiers.length > 0) {
-      const scryfallCards = await getCardsByIds(identifiers)
-      for (const sc of scryfallCards) {
-        scryfallDataMap.set(sc.id, sc)
-      }
+    if (dedupedIdentifiers.length > 0) {
+      const scryfallCards = await getCardsByIds(dedupedIdentifiers)
+      scryfallCards.forEach(sc => scryfallDataMap.set(sc.id, sc))
     }
     progressToast.update(25, `Procesando cartas...`)
 

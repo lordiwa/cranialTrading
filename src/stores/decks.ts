@@ -644,6 +644,46 @@ export const useDecksStore = defineStore('decks', () => {
     }
 
     /**
+     * Process a single card allocation: allocate from collection, overflow to wishlist.
+     */
+    const processOneAllocation = async (
+        deck: Deck,
+        item: { cardId: string; quantity: number; isInSideboard: boolean },
+        card: Card,
+        collectionStore: ReturnType<typeof useCollectionStore>,
+    ): Promise<{ allocated: number; wishlisted: number }> => {
+        const alreadyAllocated = getTotalAllocatedForCard(item.cardId)
+        const available = Math.max(0, card.quantity - alreadyAllocated)
+        const toAllocate = Math.min(item.quantity, available)
+        const toWishlist = item.quantity - toAllocate
+
+        if (toAllocate > 0) {
+            upsertAllocation(deck.allocations, item.cardId, toAllocate, item.isInSideboard)
+        }
+
+        if (toWishlist > 0) {
+            const wishCardId = await collectionStore.ensureCollectionWishlistCard({
+                scryfallId: card.scryfallId,
+                name: card.name,
+                edition: card.edition,
+                quantity: toWishlist,
+                condition: card.condition,
+                foil: card.foil,
+                price: card.price ?? 0,
+                image: card.image ?? '',
+                cmc: card.cmc,
+                type_line: card.type_line,
+                colors: card.colors,
+            })
+            if (wishCardId) {
+                upsertAllocation(deck.allocations, wishCardId, toWishlist, item.isInSideboard)
+            }
+        }
+
+        return { allocated: toAllocate, wishlisted: toWishlist }
+    }
+
+    /**
      * Allocate many cards to a deck in one Firestore write.
      * All allocation logic runs in memory, then saves once.
      */
@@ -670,35 +710,9 @@ export const useDecksStore = defineStore('decks', () => {
                 const card = collectionStore.getCardById(item.cardId)
                 if (!card) continue
 
-                const alreadyAllocated = getTotalAllocatedForCard(item.cardId)
-                const available = Math.max(0, card.quantity - alreadyAllocated)
-                const toAllocate = Math.min(item.quantity, available)
-                const toWishlist = item.quantity - toAllocate
-
-                if (toAllocate > 0) {
-                    upsertAllocation(deck.allocations, item.cardId, toAllocate, item.isInSideboard)
-                    totalAllocated += toAllocate
-                }
-
-                if (toWishlist > 0) {
-                    const wishCardId = await collectionStore.ensureCollectionWishlistCard({
-                        scryfallId: card.scryfallId,
-                        name: card.name,
-                        edition: card.edition,
-                        quantity: toWishlist,
-                        condition: card.condition,
-                        foil: card.foil,
-                        price: card.price ?? 0,
-                        image: card.image ?? '',
-                        cmc: card.cmc,
-                        type_line: card.type_line,
-                        colors: card.colors,
-                    })
-                    if (wishCardId) {
-                        upsertAllocation(deck.allocations, wishCardId, toWishlist, item.isInSideboard)
-                    }
-                    totalWishlisted += toWishlist
-                }
+                const result = await processOneAllocation(deck, item, card, collectionStore)
+                totalAllocated += result.allocated
+                totalWishlisted += result.wishlisted
 
                 if (onProgress && i % 50 === 0) {
                     onProgress(i + 1, items.length)

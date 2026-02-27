@@ -308,18 +308,10 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Save cards for potential restore on error
         const idsToDelete = new Set(cardIds)
-        const deletedCards: Card[] = []
 
         // Remove from UI in ONE operation (single reactive trigger instead of N splices)
-        const remaining: Card[] = []
-        for (const card of cards.value) {
-            if (idsToDelete.has(card.id)) {
-                deletedCards.push(card)
-            } else {
-                remaining.push(card)
-            }
-        }
-        cards.value = remaining
+        const deletedCards = cards.value.filter(card => idsToDelete.has(card.id))
+        cards.value = cards.value.filter(card => !idsToDelete.has(card.id))
 
         const BATCH_SIZE = 200
         const userId = authStore.user.id
@@ -340,9 +332,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
             const ok = await commitBatchWithRetry(() => {
                 const batch = writeBatch(db)
-                for (const cardId of chunk) {
-                    batch.delete(doc(db, 'users', userId, 'cards', cardId))
-                }
+                chunk.forEach(cardId => batch.delete(doc(db, 'users', userId, 'cards', cardId)))
                 return batch
             })
 
@@ -366,9 +356,7 @@ export const useCollectionStore = defineStore('collection', () => {
             const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
             const ok = await commitBatchWithRetry(() => {
                 const batch = writeBatch(db)
-                for (const cardId of chunk) {
-                    batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`))
-                }
+                chunk.forEach(cardId => batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`)))
                 return batch
             })
 

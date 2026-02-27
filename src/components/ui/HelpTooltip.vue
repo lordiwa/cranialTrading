@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
 const helpStore = useHelpStore()
 
 // Generate unique ID for this tooltip
-const id = computed(() => `help-${props.title}-${props.text.slice(0, 20)}`.replace(/\s+/g, '-'))
+const id = computed(() => `help-${props.title}-${props.text.slice(0, 20)}`.replaceAll(/\s+/g, '-'))
 
 // Register on mount
 onMounted(() => {

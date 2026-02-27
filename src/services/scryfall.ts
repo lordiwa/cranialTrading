@@ -17,7 +17,7 @@ async function rateLimitedFetch(url: string): Promise<Response> {
     // Retry once on 429 with backoff
     if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After')
-        const delay = retryAfter ? parseInt(retryAfter) * 1000 : 2000
+        const delay = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000
         await new Promise(resolve => setTimeout(resolve, delay))
         lastRequestTime = Date.now()
         return fetch(url)
@@ -473,7 +473,7 @@ export const getCardsByIds = async (
                 if (!response.ok) {
                     if (response.status === 429) {
                         const retryAfter = response.headers.get('Retry-After')
-                        const delay = retryAfter ? parseInt(retryAfter) * 1000 : 2000
+                        const delay = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000
                         await new Promise(resolve => setTimeout(resolve, delay))
                         retries--
                         continue

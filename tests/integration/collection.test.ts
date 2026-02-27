@@ -198,7 +198,7 @@ describe('Collection System Integration Tests', () => {
 
       for (const name of cardNames) {
         await addCardToCollection(userAId, {
-          scryfallId: `test-${name.replace(/\s/g, '-').toLowerCase()}`,
+          scryfallId: `test-${name.replaceAll(/\s/g, '-').toLowerCase()}`,
           name,
           edition: 'VMA',
           quantity: 1,

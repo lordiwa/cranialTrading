@@ -186,8 +186,8 @@ function parseStaplesTable($, table) {
     const pctCol = hasCostCol ? 3 : 2;
     const copiesCol = hasCostCol ? 4 : 3;
 
-    const percentDecks = parseFloat($(cols[pctCol]).text().replace('%', '').trim()) || 0;
-    const avgCopies = parseFloat($(cols[copiesCol]).text().trim()) || 0;
+    const percentDecks = Number.parseFloat($(cols[pctCol]).text().replace('%', '').trim()) || 0;
+    const avgCopies = Number.parseFloat($(cols[copiesCol]).text().trim()) || 0;
 
     if (name) {
       cards.push({ name, percentDecks, avgCopies, rank: cards.length + 1 });

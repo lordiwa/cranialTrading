@@ -149,7 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
 
             if (!userDoc.exists()) {
                 // Create new user document for Google user
-                const username = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+                const username = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
                     || firebaseUser.email?.split('@')[0]
                     || 'user';
 

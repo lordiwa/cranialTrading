@@ -219,7 +219,7 @@ export function useCardFilter<T extends FilterableCard>(
 
     // Power range
     if (advPowerMin.value !== undefined || advPowerMax.value !== undefined) {
-      const pow = card.power !== undefined ? Number.parseFloat(card.power) : NaN
+      const pow = card.power !== undefined ? Number.parseFloat(card.power) : Number.NaN
       if (Number.isNaN(pow)) return false
       if (advPowerMin.value !== undefined && pow < advPowerMin.value) return false
       if (advPowerMax.value !== undefined && pow > advPowerMax.value) return false
@@ -227,7 +227,7 @@ export function useCardFilter<T extends FilterableCard>(
 
     // Toughness range
     if (advToughnessMin.value !== undefined || advToughnessMax.value !== undefined) {
-      const tou = card.toughness !== undefined ? Number.parseFloat(card.toughness) : NaN
+      const tou = card.toughness !== undefined ? Number.parseFloat(card.toughness) : Number.NaN
       if (Number.isNaN(tou)) return false
       if (advToughnessMin.value !== undefined && tou < advToughnessMin.value) return false
       if (advToughnessMax.value !== undefined && tou > advToughnessMax.value) return false

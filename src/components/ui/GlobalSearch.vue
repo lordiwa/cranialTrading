@@ -415,6 +415,7 @@ defineExpose({
               <p class="text-tiny text-silver-50 flex items-center gap-1">
                 <img
                   :src="getAvatarUrlForUser(card.username, 14, card.avatarUrl)"
+                  :alt="`${card.username} avatar`"
                   class="w-3.5 h-3.5 rounded-full"
                 />
                 @{{ card.username }} · {{ card.status }}

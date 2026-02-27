@@ -618,7 +618,7 @@ const localAdvancedFilters = computed<AdvancedFilters>(() => ({
     ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
     : [],
   manaValue: selectedManaValues.value.size < manaOrder.length
-    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : parseInt(v)).filter(v => !isNaN(v)) }
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v)).filter(v => !Number.isNaN(v)) }
     : { min: undefined, max: undefined, values: undefined },
   rarity: selectedRarities.value.size < rarityOrder.length
     ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
@@ -2745,7 +2745,7 @@ const handleExportDeckCsv = async () => {
   }
 
   const csv = useMoxfield ? buildMoxfieldCsv(csvCards) : buildManaboxCsv(csvCards)
-  const filename = `${selectedDeck.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+  const filename = `${selectedDeck.value.name.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}.csv`
   downloadAsFile(csv, filename)
   toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
 }
@@ -2808,7 +2808,7 @@ const handleExportBinderCsv = async () => {
   }
 
   const csv = useMoxfield ? buildMoxfieldCsv(csvCards) : buildManaboxCsv(csvCards)
-  const filename = `${selectedBinder.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+  const filename = `${selectedBinder.value.name.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}.csv`
   downloadAsFile(csv, filename)
   toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
 }

@@ -54,7 +54,7 @@ validateTestCredentials()
 // ============ INLINE MESSAGING HELPERS ============
 
 function getConversationId(userId1: string, userId2: string): string {
-  return [userId1, userId2].sort().join('_')
+  return [userId1, userId2].sort((a, b) => a.localeCompare(b)).join('_')
 }
 
 async function createConversation(
@@ -69,7 +69,7 @@ async function createConversation(
 
   await setDoc(conversationRef, {
     id: conversationId,
-    participantIds: [userId1, userId2].sort(),
+    participantIds: [userId1, userId2].sort((a, b) => a.localeCompare(b)),
     participantNames: {
       [userId1]: username1,
       [userId2]: username2,

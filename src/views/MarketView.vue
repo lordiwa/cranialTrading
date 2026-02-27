@@ -280,16 +280,18 @@ watch(() => marketStore.activeTab, (tab) => {
       <!-- Controls Row 1: Price type, Set filter, Sort, Direction -->
       <div class="flex flex-wrap items-end gap-3 mb-3">
         <div class="w-48">
-          <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.movers.typeLabel') }}</label>
+          <label for="movers-type-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.movers.typeLabel') }}</label>
           <BaseSelect
+              id="movers-type-select"
               :modelValue="marketStore.selectedMoverType"
               :options="moverTypeOptions"
               @update:modelValue="handleMoverTypeChange"
           />
         </div>
         <div ref="setFilterRef" class="w-48 relative" @focusin="showSetDropdown = true">
-          <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.setFilter.label') }}</label>
+          <label for="movers-set-filter" class="text-tiny text-silver-50 mb-1 block">{{ t('market.setFilter.label') }}</label>
           <BaseInput
+              id="movers-set-filter"
               :modelValue="setFilterQuery"
               @update:modelValue="(val: string | number) => { setFilterQuery = String(val); showSetDropdown = true; if (!String(val)) { marketStore.moversSetFilter = '' } }"
               placeholder="All sets"
@@ -318,7 +320,7 @@ watch(() => marketStore.activeTab, (tab) => {
           </div>
         </div>
         <div>
-          <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.sort.label') }}</label>
+          <span class="text-tiny text-silver-50 mb-1 block">{{ t('market.sort.label') }}</span>
           <div class="flex gap-1">
             <button
                 @click="marketStore.moversSort = 'change'"
@@ -481,16 +483,18 @@ watch(() => marketStore.activeTab, (tab) => {
       <!-- Controls Row 1: Format, Category -->
       <div class="flex flex-wrap items-end gap-3 mb-3">
         <div class="w-48">
-          <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.staples.formatLabel') }}</label>
+          <label for="staples-format-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.staples.formatLabel') }}</label>
           <BaseSelect
+              id="staples-format-select"
               :modelValue="marketStore.selectedFormat"
               :options="formatOptions"
               @update:modelValue="handleFormatChange"
           />
         </div>
         <div class="w-40">
-          <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.staples.categoryLabel') }}</label>
+          <label for="staples-category-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.staples.categoryLabel') }}</label>
           <BaseSelect
+              id="staples-category-select"
               :modelValue="marketStore.currentStapleCategory"
               :options="categoryOptions"
               @update:modelValue="(val: string) => marketStore.currentStapleCategory = val as any"
@@ -604,15 +608,16 @@ watch(() => marketStore.activeTab, (tab) => {
         <!-- Controls Row 1: Mover type + sort toggle -->
         <div class="flex flex-wrap items-end gap-3 mb-3">
           <div class="w-48">
-            <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.movers.typeLabel') }}</label>
+            <label for="portfolio-type-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.movers.typeLabel') }}</label>
             <BaseSelect
+                id="portfolio-type-select"
                 :modelValue="marketStore.selectedMoverType"
                 :options="moverTypeOptions"
                 @update:modelValue="handleMoverTypeChange"
             />
           </div>
           <div>
-            <label class="text-tiny text-silver-50 mb-1 block">{{ t('market.sort.label') }}</label>
+            <span class="text-tiny text-silver-50 mb-1 block">{{ t('market.sort.label') }}</span>
             <div class="flex gap-1">
               <button
                   @click="marketStore.portfolioSort = 'impact'"

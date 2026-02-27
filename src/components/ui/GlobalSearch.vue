@@ -93,20 +93,35 @@ const searchUsers = async (searchQuery: string) => {
   if (!authStore.user) return
 
   try {
-    // Search public_cards collection
+    // Query public_cards with server-side prefix filter
     const publicCardsRef = collection(db, 'public_cards')
-    const snapshot = await getDocs(publicCardsRef)
+    const q = query(
+      publicCardsRef,
+      where('cardNameLower', '>=', searchQuery),
+      where('cardNameLower', '<=', searchQuery + '\uf8ff')
+    )
+    const snapshot = await getDocs(q)
 
     usersResults.value = snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((card: any) =>
-        card.cardName?.toLowerCase().includes(searchQuery) &&
-        card.userId !== authStore.user?.id
-      )
+      .filter((card: any) => card.userId !== authStore.user?.id)
       .slice(0, 8)
-  } catch (error) {
-    console.error('Error searching users:', error)
-    usersResults.value = []
+  } catch {
+    // Fallback: if Firestore index not ready, use client-side filter
+    try {
+      const publicCardsRef = collection(db, 'public_cards')
+      const snapshot = await getDocs(publicCardsRef)
+      usersResults.value = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((card: any) =>
+          card.cardName?.toLowerCase().includes(searchQuery) &&
+          card.userId !== authStore.user?.id
+        )
+        .slice(0, 8)
+    } catch (error) {
+      console.error('Error searching users:', error)
+      usersResults.value = []
+    }
   }
 }
 

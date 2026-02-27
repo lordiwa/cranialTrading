@@ -261,7 +261,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 const chunk = docs.slice(i, i + BATCH_SIZE)
                 const batch = writeBatch(db)
                 for (const d of chunk) {
-                    batch.delete(doc(db, 'users', authStore.user!.id, 'cards', d.id))
+                    batch.delete(doc(db, 'users', authStore.user.id, 'cards', d.id))
                 }
                 await batch.commit()
             }
@@ -409,44 +409,6 @@ export const useCollectionStore = defineStore('collection', () => {
      */
     const getCardById = (cardId: string): Card | undefined => {
         return cards.value.find(c => c.id === cardId)
-    }
-
-    /**
-     * Find cards matching criteria
-     */
-    const findCards = (criteria: {
-        scryfallId?: string
-        name?: string
-        edition?: string
-        condition?: CardCondition
-        foil?: boolean
-    }): Card[] => {
-        return cards.value.filter(card => {
-            if (criteria.scryfallId && card.scryfallId !== criteria.scryfallId) return false
-            if (criteria.name && !card.name.toLowerCase().includes(criteria.name.toLowerCase())) return false
-            if (criteria.edition && card.edition !== criteria.edition) return false
-            if (criteria.condition && card.condition !== criteria.condition) return false
-            if (criteria.foil !== undefined && card.foil !== criteria.foil) return false
-            return true
-        })
-    }
-
-    /**
-     * Find exact match for allocation purposes
-     * Matches by scryfallId + edition + condition + foil
-     */
-    const findExactMatch = (criteria: {
-        scryfallId: string
-        edition: string
-        condition: CardCondition
-        foil: boolean
-    }): Card | undefined => {
-        return cards.value.find(card =>
-            card.scryfallId === criteria.scryfallId &&
-            card.edition === criteria.edition &&
-            card.condition === criteria.condition &&
-            card.foil === criteria.foil
-        )
     }
 
     // ========================================================================
@@ -640,19 +602,6 @@ export const useCollectionStore = defineStore('collection', () => {
         cards.value.reduce((sum, card) => sum + (card.price * card.quantity), 0)
     )
 
-    const cardsByStatus = computed(() => {
-        const grouped: Record<CardStatus, Card[]> = {
-            collection: [],
-            sale: [],
-            trade: [],
-            wishlist: [],
-        }
-        cards.value.forEach(card => {
-            grouped[card.status].push(card)
-        })
-        return grouped
-    })
-
     // ========================================================================
     // CLEANUP
     // ========================================================================
@@ -678,8 +627,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Search
         getCardById,
-        findCards,
-        findExactMatch,
 
         // Wishlist sync
         ensureCollectionWishlistCard,
@@ -693,7 +640,6 @@ export const useCollectionStore = defineStore('collection', () => {
         // Computed
         totalCards,
         totalValue,
-        cardsByStatus,
 
         // Cleanup
         clear,

@@ -457,14 +457,6 @@ export const useBindersStore = defineStore('binders', () => {
         }
     }
 
-    // ========================================================================
-    // CLEANUP
-    // ========================================================================
-
-    const clear = () => {
-        binders.value = []
-    }
-
     return {
         // State
         binders,
@@ -488,8 +480,5 @@ export const useBindersStore = defineStore('binders', () => {
         // Hydration & Stats
         hydrateBinderCards,
         calculateStats,
-
-        // Cleanup
-        clear,
     }
 })

@@ -170,23 +170,6 @@ async function saveToDB(storeName: string, key: string, data: unknown): Promise<
   }
 }
 
-/**
- * Clear all data from a store
- */
-async function clearStore(storeName: string): Promise<void> {
-  try {
-    const db = await openDatabase()
-    await new Promise<void>((resolve) => {
-      const transaction = db.transaction(storeName, 'readwrite')
-      const store = transaction.objectStore(storeName)
-      store.clear()
-      resolve()
-    })
-  } catch {
-    // Ignore errors
-  }
-}
-
 // ========== Price Data Functions ==========
 
 /**
@@ -435,36 +418,6 @@ export async function preloadPriceData(): Promise<void> {
   } catch (error) {
     console.warn('Failed to preload MTGJSON price data:', error)
   }
-}
-
-/**
- * Clear all MTGJSON caches (IndexedDB + localStorage)
- */
-export async function clearMTGJSONCache(): Promise<void> {
-  priceDataCache = null
-  scryfallToUuidMap.clear()
-  failedSets.clear()
-
-  // Clear IndexedDB
-  await clearStore(PRICE_STORE)
-  await clearStore(MAPPING_STORE)
-
-  // Clear localStorage set caches
-  const keysToRemove: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith(SET_CACHE_PREFIX)) {
-      keysToRemove.push(key)
-    }
-  }
-  keysToRemove.forEach(key => { localStorage.removeItem(key); })
-
-  // Also remove old localStorage keys if they exist
-  localStorage.removeItem('mtgjson_prices')
-  localStorage.removeItem('mtgjson_prices_date')
-  localStorage.removeItem('mtgjson_scryfall_mapping')
-
-  console.log('MTGJSON cache cleared')
 }
 
 /**

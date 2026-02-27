@@ -231,6 +231,5 @@ export const useMessagesStore = defineStore('messages', () => {
         loadConversations,
         loadConversationMessages,
         stopListeningMessages,
-        getConversationId,
     };
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, rarityOrder, typeOrder } from '../../composables/useCardFilter'
 import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
@@ -207,7 +207,12 @@ const handleMouseEnter = (card: DisplayDeckCard) => {
 const handleMouseLeave = () => {
   if (hoverTimeout) clearTimeout(hoverTimeout)
   hoverTimeout = null
+  hoveredCard.value = null
 }
+
+onUnmounted(() => {
+  if (hoverTimeout) clearTimeout(hoverTimeout)
+})
 
 // Click handler - open card detail directly
 const handleCardClick = (card: DisplayDeckCard) => {

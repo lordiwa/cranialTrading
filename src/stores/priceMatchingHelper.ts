@@ -2,9 +2,7 @@ import { defineStore } from 'pinia'
 import { type Card } from '../types/card'
 import { type Preference } from '../types/preferences'
 
-const PRICE_TOLERANCE = 0.1
-
-export interface MatchCalculation {
+interface MatchCalculation {
     myCardIds: string[]
     myCardsInfo: Card[]
     myTotalValue: number
@@ -44,14 +42,6 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
         const diff = calculateDifferenceRatio(myValue, theirValue)
         return Math.max(0, Math.round((1 - diff) * 100))
-    }
-
-    /**
-     * Validar que el match esté dentro de la tolerancia de precio (±10%)
-     */
-    const isValidMatch = (myValue: number, theirValue: number): boolean => {
-        if (myValue === 0 || theirValue === 0) return true
-        return calculateDifferenceRatio(myValue, theirValue) <= PRICE_TOLERANCE
     }
 
     /**
@@ -247,7 +237,6 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
     return {
         calculateCompatibility,
-        isValidMatch,
         calculateBidirectionalMatch,
         calculateUnidirectionalMatch,
     }

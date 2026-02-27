@@ -19,6 +19,8 @@ import { type User } from '../types/user';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
 
+let authUnsubscribe: (() => void) | null = null;
+
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
@@ -27,7 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
     const toastStore = useToastStore();
 
     const initAuth = () => {
-        onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+        if (authUnsubscribe) return; // Already initialized
+        authUnsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
             if (isLoggingOut.value) return;
 
             if (firebaseUser) {
@@ -182,9 +185,6 @@ export const useAuthStore = defineStore('auth', () => {
             emailVerified.value = false;
             toastStore.show(t('auth.messages.logoutSuccess'), 'success');
             globalThis.location.reload();
-            setTimeout(() => {
-                isLoggingOut.value = false;
-            }, 500);
             return true;
         } catch (error: any) {
             console.error('Logout error:', error);
@@ -295,8 +295,6 @@ export const useAuthStore = defineStore('auth', () => {
             const qLower = query(usersRef, where('username', '==', normalizedUsername));
             const snapshotLower = await getDocs(qLower);
 
-            console.log(`Checking username "${normalizedUsername}": found ${snapshotLower.size} matches (lowercase)`);
-
             if (!snapshotLower.empty) {
                 return false; // Username taken
             }
@@ -305,7 +303,6 @@ export const useAuthStore = defineStore('auth', () => {
             if (username !== normalizedUsername) {
                 const qOriginal = query(usersRef, where('username', '==', username));
                 const snapshotOriginal = await getDocs(qOriginal);
-                console.log(`Checking username "${username}": found ${snapshotOriginal.size} matches (original case)`);
 
                 if (!snapshotOriginal.empty) {
                     return false; // Username taken
@@ -349,9 +346,7 @@ export const useAuthStore = defineStore('auth', () => {
     };
 
     /**
-     * Check if user can change username (10 minute cooldown for testing)
-     * TODO: Change to 1 month for production
-     * Location: src/stores/auth.ts line ~288
+     * Check if user can change username (1 month cooldown)
      */
     const canChangeUsername = (): { allowed: boolean; nextChangeDate: Date | null } => {
         if (!user.value?.lastUsernameChange) {
@@ -360,8 +355,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         const lastChange = new Date(user.value.lastUsernameChange);
         const nextChangeDate = new Date(lastChange);
-        // 10 minutes cooldown for testing (change to setMonth(+1) for production)
-        nextChangeDate.setMinutes(nextChangeDate.getMinutes() + 10);
+        nextChangeDate.setMonth(nextChangeDate.getMonth() + 1);
 
         const now = new Date();
         return {
@@ -641,7 +635,6 @@ export const useAuthStore = defineStore('auth', () => {
         user,
         loading,
         emailVerified,
-        isLoggingOut,
         initAuth,
         register,
         login,

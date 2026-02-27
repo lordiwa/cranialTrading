@@ -96,11 +96,9 @@ export async function syncCardToPublic(
       updatedAt: Timestamp.now(),
     }
     await setDoc(publicCardRef, publicCard)
-    console.log(`[PublicCards] Synced card ${card.name} to public`)
   } else {
     // Remove from public if not public or status changed
     await deleteDoc(publicCardRef).catch(() => { /* doc may not exist */ })
-    console.log(`[PublicCards] Removed card ${card.name} from public (status: ${card.status}, public: ${card.public})`)
   }
 }
 
@@ -110,7 +108,6 @@ export async function syncCardToPublic(
 export async function removeCardFromPublic(cardId: string, userId: string): Promise<void> {
   const publicCardId = `${userId}_${cardId}`
   await deleteDoc(doc(db, 'public_cards', publicCardId)).catch(() => { /* doc may not exist */ })
-  console.log(`[PublicCards] Removed card ${cardId} from public`)
 }
 
 /**
@@ -142,7 +139,6 @@ export async function syncPreferenceToPublic(
   if (userLocation) publicPref.location = userLocation
   if (userEmail) publicPref.email = userEmail
   await setDoc(publicPrefRef, publicPref)
-  console.log(`[PublicPrefs] Synced preference ${publicPref.cardName} to public`)
 }
 
 /**
@@ -151,7 +147,6 @@ export async function syncPreferenceToPublic(
 export async function removePreferenceFromPublic(prefId: string, userId: string): Promise<void> {
   const publicPrefId = `${userId}_${prefId}`
   await deleteDoc(doc(db, 'public_preferences', publicPrefId)).catch(() => { /* doc may not exist */ })
-  console.log(`[PublicPrefs] Removed preference ${prefId} from public`)
 }
 
 /**
@@ -166,21 +161,8 @@ export async function syncAllUserCards(
   userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
-  // Debug: log all statuses
-  const statusCounts: Record<string, number> = {}
-  cards.forEach(c => {
-    statusCounts[c.status] = (statusCounts[c.status] || 0) + 1
-  })
-  console.log(`[PublicCards] Card statuses:`, statusCounts)
-
   // Filter trade/sale cards that are marked as public
   const publicCards = cards.filter(c => (c.status === 'trade' || c.status === 'sale') && c.public === true)
-  console.log(`[PublicCards] Cards to sync (trade/sale + public): ${publicCards.length}`)
-
-  // Debug: show card scryfallIds
-  publicCards.forEach((c, i) => {
-    console.log(`[PublicCards] Card ${i + 1}: ${c.name} - scryfallId: ${c.scryfallId || 'MISSING'}`)
-  })
 
   // First, remove all existing public cards for this user
   const existingQuery = query(
@@ -188,7 +170,6 @@ export async function syncAllUserCards(
     where('userId', '==', userId)
   )
   const existingDocs = await getDocs(existingQuery)
-  console.log(`[PublicCards] Deleting ${existingDocs.size} existing cards`)
 
   // Delete in batches of 400 (Firestore limit is 500)
   const BATCH_SIZE = 400
@@ -230,8 +211,6 @@ export async function syncAllUserCards(
     }
     await batch.commit()
   }
-
-  console.log(`[PublicCards] Bulk synced ${publicCards.length} cards for user ${username}`)
 }
 
 /**
@@ -245,20 +224,12 @@ export async function syncAllUserPreferences(
   userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
-  console.log(`[PublicPrefs] Syncing ${preferences.length} preferences...`)
-
-  // Debug: show preference scryfallIds
-  preferences.forEach((p, i) => {
-    console.log(`[PublicPrefs] Pref ${i + 1}: ${p.name || p.cardName} - scryfallId: ${p.scryfallId || 'MISSING'}`)
-  })
-
   // First, remove all existing public preferences for this user
   const existingQuery = query(
     collection(db, 'public_preferences'),
     where('userId', '==', userId)
   )
   const existingDocs = await getDocs(existingQuery)
-  console.log(`[PublicPrefs] Deleting ${existingDocs.size} existing preferences`)
 
   // Delete in batches of 400
   const BATCH_SIZE = 400
@@ -297,8 +268,6 @@ export async function syncAllUserPreferences(
     }
     await batch.commit()
   }
-
-  console.log(`[PublicPrefs] Bulk synced ${preferences.length} preferences for user ${username}`)
 }
 
 /**
@@ -311,7 +280,6 @@ export async function findCardsMatchingPreferences(
   excludeUserId: string
 ): Promise<PublicCard[]> {
   if (preferences.length === 0) {
-    console.log('[findCards] No preferences to search')
     return []
   }
 
@@ -322,10 +290,7 @@ export async function findCardsMatchingPreferences(
       .filter(name => name && name.length > 0)
   )]
 
-  console.log(`[findCards] Searching for ${cardNames.length} card names:`, cardNames)
-
   if (cardNames.length === 0) {
-    console.log('[findCards] No valid card names in preferences')
     return []
   }
 
@@ -343,20 +308,15 @@ export async function findCardsMatchingPreferences(
       where('cardName', 'in', chunk)
     )
     const snapshot = await getDocs(q)
-    console.log(`[findCards] Query returned ${snapshot.size} docs for chunk`)
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data() as PublicCard
-      console.log(`[findCards] Found card: ${data.cardName} from ${data.username} (userId: ${data.userId})`)
-      if (data.userId === excludeUserId) {
-        console.log(`[findCards] Skipping own card`)
-      } else {
+      if (data.userId !== excludeUserId) {
         results.push({ ...data, docId: docSnap.id })
       }
     })
   }
 
-  console.log(`[findCards] Total results: ${results.length}`)
   return results
 }
 
@@ -379,8 +339,6 @@ export async function findPreferencesMatchingCards(
       .filter(name => name && name.length > 0)
   )]
 
-  console.log(`[findPrefs] Searching for ${cardNames.length} card names:`, cardNames)
-
   if (cardNames.length === 0) return []
 
   // Firestore 'in' query limited to 30 items, so chunk if needed
@@ -397,18 +355,15 @@ export async function findPreferencesMatchingCards(
       where('cardName', 'in', chunk)
     )
     const snapshot = await getDocs(q)
-    console.log(`[findPrefs] Query returned ${snapshot.size} docs for chunk`)
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data() as PublicPreference
-      console.log(`[findPrefs] Found pref: ${data.cardName} from ${data.username}`)
       if (data.userId !== excludeUserId) {
         results.push({ ...data, docId: docSnap.id })
       }
     })
   }
 
-  console.log(`[findPrefs] Total results: ${results.length}`)
   return results
 }
 

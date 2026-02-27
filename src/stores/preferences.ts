@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useAuthStore } from './auth'
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore'
+import { addDoc, collection, getDocs } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { type Preference, type PreferenceType } from '../types/preferences'
 import {
-    removePreferenceFromPublic,
     syncAllUserPreferences,
     syncPreferenceToPublic,
 } from '../services/publicCards'
@@ -99,139 +98,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
 
     /**
-     * ACTUALIZAR una preferencia completa
-     */
-    const updatePreference = async (prefId: string, updates: Partial<Preference>) => {
-        if (!authStore.user?.id) throw new Error('No user logged in')
-
-        try {
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferences', prefId)
-            await updateDoc(prefRef, updates)
-
-            const index = _preferences.value.findIndex(p => p.id === prefId)
-            const existingPref = _preferences.value[index]
-            if (index >= 0 && existingPref) {
-                _preferences.value[index] = { ...existingPref, ...updates }
-            }
-
-            console.log('✅ Preference updated:', prefId)
-        } catch (error) {
-            console.error('❌ Error updating preference:', error)
-            throw error
-        }
-    }
-
-    /**
-     * ACTUALIZAR solo el tipo de una preferencia (VENDO/CAMBIO/BUSCO)
-     * Usado cuando una carta cambia de estado entre sale/trade/wishlist
-     */
-    const updatePreferenceType = async (
-        scryfallId: string,
-        edition: string,
-        newType: PreferenceType
-    ) => {
-        if (!authStore.user?.id) throw new Error('No user logged in')
-
-        try {
-            // Buscar la preferencia por scryfallId y edition
-            const prefsRef = collection(db, 'users', authStore.user.id, 'preferences')
-            const q = query(
-                prefsRef,
-                where('scryfallId', '==', scryfallId),
-                where('edition', '==', edition)
-            )
-            const snapshot = await getDocs(q)
-
-            const firstDoc = snapshot.docs[0]
-            if (snapshot.empty || !firstDoc) {
-                console.warn(`⚠️ No preference found for ${scryfallId} (${edition})`)
-                return
-            }
-
-            // Actualizar la primera coincidencia (debería haber solo una)
-            const docId = firstDoc.id
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferences', docId)
-            await updateDoc(prefRef, { type: newType })
-
-            // Actualizar en memoria
-            const index = _preferences.value.findIndex(
-                p => p.scryfallId === scryfallId && p.edition === edition
-            )
-            const existingPref = _preferences.value[index]
-            if (index >= 0 && existingPref) {
-                existingPref.type = newType
-            }
-
-            console.log(`✅ Preference type updated: ${scryfallId} → ${newType}`)
-        } catch (error) {
-            console.error('❌ Error updating preference type:', error)
-            throw error
-        }
-    }
-
-    /**
-     * ELIMINAR una preferencia por ID
-     */
-    const deletePreference = async (prefId: string) => {
-        if (!authStore.user?.id) throw new Error('No user logged in')
-
-        try {
-            const prefRef = doc(db, 'users', authStore.user.id, 'preferences', prefId)
-            await deleteDoc(prefRef)
-
-            // Remove from public (non-blocking)
-            removePreferenceFromPublic(prefId, authStore.user.id)
-                .catch((err: unknown) => { console.error('[PublicSync] Error removing preference:', err); })
-
-            _preferences.value = _preferences.value.filter(p => p.id !== prefId)
-            console.log('✅ Preference deleted:', prefId)
-        } catch (error) {
-            console.error('❌ Error deleting preference:', error)
-            throw error
-        }
-    }
-
-    /**
-     * ELIMINAR preferencia por scryfallId y edition
-     * Usado cuando una carta cambia de collection a otro estado
-     */
-    const deletePreferenceByCard = async (scryfallId: string, edition: string) => {
-        if (!authStore.user?.id) throw new Error('No user logged in')
-
-        try {
-            // Buscar la preferencia por scryfallId y edition
-            const prefsRef = collection(db, 'users', authStore.user.id, 'preferences')
-            const q = query(
-                prefsRef,
-                where('scryfallId', '==', scryfallId),
-                where('edition', '==', edition)
-            )
-            const snapshot = await getDocs(q)
-
-            if (snapshot.empty) {
-                console.warn(`⚠️ No preference found for ${scryfallId} (${edition})`)
-                return
-            }
-
-            // Eliminar todas las coincidencias (debería haber solo una, pero por seguridad)
-            for (const doc of snapshot.docs) {
-                const prefRef = doc.ref
-                await deleteDoc(prefRef)
-
-                // Eliminar de memoria
-                _preferences.value = _preferences.value.filter(
-                    p => !(p.scryfallId === scryfallId && p.edition === edition)
-                )
-            }
-
-            console.log(`✅ Preference deleted: ${scryfallId} (${edition})`)
-        } catch (error) {
-            console.error('❌ Error deleting preference by card:', error)
-            throw error
-        }
-    }
-
-    /**
      * Bulk sync all preferences to public collection
      * Call this once to migrate existing data
      */
@@ -266,10 +132,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
         loading,
         loadPreferences,
         addPreference,
-        updatePreference,
-        updatePreferenceType,
-        deletePreference,
-        deletePreferenceByCard,
         syncAllToPublic,
         clear,
     }

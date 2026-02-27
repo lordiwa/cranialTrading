@@ -36,7 +36,6 @@ export const useSearchStore = defineStore('search', () => {
     // State
     const results = ref<ScryfallCard[]>([])
     const loading = ref(false)
-    const currentFilters = ref<FilterOptions>({})
     const lastQuery = ref('')
 
     // Computed
@@ -206,7 +205,6 @@ export const useSearchStore = defineStore('search', () => {
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
             console.log('⚡ Usando caché para:', query)
             results.value = cached.results
-            currentFilters.value = filters
             return
         }
 
@@ -230,7 +228,6 @@ export const useSearchStore = defineStore('search', () => {
             }
 
             results.value = searchResults
-            currentFilters.value = filters
 
             if (searchResults.length === 0) {
                 toastStore.show(t('search.messages.noResults'), 'info')
@@ -250,7 +247,6 @@ export const useSearchStore = defineStore('search', () => {
      */
     const clearSearch = () => {
         results.value = []
-        currentFilters.value = {}
         lastQuery.value = ''
     }
 
@@ -258,7 +254,6 @@ export const useSearchStore = defineStore('search', () => {
         // State
         results,
         loading,
-        currentFilters,
         lastQuery,
 
         // Computed
@@ -266,7 +261,6 @@ export const useSearchStore = defineStore('search', () => {
         hasResults,
 
         // Methods
-        buildQuery,
         search,
         clearSearch,
     }

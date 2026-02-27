@@ -266,7 +266,6 @@ export const useMarketStore = defineStore('market', () => {
         // Computed
         currentMovers,
         availableSets,
-        filteredMovers,
         sortedMovers,
         totalMoversPages,
         paginatedMovers,
@@ -278,7 +277,6 @@ export const useMarketStore = defineStore('market', () => {
         // Portfolio computed
         moverLookup,
         portfolioImpacts,
-        filteredPortfolio,
         sortedPortfolio,
         totalPortfolioPages,
         paginatedPortfolio,

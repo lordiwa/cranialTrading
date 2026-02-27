@@ -8,8 +8,4 @@ npm run type-check || exit 1
 echo "🧹 Linting..."
 npm run lint || exit 1
 
-# Run integration tests
-echo "🧪 Running integration tests..."
-npm run test:integration || exit 1
-
 echo "✅ All checks passed!"

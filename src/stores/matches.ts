@@ -8,7 +8,6 @@ import {
     getDocs,
     or,
     query,
-    updateDoc,
     where,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -415,101 +414,6 @@ export const useMatchesStore = defineStore('matches', () => {
     };
 
     /**
-     * Completar match - lo elimina de guardados
-     */
-    const completeMatch = async (matchId: string) => {
-        if (!authStore.user) return false;
-
-        try {
-            const match = savedMatches.value.find(m => m.docId === matchId || m.id === matchId);
-            const firestoreDocId = match?.docId || matchId;
-
-            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_guardados', firestoreDocId));
-            savedMatches.value = savedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
-            toastStore.show(t('matches.messages.completed'), 'success');
-            return true;
-        } catch (error: any) {
-            console.error('completeMatch error:', error);
-            toastStore.show(t('matches.messages.completeError') + ': ' + error.message, 'error');
-            return false;
-        }
-    };
-
-    /**
-     * Recuperar match - mueve de eliminados a nuevos
-     */
-    const recoverMatch = async (matchId: string) => {
-        if (!authStore.user) return false;
-
-        try {
-            const match = deletedMatches.value.find(m => m.docId === matchId || m.id === matchId);
-            if (!match) return false;
-
-            const firestoreDocId = match.docId || matchId;
-
-            const payload = createCleanMatchPayload(match, {
-                status: 'nuevo',
-                createdAt: new Date(),
-                lifeExpiresAt: getExpirationDate(),
-            });
-
-            const newRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
-            const docRef = await addDoc(newRef, payload);
-
-            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', firestoreDocId));
-
-            deletedMatches.value = deletedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
-            newMatches.value.push({ ...match, docId: docRef.id, status: 'nuevo' });
-
-            toastStore.show(t('matches.messages.recovered'), 'success');
-            return true;
-        } catch (error: any) {
-            console.error('recoverMatch error:', error);
-            toastStore.show(t('matches.messages.recoverError') + ': ' + error.message, 'error');
-            return false;
-        }
-    };
-
-    /**
-     * Eliminar permanentemente
-     */
-    const permanentDelete = async (matchId: string) => {
-        if (!authStore.user) return false;
-
-        try {
-            const match = deletedMatches.value.find(m => m.docId === matchId || m.id === matchId);
-            const firestoreDocId = match?.docId || matchId;
-
-            await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_eliminados', firestoreDocId));
-            deletedMatches.value = deletedMatches.value.filter(m => m.docId !== firestoreDocId && m.id !== matchId);
-            toastStore.show(t('matches.messages.permanentlyDeleted'), 'success');
-            return true;
-        } catch (error: any) {
-            console.error('permanentDelete error:', error);
-            toastStore.show(t('matches.messages.permanentDeleteError') + ': ' + error.message, 'error');
-            return false;
-        }
-    };
-
-    /**
-     * Marca match como "visto"
-     */
-    const markAsSeen = async (matchId: string) => {
-        if (!authStore.user) return;
-
-        try {
-            await updateDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', matchId), {
-                status: 'visto',
-            });
-
-            const match = newMatches.value.find(m => m.docId === matchId);
-            if (match) match.status = 'visto';
-        } catch {
-            // silent fail
-        }
-    };
-
-    /**
      * Notificar al otro usuario
      */
     const notifyOtherUser = async (match: SimpleMatch, notificationType: 'INTERESADO' | 'MATCH_COMPLETADO') => {
@@ -534,15 +438,6 @@ export const useMatchesStore = defineStore('matches', () => {
             }
         } catch {
             // silent fail
-        }
-    };
-
-    const getTotalByTab = (tab: 'new' | 'sent' | 'saved' | 'deleted') => {
-        switch (tab) {
-            case 'new': return newMatches.value.length;
-            case 'sent': return sentMatches.value.length;
-            case 'saved': return savedMatches.value.length;
-            case 'deleted': return deletedMatches.value.length;
         }
     };
 
@@ -596,65 +491,6 @@ export const useMatchesStore = defineStore('matches', () => {
         }
     };
 
-    /**
-     * Clean up duplicate shared_matches for current user
-     * Keeps only one match per sender+receiver+scryfallId+edition combination
-     */
-    const cleanupDuplicateMatches = async () => {
-        if (!authStore.user) return 0;
-
-        try {
-            const sharedMatchesRef = collection(db, 'shared_matches');
-            const userQuery = query(
-                sharedMatchesRef,
-                or(
-                    where('senderId', '==', authStore.user.id),
-                    where('receiverId', '==', authStore.user.id)
-                )
-            );
-            const snapshot = await getDocs(userQuery);
-
-            // Group by unique key: senderId_receiverId_scryfallId_edition
-            const groups = new Map<string, { docId: string; createdAt: Date }[]>();
-
-            for (const docSnap of snapshot.docs) {
-                const data = docSnap.data();
-                const key = `${data.senderId}_${data.receiverId}_${data.card?.scryfallId || ''}_${data.card?.edition || ''}`;
-
-                if (!groups.has(key)) {
-                    groups.set(key, []);
-                }
-                groups.get(key)!.push({
-                    docId: docSnap.id,
-                    createdAt: data.createdAt?.toDate?.() || new Date(0)
-                });
-            }
-
-            // Delete duplicates, keeping the oldest one
-            let deletedCount = 0;
-            for (const [_key, matches] of groups) {
-                if (matches.length > 1) {
-                    // Sort by date, keep oldest
-                    matches.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-                    // Delete all but the first (oldest)
-                    for (let i = 1; i < matches.length; i++) {
-                        const matchToDelete = matches[i];
-                        if (matchToDelete) {
-                            await deleteDoc(doc(db, 'shared_matches', matchToDelete.docId));
-                            deletedCount++;
-                        }
-                    }
-                }
-            }
-
-            console.log(`[cleanupDuplicateMatches] Deleted ${deletedCount} duplicate matches`);
-            return deletedCount;
-        } catch (error) {
-            console.error('Error cleaning up duplicate matches:', error);
-            return 0;
-        }
-    };
-
     return {
         newMatches,
         sentMatches,
@@ -663,18 +499,11 @@ export const useMatchesStore = defineStore('matches', () => {
         sharedMatches,
         loading,
         loadAllMatches,
-        cleanExpiredMatches,
         saveMatch,
         discardMatch,
-        completeMatch,
-        recoverMatch,
-        permanentDelete,
         deleteAllMatches,
-        markAsSeen,
         notifyOtherUser,
-        getTotalByTab,
         getUnseenCount,
         isMatchSaved,
-        cleanupDuplicateMatches,
     };
 });

@@ -45,10 +45,11 @@ const getOtherParticipantInfo = (conv: any): { username: string; userId: string;
   };
 };
 
-const getLastMessagePreview = (conv: any) => {
-  if (!conv.lastMessage) return 'Sin mensajes aún...';
-  const preview = conv.lastMessage.substring(0, 50);
-  return preview.length < conv.lastMessage.length ? preview + '...' : preview;
+const getLastMessagePreview = (lastMessage: any) => {
+  if (!lastMessage) return 'Sin mensajes aún...';
+  const text = typeof lastMessage === 'string' ? lastMessage : lastMessage.content || '';
+  const preview = text.substring(0, 50);
+  return preview.length < text.length ? preview + '...' : preview;
 };
 
 const handleOpenChat = (userId: string, username: string) => {

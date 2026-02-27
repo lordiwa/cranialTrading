@@ -832,7 +832,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  matchesStore.cleanExpiredMatches()
   contactsStore.stopListeningContacts()
 })
 </script>

@@ -33,40 +33,9 @@ export const cleanCardName = (name: string): string => {
 }
 
 /**
- * Check if a card is a land based on its type line
- */
-export const isLandCard = (typeLine?: string): boolean => {
-  return typeLine?.toLowerCase().includes('land') ?? false
-}
-
-/**
- * Get card type priority for sorting
- * Returns: 1=Creature, 2=Planeswalker, 3=Instant, 4=Sorcery, 5=Enchantment, 6=Artifact, 7=Land, 8=Other
- */
-export const getCardTypePriority = (typeLine?: string): number => {
-  const type = typeLine?.toLowerCase() || ''
-  if (type.includes('creature')) return 1
-  if (type.includes('planeswalker')) return 2
-  if (type.includes('instant')) return 3
-  if (type.includes('sorcery')) return 4
-  if (type.includes('enchantment')) return 5
-  if (type.includes('artifact')) return 6
-  if (type.includes('land')) return 7
-  return 8
-}
-
-/**
- * Extract foil indicator from card name
- * Returns true if name ends with *F* or similar
- */
-export const hasFoilIndicator = (name: string): boolean => {
-  return /\*f\*?\s{0,5}$/i.test(name)
-}
-
-/**
  * Parsed deck line result
  */
-export interface ParsedDeckLine {
+interface ParsedDeckLine {
   quantity: number
   cardName: string
   setCode: string | null
@@ -120,7 +89,7 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
 /**
  * Map ManaBox condition strings to app's CardCondition type
  */
-export const mapCsvCondition = (condition: string): CardCondition => {
+const mapCsvCondition = (condition: string): CardCondition => {
   switch (condition?.toLowerCase().trim()) {
     case 'mint': return 'M'
     case 'near_mint': return 'NM'
@@ -136,7 +105,7 @@ export const mapCsvCondition = (condition: string): CardCondition => {
 /**
  * Map Moxfield condition strings to app's CardCondition type
  */
-export const mapMoxfieldCondition = (condition: string): CardCondition => {
+const mapMoxfieldCondition = (condition: string): CardCondition => {
   switch (condition?.trim()) {
     case 'Mint': return 'M'
     case 'Near Mint': return 'NM'
@@ -151,7 +120,7 @@ export const mapMoxfieldCondition = (condition: string): CardCondition => {
 /**
  * Map app's CardCondition to Moxfield condition string (for CSV export)
  */
-export const conditionToCsv = (condition: CardCondition): string => {
+const conditionToCsv = (condition: CardCondition): string => {
   switch (condition) {
     case 'M': return 'Near Mint'
     case 'NM': return 'Near Mint'
@@ -166,7 +135,7 @@ export const conditionToCsv = (condition: CardCondition): string => {
 /**
  * Map app's CardCondition to ManaBox condition string (for CSV export)
  */
-export const conditionToManabox = (condition: CardCondition): string => {
+const conditionToManabox = (condition: CardCondition): string => {
   switch (condition) {
     case 'M': return 'mint'
     case 'NM': return 'near_mint'
@@ -279,7 +248,7 @@ export const buildManaboxCsv = (cards: {
 /**
  * Parse a CSV line handling quoted fields (e.g. card names with commas)
  */
-export const parseCsvLine = (line: string): string[] => {
+const parseCsvLine = (line: string): string[] => {
   const fields: string[] = []
   let current = ''
   let inQuotes = false

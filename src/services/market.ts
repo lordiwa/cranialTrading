@@ -56,15 +56,25 @@ export interface PortfolioImpact {
 // Service functions
 
 export async function getFormatStaples(format: FormatKey): Promise<FormatStaples | null> {
-    const ref = doc(db, 'market_data', 'staples', 'formats', format)
-    const snap = await getDoc(ref)
-    if (!snap.exists()) return null
-    return snap.data() as FormatStaples
+    try {
+        const ref = doc(db, 'market_data', 'staples', 'formats', format)
+        const snap = await getDoc(ref)
+        if (!snap.exists()) return null
+        return snap.data() as FormatStaples
+    } catch (error) {
+        console.error('Error fetching format staples:', error)
+        return null
+    }
 }
 
 export async function getPriceMovers(type: MoverType): Promise<PriceMovers | null> {
-    const ref = doc(db, 'market_data', 'movers', 'types', type)
-    const snap = await getDoc(ref)
-    if (!snap.exists()) return null
-    return snap.data() as PriceMovers
+    try {
+        const ref = doc(db, 'market_data', 'movers', 'types', type)
+        const snap = await getDoc(ref)
+        if (!snap.exists()) return null
+        return snap.data() as PriceMovers
+    } catch (error) {
+        console.error('Error fetching price movers:', error)
+        return null
+    }
 }

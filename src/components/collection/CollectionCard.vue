@@ -8,8 +8,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   click: [card: Card];
-  edit: [card: Card];
-  delete: [cardId: string];
 }>();
 
 // ✅ CORREGIDO: Usar 'sale' en lugar de 'sell', 'trade' en lugar de 'trade', 'wishlist' en lugar de 'busco'
@@ -62,16 +60,6 @@ const handleCardClick = () => {
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 150ms ease-out;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
 .line-clamp-1 {
   display: -webkit-box;
   -webkit-line-clamp: 1;

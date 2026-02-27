@@ -1,6 +1,6 @@
 // Shared keyword/filter constants used by AdvancedFilterModal (both Scryfall search and collection filter)
 
-export interface KeywordOption {
+interface KeywordOption {
   value: string
   label: string
 }
@@ -200,7 +200,7 @@ export const formatOptions: KeywordOption[] = [
 ]
 
 // All keywords flat list (for search)
-export const allKeywords: KeywordOption[] = [
+const allKeywords: KeywordOption[] = [
   ...combatAbilities,
   ...allCommonEffects,
   ...triggerKeywords,

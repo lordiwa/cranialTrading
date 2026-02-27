@@ -22,7 +22,6 @@ import type {
     DeckCardAllocation,
     DeckStats,
     DeckWishlistItem,
-    DisplayDeckCard,
 } from '../types/deck'
 import { t } from '../composables/useI18n'
 
@@ -160,114 +159,6 @@ export const useDecksStore = defineStore('decks', () => {
     /**
      * Hydrate a deck's allocations and wishlist into displayable cards
      */
-    const hydrateDeckCards = (deck: Deck, collectionCards: Card[]): DisplayDeckCard[] => {
-        const cardMap = new Map(collectionCards.map(c => [c.id, c]))
-        const result: DisplayDeckCard[] = []
-
-        // Hydrate allocations — isWishlist depends on the collection card's status
-        if (deck.allocations) {
-            for (const alloc of deck.allocations) {
-                const card = cardMap.get(alloc.cardId)
-                if (card) {
-                    const totalAllocated = getTotalAllocatedForCard(card.id)
-                    const addedAt = alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt)
-
-                    if (card.status === 'wishlist') {
-                        // Card is a wishlist card in collection → show as wishlist in deck
-                        result.push({
-                            cardId: card.id,
-                            scryfallId: card.scryfallId,
-                            name: card.name,
-                            edition: card.edition,
-                            condition: card.condition,
-                            foil: card.foil,
-                            language: card.language,
-                            price: card.price,
-                            image: card.image,
-                            cmc: card.cmc,
-                            type_line: card.type_line,
-                            colors: card.colors,
-                            requestedQuantity: alloc.quantity,
-                            allocatedQuantity: alloc.quantity,
-                            isInSideboard: alloc.isInSideboard,
-                            notes: alloc.notes,
-                            addedAt,
-                            isWishlist: true as const,
-                            availableInCollection: 0,
-                            totalInCollection: card.quantity,
-                        })
-                    } else {
-                        // Card is owned (collection/sale/trade) → show as owned in deck
-                        result.push({
-                            cardId: card.id,
-                            scryfallId: card.scryfallId,
-                            name: card.name,
-                            edition: card.edition,
-                            condition: card.condition,
-                            foil: card.foil,
-                            language: card.language,
-                            price: card.price,
-                            image: card.image,
-                            cmc: card.cmc,
-                            type_line: card.type_line,
-                            colors: card.colors,
-                            allocatedQuantity: alloc.quantity,
-                            isInSideboard: alloc.isInSideboard,
-                            notes: alloc.notes,
-                            addedAt,
-                            isWishlist: false as const,
-                            availableInCollection: Math.max(0, card.quantity - totalAllocated),
-                            totalInCollection: card.quantity,
-                        })
-                    }
-                }
-            }
-        }
-
-        // Hydrate legacy wishlist items (backward compat for existing data)
-        if (deck.wishlist) {
-            for (const item of deck.wishlist) {
-                result.push({
-                    cardId: '',  // Legacy items don't have a collection card yet
-                    scryfallId: item.scryfallId,
-                    name: item.name,
-                    edition: item.edition,
-                    condition: item.condition,
-                    foil: item.foil,
-                    price: item.price,
-                    image: item.image,
-                    cmc: item.cmc,
-                    type_line: item.type_line,
-                    colors: item.colors,
-                    requestedQuantity: item.quantity,
-                    allocatedQuantity: item.quantity,
-                    isInSideboard: item.isInSideboard,
-                    notes: item.notes,
-                    addedAt: item.addedAt instanceof Date ? item.addedAt : new Date(item.addedAt),
-                    isWishlist: true as const,
-                    availableInCollection: 0,
-                    totalInCollection: 0,
-                })
-            }
-        }
-
-        return result
-    }
-
-    /**
-     * Get hydrated cards for mainboard only
-     */
-    const getMainboardCards = (deck: Deck, collectionCards: Card[]): DisplayDeckCard[] => {
-        return hydrateDeckCards(deck, collectionCards).filter(c => !c.isInSideboard)
-    }
-
-    /**
-     * Get hydrated cards for sideboard only
-     */
-    const getSideboardCards = (deck: Deck, collectionCards: Card[]): DisplayDeckCard[] => {
-        return hydrateDeckCards(deck, collectionCards).filter(c => c.isInSideboard)
-    }
-
     // ========================================================================
     // MIGRATION HELPERS
     // ========================================================================
@@ -1352,9 +1243,6 @@ export const useDecksStore = defineStore('decks', () => {
         convertAllocationsToWishlist,
 
         // Hydration
-        hydrateDeckCards,
-        getMainboardCards,
-        getSideboardCards,
         getTotalAllocatedForCard,
 
         // Stats

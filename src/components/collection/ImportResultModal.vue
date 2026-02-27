@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import { useI18n } from '../../composables/useI18n';
@@ -18,7 +19,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const successRate = Math.round((props.success / props.total) * 100);
+const successRate = computed(() => props.total > 0 ? Math.round((props.success / props.total) * 100) : 0);
 </script>
 
 <template>

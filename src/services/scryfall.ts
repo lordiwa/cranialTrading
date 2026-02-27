@@ -262,7 +262,7 @@ export const getCardSuggestions = async (query: string): Promise<string[]> => {
         }
 
         const encodedQuery = encodeURIComponent(trimmedQuery)
-        const response = await fetch(
+        const response = await rateLimitedFetch(
             `${SCRYFALL_API}/cards/autocomplete?q=${encodedQuery}`
         )
 

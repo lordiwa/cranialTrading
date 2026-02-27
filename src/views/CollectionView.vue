@@ -30,7 +30,7 @@ import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { getCardsByIds, searchCards } from '../services/scryfall'
-import { buildMoxfieldCsv, buildManaboxCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
+import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
@@ -2980,7 +2980,7 @@ onMounted(async () => {
     const savedDeleteDeck = loadDeleteDeckState()
     if (savedDeleteDeck && savedDeleteDeck.status !== 'complete') {
       // Resume the delete (await to ensure errors are caught)
-      resumeDeleteDeck(savedDeleteDeck).catch((err) => {
+      resumeDeleteDeck(savedDeleteDeck).catch((err: unknown) => {
         console.error('[DeleteDeck] Resume failed:', err)
       })
     } else if (savedDeleteDeck?.status === 'complete') {

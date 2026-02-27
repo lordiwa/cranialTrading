@@ -45,6 +45,37 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
     return false
 }
 
+const deletePublicCardBatches = async (
+    publicCardIds: string[],
+    userId: string,
+    batchSize: number,
+    progress: { completed: number; total: number; onProgress?: (percent: number) => void },
+): Promise<void> => {
+    for (let i = 0; i < publicCardIds.length; i += batchSize) {
+        const chunk = publicCardIds.slice(i, i + batchSize)
+        const ok = await commitBatchWithRetry(() => {
+            const batch = writeBatch(db)
+            chunk.forEach(cardId => batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`)))
+            return batch
+        })
+
+        progress.completed++
+        if (progress.onProgress) progress.onProgress(Math.round((progress.completed / progress.total) * 100))
+
+        if (!ok) {
+            console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
+            const remainingBatches = Math.ceil((publicCardIds.length - i - batchSize) / batchSize)
+            progress.completed += Math.max(0, remainingBatches)
+            if (progress.onProgress) progress.onProgress(Math.round((progress.completed / progress.total) * 100))
+            break
+        }
+
+        if (i + batchSize < publicCardIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 200))
+        }
+    }
+}
+
 export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -351,31 +382,9 @@ export const useCollectionStore = defineStore('collection', () => {
         }
 
         // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
-        // If any batch fails (e.g. permission error), skip remaining batches
-        for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
-            const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
-            const ok = await commitBatchWithRetry(() => {
-                const batch = writeBatch(db)
-                chunk.forEach(cardId => batch.delete(doc(db, 'public_cards', `${userId}_${cardId}`)))
-                return batch
-            })
-
-            completedBatches++
-            if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
-
-            if (!ok) {
-                console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
-                // Count remaining batches for progress reporting
-                const remainingBatches = Math.ceil((publicCardIds.length - i - BATCH_SIZE) / BATCH_SIZE)
-                completedBatches += Math.max(0, remainingBatches)
-                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
-                break
-            }
-
-            if (i + BATCH_SIZE < publicCardIds.length) {
-                await new Promise(resolve => setTimeout(resolve, 200))
-            }
-        }
+        const progress = { completed: completedBatches, total: totalBatches, onProgress }
+        await deletePublicCardBatches(publicCardIds, userId, BATCH_SIZE, progress)
+        completedBatches = progress.completed
 
         if (totalFailed > 0) {
             console.warn(`Batch delete: ${totalDeleted} deleted, ${totalFailed} failed`)

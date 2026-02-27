@@ -366,9 +366,81 @@ const toggleSideboard = (deckId: string) => {
   }
 }
 
+// Process status entries: update/create/delete cards per status, return non-wishlist card IDs
+const processStatusEntries = async (
+  statuses: CardStatus[],
+  savedDistribution: Record<CardStatus, number>,
+  savedRelatedCards: Card[],
+  cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
+): Promise<string[]> => {
+  const updatedCardIds: string[] = []
+  for (const status of statuses) {
+    const targetQty = savedDistribution[status]
+    const existingCard = savedRelatedCards.find(c => c.status === status)
+    if (targetQty > 0) {
+      if (existingCard) {
+        await collectionStore.updateCard(existingCard.id, {
+          quantity: targetQty, condition: cardData.condition, foil: cardData.foil,
+          scryfallId: cardData.scryfallId, edition: cardData.edition, setCode: cardData.setCode,
+          image: cardData.image, price: cardData.price, public: cardData.isPublic,
+        })
+        if (status !== 'wishlist') updatedCardIds.push(existingCard.id)
+      } else {
+        const newCardId = await collectionStore.addCard({
+          scryfallId: cardData.scryfallId, name: cardData.name, edition: cardData.edition,
+          setCode: cardData.setCode, quantity: targetQty, condition: cardData.condition,
+          foil: cardData.foil, price: cardData.price, image: cardData.image, status, public: cardData.isPublic,
+        })
+        if (status !== 'wishlist' && newCardId) updatedCardIds.push(newCardId)
+      }
+    } else if (existingCard) {
+      await collectionStore.deleteCard(existingCard.id)
+    }
+  }
+  return updatedCardIds
+}
+
+// Build original deck allocations from related non-wishlist cards
+const buildOriginalAllocations = (savedRelatedCards: Card[]): Map<string, { quantity: number; isInSideboard: boolean }> => {
+  const map = new Map<string, { quantity: number; isInSideboard: boolean }>()
+  for (const card of savedRelatedCards) {
+    if (card.status === 'wishlist') continue
+    for (const alloc of getAllocationsForCard(card.id)) {
+      map.set(alloc.deckId, { quantity: alloc.quantity, isInSideboard: alloc.isInSideboard })
+    }
+  }
+  return map
+}
+
+// Process deck allocations: add/update/remove based on changes
+const processDeckAllocations = async (
+  primaryCardId: string,
+  savedRelatedCards: Card[],
+  savedDeckAllocations: Record<string, { quantity: number; isInSideboard: boolean }>,
+  savedAllDecks: typeof allDecks.value,
+  originalAllocations: Map<string, { quantity: number; isInSideboard: boolean }>,
+) => {
+  const nonWishlistCards = savedRelatedCards.filter(c => c.status !== 'wishlist')
+  for (const deck of savedAllDecks) {
+    const newAlloc = savedDeckAllocations[deck.id]
+    const origAlloc = originalAllocations.get(deck.id)
+    if (newAlloc && newAlloc.quantity > 0) {
+      if (origAlloc) {
+        if (origAlloc.quantity !== newAlloc.quantity || origAlloc.isInSideboard !== newAlloc.isInSideboard) {
+          for (const card of nonWishlistCards) await decksStore.deallocateCard(deck.id, card.id, origAlloc.isInSideboard)
+          await decksStore.allocateCardToDeck(deck.id, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
+        }
+      } else {
+        await decksStore.allocateCardToDeck(deck.id, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
+      }
+    } else if (origAlloc) {
+      for (const card of nonWishlistCards) await decksStore.deallocateCard(deck.id, card.id, origAlloc.isInSideboard)
+    }
+  }
+}
+
 // Save changes
 const handleSave = async () => {
-  // Prevent double-click
   if (isLoading.value) return
   isLoading.value = true
 
@@ -378,136 +450,38 @@ const handleSave = async () => {
   }
 
   try {
-    // Snapshot values at save time to prevent reactivity issues
     const savedCard = props.card
     const savedDistribution = { ...statusDistribution.value }
     const savedRelatedCards = [...relatedCards.value]
-    const savedCondition = condition.value
-    const savedFoil = foil.value
-    const savedIsPublic = isPublic.value
     const savedTotalAllocated = totalAllocated.value
 
-    const newScryfallId = selectedPrint.value?.id || savedCard.scryfallId
-    const newEdition = selectedPrint.value?.set_name || savedCard.edition
-    const newSetCode = selectedPrint.value?.set?.toUpperCase() || savedCard.setCode
-    const newImage = currentImage.value
-    const newPrice = currentPrice.value
+    const cardData = {
+      name: savedCard.name,
+      scryfallId: selectedPrint.value?.id || savedCard.scryfallId,
+      edition: selectedPrint.value?.set_name || savedCard.edition,
+      setCode: selectedPrint.value?.set?.toUpperCase() || savedCard.setCode,
+      image: currentImage.value,
+      price: currentPrice.value,
+      condition: condition.value,
+      foil: foil.value,
+      isPublic: isPublic.value,
+    }
 
-    // Calculate new owned quantity (non-wishlist)
-    const newOwnedQty = (savedDistribution.collection + savedDistribution.sale + savedDistribution.trade)
-
-    // If reducing below allocated, convert excess to wishlist in decks
+    const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
     if (newOwnedQty < savedTotalAllocated) {
       await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
     }
 
-    // Track cards that were updated/created for allocation purposes
-    const updatedCardIds: string[] = []
-
-    // Process each status
     const statuses: CardStatus[] = ['collection', 'sale', 'trade', 'wishlist']
+    const updatedCardIds = await processStatusEntries(statuses, savedDistribution, savedRelatedCards, cardData)
 
-    for (const status of statuses) {
-      const targetQty = savedDistribution[status]
-      const existingCard = savedRelatedCards.find(c => c.status === status)
-
-      if (targetQty > 0) {
-        if (existingCard) {
-          // Update existing entry - public defaults to true for all statuses
-          await collectionStore.updateCard(existingCard.id, {
-            quantity: targetQty,
-            condition: savedCondition,
-            foil: savedFoil,
-            scryfallId: newScryfallId,
-            edition: newEdition,
-            setCode: newSetCode,
-            image: newImage,
-            price: newPrice,
-            public: savedIsPublic,
-          })
-          if (status !== 'wishlist') {
-            updatedCardIds.push(existingCard.id)
-          }
-        } else {
-          // Create new entry for this status - public defaults to true
-          const newCardId = await collectionStore.addCard({
-            scryfallId: newScryfallId,
-            name: savedCard.name,
-            edition: newEdition,
-            setCode: newSetCode,
-            quantity: targetQty,
-            condition: savedCondition,
-            foil: savedFoil,
-            price: newPrice,
-            image: newImage,
-            status,
-            public: savedIsPublic,
-          })
-          if (status !== 'wishlist' && newCardId) {
-            updatedCardIds.push(newCardId)
-          }
-        }
-      } else if (existingCard) {
-        // Delete entry if quantity is 0
-        await collectionStore.deleteCard(existingCard.id)
-      }
-    }
-
-    // Save deck allocations
-    // First, get the primary card ID (collection status preferred, then sale, then trade)
     const primaryCardId = updatedCardIds[0]
-    const savedDeckAllocations = { ...deckAllocations.value }
-    const savedAllDecks = [...allDecks.value]
-
     if (primaryCardId) {
-      // Get original allocations
-      const originalAllocations = new Map<string, { quantity: number; isInSideboard: boolean }>()
-      for (const card of savedRelatedCards) {
-        if (card.status === 'wishlist') continue
-        const allocations = getAllocationsForCard(card.id)
-        for (const alloc of allocations) {
-          originalAllocations.set(alloc.deckId, {
-            quantity: alloc.quantity,
-            isInSideboard: alloc.isInSideboard
-          })
-        }
-      }
-
-      // Process deck allocations
-      for (const deck of savedAllDecks) {
-        const newAlloc = savedDeckAllocations[deck.id]
-        const origAlloc = originalAllocations.get(deck.id)
-
-        if (newAlloc && newAlloc.quantity > 0) {
-          if (origAlloc) {
-            // Update existing allocation
-            if (origAlloc.quantity !== newAlloc.quantity || origAlloc.isInSideboard !== newAlloc.isInSideboard) {
-              // Remove old and add new
-              for (const card of savedRelatedCards) {
-                if (card.status !== 'wishlist') {
-                  await decksStore.deallocateCard(deck.id, card.id, origAlloc.isInSideboard)
-                }
-              }
-              await decksStore.allocateCardToDeck(deck.id, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
-            }
-          } else {
-            // Add new allocation
-            await decksStore.allocateCardToDeck(deck.id, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
-          }
-        } else if (origAlloc) {
-          // Remove allocation
-          for (const card of savedRelatedCards) {
-            if (card.status !== 'wishlist') {
-              await decksStore.deallocateCard(deck.id, card.id, origAlloc.isInSideboard)
-            }
-          }
-        }
-      }
+      const originalAllocations = buildOriginalAllocations(savedRelatedCards)
+      await processDeckAllocations(primaryCardId, savedRelatedCards, { ...deckAllocations.value }, [...allDecks.value], originalAllocations)
     }
 
-    // Force reload collection from Firebase to ensure sync
     await collectionStore.loadCollection()
-
     toastStore.show(t('cards.detailModal.updated'), 'success')
     emit('saved')
     emit('close')

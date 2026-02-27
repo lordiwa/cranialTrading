@@ -53,27 +53,28 @@ const handleCloseChat = () => {
 
 // Helper: derive badge variant and border class from preference or card
 type BadgeVariant = 'busco' | 'cambio' | 'vendo' | 'success' | 'solo' | 'deseado' | 'error' | 'info' | 'warning';
+interface Visual { badge: BadgeVariant; border: string; label: string }
 
-const getVisualFor = (obj: any): { badge: BadgeVariant; border: string; label: string } => {
-  // obj may be a card (with status) or a preference (with type)
-  if (!obj) return { badge: 'solo', border: 'border-silver-30', label: 'COLECCIÓN' };
+const DEFAULT_VISUAL: Visual = { badge: 'solo', border: 'border-silver-30', label: 'COLECCIÓN' };
 
-  if (obj.type) {
-    const t = String(obj.type).toUpperCase();
-    if (t === 'VENDO') return { badge: 'vendo', border: 'border-rust', label: 'VENDO' };
-    if (t === 'CAMBIO') return { badge: 'cambio', border: 'border-silver', label: 'CAMBIO' };
-    if (t === 'BUSCO') return { badge: 'busco', border: 'border-neon', label: 'WISHLIST' };
-  }
+const TYPE_VISUALS: Record<string, Visual> = {
+  'VENDO': { badge: 'vendo', border: 'border-rust', label: 'VENDO' },
+  'CAMBIO': { badge: 'cambio', border: 'border-silver', label: 'CAMBIO' },
+  'BUSCO': { badge: 'busco', border: 'border-neon', label: 'WISHLIST' },
+};
 
-  if (obj.status) {
-    const s = String(obj.status).toLowerCase();
-    if (s === 'sell') return { badge: 'vendo', border: 'border-rust', label: 'VENDO' };
-    if (s === 'trade') return { badge: 'cambio', border: 'border-silver', label: 'CAMBIO' };
-    if (s === 'busco') return { badge: 'busco', border: 'border-neon', label: 'WISHLIST' };
-    if (s === 'collection') return { badge: 'solo', border: 'border-silver-20', label: 'COLECCIÓN' };
-  }
+const STATUS_VISUALS: Record<string, Visual> = {
+  'sell': { badge: 'vendo', border: 'border-rust', label: 'VENDO' },
+  'trade': { badge: 'cambio', border: 'border-silver', label: 'CAMBIO' },
+  'busco': { badge: 'busco', border: 'border-neon', label: 'WISHLIST' },
+  'collection': { badge: 'solo', border: 'border-silver-20', label: 'COLECCIÓN' },
+};
 
-  return { badge: 'solo', border: 'border-silver-30', label: 'COLECCIÓN' };
+const getVisualFor = (obj: any): Visual => {
+  if (!obj) return DEFAULT_VISUAL;
+  if (obj.type) return TYPE_VISUALS[String(obj.type).toUpperCase()] || DEFAULT_VISUAL;
+  if (obj.status) return STATUS_VISUALS[String(obj.status).toLowerCase()] || DEFAULT_VISUAL;
+  return DEFAULT_VISUAL;
 };
 </script>
 

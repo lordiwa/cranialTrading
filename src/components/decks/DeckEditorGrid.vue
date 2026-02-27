@@ -114,25 +114,17 @@ const sortCards = (cards: DisplayDeckCard[]): DisplayDeckCard[] => {
   return sorted
 }
 
-// Check if a card passes all three cross-filters
+// Generic filter check: if a filter set is active and the card's value isn't in it, reject
+const passesFilterSet = (selected: Set<string> | undefined, maxSize: number, value: string): boolean => {
+  return !selected || selected.size >= maxSize || selected.has(value)
+}
+
+// Check if a card passes all cross-filters
 const passesFilters = (card: DisplayDeckCard): boolean => {
-  if (props.selectedColors && props.selectedColors.size < deckColorOrder.length) {
-    const color = getColorCategory(card)
-    if (!props.selectedColors.has(color)) return false
-  }
-  if (props.selectedManaValues && props.selectedManaValues.size < deckManaOrder.length) {
-    const mana = getManaCategory(card)
-    if (!props.selectedManaValues.has(mana)) return false
-  }
-  if (props.selectedTypes && props.selectedTypes.size < deckTypeOrder.length) {
-    const type = getTypeCategory(card)
-    if (!props.selectedTypes.has(type)) return false
-  }
-  if (props.selectedRarities && props.selectedRarities.size < rarityOrder.length) {
-    const rarity = getCardRarityCategory(card)
-    if (!props.selectedRarities.has(rarity)) return false
-  }
-  return true
+  return passesFilterSet(props.selectedColors, deckColorOrder.length, getColorCategory(card))
+    && passesFilterSet(props.selectedManaValues, deckManaOrder.length, getManaCategory(card))
+    && passesFilterSet(props.selectedTypes, deckTypeOrder.length, getTypeCategory(card))
+    && passesFilterSet(props.selectedRarities, rarityOrder.length, getCardRarityCategory(card))
 }
 
 const hasActiveFilters = computed(() => {
@@ -142,51 +134,33 @@ const hasActiveFilters = computed(() => {
     || (props.selectedRarities && props.selectedRarities.size < rarityOrder.length)
 })
 
-// Group cards by selected mode
-const groupedCards = computed(() => {
-  const source = hasActiveFilters.value ? props.cards.filter(passesFilters) : props.cards
-
-  // If groupBy is 'none', return flat sorted list
-  if (props.groupBy === 'none') {
-    const sortedCards = sortCards(source)
-    return [{ type: 'all', cards: sortedCards }]
-  }
-
+// Build ordered groups from source cards
+const buildGroups = (source: DisplayDeckCard[], getCategoryFn: (card: DisplayDeckCard) => string, order: string[]): { type: string; cards: DisplayDeckCard[] }[] => {
   const groups: Record<string, DisplayDeckCard[]> = {}
-  const order = getCategoryOrder()
-
   for (const card of source) {
-    const category = getCategory(card)
+    const category = getCategoryFn(card)
     if (!groups[category]) groups[category] = []
     groups[category].push(card)
   }
-
-  // Sort cards within each group using sortBy
   for (const category in groups) {
     const group = groups[category]
-    if (group) {
-      groups[category] = sortCards(group)
-    }
+    if (group) groups[category] = sortCards(group)
   }
-
-  const sortedGroups: { type: string; cards: DisplayDeckCard[] }[] = []
-
+  const result: { type: string; cards: DisplayDeckCard[] }[] = []
   for (const category of order) {
-    const group = groups[category]
-    if (group && group.length > 0) {
-      sortedGroups.push({ type: category, cards: group })
-    }
+    if (groups[category]?.length) result.push({ type: category, cards: groups[category] })
   }
-
-  // Add any categories not in the order
   for (const category in groups) {
-    const group = groups[category]
-    if (!order.includes(category) && group && group.length > 0) {
-      sortedGroups.push({ type: category, cards: group })
-    }
+    if (!order.includes(category) && groups[category]?.length) result.push({ type: category, cards: groups[category] })
   }
+  return result
+}
 
-  return sortedGroups
+// Group cards by selected mode
+const groupedCards = computed(() => {
+  const source = hasActiveFilters.value ? props.cards.filter(passesFilters) : props.cards
+  if (props.groupBy === 'none') return [{ type: 'all', cards: sortCards(source) }]
+  return buildGroups(source, getCategory, getCategoryOrder())
 })
 
 // Count total cards by category

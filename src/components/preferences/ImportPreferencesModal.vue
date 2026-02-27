@@ -38,6 +38,42 @@ const conditionOptions = computed(() => [
   { value: 'PO', label: t('common.conditions.PO') },
 ])
 
+const parseMoxfieldPreferences = async (deckId: string): Promise<{ total: number; mainboard: number; sideboard: number; name?: string } | null> => {
+  const result = await fetchMoxfieldDeck(deckId)
+  if (!result.data) {
+    errorMsg.value = result.error || 'Error desconocido'
+    return null
+  }
+  const deck = result.data
+  moxfieldDeckData.value = deck
+  const mainboardCards = deck.boards?.mainboard?.cards || {}
+  const sideboardCards = deck.boards?.sideboard?.cards || {}
+  const commanderCards = deck.boards?.commanders?.cards || {}
+  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  return { total: mainboardCount + sideboardCount + commanderCount, mainboard: mainboardCount + commanderCount, sideboard: sideboardCount, name: deck.name }
+}
+
+const parseTextPreferences = (text: string): { total: number; mainboard: number; sideboard: number } => {
+  const lines = text.split('\n')
+  let mainboard = 0
+  let sideboard = 0
+  let inSideboard = false
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === 'SIDEBOARD:') { inSideboard = true; continue }
+    const match = /^(\d+)\s+/.exec(trimmed)
+    const matchQty = match?.[1]
+    if (match && matchQty) {
+      const qty = Number.parseInt(matchQty)
+      if (inSideboard) sideboard += qty
+      else mainboard += qty
+    }
+  }
+  return { total: mainboard + sideboard, mainboard, sideboard }
+}
+
 const handleParse = async () => {
   if (!inputText.value.trim()) return
 
@@ -45,71 +81,16 @@ const handleParse = async () => {
   errorMsg.value = ''
   moxfieldDeckData.value = null
 
-  // Detectar si es link o ID de Moxfield
   const deckId = extractDeckId(inputText.value)
 
   if (deckId) {
-    // Intentar obtener via Cloud Function
     isLink.value = true
-    const result = await fetchMoxfieldDeck(deckId)
-
-    if (!result.data) {
-      parsing.value = false
-      errorMsg.value = result.error || 'Error desconocido'
-      return
-    }
-
-    // Éxito - procesar el deck
-    const deck = result.data
-    moxfieldDeckData.value = deck
-
-    // Nueva estructura: deck.boards.mainboard.cards
-    const mainboardCards = deck.boards?.mainboard?.cards || {}
-    const sideboardCards = deck.boards?.sideboard?.cards || {}
-    const commanderCards = deck.boards?.commanders?.cards || {}
-
-    const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-    const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-    const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-
-    preview.value = {
-      total: mainboardCount + sideboardCount + commanderCount,
-      mainboard: mainboardCount + commanderCount,
-      sideboard: sideboardCount,
-      name: deck.name,
-    }
+    const result = await parseMoxfieldPreferences(deckId)
+    if (!result) { parsing.value = false; return }
+    preview.value = result
   } else {
-    // Es texto normal
     isLink.value = false
-    const lines = inputText.value.split('\n')
-    let mainboard = 0
-    let sideboard = 0
-    let inSideboard = false
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (trimmed === 'SIDEBOARD:') {
-        inSideboard = true
-        continue
-      }
-
-      const match = /^(\d+)\s+/.exec(trimmed)
-      const matchQty = match?.[1]
-      if (match && matchQty) {
-        const qty = Number.parseInt(matchQty)
-        if (inSideboard) {
-          sideboard += qty
-        } else {
-          mainboard += qty
-        }
-      }
-    }
-
-    preview.value = {
-      total: mainboard + sideboard,
-      mainboard,
-      sideboard,
-    }
+    preview.value = parseTextPreferences(inputText.value)
   }
 
   parsing.value = false

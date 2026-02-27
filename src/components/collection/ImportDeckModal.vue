@@ -99,6 +99,62 @@ const conditionOptions = computed(() => [
   { value: 'PO', label: t('common.conditions.PO') },
 ])
 
+interface ParsePreview { total: number; mainboard: number; sideboard: number; name?: string; cards?: string[] }
+
+const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> => {
+  const result = await fetchMoxfieldDeck(deckId)
+  if (!result.data) {
+    errorMsg.value = result.error || 'Error desconocido'
+    return null
+  }
+  const deck = result.data
+  moxfieldDeckData.value = deck
+  const mainboardCards = deck.boards?.mainboard?.cards || {}
+  const sideboardCards = deck.boards?.sideboard?.cards || {}
+  const commanderCards = deck.boards?.commanders?.cards || {}
+  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const cardNames = Object.values(mainboardCards).map((item: any) => item.card?.name || '').filter(Boolean)
+  deckNameInput.value = deck.name || ''
+  if (deck.format === 'commander' || deck.format === 'edh') {
+    deckFormat.value = 'commander'
+    if (Object.keys(commanderCards).length > 0) {
+      commanderName.value = (Object.values(commanderCards)[0] as any)?.card?.name || ''
+    }
+  }
+  return { total: mainboardCount + sideboardCount + commanderCount, mainboard: mainboardCount + commanderCount, sideboard: sideboardCount, name: deck.name, cards: cardNames }
+}
+
+const parseCsvInput = (text: string): ParsePreview => {
+  const cards = parseCsvDeckImport(text)
+  csvParsedCards.value = cards
+  const totalQty = cards.reduce((sum, c) => sum + c.quantity, 0)
+  return { total: totalQty, mainboard: totalQty, sideboard: 0, cards: cards.map(c => c.name) }
+}
+
+const parsePlainTextInput = (text: string): ParsePreview => {
+  const lines = text.split('\n')
+  let mainboard = 0
+  let sideboard = 0
+  let inSideboard = false
+  const cardNames: string[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === 'SIDEBOARD:') { inSideboard = true; continue }
+    const match = /^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/.exec(trimmed)
+    const matchQty = match?.[1]
+    const matchName = match?.[2]
+    if (match && matchQty && matchName) {
+      const qty = Number.parseInt(matchQty)
+      if (!inSideboard) cardNames.push(matchName.trim())
+      if (inSideboard) sideboard += qty
+      else mainboard += qty
+    }
+  }
+  return { total: mainboard + sideboard, mainboard, sideboard, cards: cardNames }
+}
+
 const handleParse = async () => {
   if (!inputText.value.trim()) return
 
@@ -108,107 +164,20 @@ const handleParse = async () => {
   isCsv.value = false
   csvParsedCards.value = []
 
-  // Detectar si es link o ID de Moxfield
   const deckId = extractDeckId(inputText.value)
 
   if (deckId) {
-    // Intentar obtener via Cloud Function
     isLink.value = true
-    const result = await fetchMoxfieldDeck(deckId)
-
-    if (!result.data) {
-      parsing.value = false
-      errorMsg.value = result.error || 'Error desconocido'
-      return
-    }
-
-    // Éxito - procesar el deck
-    const deck = result.data
-    moxfieldDeckData.value = deck
-
-    // Nueva estructura: deck.boards.mainboard.cards
-    const mainboardCards = deck.boards?.mainboard?.cards || {}
-    const sideboardCards = deck.boards?.sideboard?.cards || {}
-    const commanderCards = deck.boards?.commanders?.cards || {}
-
-    const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-    const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-    const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-
-    const cardNames = Object.values(mainboardCards).map((item: any) => item.card?.name || '').filter(Boolean)
-
-    preview.value = {
-      total: mainboardCount + sideboardCount + commanderCount,
-      mainboard: mainboardCount + commanderCount,
-      sideboard: sideboardCount,
-      name: deck.name,
-      cards: cardNames,
-    }
-    deckNameInput.value = deck.name || ''
-
-    // Auto-detectar formato Commander
-    if (deck.format === 'commander' || deck.format === 'edh') {
-      deckFormat.value = 'commander'
-      if (Object.keys(commanderCards).length > 0) {
-        const firstCommander = Object.values(commanderCards)[0] as any
-        commanderName.value = firstCommander?.card?.name || ''
-      }
-    }
+    const result = await parseMoxfieldInput(deckId)
+    if (!result) { parsing.value = false; return }
+    preview.value = result
   } else if (isCsvFormat(inputText.value)) {
-    // CSV (ManaBox / Moxfield)
     isLink.value = false
     isCsv.value = true
-    const cards = parseCsvDeckImport(inputText.value)
-    csvParsedCards.value = cards
-
-    const totalQty = cards.reduce((sum, c) => sum + c.quantity, 0)
-    const cardNames = cards.map(c => c.name)
-
-    preview.value = {
-      total: totalQty,
-      mainboard: totalQty,
-      sideboard: 0,
-      cards: cardNames,
-    }
+    preview.value = parseCsvInput(inputText.value)
   } else {
-    // Es texto normal (lista de cartas o export de Moxfield)
     isLink.value = false
-    const lines = inputText.value.split('\n')
-    let mainboard = 0
-    let sideboard = 0
-    let inSideboard = false
-    const cardNames: string[] = []
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (trimmed === 'SIDEBOARD:') {
-        inSideboard = true
-        continue
-      }
-
-      const match = /^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/.exec(trimmed)
-      const matchQty = match?.[1]
-      const matchName = match?.[2]
-      if (match && matchQty && matchName) {
-        const qty = Number.parseInt(matchQty)
-        const name = matchName.trim()
-        if (!inSideboard) {
-          cardNames.push(name)
-        }
-        if (inSideboard) {
-          sideboard += qty
-        } else {
-          mainboard += qty
-        }
-      }
-    }
-
-    preview.value = {
-      total: mainboard + sideboard,
-      mainboard,
-      sideboard,
-      cards: cardNames,
-    }
+    preview.value = parsePlainTextInput(inputText.value)
   }
 
   parsing.value = false

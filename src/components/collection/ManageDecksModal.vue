@@ -118,6 +118,25 @@ const decrement = (deckId: string) => {
   }
 }
 
+// Update allocation for one side (mainboard or sideboard)
+const updateSideAllocation = async (deckId: string, cardId: string, isSide: boolean, newQty: number, origAlloc: { quantity: number } | undefined) => {
+  if (origAlloc) {
+    if (newQty !== origAlloc.quantity) {
+      if (newQty === 0) await decksStore.deallocateCard(deckId, cardId, isSide)
+      else await decksStore.updateAllocation(deckId, cardId, isSide, newQty)
+    }
+  } else if (newQty > 0) {
+    await decksStore.allocateCardToDeck(deckId, cardId, newQty, isSide)
+  }
+}
+
+// Remove the opposite side allocation if it existed
+const removeOppositeAllocation = async (deckId: string, cardId: string, isSide: boolean, origAllocations: Map<string, any>) => {
+  const oppositeKey = `${deckId}-${!isSide}`
+  const opposite = origAllocations.get(oppositeKey)
+  if (opposite) await decksStore.deallocateCard(deckId, cardId, !isSide)
+}
+
 // Save all changes
 const handleSave = async () => {
   if (!props.card) return
@@ -126,59 +145,18 @@ const handleSave = async () => {
 
   try {
     const cardId = props.card.id
-
-    // Get original allocations
     const originalAllocations = new Map(
       currentAllocations.value.map(a => [`${a.deckId}-${a.isInSideboard}`, a])
     )
 
-    // Process each deck
     for (const deck of decksStore.decks) {
       const newAlloc = allocations.value[deck.id]
       const newQty = newAlloc?.quantity || 0
       const newSideboard = newAlloc?.isInSideboard || false
+      const origForSide = originalAllocations.get(`${deck.id}-${newSideboard}`)
 
-      // Find original allocation for this deck (mainboard and sideboard)
-      const origMain = originalAllocations.get(`${deck.id}-false`)
-      const origSide = originalAllocations.get(`${deck.id}-true`)
-
-      // Handle mainboard allocation
-      if (!newSideboard) {
-        if (origMain) {
-          if (newQty !== origMain.quantity) {
-            if (newQty === 0) {
-              await decksStore.deallocateCard(deck.id, cardId, false)
-            } else {
-              await decksStore.updateAllocation(deck.id, cardId, false, newQty)
-            }
-          }
-        } else if (newQty > 0) {
-          await decksStore.allocateCardToDeck(deck.id, cardId, newQty, false)
-        }
-
-        // Remove sideboard if was there before
-        if (origSide) {
-          await decksStore.deallocateCard(deck.id, cardId, true)
-        }
-      } else {
-        // Handle sideboard allocation
-        if (origSide) {
-          if (newQty !== origSide.quantity) {
-            if (newQty === 0) {
-              await decksStore.deallocateCard(deck.id, cardId, true)
-            } else {
-              await decksStore.updateAllocation(deck.id, cardId, true, newQty)
-            }
-          }
-        } else if (newQty > 0) {
-          await decksStore.allocateCardToDeck(deck.id, cardId, newQty, true)
-        }
-
-        // Remove mainboard if was there before
-        if (origMain) {
-          await decksStore.deallocateCard(deck.id, cardId, false)
-        }
-      }
+      await updateSideAllocation(deck.id, cardId, newSideboard, newQty, origForSide)
+      await removeOppositeAllocation(deck.id, cardId, newSideboard, originalAllocations)
     }
 
     toastStore.show(t('decks.manageModal.allocationsUpdated'), 'success')

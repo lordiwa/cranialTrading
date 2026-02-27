@@ -11,35 +11,35 @@ export interface KeyboardShortcut {
 
 const isEnabled = ref(true)
 
-export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (!isEnabled.value) return
+function isInInputField(target: HTMLElement): boolean {
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+}
 
-    // Don't trigger shortcuts when typing in input fields
-    const target = event.target as HTMLElement
-    const isInputField = target.tagName === 'INPUT' ||
-                         target.tagName === 'TEXTAREA' ||
-                         target.isContentEditable
-
-    for (const shortcut of shortcuts) {
-      const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase()
-      const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !event.ctrlKey && !event.metaKey
-      const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey
-      const altMatch = shortcut.alt ? event.altKey : !event.altKey
-
-      if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
-        // For Escape, always trigger (useful for closing modals)
-        // For other shortcuts, skip if in input field
-        if (shortcut.key.toLowerCase() !== 'escape' && isInputField) {
-          continue
-        }
-
-        event.preventDefault()
-        shortcut.action()
-        return
-      }
-    }
+function findMatchingShortcut(event: KeyboardEvent, shortcuts: KeyboardShortcut[]): KeyboardShortcut | null {
+  const inInput = isInInputField(event.target as HTMLElement)
+  for (const shortcut of shortcuts) {
+    const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase()
+    const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !event.ctrlKey && !event.metaKey
+    const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey
+    const altMatch = shortcut.alt ? event.altKey : !event.altKey
+    if (!keyMatch || !ctrlMatch || !shiftMatch || !altMatch) continue
+    if (shortcut.key.toLowerCase() !== 'escape' && inInput) continue
+    return shortcut
   }
+  return null
+}
+
+function handleShortcutEvent(event: KeyboardEvent, shortcuts: KeyboardShortcut[]) {
+  if (!isEnabled.value) return
+  const matched = findMatchingShortcut(event, shortcuts)
+  if (matched) {
+    event.preventDefault()
+    matched.action()
+  }
+}
+
+export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
+  const handleKeyDown = (event: KeyboardEvent) => { handleShortcutEvent(event, shortcuts) }
 
   onMounted(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -67,31 +67,7 @@ export function registerGlobalShortcuts(shortcuts: KeyboardShortcut[]) {
     window.removeEventListener('keydown', globalListener)
   }
 
-  globalListener = (event: KeyboardEvent) => {
-    if (!isEnabled.value) return
-
-    const target = event.target as HTMLElement
-    const isInputField = target.tagName === 'INPUT' ||
-                         target.tagName === 'TEXTAREA' ||
-                         target.isContentEditable
-
-    for (const shortcut of globalShortcuts.value) {
-      const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase()
-      const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !event.ctrlKey && !event.metaKey
-      const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey
-      const altMatch = shortcut.alt ? event.altKey : !event.altKey
-
-      if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
-        if (shortcut.key.toLowerCase() !== 'escape' && isInputField) {
-          continue
-        }
-
-        event.preventDefault()
-        shortcut.action()
-        return
-      }
-    }
-  }
+  globalListener = (event: KeyboardEvent) => { handleShortcutEvent(event, globalShortcuts.value) }
 
   window.addEventListener('keydown', globalListener)
 }

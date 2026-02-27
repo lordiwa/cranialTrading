@@ -179,61 +179,65 @@ export function useCardFilter<T extends FilterableCard>(
     return true
   }
 
-  // --- Advanced filter check ---
-  const passesAdvancedFilters = (card: T): boolean => {
-    // Price range
+  // --- Advanced filter helpers ---
+  const passesPrice = (card: T): boolean => {
     if (advPriceMin.value !== undefined && (card.price === undefined || card.price < advPriceMin.value)) return false
     if (advPriceMax.value !== undefined && (card.price === undefined || card.price > advPriceMax.value)) return false
+    return true
+  }
 
-    // Foil filter
+  const passesFoil = (card: T): boolean => {
     if (advFoilFilter.value === 'foil' && !card.foil) return false
     if (advFoilFilter.value === 'nonfoil' && card.foil) return false
-
-    // Sets
-    if (advSelectedSets.value.length > 0) {
-      const cardSet = card.setCode?.toLowerCase() || ''
-      if (!advSelectedSets.value.some(s => s.toLowerCase() === cardSet)) return false
-    }
-
-    // Keywords - check oracle_text and keywords array
-    if (advSelectedKeywords.value.length > 0) {
-      const oracleText = card.oracle_text?.toLowerCase() || ''
-      const cardKeywords = card.keywords?.map(k => k.toLowerCase()) || []
-      const typeLine = card.type_line?.toLowerCase() || ''
-      for (const kw of advSelectedKeywords.value) {
-        const kwLower = kw.toLowerCase()
-        if (!oracleText.includes(kwLower) && !cardKeywords.includes(kwLower) && !typeLine.includes(kwLower)) return false
-      }
-    }
-
-    // Format legality
-    if (advSelectedFormats.value.length > 0) {
-      if (!card.legalities) return false
-      for (const fmt of advSelectedFormats.value) {
-        if (card.legalities[fmt] !== 'legal') return false
-      }
-    }
-
-    // Full art
-    if (advFullArtOnly.value && !card.full_art) return false
-
-    // Power range
-    if (advPowerMin.value !== undefined || advPowerMax.value !== undefined) {
-      const pow = card.power !== undefined ? Number.parseFloat(card.power) : Number.NaN
-      if (Number.isNaN(pow)) return false
-      if (advPowerMin.value !== undefined && pow < advPowerMin.value) return false
-      if (advPowerMax.value !== undefined && pow > advPowerMax.value) return false
-    }
-
-    // Toughness range
-    if (advToughnessMin.value !== undefined || advToughnessMax.value !== undefined) {
-      const tou = card.toughness !== undefined ? Number.parseFloat(card.toughness) : Number.NaN
-      if (Number.isNaN(tou)) return false
-      if (advToughnessMin.value !== undefined && tou < advToughnessMin.value) return false
-      if (advToughnessMax.value !== undefined && tou > advToughnessMax.value) return false
-    }
-
     return true
+  }
+
+  const passesSets = (card: T): boolean => {
+    if (advSelectedSets.value.length === 0) return true
+    const cardSet = card.setCode?.toLowerCase() || ''
+    return advSelectedSets.value.some(s => s.toLowerCase() === cardSet)
+  }
+
+  const passesKeywords = (card: T): boolean => {
+    if (advSelectedKeywords.value.length === 0) return true
+    const oracleText = card.oracle_text?.toLowerCase() || ''
+    const cardKeywords = card.keywords?.map(k => k.toLowerCase()) || []
+    const typeLine = card.type_line?.toLowerCase() || ''
+    return advSelectedKeywords.value.every(kw => {
+      const kwLower = kw.toLowerCase()
+      return oracleText.includes(kwLower) || cardKeywords.includes(kwLower) || typeLine.includes(kwLower)
+    })
+  }
+
+  const passesFormats = (card: T): boolean => {
+    if (advSelectedFormats.value.length === 0) return true
+    if (!card.legalities) return false
+    return advSelectedFormats.value.every(fmt => card.legalities![fmt] === 'legal')
+  }
+
+  const passesFullArt = (card: T): boolean => {
+    return !advFullArtOnly.value || !!card.full_art
+  }
+
+  const passesStatRange = (value: string | undefined, min?: number, max?: number): boolean => {
+    if (min === undefined && max === undefined) return true
+    const parsed = value !== undefined ? Number.parseFloat(value) : Number.NaN
+    if (Number.isNaN(parsed)) return false
+    if (min !== undefined && parsed < min) return false
+    if (max !== undefined && parsed > max) return false
+    return true
+  }
+
+  // --- Advanced filter check ---
+  const passesAdvancedFilters = (card: T): boolean => {
+    return passesPrice(card)
+      && passesFoil(card)
+      && passesSets(card)
+      && passesKeywords(card)
+      && passesFormats(card)
+      && passesFullArt(card)
+      && passesStatRange(card.power, advPowerMin.value, advPowerMax.value)
+      && passesStatRange(card.toughness, advToughnessMin.value, advToughnessMax.value)
   }
 
   const hasActiveFilters = computed(() => {

@@ -1,5 +1,31 @@
 const SCRYFALL_API = 'https://api.scryfall.com'
 
+// Rate limiter: Scryfall allows ~10 req/s, we stay safe at ~5 req/s
+let lastRequestTime = 0
+const MIN_REQUEST_INTERVAL = 200 // ms between requests
+
+async function rateLimitedFetch(url: string): Promise<Response> {
+    const now = Date.now()
+    const elapsed = now - lastRequestTime
+    if (elapsed < MIN_REQUEST_INTERVAL) {
+        await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - elapsed))
+    }
+    lastRequestTime = Date.now()
+
+    const response = await fetch(url)
+
+    // Retry once on 429 with backoff
+    if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After')
+        const delay = retryAfter ? parseInt(retryAfter) * 1000 : 2000
+        await new Promise(resolve => setTimeout(resolve, delay))
+        lastRequestTime = Date.now()
+        return fetch(url)
+    }
+
+    return response
+}
+
 // Cache para sugerencias (10 minutos)
 const suggestionsCache = new Map<string, { results: string[], timestamp: number }>()
 const SUGGESTIONS_CACHE_TTL = 10 * 60 * 1000
@@ -89,7 +115,7 @@ export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
 
         console.log(`🔍 Query enviada a Scryfall: ${finalQuery}`)
 
-        const response = await fetch(
+        const response = await rateLimitedFetch(
             `${SCRYFALL_API}/cards/search?q=${encodedQuery}&unique=prints&order=released&dir=desc`
         )
 
@@ -116,7 +142,7 @@ export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
  */
 export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
     try {
-        const response = await fetch(`${SCRYFALL_API}/cards/${id}`)
+        const response = await rateLimitedFetch(`${SCRYFALL_API}/cards/${id}`)
 
         if (!response.ok) {
             throw new Error(`Scryfall API error: ${response.status}`)
@@ -161,14 +187,9 @@ export const searchAdvanced = async (
 
         console.log(`🔍 Buscando con query: ${query}`)
 
-        const response = await fetch(`${SCRYFALL_API}/cards/search?${params.toString()}`)
+        const response = await rateLimitedFetch(`${SCRYFALL_API}/cards/search?${params.toString()}`)
 
         if (!response.ok) {
-            if (response.status === 429) {
-                console.warn('⚠️ Rate limit alcanzado, esperando...')
-                await new Promise(resolve => setTimeout(resolve, 1000))
-                return await searchAdvanced(query, options) // Reintentar
-            }
             if (response.status === 404) {
                 console.warn('⚠️ No se encontraron cartas con estos filtros')
                 return []
@@ -433,6 +454,14 @@ export const getCardsByIds = async (
 
         while (retries > 0) {
             try {
+                // Respect rate limit
+                const now = Date.now()
+                const elapsed = now - lastRequestTime
+                if (elapsed < MIN_REQUEST_INTERVAL) {
+                    await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - elapsed))
+                }
+                lastRequestTime = Date.now()
+
                 const response = await fetch(`${SCRYFALL_API}/cards/collection`, {
                     method: 'POST',
                     headers: {
@@ -443,8 +472,9 @@ export const getCardsByIds = async (
 
                 if (!response.ok) {
                     if (response.status === 429) {
-                        console.warn('⚠️ Rate limit, esperando 100ms...')
-                        await new Promise(resolve => setTimeout(resolve, 100))
+                        const retryAfter = response.headers.get('Retry-After')
+                        const delay = retryAfter ? parseInt(retryAfter) * 1000 : 2000
+                        await new Promise(resolve => setTimeout(resolve, delay))
                         retries--
                         continue
                     }
@@ -488,7 +518,7 @@ export const getAllSets = async (): Promise<ScryfallSet[]> => {
         }
 
         console.log('🔍 Obteniendo sets de Scryfall...')
-        const response = await fetch(`${SCRYFALL_API}/sets`)
+        const response = await rateLimitedFetch(`${SCRYFALL_API}/sets`)
 
         if (!response.ok) {
             throw new Error(`Scryfall sets API error: ${response.status}`)

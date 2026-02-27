@@ -115,7 +115,7 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
   return { quantity, cardName, setCode, isFoil }
 }
 
-// ============ CSV (ManaBox) IMPORT/EXPORT ============
+// ============ CSV (ManaBox / Moxfield) IMPORT/EXPORT ============
 
 /**
  * Map ManaBox condition strings to app's CardCondition type
@@ -134,6 +134,21 @@ export const mapCsvCondition = (condition: string): CardCondition => {
 }
 
 /**
+ * Map Moxfield condition strings to app's CardCondition type
+ */
+export const mapMoxfieldCondition = (condition: string): CardCondition => {
+  switch (condition?.trim()) {
+    case 'Mint': return 'M'
+    case 'Near Mint': return 'NM'
+    case 'Lightly Played': return 'LP'
+    case 'Moderately Played': return 'MP'
+    case 'Heavily Played': return 'HP'
+    case 'Damaged': return 'PO'
+    default: return 'NM'
+  }
+}
+
+/**
  * Map app's CardCondition to Moxfield condition string (for CSV export)
  */
 export const conditionToCsv = (condition: CardCondition): string => {
@@ -145,6 +160,21 @@ export const conditionToCsv = (condition: CardCondition): string => {
     case 'HP': return 'Heavily Played'
     case 'PO': return 'Damaged'
     default: return 'Near Mint'
+  }
+}
+
+/**
+ * Map app's CardCondition to ManaBox condition string (for CSV export)
+ */
+export const conditionToManabox = (condition: CardCondition): string => {
+  switch (condition) {
+    case 'M': return 'mint'
+    case 'NM': return 'near_mint'
+    case 'LP': return 'excellent'
+    case 'MP': return 'light_played'
+    case 'HP': return 'played'
+    case 'PO': return 'poor'
+    default: return 'near_mint'
   }
 }
 
@@ -208,6 +238,45 @@ export const buildMoxfieldCsv = (cards: {
 }
 
 /**
+ * Build ManaBox-compatible CSV from card data.
+ */
+export const buildManaboxCsv = (cards: {
+  name: string
+  setCode: string
+  quantity: number
+  foil: boolean
+  scryfallId: string
+  price: number
+  condition: CardCondition
+  language?: string
+}[]): string => {
+  const header = 'Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,ManaBox ID,Scryfall ID,Purchase price,Misprint,Altered,Condition,Language,Purchase currency'
+  const lines = [header]
+
+  for (const card of cards) {
+    lines.push([
+      escapeCsvField(card.name),            // Name
+      card.setCode,                         // Set code
+      '',                                   // Set name (not stored)
+      '',                                   // Collector number (not stored)
+      card.foil ? 'foil' : '',              // Foil
+      '',                                   // Rarity (not stored)
+      String(card.quantity),                // Quantity
+      '',                                   // ManaBox ID (not stored)
+      card.scryfallId || '',                // Scryfall ID
+      card.price ? card.price.toFixed(2) : '', // Purchase price
+      '',                                   // Misprint
+      '',                                   // Altered
+      conditionToManabox(card.condition),   // Condition
+      (card.language || 'en').toLowerCase(), // Language
+      '',                                   // Purchase currency
+    ].join(','))
+  }
+
+  return lines.join('\n')
+}
+
+/**
  * Parse a CSV line handling quoted fields (e.g. card names with commas)
  */
 export const parseCsvLine = (line: string): string[] => {
@@ -250,15 +319,19 @@ export interface ParsedCsvCard {
 }
 
 /**
- * Detect if text is a ManaBox CSV export
+ * Detect if text is a CSV export (ManaBox or Moxfield)
  */
 export const isCsvFormat = (text: string): boolean => {
   const firstLine = text.split('\n')[0]?.trim() || ''
+  // ManaBox: headers contain "Name,Set code" or "Scryfall ID"
+  // Moxfield: headers contain "Count,Name,Edition" or "Collector Number"
   return firstLine.includes('Name,Set code') || firstLine.includes('Scryfall ID')
+    || firstLine.includes('Count,Name,Edition') || firstLine.includes('Collector Number')
 }
 
 /**
- * Parse ManaBox CSV text into structured card data
+ * Parse CSV text (ManaBox or Moxfield) into structured card data.
+ * Auto-detects format based on header columns.
  */
 export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
   const lines = csvText.split('\n').filter(l => l.trim())
@@ -272,15 +345,23 @@ export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
   headers.forEach((h, i) => { colIndex.set(h.trim(), i) })
 
   const nameIdx = colIndex.get('Name')
-  const setCodeIdx = colIndex.get('Set code')
-  const quantityIdx = colIndex.get('Quantity')
+  // ManaBox uses "Set code", Moxfield uses "Edition"
+  const setCodeIdx = colIndex.get('Set code') ?? colIndex.get('Edition')
+  // ManaBox uses "Quantity", Moxfield uses "Count"
+  const quantityIdx = colIndex.get('Quantity') ?? colIndex.get('Count')
   const foilIdx = colIndex.get('Foil')
   const scryfallIdx = colIndex.get('Scryfall ID')
-  const priceIdx = colIndex.get('Purchase price')
+  // ManaBox uses "Purchase price", Moxfield uses "Purchase Price"
+  const priceIdx = colIndex.get('Purchase price') ?? colIndex.get('Purchase Price')
   const conditionIdx = colIndex.get('Condition')
   const languageIdx = colIndex.get('Language')
 
   if (nameIdx === undefined || quantityIdx === undefined) return []
+
+  // Detect format for condition mapping:
+  // ManaBox has "Set code" or "Scryfall ID"; Moxfield has "Edition" or "Count" without "Set code"
+  const isManaBox = colIndex.has('Set code') || colIndex.has('Scryfall ID')
+  const conditionMapper = isManaBox ? mapCsvCondition : mapMoxfieldCondition
 
   const getField = (fields: string[], idx: number | undefined): string => {
     if (idx === undefined) return ''
@@ -307,7 +388,7 @@ export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
       language: lang || undefined,
       scryfallId: getField(fields, scryfallIdx).trim(),
       price: Number.parseFloat(getField(fields, priceIdx) || '0') || 0,
-      condition: mapCsvCondition(getField(fields, conditionIdx)),
+      condition: conditionMapper(getField(fields, conditionIdx)),
     })
   }
 

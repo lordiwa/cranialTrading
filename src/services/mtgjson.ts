@@ -66,6 +66,7 @@ const MTGJSON_API = 'https://mtgjson.com/api/v5'
 let priceDataCache: Record<string, MTGJSONPriceFormats> | null = null
 let scryfallToUuidMap = new Map<string, string>()
 let dbInstance: IDBDatabase | null = null
+const failedSets = new Set<string>()
 
 // One-time cleanup of old/bloated localStorage keys (migrating to IndexedDB)
 ;(() => {
@@ -349,8 +350,8 @@ async function fetchSetMapping(setCode: string): Promise<void> {
 
     console.log(`Loaded ${count} cards from ${setCode}`)
   } catch (error) {
-    console.error(`Error fetching set ${setCode}:`, error)
-    // Don't throw - just log the error and continue
+    console.warn(`[MTGJSON] Set ${setCode} failed (will skip for this session):`, error)
+    failedSets.add(setCode.toUpperCase())
   }
 }
 
@@ -368,7 +369,7 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
     }
 
     // If we don't have the mapping for this card, fetch the set data
-    if (!scryfallToUuidMap.has(scryfallId) && setCode) {
+    if (!scryfallToUuidMap.has(scryfallId) && setCode && !failedSets.has(setCode.toUpperCase())) {
       await fetchSetMapping(setCode)
       // Save updated mapping (async)
       saveMappingToCache(scryfallToUuidMap)
@@ -442,6 +443,7 @@ export async function preloadPriceData(): Promise<void> {
 export async function clearMTGJSONCache(): Promise<void> {
   priceDataCache = null
   scryfallToUuidMap.clear()
+  failedSets.clear()
 
   // Clear IndexedDB
   await clearStore(PRICE_STORE)

@@ -11,9 +11,14 @@ import { type DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 import { isCsvFormat, parseCsvDeckImport, type ParsedCsvCard } from '../../utils/cardHelpers'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   show: boolean
-}>()
+  isBinder?: boolean
+  defaultStatus?: CardStatus
+}>(), {
+  isBinder: false,
+  defaultStatus: 'collection',
+})
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -42,7 +47,7 @@ const deckNameInput = ref('')
 const makeAllPublic = ref(false)
 
 // Import status
-const importStatus = ref<CardStatus>('collection')
+const importStatus = ref<CardStatus>(props.defaultStatus)
 
 const statusOptions = computed(() => [
   { value: 'collection', label: t('common.status.collection') },
@@ -50,6 +55,13 @@ const statusOptions = computed(() => [
   { value: 'trade', label: t('common.status.trade') },
   { value: 'wishlist', label: t('common.status.wishlist') },
 ])
+
+// Reset importStatus to defaultStatus when modal opens
+watch(() => props.show, (visible) => {
+  if (visible) {
+    importStatus.value = props.defaultStatus
+  }
+})
 
 // Auto-enable makeAllPublic when status is sale or trade
 watch(importStatus, (newStatus) => {
@@ -143,7 +155,7 @@ const handleParse = async () => {
       }
     }
   } else if (isCsvFormat(inputText.value)) {
-    // CSV de ManaBox
+    // CSV (ManaBox / Moxfield)
     isLink.value = false
     isCsv.value = true
     const cards = parseCsvDeckImport(inputText.value)
@@ -209,7 +221,7 @@ const handleImport = () => {
   const statusToSend = importStatus.value !== 'collection' ? importStatus.value : undefined
 
   if (isCsv.value && csvParsedCards.value.length > 0) {
-    // Importación desde CSV de ManaBox
+    // Importación desde CSV (ManaBox / Moxfield)
     emit('importCsv', csvParsedCards.value, nameToSend, makeAllPublic.value, deckFormat.value, commanderToSend, statusToSend)
   } else if (isLink.value && moxfieldDeckData.value) {
     // Importación directa desde API de Moxfield
@@ -234,7 +246,7 @@ const handleClose = () => {
   moxfieldDeckData.value = null
   isCsv.value = false
   csvParsedCards.value = []
-  importStatus.value = 'collection'
+  importStatus.value = props.defaultStatus
   emit('close')
 }
 
@@ -260,7 +272,7 @@ const handleCsvFile = (event: Event) => {
         <textarea
             id="import-deck-input"
             v-model="inputText"
-            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;...&#10;o&#10;CSV de ManaBox"
+            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;...&#10;o&#10;CSV (ManaBox / Moxfield)"
             class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-sans"
             rows="8"
             @input="preview = null"
@@ -356,8 +368,8 @@ const handleCsvFile = (event: Event) => {
         <BaseInput id="import-deck-name" v-model="deckNameInput" :placeholder="t('decks.importModal.options.deckNamePlaceholder')" />
       </div>
 
-      <!-- Formato del deck -->
-      <div v-if="preview">
+      <!-- Formato del deck (hidden for binders) -->
+      <div v-if="preview && !isBinder">
         <label for="import-deck-format" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.formatLabel') }}</label>
         <BaseSelect
             id="import-deck-format"
@@ -376,8 +388,8 @@ const handleCsvFile = (event: Event) => {
         />
       </div>
 
-      <!-- Commander (solo si es Commander) -->
-      <div v-if="preview && isCommander">
+      <!-- Commander (solo si es Commander, hidden for binders) -->
+      <div v-if="preview && isCommander && !isBinder">
         <label for="import-deck-commander" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.commanderLabel') }}</label>
         <BaseInput
             id="import-deck-commander"

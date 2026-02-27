@@ -254,13 +254,18 @@ export const useCollectionStore = defineStore('collection', () => {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
             const snapshot = await getDocs(colRef)
 
-            const batchDeletes: Promise<void>[] = []
-            snapshot.docs.forEach((d) => {
-                const cardRef = doc(db, 'users', authStore.user!.id, 'cards', d.id)
-                batchDeletes.push(deleteDoc(cardRef))
-            })
+            // Use writeBatch for efficient bulk deletion (max 500 per batch)
+            const BATCH_SIZE = 500
+            const docs = snapshot.docs
+            for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+                const chunk = docs.slice(i, i + BATCH_SIZE)
+                const batch = writeBatch(db)
+                for (const d of chunk) {
+                    batch.delete(doc(db, 'users', authStore.user!.id, 'cards', d.id))
+                }
+                await batch.commit()
+            }
 
-            await Promise.all(batchDeletes)
             cards.value = []
             toastStore.show(t('collection.messages.allDeleted'), 'success')
             return true
@@ -279,22 +284,19 @@ export const useCollectionStore = defineStore('collection', () => {
         if (!authStore.user || cardIds.length === 0) return { success: true, deleted: 0, failed: 0 }
 
         // Save cards for potential restore on error
-        const deletedCards: { card: Card; index: number }[] = []
+        const idsToDelete = new Set(cardIds)
+        const deletedCards: Card[] = []
 
-        // Remove from UI immediately (optimistic)
-        for (const cardId of cardIds) {
-            const index = cards.value.findIndex(c => c.id === cardId)
-            const card = cards.value[index]
-            if (index !== -1 && card) {
-                deletedCards.push({ card, index })
+        // Remove from UI in ONE operation (single reactive trigger instead of N splices)
+        const remaining: Card[] = []
+        for (const card of cards.value) {
+            if (idsToDelete.has(card.id)) {
+                deletedCards.push(card)
+            } else {
+                remaining.push(card)
             }
         }
-
-        // Sort by index descending to remove from end first (preserves indices)
-        deletedCards.sort((a, b) => b.index - a.index)
-        for (const { index } of deletedCards) {
-            cards.value.splice(index, 1)
-        }
+        cards.value = remaining
 
         const BATCH_SIZE = 200
         const MAX_RETRIES = 2
@@ -304,21 +306,26 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Only sale/trade cards exist in public_cards
         const publicCardIds = deletedCards
-            .filter(({ card }) => card.status === 'sale' || card.status === 'trade')
-            .map(({ card }) => card.id)
+            .filter(card => card.status === 'sale' || card.status === 'trade')
+            .map(card => card.id)
 
         const totalBatches = Math.ceil(cardIds.length / BATCH_SIZE) + Math.ceil(publicCardIds.length / BATCH_SIZE)
         let completedBatches = 0
 
-        // Helper: commit a batch with retry logic
+        // Helper: commit a batch with retry logic (skips retries for permission errors)
         const commitWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>): Promise<boolean> => {
             for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
                 try {
                     const batch = batchFn()
                     await batch.commit()
                     return true
-                } catch (error) {
+                } catch (error: unknown) {
                     console.warn(`Batch commit failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}):`, error)
+                    // Don't retry permission errors — they'll never succeed
+                    const msg = error instanceof Error ? error.message : String(error)
+                    if (msg.includes('permission') || msg.includes('Permission')) {
+                        return false
+                    }
                     if (attempt < MAX_RETRIES) {
                         await new Promise(resolve => setTimeout(resolve, 500))
                     }
@@ -354,7 +361,15 @@ export const useCollectionStore = defineStore('collection', () => {
         }
 
         // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
+        // If first batch fails (e.g. permission error), skip remaining batches
+        let publicCardsBlocked = false
         for (let i = 0; i < publicCardIds.length; i += BATCH_SIZE) {
+            if (publicCardsBlocked) {
+                completedBatches++
+                if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
+                continue
+            }
+
             const chunk = publicCardIds.slice(i, i + BATCH_SIZE)
 
             const ok = await commitWithRetry(() => {
@@ -366,13 +381,14 @@ export const useCollectionStore = defineStore('collection', () => {
             })
 
             if (!ok) {
-                console.warn(`Failed to delete ${chunk.length} public_cards after retries`)
+                console.warn(`Failed to delete public_cards batch — skipping remaining public_cards cleanup`)
+                publicCardsBlocked = true
             }
 
             completedBatches++
             if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
 
-            if (i + BATCH_SIZE < publicCardIds.length) {
+            if (!publicCardsBlocked && i + BATCH_SIZE < publicCardIds.length) {
                 await new Promise(resolve => setTimeout(resolve, 200))
             }
         }

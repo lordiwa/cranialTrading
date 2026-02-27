@@ -30,7 +30,7 @@ import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { getCardsByIds, searchCards } from '../services/scryfall'
-import { buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
+import { buildMoxfieldCsv, buildManaboxCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
@@ -280,6 +280,7 @@ interface DeleteDeckState {
   status: 'deleting_cards' | 'deleting_deck' | 'complete' | 'error'
   deleteCards: boolean
   cardCount: number
+  cardIds: string[]
 }
 
 const DELETE_DECK_STORAGE_KEY = 'cranial_delete_deck_progress'
@@ -292,11 +293,18 @@ const saveDeleteDeckState = (state: DeleteDeckState) => {
     localStorage.setItem(DELETE_DECK_STORAGE_KEY, JSON.stringify(state))
     deleteDeckProgress.value = state
   } catch (e) {
-    // If quota exceeded, clear stale import state and retry
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      // Retry after clearing stale import state
       try {
         localStorage.removeItem(IMPORT_STORAGE_KEY)
         localStorage.setItem(DELETE_DECK_STORAGE_KEY, JSON.stringify(state))
+        deleteDeckProgress.value = state
+        return
+      } catch { /* ignore first retry */ }
+      // Fallback: save without cardIds (better partial than nothing)
+      try {
+        const fallback = { ...state, cardIds: [] }
+        localStorage.setItem(DELETE_DECK_STORAGE_KEY, JSON.stringify(fallback))
         deleteDeckProgress.value = state
         return
       } catch { /* ignore */ }
@@ -593,11 +601,28 @@ const {
 } = useCardFilter(statusFilteredCards)
 
 // Bridge: individual refs <-> AdvancedFilters for the shared modal
+// Modal uses Scryfall-style values (w, u, creature, common), collection uses display categories (White, Blue, Creatures, Common)
+const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' }
+const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' }
+const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
+const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' }
+const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
+const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' }
+
+// When all items are selected (= no filter), pass empty array so the modal shows nothing selected
 const localAdvancedFilters = computed<AdvancedFilters>(() => ({
-  colors: [...selectedColors.value],
-  types: [...selectedTypes.value],
-  manaValue: { min: undefined, max: undefined, values: undefined },
-  rarity: [...selectedRarities.value],
+  colors: selectedColors.value.size < colorOrder.length
+    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
+    : [],
+  types: selectedTypes.value.size < typeOrder.length
+    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
+    : [],
+  manaValue: selectedManaValues.value.size < manaOrder.length
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : parseInt(v)).filter(v => !isNaN(v)) }
+    : { min: undefined, max: undefined, values: undefined },
+  rarity: selectedRarities.value.size < rarityOrder.length
+    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
+    : [],
   sets: advSelectedSets.value,
   power: { min: advPowerMin.value, max: advPowerMax.value },
   toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
@@ -627,11 +652,21 @@ const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   advFoilFilter.value = updated.isFoil ? 'foil' : 'any'
   // Sync full art
   advFullArtOnly.value = updated.isFullArt
-  // Sync chip filters (colors, types, rarity) — AdvancedFilterModal manages these as arrays
-  // Convert arrays to Sets for chip filters
-  selectedColors.value = new Set(updated.colors.length > 0 ? updated.colors : colorOrder)
-  selectedTypes.value = new Set(updated.types.length > 0 ? updated.types : typeOrder)
-  selectedRarities.value = new Set(updated.rarity.length > 0 ? updated.rarity : rarityOrder)
+  // Sync mana values — modal uses numbers [0..10], collection uses strings ['0'..'9','10+','Lands']
+  if (updated.manaValue.values?.length) {
+    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v))
+    selectedManaValues.value = new Set(mapped)
+  } else {
+    selectedManaValues.value = new Set(manaOrder)
+  }
+  // Sync chip filters — map modal values back to collection categories
+  // Empty array from modal = no filter = select all
+  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v)
+  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder)
+  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v)
+  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder)
+  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v)
+  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder)
 }
 
 // Active chip filter count for badge
@@ -1307,26 +1342,42 @@ const handleDeleteBinder = async () => {
   }
 
   isDeletingBinder.value = true
-  const success = await binderStore.deleteBinder(binderId)
 
-  if (success) {
-    // Delete cards from collection if requested
+  // Deselect binder BEFORE deleting cards to avoid reactive cascade
+  // (each card splice would re-trigger binderDisplayCards computed otherwise)
+  binderFilter.value = 'all'
+
+  try {
+    // Step 1: Delete cards first (binder doc still in Firestore as recovery reference)
     if (deleteCards && cardIds.length > 0) {
-      const result = await collectionStore.batchDeleteCards(cardIds)
-      if (result.failed > 0) {
-        toastStore.show(t('binders.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
-      } else {
-        toastStore.show(t('binders.deletedWithCards', { count: cardIds.length }), 'success')
+      try {
+        const result = await collectionStore.batchDeleteCards(cardIds)
+        if (result.failed > 0) {
+          toastStore.show(t('binders.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+        } else {
+          toastStore.show(t('binders.deletedWithCards', { count: cardIds.length }), 'success')
+        }
+      } catch (cardErr) {
+        console.warn('[DeleteBinder] Card deletion failed, proceeding to delete binder:', cardErr)
+        toastStore.show(t('binders.deletedWithCardWarning', { deleted: 0, failed: cardIds.length }), 'error')
       }
     }
 
-    const remaining = binderStore.binders
-    if (remaining.length > 0) {
-      binderFilter.value = remaining[0]!.id
-    } else {
-      binderFilter.value = 'all'
+    // Step 2: Delete the binder document
+    const success = await binderStore.deleteBinder(binderId)
+    if (success) {
+      const remaining = binderStore.binders
+      if (remaining.length > 0) {
+        binderFilter.value = remaining[0]!.id
+      } else {
+        binderFilter.value = 'all'
+      }
     }
+  } catch (err) {
+    console.error('[DeleteBinder] Error:', err)
+    toastStore.show(t('common.messages.loadError'), 'error')
   }
+
   isDeletingBinder.value = false
 }
 
@@ -2412,7 +2463,7 @@ const handleImportBinderCsv = async (
 }
 
 // Execute delete deck with progress tracking (can resume)
-const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isResume = false) => {
+const executeDeleteDeck = async (state: DeleteDeckState, isResume = false) => {
   // Prevent duplicate executions (only check if not a resume with existing toast)
   if (!isResume && isDeleteRunning) {
     return
@@ -2422,32 +2473,49 @@ const executeDeleteDeck = async (state: DeleteDeckState, cardIds: string[], isRe
   isDeletingDeck.value = true
   deleteProgress.value = 0
 
+  const cardIds = state.cardIds
+
+  // Deselect deck BEFORE deleting cards to avoid reactive cascade
+  // (each card splice would re-trigger deckOwnedCards computed otherwise)
+  deckFilter.value = 'all'
+
   try {
-    // Step 1: Delete the deck FIRST (single fast operation — guarantees deck is always removed)
-    if (state.status === 'deleting_cards' || state.status === 'deleting_deck') {
-      deleteProgress.value = 5
+    // Step 1: Delete cards (if pending)
+    if (state.status === 'deleting_cards') {
+      if (state.deleteCards && cardIds.length > 0) {
+        saveDeleteDeckState(state)
+        const result = await collectionStore.batchDeleteCards(cardIds, (percent) => {
+          deleteProgress.value = 5 + Math.round(percent * 0.80)
+        })
+
+        if (result.failed > 0) {
+          console.warn(`[DeleteDeck] ${result.failed} cards failed to delete`)
+          // On first attempt: save error to allow resume/retry on next load
+          // On resume: advance anyway to avoid infinite retry loop
+          if (!isResume) {
+            toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+            throw new Error(`Card deletion incomplete: ${result.failed} failed`)
+          }
+          toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
+        } else {
+          toastStore.show(t('decks.messages.deletedWithCards', { count: cardIds.length }), 'success')
+        }
+      }
+      // Advance to deleting_deck (also handles resume with empty cardIds)
       state.status = 'deleting_deck'
       saveDeleteDeckState(state)
-      await decksStore.deleteDeck(state.deckId, true)
-      deckFilter.value = 'all'
     }
 
-    // Step 2: Delete cards in batches (deck is already gone)
-    if (state.deleteCards && cardIds.length > 0) {
-      state.status = 'deleting_cards'
-      saveDeleteDeckState(state)
-      const result = await collectionStore.batchDeleteCards(cardIds, (percent) => {
-        // Cards deletion is 10-95% of total progress
-        deleteProgress.value = 10 + Math.round(percent * 0.85)
-      })
-
-      if (result.failed > 0) {
-        console.warn(`[DeleteDeck] ${result.failed} cards failed to delete (orphaned)`)
-        toastStore.show(t('decks.messages.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
-      } else {
-        toastStore.show(t('decks.messages.deletedWithCards', { count: cardIds.length }), 'success')
+    // Step 2: Delete the deck document
+    if (state.status === 'deleting_deck') {
+      deleteProgress.value = 90
+      const deckDeleted = await decksStore.deleteDeck(state.deckId, true)
+      if (!deckDeleted) {
+        throw new Error('Failed to delete deck document')
       }
-    } else {
+    }
+
+    if (!state.deleteCards || cardIds.length === 0) {
       toastStore.show(t('decks.messages.deletedCardsKept'), 'success')
     }
 
@@ -2481,14 +2549,20 @@ const resumeDeleteDeck = async (savedState: DeleteDeckState) => {
     return
   }
 
-  // On resume: if crashed during card deletion, deck still exists → just retry deck deletion
-  // If crashed during deck deletion, just retry that
-  if (savedState.status === 'error' || savedState.status === 'deleting_cards') {
-    savedState.status = 'deleting_deck'
+  // Ensure cardIds array exists (backwards compat with old state format)
+  if (!savedState.cardIds) {
+    savedState.cardIds = []
   }
 
-  // No cardIds on resume — cards were either batch-deleted or not
-  await executeDeleteDeck(savedState, [], true)
+  // On resume after error: retry from the step that failed
+  if (savedState.status === 'error') {
+    // If we still have cardIds and deleteCards was requested, retry from cards
+    savedState.status = savedState.deleteCards && savedState.cardIds.length > 0
+      ? 'deleting_cards'
+      : 'deleting_deck'
+  }
+
+  await executeDeleteDeck(savedState, true)
 }
 
 // Eliminar deck
@@ -2525,18 +2599,17 @@ const handleDeleteDeck = async () => {
     })
   }
 
-  // Initialize state (lightweight — no cardIds stored in localStorage)
   const state: DeleteDeckState = {
     deckId,
     deckName,
     status: deleteCards && cardIds.length > 0 ? 'deleting_cards' : 'deleting_deck',
     deleteCards,
     cardCount: deleteCards ? cardIds.length : 0,
+    cardIds: deleteCards ? cardIds : [],
   }
   saveDeleteDeckState(state)
 
-  // Pass cardIds as param (not stored in localStorage to avoid QuotaExceeded)
-  await executeDeleteDeck(state, deleteCards ? cardIds : [])
+  await executeDeleteDeck(state)
 }
 
 // Toggle visibilidad de todas las cartas del deck
@@ -2636,6 +2709,13 @@ const handleExportDeck = async () => {
 const handleExportDeckCsv = async () => {
   if (!selectedDeck.value) return
 
+  const useMoxfield = await confirmStore.show({
+    title: t('decks.detail.exportFormatTitle'),
+    message: t('decks.detail.exportFormatMessage'),
+    confirmText: 'MOXFIELD',
+    cancelText: 'MANABOX',
+  })
+
   const cardMap = new Map<string, typeof collectionStore.cards[number]>()
   for (const c of collectionStore.cards) {
     cardMap.set(c.id, c)
@@ -2664,8 +2744,71 @@ const handleExportDeckCsv = async () => {
     })
   }
 
-  const csv = buildMoxfieldCsv(csvCards)
+  const csv = useMoxfield ? buildMoxfieldCsv(csvCards) : buildManaboxCsv(csvCards)
   const filename = `${selectedDeck.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+  downloadAsFile(csv, filename)
+  toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
+}
+
+// ========== BINDER EXPORT ==========
+
+const handleExportBinder = async () => {
+  if (!selectedBinder.value) return
+
+  const setCodeMap = new Map<string, string>()
+  for (const c of collectionStore.cards) {
+    if (c.setCode) setCodeMap.set(c.id, c.setCode)
+  }
+
+  const lines: string[] = []
+  for (const card of binderDisplayCards.value) {
+    const code = setCodeMap.get((card as any).cardId)?.toUpperCase() || card.edition
+    lines.push(`${card.allocatedQuantity} ${card.name} (${code})`)
+  }
+
+  const text = lines.join('\n')
+  try {
+    await navigator.clipboard.writeText(text)
+    toastStore.show(t('decks.detail.exportCopied'), 'success')
+  } catch {
+    toastStore.show(t('decks.detail.exportError'), 'error')
+  }
+}
+
+const handleExportBinderCsv = async () => {
+  if (!selectedBinder.value) return
+
+  const useMoxfield = await confirmStore.show({
+    title: t('decks.detail.exportFormatTitle'),
+    message: t('decks.detail.exportFormatMessage'),
+    confirmText: 'MOXFIELD',
+    cancelText: 'MANABOX',
+  })
+
+  const cardMap = new Map<string, typeof collectionStore.cards[number]>()
+  for (const c of collectionStore.cards) {
+    cardMap.set(c.id, c)
+  }
+
+  const csvCards: Parameters<typeof buildMoxfieldCsv>[0] = []
+  for (const card of binderDisplayCards.value) {
+    const col = cardMap.get((card as any).cardId)
+    const setCode = col?.setCode?.toUpperCase() || card.edition
+
+    csvCards.push({
+      name: card.name,
+      setCode,
+      quantity: card.allocatedQuantity,
+      foil: card.foil,
+      scryfallId: card.scryfallId,
+      price: card.price,
+      condition: card.condition,
+      language: card.language,
+    })
+  }
+
+  const csv = useMoxfield ? buildMoxfieldCsv(csvCards) : buildManaboxCsv(csvCards)
+  const filename = `${selectedBinder.value.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
   downloadAsFile(csv, filename)
   toastStore.show(t('decks.detail.exportCsvDownloaded'), 'success')
 }
@@ -2836,8 +2979,10 @@ onMounted(async () => {
     // Check for incomplete delete deck operations
     const savedDeleteDeck = loadDeleteDeckState()
     if (savedDeleteDeck && savedDeleteDeck.status !== 'complete') {
-      // Resume the delete
-      resumeDeleteDeck(savedDeleteDeck)
+      // Resume the delete (await to ensure errors are caught)
+      resumeDeleteDeck(savedDeleteDeck).catch((err) => {
+        console.error('[DeleteDeck] Resume failed:', err)
+      })
     } else if (savedDeleteDeck?.status === 'complete') {
       // Clean up completed delete
       clearDeleteDeckState()
@@ -3186,6 +3331,14 @@ onUnmounted(() => {
               <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards || 0 }} cards</span>
               <span class="text-silver-30">|</span>
               <span class="text-tiny text-silver-50">${{ (selectedBinder.stats?.totalPrice || 0).toFixed(2) }}</span>
+              <BaseButton size="small" variant="secondary" @click="handleExportBinder">
+                <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
+                <span class="sm:hidden">📋</span>
+              </BaseButton>
+              <BaseButton size="small" variant="secondary" @click="handleExportBinderCsv">
+                <span class="hidden sm:inline">CSV</span>
+                <span class="sm:hidden">CSV</span>
+              </BaseButton>
               <BaseButton size="small" variant="secondary" @click="handleDeleteBinder" :disabled="isDeletingBinder">
                 <template v-if="isDeletingBinder">
                   <span class="animate-spin inline-block">&#x23F3;</span>
@@ -3599,6 +3752,8 @@ onUnmounted(() => {
     <!-- Import Binder Modal -->
     <ImportDeckModal
         :show="showImportBinderModal"
+        :is-binder="true"
+        default-status="sale"
         @close="showImportBinderModal = false"
         @import="handleImportBinder"
         @import-direct="handleImportBinderDirect"

@@ -20,7 +20,7 @@ export const useMarketStore = defineStore('market', () => {
     const staples = ref<FormatStaples | null>(null)
     const staplesLoading = ref(false)
 
-    const selectedMoverType = ref<MoverType>('average_regular')
+    const selectedMoverType = ref<MoverType>('market_regular')
     const movers = ref<PriceMovers | null>(null)
     const moversLoading = ref(false)
     const moversDirection = ref<'winners' | 'losers'>('winners')

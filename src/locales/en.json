@@ -854,6 +854,8 @@
       "edit": "EDIT",
       "export": "EXPORT",
       "exportCopied": "Decklist copied to clipboard",
+      "exportFormatTitle": "Export format",
+      "exportFormatMessage": "Which format do you want to export the CSV in?",
       "exportCsvDownloaded": "CSV downloaded",
       "exportError": "Error copying decklist",
       "back": "← BACK",

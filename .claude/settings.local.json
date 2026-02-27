@@ -51,7 +51,8 @@
       "WebFetch(domain:www.mtggoldfish.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:justtcg.com)"
+      "WebFetch(domain:justtcg.com)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

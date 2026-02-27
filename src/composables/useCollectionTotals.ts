@@ -15,6 +15,9 @@ const setCodeCache = new Map<string, string>()
 // Track cards we've already tried to fix (to avoid repeated attempts)
 const fixAttemptedCache = new Set<string>()
 
+// Abort controller for cancelling in-progress fetches
+let fetchAbortController: AbortController | null = null
+
 // Shared card prices map (by card ID) — shared across all composable instances
 const sharedCardPrices = ref<Map<string, CardPrices | null>>(new Map())
 
@@ -80,19 +83,21 @@ export function useCollectionTotals(cards: () => Card[]) {
           image = firstFace.image_uris?.normal || ''
         }
 
-        // Update card in collection store (background, don't await)
+        // Update card in collection store only if it still exists
         const collectionStore = useCollectionStore()
-        collectionStore.updateCard(card.id, {
-          scryfallId,
-          setCode,
-          edition,
-          price,
-          image: image || card.image,
-        }).then(() => {
-          console.log(`✅ Auto-fixed card: ${card.name}`)
-        }).catch((e: unknown) => {
-          console.warn(`Failed to auto-fix ${card.name}:`, e)
-        })
+        if (collectionStore.getCardById(card.id)) {
+          collectionStore.updateCard(card.id, {
+            scryfallId,
+            setCode,
+            edition,
+            price,
+            image: image || card.image,
+          }).then(() => {
+            console.log(`✅ Auto-fixed card: ${card.name}`)
+          }).catch((e: unknown) => {
+            console.warn(`Failed to auto-fix ${card.name}:`, e)
+          })
+        }
 
         return scryfallId
       }
@@ -150,8 +155,15 @@ export function useCollectionTotals(cards: () => Card[]) {
     }
   }
 
-  // Fetch all prices
+  // Fetch all prices (cancellable)
   const fetchAllPrices = async () => {
+    // Cancel any previous run
+    if (fetchAbortController) {
+      fetchAbortController.abort()
+    }
+    fetchAbortController = new AbortController()
+    const signal = fetchAbortController.signal
+
     const cardList = cards()
     if (cardList.length === 0) return
 
@@ -160,22 +172,18 @@ export function useCollectionTotals(cards: () => Card[]) {
     processedCards.value = 0
     progress.value = 0
 
-    // Process in batches to avoid overwhelming the browser
-    const batchSize = 5
-    for (let i = 0; i < cardList.length; i += batchSize) {
-      const batch = cardList.slice(i, i + batchSize)
+    // Process sequentially — Scryfall rate limiter handles timing
+    for (const card of cardList) {
+      if (signal.aborted) break
 
-      await Promise.all(batch.map(async (card) => {
-        const prices = await fetchCardPrice(card)
-        cardPrices.value.set(card.id, prices)
-        processedCards.value++
-        progress.value = Math.round((processedCards.value / totalCards.value) * 100)
-      }))
+      // Skip cards that no longer exist in the store (deleted mid-fetch)
+      const collectionStore = useCollectionStore()
+      if (!collectionStore.getCardById(card.id)) continue
 
-      // Small delay between batches to not block UI
-      if (i + batchSize < cardList.length) {
-        await new Promise(resolve => setTimeout(resolve, 50))
-      }
+      const prices = await fetchCardPrice(card)
+      cardPrices.value.set(card.id, prices)
+      processedCards.value++
+      progress.value = Math.round((processedCards.value / totalCards.value) * 100)
     }
 
     loading.value = false

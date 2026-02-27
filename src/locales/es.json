@@ -854,6 +854,8 @@
       "edit": "EDITAR",
       "export": "EXPORTAR",
       "exportCopied": "Lista de cartas copiada al portapapeles",
+      "exportFormatTitle": "Formato de exportación",
+      "exportFormatMessage": "¿En qué formato exportar el CSV?",
       "exportCsvDownloaded": "CSV descargado",
       "exportError": "Error al copiar lista de cartas",
       "back": "← VOLVER",

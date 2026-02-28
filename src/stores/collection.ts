@@ -173,6 +173,14 @@ export const useCollectionStore = defineStore('collection', () => {
     const updateCard = async (cardId: string, updates: Partial<Card>): Promise<boolean> => {
         if (!authStore.user) return false
 
+        // Optimistic update: apply to UI immediately
+        const index = cards.value.findIndex((c) => c.id === cardId)
+        const existingCard = cards.value[index]
+        const snapshot = existingCard ? { ...existingCard } : null
+        if (index > -1 && existingCard) {
+            cards.value[index] = { ...existingCard, ...updates, updatedAt: new Date() }
+        }
+
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await updateDoc(cardRef, {
@@ -180,17 +188,9 @@ export const useCollectionStore = defineStore('collection', () => {
                 updatedAt: Timestamp.now(),
             })
 
-            const index = cards.value.findIndex((c) => c.id === cardId)
-            const existingCard = cards.value[index]
-            if (index > -1 && existingCard) {
-                const updatedCard = {
-                    ...existingCard,
-                    ...updates,
-                    updatedAt: new Date(),
-                }
-                cards.value[index] = updatedCard
-
-                // Sync to public collection (non-blocking)
+            // Sync to public collection (non-blocking)
+            const updatedCard = cards.value[index]
+            if (updatedCard) {
                 const userInfo = getUserInfo()
                 if (userInfo) {
                     syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
@@ -200,6 +200,10 @@ export const useCollectionStore = defineStore('collection', () => {
 
             return true
         } catch (error) {
+            // Rollback on failure
+            if (index > -1 && snapshot) {
+                cards.value[index] = snapshot
+            }
             console.error('Error updating card:', error)
             toastStore.show(t('collection.messages.updateError'), 'error')
             return false

@@ -42,7 +42,6 @@ const collectionStore = useCollectionStore()
 const marketStore = useMarketStore()
 const toastStore = useToastStore()
 const togglingPublic = ref(false)
-const showMobileMenu = ref(false)
 
 // Refs for IntersectionObserver
 const compactCardRef = ref<HTMLElement | null>(null)
@@ -56,6 +55,13 @@ const SWIPE_THRESHOLD = 80
 
 // Status cycle order
 const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
+
+const setStatus = (status: CardStatus) => {
+  if (props.readonly || props.isBeingDeleted || status === props.card.status) return
+  collectionStore.updateCard(props.card.id, { status })
+    .then(ok => { if (ok) toastStore.show(t('cards.grid.statusChanged', { status }), 'success') })
+    .catch(() => { toastStore.show(t('cards.grid.statusError'), 'error') })
+}
 
 const handleTouchStart = (e: TouchEvent) => {
   if (props.readonly || props.isBeingDeleted) return
@@ -332,14 +338,55 @@ const priceChangeData = computed(() => {
       </div>
     </div>
 
-    <!-- Card Image Container -->
+    <!-- Row 1: Status Bar -->
+    <div class="flex items-center gap-1.5 px-1 py-1">
+      <!-- Public/Eye toggle -->
+      <button
+          v-if="!readonly && !isBeingDeleted"
+          @click.stop="togglePublic"
+          :disabled="togglingPublic"
+          class="flex items-center justify-center transition-all"
+          :class="card.public ? 'text-neon' : 'text-silver-50'"
+          :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
+      >
+        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
+      </button>
+      <span v-else class="w-4"></span>
+
+      <!-- All status icons -->
+      <template v-for="status in STATUS_ORDER" :key="status">
+        <button
+            v-if="!readonly && !isBeingDeleted"
+            @click.stop="setStatus(status)"
+            class="flex items-center transition-all"
+            :class="card.status === status
+              ? getStatusColor(status)
+              : 'text-silver-30 hover:text-silver-50'"
+        >
+          <SvgIcon :name="getStatusIconName(status)" size="tiny" />
+        </button>
+        <SvgIcon
+            v-else
+            :name="getStatusIconName(status)"
+            size="tiny"
+            :class="card.status === status ? getStatusColor(status) : 'text-silver-30'"
+        />
+      </template>
+
+      <!-- Status label (right-aligned) -->
+      <span class="ml-auto text-tiny font-bold uppercase" :class="getStatusColor(card.status)">
+        {{ card.status }}
+      </span>
+    </div>
+
+    <!-- Row 2: Card Image -->
     <div
-        class="relative aspect-[3/4] bg-secondary border overflow-hidden transition-all rounded"
+        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all"
         :class="[
           selectionMode && isSelected ? 'border-neon border-2' : '',
-          !selectionMode && isBeingDeleted ? 'border-rust animate-pulse border' : '',
-          !selectionMode && !isBeingDeleted ? (isCardAllocated ? 'border-neon-30 border' : 'border-silver-30 border group-hover:border-neon') : '',
-          selectionMode && !isSelected ? 'border-silver-30 border' : '',
+          !selectionMode && isBeingDeleted ? 'border-rust animate-pulse' : '',
+          !selectionMode && !isBeingDeleted ? (isCardAllocated ? 'border-neon-30' : 'border-silver-30 group-hover:border-neon') : '',
+          selectionMode && !isSelected ? 'border-silver-30' : '',
         ]"
         :style="swipeStyle"
         @click="selectionMode ? emit('toggleSelect', card.id) : (!isBeingDeleted && !isSwiping && emit('cardClick', card))"
@@ -365,30 +412,23 @@ const priceChangeData = computed(() => {
           :src="getCardImage(card)"
           :alt="card.name"
           loading="lazy"
-          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          class="w-full h-full object-cover"
       />
       <div v-else class="w-full h-full flex items-center justify-center bg-primary">
         <span class="text-tiny text-silver-50">{{ t('cards.grid.noImage') }}</span>
       </div>
 
-      <!-- ========== Status Badge - ALWAYS VISIBLE, centered top ========== -->
-      <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-silver-30 px-2 py-1 z-10 rounded">
-        <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
-          <SvgIcon :name="getStatusIconName(card.status)" size="tiny" />
-          {{ card.status }}
-        </p>
-      </div>
-
-      <!-- ========== DESKTOP: Hover overlay ========== -->
-      <div
-          v-if="!readonly && !isBeingDeleted"
-          class="absolute inset-0 bg-primary/70 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center pointer-events-none group-hover:pointer-events-auto"
+      <!-- Toggle button for split cards (always visible if split) -->
+      <button
+          v-if="isSplitCard"
+          @click.stop="toggleCardFace"
+          class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
+          :title="t('cards.grid.flipTitle')"
       >
-        <!-- Edit text -->
-        <p class="text-small font-bold text-silver mt-8">{{ t('cards.grid.clickToEdit') }}</p>
-      </div>
+        <SvgIcon name="flip" size="tiny" />
+      </button>
 
-      <!-- ========== Deleting overlay ========== -->
+      <!-- Deleting overlay -->
       <div
           v-if="isBeingDeleted"
           class="absolute inset-0 bg-primary/80 flex flex-col items-center justify-center"
@@ -399,198 +439,71 @@ const priceChangeData = computed(() => {
         </svg>
         <p class="text-tiny font-bold text-rust">{{ t('cards.grid.deleting') }}</p>
       </div>
-
-      <!-- ========== DESKTOP: Badges on hover ========== -->
-      <!-- Toggle button para split cards (always visible if split) -->
-      <button
-          v-if="isSplitCard"
-          @click.stop="toggleCardFace"
-          class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
-          :title="t('cards.grid.flipTitle')"
-      >
-        <SvgIcon name="flip" size="tiny" />
-      </button>
-
-      <!-- Public toggle button (desktop: hover only) -->
-      <button
-          v-if="!readonly && !isBeingDeleted"
-          @click.stop="togglePublic"
-          :disabled="togglingPublic"
-          :class="[
-            'absolute top-2 bg-primary/95 border px-2 py-1 transition-all flex items-center justify-center z-10 rounded',
-            'opacity-0 group-hover:opacity-100 md:block hidden',
-            isSplitCard ? 'left-12' : 'left-2',
-            card.public ? 'border-neon' : 'border-silver-50'
-          ]"
-          :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
-      >
-        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
-      </button>
-
-
-      <!-- Qty Badge (desktop: hover only) -->
-      <div
-          class="absolute bottom-10 left-2 bg-primary/95 border border-silver-50 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block rounded"
-          :title="isCardAllocated
-            ? t('cards.grid.availableOf', { available: allocationInfo.available, total: card.quantity, allocated: allocationInfo.allocated })
-            : t('cards.grid.copiesInCollection', { qty: card.quantity })"
-      >
-        <template v-if="isCardAllocated">
-          <p class="text-tiny font-bold flex items-center gap-1">
-            <span class="text-neon">{{ allocationInfo.available }}</span>
-            <span class="text-silver-50">{{ t('cards.grid.available') }}</span>
-          </p>
-        </template>
-        <template v-else>
-          <p class="text-tiny font-bold text-neon">x{{ card.quantity }}</p>
-        </template>
-      </div>
-
-      <!-- Deck badges (desktop: hover only) -->
-      <div
-          v-if="isCardAllocated"
-          class="absolute bottom-10 right-2 flex flex-wrap gap-1 justify-end max-w-[60%] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-      >
-        <div
-            v-for="alloc in allocationInfo.allocations.slice(0, 2)"
-            :key="alloc.deckId"
-            class="bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
-            :title="t('cards.grid.inDeck', { qty: alloc.quantity, deckName: alloc.deckName }) + (alloc.isInSideboard ? ' (SB)' : '')"
-        >
-          <p class="text-[14px] font-bold text-neon truncate max-w-[50px]">
-            {{ alloc.quantity }}x {{ alloc.deckName.slice(0, 5) }}..
-          </p>
-        </div>
-        <div
-            v-if="allocationInfo.allocations.length > 2"
-            class="bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
-        >
-          <p class="text-[14px] font-bold text-neon">+{{ allocationInfo.allocations.length - 2 }}</p>
-        </div>
-      </div>
-
-      <!-- Delete button (desktop: hover only, bottom center) -->
-      <button
-          v-if="!readonly && !isBeingDeleted"
-          @click.stop="emit('delete', card)"
-          class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary/95 border border-rust px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1 hover:bg-rust/20 z-10 rounded"
-          :title="t('cards.grid.deleteTitle')"
-      >
-        <SvgIcon name="trash" size="tiny" class="text-rust" />
-        <span class="text-tiny font-bold text-rust">{{ t('cards.grid.delete') }}</span>
-      </button>
-
-      <!-- ========== MOBILE: Gear menu ========== -->
-      <div v-if="!readonly && !isBeingDeleted" class="md:hidden absolute top-2 right-2 z-20">
-        <button
-            @click.stop="showMobileMenu = !showMobileMenu"
-            class="bg-primary/95 border border-silver-50 p-2 transition-all rounded"
-            :class="{ 'border-neon': showMobileMenu }"
-        >
-          <SvgIcon name="settings" size="tiny" />
-        </button>
-
-        <!-- Mobile dropdown menu -->
-        <div
-            v-if="showMobileMenu"
-            class="absolute top-full right-0 mt-1 bg-primary border border-silver-30 shadow-lg min-w-[140px] rounded"
-            @click.stop
-        >
-          <!-- Status info -->
-          <div class="px-3 py-2 border-b border-silver-20">
-            <p class="text-tiny font-bold flex items-center gap-1" :class="getStatusColor(card.status)">
-              <SvgIcon :name="getStatusIconName(card.status)" size="tiny" />
-              {{ card.status }}
-            </p>
-            <p class="text-tiny text-silver-50 mt-1">
-              {{ isCardAllocated ? `${allocationInfo.available} disp / ${card.quantity}` : `x${card.quantity}` }}
-            </p>
-          </div>
-
-          <!-- Toggle visibility -->
-          <button
-              @click.stop="togglePublic(); showMobileMenu = false"
-              :disabled="togglingPublic"
-              class="w-full px-3 py-2 text-left text-tiny font-bold flex items-center gap-2 hover:bg-silver-10 transition-colors"
-              :class="card.public ? 'text-neon' : 'text-silver-50'"
-          >
-            <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
-            {{ card.public ? t('cards.grid.public') : t('cards.grid.private') }}
-          </button>
-
-          <!-- Delete -->
-          <button
-              @click.stop="emit('delete', card); showMobileMenu = false"
-              class="w-full px-3 py-2 text-left text-tiny font-bold text-rust flex items-center gap-2 hover:bg-rust/10 transition-colors border-t border-silver-20"
-          >
-            <SvgIcon name="trash" size="tiny" />
-            {{ t('cards.grid.delete') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- ========== MOBILE: Deck badges (always visible, compact) ========== -->
-      <div
-          v-if="isCardAllocated"
-          class="md:hidden absolute bottom-2 left-2 bg-primary/95 border border-neon px-1.5 py-0.5 rounded"
-      >
-        <p class="text-[14px] font-bold text-neon">
-          {{ t('cards.grid.inDecks', { qty: allocationInfo.allocated }) }}
-        </p>
-      </div>
     </div>
 
-    <!-- Card Info -->
-    <div class="mt-3 space-y-1 min-h-[120px]">
-      <!-- Name -->
-      <p class="text-tiny font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors min-h-[32px]">
-        {{ card.name }}
-      </p>
+    <!-- Row 3: Deck Allocation -->
+    <div class="mt-1 text-tiny font-bold truncate">
+      <template v-if="isCardAllocated">
+        <span class="text-neon">x{{ card.quantity }}</span>
+        <span class="text-silver-50"> | </span>
+        <template v-for="(alloc, idx) in allocationInfo.allocations.slice(0, 3)" :key="alloc.deckId">
+          <span class="text-silver-70">{{ t('cards.grid.inDeck', { qty: alloc.quantity, deckName: alloc.deckName }) }}</span>
+          <span v-if="idx < Math.min(allocationInfo.allocations.length, 3) - 1" class="text-silver-50">, </span>
+        </template>
+        <span v-if="allocationInfo.allocations.length > 3" class="text-silver-50"> +{{ allocationInfo.allocations.length - 3 }}</span>
+      </template>
+      <template v-else>
+        <span class="text-neon">x{{ card.quantity }}</span>
+      </template>
+    </div>
 
-      <!-- Edition & Condition -->
-      <p class="text-tiny text-silver-70">
+    <!-- Row 4: Card Name (fixed 2-line height: 14px * 1.5 lh * 2 = 42px) -->
+    <p class="text-small font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors mt-1 h-[42px]">
+      {{ card.name }}
+    </p>
+
+    <!-- Row 5: Edition / Type (fixed 2-line height: 14px * 1.4 lh * 2 ≈ 40px) -->
+    <div class="mt-1 h-[40px]">
+      <p class="text-tiny text-silver-70 truncate">
         {{ card.edition }} - {{ card.condition }}
         <span v-if="card.foil" class="text-neon">FOIL</span>
       </p>
+      <p class="text-tiny text-silver-30 truncate">{{ card.type_line || '&nbsp;' }}</p>
+    </div>
 
-      <!-- Allocation summary if used in decks -->
-      <p v-if="isCardAllocated" class="text-tiny text-silver-50">
-        {{ t('cards.grid.inDecks', { qty: allocationInfo.allocated }) }}, {{ allocationInfo.available }} {{ t('cards.grid.available') }}.
-      </p>
-      <p v-else class="text-tiny text-silver-50 invisible">-</p>
-
-      <!-- Multi-source Prices -->
-      <div class="space-y-0.5 min-h-[48px]">
-        <!-- TCGPlayer Price -->
-        <div class="flex items-center gap-1">
-          <p class="text-tiny font-bold text-neon">
-            TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
-          </p>
-          <span
-              v-if="priceChangeData"
-              class="text-[14px] font-bold px-1 rounded"
-              :class="priceChangeData.isPositive ? 'text-neon bg-neon/10' : 'text-rust bg-rust/10'"
-          >
-            {{ priceChangeData.isPositive ? '\u25B2' : '\u25BC' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
-          </span>
-        </div>
-        <!-- Card Kingdom Price -->
-        <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
-          CK: {{ formatPrice(cardKingdomRetail) }}
+    <!-- Row 6: Prices -->
+    <div class="mt-1 space-y-0.5">
+      <!-- TCGPlayer Price -->
+      <div class="flex items-center gap-1">
+        <p class="text-tiny font-bold text-neon">
+          TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
         </p>
-        <p v-else class="text-tiny text-silver-50">CK: -</p>
-        <!-- CK Buylist -->
-        <p v-if="cardKingdomBuylist" class="text-tiny text-[#FF9800]">
-          BL: {{ formatPrice(cardKingdomBuylist) }}
-        </p>
-        <p v-else class="text-tiny text-silver-50">BL: -</p>
+        <span
+            v-if="priceChangeData"
+            class="text-[14px] font-bold px-1 rounded"
+            :class="priceChangeData.isPositive ? 'text-neon bg-neon/10' : 'text-rust bg-rust/10'"
+        >
+          {{ priceChangeData.isPositive ? '&#x25B2;' : '&#x25BC;' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
+        </span>
       </div>
+      <!-- Card Kingdom Price -->
+      <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
+        CK: {{ formatPrice(cardKingdomRetail) }}
+      </p>
+      <p v-else class="text-tiny text-silver-50">CK: -</p>
+      <!-- CK Buylist -->
+      <p v-if="cardKingdomBuylist" class="text-tiny text-[#FF9800]">
+        BL: {{ formatPrice(cardKingdomBuylist) }}
+      </p>
+      <p v-else class="text-tiny text-silver-50">BL: -</p>
+    </div>
 
-      <!-- Sparkline -->
+    <!-- Row 7: Sparkline (always reserve space) -->
+    <div class="h-[24px] mt-1">
       <svg
         v-if="cardHistory.length >= 2"
         :viewBox="`0 0 100 24`"
-        class="w-full h-[24px] mt-1"
+        class="w-full h-full"
         preserveAspectRatio="none"
       >
         <polyline
@@ -604,6 +517,15 @@ const priceChangeData = computed(() => {
       </svg>
     </div>
 
+    <!-- Row 8: ELIMINAR Button -->
+    <button
+        v-if="!readonly && !isBeingDeleted"
+        @click.stop="emit('delete', card)"
+        class="w-full mt-2 border border-silver-30 px-2 py-1 text-tiny font-bold text-silver-70 flex items-center justify-center gap-1 hover:border-rust hover:text-rust transition-colors rounded"
+    >
+      <SvgIcon name="trash" size="tiny" />
+      {{ t('cards.grid.delete') }}
+    </button>
 
     <!-- Interest Button (only when readonly and showInterest) -->
     <div v-if="readonly && showInterest && (card.status === 'sale' || card.status === 'trade')" class="mt-3">

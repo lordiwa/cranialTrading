@@ -3001,10 +3001,10 @@ onUnmounted(() => {
             <button
                 @click="switchToCollection"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 border-2 whitespace-nowrap',
+                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
                   viewMode === 'collection'
-                    ? 'bg-neon text-primary border-neon'
-                    : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
+                    ? 'bg-neon text-primary'
+                    : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
                 ]"
             >
               {{ t('collection.tabs.collection') }}
@@ -3013,10 +3013,10 @@ onUnmounted(() => {
                 data-tour="deck-tab"
                 @click="switchToDecks()"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 border-2 whitespace-nowrap',
+                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
                   viewMode === 'decks'
-                    ? 'bg-neon text-primary border-neon'
-                    : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
+                    ? 'bg-neon text-primary'
+                    : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
                 ]"
             >
               {{ t('collection.tabs.decks') }}
@@ -3025,10 +3025,10 @@ onUnmounted(() => {
             <button
                 @click="switchToBinders()"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 border-2 whitespace-nowrap',
+                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
                   viewMode === 'binders'
-                    ? 'bg-neon text-primary border-neon'
-                    : 'bg-primary border-silver-30 text-silver-70 hover:border-silver-50'
+                    ? 'bg-neon text-primary'
+                    : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
                 ]"
             >
               {{ t('collection.tabs.binders') }}
@@ -3244,12 +3244,12 @@ onUnmounted(() => {
                 :class="[
                   'px-3 py-1 text-tiny font-bold whitespace-nowrap transition-150 rounded',
                   statusFilter === status
-                    ? status === 'wishlist' ? 'border border-yellow-400 text-yellow-400' : 'border border-neon text-neon'
-                    : 'border border-silver-30 text-silver-50 hover:border-silver-50'
+                    ? 'bg-neon text-primary'
+                    : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
                 ]"
             >
               {{ getStatusLabel(status) }}
-              <span class="ml-1" :class="status === 'wishlist' ? 'text-yellow-400' : 'text-neon'">{{ count }}</span>
+              <span class="ml-1" :class="statusFilter === status ? 'text-primary' : 'text-neon'">{{ count }}</span>
             </button>
             <HelpTooltip
                 v-if="status === 'collection'"

@@ -166,8 +166,7 @@
     }
 
     .input-base {
-        @apply w-full bg-primary border px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-sans rounded;
-        border-color: #EEEEEE;
+        @apply w-full bg-primary border border-silver-10 px-3 py-3 min-h-[44px] text-small md:text-body text-silver placeholder:text-silver-50 focus:outline-none font-sans rounded;
         transition: all 150ms ease-out;
     }
 

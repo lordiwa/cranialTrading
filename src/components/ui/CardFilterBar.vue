@@ -62,17 +62,31 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 
 <template>
   <div class="mb-6 space-y-3">
-    <div ref="wrapperRef" class="relative">
-      <BaseInput
-          :model-value="filterQuery"
-          @update:model-value="handleInput"
-          :placeholder="t('collection.filters.searchPlaceholder')"
-          type="text"
-          clearable
-      />
+    <div class="flex items-center gap-2">
+      <!-- Advanced filters button (before search) -->
+      <button
+          @click="emit('open-filters')"
+          :class="[
+            'flex-shrink-0 p-2.5 rounded transition-colors',
+            activeFilterCount > 0
+              ? 'bg-neon-10 text-neon'
+              : 'text-silver-50 hover:text-silver'
+          ]"
+      >
+        <SvgIcon name="filter" size="small" />
+      </button>
 
-      <!-- Suggestions dropdown -->
-      <div v-if="showDropdown && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
+      <div ref="wrapperRef" class="relative flex-1">
+        <BaseInput
+            :model-value="filterQuery"
+            @update:model-value="handleInput"
+            :placeholder="t('collection.filters.searchPlaceholder')"
+            type="text"
+            clearable
+        />
+
+        <!-- Suggestions dropdown -->
+        <div v-if="showDropdown && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
         <!-- Local matches section -->
         <div v-if="localMatches.length > 0">
           <div class="px-3 py-1 text-tiny text-silver-50 uppercase bg-silver-10">
@@ -103,6 +117,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
           <SvgIcon name="search" size="tiny" />
           {{ t('collection.suggestions.advancedSearch') }} →
         </button>
+        </div>
       </div>
     </div>
 
@@ -111,7 +126,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <select
           :value="sortBy"
           @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value)"
-          class="bg-primary border border-silver-30 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
+          class="bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
       >
         <option value="recent">{{ t('collection.sort.recent') }}</option>
         <option value="name">{{ t('collection.sort.name') }}</option>
@@ -122,7 +137,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <select
           :value="groupBy"
           @change="emit('update:groupBy', ($event.target as HTMLSelectElement).value)"
-          class="bg-primary border border-silver-30 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
+          class="bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
       >
         <option value="none">{{ t('collection.group.none') }}</option>
         <option value="type">{{ t('collection.deckStats.type') }}</option>
@@ -130,27 +145,12 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <option value="color">{{ t('collection.deckStats.color') }}</option>
       </select>
 
-      <!-- Local filters button -->
-      <button
-          @click="emit('open-filters')"
-          :class="[
-            'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1 border',
-            activeFilterCount > 0
-              ? 'bg-neon-10 border-neon text-neon'
-              : 'border-silver-30 text-silver-50 hover:text-silver hover:border-neon'
-          ]"
-      >
-        <SvgIcon name="settings" size="tiny" />
-        {{ t('search.filterPanel.moreFilters') }}
-        <span v-if="activeFilterCount > 0" class="bg-neon text-primary px-1 rounded text-tiny">{{ activeFilterCount }}</span>
-      </button>
-
       <!-- View type dropdown -->
       <select
           v-if="showViewType"
           :value="viewType"
           @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'stack' | 'visual' | 'texto')"
-          class="bg-primary border border-silver-30 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
+          class="bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
       >
         <option value="visual">{{ t('collection.view.visual') }}</option>
         <option value="stack">{{ t('collection.view.stack') }}</option>

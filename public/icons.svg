@@ -159,4 +159,13 @@
   </g>
 </symbol>
 
+<symbol id="icon-filter" viewBox="0 0 100 100">
+  <line fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" x1="15" y1="30" x2="85" y2="30"/>
+  <line fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" x1="15" y1="50" x2="85" y2="50"/>
+  <line fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" x1="15" y1="70" x2="85" y2="70"/>
+  <circle fill="currentColor" cx="35" cy="30" r="7"/>
+  <circle fill="currentColor" cx="60" cy="50" r="7"/>
+  <circle fill="currentColor" cx="42" cy="70" r="7"/>
+</symbol>
+
 </svg>

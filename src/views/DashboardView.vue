@@ -232,7 +232,7 @@ const debugPublicCollections = async () => {
 }
 
 // Expose to window for debugging
-if (typeof globalThis.window !== 'undefined') {
+if (globalThis.window !== undefined) {
   (globalThis as any).debugPublicCollections = debugPublicCollections
 }
 

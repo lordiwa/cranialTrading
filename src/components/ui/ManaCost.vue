@@ -18,31 +18,26 @@ const symbols = computed(() => {
   const result: string[] = []
   const cost = props.cost.trim()
 
-  // Match {X}, {2/W}, {W/U}, {W}, {10}, etc. or bare symbols like 2WU
-  const bracketPattern = /\{([^}]+)\}/g
-  let match
-  let lastIndex = 0
-
-  while ((match = bracketPattern.exec(cost)) !== null) {
-    // Check for any bare symbols before this match
-    if (match.index > lastIndex) {
-      const bare = cost.slice(lastIndex, match.index)
+  // Parse {X}, {2/W}, {W/U}, {W}, {10}, etc. or bare symbols like 2WU
+  let i = 0
+  while (i < cost.length) {
+    if (cost[i] === '{') {
+      const end = cost.indexOf('}', i + 1)
+      if (end !== -1) {
+        const symbol = cost.slice(i + 1, end)
+        if (symbol) result.push(symbol)
+        i = end + 1
+      } else {
+        result.push(...parseBareSymbols(cost.slice(i + 1)))
+        break
+      }
+    } else {
+      const nextBrace = cost.indexOf('{', i)
+      const bare = nextBrace === -1 ? cost.slice(i) : cost.slice(i, nextBrace)
       result.push(...parseBareSymbols(bare))
+      if (nextBrace === -1) break
+      i = nextBrace
     }
-    const symbol = match[1]
-    if (symbol) result.push(symbol)
-    lastIndex = bracketPattern.lastIndex
-  }
-
-  // Check for any remaining bare symbols after last match
-  if (lastIndex < cost.length) {
-    const bare = cost.slice(lastIndex)
-    result.push(...parseBareSymbols(bare))
-  }
-
-  // If no brackets were found, try parsing as bare symbols
-  if (result.length === 0 && cost.length > 0) {
-    result.push(...parseBareSymbols(cost))
   }
 
   return result

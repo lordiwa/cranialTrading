@@ -21,23 +21,24 @@ const symbols = computed(() => {
   // Parse {X}, {2/W}, {W/U}, {W}, {10}, etc. or bare symbols like 2WU
   let i = 0
   while (i < cost.length) {
-    if (cost[i] === '{') {
-      const end = cost.indexOf('}', i + 1)
-      if (end !== -1) {
-        const symbol = cost.slice(i + 1, end)
-        if (symbol) result.push(symbol)
-        i = end + 1
-      } else {
-        result.push(...parseBareSymbols(cost.slice(i + 1)))
+    if (cost[i] !== '{') {
+      const nextBrace = cost.indexOf('{', i)
+      if (nextBrace === -1) {
+        result.push(...parseBareSymbols(cost.slice(i)))
         break
       }
-    } else {
-      const nextBrace = cost.indexOf('{', i)
-      const bare = nextBrace === -1 ? cost.slice(i) : cost.slice(i, nextBrace)
-      result.push(...parseBareSymbols(bare))
-      if (nextBrace === -1) break
+      result.push(...parseBareSymbols(cost.slice(i, nextBrace)))
       i = nextBrace
+      continue
     }
+    const end = cost.indexOf('}', i + 1)
+    if (end === -1) {
+      result.push(...parseBareSymbols(cost.slice(i + 1)))
+      break
+    }
+    const symbol = cost.slice(i + 1, end)
+    if (symbol) result.push(symbol)
+    i = end + 1
   }
 
   return result

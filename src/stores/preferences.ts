@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useAuthStore } from './auth'
+import { useToastStore } from './toast'
 import { addDoc, collection, getDocs } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { type Preference, type PreferenceType } from '../types/preferences'
@@ -11,6 +12,7 @@ import {
 
 export const usePreferencesStore = defineStore('preferences', () => {
     const authStore = useAuthStore()
+    const toastStore = useToastStore()
     const _preferences = ref<Preference[]>([])
     const loading = ref(false)
 
@@ -82,11 +84,14 @@ export const usePreferencesStore = defineStore('preferences', () => {
             const newPref = { id: docRef.id, ...prefData } as Preference
             _preferences.value.push(newPref)
 
-            // Sync to public (non-blocking)
+            // Sync to public (non-blocking, toast on failure)
             const userInfo = getUserInfo()
             if (userInfo) {
                 syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                    .catch((err: unknown) => { console.error('[PublicSync] Error syncing preference:', err); })
+                    .catch((err: unknown) => {
+                        console.error('[PublicSync] Error syncing preference:', err)
+                        toastStore.show('Error sincronizando preferencia', 'error')
+                    })
             }
 
             console.log('✅ Preference added:', prefData.name)

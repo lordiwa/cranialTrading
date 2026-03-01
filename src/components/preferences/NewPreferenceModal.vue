@@ -90,8 +90,14 @@ watch(searchQuery, (newQuery) => {
   searching.value = true;
   searchTimeout = setTimeout(() => {
     void (async () => {
-      searchResults.value = await searchCards(newQuery);
-      searching.value = false;
+      try {
+        searchResults.value = await searchCards(newQuery);
+      } catch (e) {
+        console.error('Error searching cards:', e)
+        searchResults.value = [];
+      } finally {
+        searching.value = false;
+      }
     })();
   }, 300);
 });

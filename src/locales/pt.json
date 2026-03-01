@@ -488,6 +488,15 @@
       "confirm": "Excluir {count} cartas selecionadas? Esta ação não pode ser desfeita.",
       "success": "{count} cartas excluídas"
     },
+    "bulkEdit": {
+      "statusLabel": "STATUS",
+      "visibilityLabel": "VISIB.",
+      "statusSuccess": "{count} cartas alteradas para {status}",
+      "publicSuccess": "{count} cartas atualizadas",
+      "setPublic": "PÚBLICO",
+      "setPrivate": "PRIVADO",
+      "processing": "Processando..."
+    },
     "messages": {
       "loadError": "Erro ao carregar coleção",
       "addError": "Erro ao adicionar carta",

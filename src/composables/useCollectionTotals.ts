@@ -86,17 +86,16 @@ export function useCollectionTotals(cards: () => Card[]) {
         // Update card in collection store only if it still exists
         const collectionStore = useCollectionStore()
         if (collectionStore.getCardById(card.id)) {
-          collectionStore.updateCard(card.id, {
+          const ok = await collectionStore.updateCard(card.id, {
             scryfallId,
             setCode,
             edition,
             price,
             image: image || card.image,
-          }).then(() => {
-            console.log(`✅ Auto-fixed card: ${card.name}`)
-          }).catch((e: unknown) => {
-            console.warn(`Failed to auto-fix ${card.name}:`, e)
           })
+          if (ok) {
+            console.log(`✅ Auto-fixed card: ${card.name}`)
+          }
         }
 
         return scryfallId

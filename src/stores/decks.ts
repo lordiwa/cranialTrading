@@ -1068,14 +1068,17 @@ export const useDecksStore = defineStore('decks', () => {
                     wishlist: deck.wishlist || [],
                     stats: deck.stats,
                     updatedAt: Timestamp.now(),
-                }).catch((error: unknown) => {
-                    console.error(`Error reducing allocations for deck ${deck.name}:`, error)
                 })
             )
         }
 
         // Execute all updates in parallel
-        await Promise.all(updatePromises)
+        const results = await Promise.allSettled(updatePromises)
+        const failures = results.filter(r => r.status === 'rejected')
+        if (failures.length > 0) {
+            console.error(`Error reducing allocations for ${failures.length} deck(s):`, failures)
+            toastStore.show(t('decks.messages.allocateError'), 'error')
+        }
     }
 
     /**
@@ -1144,14 +1147,17 @@ export const useDecksStore = defineStore('decks', () => {
                     wishlist: deck.wishlist || [],
                     stats: deck.stats,
                     updatedAt: Timestamp.now(),
-                }).catch((error: unknown) => {
-                    console.error(`Error converting allocations for deck ${deck.name}:`, error)
                 })
             )
         }
 
         // Execute all updates in parallel
-        await Promise.all(updatePromises)
+        const results = await Promise.allSettled(updatePromises)
+        const failures = results.filter(r => r.status === 'rejected')
+        if (failures.length > 0) {
+            console.error(`Error converting allocations for ${failures.length} deck(s):`, failures)
+            toastStore.show(t('decks.messages.allocateError'), 'error')
+        }
     }
 
     // ========================================================================

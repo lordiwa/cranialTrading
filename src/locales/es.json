@@ -488,6 +488,15 @@
       "confirm": "¿Eliminar {count} cartas seleccionadas? Esta acción no se puede deshacer.",
       "success": "{count} cartas eliminadas"
     },
+    "bulkEdit": {
+      "statusLabel": "ESTADO",
+      "visibilityLabel": "VISIB.",
+      "statusSuccess": "{count} cartas cambiadas a {status}",
+      "publicSuccess": "{count} cartas actualizadas",
+      "setPublic": "PÚBLICO",
+      "setPrivate": "PRIVADO",
+      "processing": "Procesando..."
+    },
     "messages": {
       "loadError": "Error al cargar colección",
       "addError": "Error al agregar carta",

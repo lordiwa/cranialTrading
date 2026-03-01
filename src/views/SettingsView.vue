@@ -170,13 +170,18 @@ const handleUsernameInput = () => {
     usernameCheckTimeout = setTimeout(() => {
       void (async () => {
         checkingUsername.value = true;
-        const available = await authStore.checkUsernameAvailable(newUsername.value);
-        usernameAvailable.value = available;
+        try {
+          const available = await authStore.checkUsernameAvailable(newUsername.value);
+          usernameAvailable.value = available;
 
-        if (!available) {
-          usernameSuggestions.value = await authStore.generateUsernameSuggestions(newUsername.value);
+          if (!available) {
+            usernameSuggestions.value = await authStore.generateUsernameSuggestions(newUsername.value);
+          }
+        } catch (e) {
+          console.error('Error checking username:', e);
+        } finally {
+          checkingUsername.value = false;
         }
-        checkingUsername.value = false;
       })();
     }, 500);
   }

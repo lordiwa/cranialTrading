@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../services/firebase'
+import { useToastStore } from '../stores/toast'
 import type { Card } from '../types/card'
 import type { CardPrices } from '../services/mtgjson'
 
@@ -31,6 +32,7 @@ function getTodayStr(): string {
 }
 
 export function usePriceHistory() {
+  const toastStore = useToastStore()
 
   /**
    * Save a daily snapshot — gated by localStorage so at most 1 write/day.
@@ -66,6 +68,7 @@ export function usePriceHistory() {
       })
       .catch((e: unknown) => {
         console.warn('Failed to save price snapshot:', e)
+        toastStore.show('Error guardando historial de precios', 'error')
       })
   }
 
@@ -152,6 +155,7 @@ export function usePriceHistory() {
       })
       .catch((e: unknown) => {
         console.warn('Failed to save card price history:', e)
+        toastStore.show('Error guardando historial de precios por carta', 'error')
       })
   }
 

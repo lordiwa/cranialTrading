@@ -1037,6 +1037,7 @@ const deckActiveSourceLabel = computed(() => {
 // ========== BULK SELECTION ==========
 const selectionMode = ref(false)
 const selectedCardIds = ref<Set<string>>(new Set())
+const bulkActionLoading = ref(false)
 
 const toggleSelectionMode = () => {
   selectionMode.value = !selectionMode.value
@@ -1071,7 +1072,7 @@ const clearSelection = () => {
 }
 
 const handleBulkDelete = async () => {
-  if (selectedCardIds.value.size === 0) return
+  if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
 
   const confirmed = await confirmStore.show({
     title: t('collection.bulkDelete.title'),
@@ -1083,12 +1084,49 @@ const handleBulkDelete = async () => {
 
   if (!confirmed) return
 
-  const ids = [...selectedCardIds.value]
-  const result = await collectionStore.batchDeleteCards(ids)
-  if (result.success) {
-    toastStore.show(t('collection.bulkDelete.success', { count: ids.length }), 'success')
-    selectedCardIds.value = new Set()
-    selectionMode.value = false
+  bulkActionLoading.value = true
+  try {
+    const ids = [...selectedCardIds.value]
+    const result = await collectionStore.batchDeleteCards(ids)
+    if (result.success) {
+      toastStore.show(t('collection.bulkDelete.success', { count: ids.length }), 'success')
+      selectedCardIds.value = new Set()
+      selectionMode.value = false
+    }
+  } finally {
+    bulkActionLoading.value = false
+  }
+}
+
+const handleBulkStatusChange = async (status: CardStatus) => {
+  if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
+  bulkActionLoading.value = true
+  try {
+    const ids = [...selectedCardIds.value]
+    const ok = await collectionStore.batchUpdateCards(ids, { status })
+    if (ok) {
+      toastStore.show(t('collection.bulkEdit.statusSuccess', { count: ids.length, status: t(`common.status.${status}`) }), 'success')
+      selectedCardIds.value = new Set()
+      selectionMode.value = false
+    }
+  } finally {
+    bulkActionLoading.value = false
+  }
+}
+
+const handleBulkPublicToggle = async (isPublic: boolean) => {
+  if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
+  bulkActionLoading.value = true
+  try {
+    const ids = [...selectedCardIds.value]
+    const ok = await collectionStore.batchUpdateCards(ids, { public: isPublic })
+    if (ok) {
+      toastStore.show(t('collection.bulkEdit.publicSuccess', { count: ids.length }), 'success')
+      selectedCardIds.value = new Set()
+      selectionMode.value = false
+    }
+  } finally {
+    bulkActionLoading.value = false
   }
 }
 
@@ -1172,21 +1210,23 @@ const handleDelete = async (card: Card) => {
 
   if (!confirmed) return
 
-  // Delete card optimistically (UI updates immediately, toast after DB)
+  // Delete card + convert allocations in parallel
   const deletePromise = collectionStore.deleteCard(card.id)
+  const convertPromise = hasAllocations
+    ? decksStore.convertAllocationsToWishlist(card)
+    : Promise.resolve()
 
-  // Convert allocations to wishlist in background (non-blocking)
-  if (hasAllocations) {
-    decksStore.convertAllocationsToWishlist(card)
-      .catch((err: unknown) => { console.error('Error converting allocations:', err); })
-  }
+  const [deleteResult, convertResult] = await Promise.allSettled([deletePromise, convertPromise])
 
-  // Wait for delete to complete, then show toast
-  const success = await deletePromise
-  if (success) {
+  if (deleteResult.status === 'fulfilled' && deleteResult.value) {
     toastStore.show(`"${card.name}" eliminada`, 'success')
   }
-  // If failed, store already shows error toast and restores card
+  // If delete failed, store already shows error toast and restores card
+
+  if (convertResult.status === 'rejected') {
+    console.error('Error converting allocations:', convertResult.reason)
+    toastStore.show(t('decks.messages.allocateError'), 'error')
+  }
 }
 
 // Handler cuando se cierra el modal de detalle
@@ -2844,8 +2884,7 @@ onMounted(async () => {
     // Check for incomplete imports
     const savedImport = loadImportState()
     if (savedImport && savedImport.status !== 'complete') {
-      // Resume the import
-      resumeImport(savedImport)
+      await resumeImport(savedImport)
     } else if (savedImport?.status === 'complete') {
       // Clean up completed import
       clearImportState()
@@ -2854,10 +2893,12 @@ onMounted(async () => {
     // Check for incomplete delete deck operations
     const savedDeleteDeck = loadDeleteDeckState()
     if (savedDeleteDeck && savedDeleteDeck.status !== 'complete') {
-      // Resume the delete (await to ensure errors are caught)
-      resumeDeleteDeck(savedDeleteDeck).catch((err: unknown) => {
+      try {
+        await resumeDeleteDeck(savedDeleteDeck)
+      } catch (err) {
         console.error('[DeleteDeck] Resume failed:', err)
-      })
+        toastStore.show(t('decks.messages.deleteError'), 'error')
+      }
     } else if (savedDeleteDeck?.status === 'complete') {
       // Clean up completed delete
       clearDeleteDeckState()
@@ -3299,36 +3340,104 @@ onUnmounted(() => {
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->
-        <div v-if="selectionMode && viewMode === 'collection'" class="bg-rust/10 border border-rust p-3 mb-4 flex flex-wrap items-center justify-between gap-3 rounded">
-          <div class="flex items-center gap-3">
-            <span class="text-small font-bold text-silver">
-              {{ t('collection.bulkDelete.selected', { count: selectedCardIds.size }) }}
-            </span>
+        <div v-if="selectionMode && viewMode === 'collection'" class="bg-silver-5 border border-silver-10 p-3 mb-4 rounded space-y-3 relative">
+          <!-- Loading overlay -->
+          <div v-if="bulkActionLoading" class="absolute inset-0 bg-primary/70 rounded flex items-center justify-center z-10">
+            <span class="text-small font-bold text-neon animate-pulse">{{ t('collection.bulkEdit.processing') }}</span>
+          </div>
+
+          <!-- Row 1: Selection info -->
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <span class="text-small font-bold text-silver">
+                {{ t('collection.bulkDelete.selected', { count: selectedCardIds.size }) }}
+              </span>
+              <button
+                  @click="selectAllFiltered"
+                  :disabled="bulkActionLoading"
+                  class="text-tiny text-neon hover:text-neon/80 underline transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {{ t('collection.bulkDelete.selectAll') }}
+              </button>
+              <button
+                  v-if="selectedCardIds.size > 0"
+                  @click="clearSelection"
+                  :disabled="bulkActionLoading"
+                  class="text-tiny text-silver-50 hover:text-silver underline transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {{ t('collection.bulkDelete.clearSelection') }}
+              </button>
+            </div>
+            <BaseButton size="small" variant="secondary" :disabled="bulkActionLoading" @click="toggleSelectionMode">
+              {{ t('common.actions.cancel') }}
+            </BaseButton>
+          </div>
+
+          <!-- Row 2: Status change -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.statusLabel') }}</span>
             <button
-                @click="selectAllFiltered"
-                class="text-tiny text-neon hover:text-neon/80 underline transition-colors"
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                @click="handleBulkStatusChange('collection')"
+                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
             >
-              {{ t('collection.bulkDelete.selectAll') }}
+              <SvgIcon name="check" size="tiny" />
+              {{ t('common.status.collection').toUpperCase() }}
             </button>
             <button
-                v-if="selectedCardIds.size > 0"
-                @click="clearSelection"
-                class="text-tiny text-silver-50 hover:text-silver underline transition-colors"
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                @click="handleBulkStatusChange('trade')"
+                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-blue-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-blue-400"
             >
-              {{ t('collection.bulkDelete.clearSelection') }}
+              <SvgIcon name="flip" size="tiny" />
+              {{ t('common.status.trade').toUpperCase() }}
+            </button>
+            <button
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                @click="handleBulkStatusChange('sale')"
+                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-yellow-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-yellow-400"
+            >
+              <SvgIcon name="money" size="tiny" />
+              {{ t('common.status.sale').toUpperCase() }}
+            </button>
+            <button
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                @click="handleBulkStatusChange('wishlist')"
+                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-red-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-red-400"
+            >
+              <SvgIcon name="star" size="tiny" />
+              {{ t('common.status.wishlist').toUpperCase() }}
             </button>
           </div>
-          <div class="flex items-center gap-2">
+
+          <!-- Row 3: Visibility + Delete -->
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.visibilityLabel') }}</span>
+              <button
+                  :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                  @click="handleBulkPublicToggle(true)"
+                  class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
+              >
+                <SvgIcon name="eye-open" size="tiny" />
+                {{ t('collection.bulkEdit.setPublic') }}
+              </button>
+              <button
+                  :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                  @click="handleBulkPublicToggle(false)"
+                  class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-silver-50/50 disabled:opacity-30 disabled:cursor-not-allowed text-silver-50"
+              >
+                <SvgIcon name="eye-closed" size="tiny" />
+                {{ t('collection.bulkEdit.setPrivate') }}
+              </button>
+            </div>
             <BaseButton
                 size="small"
                 variant="danger"
-                :disabled="selectedCardIds.size === 0"
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
                 @click="handleBulkDelete"
             >
               {{ t('collection.bulkDelete.deleteSelected', { count: selectedCardIds.size }) }}
-            </BaseButton>
-            <BaseButton size="small" variant="secondary" @click="toggleSelectionMode">
-              {{ t('common.actions.cancel') }}
             </BaseButton>
           </div>
         </div>

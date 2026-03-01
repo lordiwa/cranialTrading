@@ -56,11 +56,14 @@ const SWIPE_THRESHOLD = 80
 // Status cycle order
 const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
 
-const setStatus = (status: CardStatus) => {
+const setStatus = async (status: CardStatus) => {
   if (props.readonly || props.isBeingDeleted || status === props.card.status) return
-  collectionStore.updateCard(props.card.id, { status })
-    .then(ok => { if (ok) toastStore.show(t('cards.grid.statusChanged', { status }), 'success') })
-    .catch(() => { toastStore.show(t('cards.grid.statusError'), 'error') })
+  try {
+    const ok = await collectionStore.updateCard(props.card.id, { status })
+    if (ok) toastStore.show(t('cards.grid.statusChanged', { status }), 'success')
+  } catch {
+    toastStore.show(t('cards.grid.statusError'), 'error')
+  }
 }
 
 const handleTouchStart = (e: TouchEvent) => {

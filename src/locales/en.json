@@ -488,6 +488,15 @@
       "confirm": "Delete {count} selected cards? This cannot be undone.",
       "success": "{count} cards deleted"
     },
+    "bulkEdit": {
+      "statusLabel": "STATUS",
+      "visibilityLabel": "VISIB.",
+      "statusSuccess": "{count} cards changed to {status}",
+      "publicSuccess": "{count} cards updated",
+      "setPublic": "PUBLIC",
+      "setPrivate": "PRIVATE",
+      "processing": "Processing..."
+    },
     "messages": {
       "loadError": "Error loading collection",
       "addError": "Error adding card",

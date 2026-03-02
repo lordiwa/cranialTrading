@@ -21,6 +21,7 @@ import {
     syncCardToPublic,
 } from '../services/publicCards'
 import { t } from '../composables/useI18n'
+import { getCardsByIds } from '../services/scryfall'
 
 /**
  * Commit a Firestore batch with retry logic (skips retries for permission errors)
@@ -118,12 +119,79 @@ export const useCollectionStore = defineStore('collection', () => {
                 createdAt: doc.data().createdAt?.toDate() || new Date(),
             })) as Card[]
 
+            // Enrich cards missing metadata (non-blocking)
+            enrichCardsWithMissingMetadata().catch((err: unknown) => {
+                console.warn('[Enrichment] Background enrichment failed:', err)
+            })
         } catch (error) {
             console.error('Error loading collection:', error)
             toastStore.show(t('collection.messages.loadError'), 'error')
         } finally {
             loading.value = false
         }
+    }
+
+    /**
+     * Enrich cards missing type_line (and other Scryfall metadata) in background.
+     * Fetches from Scryfall by scryfallId and updates both local state and Firestore.
+     */
+    const enrichCardsWithMissingMetadata = async () => {
+        if (!authStore.user?.id) return
+
+        const cardsToEnrich = cards.value.filter(c => c.scryfallId && (!c.type_line || c.produced_mana === undefined))
+        if (cardsToEnrich.length === 0) return
+
+        console.log(`[Enrichment] ${cardsToEnrich.length} cards missing metadata, fetching from Scryfall...`)
+
+        const identifiers = cardsToEnrich.map(c => ({ id: c.scryfallId }))
+        const scryfallCards = await getCardsByIds(identifiers)
+
+        if (scryfallCards.length === 0) return
+
+        const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]))
+
+        const BATCH_SIZE = 500
+        const updates: { card: Card; data: Partial<Card> }[] = []
+
+        for (const card of cardsToEnrich) {
+            const sc = scryfallMap.get(card.scryfallId)
+            if (!sc) continue
+
+            const patch: Partial<Card> = {}
+            if (!card.type_line && sc.type_line) patch.type_line = sc.type_line
+            if (!card.colors && sc.colors) patch.colors = sc.colors
+            if (card.cmc === undefined && sc.cmc !== undefined) patch.cmc = sc.cmc
+            if (!card.rarity && sc.rarity) patch.rarity = sc.rarity
+            if (!card.oracle_text && sc.oracle_text) patch.oracle_text = sc.oracle_text
+            if (!card.keywords && sc.keywords) patch.keywords = sc.keywords
+            if (!card.legalities && sc.legalities) patch.legalities = sc.legalities
+            if (!card.power && sc.power) patch.power = sc.power
+            if (!card.toughness && sc.toughness) patch.toughness = sc.toughness
+            if (card.full_art === undefined && sc.full_art !== undefined) patch.full_art = sc.full_art
+            if (card.produced_mana === undefined && sc.produced_mana) patch.produced_mana = sc.produced_mana
+
+            if (Object.keys(patch).length > 0) {
+                // Update local state immediately
+                Object.assign(card, patch)
+                updates.push({ card, data: patch })
+            }
+        }
+
+        if (updates.length === 0) return
+
+        // Persist to Firestore in batches
+        const userId = authStore.user.id
+        for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+            const chunk = updates.slice(i, i + BATCH_SIZE)
+            const batch = writeBatch(db)
+            for (const { card, data } of chunk) {
+                const cardRef = doc(db, 'users', userId, 'cards', card.id)
+                batch.update(cardRef, { ...data, updatedAt: Timestamp.now() })
+            }
+            await batch.commit()
+        }
+
+        console.log(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
     }
 
     /**

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { type FilterOptions, useSearchStore } from '../../stores/search'
 import { getCardSuggestions } from '../../services/scryfall'
@@ -10,6 +11,7 @@ import SvgIcon from '../ui/SvgIcon.vue'
 import ManaIcon from '../ui/ManaIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 
+const route = useRoute()
 const { t } = useI18n()
 const searchStore = useSearchStore()
 const showAdvancedFilters = ref(false)
@@ -146,7 +148,15 @@ const handleClickOutside = (e: MouseEvent) => {
   }
 }
 
-onMounted(() => { document.addEventListener('click', handleClickOutside) })
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  // If URL has ?q= param, populate the name filter and search
+  const q = route.query.q
+  if (q && typeof q === 'string' && q.trim()) {
+    filters.name = q.trim()
+    handleSearch()
+  }
+})
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 
 // Opciones predefinidas

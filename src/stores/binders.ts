@@ -92,6 +92,7 @@ export const useBindersStore = defineStore('binders', () => {
                 cmc: card.cmc,
                 type_line: card.type_line,
                 colors: card.colors,
+                produced_mana: card.produced_mana,
                 allocatedQuantity: alloc.quantity,
                 isInSideboard: false,
                 addedAt,
@@ -378,6 +379,39 @@ export const useBindersStore = defineStore('binders', () => {
         }
     }
 
+    const bulkDeallocateCardsFromBinder = async (
+        binderId: string,
+        cardIds: string[],
+    ): Promise<number> => {
+        if (!authStore.user?.id || cardIds.length === 0) return 0
+        try {
+            const binder = binders.value.find(b => b.id === binderId)
+            if (!binder?.allocations) return 0
+
+            const cardIdSet = new Set(cardIds)
+            const before = binder.allocations.length
+            binder.allocations = binder.allocations.filter(a => !cardIdSet.has(a.cardId))
+            const removed = before - binder.allocations.length
+
+            if (removed > 0) {
+                const collectionStore = useCollectionStore()
+                binder.stats = calculateStats(binder.allocations, collectionStore.cards)
+                binder.updatedAt = new Date()
+
+                const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
+                await updateDoc(binderRef, {
+                    allocations: binder.allocations,
+                    stats: binder.stats,
+                    updatedAt: Timestamp.now(),
+                })
+            }
+            return removed
+        } catch (error) {
+            console.error('Error bulk deallocating cards from binder:', error)
+            return 0
+        }
+    }
+
     const deallocateCard = async (binderId: string, cardId: string): Promise<boolean> => {
         if (!authStore.user?.id) return false
 
@@ -473,6 +507,7 @@ export const useBindersStore = defineStore('binders', () => {
         // Allocations
         allocateCardToBinder,
         bulkAllocateCardsToBinder,
+        bulkDeallocateCardsFromBinder,
         deallocateCard,
         updateAllocation,
         getTotalAllocatedForCard,

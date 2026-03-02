@@ -28,6 +28,7 @@ export interface Card {
     keywords?: string[];        // Keyword abilities (e.g., ["flying", "trample"])
     legalities?: Record<string, string>; // Format legality (e.g., { standard: "legal", modern: "legal" })
     full_art?: boolean;         // Whether the card is full art
+    produced_mana?: string[];   // Colors of mana the card can produce (e.g., ["G", "U"] for Breeding Pool)
     createdAt?: Date;
     updatedAt: Date;
 }

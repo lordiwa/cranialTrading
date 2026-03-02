@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, rarityOrder, typeOrder } from '../../composables/useCardFilter'
+import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder } from '../../composables/useCardFilter'
 import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
 
 const props = defineProps<{
@@ -11,6 +11,7 @@ const props = defineProps<{
   groupBy?: 'none' | 'type' | 'mana' | 'color'
   sortBy?: 'recent' | 'name' | 'price'
   selectedColors?: Set<string>
+  exactColorMode?: boolean
   selectedManaValues?: Set<string>
   selectedTypes?: Set<string>
   selectedRarities?: Set<string>
@@ -34,6 +35,11 @@ let hoverTimeout: ReturnType<typeof setTimeout> | null = null
 // Type guard
 const isWishlistCard = (card: DisplayDeckCard): card is HydratedWishlistCard => {
   return card.isWishlist
+}
+
+// Proxy detection: wishlist card but user owns copies allocated elsewhere
+const isProxy = (card: DisplayDeckCard): boolean => {
+  return card.isWishlist && card.totalInCollection > 0
 }
 
 const getQuantity = (card: DisplayDeckCard): number => {
@@ -121,7 +127,9 @@ const passesFilterSet = (selected: Set<string> | undefined, maxSize: number, val
 
 // Check if a card passes all cross-filters
 const passesFilters = (card: DisplayDeckCard): boolean => {
-  return passesFilterSet(props.selectedColors, deckColorOrder.length, getColorCategory(card))
+  // Color filter: lands with produced_mana match if ANY produced color is selected
+  const colorOk = !props.selectedColors || props.selectedColors.size >= deckColorOrder.length || passesColorFilter(card, props.selectedColors, props.exactColorMode)
+  return colorOk
     && passesFilterSet(props.selectedManaValues, deckManaOrder.length, getManaCategory(card))
     && passesFilterSet(props.selectedTypes, deckTypeOrder.length, getTypeCategory(card))
     && passesFilterSet(props.selectedRarities, rarityOrder.length, getCardRarityCategory(card))
@@ -265,8 +273,12 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
             {{ t('decks.editorGrid.categories.Commander') }}
           </div>
 
+          <!-- Proxy indicator -->
+          <div v-if="isProxy(previewCard)" class="bg-blue-400/10 border border-blue-400 p-2 text-tiny text-blue-400">
+            {{ t('decks.editorGrid.proxyCard') }}
+          </div>
           <!-- Wishlist indicator -->
-          <div v-if="previewCard.isWishlist" class="bg-amber/10 border border-amber p-2 text-tiny text-amber">
+          <div v-else-if="previewCard.isWishlist" class="bg-amber/10 border border-amber p-2 text-tiny text-amber">
             {{ t('decks.editorGrid.noCardsInCollection') }}
           </div>
         </div>
@@ -301,7 +313,7 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
             v-for="card in group.cards"
             :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
             class="relative cursor-pointer group"
-            :class="{ 'opacity-60': card.isWishlist }"
+            :class="{ 'opacity-75': isProxy(card), 'opacity-60': card.isWishlist && !isProxy(card) }"
             @mouseenter="handleMouseEnter(card)"
             @mouseleave="handleMouseLeave"
             @click="handleCardClick(card)"
@@ -310,7 +322,7 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
             <div
               class="w-full md:w-[145px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
               :class="[
-                card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
+                isProxy(card) ? 'border-blue-400' : card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
                 'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
               ]"
             >

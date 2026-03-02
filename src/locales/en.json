@@ -379,7 +379,9 @@
       "owned": "OWNED",
       "available": "AVAILABLE",
       "wishlist": "WANTED",
-      "searchPlaceholder": "Search by name..."
+      "searchPlaceholder": "Search by name...",
+      "colorModeAny": "ANY",
+      "colorModeExact": "EXACT"
     },
     "sort": {
       "label": "Sort",
@@ -495,7 +497,15 @@
       "publicSuccess": "{count} cards updated",
       "setPublic": "PUBLIC",
       "setPrivate": "PRIVATE",
-      "processing": "Processing..."
+      "processing": "Processing...",
+      "addLabel": "ADD TO",
+      "deck": "DECK",
+      "binder": "BINDER",
+      "newDeck": "+ New deck",
+      "newBinder": "+ New binder",
+      "deckSuccess": "{allocated} cards added to deck, {wishlisted} as proxy",
+      "binderSuccess": "{count} cards added to binder",
+      "binderMoveSuccess": "{count} cards moved to binder"
     },
     "messages": {
       "loadError": "Error loading collection",
@@ -793,6 +803,7 @@
       "uniqueCards": "UNIQUE CARDS",
       "totalCards": "TOTAL CARDS",
       "inCollection": "IN COLLECTION",
+      "proxy": "PROXY",
       "wishlist": "WISHLIST",
       "noCardsIn": "No cards in {section}",
       "headers": {
@@ -812,6 +823,7 @@
       "removeTitle": "Remove from deck",
       "legend": {
         "inCollection": "In collection",
+        "proxy": "Proxy (you own copies in other decks)",
         "wishlist": "Wishlist (need to buy)"
       }
     },
@@ -904,6 +916,7 @@
       "tcg": "TCG:",
       "total": "Total:",
       "noCardsInCollection": "You don't have this card in collection",
+      "proxyCard": "You use this card in other decks (proxy)",
       "noCards": "No cards",
       "emptyBoard": "No cards in this board",
       "removeCommander": "★ REMOVE COMMANDER",

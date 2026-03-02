@@ -48,9 +48,15 @@ const ownedCards = computed(() => {
       .reduce((sum, c) => sum + getQuantity(c), 0)
 })
 
-const wishlistCards = computed(() => {
+const proxyCards = computed(() => {
   return props.cards
-      .filter(c => c.isWishlist)
+      .filter(c => c.isWishlist && c.totalInCollection > 0)
+      .reduce((sum, c) => sum + getQuantity(c), 0)
+})
+
+const needCards = computed(() => {
+  return props.cards
+      .filter(c => c.isWishlist && c.totalInCollection === 0)
       .reduce((sum, c) => sum + getQuantity(c), 0)
 })
 </script>
@@ -58,7 +64,7 @@ const wishlistCards = computed(() => {
 <template>
   <div class="space-y-4">
     <!-- Header stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
       <div class="bg-secondary border border-silver-30 p-3">
         <p class="text-tiny text-silver-70">{{ t('decks.cardsList.uniqueCards') }}</p>
         <p class="text-h3 font-bold text-neon">{{ cards.length }}</p>
@@ -72,9 +78,15 @@ const wishlistCards = computed(() => {
         <p class="text-h3 font-bold text-neon">{{ ownedCards }}</p>
       </div>
       <div class="bg-secondary border border-silver-30 p-3">
+        <p class="text-tiny text-silver-70">{{ t('decks.cardsList.proxy') }}</p>
+        <p class="text-h3 font-bold" :class="proxyCards > 0 ? 'text-blue-400' : 'text-silver-50'">
+          {{ proxyCards }}
+        </p>
+      </div>
+      <div class="bg-secondary border border-silver-30 p-3">
         <p class="text-tiny text-silver-70">{{ t('decks.cardsList.wishlist') }}</p>
-        <p class="text-h3 font-bold" :class="wishlistCards > 0 ? 'text-amber' : 'text-silver-50'">
-          {{ wishlistCards }}
+        <p class="text-h3 font-bold" :class="needCards > 0 ? 'text-amber' : 'text-silver-50'">
+          {{ needCards }}
         </p>
       </div>
     </div>
@@ -102,7 +114,7 @@ const wishlistCards = computed(() => {
             v-for="(card, index) in cards"
             :key="getCardKey(card, index)"
             class="p-3 md:p-4 hover:bg-secondary-40 transition-150"
-            :class="{ 'bg-amber-5 border-l-2 border-amber': card.isWishlist }"
+            :class="{ 'bg-blue-5 border-l-2 border-blue-400': card.isWishlist && card.totalInCollection > 0, 'bg-amber-5 border-l-2 border-amber': card.isWishlist && card.totalInCollection === 0 }"
         >
           <!-- Mobile layout -->
           <div class="md:hidden space-y-2">
@@ -110,7 +122,10 @@ const wishlistCards = computed(() => {
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <p class="font-bold text-silver">{{ getQuantity(card) }}x {{ card.name }}</p>
-                  <BaseBadge v-if="card.isWishlist" variant="deseado" class="text-tiny">
+                  <BaseBadge v-if="card.isWishlist && card.totalInCollection > 0" variant="info" class="text-tiny">
+                    {{ t('decks.cardsList.proxy') }}
+                  </BaseBadge>
+                  <BaseBadge v-else-if="card.isWishlist" variant="deseado" class="text-tiny">
                     WISHLIST
                   </BaseBadge>
                 </div>
@@ -118,7 +133,7 @@ const wishlistCards = computed(() => {
               </div>
               <div class="text-right">
                 <p class="text-tiny text-silver-50">${{ card.price.toFixed(2) }} {{ t('decks.cardsList.perUnit') }}</p>
-                <p class="font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
+                <p class="font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 text-tiny">
@@ -148,13 +163,16 @@ const wishlistCards = computed(() => {
 
           <!-- Desktop layout -->
           <div class="hidden md:grid grid-cols-12 gap-2 items-center">
-            <div class="col-span-1 font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">
+            <div class="col-span-1 font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">
               {{ getQuantity(card) }}
             </div>
             <div class="col-span-5">
               <div class="flex items-center gap-2">
                 <p class="font-bold text-silver truncate">{{ card.name }}</p>
-                <BaseBadge v-if="card.isWishlist" variant="deseado" class="text-tiny flex-shrink-0">
+                <BaseBadge v-if="card.isWishlist && card.totalInCollection > 0" variant="info" class="text-tiny flex-shrink-0">
+                  {{ t('decks.cardsList.proxy') }}
+                </BaseBadge>
+                <BaseBadge v-else-if="card.isWishlist" variant="deseado" class="text-tiny flex-shrink-0">
                   WISHLIST
                 </BaseBadge>
                 <BaseBadge v-if="card.foil" variant="cambio" class="text-tiny flex-shrink-0">
@@ -173,7 +191,7 @@ const wishlistCards = computed(() => {
             </div>
             <div class="col-span-2">
               <p class="text-small text-silver">${{ card.price.toFixed(2) }} {{ t('decks.cardsList.perUnit') }}</p>
-              <p class="text-tiny font-bold" :class="card.isWishlist ? 'text-amber' : 'text-neon'">
+              <p class="text-tiny font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">
                 ${{ (card.price * getQuantity(card)).toFixed(2) }}
               </p>
             </div>
@@ -205,6 +223,10 @@ const wishlistCards = computed(() => {
         <span>{{ t('decks.cardsList.legend.inCollection') }}</span>
       </div>
       <div class="flex items-center gap-1">
+        <span class="w-3 h-3 bg-blue-400"></span>
+        <span>{{ t('decks.cardsList.legend.proxy') }}</span>
+      </div>
+      <div class="flex items-center gap-1">
         <span class="w-3 h-3 bg-amber"></span>
         <span>{{ t('decks.cardsList.legend.wishlist') }}</span>
       </div>
@@ -215,5 +237,8 @@ const wishlistCards = computed(() => {
 <style scoped>
 .bg-amber-5 {
   background-color: rgba(245, 158, 11, 0.05);
+}
+.bg-blue-5 {
+  background-color: rgba(96, 165, 250, 0.05);
 }
 </style>

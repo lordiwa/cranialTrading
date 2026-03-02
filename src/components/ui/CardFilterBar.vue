@@ -67,10 +67,10 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <button
           @click="emit('open-filters')"
           :class="[
-            'flex-shrink-0 p-2.5 rounded transition-colors',
+            'flex-shrink-0 h-[40px] w-[40px] flex items-center justify-center rounded border transition-colors',
             activeFilterCount > 0
-              ? 'bg-neon-10 text-neon'
-              : 'text-silver-50 hover:text-silver'
+              ? 'bg-neon-10 border-neon text-neon'
+              : 'border-silver-10 text-silver hover:text-neon hover:border-silver-30'
           ]"
       >
         <SvgIcon name="filter" size="small" />

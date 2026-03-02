@@ -20,6 +20,7 @@ export interface FilterableCard {
   keywords?: string[]
   legalities?: Record<string, string>
   full_art?: boolean
+  produced_mana?: string[]
 }
 
 /** Get a card's timestamp for sorting by date (handles createdAt or addedAt fields) */
@@ -61,24 +62,67 @@ export const getCardManaCategory = (card: FilterableCard): string => {
   return String(cmc)
 }
 
+/** Map a single color letter to its display name */
+const colorLetterToName = (letter: string): string => {
+  switch (letter.toUpperCase()) {
+    case 'W': return 'White'
+    case 'U': return 'Blue'
+    case 'B': return 'Black'
+    case 'R': return 'Red'
+    case 'G': return 'Green'
+    default: return 'Colorless'
+  }
+}
+
+/** Categorize a list of color letters (W/U/B/R/G) into a display category */
+const categorizeManaColors = (colorLetters: string[]): string => {
+  const valid = colorLetters.filter(c => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+  if (valid.length === 0) return 'Colorless'
+  if (valid.length >= 2) return 'Multicolor'
+  return colorLetterToName(valid[0]!)
+}
+
 export const getCardColorCategory = (card: FilterableCard): string => {
   const typeLine = card.type_line?.toLowerCase() || ''
-  if (typeLine.includes('land')) return 'Lands'
 
-  const colors = card.colors || []
-  const validColors = colors.filter((c: string) => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+  // Lands: categorize by produced mana colors if available
+  if (typeLine.includes('land')) {
+    if (card.produced_mana && card.produced_mana.length > 0) {
+      return categorizeManaColors(card.produced_mana)
+    }
+    return 'Lands'
+  }
 
-  if (validColors.length === 0) return 'Colorless'
-  if (validColors.length >= 2) return 'Multicolor'
+  return categorizeManaColors(card.colors || [])
+}
 
-  const color = validColors[0]?.toUpperCase()
-  if (color === 'W') return 'White'
-  if (color === 'U') return 'Blue'
-  if (color === 'B') return 'Black'
-  if (color === 'R') return 'Red'
-  if (color === 'G') return 'Green'
+/**
+ * Check if a card passes a color filter set.
+ * exact=false (ANY): lands pass if ANY produced color is in the selected set.
+ * exact=true (EXACT): lands pass only if ALL produced colors are within the selected set.
+ * For non-land cards: passes if the single color category is in the selected set.
+ */
+export const passesColorFilter = (card: FilterableCard, selected: Set<string>, exact = false): boolean => {
+  const typeLine = card.type_line?.toLowerCase() || ''
+  if (typeLine.includes('land') && card.produced_mana && card.produced_mana.length > 0) {
+    const validColors = card.produced_mana.filter(c => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+    if (validColors.length === 0) return selected.has('Colorless')
+    if (exact) {
+      // EXACT: every produced color must be in the selected set
+      return validColors.every(c => selected.has(colorLetterToName(c)))
+    }
+    // ANY: at least one produced color is selected
+    return validColors.some(c => selected.has(colorLetterToName(c)))
+        || (validColors.length >= 2 && selected.has('Multicolor'))
+  }
 
-  return 'Colorless'
+  // Non-land cards: in exact mode, multicolor cards pass only if all their colors are selected
+  if (exact && card.colors && card.colors.length >= 2) {
+    const validColors = card.colors.filter(c => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
+    return validColors.every(c => selected.has(colorLetterToName(c)))
+  }
+
+  return selected.has(getCardColorCategory(card))
 }
 
 // ========== Constants ==========
@@ -116,6 +160,7 @@ export function useCardFilter<T extends FilterableCard>(
   const groupBy = ref<'none' | 'type' | 'mana' | 'color'>('none')
 
   const selectedColors = ref<Set<string>>(new Set(colorOrder))
+  const exactColorMode = ref(false)
   const selectedManaValues = ref<Set<string>>(new Set(manaOrder))
   const selectedTypes = ref<Set<string>>(new Set(typeOrder))
   const selectedRarities = ref<Set<string>>(new Set(rarityOrder))
@@ -176,8 +221,10 @@ export function useCardFilter<T extends FilterableCard>(
 
   // --- Chip filter check ---
   const passesChipFilters = (card: T): boolean => {
-    const color = getCardColorCategory(card)
-    if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !selectedColors.value.has(color)) return false
+    // Color filter: lands with produced_mana match if ANY produced color is selected
+    if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length) {
+      if (!passesColorFilter(card, selectedColors.value, exactColorMode.value)) return false
+    }
     const mana = getCardManaCategory(card)
     if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
     const type = getCardTypeCategory(card)
@@ -429,6 +476,7 @@ export function useCardFilter<T extends FilterableCard>(
     sortBy,
     groupBy,
     selectedColors,
+    exactColorMode,
     selectedManaValues,
     selectedTypes,
     selectedRarities,

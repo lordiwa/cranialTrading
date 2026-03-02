@@ -48,6 +48,7 @@ export interface HydratedDeckCard {
     cmc?: number              // Mana value for grouping
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
+    produced_mana?: string[]  // Colors of mana produced (for lands)
 
     // From DeckCardAllocation
     allocatedQuantity: number
@@ -75,6 +76,7 @@ export interface HydratedWishlistCard {
     cmc?: number              // Mana value for grouping
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
+    produced_mana?: string[]  // Colors of mana produced (for lands)
     requestedQuantity: number
     allocatedQuantity: number // Same as requestedQuantity (for unified access)
     isInSideboard: boolean

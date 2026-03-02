@@ -36,7 +36,7 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
-import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
+import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { useCollectionTotals } from '../composables/useCollectionTotals'
 
 const route = useRoute()
@@ -576,6 +576,7 @@ const {
   sortBy,
   groupBy: deckGroupBy,
   selectedColors,
+  exactColorMode,
   selectedManaValues,
   selectedTypes,
   selectedRarities,
@@ -690,8 +691,7 @@ const resetAllChipFilters = () => {
 
 // Wishlist grouping — reuses the same filter state from the main composable
 const passesChipFilters = (card: Card): boolean => {
-  const color = getCardColorCategory(card)
-  if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !selectedColors.value.has(color)) return false
+  if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !passesColorFilter(card, selectedColors.value, exactColorMode.value)) return false
   const mana = getCardManaCategory(card)
   if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
   const type = getCardTypeCategory(card)
@@ -783,6 +783,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
       cmc: card.cmc,
       type_line: card.type_line,
       colors: card.colors,
+      produced_mana: card.produced_mana,
       allocatedQuantity: deckAlloc?.quantity || 0,
       isInSideboard: false,
       notes: undefined,
@@ -817,6 +818,14 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
   }))
 
   // Convert new-model wishlist allocation cards (collection cards with status='wishlist')
+  // Look up actual owned count (non-wishlist cards) by scryfallId for proxy detection
+  const ownedByScryfallId = new Map<string, number>()
+  for (const c of collectionStore.cards) {
+    if (c.status !== 'wishlist') {
+      ownedByScryfallId.set(c.scryfallId, (ownedByScryfallId.get(c.scryfallId) || 0) + c.quantity)
+    }
+  }
+
   const allocWishlistDisplay: HydratedWishlistCard[] = deckAllocWishlistCards.value
       .filter(({ alloc }) => !alloc.isInSideboard)
       .map(({ card, alloc }) => ({
@@ -831,6 +840,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
         cmc: card.cmc,
         type_line: card.type_line,
         colors: card.colors,
+        produced_mana: card.produced_mana,
         requestedQuantity: alloc.quantity,
         allocatedQuantity: alloc.quantity,
         isInSideboard: false,
@@ -838,7 +848,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
         addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
         isWishlist: true as const,
         availableInCollection: 0,
-        totalInCollection: card.quantity,
+        totalInCollection: ownedByScryfallId.get(card.scryfallId) || 0,
       }))
 
   return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
@@ -863,6 +873,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
       cmc: card.cmc,
       type_line: card.type_line,
       colors: card.colors,
+      produced_mana: card.produced_mana,
       allocatedQuantity: deckAlloc?.quantity || 0,
       isInSideboard: true,
       notes: undefined,
@@ -897,6 +908,14 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
   }))
 
   // Convert new-model wishlist allocation cards (collection cards with status='wishlist')
+  // Look up actual owned count (non-wishlist cards) by scryfallId for proxy detection
+  const sideboardOwnedByScryfallId = new Map<string, number>()
+  for (const c of collectionStore.cards) {
+    if (c.status !== 'wishlist') {
+      sideboardOwnedByScryfallId.set(c.scryfallId, (sideboardOwnedByScryfallId.get(c.scryfallId) || 0) + c.quantity)
+    }
+  }
+
   const allocWishlistDisplay: HydratedWishlistCard[] = deckAllocWishlistCards.value
       .filter(({ alloc }) => alloc.isInSideboard)
       .map(({ card, alloc }) => ({
@@ -911,6 +930,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
         cmc: card.cmc,
         type_line: card.type_line,
         colors: card.colors,
+        produced_mana: card.produced_mana,
         requestedQuantity: alloc.quantity,
         allocatedQuantity: alloc.quantity,
         isInSideboard: true,
@@ -918,7 +938,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
         addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
         isWishlist: true as const,
         availableInCollection: 0,
-        totalInCollection: card.quantity,
+        totalInCollection: sideboardOwnedByScryfallId.get(card.scryfallId) || 0,
       }))
 
   return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
@@ -1130,6 +1150,84 @@ const handleBulkPublicToggle = async (isPublic: boolean) => {
   }
 }
 
+// ---- Bulk allocate to deck/binder ----
+const showBulkDeckPicker = ref(false)
+const showBulkBinderPicker = ref(false)
+const pendingBulkAllocateDeck = ref(false)
+const pendingBulkAllocateBinder = ref(false)
+
+const handleBulkAllocateToDeck = async (deckId: string) => {
+  if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
+  showBulkDeckPicker.value = false
+  bulkActionLoading.value = true
+  try {
+    const items = [...selectedCardIds.value].map(cardId => ({
+      cardId,
+      quantity: 1,
+      isInSideboard: false,
+    }))
+    const result = await decksStore.bulkAllocateCardsToDeck(deckId, items)
+    if (result.allocated > 0 || result.wishlisted > 0) {
+      toastStore.show(t('collection.bulkEdit.deckSuccess', { allocated: result.allocated, wishlisted: result.wishlisted }), 'success')
+      selectedCardIds.value = new Set()
+      selectionMode.value = false
+    }
+  } finally {
+    bulkActionLoading.value = false
+  }
+}
+
+const handleBulkAllocateToBinder = async (binderId: string) => {
+  if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
+  showBulkBinderPicker.value = false
+  bulkActionLoading.value = true
+  try {
+    const cardIds = [...selectedCardIds.value]
+
+    // Move: deallocate selected cards from any OTHER binders first
+    let totalMoved = 0
+    for (const binder of binderStore.binders) {
+      if (binder.id === binderId) continue
+      const cardsInBinder = cardIds.filter(
+        id => binder.allocations?.some(a => a.cardId === id)
+      )
+      if (cardsInBinder.length > 0) {
+        totalMoved += await binderStore.bulkDeallocateCardsFromBinder(binder.id, cardsInBinder)
+      }
+    }
+
+    // Now allocate to target binder (availability freed up), using full card quantity
+    const items = cardIds.map(cardId => {
+      const card = collectionStore.getCardById(cardId)
+      return { cardId, quantity: card?.quantity ?? 1 }
+    })
+    const allocated = await binderStore.bulkAllocateCardsToBinder(binderId, items)
+
+    if (allocated > 0) {
+      const msgKey = totalMoved > 0
+        ? 'collection.bulkEdit.binderMoveSuccess'
+        : 'collection.bulkEdit.binderSuccess'
+      toastStore.show(t(msgKey, { count: allocated }), 'success')
+      selectedCardIds.value = new Set()
+      selectionMode.value = false
+    }
+  } finally {
+    bulkActionLoading.value = false
+  }
+}
+
+const handleBulkCreateDeck = () => {
+  showBulkDeckPicker.value = false
+  showCreateDeckModal.value = true
+  pendingBulkAllocateDeck.value = true
+}
+
+const handleBulkCreateBinder = () => {
+  showBulkBinderPicker.value = false
+  showCreateBinderModal.value = true
+  pendingBulkAllocateBinder.value = true
+}
+
 // ========== METHODS ==========
 
 // Get how many copies of a card the user owns (by name, any edition)
@@ -1334,8 +1432,13 @@ const handleCreateBinder = async (data: CreateBinderInput) => {
   const binderId = await binderStore.createBinder(data)
   if (binderId) {
     showCreateBinderModal.value = false
-    viewMode.value = 'binders'
-    binderFilter.value = binderId
+    if (pendingBulkAllocateBinder.value) {
+      pendingBulkAllocateBinder.value = false
+      await handleBulkAllocateToBinder(binderId)
+    } else {
+      viewMode.value = 'binders'
+      binderFilter.value = binderId
+    }
   }
 }
 
@@ -1374,6 +1477,7 @@ const extractScryfallCardData = (card: any) => {
     keywords: card.keywords || [],
     legalities: card.legalities,
     full_art: card.full_art || false,
+    produced_mana: card.produced_mana || undefined,
   }
 }
 
@@ -1773,8 +1877,13 @@ const handleCreateDeck = async (deckData: any) => {
   const deckId = await decksStore.createDeck(deckData)
   if (deckId) {
     showCreateDeckModal.value = false
-    deckFilter.value = deckId
-    toastStore.show(`Deck "${deckData.name}" creado`, 'success')
+    if (pendingBulkAllocateDeck.value) {
+      pendingBulkAllocateDeck.value = false
+      await handleBulkAllocateToDeck(deckId)
+    } else {
+      deckFilter.value = deckId
+      toastStore.show(`Deck "${deckData.name}" creado`, 'success')
+    }
   }
 }
 
@@ -3334,8 +3443,10 @@ onUnmounted(() => {
             :filters="localAdvancedFilters"
             mode="local"
             :local-sets="collectionSets"
+            :exact-color-mode="exactColorMode"
             @close="showLocalFilters = false"
             @update:filters="handleLocalFiltersUpdate"
+            @update:exact-color-mode="exactColorMode = $event"
             @reset="resetAllChipFilters"
         />
 
@@ -3410,27 +3521,90 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- Row 3: Visibility + Delete -->
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-              <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.visibilityLabel') }}</span>
+          <!-- Row 3: Visibility -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.visibilityLabel') }}</span>
+            <button
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                @click="handleBulkPublicToggle(true)"
+                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
+            >
+              <SvgIcon name="eye-open" size="tiny" />
+              {{ t('collection.bulkEdit.setPublic') }}
+            </button>
+            <button
+                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
+                @click="handleBulkPublicToggle(false)"
+                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-silver-50/50 disabled:opacity-30 disabled:cursor-not-allowed text-silver-50"
+            >
+              <SvgIcon name="eye-closed" size="tiny" />
+              {{ t('collection.bulkEdit.setPrivate') }}
+            </button>
+          </div>
+
+          <!-- Row 4: Allocate to deck/binder -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.addLabel') }}</span>
+
+            <!-- Deck picker -->
+            <div class="relative">
               <button
                   :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                  @click="handleBulkPublicToggle(true)"
+                  @click="showBulkDeckPicker = !showBulkDeckPicker; showBulkBinderPicker = false"
                   class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
               >
-                <SvgIcon name="eye-open" size="tiny" />
-                {{ t('collection.bulkEdit.setPublic') }}
+                <SvgIcon name="box" size="tiny" />
+                {{ t('collection.bulkEdit.deck') }} ▾
               </button>
+              <div v-if="showBulkDeckPicker" class="absolute top-full left-0 mt-1 z-20 bg-primary border border-silver-10 rounded shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
+                <button
+                    v-for="deck in decksList"
+                    :key="deck.id"
+                    @click="handleBulkAllocateToDeck(deck.id)"
+                    class="w-full text-left px-3 py-2 text-tiny text-silver hover:bg-silver-5 transition-colors"
+                >
+                  {{ deck.name }}
+                </button>
+                <button
+                    @click="handleBulkCreateDeck"
+                    class="w-full text-left px-3 py-2 text-tiny text-neon hover:bg-silver-5 transition-colors border-t border-silver-10"
+                >
+                  {{ t('collection.bulkEdit.newDeck') }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Binder picker -->
+            <div class="relative">
               <button
                   :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                  @click="handleBulkPublicToggle(false)"
-                  class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-silver-50/50 disabled:opacity-30 disabled:cursor-not-allowed text-silver-50"
+                  @click="showBulkBinderPicker = !showBulkBinderPicker; showBulkDeckPicker = false"
+                  class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
               >
-                <SvgIcon name="eye-closed" size="tiny" />
-                {{ t('collection.bulkEdit.setPrivate') }}
+                <SvgIcon name="collection" size="tiny" />
+                {{ t('collection.bulkEdit.binder') }} ▾
               </button>
+              <div v-if="showBulkBinderPicker" class="absolute top-full left-0 mt-1 z-20 bg-primary border border-silver-10 rounded shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
+                <button
+                    v-for="binder in bindersList"
+                    :key="binder.id"
+                    @click="handleBulkAllocateToBinder(binder.id)"
+                    class="w-full text-left px-3 py-2 text-tiny text-silver hover:bg-silver-5 transition-colors"
+                >
+                  {{ binder.name }}
+                </button>
+                <button
+                    @click="handleBulkCreateBinder"
+                    class="w-full text-left px-3 py-2 text-tiny text-neon hover:bg-silver-5 transition-colors border-t border-silver-10"
+                >
+                  {{ t('collection.bulkEdit.newBinder') }}
+                </button>
+              </div>
             </div>
+          </div>
+
+          <!-- Row 5: Delete -->
+          <div class="flex flex-wrap items-center justify-end gap-2">
             <BaseButton
                 size="small"
                 variant="danger"
@@ -3574,6 +3748,7 @@ onUnmounted(() => {
               :group-by="deckGroupBy"
               :sort-by="sortBy"
               :selected-colors="selectedColors"
+              :exact-color-mode="exactColorMode"
               :selected-mana-values="selectedManaValues"
               :selected-types="selectedTypes"
               :selected-rarities="selectedRarities"
@@ -3603,6 +3778,7 @@ onUnmounted(() => {
               :group-by="deckGroupBy"
               :sort-by="sortBy"
               :selected-colors="selectedColors"
+              :exact-color-mode="exactColorMode"
               :selected-mana-values="selectedManaValues"
               :selected-types="selectedTypes"
               :selected-rarities="selectedRarities"
@@ -3657,6 +3833,7 @@ onUnmounted(() => {
               :group-by="deckGroupBy"
               :sort-by="sortBy"
               :selected-colors="selectedColors"
+              :exact-color-mode="exactColorMode"
               :selected-mana-values="selectedManaValues"
               :selected-types="selectedTypes"
               :selected-rarities="selectedRarities"

@@ -48,7 +48,7 @@ const showClearButton = computed(() => {
         @input="handleInput"
         :class="[
         'input-base', // NEW: Use the global utility class!
-        error ? 'error' : 'border-silver focus:border-2 focus:border-neon', // CLEANER
+        error ? 'error' : 'border-silver-10 focus:border-2 focus:border-neon',
         type === 'number' ? 'no-spinner' : '',
         clearable ? 'pr-10' : '',
       ]"

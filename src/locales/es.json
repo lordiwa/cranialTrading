@@ -379,7 +379,9 @@
       "owned": "TENGO",
       "available": "DISPONIBLE",
       "wishlist": "NECESITO",
-      "searchPlaceholder": "Buscar por nombre..."
+      "searchPlaceholder": "Buscar por nombre...",
+      "colorModeAny": "CUALQ",
+      "colorModeExact": "EXACTO"
     },
     "sort": {
       "label": "Ordenar",
@@ -495,7 +497,15 @@
       "publicSuccess": "{count} cartas actualizadas",
       "setPublic": "PÚBLICO",
       "setPrivate": "PRIVADO",
-      "processing": "Procesando..."
+      "processing": "Procesando...",
+      "addLabel": "AÑADIR",
+      "deck": "MAZO",
+      "binder": "CARPETA",
+      "newDeck": "+ Nuevo mazo",
+      "newBinder": "+ Nueva carpeta",
+      "deckSuccess": "{allocated} cartas agregadas al mazo, {wishlisted} como proxy",
+      "binderSuccess": "{count} cartas añadidas a la carpeta",
+      "binderMoveSuccess": "{count} cartas movidas a la carpeta"
     },
     "messages": {
       "loadError": "Error al cargar colección",
@@ -793,6 +803,7 @@
       "uniqueCards": "CARTAS ÚNICAS",
       "totalCards": "TOTAL CARTAS",
       "inCollection": "EN COLECCIÓN",
+      "proxy": "PROXY",
       "wishlist": "WISHLIST",
       "noCardsIn": "No hay cartas en {section}",
       "headers": {
@@ -812,6 +823,7 @@
       "removeTitle": "Quitar del deck",
       "legend": {
         "inCollection": "En colección",
+        "proxy": "Proxy (tienes copias en otros mazos)",
         "wishlist": "Wishlist (necesitas comprar)"
       }
     },
@@ -904,6 +916,7 @@
       "tcg": "TCG:",
       "total": "Total:",
       "noCardsInCollection": "No tienes esta carta en colección",
+      "proxyCard": "Usas esta carta en otros mazos (proxy)",
       "noCards": "Sin cartas",
       "emptyBoard": "No hay cartas en este board",
       "removeCommander": "★ QUITAR COMMANDER",

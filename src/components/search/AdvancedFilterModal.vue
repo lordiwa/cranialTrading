@@ -30,15 +30,19 @@ const props = withDefaults(defineProps<{
   mode?: 'scryfall' | 'local'
   /** Sets available in the user's collection (only used when mode='local') */
   localSets?: { code: string; name: string }[]
+  /** ANY/EXACT color filter mode (only used when mode='local') */
+  exactColorMode?: boolean
 }>(), {
   mode: 'scryfall',
   localSets: () => [],
+  exactColorMode: false,
 })
 
 const emit = defineEmits<{
   close: []
   'update:filters': [filters: AdvancedFilters]
   'reset': []
+  'update:exactColorMode': [value: boolean]
 }>()
 
 const { t } = useI18n()
@@ -395,6 +399,31 @@ const handleReset = () => {
                 :title="color.label"
             >
               <ManaIcon :symbol="color.value.toUpperCase()" size="small" />
+            </button>
+          </div>
+          <!-- ANY / EXACT toggle (local mode only) -->
+          <div v-if="mode === 'local' && f.colors && f.colors.length > 0" class="flex gap-1 mt-2">
+            <button
+                @click="emit('update:exactColorMode', false)"
+                :class="[
+                  'px-2 py-0.5 text-tiny font-bold transition-fast rounded',
+                  !exactColorMode
+                    ? 'bg-neon text-primary'
+                    : 'bg-silver-10 border border-silver-30 text-silver-50 hover:border-neon'
+                ]"
+            >
+              {{ t('collection.filters.colorModeAny') }}
+            </button>
+            <button
+                @click="emit('update:exactColorMode', true)"
+                :class="[
+                  'px-2 py-0.5 text-tiny font-bold transition-fast rounded',
+                  exactColorMode
+                    ? 'bg-neon text-primary'
+                    : 'bg-silver-10 border border-silver-30 text-silver-50 hover:border-neon'
+                ]"
+            >
+              {{ t('collection.filters.colorModeExact') }}
             </button>
           </div>
         </div>

@@ -81,6 +81,7 @@ export interface ScryfallCard {
     keywords?: string[]
     legalities?: Record<string, string>
     full_art?: boolean
+    produced_mana?: string[]
     prices?: {
         usd?: string
         usd_foil?: string

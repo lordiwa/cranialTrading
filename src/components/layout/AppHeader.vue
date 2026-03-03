@@ -113,6 +113,7 @@ const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessage
 const navigationLinks = computed(() => [
   { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: collectionStore.cards.length },
   { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
+  { path: '/contacts', label: t('header.nav.contacts'), icon: 'user', badge: 0 },
   { path: '/market', label: t('header.nav.market'), icon: 'fire', badge: 0 },
 ])
 
@@ -184,7 +185,7 @@ onUnmounted(() => {
               v-for="link in navigationLinks"
               :key="link.path + link.label"
               :to="link.path"
-              :data-testid="'nav-' + link.icon"
+              :data-testid="`nav-${link.icon}`"
               :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
               :class="[
                 'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',

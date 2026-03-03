@@ -518,7 +518,8 @@ const handleSave = async () => {
       await processDeckAllocations(primaryCardId, savedRelatedCards, { ...deckAllocations.value }, [...allDecks.value], originalAllocations)
     }
 
-    await collectionStore.loadCollection()
+    // Refresh collection in background — individual operations above already applied optimistic updates
+    collectionStore.loadCollection().catch((e: unknown) => { console.warn('Background collection refresh failed:', e) })
     toastStore.show(t('cards.detailModal.updated'), 'success')
     emit('saved')
     emit('close')

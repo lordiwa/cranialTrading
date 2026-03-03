@@ -360,7 +360,14 @@
     "blockedUsersModal": {
       "title": "Usuários Bloqueados",
       "noBlocked": "Nenhum usuário bloqueado",
-      "unblock": "DESBLOQUEAR"
+      "unblock": "DESBLOQUEAR",
+      "block": "BLOQUEAR",
+      "usernamePlaceholder": "Digite o usuário para bloquear...",
+      "userNotFound": "Usuário não encontrado",
+      "alreadyBlocked": "Usuário já está bloqueado",
+      "cannotBlockSelf": "Você não pode bloquear a si mesmo",
+      "userBlocked": "{username} foi bloqueado",
+      "blockError": "Erro ao bloquear usuário"
     }
   },
 
@@ -443,7 +450,8 @@
       "newBinder": "+ NOVA PASTA",
       "import": "IMPORTAR",
       "createDeck": "+ CRIAR DECK",
-      "new": "+ NOVO"
+      "new": "+ NOVO",
+      "addCard": "ADICIONAR CARTA"
     },
     "searchResults": {
       "title": "RESULTADOS DA BUSCA",

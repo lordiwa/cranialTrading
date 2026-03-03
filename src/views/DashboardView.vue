@@ -14,7 +14,7 @@ import { useAuthStore } from '../stores/auth'
 import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
 import { useDecksStore } from '../stores/decks'
-import { addDoc, collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, getDocs, limit, query, where } from 'firebase/firestore'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
@@ -248,6 +248,8 @@ interface BlockedUser {
 const showBlockedUsersModal = ref(false)
 const blockedUsers = ref<BlockedUser[]>([])
 const loadingBlockedUsers = ref(false)
+const blockUsernameInput = ref('')
+const blockingUser = ref(false)
 
 /**
  * Load list of blocked users with their details
@@ -324,6 +326,61 @@ const unblockUser = async (user: BlockedUser) => {
 const openBlockedUsersModal = async () => {
   showBlockedUsersModal.value = true
   await loadBlockedUsers()
+}
+
+const handleBlockByUsername = async () => {
+  if (!authStore.user || !blockUsernameInput.value.trim()) return
+
+  const username = blockUsernameInput.value.trim().toLowerCase()
+
+  if (username === authStore.user.username?.toLowerCase()) {
+    toastStore.show(t('dashboard.blockedUsersModal.cannotBlockSelf'), 'error')
+    return
+  }
+
+  blockingUser.value = true
+  try {
+    const usersRef = collection(db, 'users')
+    const q = query(usersRef, where('username', '==', username), limit(1))
+    const snapshot = await getDocs(q)
+
+    if (snapshot.empty) {
+      toastStore.show(t('dashboard.blockedUsersModal.userNotFound'), 'error')
+      return
+    }
+
+    const userDoc = snapshot.docs[0]!
+    const userId = userDoc.id
+    const userData = userDoc.data()
+
+    if (discardedMatchIds.value.has(userId)) {
+      toastStore.show(t('dashboard.blockedUsersModal.alreadyBlocked'), 'info')
+      blockUsernameInput.value = ''
+      return
+    }
+
+    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
+    await addDoc(discardedRef, {
+      otherUserId: userId,
+      otherUsername: userData.username || username,
+      otherLocation: userData.location || '',
+      status: 'eliminado',
+      eliminatedAt: new Date(),
+      lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+    })
+
+    discardedMatchIds.value.add(userId)
+    blockUsernameInput.value = ''
+    toastStore.show(t('dashboard.blockedUsersModal.userBlocked', { username: userData.username || username }), 'success')
+
+    await loadBlockedUsers()
+    await calculateMatches()
+  } catch (err) {
+    console.error('Error blocking user:', err)
+    toastStore.show(t('dashboard.blockedUsersModal.blockError'), 'error')
+  } finally {
+    blockingUser.value = false
+  }
 }
 
 onMounted(async () => {
@@ -1287,39 +1344,61 @@ const sendInterestFromSearch = async (card: any) => {
         :title="t('dashboard.blockedUsersModal.title')"
         @close="showBlockedUsersModal = false"
     >
-      <div class="min-w-[300px] max-h-[400px] overflow-y-auto">
-        <div v-if="loadingBlockedUsers" class="flex justify-center py-8">
-          <BaseLoader />
-        </div>
-
-        <div v-else-if="blockedUsers.length === 0" class="text-center py-8 text-silver-50">
-          {{ t('dashboard.blockedUsersModal.noBlocked') }}
-        </div>
-
-        <div v-else class="space-y-3">
-          <div
-              v-for="user in blockedUsers"
-              :key="user.odifUserId"
-              class="flex items-center justify-between p-3 border border-silver-30 rounded-md"
+      <div class="min-w-[300px]">
+        <!-- Block by username input -->
+        <div class="flex gap-2 mb-4">
+          <input
+              v-model="blockUsernameInput"
+              type="text"
+              :placeholder="t('dashboard.blockedUsersModal.usernamePlaceholder')"
+              class="flex-1 px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none"
+              @keyup.enter="handleBlockByUsername"
+              :disabled="blockingUser"
+          />
+          <BaseButton
+              size="small"
+              :disabled="!blockUsernameInput.trim() || blockingUser"
+              @click="handleBlockByUsername"
           >
-            <div class="flex items-center gap-3">
-              <img
-                  :src="getAvatarUrlForUser(user.odifUserId)"
-                  :alt="user.username"
-                  class="w-10 h-10 rounded-full object-cover"
-              />
-              <div>
-                <p class="text-silver font-medium">{{ user.username }}</p>
-                <p v-if="user.location" class="text-tiny text-silver-50">{{ user.location }}</p>
-              </div>
-            </div>
-            <BaseButton
-                variant="secondary"
-                size="small"
-                @click="unblockUser(user)"
+            {{ t('dashboard.blockedUsersModal.block') }}
+          </BaseButton>
+        </div>
+
+        <!-- Blocked users list -->
+        <div class="max-h-[350px] overflow-y-auto">
+          <div v-if="loadingBlockedUsers" class="flex justify-center py-8">
+            <BaseLoader />
+          </div>
+
+          <div v-else-if="blockedUsers.length === 0" class="text-center py-8 text-silver-50">
+            {{ t('dashboard.blockedUsersModal.noBlocked') }}
+          </div>
+
+          <div v-else class="space-y-3">
+            <div
+                v-for="user in blockedUsers"
+                :key="user.odifUserId"
+                class="flex items-center justify-between p-3 border border-silver-30 rounded-md"
             >
-              {{ t('dashboard.blockedUsersModal.unblock') }}
-            </BaseButton>
+              <div class="flex items-center gap-3">
+                <img
+                    :src="getAvatarUrlForUser(user.odifUserId)"
+                    :alt="user.username"
+                    class="w-10 h-10 rounded-full object-cover"
+                />
+                <div>
+                  <p class="text-silver font-medium">{{ user.username }}</p>
+                  <p v-if="user.location" class="text-tiny text-silver-50">{{ user.location }}</p>
+                </div>
+              </div>
+              <BaseButton
+                  variant="secondary"
+                  size="small"
+                  @click="unblockUser(user)"
+              >
+                {{ t('dashboard.blockedUsersModal.unblock') }}
+              </BaseButton>
+            </div>
           </div>
         </div>
       </div>

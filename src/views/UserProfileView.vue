@@ -6,7 +6,7 @@ import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
-import { colorOrder, manaOrder, typeOrder, rarityOrder, useCardFilter } from '../composables/useCardFilter';
+import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';

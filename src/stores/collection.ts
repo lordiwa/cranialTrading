@@ -217,13 +217,12 @@ export const useCollectionStore = defineStore('collection', () => {
             }
             cards.value.push(newCard)
 
-            // Sync to public collection (non-blocking, toast on failure)
+            // Sync to public collection (non-blocking, log-only on failure)
             const userInfo = getUserInfo()
             if (userInfo) {
                 syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                     .catch((err: unknown) => {
                         console.error('[PublicSync] Error syncing card:', err)
-                        toastStore.show(t('collection.messages.syncError'), 'error')
                     })
             }
 
@@ -259,7 +258,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 updatedAt: Timestamp.now(),
             })
 
-            // Sync to public collection (non-blocking, toast on failure)
+            // Sync to public collection (non-blocking, log-only on failure)
             const updatedCard = cards.value[index]
             if (updatedCard) {
                 const userInfo = getUserInfo()
@@ -267,7 +266,6 @@ export const useCollectionStore = defineStore('collection', () => {
                     syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                         .catch((err: unknown) => {
                             console.error('[PublicSync] Error syncing card update:', err)
-                            toastStore.show(t('collection.messages.syncError'), 'error')
                         })
                 }
             }
@@ -336,13 +334,12 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
-            // Report public sync failures (non-blocking — don't await before returning)
+            // Report public sync failures (non-blocking, log-only)
             if (syncPromises.length > 0) {
                 Promise.allSettled(syncPromises).then(results => {
                     const failures = results.filter(r => r.status === 'rejected')
                     if (failures.length > 0) {
                         console.error(`[PublicSync] ${failures.length} card(s) failed to sync:`, failures)
-                        toastStore.show(t('collection.messages.syncError'), 'error')
                     }
                 })
             }
@@ -375,11 +372,10 @@ export const useCollectionStore = defineStore('collection', () => {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await deleteDoc(cardRef)
 
-            // Remove from public collection (non-blocking, toast on failure)
+            // Remove from public collection (non-blocking, log-only on failure)
             removeCardFromPublic(cardId, authStore.user.id)
                 .catch((err: unknown) => {
                     console.error('[PublicSync] Error removing card:', err)
-                    toastStore.show(t('collection.messages.syncError'), 'error')
                 })
 
             return true

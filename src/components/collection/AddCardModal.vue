@@ -271,6 +271,11 @@ const handleAddCard = async () => {
       })
     }
 
+    if (!cardId) {
+      // addCard handled the error internally — don't show a second toast
+      return
+    }
+
     toastStore.show(t('cards.addModal.success', { name: selectedPrint.value.name }), 'success')
     emit('added')
     handleClose()

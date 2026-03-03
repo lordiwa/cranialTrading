@@ -3139,6 +3139,10 @@ onUnmounted(() => {
         <BaseButton v-else size="small" @click="showCreateDeckModal = true">
           {{ t('collection.actions.newDeck') }}
         </BaseButton>
+        <BaseButton size="small" variant="secondary" @click="selectedScryfallCard = null; showAddCardModal = true">
+          <SvgIcon name="plus" size="tiny" class="inline-block mr-1" />
+          {{ t('collection.actions.addCard') }}
+        </BaseButton>
       </div>
     </div>
 

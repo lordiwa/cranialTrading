@@ -360,7 +360,14 @@
     "blockedUsersModal": {
       "title": "Usuarios Bloqueados",
       "noBlocked": "No hay usuarios bloqueados",
-      "unblock": "DESBLOQUEAR"
+      "unblock": "DESBLOQUEAR",
+      "block": "BLOQUEAR",
+      "usernamePlaceholder": "Escribe el usuario a bloquear...",
+      "userNotFound": "Usuario no encontrado",
+      "alreadyBlocked": "El usuario ya está bloqueado",
+      "cannotBlockSelf": "No puedes bloquearte a ti mismo",
+      "userBlocked": "{username} ha sido bloqueado",
+      "blockError": "Error al bloquear usuario"
     }
   },
 
@@ -443,7 +450,8 @@
       "newBinder": "+ NUEVA CARPETA",
       "import": "IMPORTAR",
       "createDeck": "+ CREAR MAZO",
-      "new": "+ NUEVO"
+      "new": "+ NUEVO",
+      "addCard": "AGREGAR CARTA"
     },
     "searchResults": {
       "title": "RESULTADOS DE BÚSQUEDA",

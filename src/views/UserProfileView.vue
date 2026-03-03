@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { addDoc, collection, getDocs, limit, query, startAfter, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
+import { colorOrder, manaOrder, typeOrder, rarityOrder, useCardFilter } from '../composables/useCardFilter';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import CollectionGrid from '../components/collection/CollectionGrid.vue';
+import CardFilterBar from '../components/ui/CardFilterBar.vue';
+import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
 import type { Card } from '../types/card';
 import { getAvatarUrlForUser } from '../utils/avatar';
@@ -23,16 +26,13 @@ const { t } = useI18n();
 const username = ref<string>(route.params.username as string || '');
 const userId = ref<string | null>(null);
 const userInfo = ref<{ username?: string; location?: string; avatarUrl?: string | null } | null>(null);
-const cards = ref<any[]>([]);
+const cards = ref<Card[]>([]);
 const loading = ref(false);
-const loadingMore = ref(false);
 const userNotFound = ref(false);
-const pageSize = 24;
-const lastDoc = ref<any>(null);
-const hasMore = ref(true);
 const showChat = ref(false);
 const selectedUserId = ref('');
 const selectedUsername = ref('');
+const showFilters = ref(false);
 
 // Computed properties
 const isOwnProfile = computed(() => {
@@ -90,13 +90,9 @@ const loadProfile = async () => {
       userInfo.value = userData as any;
     }
 
-    // Reset pagination
+    // Load all cards at once, then filter for public ones client-side
     cards.value = [];
-    lastDoc.value = null;
-    hasMore.value = true;
-
-    // Load first page of public cards
-    await loadNextPage();
+    await loadAllPublicCards();
   } catch (err) {
     console.error('Error loading profile:', err);
     toastStore.show(t('profile.messages.loadError'), 'error');
@@ -106,43 +102,25 @@ const loadProfile = async () => {
   }
 };
 
-const loadNextPage = async () => {
-  if (!userId.value || !hasMore.value) return;
+const loadAllPublicCards = async () => {
+  if (!userId.value) return;
 
-  loadingMore.value = true;
   try {
     const cardsCol = collection(db, 'users', userId.value, 'cards');
-    let q = query(cardsCol, limit(pageSize * 2));
-
-    if (lastDoc.value) {
-      q = query(cardsCol, startAfter(lastDoc.value), limit(pageSize * 2));
-    }
-
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(query(cardsCol));
 
     // Filter: show public cards
     // - Any card with public: true
     // - Sale/trade cards default to public (unless public: false)
-    const publicCards = snapshot.docs
-      .map(d => ({ id: d.id, ...d.data() }))
+    cards.value = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }) as Card)
       .filter((card: any) =>
         card.public === true ||
         ((card.status === 'sale' || card.status === 'trade') && card.public !== false)
       );
-
-    cards.value.push(...publicCards);
-
-    if (snapshot.docs.length > 0) {
-      lastDoc.value = snapshot.docs[snapshot.docs.length - 1];
-    }
-
-    // Has more if we got a full batch
-    hasMore.value = snapshot.docs.length === pageSize * 2;
   } catch (err) {
     console.error('Error loading cards:', err);
     toastStore.show(t('profile.messages.loadCardsError'), 'error');
-  } finally {
-    loadingMore.value = false;
   }
 };
 
@@ -154,6 +132,115 @@ const handleContact = (id: string, username: string) => {
 
 const handleCloseChat = () => {
   showChat.value = false;
+};
+
+// ========== FILTER COMPOSABLE ==========
+const {
+  filterQuery,
+  sortBy,
+  groupBy,
+  selectedColors,
+  exactColorMode,
+  selectedManaValues,
+  selectedTypes,
+  selectedRarities,
+  filteredCards,
+  groupedCards,
+  translateCategory,
+  // Advanced filters
+  advPriceMin,
+  advPriceMax,
+  advFoilFilter,
+  advSelectedSets,
+  advSelectedKeywords,
+  advSelectedFormats,
+  advFullArtOnly,
+  advPowerMin,
+  advPowerMax,
+  advToughnessMin,
+  advToughnessMax,
+  advancedFilterCount,
+  collectionSets,
+  resetAdvancedFilters,
+} = useCardFilter(cards);
+
+// Bridge: individual refs <-> AdvancedFilters for the modal
+const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' };
+const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' };
+const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' };
+const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' };
+const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' };
+const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' };
+
+const localAdvancedFilters = computed<AdvancedFilters>(() => ({
+  colors: selectedColors.value.size < colorOrder.length
+    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
+    : [],
+  types: selectedTypes.value.size < typeOrder.length
+    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
+    : [],
+  manaValue: selectedManaValues.value.size < manaOrder.length
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v)).filter(v => !Number.isNaN(v)) }
+    : { min: undefined, max: undefined, values: undefined },
+  rarity: selectedRarities.value.size < rarityOrder.length
+    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
+    : [],
+  sets: advSelectedSets.value,
+  power: { min: advPowerMin.value, max: advPowerMax.value },
+  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
+  formatLegal: advSelectedFormats.value,
+  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
+  keywords: advSelectedKeywords.value,
+  isFoil: advFoilFilter.value === 'foil',
+  isFullArt: advFullArtOnly.value,
+}));
+
+const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
+  advSelectedSets.value = [...updated.sets];
+  advSelectedKeywords.value = [...updated.keywords];
+  advSelectedFormats.value = [...updated.formatLegal];
+  advPriceMin.value = updated.priceUSD.min;
+  advPriceMax.value = updated.priceUSD.max;
+  advPowerMin.value = updated.power.min;
+  advPowerMax.value = updated.power.max;
+  advToughnessMin.value = updated.toughness.min;
+  advToughnessMax.value = updated.toughness.max;
+  advFoilFilter.value = updated.isFoil ? 'foil' : 'any';
+  advFullArtOnly.value = updated.isFullArt;
+  if (updated.manaValue.values?.length) {
+    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v));
+    selectedManaValues.value = new Set(mapped);
+  } else {
+    selectedManaValues.value = new Set(manaOrder);
+  }
+  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v);
+  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder);
+  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v);
+  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder);
+  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v);
+  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder);
+};
+
+const activeChipFilterCount = computed(() => {
+  let count = 0;
+  if (selectedColors.value.size < colorOrder.length) count++;
+  if (selectedManaValues.value.size < manaOrder.length) count++;
+  if (selectedTypes.value.size < typeOrder.length) count++;
+  if (selectedRarities.value.size < rarityOrder.length) count++;
+  count += advancedFilterCount.value;
+  return count;
+});
+
+const resetAllChipFilters = () => {
+  selectedColors.value = new Set(colorOrder);
+  selectedManaValues.value = new Set(manaOrder);
+  selectedTypes.value = new Set(typeOrder);
+  selectedRarities.value = new Set(rarityOrder);
+  resetAdvancedFilters();
+};
+
+const getGroupCardCount = (groupCards: Card[]): number => {
+  return groupCards.reduce((sum, card) => sum + (card.quantity || 1), 0);
 };
 
 // Track cards user already expressed interest in
@@ -328,23 +415,53 @@ onMounted(() => {
       <div v-else>
         <h2 class="text-h3 font-bold text-silver mb-6">
           {{ t('profile.publicCollection') }}
-          <span class="text-small text-silver-70 font-normal ml-2">({{ cards.length }} {{ t('profile.cards') }})</span>
+          <span class="text-small text-silver-70 font-normal ml-2">({{ filteredCards.length }} {{ t('profile.cards') }})</span>
         </h2>
 
-        <div class="space-y-8">
-          <CollectionGrid
-              :cards="cards"
-              :readonly="true"
-              :show-interest="canShowInterest"
-              :interested-cards="interestedCards"
-              @interest="handleInterest"
-          />
+        <!-- Search & filter bar -->
+        <CardFilterBar
+            v-model:filter-query="filterQuery"
+            v-model:sort-by="sortBy"
+            v-model:group-by="groupBy"
+            :active-filter-count="activeChipFilterCount"
+            :show-suggestions="false"
+            @open-filters="showFilters = true"
+        />
 
-          <!-- Load more button -->
-          <div v-if="hasMore" class="text-center">
-            <BaseButton :disabled="loadingMore" @click="loadNextPage">
-              {{ loadingMore ? t('common.actions.loading') : t('common.actions.loadMore') }}
-            </BaseButton>
+        <AdvancedFilterModal
+            :show="showFilters"
+            :filters="localAdvancedFilters"
+            mode="local"
+            :local-sets="collectionSets"
+            :exact-color-mode="exactColorMode"
+            @close="showFilters = false"
+            @update:filters="handleLocalFiltersUpdate"
+            @update:exact-color-mode="exactColorMode = $event"
+            @reset="resetAllChipFilters"
+        />
+
+        <!-- No results after filtering -->
+        <div v-if="filteredCards.length === 0" class="border border-silver-30 p-8 text-center">
+          <p class="text-body text-silver-70">
+            {{ t('profile.noPublicCards') }}
+          </p>
+        </div>
+
+        <div v-else class="space-y-8">
+          <!-- Grouped view -->
+          <div v-for="group in groupedCards" :key="group.type" class="mb-6">
+            <!-- Category Header (hidden when no grouping) -->
+            <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-silver-20">
+              <h4 class="text-tiny font-bold text-neon uppercase">{{ translateCategory(group.type) }}</h4>
+              <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+            </div>
+            <CollectionGrid
+                :cards="group.cards"
+                :readonly="true"
+                :show-interest="canShowInterest"
+                :interested-cards="interestedCards"
+                @interest="handleInterest"
+            />
           </div>
         </div>
       </div>

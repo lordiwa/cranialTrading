@@ -11,9 +11,14 @@ const { t } = useI18n();
 const email = ref('');
 const loading = ref(false);
 const submitted = ref(false);
+const emailError = ref('');
 
 const handleSendReset = async () => {
-  if (!email.value) return;
+  emailError.value = '';
+  if (!email.value.trim()) {
+    emailError.value = t('auth.forgotPassword.emailRequired');
+    return;
+  }
 
   loading.value = true;
   const success = await authStore.sendResetPasswordEmail(email.value);
@@ -46,7 +51,7 @@ const handleSendReset = async () => {
         </div>
       </div>
 
-      <div v-else class="bg-primary border border-silver-30 p-8 space-y-lg">
+      <form v-else class="bg-primary border border-silver-30 p-8 space-y-lg" @submit.prevent="handleSendReset">
         <p class="text-small text-silver-70">
           {{ t('auth.forgotPassword.instruction') }}
         </p>
@@ -54,12 +59,14 @@ const handleSendReset = async () => {
         <BaseInput
             v-model="email"
             type="email"
+            required
             :placeholder="t('auth.forgotPassword.emailPlaceholder')"
+            :error="emailError"
         />
 
         <BaseButton
-            @click="handleSendReset"
-            :disabled="loading || !email"
+            type="submit"
+            :disabled="loading"
             class="w-full"
         >
           {{ loading ? t('auth.forgotPassword.submitting') : t('auth.forgotPassword.submit') }}
@@ -70,7 +77,7 @@ const handleSendReset = async () => {
             {{ t('auth.forgotPassword.backToLogin') }}
           </RouterLink>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 </template>

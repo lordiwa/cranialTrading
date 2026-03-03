@@ -54,7 +54,22 @@
       "WebFetch(domain:justtcg.com)",
       "mcp__ide__getDiagnostics",
       "Bash(git reset:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebFetch(domain:www.testsprite.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.testsprite.com)",
+      "mcp__TestSprite__testsprite_bootstrap",
+      "mcp__TestSprite__testsprite_generate_code_summary",
+      "mcp__TestSprite__testsprite_generate_standardized_prd",
+      "mcp__TestSprite__testsprite_generate_frontend_test_plan",
+      "mcp__TestSprite__testsprite_generate_code_and_execute",
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)",
+      "Bash(tasklist.exe:*)",
+      "Bash(MSYS_NO_PATHCONV=1 tasklist.exe:*)",
+      "Bash(wmic process:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }

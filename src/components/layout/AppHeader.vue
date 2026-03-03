@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { useCollectionStore } from '../../stores/collection'
 import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
 import { type SupportedLocale, useI18n } from '../../composables/useI18n'
@@ -16,6 +17,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const matchesStore = useMatchesStore()
 const messagesStore = useMessagesStore()
+const collectionStore = useCollectionStore()
 const { t, locale, setLocale } = useI18n()
 
 const languages = [
@@ -109,7 +111,7 @@ const closeMobileMenu = () => {
 const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessagesCount.value)
 
 const navigationLinks = computed(() => [
-  { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: 0 },
+  { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: collectionStore.cards.length },
   { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
   { path: '/market', label: t('header.nav.market'), icon: 'fire', badge: 0 },
 ])
@@ -182,6 +184,7 @@ onUnmounted(() => {
               v-for="link in navigationLinks"
               :key="link.path + link.label"
               :to="link.path"
+              :data-testid="'nav-' + link.icon"
               :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
               :class="[
                 'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
@@ -196,7 +199,7 @@ onUnmounted(() => {
             {{ link.label }}
           </router-link>
           <!-- Matches dropdown (replaces simple nav link) -->
-          <MatchNotificationsDropdown data-tour="nav-matches" :active="isMatchesActive" />
+          <MatchNotificationsDropdown data-testid="nav-matches" data-tour="nav-matches" :active="isMatchesActive" />
         </nav>
 
         <!-- Global Search (Desktop) -->
@@ -395,6 +398,7 @@ onUnmounted(() => {
       <!-- Collection -->
       <router-link
           to="/collection"
+          data-testid="nav-collection-mobile"
           :class="[
             'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
             isActive('/collection') ? 'text-neon' : 'text-silver-50'
@@ -406,6 +410,7 @@ onUnmounted(() => {
       <!-- Matches -->
       <router-link
           to="/saved-matches"
+          data-testid="nav-matches-mobile"
           :class="[
             'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast relative min-w-0',
             isMatchesActive ? 'text-neon' : 'text-silver-50'

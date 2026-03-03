@@ -155,8 +155,8 @@ const handleSave = async () => {
       const newSideboard = newAlloc?.isInSideboard || false
       const origForSide = originalAllocations.get(`${deck.id}-${newSideboard}`)
 
-      await updateSideAllocation(deck.id, cardId, newSideboard, newQty, origForSide)
       await removeOppositeAllocation(deck.id, cardId, newSideboard, originalAllocations)
+      await updateSideAllocation(deck.id, cardId, newSideboard, newQty, origForSide)
     }
 
     toastStore.show(t('decks.manageModal.allocationsUpdated'), 'success')
@@ -240,7 +240,7 @@ const cardImage = computed(() => {
 
               <button
                 @click="increment(deck.id)"
-                :disabled="remainingQty <= 0 && getDeckAllocation(deck.id) === 0"
+                :disabled="remainingQty <= 0"
                 class="w-8 h-8 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 +

@@ -128,6 +128,13 @@ watch(() => props.card, async (card) => {
   }
 }, { immediate: true })
 
+// Clamp quantity for owned cards so it never exceeds max
+watch(() => form.value.quantity, (val) => {
+  if (isOwnedCard.value && val > maxQuantityForOwned.value) {
+    form.value.quantity = maxQuantityForOwned.value
+  }
+})
+
 // También recargar cuando show cambia a true
 watch(() => props.show, async (show) => {
   if (show && props.card) {

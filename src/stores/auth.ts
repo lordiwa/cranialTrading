@@ -100,6 +100,12 @@ export const useAuthStore = defineStore('auth', () => {
 
     const register = async (email: string, password: string, username: string, location: string) => {
         try {
+            const isAvailable = await checkUsernameAvailable(username);
+            if (!isAvailable) {
+                toastStore.show(t('auth.messages.usernameTaken'), 'error');
+                return false;
+            }
+
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const userId = userCredential.user.uid;
 

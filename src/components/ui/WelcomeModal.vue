@@ -47,7 +47,7 @@ const handleSkip = async () => {
         class="fixed inset-0 z-[9999] flex items-center justify-center"
     >
       <!-- Overlay -->
-      <div class="absolute inset-0 bg-black/80" @click.stop></div>
+      <div class="absolute inset-0 bg-black/80" @click="handleSkip"></div>
 
       <!-- Modal -->
       <div class="relative bg-primary border border-neon rounded px-8 py-10 max-w-md w-full mx-4 text-center">

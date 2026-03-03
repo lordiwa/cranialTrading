@@ -118,31 +118,36 @@ onMounted(() => {
           <BaseInput
               v-model="email"
               type="email"
+              required
               :placeholder="t('auth.register.emailLabel')"
           />
 
           <BaseInput
               v-model="password"
               type="password"
+              required
               :placeholder="t('auth.register.passwordLabel')"
           />
 
           <BaseInput
               v-model="username"
               type="text"
+              required
               :placeholder="t('auth.register.usernameLabel')"
           />
 
           <BaseInput
               v-model="location"
               type="text"
+              required
               :placeholder="t('auth.register.locationLabel')"
           />
 
           <BaseButton
               type="submit"
               class="w-full"
-              :disabled="loading || !email || !password || !username || !location"
+              data-testid="register-submit"
+              :disabled="loading"
           >
             {{ loading ? t('auth.register.submitting') : t('auth.register.submit') }}
           </BaseButton>

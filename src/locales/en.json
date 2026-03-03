@@ -135,7 +135,8 @@
       "submitting": "SENDING...",
       "success": "Email sent",
       "successMessage": "Check your email for the recovery link. If you don't see it, check spam.",
-      "backToLogin": "Back to login"
+      "backToLogin": "Back to login",
+      "emailRequired": "Please enter your email"
     },
     "resetPassword": {
       "title": "NEW PASSWORD",
@@ -173,7 +174,8 @@
       "verifyEmailError": "Error verifying email",
       "saveUserError": "Error saving user data",
       "loadUserError": "Error loading user data",
-      "passwordUpdated": "Password updated"
+      "passwordUpdated": "Password updated",
+      "usernameTaken": "This username is already taken. Please choose another."
     }
   },
 

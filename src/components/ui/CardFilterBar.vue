@@ -16,9 +16,11 @@ const props = withDefaults(defineProps<{
   showViewType?: boolean
   viewType?: 'stack' | 'visual' | 'texto'
   activeFilterCount?: number
+  showSuggestions?: boolean
 }>(), {
   viewMode: 'collection',
   activeFilterCount: 0,
+  showSuggestions: true,
 })
 
 const emit = defineEmits<{
@@ -86,7 +88,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         />
 
         <!-- Suggestions dropdown -->
-        <div v-if="showDropdown && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
+        <div v-if="showSuggestions && showDropdown && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
         <!-- Local matches section -->
         <div v-if="localMatches.length > 0">
           <div class="px-3 py-1 text-tiny text-silver-50 uppercase bg-silver-10">

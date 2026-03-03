@@ -5,12 +5,14 @@ interface Props {
   variant?: 'primary' | 'secondary' | 'danger';
   size?: 'normal' | 'small';
   disabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
 }
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'primary',
   size: 'normal',
   disabled: false,
+  type: 'button',
 });
 
 const baseClasses = 'font-bold transition-fast cursor-pointer min-h-[44px] flex items-center justify-center rounded';
@@ -35,6 +37,7 @@ const variantClasses = computed(() => ({
 
 <template>
   <button
+      :type="type"
       :class="[baseClasses, sizeClasses[size], variantClasses[variant]]"
       :disabled="disabled"
   >

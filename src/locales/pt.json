@@ -135,7 +135,8 @@
       "submitting": "ENVIANDO...",
       "success": "Email enviado",
       "successMessage": "Verifique seu email para o link de recuperação. Se não encontrar, verifique o spam.",
-      "backToLogin": "Voltar ao login"
+      "backToLogin": "Voltar ao login",
+      "emailRequired": "Digite seu email"
     },
     "resetPassword": {
       "title": "NOVA SENHA",
@@ -173,7 +174,8 @@
       "verifyEmailError": "Erro ao verificar email",
       "saveUserError": "Erro ao salvar dados do usuário",
       "loadUserError": "Erro ao carregar dados do usuário",
-      "passwordUpdated": "Senha atualizada"
+      "passwordUpdated": "Senha atualizada",
+      "usernameTaken": "Este username já está em uso. Escolha outro."
     }
   },
 

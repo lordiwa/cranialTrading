@@ -7,6 +7,7 @@ interface Props {
   placeholder?: string;
   error?: string;
   disabled?: boolean;
+  required?: boolean;
   id?: string;
   clearable?: boolean;
 }
@@ -16,6 +17,7 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: '',
   error: '',
   disabled: false,
+  required: false,
   clearable: false,
 });
 
@@ -45,6 +47,7 @@ const showClearButton = computed(() => {
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
+        :required="required"
         @input="handleInput"
         :class="[
         'input-base', // NEW: Use the global utility class!

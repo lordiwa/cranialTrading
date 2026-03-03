@@ -135,7 +135,8 @@
       "submitting": "ENVIANDO...",
       "success": "Email enviado",
       "successMessage": "Revisa tu correo para el enlace de recuperación. Si no lo ves, revisa spam.",
-      "backToLogin": "Volver al login"
+      "backToLogin": "Volver al login",
+      "emailRequired": "Ingresa tu email"
     },
     "resetPassword": {
       "title": "NUEVA CONTRASEÑA",
@@ -173,7 +174,8 @@
       "verifyEmailError": "Error al verificar email",
       "saveUserError": "Error al guardar datos de usuario",
       "loadUserError": "Error al cargar datos de usuario",
-      "passwordUpdated": "Contraseña actualizada"
+      "passwordUpdated": "Contraseña actualizada",
+      "usernameTaken": "Este username ya está en uso. Elige otro."
     }
   },
 

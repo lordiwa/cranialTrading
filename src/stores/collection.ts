@@ -203,8 +203,13 @@ export const useCollectionStore = defineStore('collection', () => {
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
+            // Strip undefined values — Firestore rejects them
+            const cleanData: Record<string, unknown> = {}
+            for (const [key, value] of Object.entries(cardData)) {
+                if (value !== undefined) cleanData[key] = value
+            }
             const docRef = await addDoc(colRef, {
-                ...cardData,
+                ...cleanData,
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
             })

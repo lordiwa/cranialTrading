@@ -591,6 +591,7 @@ const {
   advSelectedSets,
   advSelectedKeywords,
   advSelectedFormats,
+  advSelectedCreatureTypes,
   advFullArtOnly,
   advPowerMin,
   advPowerMax,
@@ -598,6 +599,7 @@ const {
   advToughnessMax,
   advancedFilterCount,
   collectionSets,
+  collectionCreatureTypes,
   resetAdvancedFilters,
 } = useCardFilter(statusFilteredCards)
 
@@ -630,6 +632,7 @@ const localAdvancedFilters = computed<AdvancedFilters>(() => ({
   formatLegal: advSelectedFormats.value,
   priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
   keywords: advSelectedKeywords.value,
+  creatureTypes: advSelectedCreatureTypes.value,
   isFoil: advFoilFilter.value === 'foil',
   isFullArt: advFullArtOnly.value,
 }))
@@ -641,6 +644,8 @@ const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   advSelectedKeywords.value = [...updated.keywords]
   // Sync formats
   advSelectedFormats.value = [...updated.formatLegal]
+  // Sync creature types
+  advSelectedCreatureTypes.value = [...(updated.creatureTypes || [])]
   // Sync price
   advPriceMin.value = updated.priceUSD.min
   advPriceMax.value = updated.priceUSD.max
@@ -3447,6 +3452,7 @@ onUnmounted(() => {
             :filters="localAdvancedFilters"
             mode="local"
             :local-sets="collectionSets"
+            :local-creature-types="collectionCreatureTypes"
             :exact-color-mode="exactColorMode"
             @close="showLocalFilters = false"
             @update:filters="handleLocalFiltersUpdate"

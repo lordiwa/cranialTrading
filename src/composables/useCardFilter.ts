@@ -147,6 +147,16 @@ export const translateCategory = (category: string, t: (key: string) => string):
   return translated === key ? category : translated
 }
 
+// ========== Creature subtype extraction ==========
+
+/** Extract creature subtypes from a type_line string (e.g., "Legendary Creature — Human Wizard" → ["human", "wizard"]) */
+export const extractCreatureSubtypes = (typeLine: string): string[] => {
+  if (!typeLine) return []
+  const dashIndex = typeLine.indexOf('—')
+  if (dashIndex === -1) return []
+  return typeLine.substring(dashIndex + 1).trim().split(/\s+/).filter(s => s.length > 0).map(s => s.toLowerCase())
+}
+
 // ========== Composable ==========
 
 export function useCardFilter<T extends FilterableCard>(
@@ -177,6 +187,7 @@ export function useCardFilter<T extends FilterableCard>(
   const advPowerMax = ref<number | undefined>(undefined)
   const advToughnessMin = ref<number | undefined>(undefined)
   const advToughnessMax = ref<number | undefined>(undefined)
+  const advSelectedCreatureTypes = ref<string[]>([])
 
   // Reset chip filters when groupBy goes to 'none'
   watch(groupBy, (val) => {
@@ -217,6 +228,12 @@ export function useCardFilter<T extends FilterableCard>(
     const idx = advSelectedFormats.value.indexOf(format)
     if (idx > -1) advSelectedFormats.value.splice(idx, 1)
     else advSelectedFormats.value.push(format)
+  }
+
+  const toggleAdvCreatureType = (type: string) => {
+    const idx = advSelectedCreatureTypes.value.indexOf(type)
+    if (idx > -1) advSelectedCreatureTypes.value.splice(idx, 1)
+    else advSelectedCreatureTypes.value.push(type)
   }
 
   // --- Chip filter check ---
@@ -270,6 +287,12 @@ export function useCardFilter<T extends FilterableCard>(
     return advSelectedFormats.value.every(fmt => card.legalities![fmt] === 'legal')
   }
 
+  const passesCreatureTypes = (card: T): boolean => {
+    if (advSelectedCreatureTypes.value.length === 0) return true
+    const subtypes = extractCreatureSubtypes(card.type_line || '')
+    return advSelectedCreatureTypes.value.some(ct => subtypes.includes(ct.toLowerCase()))
+  }
+
   const passesFullArt = (card: T): boolean => {
     return !advFullArtOnly.value || !!card.full_art
   }
@@ -290,6 +313,7 @@ export function useCardFilter<T extends FilterableCard>(
       && passesSets(card)
       && passesKeywords(card)
       && passesFormats(card)
+      && passesCreatureTypes(card)
       && passesFullArt(card)
       && passesStatRange(card.power, advPowerMin.value, advPowerMax.value)
       && passesStatRange(card.toughness, advToughnessMin.value, advToughnessMax.value)
@@ -309,6 +333,7 @@ export function useCardFilter<T extends FilterableCard>(
       || advSelectedSets.value.length > 0
       || advSelectedKeywords.value.length > 0
       || advSelectedFormats.value.length > 0
+      || advSelectedCreatureTypes.value.length > 0
       || advFullArtOnly.value
       || advPowerMin.value !== undefined
       || advPowerMax.value !== undefined
@@ -323,6 +348,7 @@ export function useCardFilter<T extends FilterableCard>(
     if (advSelectedSets.value.length > 0) count++
     if (advSelectedKeywords.value.length > 0) count++
     if (advSelectedFormats.value.length > 0) count++
+    if (advSelectedCreatureTypes.value.length > 0) count++
     if (advFullArtOnly.value) count++
     if (advPowerMin.value !== undefined || advPowerMax.value !== undefined) count++
     if (advToughnessMin.value !== undefined || advToughnessMax.value !== undefined) count++
@@ -341,6 +367,19 @@ export function useCardFilter<T extends FilterableCard>(
     return [...setMap.values()].sort((a, b) => a.name.localeCompare(b.name))
   })
 
+  // Unique creature subtypes from the user's cards, sorted by frequency
+  const collectionCreatureTypes = computed(() => {
+    const typeCount = new Map<string, number>()
+    for (const card of cards.value) {
+      for (const st of extractCreatureSubtypes(card.type_line || '')) {
+        typeCount.set(st, (typeCount.get(st) || 0) + 1)
+      }
+    }
+    return [...typeCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([type, count]) => ({ value: type, label: type.charAt(0).toUpperCase() + type.slice(1), count }))
+  })
+
   const resetAdvancedFilters = () => {
     advPriceMin.value = undefined
     advPriceMax.value = undefined
@@ -348,6 +387,7 @@ export function useCardFilter<T extends FilterableCard>(
     advSelectedSets.value = []
     advSelectedKeywords.value = []
     advSelectedFormats.value = []
+    advSelectedCreatureTypes.value = []
     advFullArtOnly.value = false
     advPowerMin.value = undefined
     advPowerMax.value = undefined
@@ -494,6 +534,7 @@ export function useCardFilter<T extends FilterableCard>(
     advSelectedSets,
     advSelectedKeywords,
     advSelectedFormats,
+    advSelectedCreatureTypes,
     advFullArtOnly,
     advPowerMin,
     advPowerMax,
@@ -504,12 +545,14 @@ export function useCardFilter<T extends FilterableCard>(
     toggleAdvSet,
     toggleAdvKeyword,
     toggleAdvFormat,
+    toggleAdvCreatureType,
 
     // Computed
     hasActiveFilters,
     hasActiveAdvancedFilters,
     advancedFilterCount,
     collectionSets,
+    collectionCreatureTypes,
     filteredCards,
     groupedCards,
 

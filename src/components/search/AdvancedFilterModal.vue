@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { allCommonEffects, allSetMechanics, combatAbilities, commonEffects, formatOptions, getKeywordLabel, setMechanics, specialTypes, triggerKeywords } from '../../utils/filterKeywords'
+import { allCommonEffects, allCreatureTypes, allSetMechanics, combatAbilities, commonEffects, formatOptions, getKeywordLabel, setMechanics, specialTypes, triggerKeywords } from '../../utils/filterKeywords'
 import { getAllSets, type ScryfallSet } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
@@ -19,6 +19,7 @@ export interface AdvancedFilters {
   formatLegal: string[]
   priceUSD: { min?: number; max?: number }
   keywords: string[]
+  creatureTypes: string[]
   isFoil: boolean
   isFullArt: boolean
 }
@@ -30,11 +31,14 @@ const props = withDefaults(defineProps<{
   mode?: 'scryfall' | 'local'
   /** Sets available in the user's collection (only used when mode='local') */
   localSets?: { code: string; name: string }[]
+  /** Creature types available in the user's collection (only used when mode='local') */
+  localCreatureTypes?: { value: string; label: string; count: number }[]
   /** ANY/EXACT color filter mode (only used when mode='local') */
   exactColorMode?: boolean
 }>(), {
   mode: 'scryfall',
   localSets: () => [],
+  localCreatureTypes: () => [],
   exactColorMode: false,
 })
 
@@ -73,12 +77,16 @@ const filterSearchQuery = ref('')
 const filterSearchResults = computed(() => {
   const query = filterSearchQuery.value.toLowerCase().trim()
   if (!query || query.length < 2) return []
+  const creatureTypeSource = props.mode === 'local' && props.localCreatureTypes.length > 0
+    ? props.localCreatureTypes.map(ct => ({ value: ct.value, label: ct.label }))
+    : allCreatureTypes
   const allFilters = [
-    ...combatAbilities.map(k => ({ ...k, category: 'Combate' })),
-    ...allCommonEffects.map(k => ({ ...k, category: 'Efectos' })),
-    ...triggerKeywords.map(k => ({ ...k, category: 'Triggers' })),
-    ...allSetMechanics.map(k => ({ ...k, category: 'Mecánicas' })),
-    ...specialTypes.map(k => ({ ...k, category: 'Tipos' })),
+    ...combatAbilities.map(k => ({ ...k, category: 'Combate', isCreatureType: false })),
+    ...allCommonEffects.map(k => ({ ...k, category: 'Efectos', isCreatureType: false })),
+    ...triggerKeywords.map(k => ({ ...k, category: 'Triggers', isCreatureType: false })),
+    ...allSetMechanics.map(k => ({ ...k, category: 'Mecánicas', isCreatureType: false })),
+    ...specialTypes.map(k => ({ ...k, category: 'Tipos', isCreatureType: false })),
+    ...creatureTypeSource.map(k => ({ ...k, category: 'Creature Types', isCreatureType: true })),
   ]
   return allFilters
     .filter(k => k.label.toLowerCase().includes(query) || k.value.toLowerCase().includes(query))
@@ -166,6 +174,36 @@ const toggleRarity = (rarity: string) => { f.value.rarity = toggleInArray(f.valu
 const toggleFormat = (format: string) => { f.value.formatLegal = toggleInArray(f.value.formatLegal, format); emitUpdate() }
 const toggleKeyword = (keyword: string) => { f.value.keywords = toggleInArray(f.value.keywords, keyword); emitUpdate() }
 const toggleSet = (setCode: string) => { f.value.sets = toggleInArray(f.value.sets, setCode); emitUpdate() }
+const toggleCreatureType = (type: string) => { f.value.creatureTypes = toggleInArray(f.value.creatureTypes, type); emitUpdate() }
+
+// ========== Creature Types ==========
+const creatureTypeSearchQuery = ref('')
+const showAllCreatureTypes = ref(false)
+
+const displayCreatureTypes = computed(() => {
+  const source = props.mode === 'local' && props.localCreatureTypes.length > 0
+    ? props.localCreatureTypes
+    : allCreatureTypes.map(ct => ({ ...ct, count: 0 }))
+  const q = creatureTypeSearchQuery.value.toLowerCase().trim()
+  const filtered = q
+    ? source.filter(ct => ct.label.toLowerCase().includes(q) || ct.value.toLowerCase().includes(q))
+    : source
+  if (showAllCreatureTypes.value || q) return filtered
+  return filtered.slice(0, 20)
+})
+
+const totalCreatureTypeCount = computed(() => {
+  if (props.mode === 'local' && props.localCreatureTypes.length > 0) return props.localCreatureTypes.length
+  return allCreatureTypes.length
+})
+
+const getCreatureTypeLabel = (value: string): string => {
+  if (props.mode === 'local') {
+    const found = props.localCreatureTypes.find(ct => ct.value === value)
+    if (found) return found.label
+  }
+  return allCreatureTypes.find(ct => ct.value === value)?.label || value.charAt(0).toUpperCase() + value.slice(1)
+}
 
 // ========== Counting ==========
 const countSelectedInCategory = (categoryKeywords: { value: string }[]) => {
@@ -185,6 +223,7 @@ const activeFilterCount = computed(() => {
   if (f.value.formatLegal?.length) count++
   if (f.value.priceUSD?.min !== undefined || f.value.priceUSD?.max !== undefined) count++
   if (f.value.keywords?.length) count++
+  if (f.value.creatureTypes?.length) count++
   if (f.value.isFoil) count++
   if (f.value.isFullArt) count++
   return count
@@ -243,6 +282,9 @@ const removeFilter = (type: string, value?: string) => {
     case 'keyword':
       if (value) f.value.keywords = f.value.keywords.filter(k => k !== value)
       break
+    case 'creatureType':
+      if (value) f.value.creatureTypes = f.value.creatureTypes.filter(ct => ct !== value)
+      break
     case 'manaValue':
       f.value.manaValue = { min: undefined, max: undefined, values: undefined }
       break
@@ -270,7 +312,7 @@ const handleReset = () => {
     colors: [], types: [], manaValue: { min: undefined, max: undefined, values: undefined },
     rarity: [], sets: [], power: { min: undefined, max: undefined },
     toughness: { min: undefined, max: undefined }, formatLegal: [],
-    priceUSD: { min: undefined, max: undefined }, keywords: [],
+    priceUSD: { min: undefined, max: undefined }, keywords: [], creatureTypes: [],
     isFoil: false, isFullArt: false,
   }
   emit('reset')
@@ -308,14 +350,14 @@ const handleReset = () => {
           <button
               v-for="result in filterSearchResults"
               :key="result.value"
-              @click="toggleKeyword(result.value)"
+              @click="result.isCreatureType ? toggleCreatureType(result.value) : toggleKeyword(result.value)"
               class="w-full px-4 py-2 flex items-center justify-between hover:bg-neon-10 transition-fast border-b border-silver-30 last:border-b-0"
           >
             <span class="text-small text-silver">
               {{ result.label }}
               <span class="text-tiny text-silver-50 ml-2">{{ result.category }}</span>
             </span>
-            <span v-if="f.keywords?.includes(result.value)" class="text-neon text-tiny font-bold">✓</span>
+            <span v-if="result.isCreatureType ? f.creatureTypes?.includes(result.value) : f.keywords?.includes(result.value)" class="text-neon text-tiny font-bold">✓</span>
           </button>
         </div>
         <div
@@ -351,6 +393,10 @@ const handleReset = () => {
         <button v-for="keyword in f.keywords" :key="`k-${keyword}`" @click="removeFilter('keyword', keyword)"
             class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
           {{ getKeywordLabel(keyword) }} <span class="opacity-70">×</span>
+        </button>
+        <button v-for="ct in f.creatureTypes" :key="`ct-${ct}`" @click="removeFilter('creatureType', ct)"
+            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
+          {{ getCreatureTypeLabel(ct) }} <span class="opacity-70">×</span>
         </button>
         <button v-if="f.manaValue?.values?.length || f.manaValue?.min !== undefined || f.manaValue?.max !== undefined"
             @click="removeFilter('manaValue')"
@@ -745,6 +791,68 @@ const handleReset = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ========== CREATURE TYPES ACCORDION ========== -->
+      <div class="border border-silver-30 rounded">
+        <button
+            @click="toggleAccordion('creatureTypes')"
+            class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+        >
+          <span class="text-small font-bold text-silver flex items-center gap-2">
+            {{ t('search.accordions.creatureTypes') }}
+            <HelpTooltip :text="t('help.tooltips.search.creatureTypes')" :title="t('help.titles.creatureTypes')" />
+          </span>
+          <span class="flex items-center gap-2">
+            <span v-if="f.creatureTypes?.length" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ f.creatureTypes.length }}</span>
+            <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('creatureTypes') }">▼</span>
+          </span>
+        </button>
+        <div v-if="isAccordionOpen('creatureTypes')" class="px-3 py-2 bg-silver-10/50">
+          <div class="relative mb-2">
+            <input
+                v-model="creatureTypeSearchQuery"
+                type="text"
+                :placeholder="t('search.filterPanel.creatureTypeSearchPlaceholder')"
+                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+            />
+            <button v-if="creatureTypeSearchQuery.length > 0" @click="creatureTypeSearchQuery = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20" type="button">
+              ✕
+            </button>
+          </div>
+          <div v-if="f.creatureTypes?.length" class="flex flex-wrap gap-1 mb-2 pb-2 border-b border-silver-30">
+            <button v-for="ct in f.creatureTypes" :key="`selected-ct-${ct}`" @click="toggleCreatureType(ct)"
+                class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast rounded">
+              {{ getCreatureTypeLabel(ct) }} <span class="opacity-70">×</span>
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <button
+                v-for="ct in displayCreatureTypes"
+                :key="ct.value"
+                @click="toggleCreatureType(ct.value)"
+                :class="[
+                  'px-2 py-1 text-tiny font-bold transition-fast rounded',
+                  f.creatureTypes?.includes(ct.value)
+                    ? 'bg-neon text-primary border border-neon'
+                    : 'bg-primary border border-silver-30 text-silver hover:border-neon'
+                ]"
+            >
+              {{ ct.label }}<span v-if="ct.count" class="ml-1 opacity-70">({{ ct.count }})</span>
+            </button>
+          </div>
+          <button
+              v-if="!creatureTypeSearchQuery && totalCreatureTypeCount > 20"
+              @click="showAllCreatureTypes = !showAllCreatureTypes"
+              class="mt-2 text-tiny text-neon hover:underline"
+          >
+            {{ showAllCreatureTypes ? t('common.actions.close') : `Show all (${totalCreatureTypeCount})` }}
+          </button>
+          <p v-if="displayCreatureTypes.length === 0 && creatureTypeSearchQuery" class="text-tiny text-silver-50 py-2">
+            {{ t('search.filterPanel.noCreatureTypesFound') }}
+          </p>
         </div>
       </div>
 

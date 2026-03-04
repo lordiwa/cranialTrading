@@ -254,8 +254,18 @@ export const useMatchesStore = defineStore('matches', () => {
             const savedFromFirestore = savedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
 
             // NUEVOS: received from others (not sent by me)
+            // Deduplicate: calculated matches (matches_nuevos) keep only the latest per otherUserId,
+            // shared matches (from "Me Interesa") are unique by docId and kept as-is
+            const parsedNewDocs = newDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            const seenUserIds = new Set<string>();
+            const dedupedNewDocs = parsedNewDocs.filter(m => {
+                const key = m.otherUserId;
+                if (seenUserIds.has(key)) return false;
+                seenUserIds.add(key);
+                return true;
+            });
             newMatches.value = [
-                ...newDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data())),
+                ...dedupedNewDocs,
                 ...sharedForNew,
             ];
 

@@ -189,6 +189,67 @@ export const specialTypes: KeywordOption[] = [
   { value: 'snow', label: 'Snow' },
 ]
 
+// ============ CREATURE TYPES (common MTG subtypes for Scryfall mode) ============
+export const creatureTypes: KeywordOption[] = [
+  // Major races
+  { value: 'human', label: 'Human' },
+  { value: 'elf', label: 'Elf' },
+  { value: 'goblin', label: 'Goblin' },
+  { value: 'merfolk', label: 'Merfolk' },
+  { value: 'dwarf', label: 'Dwarf' },
+  { value: 'faerie', label: 'Faerie' },
+  { value: 'orc', label: 'Orc' },
+  { value: 'spirit', label: 'Spirit' },
+  { value: 'elemental', label: 'Elemental' },
+  { value: 'soldier', label: 'Soldier' },
+  { value: 'wizard', label: 'Wizard' },
+  { value: 'warrior', label: 'Warrior' },
+  { value: 'cleric', label: 'Cleric' },
+  { value: 'rogue', label: 'Rogue' },
+  { value: 'knight', label: 'Knight' },
+  { value: 'shaman', label: 'Shaman' },
+  { value: 'druid', label: 'Druid' },
+  { value: 'monk', label: 'Monk' },
+  // Iconic creatures
+  { value: 'dragon', label: 'Dragon' },
+  { value: 'angel', label: 'Angel' },
+  { value: 'demon', label: 'Demon' },
+  { value: 'hydra', label: 'Hydra' },
+  { value: 'sphinx', label: 'Sphinx' },
+  { value: 'dinosaur', label: 'Dinosaur' },
+  { value: 'phoenix', label: 'Phoenix' },
+  { value: 'beast', label: 'Beast' },
+  // Tribal / undead
+  { value: 'zombie', label: 'Zombie' },
+  { value: 'vampire', label: 'Vampire' },
+  { value: 'werewolf', label: 'Werewolf' },
+  { value: 'skeleton', label: 'Skeleton' },
+  // Animals & nature
+  { value: 'cat', label: 'Cat' },
+  { value: 'dog', label: 'Dog' },
+  { value: 'bird', label: 'Bird' },
+  { value: 'snake', label: 'Snake' },
+  { value: 'rat', label: 'Rat' },
+  { value: 'spider', label: 'Spider' },
+  { value: 'insect', label: 'Insect' },
+  { value: 'treefolk', label: 'Treefolk' },
+  { value: 'fungus', label: 'Fungus' },
+  // Artifact creatures
+  { value: 'golem', label: 'Golem' },
+  { value: 'construct', label: 'Construct' },
+  { value: 'robot', label: 'Robot' },
+  // Other popular
+  { value: 'pirate', label: 'Pirate' },
+  { value: 'scout', label: 'Scout' },
+  { value: 'assassin', label: 'Assassin' },
+  { value: 'berserker', label: 'Berserker' },
+  { value: 'sliver', label: 'Sliver' },
+  { value: 'horror', label: 'Horror' },
+  { value: 'god', label: 'God' },
+]
+
+export const allCreatureTypes: KeywordOption[] = [...creatureTypes]
+
 // ============ FORMAT OPTIONS ============
 export const formatOptions: KeywordOption[] = [
   { value: 'standard', label: 'Standard' },
@@ -206,6 +267,7 @@ const allKeywords: KeywordOption[] = [
   ...triggerKeywords,
   ...allSetMechanics,
   ...specialTypes,
+  ...allCreatureTypes,
 ]
 
 export const getKeywordLabel = (value: string): string => {

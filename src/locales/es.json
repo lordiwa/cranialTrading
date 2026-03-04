@@ -1275,7 +1275,9 @@
       "noFilterResults": "No se encontraron filtros para \"{query}\"",
       "onlyReleased": "Solo lanzadas",
       "setSearchPlaceholder": "Buscar edición... (ej: Dominaria, MH3)",
-      "noSetsFound": "No se encontraron ediciones"
+      "noSetsFound": "No se encontraron ediciones",
+      "creatureTypeSearchPlaceholder": "Buscar tipo de criatura... (ej: Humano, Dragón)",
+      "noCreatureTypesFound": "No se encontraron tipos de criatura"
     },
     "modal": {
       "title": "FILTROS AVANZADOS",
@@ -1304,7 +1306,8 @@
       "effects": "Efectos Comunes",
       "triggers": "Triggers",
       "setMechanics": "Mecánicas de Set",
-      "sets": "Ediciones / Sets"
+      "sets": "Ediciones / Sets",
+      "creatureTypes": "Tipos de Criatura"
     },
     "effectCategories": {
       "removal": "Remoción",
@@ -1513,6 +1516,7 @@
       "triggers": "Triggers",
       "setMechanics": "Mecánicas de Set",
       "specialTypes": "Tipos Especiales",
+      "creatureTypes": "Tipos de Criatura",
       "foilFullArt": "Foil / Full Art"
     },
     "tooltips": {
@@ -1584,6 +1588,7 @@
         "triggers": "Habilidades que se activan por eventos: ETB (al entrar), LTB (al salir), Ataque, Muerte, etc.",
         "setMechanics": "Mecánicas específicas de sets: Cascade, Convoke, Delve, Flashback, Madness, etc.",
         "specialTypes": "Tipos especiales de cartas: Legendarias, Saga, Equipamiento, Aura, Vehículo, etc.",
+        "creatureTypes": "Filtrar por subtipos de criatura: Humano, Elfo, Goblin, Dragón, Zombi, etc. En modo colección, los tipos se extraen de tus cartas.",
         "foilFullArt": "Filtrar por cartas Foil (holográficas) o Full Art (arte extendido sin borde)."
       }
     },

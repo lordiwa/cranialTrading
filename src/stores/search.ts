@@ -25,6 +25,7 @@ export interface FilterOptions {
     formatLegal?: string[]
     priceUSD?: { min?: number; max?: number }
     keywords?: string[]
+    creatureTypes?: string[]
     isFoil?: boolean
     isFullArt?: boolean
     onlyReleased?: boolean
@@ -111,6 +112,10 @@ export const useSearchStore = defineStore('search', () => {
           ...buildRangeQuery(filters.priceUSD, 'usd'),
           ...buildKeywordsQuery(filters.keywords),
         )
+
+        if (filters.creatureTypes && filters.creatureTypes.length > 0) {
+            parts.push(...filters.creatureTypes.map(ct => `t:${ct}`))
+        }
 
         if (filters.isFoil) parts.push('is:foil')
         if (filters.isFullArt) parts.push('is:full')

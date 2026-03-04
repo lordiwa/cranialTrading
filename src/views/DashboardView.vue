@@ -775,6 +775,9 @@ const calculateMatches = async () => {
       await saveMatchesToFirebase(foundMatches)
     }
 
+    // Reload matches from Firestore to sync store state with what was just written
+    await matchesStore.loadAllMatches()
+
     console.log(`✅ Total de matches: ${foundMatches.length} (de ${userMatches.size} usuarios potenciales)`)
   } catch (error) {
     console.error('Error calculando matches:', error)
@@ -796,10 +799,13 @@ const saveMatchesToFirebase = async (matches: any[]) => {
   try {
     const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
 
-    // Primero limpiar matches_nuevos existentes para evitar duplicados
+    // Only delete self-calculated matches, preserve notification docs from other users
+    // (notification docs have _notificationOf field set by the cloud function)
     const existingSnapshot = await getDocs(matchesRef)
     for (const docSnap of existingSnapshot.docs) {
-      await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
+      if (!docSnap.data()._notificationOf) {
+        await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
+      }
     }
 
     // Ahora guardar los nuevos y notificar al otro usuario

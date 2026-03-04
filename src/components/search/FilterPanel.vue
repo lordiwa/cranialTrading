@@ -29,6 +29,7 @@ const filters = reactive<FilterOptions>({
   formatLegal: [],
   priceUSD: { min: undefined, max: undefined },
   keywords: [],
+  creatureTypes: [],
   isFoil: false,
   isFullArt: false,
   onlyReleased: true,
@@ -46,6 +47,7 @@ const advancedFiltersForModal = computed<AdvancedFilters>(() => ({
   formatLegal: filters.formatLegal || [],
   priceUSD: filters.priceUSD || { min: undefined, max: undefined },
   keywords: filters.keywords || [],
+  creatureTypes: filters.creatureTypes || [],
   isFoil: filters.isFoil || false,
   isFullArt: filters.isFullArt || false,
 }))
@@ -61,6 +63,7 @@ const handleAdvancedFiltersUpdate = (updated: AdvancedFilters) => {
   filters.formatLegal = updated.formatLegal
   filters.priceUSD = updated.priceUSD
   filters.keywords = updated.keywords
+  filters.creatureTypes = updated.creatureTypes
   filters.isFoil = updated.isFoil
   filters.isFullArt = updated.isFullArt
 }
@@ -76,6 +79,7 @@ const handleAdvancedReset = () => {
   filters.formatLegal = []
   filters.priceUSD = { min: undefined, max: undefined }
   filters.keywords = []
+  filters.creatureTypes = []
   filters.isFoil = false
   filters.isFullArt = false
   selectedManaValues.value = []

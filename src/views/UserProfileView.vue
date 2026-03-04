@@ -154,6 +154,7 @@ const {
   advSelectedSets,
   advSelectedKeywords,
   advSelectedFormats,
+  advSelectedCreatureTypes,
   advFullArtOnly,
   advPowerMin,
   advPowerMax,
@@ -161,6 +162,7 @@ const {
   advToughnessMax,
   advancedFilterCount,
   collectionSets,
+  collectionCreatureTypes,
   resetAdvancedFilters,
 } = useCardFilter(cards);
 
@@ -191,6 +193,7 @@ const localAdvancedFilters = computed<AdvancedFilters>(() => ({
   formatLegal: advSelectedFormats.value,
   priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
   keywords: advSelectedKeywords.value,
+  creatureTypes: advSelectedCreatureTypes.value,
   isFoil: advFoilFilter.value === 'foil',
   isFullArt: advFullArtOnly.value,
 }));
@@ -199,6 +202,7 @@ const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   advSelectedSets.value = [...updated.sets];
   advSelectedKeywords.value = [...updated.keywords];
   advSelectedFormats.value = [...updated.formatLegal];
+  advSelectedCreatureTypes.value = [...(updated.creatureTypes || [])];
   advPriceMin.value = updated.priceUSD.min;
   advPriceMax.value = updated.priceUSD.max;
   advPowerMin.value = updated.power.min;
@@ -433,6 +437,7 @@ onMounted(() => {
             :filters="localAdvancedFilters"
             mode="local"
             :local-sets="collectionSets"
+            :local-creature-types="collectionCreatureTypes"
             :exact-color-mode="exactColorMode"
             @close="showFilters = false"
             @update:filters="handleLocalFiltersUpdate"

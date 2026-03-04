@@ -257,9 +257,15 @@ export const useCollectionStore = defineStore('collection', () => {
         }
 
         try {
+            // Strip undefined values — Firestore rejects them
+            const cleanUpdates: Record<string, unknown> = {}
+            for (const [key, value] of Object.entries(updates)) {
+                if (value !== undefined) cleanUpdates[key] = value
+            }
+
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await updateDoc(cardRef, {
-                ...updates,
+                ...cleanUpdates,
                 updatedAt: Timestamp.now(),
             })
 
@@ -305,10 +311,16 @@ export const useCollectionStore = defineStore('collection', () => {
             for (const chunk of chunks) {
                 const batch = writeBatch(db)
 
+                // Strip undefined values — Firestore rejects them
+                const cleanUpdates: Record<string, unknown> = {}
+                for (const [key, value] of Object.entries(updates)) {
+                    if (value !== undefined) cleanUpdates[key] = value
+                }
+
                 for (const cardId of chunk) {
                     const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
                     batch.update(cardRef, {
-                        ...updates,
+                        ...cleanUpdates,
                         updatedAt: Timestamp.now(),
                     })
                 }

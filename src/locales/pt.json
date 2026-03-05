@@ -1319,8 +1319,9 @@
     "mechanicCategories": {
       "meta": "Meta / Competitivas",
       "popular": "Clássicas Populares",
-      "recent": "Recentes (2023-2025)",
-      "other": "Outras"
+      "recent": "Recentes (2023-2026)",
+      "other": "Outras",
+      "classic": "Clássicas / Sets Anteriores"
     },
     "results": {
       "noCardsFound": "📭 Nenhuma carta encontrada",

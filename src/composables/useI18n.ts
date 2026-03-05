@@ -1,20 +1,22 @@
 import { computed, ref } from 'vue'
-import esLocale from '../locales/es.json'
-import enLocale from '../locales/en.json'
-import ptLocale from '../locales/pt.json'
 
 // Tipo para los locales soportados
 export type SupportedLocale = 'es' | 'en' | 'pt'
 
-// Locales disponibles
-const locales: Record<SupportedLocale, Record<string, any>> = {
-  es: esLocale,
-  en: enLocale,
-  pt: ptLocale,
-}
+// Locales cargados dinámicamente (solo el activo al inicio)
+const locales = ref<Record<string, Record<string, any>>>({})
 
 // Estado global del idioma actual
 const currentLocale = ref<SupportedLocale>('es')
+
+/**
+ * Carga un locale dinámicamente
+ */
+async function loadLocale(lang: SupportedLocale): Promise<void> {
+  if (locales.value[lang]) return
+  const module = await import(`../locales/${lang}.json`)
+  locales.value[lang] = module.default
+}
 
 /**
  * Obtiene un valor anidado de un objeto usando notación de punto
@@ -45,23 +47,20 @@ function interpolate(template: string, params: Record<string, string | number>):
 }
 
 /**
- * Cambia el idioma actual
+ * Cambia el idioma actual (carga el locale si no está en memoria)
  * @param newLocale - Nuevo idioma
  */
-function setLocale(newLocale: SupportedLocale) {
-  if (locales[newLocale]) {
-    currentLocale.value = newLocale
-    localStorage.setItem('cranial_locale', newLocale)
-  } else {
-    console.warn(`[i18n] Locale '${newLocale}' not supported`)
-  }
+async function setLocale(newLocale: SupportedLocale): Promise<void> {
+  await loadLocale(newLocale)
+  currentLocale.value = newLocale
+  localStorage.setItem('cranial_locale', newLocale)
 }
 
 /**
  * Obtiene todos los idiomas disponibles
  */
 function getAvailableLocales(): SupportedLocale[] {
-  return Object.keys(locales) as SupportedLocale[]
+  return ['es', 'en', 'pt']
 }
 
 /**
@@ -69,7 +68,7 @@ function getAvailableLocales(): SupportedLocale[] {
  */
 export function useI18n() {
   const locale = computed(() => currentLocale.value)
-  const messages = computed(() => locales[currentLocale.value])
+  const messages = computed(() => locales.value[currentLocale.value] ?? {})
 
   /**
    * Traduce una clave a su valor en el idioma actual
@@ -112,16 +111,19 @@ export function useI18n() {
 /**
  * Inicializa el idioma desde localStorage o usa el default
  */
-export function initI18n() {
+export async function initI18n(): Promise<void> {
   const saved = localStorage.getItem('cranial_locale') as SupportedLocale | null
-  if (saved && locales[saved]) {
-    currentLocale.value = saved
-  }
+  const lang = (saved && ['es', 'en', 'pt'].includes(saved)) ? saved : 'es'
+  await loadLocale(lang)
+  currentLocale.value = lang
 }
 
 // Exportar función t standalone para uso en stores
 export function t(key: string, params?: Record<string, string | number>): string {
-  const value = getNestedValue(locales[currentLocale.value], key)
+  const current = locales.value[currentLocale.value]
+  if (!current) return key
+
+  const value = getNestedValue(current, key)
 
   if (value === undefined) {
     console.warn(`[i18n] Missing translation for key: ${key}`)

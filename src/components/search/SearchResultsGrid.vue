@@ -88,10 +88,11 @@ const formatPrice = (price: string | null | undefined): string => {
             class="bg-primary border border-silver-30 p-md hover:border-neon transition-fast"
         >
           <!-- Card image -->
-          <div v-if="card.image_uris?.normal" class="mb-md">
+          <div v-if="card.image_uris?.small || card.image_uris?.normal" class="mb-md">
             <img
-                :src="card.image_uris.normal"
+                :src="card.image_uris.small || card.image_uris.normal"
                 :alt="card.name"
+                loading="lazy"
                 class="w-full aspect-[3/4] object-cover border border-silver-20"
             />
           </div>

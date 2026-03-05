@@ -243,6 +243,7 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
             v-if="getCardImage(previewCard)"
             :src="getCardImage(previewCard)"
             :alt="previewCard.name"
+            loading="lazy"
             class="w-full h-full object-cover"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">

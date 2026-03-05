@@ -3,7 +3,6 @@ import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from './stores/auth';
 import { preloadPriceData } from './services/mtgjson';
-import { initI18n } from './composables/useI18n';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
@@ -11,9 +10,6 @@ import AppFooter from './components/layout/AppFooter.vue';
 
 const authStore = useAuthStore();
 const route = useRoute();
-
-// Initialize i18n from localStorage
-initI18n();
 
 // Pages where footer should NOT appear
 const noFooterRoutes = new Set(['login', 'register', 'forgot-password', 'reset-password', 'verify-email']);
@@ -26,9 +22,13 @@ const showFooter = computed(() => {
 onMounted(() => {
   authStore.initAuth();
 
-  // Preload MTGJSON price data in background (Card Kingdom, etc.)
-  // This is ~4.6MB compressed, cached for 24 hours
-  preloadPriceData();
+  // Defer price preload until browser is idle so it doesn't compete with initial render
+  const deferPreload = () => { void preloadPriceData(); };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(deferPreload);
+  } else {
+    setTimeout(deferPreload, 2000);
+  }
 });
 </script>
 

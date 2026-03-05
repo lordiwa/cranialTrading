@@ -329,6 +329,7 @@ const handleClose = () => {
             <img
                 :src="currentImage"
                 :alt="card.name"
+                loading="lazy"
                 class="w-28 sm:w-32 aspect-[2/3] object-cover border border-silver-30 rounded group-hover:border-neon transition-colors"
             />
             <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
@@ -558,6 +559,7 @@ const handleClose = () => {
         <img
             :src="zoomImage"
             :alt="card?.name"
+            loading="lazy"
             class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
             @click.stop
         />

@@ -162,6 +162,7 @@ const handleClose = () => {
                   v-if="card.image_uris?.small"
                   :src="card.image_uris.small"
                   :alt="card.name"
+                  loading="lazy"
                   class="w-12 h-16 object-cover"
               />
               <div class="flex-1">
@@ -181,6 +182,7 @@ const handleClose = () => {
                 v-if="selectedCard.image_uris?.normal"
                 :src="selectedCard.image_uris.normal"
                 :alt="selectedCard.name"
+                loading="lazy"
                 class="w-24 h-32 object-cover"
             />
             <div class="flex-1">

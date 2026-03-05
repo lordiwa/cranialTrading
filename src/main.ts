@@ -3,17 +3,22 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import { useAuthStore } from './stores/auth';
+import { initI18n } from './composables/useI18n';
 import './style.css';
 
-const app = createApp(App);
-const pinia = createPinia();
+(async () => {
+  const app = createApp(App);
+  const pinia = createPinia();
 
-app.use(pinia);
-app.use(router);
+  app.use(pinia);
+  app.use(router);
 
-// Initialize auth AFTER router is set up
-const authStore = useAuthStore();
-authStore.initAuth();
+  // Initialize auth AFTER router is set up
+  const authStore = useAuthStore();
+  authStore.initAuth();
 
+  // Load locale before mounting so translations are ready
+  await initI18n();
 
-app.mount('#app');
+  app.mount('#app');
+})();

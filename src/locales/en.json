@@ -1319,8 +1319,9 @@
     "mechanicCategories": {
       "meta": "Meta / Competitive",
       "popular": "Classic Popular",
-      "recent": "Recent (2023-2025)",
-      "other": "Other"
+      "recent": "Recent (2023-2026)",
+      "other": "Other",
+      "classic": "Classic / Older Sets"
     },
     "results": {
       "noCardsFound": "📭 No cards found",

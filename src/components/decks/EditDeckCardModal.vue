@@ -245,6 +245,7 @@ const handleClose = () => {
                 v-if="currentImage"
                 :src="currentImage"
                 :alt="card.name"
+                loading="lazy"
                 class="w-32 h-44 object-cover border border-silver-30"
             />
             <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">

@@ -37,7 +37,7 @@ onMounted(() => {
 })
 
 const getCardImage = (card: any): string => {
-  return card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
+  return card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
 }
 </script>
 

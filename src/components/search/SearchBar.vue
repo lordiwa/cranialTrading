@@ -164,9 +164,10 @@ const selectCard = (card: any) => {
               class="border border-silver-30 p-3 hover:border-neon cursor-pointer transition-fast rounded"
           >
             <img
-                v-if="card.image_uris?.normal"
-                :src="card.image_uris.normal"
+                v-if="card.image_uris?.small || card.image_uris?.normal"
+                :src="card.image_uris.small || card.image_uris.normal"
                 :alt="card.name"
+                loading="lazy"
                 class="w-full aspect-[3/4] object-cover mb-2"
             />
             <p class="text-tiny text-silver-70">{{ card.set_name }}</p>

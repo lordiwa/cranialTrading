@@ -437,6 +437,7 @@ const handleClose = () => {
             <img
                 :src="card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small"
                 :alt="card.name"
+                loading="lazy"
                 class="w-full aspect-[2/3] object-cover"
             />
             <div class="absolute bottom-0 left-0 right-0 bg-primary/80 px-1 py-0.5">
@@ -467,6 +468,7 @@ const handleClose = () => {
                 <img
                     :src="currentCardImage"
                     :alt="currentCardName"
+                    loading="lazy"
                     class="w-full aspect-[2/3] object-cover border border-[#EEEEEE]/20 rounded group-hover:border-neon transition-colors"
                 />
                 <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
@@ -640,6 +642,7 @@ const handleClose = () => {
         <img
             :src="zoomImage"
             :alt="currentCardName"
+            loading="lazy"
             class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
             @click.stop
         />

@@ -1,7 +1,7 @@
 /**
  * Composable for calculating collection totals with multi-source prices
  */
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, triggerRef } from 'vue'
 import { type CardPrices, formatPrice, getCardPrices } from '../services/mtgjson'
 import { getCardById, searchCards } from '../services/scryfall'
 import { useCollectionStore } from '../stores/collection'
@@ -19,7 +19,9 @@ const fixAttemptedCache = new Set<string>()
 let fetchAbortController: AbortController | null = null
 
 // Shared card prices map (by card ID) — shared across all composable instances
-const sharedCardPrices = ref<Map<string, CardPrices | null>>(new Map())
+// shallowRef: Map mutations (.set/.delete) don't trigger reactivity automatically.
+// We call triggerRef() in batches to avoid re-computing totals on every single card price update.
+const sharedCardPrices = shallowRef<Map<string, CardPrices | null>>(new Map())
 
 export interface CollectionTotals {
   // TCGPlayer totals
@@ -172,6 +174,11 @@ export function useCollectionTotals(cards: () => Card[]) {
     progress.value = 0
 
     // Process sequentially — Scryfall rate limiter handles timing
+    // Batch reactivity: only trigger totals recalculation every BATCH_TRIGGER_SIZE cards
+    // instead of on every single price update (avoids O(N²) re-computation)
+    const BATCH_TRIGGER_SIZE = 25
+    let batchCount = 0
+
     for (const card of cardList) {
       if (signal.aborted) break
 
@@ -180,9 +187,20 @@ export function useCollectionTotals(cards: () => Card[]) {
       if (!collectionStore.getCardById(card.id)) continue
 
       const prices = await fetchCardPrice(card)
-      cardPrices.value.set(card.id, prices)
+      cardPrices.value.set(card.id, prices) // Raw Map mutation — no reactivity (shallowRef)
       processedCards.value++
       progress.value = Math.round((processedCards.value / totalCards.value) * 100)
+
+      batchCount++
+      if (batchCount >= BATCH_TRIGGER_SIZE) {
+        triggerRef(cardPrices) // Notify Vue → totals recalculate
+        batchCount = 0
+      }
+    }
+
+    // Final trigger for remaining cards in the last incomplete batch
+    if (batchCount > 0) {
+      triggerRef(cardPrices)
     }
 
     loading.value = false

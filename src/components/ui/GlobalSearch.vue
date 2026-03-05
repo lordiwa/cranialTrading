@@ -383,6 +383,7 @@ defineExpose({
               v-if="card.image"
               :src="card.image"
               :alt="card.name"
+              loading="lazy"
               class="w-10 h-14 object-cover rounded"
             />
             <div class="flex-1 min-w-0">
@@ -407,6 +408,7 @@ defineExpose({
               v-if="card.image"
               :src="card.image"
               :alt="card.cardName"
+              loading="lazy"
               class="w-10 h-14 object-cover rounded cursor-pointer"
               @click="goToUserCard(card)"
             />
@@ -451,6 +453,7 @@ defineExpose({
               v-if="card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small"
               :src="card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small"
               :alt="card.name"
+              loading="lazy"
               class="w-10 h-14 object-cover rounded"
             />
             <div class="flex-1 min-w-0">

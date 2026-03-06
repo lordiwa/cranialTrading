@@ -15,7 +15,23 @@ npm run preview     # Preview production build locally
 npm run type-check  # Verify TypeScript types
 ```
 
-No test framework is configured. No linting/formatting tools in the main app.
+## Testing
+
+```bash
+npm run test:unit          # Run unit tests (fast, no Firebase)
+npm run test:unit:watch    # Watch mode for TDD
+npm run test:unit:coverage # Unit tests with coverage report
+npm run test:integration   # Integration tests (requires .env.local)
+npm run e2e                # Playwright E2E tests
+```
+
+### Test Conventions
+- Unit tests in `tests/unit/`, integration in `tests/integration/`, E2E in `e2e/`
+- Use Vitest globals (describe/it/expect) — do not import them
+- Use test fixtures from `tests/unit/helpers/fixtures.ts`
+- Never import real Firebase in unit tests — mock it
+- New pure functions should be TDD'd: write failing test first
+- Run `npm run test:unit` before committing
 
 ## Architecture
 

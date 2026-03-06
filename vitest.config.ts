@@ -10,16 +10,30 @@ export default defineConfig({
     }
   },
   test: {
-    globals: true,
-    environment: 'happy-dom',
-    setupFiles: ['./tests/setup.ts'],
-    include: ['tests/**/*.test.ts'],
-    testTimeout: 30000, // 30s for Firebase operations
-    hookTimeout: 30000,
-    // Run integration tests sequentially to avoid race conditions
-    fileParallelism: false,
-    sequence: {
-      concurrent: false
-    }
-  }
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['tests/unit/**/*.test.ts'],
+          environment: 'happy-dom',
+          globals: true,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          include: ['tests/integration/**/*.test.ts'],
+          environment: 'happy-dom',
+          globals: true,
+          setupFiles: ['./tests/setup.ts'],
+          testTimeout: 30000,
+          hookTimeout: 30000,
+          fileParallelism: false,
+          sequence: { concurrent: false },
+        },
+      },
+    ],
+  },
 })

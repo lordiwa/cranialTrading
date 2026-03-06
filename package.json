@@ -1,7 +1,7 @@
 {
   "name": "cranial-trading",
   "private": true,
-  "version": "1.7.5",
+  "version": "1.7.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,11 @@
     "test:coverage": "vitest run --coverage",
     "presubmit": "npm run type-check && npm run lint && npm run test:integration",
     "verify": "npm run presubmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e": "npx playwright test",
+    "e2e:headed": "npx playwright test --headed",
+    "e2e:ui": "npx playwright test --ui",
+    "e2e:report": "npx playwright show-report e2e/playwright-report"
   },
   "dependencies": {
     "driver.js": "^1.4.0",
@@ -32,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.58.2",
     "@types/lodash-es": "^4.17.12",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vitest/ui": "^4.0.18",

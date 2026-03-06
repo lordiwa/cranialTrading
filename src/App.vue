@@ -2,7 +2,6 @@
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from './stores/auth';
-import { preloadPriceData } from './services/mtgjson';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
@@ -22,13 +21,6 @@ const showFooter = computed(() => {
 onMounted(() => {
   authStore.initAuth();
 
-  // Defer price preload until browser is idle so it doesn't compete with initial render
-  const deferPreload = () => { void preloadPriceData(); };
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(deferPreload);
-  } else {
-    setTimeout(deferPreload, 2000);
-  }
 });
 </script>
 

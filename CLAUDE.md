@@ -6,6 +6,61 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Cranial Trading is a Magic: The Gathering trading platform built with Vue 3 (Composition API), TypeScript, Vite, and Firebase. Users can manage card collections, create decks, find trading matches, and message other traders.
 
+## MANDATORY: TDD Development Workflow
+
+**Every feature, fix, change, or refactor MUST follow this process. No exceptions.**
+
+### 1. Plan
+- Understand the request and identify affected files
+- Break down the work into testable units (pure functions, store logic, component behavior)
+- Identify which test types are needed (unit, integration, E2E)
+- Present the plan to the user before writing any code
+
+### 2. Write Tests First (RED)
+- Write failing unit tests for all new/changed business logic BEFORE implementation
+- For bug fixes: write a regression test that reproduces the bug first
+- For pure functions and store logic: unit tests in `tests/unit/`
+- For Firebase operations: integration tests in `tests/integration/`
+- Run `npm run test:unit` to confirm tests fail (RED phase)
+
+### 3. Implement (GREEN)
+- Write the minimum code to make all tests pass
+- Run `npm run test:unit` after each meaningful change
+- Do not move on until all tests are green
+
+### 4. Refactor
+- Clean up the implementation while keeping tests green
+- Extract helpers, improve naming, simplify logic
+- Run `npm run test:unit` to confirm nothing broke
+
+### 5. QA Against Plan
+- Review the original plan and verify every requirement is met
+- Run `npm run test:unit:coverage` to check coverage on changed files
+- Changed business logic files should have 85%+ coverage
+- Run `npx vite build` to verify the build still succeeds
+
+### 6. Done
+- All tests pass, coverage is adequate, build succeeds
+- Summarize what was done and what was tested
+
+### When to Skip TDD
+- Pure UI/styling changes with no logic (CSS, template-only edits)
+- Config file changes (tailwind, vite, eslint)
+- Documentation-only changes
+
+### Quick Reference
+| Change type | Test first? | Test type |
+|-------------|------------|-----------|
+| New pure function | Always | Unit |
+| Bug fix | Always (regression test) | Unit |
+| Store algorithm | Always | Unit |
+| Firebase CRUD | Yes | Integration |
+| New Vue component | No | E2E only |
+| Refactor | Write characterization tests first | Unit |
+| UI/styling only | No | None |
+
+---
+
 ## Development Commands
 
 ```bash

@@ -60,6 +60,10 @@ jobs:
   e2e:
     needs: [build]
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
+      TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,12 +76,20 @@ jobs:
         with:
           name: dist
           path: dist/
+      - name: Create .env.local for Playwright
+        run: |
+          echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
+          echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Verify test credentials
+        run: |
+          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
+            echo "::error::Missing GitHub secrets: TEST_USER_A_EMAIL and/or TEST_USER_A_PASSWORD"
+            echo "Add them at: Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+          echo "Test credentials configured OK"
       - name: Run E2E tests
         run: npx playwright test
-        env:
-          CI: true
-          TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
-          TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

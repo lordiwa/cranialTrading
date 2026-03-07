@@ -16,6 +16,8 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   showInterest?: boolean
   isInterested?: boolean
+  showCart?: boolean
+  isInCart?: boolean
   isBeingDeleted?: boolean
   selectionMode?: boolean
   isSelected?: boolean
@@ -24,6 +26,8 @@ const props = withDefaults(defineProps<{
   readonly: false,
   showInterest: false,
   isInterested: false,
+  showCart: false,
+  isInCart: false,
   isBeingDeleted: false,
   selectionMode: false,
   isSelected: false,
@@ -33,6 +37,7 @@ const emit = defineEmits<{
   cardClick: [card: Card]
   delete: [card: Card]
   interest: [card: Card]
+  addToCart: [card: Card]
   toggleSelect: [cardId: string]
 }>()
 
@@ -545,6 +550,24 @@ const priceChangeData = computed(() => {
           class="w-full px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150 rounded"
       >
         {{ t('cards.grid.interested') }}
+      </button>
+    </div>
+
+    <!-- Cart Button (only when readonly and showCart, for anonymous users) -->
+    <div v-if="readonly && showCart && (card.status === 'sale' || card.status === 'trade')" class="mt-3">
+      <button
+          v-if="isInCart"
+          disabled
+          class="w-full px-2 py-1 bg-silver-10 border border-silver-30 text-silver-50 text-tiny font-bold cursor-not-allowed rounded"
+      >
+        {{ t('cart.inCart') }}
+      </button>
+      <button
+          v-else
+          @click="emit('addToCart', card)"
+          class="w-full px-2 py-1 bg-neon-10 border border-neon text-neon text-tiny font-bold hover:bg-neon-20 transition-150 rounded"
+      >
+        {{ t('cart.addToCart') }}
       </button>
     </div>
   </div>

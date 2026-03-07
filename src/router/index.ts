@@ -153,7 +153,7 @@ router.beforeEach(async (to, _from, next) => {
     const requiresGuest = to.meta.requiresGuest;
 
     if (requiresAuth && !isAuthenticated) {
-        next('/login'); return;
+        next({ path: '/login', query: { returnUrl: to.fullPath } }); return;
     }
 
     if (requiresGuest && isAuthenticated) {

@@ -179,6 +179,28 @@
     }
   },
 
+  "cart": {
+    "title": "Carrito de Intercambio",
+    "emptyState": "Tu carrito esta vacio. Agrega cartas de la coleccion.",
+    "addToCart": "AGREGAR",
+    "inCart": "EN CARRITO",
+    "remove": "QUITAR",
+    "total": "Total",
+    "share": "COMPARTIR",
+    "loginToMatch": "INICIAR SESION",
+    "registerToMatch": "REGISTRARSE",
+    "shareSuccess": "Carrito compartido!",
+    "shareCopied": "Carrito copiado al portapapeles!",
+    "shareError": "No se pudo compartir el carrito",
+    "convertTitle": "Convertir Carrito",
+    "convertMessage": "Convertir {count} items en solicitudes de match con @{username}?",
+    "convertSuccess": "{count} solicitudes enviadas!",
+    "convertPartial": "{success} de {total} solicitudes enviadas",
+    "itemCount": "{count} item | {count} items",
+    "each": "c/u",
+    "qtyLabel": "Cant"
+  },
+
   "landing": {
     "tagline": "From Trash to Treasures",
     "subtitle": "Tu bulk no es basura. Es el tesoro de otro coleccionista.",

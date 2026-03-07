@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import { type SupportedLocale, useI18n } from '../composables/useI18n';
@@ -8,6 +8,7 @@ import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SvgIcon from '../components/ui/SvgIcon.vue';
 
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const toastStore = useToastStore();
@@ -33,7 +34,7 @@ const handleLogin = async () => {
     const success = await authStore.login(email.value, password.value);
 
     if (success) {
-      await router.push('/dashboard');
+      await router.push(route.query.returnUrl as string || '/dashboard');
       return;
     }
 
@@ -50,7 +51,7 @@ const handleGoogleLogin = async () => {
   try {
     const success = await authStore.loginWithGoogle();
     if (success) {
-      await router.push('/dashboard');
+      await router.push(route.query.returnUrl as string || '/dashboard');
     }
   } finally {
     googleLoading.value = false;

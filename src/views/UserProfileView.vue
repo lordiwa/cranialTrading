@@ -1,25 +1,34 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
+import { useConfirmStore } from '../stores/confirm';
+import { useExchangeCartStore } from '../stores/exchangeCart';
 import { useI18n } from '../composables/useI18n';
+import { buildLoginUrl, buildRegisterUrl } from '../composables/useReturnUrl';
 import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter';
+import { shareCart } from '../utils/exchangeCartShare';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
+import CartFab from '../components/cart/CartFab.vue';
 import CollectionGrid from '../components/collection/CollectionGrid.vue';
 import CardFilterBar from '../components/ui/CardFilterBar.vue';
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue';
 import ChatModal from '../components/chat/ChatModal.vue';
+import ExchangeCartDrawer from '../components/cart/ExchangeCartDrawer.vue';
 import type { Card } from '../types/card';
 import { getAvatarUrlForUser } from '../utils/avatar';
 
 const route = useRoute();
+const router = useRouter();
 const toastStore = useToastStore();
 const authStore = useAuthStore();
+const confirmStore = useConfirmStore();
+const cartStore = useExchangeCartStore();
 const { t } = useI18n();
 
 // State refs
@@ -41,6 +50,16 @@ const isOwnProfile = computed(() => {
 
 const canShowInterest = computed(() => {
   return !!(authStore.user && !isOwnProfile.value);
+});
+
+// Cart mode: show cart buttons for anonymous users (not logged in, not own profile)
+const showCartMode = computed(() => !authStore.user);
+const showCartDrawer = ref(false);
+const cartItemCount = computed(() => cartStore.getCartItemCount(username.value));
+const cartItemIds = computed(() => {
+  const cart = cartStore.getCart(username.value);
+  if (!cart) return new Set<string>();
+  return new Set(cart.items.map(i => i.scryfallId || i.cardId));
 });
 
 // Use custom avatar if available (own profile or other user's uploaded avatar)
@@ -343,9 +362,85 @@ const handleInterest = async (card: Card) => {
   }
 };
 
+// ========== EXCHANGE CART ==========
+const handleAddToCart = (card: Card) => {
+  cartStore.addItem(username.value, {
+    scryfallId: card.scryfallId || '',
+    cardId: card.id,
+    name: card.name,
+    edition: card.edition,
+    quantity: 1,
+    maxQuantity: card.quantity || 1,
+    condition: card.condition || 'NM',
+    foil: card.foil || false,
+    price: card.price || 0,
+    image: card.image || '',
+    status: card.status || 'collection',
+  });
+  toastStore.show(t('cart.inCart'), 'success');
+};
+
+const handleShareCart = async () => {
+  const cart = cartStore.getCart(username.value);
+  if (!cart || cart.items.length === 0) return;
+  const baseUrl = window.location.origin;
+  const result = await shareCart(username.value, cart.items, baseUrl);
+  if (result === 'shared') toastStore.show(t('cart.shareSuccess'), 'success');
+  else if (result === 'copied') toastStore.show(t('cart.shareCopied'), 'success');
+  else toastStore.show(t('cart.shareError'), 'error');
+};
+
+const handleLoginToMatch = () => {
+  const profilePath = `/@${username.value}`;
+  router.push(buildLoginUrl(profilePath));
+};
+
+const handleRegisterToMatch = () => {
+  const profilePath = `/@${username.value}`;
+  router.push(buildRegisterUrl(profilePath));
+};
+
+const convertCartToMatches = async () => {
+  const cart = cartStore.getCart(username.value);
+  if (!cart || cart.items.length === 0 || !authStore.user || isOwnProfile.value) return;
+
+  const confirmed = await confirmStore.show({
+    title: t('cart.convertTitle'),
+    message: t('cart.convertMessage', { count: cart.items.length, username: username.value }),
+  });
+  if (!confirmed) return;
+
+  let successCount = 0;
+  for (const item of cart.items) {
+    const matchingCard = cards.value.find(c =>
+      (c.scryfallId === item.scryfallId || c.id === item.cardId) &&
+      (c.status === 'sale' || c.status === 'trade')
+    );
+    if (!matchingCard) continue;
+    try {
+      await handleInterest(matchingCard);
+      successCount++;
+    } catch {
+      // Continue on partial failures
+    }
+  }
+
+  cartStore.clearCart(username.value);
+
+  if (successCount === cart.items.length) {
+    toastStore.show(t('cart.convertSuccess', { count: successCount }), 'success');
+  } else if (successCount > 0) {
+    toastStore.show(t('cart.convertPartial', { success: successCount, total: cart.items.length }), 'info');
+  }
+};
+
 // Initialize on mount
-onMounted(() => {
-  loadProfile();
+onMounted(async () => {
+  await loadProfile();
+  // Post-auth cart conversion: if logged in and cart exists for this profile
+  if (authStore.user && !isOwnProfile.value && cartStore.getCartItemCount(username.value) > 0) {
+    convertCartToMatches();
+  }
 });
 </script>
 
@@ -465,7 +560,10 @@ onMounted(() => {
                 :readonly="true"
                 :show-interest="canShowInterest"
                 :interested-cards="interestedCards"
+                :show-cart="showCartMode"
+                :cart-item-ids="cartItemIds"
                 @interest="handleInterest"
+                @add-to-cart="handleAddToCart"
             />
           </div>
         </div>
@@ -479,5 +577,21 @@ onMounted(() => {
           @close="handleCloseChat"
       />
     </div>
+
+    <!-- Exchange Cart (anonymous users only) -->
+    <CartFab
+        v-if="showCartMode"
+        :item-count="cartItemCount"
+        @toggle="showCartDrawer = !showCartDrawer"
+    />
+    <ExchangeCartDrawer
+        v-if="showCartMode"
+        :username="username"
+        :show="showCartDrawer"
+        @close="showCartDrawer = false"
+        @share="handleShareCart"
+        @login-to-match="handleLoginToMatch"
+        @register-to-match="handleRegisterToMatch"
+    />
   </AppContainer>
 </template>

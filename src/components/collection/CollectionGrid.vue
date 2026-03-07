@@ -10,6 +10,8 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   showInterest?: boolean
   interestedCards?: Set<string>
+  showCart?: boolean
+  cartItemIds?: Set<string>
   deletingCardIds?: Set<string>
   selectionMode?: boolean
   selectedCardIds?: Set<string>
@@ -17,6 +19,7 @@ const props = withDefaults(defineProps<{
   compact: false,
   readonly: false,
   showInterest: false,
+  showCart: false,
   selectionMode: false,
 })
 
@@ -24,6 +27,7 @@ const emit = defineEmits<{
   cardClick: [card: Card]
   delete: [card: Card]
   interest: [card: Card]
+  addToCart: [card: Card]
   toggleSelect: [cardId: string]
 }>()
 
@@ -59,12 +63,15 @@ const loadMore = () => {
           :readonly="props.readonly"
           :show-interest="props.showInterest"
           :is-interested="props.interestedCards?.has(card.scryfallId || card.id) || false"
+          :show-cart="props.showCart"
+          :is-in-cart="props.cartItemIds?.has(card.scryfallId || card.id) || false"
           :is-being-deleted="props.deletingCardIds?.has(card.id) || false"
           :selection-mode="props.selectionMode"
           :is-selected="props.selectedCardIds?.has(card.id) || false"
           @card-click="selectionMode ? emit('toggleSelect', $event.id) : emit('cardClick', $event)"
           @delete="emit('delete', $event)"
           @interest="emit('interest', $event)"
+          @add-to-cart="emit('addToCart', $event)"
           @toggle-select="emit('toggleSelect', $event)"
       />
     </div>

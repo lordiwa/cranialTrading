@@ -179,6 +179,28 @@
     }
   },
 
+  "cart": {
+    "title": "Exchange Cart",
+    "emptyState": "Your cart is empty. Add cards from the collection above.",
+    "addToCart": "ADD TO CART",
+    "inCart": "IN CART",
+    "remove": "REMOVE",
+    "total": "Total",
+    "share": "SHARE CART",
+    "loginToMatch": "LOGIN TO MATCH",
+    "registerToMatch": "REGISTER TO MATCH",
+    "shareSuccess": "Cart shared successfully!",
+    "shareCopied": "Cart copied to clipboard!",
+    "shareError": "Could not share cart",
+    "convertTitle": "Convert Cart to Match Requests",
+    "convertMessage": "Convert {count} items to match requests with @{username}?",
+    "convertSuccess": "{count} match requests sent successfully!",
+    "convertPartial": "{success} of {total} match requests sent",
+    "itemCount": "{count} item | {count} items",
+    "each": "each",
+    "qtyLabel": "Qty"
+  },
+
   "landing": {
     "tagline": "From Trash to Treasures",
     "subtitle": "Your bulk isn't trash. It's another collector's treasure.",

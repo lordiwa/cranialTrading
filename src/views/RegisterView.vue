@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const { t } = useI18n();
@@ -45,13 +46,13 @@ const handleCheckVerification = async () => {
   checkingVerification.value = false;
 
   if (verified) {
-    router.push('/dashboard');
+    router.push(route.query.returnUrl as string || '/dashboard');
   }
 };
 
 onMounted(() => {
   if (authStore.user && authStore.emailVerified) {
-    router.push('/dashboard');
+    router.push(route.query.returnUrl as string || '/dashboard');
   }
 });
 </script>

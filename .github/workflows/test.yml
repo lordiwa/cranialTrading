@@ -57,9 +57,11 @@ jobs:
           name: dist
           path: dist/
 
-  e2e:
+  # ── E2E test groups (run in parallel) ──────────────────────────────
+  e2e-smoke:
     needs: [build]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -76,26 +78,115 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Create .env.local for Playwright
+      - name: Create .env.local
         run: |
           echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
           echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
-      - name: Verify test credentials
-        run: |
-          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
-            echo "::error::Missing GitHub secrets: TEST_USER_A_EMAIL and/or TEST_USER_A_PASSWORD"
-            echo "Add them at: Settings → Secrets and variables → Actions → New repository secret"
-            exit 1
-          fi
-          echo "Test credentials configured OK"
-      - name: Run E2E tests
-        run: npx playwright test
+      - name: Run smoke & auth tests
+        run: npx playwright test --project=auth-tests e2e/specs/smoke e2e/specs/help e2e/specs/i18n e2e/specs/notifications
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-smoke
           path: e2e/playwright-report/
 
+  e2e-collection:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CI: true
+      TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
+      TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create .env.local
+        run: |
+          echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
+          echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Run collection & search tests
+        run: npx playwright test e2e/specs/collection e2e/specs/search e2e/specs/preferences
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-collection
+          path: e2e/playwright-report/
+
+  e2e-features:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CI: true
+      TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
+      TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create .env.local
+        run: |
+          echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
+          echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Run deck, binder & settings tests
+        run: npx playwright test e2e/specs/decks e2e/specs/binders e2e/specs/settings e2e/specs/market
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-features
+          path: e2e/playwright-report/
+
+  e2e-social:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CI: true
+      TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
+      TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create .env.local
+        run: |
+          echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
+          echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Run matches, messages, contacts & profile tests
+        run: npx playwright test e2e/specs/matches e2e/specs/messages e2e/specs/contacts e2e/specs/user-profile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-social
+          path: e2e/playwright-report/
+
+  # ── Deploy (independent of E2E) ───────────────────────────────────
   deploy:
     needs: [build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

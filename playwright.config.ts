@@ -12,7 +12,7 @@ export default defineConfig({
   testDir: './e2e/specs',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: 0,
   workers: 1,
   reporter: [
     ['html', { outputFolder: 'e2e/playwright-report', open: 'never' }],

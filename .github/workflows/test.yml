@@ -83,7 +83,7 @@ jobs:
           echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
           echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
       - name: Run smoke & auth tests
-        run: npx playwright test --project=auth-tests e2e/specs/smoke e2e/specs/help e2e/specs/i18n e2e/specs/notifications
+        run: npx playwright test e2e/specs/auth e2e/specs/smoke e2e/specs/help e2e/specs/i18n e2e/specs/notifications
       - uses: actions/upload-artifact@v4
         if: always()
         with:

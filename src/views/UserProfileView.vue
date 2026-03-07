@@ -119,6 +119,11 @@ const loadProfile = async () => {
   } finally {
     loading.value = false;
   }
+
+  // Post-auth cart conversion: if logged in and cart exists for this profile
+  if (authStore.user && !isOwnProfile.value && cartStore.getCartItemCount(username.value) > 0) {
+    convertCartToMatches();
+  }
 };
 
 const loadAllPublicCards = async () => {
@@ -435,12 +440,8 @@ const convertCartToMatches = async () => {
 };
 
 // Initialize on mount
-onMounted(async () => {
-  await loadProfile();
-  // Post-auth cart conversion: if logged in and cart exists for this profile
-  if (authStore.user && !isOwnProfile.value && cartStore.getCartItemCount(username.value) > 0) {
-    convertCartToMatches();
-  }
+onMounted(() => {
+  loadProfile();
 });
 </script>
 

@@ -64,7 +64,7 @@ const needCards = computed(() => {
 <template>
   <div class="space-y-4">
     <!-- Header stats -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       <div class="bg-secondary border border-silver-30 p-3">
         <p class="text-tiny text-silver-70">{{ t('decks.cardsList.uniqueCards') }}</p>
         <p class="text-h3 font-bold text-neon">{{ cards.length }}</p>

@@ -1313,7 +1313,7 @@ const sendInterestFromSearch = async (card: any) => {
       </div>
 
       <!-- No data warning -->
-      <div v-else-if="collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
+      <div v-else-if="collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0" class="border border-silver-30 p-6 md:p-8 text-center rounded-md">
         <p class="text-h3 text-silver-70 mb-2">{{ t('dashboard.empty.noCardsOrPrefs') }}</p>
         <p class="text-body text-silver-50 mb-6">
           {{ t('dashboard.empty.addCardsOrPrefs') }}
@@ -1324,7 +1324,7 @@ const sendInterestFromSearch = async (card: any) => {
       </div>
 
       <!-- No matches state -->
-      <div v-else-if="calculatedMatches.length === 0 && !loading" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
+      <div v-else-if="calculatedMatches.length === 0 && !loading" class="border border-silver-30 p-6 md:p-8 text-center rounded-md">
         <p class="text-h3 text-silver-70 mb-2">{{ t('dashboard.empty.noMatches') }}</p>
         <p class="text-body text-silver-50">
           {{ t('dashboard.empty.usersInPlatform', { count: totalUsers }) }}

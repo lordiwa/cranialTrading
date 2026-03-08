@@ -6,7 +6,7 @@ const { t } = useI18n()
 
 <template>
   <footer class="border-t border-silver-20 bg-primary">
-    <div class="max-w-7xl mx-auto px-4 py-4">
+    <div class="max-w-[1200px] mx-auto px-4 py-4">
       <div class="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
         <p class="text-tiny text-silver-50">
           © 2024 Cranial Trading

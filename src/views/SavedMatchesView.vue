@@ -1053,7 +1053,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="currentMatches.length === 0 && !loading" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
+      <div v-else-if="currentMatches.length === 0 && !loading" class="border border-silver-30 p-6 md:p-8 text-center rounded-md">
         <p class="text-body text-silver-70">
           {{ activeTab === 'new' ? t('matches.empty.new.title') :
             activeTab === 'sent' ? t('matches.empty.sent.title') :

@@ -214,7 +214,7 @@ async function toggleChart() {
 
     <!-- Chart panel (slides above the footer, only when expanded) -->
     <div v-if="showChart && mobileExpanded" class="md:hidden border-b border-silver-10 px-4 py-3">
-      <div class="container mx-auto max-w-7xl">
+      <div class="container mx-auto max-w-[1200px]">
         <div class="flex items-center justify-between mb-2">
           <span class="text-tiny font-bold text-silver">{{ t('collection.totals.history.title') }}</span>
           <span v-if="chartHasData" class="text-tiny text-silver-50">
@@ -244,7 +244,7 @@ async function toggleChart() {
 
     <!-- Chart panel (desktop, always available) -->
     <div v-if="showChart" class="hidden md:block border-b border-silver-10 px-4 py-3">
-      <div class="container mx-auto max-w-7xl">
+      <div class="container mx-auto max-w-[1200px]">
         <div class="flex items-center justify-between mb-2">
           <span class="text-tiny font-bold text-silver">{{ t('collection.totals.history.title') }}</span>
           <span v-if="chartHasData" class="text-tiny text-silver-50">
@@ -272,7 +272,7 @@ async function toggleChart() {
       </div>
     </div>
 
-    <div class="container mx-auto max-w-7xl">
+    <div class="container mx-auto max-w-[1200px]">
       <!-- Desktop: fila única (unchanged) -->
       <div class="hidden md:flex items-center gap-4 text-tiny px-4 py-2">
         <div class="flex items-center gap-1 border-r border-silver-30 pr-4">

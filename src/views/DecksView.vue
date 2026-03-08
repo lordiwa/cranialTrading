@@ -615,7 +615,7 @@ onMounted(async () => {
       <BaseLoader v-if="decksStore.loading" size="large" />
 
       <!-- Empty state -->
-      <div v-else-if="filteredDecks.length === 0" class="border border-silver-30 p-8 md:p-12 text-center rounded-md">
+      <div v-else-if="filteredDecks.length === 0" class="border border-silver-30 p-6 md:p-8 text-center rounded-md">
         <p class="text-body text-silver-70 mb-4">{{ t('decks.empty.noDecks') }}</p>
         <p class="text-small text-silver-50 mb-6">
           {{ decksStore.totalDecks === 0

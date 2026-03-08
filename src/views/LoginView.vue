@@ -303,7 +303,7 @@ const useCases = computed(() => [
 
     <!-- Footer -->
     <footer class="border-t border-silver-20 bg-secondary/30">
-      <div class="max-w-7xl mx-auto px-6 py-8">
+      <div class="max-w-[1200px] mx-auto px-6 py-8">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           <!-- Brand -->
           <div class="col-span-2 md:col-span-1">

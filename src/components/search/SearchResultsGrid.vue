@@ -56,7 +56,7 @@ const formatPrice = (price: string | null | undefined): string => {
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="!hasResults && searchStore.lastQuery" class="border border-silver-30 p-8 md:p-12 text-center">
+    <div v-else-if="!hasResults && searchStore.lastQuery" class="border border-silver-30 p-6 md:p-8 text-center">
       <p class="text-body text-silver-70 mb-2">{{ t('search.results.noCardsFound') }}</p>
       <p class="text-small text-silver-50">
         {{ t('search.results.adjustFilters') }}
@@ -64,7 +64,7 @@ const formatPrice = (price: string | null | undefined): string => {
     </div>
 
     <!-- No search state -->
-    <div v-else-if="!hasResults && !searchStore.lastQuery" class="border border-silver-30 p-8 md:p-12 text-center">
+    <div v-else-if="!hasResults && !searchStore.lastQuery" class="border border-silver-30 p-6 md:p-8 text-center">
       <p class="text-body text-silver-70">{{ t('search.results.configureFilters') }}</p>
     </div>
 

@@ -69,7 +69,12 @@
       "Bash(tasklist.exe:*)",
       "Bash(MSYS_NO_PATHCONV=1 tasklist.exe:*)",
       "Bash(wmic process:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(gh run:*)",
+      "Bash(cmd:*)",
+      "WebFetch(domain:cranialtrading.com)",
+      "Bash(npx playwright:*)",
+      "Bash(where gh:*)"
     ]
   }
 }

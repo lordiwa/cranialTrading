@@ -169,7 +169,7 @@ onUnmounted(() => {
 
 <template>
   <header class="bg-primary border-b border-silver-20 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+    <div class="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8">
       <div class="flex items-center justify-between h-14 md:h-20">
         <!-- Logo -->
         <router-link to="/saved-matches" class="flex items-center gap-2 flex-shrink-0">
@@ -188,7 +188,7 @@ onUnmounted(() => {
               :data-testid="`nav-${link.icon}`"
               :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
               :class="[
-                'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
+                'px-3 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
                 isActive(link.path)
                   ? 'bg-neon-10 border-b-2 border-neon text-neon'
                   : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
@@ -204,7 +204,7 @@ onUnmounted(() => {
         </nav>
 
         <!-- Global Search (Desktop) -->
-        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="hidden md:block flex-shrink-0" />
+        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="hidden md:block flex-shrink-0 max-w-[200px] lg:max-w-[250px]" />
 
         <!-- Right side: User & Settings -->
         <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
@@ -371,7 +371,7 @@ onUnmounted(() => {
         v-if="showLocationSuggestion && detectedLocation"
         class="bg-neon-10 border-b border-neon-20 px-4 py-2"
     >
-      <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div class="max-w-[1200px] mx-auto flex items-center justify-between gap-4">
         <p class="text-tiny text-silver">
           📍 {{ t('header.locationSuggestion.message', { location: detectedLocation }) }}
         </p>

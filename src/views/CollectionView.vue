@@ -57,6 +57,8 @@ const showCardDetailModal = ref(false)
 const showManageDecksModal = ref(false)
 const showCreateDeckModal = ref(false)
 const showCreateBinderModal = ref(false)
+const createDeckModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
+const createBinderModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
 const showImportDeckModal = ref(false)
 const showImportBinderModal = ref(false)
 const showLocalFilters = ref(false)
@@ -1063,6 +1065,7 @@ const deckActiveSourceLabel = computed(() => {
 const selectionMode = ref(false)
 const selectedCardIds = ref<Set<string>>(new Set())
 const bulkActionLoading = ref(false)
+const bulkActionProgress = ref(0)
 
 const toggleSelectionMode = () => {
   selectionMode.value = !selectionMode.value
@@ -1126,9 +1129,10 @@ const handleBulkDelete = async () => {
 const handleBulkStatusChange = async (status: CardStatus) => {
   if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
   bulkActionLoading.value = true
+  bulkActionProgress.value = 0
   try {
     const ids = [...selectedCardIds.value]
-    const ok = await collectionStore.batchUpdateCards(ids, { status })
+    const ok = await collectionStore.batchUpdateCards(ids, { status }, (p) => { bulkActionProgress.value = p })
     if (ok) {
       toastStore.show(t('collection.bulkEdit.statusSuccess', { count: ids.length, status: t(`common.status.${status}`) }), 'success')
       selectedCardIds.value = new Set()
@@ -1136,15 +1140,17 @@ const handleBulkStatusChange = async (status: CardStatus) => {
     }
   } finally {
     bulkActionLoading.value = false
+    bulkActionProgress.value = 0
   }
 }
 
 const handleBulkPublicToggle = async (isPublic: boolean) => {
   if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
   bulkActionLoading.value = true
+  bulkActionProgress.value = 0
   try {
     const ids = [...selectedCardIds.value]
-    const ok = await collectionStore.batchUpdateCards(ids, { public: isPublic })
+    const ok = await collectionStore.batchUpdateCards(ids, { public: isPublic }, (p) => { bulkActionProgress.value = p })
     if (ok) {
       toastStore.show(t('collection.bulkEdit.publicSuccess', { count: ids.length }), 'success')
       selectedCardIds.value = new Set()
@@ -1152,6 +1158,7 @@ const handleBulkPublicToggle = async (isPublic: boolean) => {
     }
   } finally {
     bulkActionLoading.value = false
+    bulkActionProgress.value = 0
   }
 }
 
@@ -1174,9 +1181,11 @@ const handleBulkAllocateToDeck = async (deckId: string) => {
     const result = await decksStore.bulkAllocateCardsToDeck(deckId, items)
     if (result.allocated > 0 || result.wishlisted > 0) {
       toastStore.show(t('collection.bulkEdit.deckSuccess', { allocated: result.allocated, wishlisted: result.wishlisted }), 'success')
-      selectedCardIds.value = new Set()
-      selectionMode.value = false
+    } else {
+      toastStore.show(t('collection.bulkEdit.deckSuccess', { allocated: 0, wishlisted: 0 }), 'info')
     }
+    selectedCardIds.value = new Set()
+    selectionMode.value = false
   } finally {
     bulkActionLoading.value = false
   }
@@ -1213,9 +1222,11 @@ const handleBulkAllocateToBinder = async (binderId: string) => {
         ? 'collection.bulkEdit.binderMoveSuccess'
         : 'collection.bulkEdit.binderSuccess'
       toastStore.show(t(msgKey, { count: allocated }), 'success')
-      selectedCardIds.value = new Set()
-      selectionMode.value = false
+    } else {
+      toastStore.show(t('collection.bulkEdit.binderSuccess', { count: 0 }), 'info')
     }
+    selectedCardIds.value = new Set()
+    selectionMode.value = false
   } finally {
     bulkActionLoading.value = false
   }
@@ -1434,16 +1445,61 @@ const handleDeckGridToggleCommander = async (displayCard: DisplayDeckCard) => {
 // ========== BINDER EVENT HANDLERS ==========
 
 const handleCreateBinder = async (data: CreateBinderInput) => {
-  const binderId = await binderStore.createBinder(data)
-  if (binderId) {
+  const modalRef = createBinderModalRef.value
+  try {
+    modalRef?.setLoading(true)
+    const binderId = await binderStore.createBinder(data)
+    if (!binderId) return
+
     showCreateBinderModal.value = false
+
     if (pendingBulkAllocateBinder.value) {
       pendingBulkAllocateBinder.value = false
-      await handleBulkAllocateToBinder(binderId)
+      bulkActionLoading.value = true
+      try {
+        const cardIds = [...selectedCardIds.value]
+
+        // Move: deallocate selected cards from any OTHER binders first
+        let totalMoved = 0
+        for (const binder of binderStore.binders) {
+          if (binder.id === binderId) continue
+          const cardsInBinder = cardIds.filter(
+            id => binder.allocations?.some(a => a.cardId === id)
+          )
+          if (cardsInBinder.length > 0) {
+            totalMoved += await binderStore.bulkDeallocateCardsFromBinder(binder.id, cardsInBinder)
+          }
+        }
+
+        const items = cardIds.map(cardId => {
+          const card = collectionStore.getCardById(cardId)
+          return { cardId, quantity: card?.quantity ?? 1 }
+        })
+        const allocated = await binderStore.bulkAllocateCardsToBinder(binderId, items)
+        if (allocated > 0) {
+          const msgKey = totalMoved > 0
+            ? 'collection.bulkEdit.binderMoveSuccess'
+            : 'collection.bulkEdit.binderSuccess'
+          toastStore.show(t(msgKey, { count: allocated }), 'success')
+        } else {
+          toastStore.show(t('collection.bulkEdit.binderSuccess', { count: 0 }), 'info')
+        }
+        selectedCardIds.value = new Set()
+        selectionMode.value = false
+      } finally {
+        bulkActionLoading.value = false
+      }
+      viewMode.value = 'binders'
+      binderFilter.value = binderId
     } else {
       viewMode.value = 'binders'
       binderFilter.value = binderId
     }
+  } catch (error) {
+    console.error('Error in handleCreateBinder:', error)
+    toastStore.show(t('binders.errors.create'), 'error')
+  } finally {
+    modalRef?.setLoading(false)
   }
 }
 
@@ -1879,16 +1935,42 @@ const quickAllocateCardToBinder = async (card: Card) => {
 
 // Crear deck
 const handleCreateDeck = async (deckData: any) => {
-  const deckId = await decksStore.createDeck(deckData)
-  if (deckId) {
+  const modalRef = createDeckModalRef.value
+  try {
+    modalRef?.setLoading(true)
+    const deckId = await decksStore.createDeck(deckData)
+    if (!deckId) return
+
     showCreateDeckModal.value = false
+
     if (pendingBulkAllocateDeck.value) {
       pendingBulkAllocateDeck.value = false
-      await handleBulkAllocateToDeck(deckId)
+      bulkActionLoading.value = true
+      try {
+        const ids = [...selectedCardIds.value]
+        const items = ids.map(cardId => ({ cardId, quantity: 1, isInSideboard: false }))
+        const result = await decksStore.bulkAllocateCardsToDeck(deckId, items)
+        if (result.allocated > 0 || result.wishlisted > 0) {
+          toastStore.show(t('collection.bulkEdit.deckSuccess', { allocated: result.allocated, wishlisted: result.wishlisted }), 'success')
+        } else {
+          toastStore.show(t('collection.bulkEdit.deckSuccess', { allocated: 0, wishlisted: 0 }), 'info')
+        }
+        selectedCardIds.value = new Set()
+        selectionMode.value = false
+      } finally {
+        bulkActionLoading.value = false
+      }
+      viewMode.value = 'decks'
+      deckFilter.value = deckId
     } else {
       deckFilter.value = deckId
       toastStore.show(`Deck "${deckData.name}" creado`, 'success')
     }
+  } catch (error) {
+    console.error('Error in handleCreateDeck:', error)
+    toastStore.show(t('decks.messages.createError'), 'error')
+  } finally {
+    modalRef?.setLoading(false)
   }
 }
 
@@ -3463,8 +3545,13 @@ onUnmounted(() => {
         <!-- ========== BULK SELECTION ACTION BAR ========== -->
         <div v-if="selectionMode && viewMode === 'collection'" class="bg-silver-5 border border-silver-10 p-3 mb-4 rounded space-y-3 relative">
           <!-- Loading overlay -->
-          <div v-if="bulkActionLoading" class="absolute inset-0 bg-primary/70 rounded flex items-center justify-center z-10">
-            <span class="text-small font-bold text-neon animate-pulse">{{ t('collection.bulkEdit.processing') }}</span>
+          <div v-if="bulkActionLoading" class="absolute inset-0 bg-primary/70 rounded flex flex-col items-center justify-center z-10 gap-2">
+            <span class="text-small font-bold text-neon animate-pulse">
+              {{ bulkActionProgress > 0 ? `${bulkActionProgress}%` : t('collection.bulkEdit.processing') }}
+            </span>
+            <div v-if="bulkActionProgress > 0" class="w-3/4 h-1 bg-silver-10 rounded overflow-hidden">
+              <div class="h-full bg-neon transition-all duration-300" :style="{ width: `${bulkActionProgress}%` }"></div>
+            </div>
           </div>
 
           <!-- Row 1: Selection info -->
@@ -3899,6 +3986,7 @@ onUnmounted(() => {
 
     <!-- Create Deck Modal -->
     <CreateDeckModal
+        ref="createDeckModalRef"
         :show="showCreateDeckModal"
         @close="showCreateDeckModal = false"
         @create="handleCreateDeck"
@@ -3906,6 +3994,7 @@ onUnmounted(() => {
 
     <!-- Create Binder Modal -->
     <CreateBinderModal
+        ref="createBinderModalRef"
         :show="showCreateBinderModal"
         @close="showCreateBinderModal = false"
         @create="handleCreateBinder"
@@ -3945,7 +4034,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <div v-if="viewMode === 'decks' && selectedDeck"
          class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden">
-      <div class="container mx-auto max-w-7xl">
+      <div class="container mx-auto max-w-[1200px]">
         <!-- Desktop: fila única (unchanged) -->
         <div class="hidden md:flex items-center gap-4 text-tiny px-4 py-2">
           <div class="flex items-center gap-1 border-r border-silver-30 pr-4">

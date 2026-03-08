@@ -83,6 +83,10 @@ const toggleColor = (color: string) => {
   }
 }
 
+const loading = ref(false)
+const setLoading = (v: boolean) => { loading.value = v }
+defineExpose({ setLoading })
+
 const handleCreate = () => {
   if (!form.value.name.trim()) {
     toastStore.show(t('decks.createModal.validation.nameRequired'), 'error')
@@ -92,7 +96,6 @@ const handleCreate = () => {
     ...form.value,
     deckList: deckList.value.trim() || undefined
   })
-  resetForm()
 }
 
 const resetForm = () => {
@@ -203,13 +206,15 @@ watch(() => props.show, (show) => {
       <div class="flex gap-3 pt-4">
         <BaseButton
             class="flex-1"
+            :disabled="loading"
             @click="handleCreate"
         >
-          {{ t('decks.createModal.submit') }}
+          {{ loading ? '...' : t('decks.createModal.submit') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
             class="flex-1"
+            :disabled="loading"
             @click="emit('close')"
         >
           {{ t('common.actions.cancel') }}

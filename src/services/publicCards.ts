@@ -103,6 +103,64 @@ export async function syncCardToPublic(
 }
 
 /**
+ * Batch sync multiple cards to public_cards using writeBatch
+ * Much faster than individual syncCardToPublic calls for bulk operations
+ */
+export async function batchSyncCardsToPublic(
+  cards: Card[],
+  userId: string,
+  username: string,
+  userLocation?: string,
+  userEmail?: string,
+  userAvatarUrl?: string | null,
+  onProgress?: (completedChunks: number, totalChunks: number) => void
+): Promise<void> {
+  if (cards.length === 0) return
+
+  const BATCH_SIZE = 400
+  const totalChunks = Math.ceil(cards.length / BATCH_SIZE)
+  let completedChunks = 0
+
+  for (let i = 0; i < cards.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db)
+    const chunk = cards.slice(i, i + BATCH_SIZE)
+
+    for (const card of chunk) {
+      const publicCardId = `${userId}_${card.id}`
+      const publicCardRef = doc(db, 'public_cards', publicCardId)
+      const isPublicCard = (card.status === 'trade' || card.status === 'sale') && card.public === true
+
+      if (isPublicCard) {
+        batch.set(publicCardRef, {
+          cardId: card.id,
+          userId,
+          username,
+          avatarUrl: userAvatarUrl || null,
+          cardName: card.name,
+          scryfallId: card.scryfallId,
+          status: card.status as 'trade' | 'sale',
+          price: card.price || 0,
+          edition: card.edition || '',
+          condition: card.condition || 'NM',
+          foil: card.foil || false,
+          quantity: card.quantity || 1,
+          image: card.image || '',
+          location: userLocation,
+          email: userEmail,
+          updatedAt: Timestamp.now(),
+        })
+      } else {
+        batch.delete(publicCardRef)
+      }
+    }
+
+    await batch.commit()
+    completedChunks++
+    onProgress?.(completedChunks, totalChunks)
+  }
+}
+
+/**
  * Remove a card from public_cards collection
  */
 export async function removeCardFromPublic(cardId: string, userId: string): Promise<void> {

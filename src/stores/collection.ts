@@ -15,6 +15,7 @@ import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import {
+    batchSyncCardsToPublic,
     removeCardFromPublic,
     syncAllUserCards,
     syncAllUserPreferences,
@@ -297,7 +298,7 @@ export const useCollectionStore = defineStore('collection', () => {
      * Batch update multiple cards at once (more efficient than individual updates)
      * Uses Firestore writeBatch for atomic operations (max 500 per batch)
      */
-    const batchUpdateCards = async (cardIds: string[], updates: Partial<Card>): Promise<boolean> => {
+    const batchUpdateCards = async (cardIds: string[], updates: Partial<Card>, onProgress?: (percent: number) => void): Promise<boolean> => {
         if (!authStore.user || cardIds.length === 0) return false
 
         try {
@@ -307,6 +308,11 @@ export const useCollectionStore = defineStore('collection', () => {
             for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
                 chunks.push(cardIds.slice(i, i + BATCH_SIZE))
             }
+
+            const firestoreChunkCount = chunks.length
+            const publicSyncChunkCount = Math.ceil(cardIds.length / 400)
+            const totalSteps = firestoreChunkCount + publicSyncChunkCount
+            let completedSteps = 0
 
             for (const chunk of chunks) {
                 const batch = writeBatch(db)
@@ -326,11 +332,13 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
 
                 await batch.commit()
+                completedSteps++
+                onProgress?.(Math.round((completedSteps / totalSteps) * 100))
             }
 
             // Update local state
             const userInfo = getUserInfo()
-            const syncPromises: Promise<void>[] = []
+            const updatedCards: Card[] = []
             for (const cardId of cardIds) {
                 const index = cards.value.findIndex((c) => c.id === cardId)
                 const existingCard = cards.value[index]
@@ -341,24 +349,24 @@ export const useCollectionStore = defineStore('collection', () => {
                         updatedAt: new Date(),
                     }
                     cards.value[index] = updatedCard
-
-                    // Queue public sync (non-blocking, collected for error reporting)
-                    if (userInfo) {
-                        syncPromises.push(
-                            syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                        )
-                    }
+                    updatedCards.push(updatedCard)
                 }
             }
 
-            // Report public sync failures (non-blocking, log-only)
-            if (syncPromises.length > 0) {
-                Promise.allSettled(syncPromises).then(results => {
-                    const failures = results.filter(r => r.status === 'rejected')
-                    if (failures.length > 0) {
-                        console.error(`[PublicSync] ${failures.length} card(s) failed to sync:`, failures)
-                    }
-                })
+            // Batch sync to public_cards
+            if (userInfo && updatedCards.length > 0) {
+                if (onProgress) {
+                    // Await with progress tracking
+                    await batchSyncCardsToPublic(updatedCards, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, (completed) => {
+                        onProgress(Math.round(((firestoreChunkCount + completed) / totalSteps) * 100))
+                    })
+                } else {
+                    // Fire and forget (original behavior)
+                    batchSyncCardsToPublic(updatedCards, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
+                        .catch((err: unknown) => {
+                            console.error(`[PublicSync] Batch sync failed:`, err)
+                        })
+                }
             }
 
             return true

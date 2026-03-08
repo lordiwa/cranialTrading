@@ -22,13 +22,16 @@ const form = ref<CreateBinderInput>({
   description: '',
 })
 
+const loading = ref(false)
+const setLoading = (v: boolean) => { loading.value = v }
+defineExpose({ setLoading })
+
 const handleCreate = () => {
   if (!form.value.name.trim()) {
     toastStore.show(t('decks.createModal.validation.nameRequired'), 'error')
     return
   }
   emit('create', { ...form.value })
-  resetForm()
 }
 
 const resetForm = () => {
@@ -84,13 +87,15 @@ watch(() => props.show, (show) => {
       <div class="flex gap-3 pt-4">
         <BaseButton
             class="flex-1"
+            :disabled="loading"
             @click="handleCreate"
         >
-          {{ t('binders.create.submit') }}
+          {{ loading ? '...' : t('binders.create.submit') }}
         </BaseButton>
         <BaseButton
             variant="secondary"
             class="flex-1"
+            :disabled="loading"
             @click="emit('close')"
         >
           {{ t('binders.create.cancel') }}

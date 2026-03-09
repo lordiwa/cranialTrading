@@ -64,7 +64,12 @@ const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
 const setStatus = async (status: CardStatus) => {
   if (props.readonly || props.isBeingDeleted || status === props.card.status) return
   try {
-    const ok = await collectionStore.updateCard(props.card.id, { status })
+    const updates: Partial<Card> = { status }
+    // Reset public flag when moving to collection (only non-public status)
+    if (status === 'collection') {
+      updates.public = false
+    }
+    const ok = await collectionStore.updateCard(props.card.id, updates)
     if (ok) toastStore.show(t('cards.grid.statusChanged', { status }), 'success')
   } catch {
     toastStore.show(t('cards.grid.statusError'), 'error')
@@ -346,8 +351,8 @@ const priceChangeData = computed(() => {
       </div>
     </div>
 
-    <!-- Row 1: Status Bar -->
-    <div class="flex items-center gap-1.5 px-1 py-1">
+    <!-- Row 1: Status Bar (full width) -->
+    <div class="flex items-center justify-between bg-primary/80 border border-silver-20 rounded px-2 py-1">
       <!-- Public/Eye toggle -->
       <button
           v-if="!readonly && !isBeingDeleted"
@@ -357,11 +362,12 @@ const priceChangeData = computed(() => {
           :class="card.public ? 'text-neon' : 'text-silver-50'"
           :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
       >
-        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="tiny" />
+        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="small" />
       </button>
-      <span v-else class="w-4"></span>
+      <SvgIcon v-else :name="card.public ? 'eye-open' : 'eye-closed'" size="small" class="text-silver-30" />
 
-      <!-- All status icons -->
+      <div class="w-px h-4 bg-silver-20"></div>
+
       <template v-for="status in STATUS_ORDER" :key="status">
         <button
             v-if="!readonly && !isBeingDeleted"
@@ -371,20 +377,15 @@ const priceChangeData = computed(() => {
               ? getStatusColor(status)
               : 'text-silver-30 hover:text-silver-50'"
         >
-          <SvgIcon :name="getStatusIconName(status)" size="tiny" />
+          <SvgIcon :name="getStatusIconName(status)" size="small" />
         </button>
         <SvgIcon
             v-else
             :name="getStatusIconName(status)"
-            size="tiny"
+            size="small"
             :class="card.status === status ? getStatusColor(status) : 'text-silver-30'"
         />
       </template>
-
-      <!-- Status label (right-aligned) -->
-      <span class="ml-auto text-tiny font-bold uppercase" :class="getStatusColor(card.status)">
-        {{ card.status }}
-      </span>
     </div>
 
     <!-- Row 2: Card Image -->
@@ -435,6 +436,14 @@ const priceChangeData = computed(() => {
       >
         <SvgIcon name="flip" size="tiny" />
       </button>
+
+      <!-- Status label overlay (bottom center of card) -->
+      <span
+          class="absolute bottom-1 left-1/2 -translate-x-1/2 bg-primary/85 border border-silver-20 px-2 py-0.5 rounded text-tiny font-bold uppercase z-10 hidden lg:inline"
+          :class="getStatusColor(card.status)"
+      >
+        {{ card.status }}
+      </span>
 
       <!-- Deleting overlay -->
       <div

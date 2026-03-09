@@ -248,7 +248,7 @@ const allocationWarning = computed(() => {
 
 // Show public option when there are cards for sale or trade
 const showPublicOption = computed(() => {
-  return statusDistribution.value.sale > 0 || statusDistribution.value.trade > 0
+  return statusDistribution.value.sale > 0 || statusDistribution.value.trade > 0 || statusDistribution.value.wishlist > 0
 })
 
 // ========== METHODS ==========
@@ -281,7 +281,7 @@ const initializeForm = async () => {
   // Use condition and foil from the fresh card
   condition.value = freshCard.condition
   foil.value = freshCard.foil
-  isPublic.value = freshCard.public ?? true
+  isPublic.value = freshCard.public ?? false
 
   // Load deck allocations for all related cards
   deckAllocations.value = {}

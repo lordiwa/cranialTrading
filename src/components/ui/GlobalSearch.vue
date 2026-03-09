@@ -294,7 +294,7 @@ defineExpose({
         v-model="searchQuery"
         type="text"
         :placeholder="t('header.search.placeholder')"
-        class="w-56 lg:w-72 bg-primary border border-silver-30 pl-12 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded transition-all"
+        class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded transition-all"
         @input="handleInput"
         @focus="searchQuery.length >= 2 && (isOpen = true)"
       />

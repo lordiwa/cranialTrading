@@ -203,76 +203,63 @@
 
   "landing": {
     "tagline": "From Trash to Treasures",
-    "subtitle": "Your bulk isn't trash. It's another collector's treasure.",
+    "subtitle": "The all-in-one platform to manage your MTG collection, find trading partners automatically, and close deals — no middlemen, no fees.",
     "description": "We connect Magic traders so you can turn those forgotten cards into real value.",
-    "features": {
-      "collection": {
-        "title": "Manage Your Collection",
-        "description": "Organize all your cards with updated prices"
-      },
-      "matches": {
-        "title": "Find Matches",
-        "description": "Our algorithm finds compatible traders"
-      },
-      "bulk": {
-        "title": "Monetize Your Bulk",
-        "description": "Those cards you think are worthless, someone is looking for them"
-      },
-      "connect": {
-        "title": "Connect with Traders",
-        "description": "Direct messaging to close trades"
-      }
-    },
-    "capabilities": {
-      "title": "What can you do on Cranial Trading?",
-      "items": {
-        "catalog": {
-          "title": "Catalog your entire collection",
-          "description": "Add cards by searching or scanning. Import decks from Moxfield. Track condition, language and foil status."
-        },
-        "prices": {
-          "title": "Check real-time prices",
-          "description": "Updated prices from TCGPlayer, Card Kingdom and buylist. Know the real value of your collection instantly."
-        },
-        "decks": {
-          "title": "Build and manage decks",
-          "description": "Create decks for Standard, Modern, Commander and more. See which cards you're missing and which you already own."
-        },
-        "trade": {
-          "title": "Trade cards with other players",
-          "description": "The system automatically finds users who have what you need and need what you have."
-        },
-        "sell": {
-          "title": "Sell cards you no longer use",
-          "description": "List your available collection. Other players can contact you directly."
-        },
-        "wishlist": {
-          "title": "Create your wishlist",
-          "description": "Mark the cards you need. Get notified when someone has them available."
-        }
-      }
-    },
-    "useCases": {
-      "title": "Ideal for",
-      "casual": "Casual players who want to organize their cards",
-      "competitive": "Competitive players building tournament decks",
-      "collectors": "Collectors searching for specific pieces",
-      "stores": "Stores and sellers managing inventory",
-      "returning": "Players returning to the game after years"
-    },
-    "cta": {
-      "title": "Start free today",
-      "description": "No fees, no limits, no tricks. Just Magic."
+    "hero": {
+      "cta": "Create Free Account"
     },
     "stats": {
-      "free": "Free",
-      "p2p": "No middlemen",
-      "mtg": "Specialized"
+      "traders": "Traders",
+      "cardsListed": "Cards Listed",
+      "matchesMade": "Matches Made"
     },
-    "helpSection": {
-      "title": "Need help?",
-      "description": "Check our complete guide with FAQs, tutorials and tips to get the most out of the platform.",
-      "cta": "View Help Center"
+    "howItWorks": {
+      "title": "How It Works",
+      "step1": {
+        "title": "Add Your Cards",
+        "desc": "Import your collection or add cards one by one. Mark what you want to trade, sell, or find."
+      },
+      "step2": {
+        "title": "Get Matched",
+        "desc": "Our algorithm scans all traders and finds who has what you need — and who needs what you have."
+      },
+      "step3": {
+        "title": "Close the Deal",
+        "desc": "Message your match directly. Agree on terms, meet up, and trade."
+      }
+    },
+    "features": {
+      "matching": {
+        "title": "Smart Matching Engine",
+        "description": "We automatically find traders who have what you need AND need what you have. No browsing, no posting."
+      },
+      "collection": {
+        "title": "Complete Collection Manager",
+        "description": "Catalog every card with real-time prices from TCGPlayer and Card Kingdom. Track condition, foil, and edition."
+      },
+      "decks": {
+        "title": "Deck Builder + Allocator",
+        "description": "Build decks for any format. See which cards you own and what's missing. Import from Moxfield."
+      },
+      "messaging": {
+        "title": "Direct Messaging",
+        "description": "No Discord or email needed. Message your trading partner right here. Negotiate, agree, and meet up."
+      }
+    },
+    "comparison": {
+      "title": "Why Cranial Trading?",
+      "cranial": "Cranial Trading",
+      "others": "Other Tools",
+      "rows": {
+        "allInOne": { "label": "All-in-one", "us": "Collection + Decks + Trading + Messages", "them": "Need 3-4 different sites" },
+        "matching": { "label": "Matching", "us": "Automatic match discovery", "them": "Manual search & posting" },
+        "messaging": { "label": "Communication", "us": "Built-in messaging", "them": "Discord, email, or forums" },
+        "price": { "label": "Cost", "us": "100% free, no fees", "them": "Subscriptions or trade fees" }
+      },
+      "cta": "Join for Free"
+    },
+    "login": {
+      "alreadyHaveAccount": "Already have an account? Sign in:"
     },
     "footer": {
       "platform": "PLATFORM",
@@ -537,7 +524,8 @@
       "newBinder": "+ New binder",
       "deckSuccess": "{allocated} cards added to deck, {wishlisted} as proxy",
       "binderSuccess": "{count} cards added to binder",
-      "binderMoveSuccess": "{count} cards moved to binder"
+      "binderMoveSuccess": "{count} cards moved to binder",
+      "noPublicEligible": "No eligible cards in selection to make public"
     },
     "messages": {
       "loadError": "Error loading collection",

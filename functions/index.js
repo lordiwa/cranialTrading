@@ -153,6 +153,39 @@ exports.notifyMatchUser = onCall({ cors: true }, async (request) => {
   }
 });
 
+// ========== PLATFORM STATS ==========
+
+/**
+ * updatePlatformStats — Scheduled every 6 hours.
+ * Counts users, public cards, and shared matches, writes to /platform_stats/current.
+ */
+exports.updatePlatformStats = onSchedule(
+  { schedule: 'every 6 hours', maxInstances: 1, timeoutSeconds: 60 },
+  async () => {
+    logger.info('Starting updatePlatformStats...');
+
+    try {
+      const [usersSnap, publicCardsSnap, matchesSnap] = await Promise.all([
+        db.collection('users').count().get(),
+        db.collection('public_cards').count().get(),
+        db.collection('shared_matches').count().get(),
+      ]);
+
+      const stats = {
+        users: usersSnap.data().count,
+        publicCards: publicCardsSnap.data().count,
+        matches: matchesSnap.data().count,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await db.doc('platform_stats/current').set(stats);
+      logger.info('Platform stats updated:', stats);
+    } catch (err) {
+      logger.error('Failed to update platform stats:', err.message);
+    }
+  },
+);
+
 // ========== MARKET DATA FUNCTIONS ==========
 
 const FORMATS = ['standard', 'modern', 'pioneer', 'legacy', 'vintage', 'pauper', 'commander'];

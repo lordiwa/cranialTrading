@@ -73,8 +73,8 @@ export async function syncCardToPublic(
   const publicCardId = `${userId}_${card.id}`
   const publicCardRef = doc(db, 'public_cards', publicCardId)
 
-  // Only publish trade/sale cards that are marked as public
-  const isPublicCard = (card.status === 'trade' || card.status === 'sale') && card.public === true
+  // Only publish non-collection cards that are marked as public
+  const isPublicCard = card.status !== 'collection' && card.public === true
 
   if (isPublicCard) {
     const publicCard = {
@@ -128,7 +128,7 @@ export async function batchSyncCardsToPublic(
     for (const card of chunk) {
       const publicCardId = `${userId}_${card.id}`
       const publicCardRef = doc(db, 'public_cards', publicCardId)
-      const isPublicCard = (card.status === 'trade' || card.status === 'sale') && card.public === true
+      const isPublicCard = card.status !== 'collection' && card.public === true
 
       if (isPublicCard) {
         batch.set(publicCardRef, {
@@ -219,8 +219,8 @@ export async function syncAllUserCards(
   userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
-  // Filter trade/sale cards that are marked as public
-  const publicCards = cards.filter(c => (c.status === 'trade' || c.status === 'sale') && c.public === true)
+  // Filter non-collection cards that are marked as public
+  const publicCards = cards.filter(c => c.status !== 'collection' && c.public === true)
 
   // First, remove all existing public cards for this user
   const existingQuery = query(

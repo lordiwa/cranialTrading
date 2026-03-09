@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import { type SupportedLocale, useI18n } from '../composables/useI18n';
+import { useScrollReveal } from '../composables/useScrollReveal';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SvgIcon from '../components/ui/SvgIcon.vue';
@@ -25,6 +26,8 @@ const email = ref('');
 const password = ref('');
 const loading = ref(false);
 const googleLoading = ref(false);
+
+useScrollReveal();
 
 const handleLogin = async () => {
   if (!email.value || !password.value) return;
@@ -60,42 +63,29 @@ const handleGoogleLogin = async () => {
 
 const features = computed(() => [
   {
-    icon: 'box',
+    icon: 'handshake',
+    title: t('landing.features.matching.title'),
+    description: t('landing.features.matching.description')
+  },
+  {
+    icon: 'collection',
     title: t('landing.features.collection.title'),
     description: t('landing.features.collection.description')
   },
   {
-    icon: 'search',
-    title: t('landing.features.matches.title'),
-    description: t('landing.features.matches.description')
+    icon: 'box',
+    title: t('landing.features.decks.title'),
+    description: t('landing.features.decks.description')
   },
   {
-    icon: 'money',
-    title: t('landing.features.bulk.title'),
-    description: t('landing.features.bulk.description')
-  },
-  {
-    icon: 'handshake',
-    title: t('landing.features.connect.title'),
-    description: t('landing.features.connect.description')
+    icon: 'chat',
+    title: t('landing.features.messaging.title'),
+    description: t('landing.features.messaging.description')
   }
 ]);
 
-const capabilities = computed(() => [
-  { key: 'catalog', icon: 'collection' },
-  { key: 'prices', icon: 'money' },
-  { key: 'decks', icon: 'box' },
-  { key: 'trade', icon: 'handshake' },
-  { key: 'sell', icon: 'star' },
-  { key: 'wishlist', icon: 'search' }
-]);
-
-const useCases = computed(() => [
-  'casual',
-  'competitive',
-  'collectors',
-  'stores',
-  'returning'
+const comparisonRows = computed(() => [
+  'allInOne', 'matching', 'messaging', 'price'
 ]);
 </script>
 
@@ -114,6 +104,17 @@ const useCases = computed(() => [
               </svg>
               <span class="text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
             </div>
+
+            <!-- CTA box above login form -->
+            <div class="mb-6 p-4 bg-neon-10 border border-neon-30 rounded-lg text-center">
+              <p class="text-small font-bold text-neon mb-2">{{ t('landing.subtitle') }}</p>
+              <RouterLink to="/register">
+                <BaseButton class="w-full">{{ t('landing.hero.cta') }}</BaseButton>
+              </RouterLink>
+            </div>
+
+            <!-- Separator -->
+            <p class="text-center text-tiny text-silver-50 mb-4">{{ t('landing.login.alreadyHaveAccount') }}</p>
 
             <div class="bg-primary/95 border border-silver-30 p-6 lg:p-8 rounded-lg">
               <h2 class="text-h3 lg:text-h2 font-bold text-silver mb-6">{{ t('auth.login.title') }}</h2>
@@ -179,17 +180,9 @@ const useCases = computed(() => [
               </div>
             </div>
 
-            <!-- Trust badges -->
-            <div class="mt-4 flex items-center justify-center gap-4 text-tiny text-silver-50">
+            <!-- Trust badge -->
+            <div class="mt-4 flex items-center justify-center text-tiny text-silver-50">
               <span class="flex items-center gap-1"><SvgIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
-              <span>•</span>
-              <span class="flex items-center gap-1"><SvgIcon name="fire" size="tiny" /> {{ t('auth.login.firebaseAuth') }}</span>
-            </div>
-
-            <!-- CTA -->
-            <div class="mt-6 p-4 bg-neon-10 border border-neon-30 rounded-lg text-center">
-              <p class="text-small font-bold text-neon">{{ t('landing.cta.title') }}</p>
-              <p class="text-tiny text-silver-50">{{ t('landing.cta.description') }}</p>
             </div>
           </div>
         </div>
@@ -197,8 +190,31 @@ const useCases = computed(() => [
 
       <!-- Left Column: Content (scrollable) -->
       <div class="flex-1 px-6 py-12 lg:px-12 xl:px-16 overflow-y-auto">
-        <!-- Logo & Tagline -->
-        <div class="mb-10">
+
+        <!-- Section 1: Hero -->
+        <div class="mb-16 relative">
+          <!-- Floating card images -->
+          <div class="hidden xl:block absolute right-0 top-0 w-20 2xl:w-28 h-full pointer-events-none overflow-hidden" aria-hidden="true">
+            <img
+              src="https://cards.scryfall.io/art_crop/front/e/0/e01b2a09-d4e1-43f4-9015-4b06bfc0f712.jpg?1547517482"
+              alt=""
+              class="floating-card absolute w-10 2xl:w-14 rounded shadow-lg opacity-50"
+              style="top: 10%; right: 5%; animation-delay: 0s;"
+            />
+            <img
+              src="https://cards.scryfall.io/art_crop/front/d/7/d7749331-3eb8-4f42-aee6-a29e22d4ee82.jpg?1673147665"
+              alt=""
+              class="floating-card absolute w-8 2xl:w-12 rounded shadow-lg opacity-35"
+              style="top: 45%; right: 20%; animation-delay: 1.5s;"
+            />
+            <img
+              src="https://cards.scryfall.io/art_crop/front/0/c/0c3e1e43-b07a-4955-8be5-d340b3044a8e.jpg?1673146614"
+              alt=""
+              class="floating-card absolute w-8 2xl:w-12 rounded shadow-lg opacity-40"
+              style="top: 75%; right: 0%; animation-delay: 3s;"
+            />
+          </div>
+
           <div class="flex items-center gap-4 mb-6">
             <svg class="w-16 h-16 lg:w-20 lg:h-20 text-neon" viewBox="0 0 100 100" fill="currentColor">
               <use href="/icons.svg#cranial-logo" />
@@ -209,7 +225,6 @@ const useCases = computed(() => [
             </div>
           </div>
 
-          <!-- Hero Text -->
           <div class="space-y-4">
             <h2 class="text-h2 lg:text-h1 font-bold text-silver leading-tight">
               From Trash<br/>
@@ -217,86 +232,84 @@ const useCases = computed(() => [
             </h2>
             <p class="text-body text-silver-70 max-w-lg">
               {{ t('landing.subtitle') }}
-              {{ t('landing.description') }}
             </p>
+            <RouterLink to="/register" class="inline-block mt-2">
+              <BaseButton>{{ t('landing.hero.cta') }}</BaseButton>
+            </RouterLink>
           </div>
         </div>
 
-        <!-- Features Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div
-              v-for="feature in features"
-              :key="feature.title"
-              class="bg-primary/90 border border-silver-20 p-4 hover:border-neon-30 transition-all rounded-md"
-          >
-            <div class="mb-2"><SvgIcon :name="feature.icon" size="large" /></div>
-            <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
-            <p class="text-tiny text-silver-50">{{ feature.description }}</p>
-          </div>
-        </div>
-
-        <!-- Stats -->
-        <div class="flex gap-8 text-center mb-12">
-          <div>
-            <p class="text-h2 font-bold text-neon">100%</p>
-            <p class="text-tiny text-silver-50">{{ t('landing.stats.free') }}</p>
-          </div>
-          <div>
-            <p class="text-h2 font-bold text-neon">P2P</p>
-            <p class="text-tiny text-silver-50">{{ t('landing.stats.p2p') }}</p>
-          </div>
-          <div>
-            <p class="text-h2 font-bold text-neon">MTG</p>
-            <p class="text-tiny text-silver-50">{{ t('landing.stats.mtg') }}</p>
-          </div>
-        </div>
-
-        <!-- Capabilities Section -->
-        <section class="mb-12">
-          <h2 class="text-h3 font-bold text-silver mb-6">{{ t('landing.capabilities.title') }}</h2>
-          <div class="space-y-4">
-            <article
-                v-for="cap in capabilities"
-                :key="cap.key"
-                class="flex gap-4 p-4 bg-secondary/20 border border-silver-10 rounded-md hover:border-silver-30 transition-all"
-            >
-              <div class="flex-shrink-0 w-10 h-10 bg-neon-10 rounded-full flex items-center justify-center">
-                <SvgIcon :name="cap.icon" size="small" class="text-neon" />
+        <!-- Section 2: How It Works -->
+        <section class="scroll-reveal mb-16">
+          <h2 class="text-h3 font-bold text-silver mb-8">{{ t('landing.howItWorks.title') }}</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Step 1 -->
+            <div class="text-center md:text-left">
+              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
+                <SvgIcon name="plus" size="large" class="text-neon" />
               </div>
-              <div>
-                <h3 class="text-small font-bold text-silver mb-1">{{ t(`landing.capabilities.items.${cap.key}.title`) }}</h3>
-                <p class="text-tiny text-silver-50">{{ t(`landing.capabilities.items.${cap.key}.description`) }}</p>
+              <h3 class="text-small font-bold text-silver mb-2">{{ t('landing.howItWorks.step1.title') }}</h3>
+              <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step1.desc') }}</p>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="text-center md:text-left">
+              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
+                <SvgIcon name="search" size="large" class="text-neon" />
               </div>
-            </article>
+              <h3 class="text-small font-bold text-silver mb-2">{{ t('landing.howItWorks.step2.title') }}</h3>
+              <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step2.desc') }}</p>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="text-center md:text-left">
+              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
+                <SvgIcon name="chat" size="large" class="text-neon" />
+              </div>
+              <h3 class="text-small font-bold text-silver mb-2">{{ t('landing.howItWorks.step3.title') }}</h3>
+              <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step3.desc') }}</p>
+            </div>
           </div>
         </section>
 
-        <!-- Use Cases -->
-        <section class="mb-12">
-          <h2 class="text-h3 font-bold text-silver mb-4">{{ t('landing.useCases.title') }}</h2>
-          <ul class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <li
-                v-for="useCase in useCases"
-                :key="useCase"
-                class="flex items-center gap-2 text-small text-silver-70"
+        <!-- Section 4: Feature Deep-Dive -->
+        <section class="scroll-reveal mb-16">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div
+                v-for="feature in features"
+                :key="feature.title"
+                class="bg-primary/90 border border-silver-20 p-5 hover:border-neon-30 transition-all rounded-md group"
             >
-              <span class="text-neon">✓</span>
-              {{ t(`landing.useCases.${useCase}`) }}
+              <div class="mb-3 w-10 h-10 bg-neon-10 rounded-full flex items-center justify-center group-hover:bg-neon-20 transition-colors">
+                <SvgIcon :name="feature.icon" size="small" class="text-neon" />
+              </div>
+              <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
+              <p class="text-tiny text-silver-50">{{ feature.description }}</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 5: Why Cranial Trading + Final CTA -->
+        <section class="scroll-reveal mb-16">
+          <h2 class="text-h3 font-bold text-silver mb-6">{{ t('landing.comparison.title') }}</h2>
+          <ul class="space-y-4">
+            <li
+              v-for="row in comparisonRows"
+              :key="row"
+              class="flex items-start gap-3 p-4 bg-secondary/20 border border-silver-10 rounded-md"
+            >
+              <span class="text-neon text-body mt-0.5 flex-shrink-0">&#10003;</span>
+              <div>
+                <h3 class="text-small font-bold text-silver">{{ t(`landing.comparison.rows.${row}.label`) }}</h3>
+                <p class="text-tiny text-silver-50">{{ t(`landing.comparison.rows.${row}.us`) }}</p>
+              </div>
             </li>
           </ul>
-        </section>
-
-        <!-- Help Section -->
-        <section class="p-6 bg-neon-10 border border-neon-30 rounded-lg">
-          <h2 class="text-h3 font-bold text-neon mb-2">{{ t('landing.helpSection.title') }}</h2>
-          <p class="text-small text-silver-70 mb-4">{{ t('landing.helpSection.description') }}</p>
-          <RouterLink
-              to="/faq"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-neon text-primary font-bold text-small rounded hover:bg-neon/90 transition-fast"
-          >
-            <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
-            {{ t('landing.helpSection.cta') }}
-          </RouterLink>
+          <div class="mt-8 text-center">
+            <RouterLink to="/register" class="inline-block">
+              <BaseButton>{{ t('landing.comparison.cta') }}</BaseButton>
+            </RouterLink>
+          </div>
         </section>
       </div>
     </main>
@@ -304,20 +317,7 @@ const useCases = computed(() => [
     <!-- Footer -->
     <footer class="border-t border-silver-20 bg-secondary/30">
       <div class="max-w-[1200px] mx-auto px-6 py-8">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-          <!-- Brand -->
-          <div class="col-span-2 md:col-span-1">
-            <div class="flex items-center gap-2 mb-4">
-              <svg class="w-8 h-8 text-neon" viewBox="0 0 100 100" fill="currentColor">
-                <use href="/icons.svg#cranial-logo" />
-              </svg>
-              <span class="text-small font-bold text-neon font-brother">CRANIAL TRADING</span>
-            </div>
-            <p class="text-tiny text-silver-50">
-              {{ t('landing.description') }}
-            </p>
-          </div>
-
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <!-- Platform -->
           <div>
             <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.platform') }}</h4>
@@ -393,5 +393,28 @@ const useCases = computed(() => [
 }
 .bg-neon-10 {
   background-color: rgba(204, 255, 0, 0.1);
+}
+.bg-neon-20 {
+  background-color: rgba(204, 255, 0, 0.2);
+}
+
+/* Floating card animation */
+.floating-card {
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50% { transform: translateY(-15px) rotate(2deg); }
+}
+
+/* Scroll reveal */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
 }
 </style>

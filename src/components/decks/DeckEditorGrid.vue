@@ -235,7 +235,7 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
 <template>
   <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative">
     <!-- Left Panel: Card Preview (Sticky) - Hidden on mobile -->
-    <div class="hidden md:block w-[240px] xl:w-[280px] flex-shrink-0 sticky top-[88px] self-start">
+    <div class="hidden md:block w-[110px] lg:w-[140px] xl:w-[180px] 2xl:w-[250px] flex-shrink-0 sticky top-[88px] self-start">
       <div v-if="previewCard" class="space-y-3">
         <!-- Card Image -->
         <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden">
@@ -321,7 +321,7 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
           >
             <!-- Card miniature - ONLY image -->
             <div
-              class="w-full md:w-[145px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+              class="w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
               :class="[
                 isProxy(card) ? 'border-blue-400' : card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
                 'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'

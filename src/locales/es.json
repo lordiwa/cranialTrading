@@ -203,76 +203,63 @@
 
   "landing": {
     "tagline": "From Trash to Treasures",
-    "subtitle": "Tu bulk no es basura. Es el tesoro de otro coleccionista.",
+    "subtitle": "La plataforma todo-en-uno para gestionar tu colección MTG, encontrar socios de intercambio automáticamente y cerrar tratos — sin intermediarios, sin comisiones.",
     "description": "Conectamos traders de Magic para que conviertas esas cartas olvidadas en valor real.",
-    "features": {
-      "collection": {
-        "title": "Gestiona tu Colección",
-        "description": "Organiza todas tus cartas con precios actualizados"
-      },
-      "matches": {
-        "title": "Encuentra Matches",
-        "description": "Nuestro algoritmo encuentra traders compatibles"
-      },
-      "bulk": {
-        "title": "Monetiza tu Bulk",
-        "description": "Esas cartas que crees que no valen, alguien las busca"
-      },
-      "connect": {
-        "title": "Conecta con Traders",
-        "description": "Mensajería directa para cerrar trades"
-      }
-    },
-    "capabilities": {
-      "title": "¿Qué puedes hacer en Cranial Trading?",
-      "items": {
-        "catalog": {
-          "title": "Cataloga tu colección completa",
-          "description": "Agrega cartas escaneando o buscando por nombre. Importa mazos desde Moxfield. Lleva control de condición, idioma y si es foil."
-        },
-        "prices": {
-          "title": "Consulta precios en tiempo real",
-          "description": "Precios de TCGPlayer, Card Kingdom y buylist actualizados. Conoce el valor real de tu colección al instante."
-        },
-        "decks": {
-          "title": "Construye y gestiona mazos",
-          "description": "Crea mazos para Standard, Modern, Commander y más. Ve qué cartas te faltan y cuáles ya tienes."
-        },
-        "trade": {
-          "title": "Intercambia cartas con otros jugadores",
-          "description": "El sistema encuentra automáticamente usuarios que tienen lo que buscas y buscan lo que tienes."
-        },
-        "sell": {
-          "title": "Vende cartas que ya no uses",
-          "description": "Publica tu colección disponible. Otros jugadores pueden contactarte directamente."
-        },
-        "wishlist": {
-          "title": "Crea tu lista de deseos",
-          "description": "Marca las cartas que necesitas. Recibe notificaciones cuando alguien las tenga disponibles."
-        }
-      }
-    },
-    "useCases": {
-      "title": "Ideal para",
-      "casual": "Jugadores casuales que quieren organizar sus cartas",
-      "competitive": "Jugadores competitivos armando mazos de torneo",
-      "collectors": "Coleccionistas buscando piezas específicas",
-      "stores": "Tiendas y vendedores gestionando inventario",
-      "returning": "Jugadores que vuelven al juego después de años"
-    },
-    "cta": {
-      "title": "Empieza gratis hoy",
-      "description": "Sin comisiones, sin límites, sin trucos. Solo Magic."
+    "hero": {
+      "cta": "Crear Cuenta Gratis"
     },
     "stats": {
-      "free": "Gratis",
-      "p2p": "Sin intermediarios",
-      "mtg": "Especializado"
+      "traders": "Traders",
+      "cardsListed": "Cartas Listadas",
+      "matchesMade": "Matches Realizados"
     },
-    "helpSection": {
-      "title": "¿Necesitas ayuda?",
-      "description": "Consulta nuestra guía completa con preguntas frecuentes, tutoriales y consejos para aprovechar la plataforma.",
-      "cta": "Ver Centro de Ayuda"
+    "howItWorks": {
+      "title": "Cómo Funciona",
+      "step1": {
+        "title": "Agrega tus Cartas",
+        "desc": "Importa tu colección o agrega cartas una por una. Marca lo que quieres intercambiar, vender o buscar."
+      },
+      "step2": {
+        "title": "Recibe Matches",
+        "desc": "Nuestro algoritmo escanea todos los traders y encuentra quién tiene lo que necesitas — y quién necesita lo que tienes."
+      },
+      "step3": {
+        "title": "Cierra el Trato",
+        "desc": "Envía un mensaje directo a tu match. Acuerden condiciones, queden y hagan el intercambio."
+      }
+    },
+    "features": {
+      "matching": {
+        "title": "Motor de Matching Inteligente",
+        "description": "Encontramos automáticamente traders que tienen lo que necesitas Y necesitan lo que tienes. Sin buscar, sin publicar."
+      },
+      "collection": {
+        "title": "Gestor de Colección Completo",
+        "description": "Cataloga cada carta con precios en tiempo real de TCGPlayer y Card Kingdom. Controla condición, foil y edición."
+      },
+      "decks": {
+        "title": "Constructor de Mazos + Asignador",
+        "description": "Construye mazos para cualquier formato. Ve qué cartas tienes y cuáles te faltan. Importa desde Moxfield."
+      },
+      "messaging": {
+        "title": "Mensajería Directa",
+        "description": "Sin Discord ni email. Envía mensajes a tu socio de intercambio aquí mismo. Negocia, acuerda y queda."
+      }
+    },
+    "comparison": {
+      "title": "¿Por qué Cranial Trading?",
+      "cranial": "Cranial Trading",
+      "others": "Otras Herramientas",
+      "rows": {
+        "allInOne": { "label": "Todo-en-uno", "us": "Colección + Mazos + Trading + Mensajes", "them": "Necesitas 3-4 sitios diferentes" },
+        "matching": { "label": "Matching", "us": "Descubrimiento automático de matches", "them": "Búsqueda y publicación manual" },
+        "messaging": { "label": "Comunicación", "us": "Mensajería integrada", "them": "Discord, email o foros" },
+        "price": { "label": "Costo", "us": "100% gratis, sin comisiones", "them": "Suscripciones o comisiones" }
+      },
+      "cta": "Únete Gratis"
+    },
+    "login": {
+      "alreadyHaveAccount": "¿Ya tienes cuenta? Inicia sesión:"
     },
     "footer": {
       "platform": "PLATAFORMA",
@@ -537,7 +524,8 @@
       "newBinder": "+ Nueva carpeta",
       "deckSuccess": "{allocated} cartas agregadas al mazo, {wishlisted} como proxy",
       "binderSuccess": "{count} cartas añadidas a la carpeta",
-      "binderMoveSuccess": "{count} cartas movidas a la carpeta"
+      "binderMoveSuccess": "{count} cartas movidas a la carpeta",
+      "noPublicEligible": "No hay cartas elegibles en la selección para hacer públicas"
     },
     "messages": {
       "loadError": "Error al cargar colección",

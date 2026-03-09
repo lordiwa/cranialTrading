@@ -204,10 +204,10 @@ onUnmounted(() => {
         </nav>
 
         <!-- Global Search (Desktop) -->
-        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="hidden md:block flex-shrink-0 max-w-[200px] lg:max-w-[250px]" />
+        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="hidden md:block min-w-0 w-[180px] lg:w-[230px]" />
 
         <!-- Right side: User & Settings -->
-        <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
+        <div class="flex items-center gap-2 md:gap-4 flex-shrink-0 ml-2">
           <!-- User Menu -->
           <div v-if="isAuthenticated" class="flex items-center">
             <!-- Divider -->
@@ -222,7 +222,7 @@ onUnmounted(() => {
                     class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                     :title="t('help.menu.faq')"
                 >
-                  <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
+                  <span class="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
                 </button>
                 <div
                     v-if="showHelpMenu"
@@ -302,7 +302,7 @@ onUnmounted(() => {
                   class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                   :title="t('help.menu.faq')"
               >
-                <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">?</span>
+                <span class="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
               </button>
               <div
                   v-if="showHelpMenu"

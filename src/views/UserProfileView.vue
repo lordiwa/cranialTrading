@@ -133,14 +133,11 @@ const loadAllPublicCards = async () => {
     const cardsCol = collection(db, 'users', userId.value, 'cards');
     const snapshot = await getDocs(query(cardsCol));
 
-    // Filter: show public cards
-    // - Any card with public: true
-    // - Sale/trade cards default to public (unless public: false)
+    // Filter: show public cards (sale/trade/wishlist only, never collection)
     cards.value = snapshot.docs
       .map(d => ({ id: d.id, ...d.data() }) as Card)
       .filter((card: any) =>
-        card.public === true ||
-        ((card.status === 'sale' || card.status === 'trade') && card.public !== false)
+        card.status !== 'collection' && card.public !== false
       );
   } catch (err) {
     console.error('Error loading cards:', err);

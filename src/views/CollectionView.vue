@@ -1150,9 +1150,20 @@ const handleBulkPublicToggle = async (isPublic: boolean) => {
   bulkActionProgress.value = 0
   try {
     const ids = [...selectedCardIds.value]
-    const ok = await collectionStore.batchUpdateCards(ids, { public: isPublic }, (p) => { bulkActionProgress.value = p })
+    // Only set public:true on non-collection cards; for public:false, apply to all
+    const filteredIds = isPublic
+      ? ids.filter(id => {
+          const card = collectionStore.getCardById(id)
+          return card && card.status !== 'collection'
+        })
+      : ids
+    if (filteredIds.length === 0) {
+      toastStore.show(t('collection.bulkEdit.noPublicEligible'), 'info')
+      return
+    }
+    const ok = await collectionStore.batchUpdateCards(filteredIds, { public: isPublic }, (p) => { bulkActionProgress.value = p })
     if (ok) {
-      toastStore.show(t('collection.bulkEdit.publicSuccess', { count: ids.length }), 'success')
+      toastStore.show(t('collection.bulkEdit.publicSuccess', { count: filteredIds.length }), 'success')
       selectedCardIds.value = new Set()
       selectionMode.value = false
     }

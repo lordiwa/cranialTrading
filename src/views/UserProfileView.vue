@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, getDocsFromServer, limit, query, where } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
@@ -89,28 +89,27 @@ const findUserByUsername = async (uname: string): Promise<{ id: string; data: an
     // authStateReady might not exist in older SDK versions, continue anyway
   }
 
-  const MAX_RETRIES = 2;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  // Use getDocsFromServer to bypass SDK memory cache (which returns empty for anonymous users)
+  const usersCol = collection(db, 'users');
+  const q = query(usersCol, where('username', '==', uname), limit(1));
+  try {
+    const snapshot = await getDocsFromServer(q);
+    const firstDoc = snapshot.docs[0];
+    if (!snapshot.empty && firstDoc) {
+      return { id: firstDoc.id, data: firstDoc.data() };
+    }
+  } catch (err) {
+    // Fallback to getDocs if getDocsFromServer fails (e.g. offline)
+    console.warn('[Profile] getDocsFromServer failed, falling back to getDocs:', err);
     try {
-      const usersCol = collection(db, 'users');
-      const q = query(usersCol, where('username', '==', uname), limit(1));
       const snapshot = await getDocs(q);
       const firstDoc = snapshot.docs[0];
       if (!snapshot.empty && firstDoc) {
         return { id: firstDoc.id, data: firstDoc.data() };
       }
-      // Empty result — could be SDK timing issue, retry after delay
-      console.warn(`[Profile] Query returned empty for "${uname}" (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 1500));
-      }
-    } catch (err) {
-      console.error(`[Profile] Query attempt ${attempt + 1}/${MAX_RETRIES + 1} failed:`, err);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 1500));
-      } else {
-        throw err;
-      }
+    } catch (fallbackErr) {
+      console.error('[Profile] getDocs fallback also failed:', fallbackErr);
+      throw fallbackErr;
     }
   }
   return null;

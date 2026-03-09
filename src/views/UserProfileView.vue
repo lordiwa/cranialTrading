@@ -76,6 +76,30 @@ watch(() => route.params.username, (v) => {
   loadProfile();
 });
 
+// Helper: query Firestore for user by username with retry logic
+// Retries handle transient errors (e.g. Firestore SDK auth sync delay for anonymous users)
+const findUserByUsername = async (uname: string): Promise<{ id: string; data: any } | null> => {
+  const MAX_RETRIES = 2;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const usersCol = collection(db, 'users');
+      const q = query(usersCol, where('username', '==', uname), limit(1));
+      const snapshot = await getDocs(q);
+      const firstDoc = snapshot.docs[0];
+      if (snapshot.empty || !firstDoc) return null;
+      return { id: firstDoc.id, data: firstDoc.data() };
+    } catch (err) {
+      console.error(`[Profile] Query attempt ${attempt + 1}/${MAX_RETRIES + 1} failed:`, err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 1000));
+      } else {
+        throw err;
+      }
+    }
+  }
+  return null;
+};
+
 // Methods
 const loadProfile = async () => {
   if (!username.value) return;
@@ -92,21 +116,16 @@ const loadProfile = async () => {
         location: authStore.user.location,
       };
     } else {
-      // Query users collection to find userId by username
-      const usersCol = collection(db, 'users');
-      const q = query(usersCol, where('username', '==', username.value), limit(1));
-      const snapshot = await getDocs(q);
-
-      const firstDoc = snapshot.docs[0];
-      if (snapshot.empty || !firstDoc) {
+      // Query users collection to find userId by username (with retry for anonymous users)
+      const result = await findUserByUsername(username.value);
+      if (!result) {
         userNotFound.value = true;
         loading.value = false;
         return;
       }
 
-      const userData = firstDoc.data();
-      userId.value = firstDoc.id;
-      userInfo.value = userData as any;
+      userId.value = result.id;
+      userInfo.value = result.data as any;
     }
 
     // Load all cards at once, then filter for public ones client-side
@@ -114,7 +133,9 @@ const loadProfile = async () => {
     await loadAllPublicCards();
   } catch (err) {
     console.error('Error loading profile:', err);
-    toastStore.show(t('profile.messages.loadError'), 'error');
+    // Show error toast with actual error detail for debugging
+    const errMsg = err instanceof Error ? err.message : String(err);
+    toastStore.show(`${t('profile.messages.loadError')}: ${errMsg}`, 'error');
     userNotFound.value = true;
   } finally {
     loading.value = false;

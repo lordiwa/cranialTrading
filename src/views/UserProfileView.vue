@@ -496,6 +496,11 @@ onMounted(() => {
 
     <!-- Profile content -->
     <div v-else>
+      <!-- Loading state -->
+      <BaseLoader v-if="loading" size="large" class="min-h-[50vh] flex items-center justify-center" />
+
+      <!-- Profile loaded -->
+      <template v-else>
       <!-- Profile header -->
       <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-8 border-b border-silver-20">
         <div class="flex items-center gap-4">
@@ -534,11 +539,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Loading state -->
-      <BaseLoader v-if="loading" size="large" />
-
       <!-- Empty state -->
-      <div v-else-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
+      <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
         <p class="text-body text-silver-70">
           {{ t('profile.noPublicCards') }}
         </p>
@@ -610,6 +612,7 @@ onMounted(() => {
           :other-username="selectedUsername"
           @close="handleCloseChat"
       />
+      </template>
     </div>
 
     <!-- Exchange Cart (anonymous users only) -->

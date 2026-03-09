@@ -151,7 +151,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
         const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]))
 
-        const BATCH_SIZE = 500
+        const BATCH_SIZE = 400
         const updates: { card: Card; data: Partial<Card> }[] = []
 
         for (const card of cardsToEnrich) {
@@ -180,16 +180,20 @@ export const useCollectionStore = defineStore('collection', () => {
 
         if (updates.length === 0) return
 
-        // Persist to Firestore in batches
+        // Persist to Firestore in batches (use set+merge to avoid NOT_FOUND errors)
         const userId = authStore.user.id
         for (let i = 0; i < updates.length; i += BATCH_SIZE) {
             const chunk = updates.slice(i, i + BATCH_SIZE)
             const batch = writeBatch(db)
             for (const { card, data } of chunk) {
                 const cardRef = doc(db, 'users', userId, 'cards', card.id)
-                batch.update(cardRef, { ...data, updatedAt: Timestamp.now() })
+                batch.set(cardRef, { ...data, updatedAt: Timestamp.now() }, { merge: true })
             }
-            await batch.commit()
+            try {
+                await batch.commit()
+            } catch (err) {
+                console.warn(`[Enrichment] Batch ${i / BATCH_SIZE + 1} failed, skipping:`, err)
+            }
         }
 
         console.log(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)

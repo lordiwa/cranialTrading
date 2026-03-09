@@ -152,6 +152,12 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
     }
 
+    // ========== PLATFORM STATS (public read, written by Cloud Functions) ==========
+    match /platform_stats/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ========== MARKET DATA (read-only, populated by Cloud Functions) ==========
     match /market_data/{docId} {
       allow read: if request.auth != null;

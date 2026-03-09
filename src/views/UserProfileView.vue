@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { addDoc, collection, getDocs, getDocsFromServer, limit, query, where } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -76,41 +76,69 @@ watch(() => route.params.username, (v) => {
   loadProfile();
 });
 
-// Helper: query Firestore for user by username with retry logic
-// Retries handle: Firestore SDK auth-sync delay, transient errors, AND empty results
-// (anonymous users may get empty results on first query if SDK hasn't synced auth state)
+// Helper: query Firestore for user by username
+// Anonymous users use the Firestore REST API directly to bypass SDK bugs
+// (SDK v11 getDocsFromServer fails and getDocs returns empty for unauthenticated queries)
 const findUserByUsername = async (uname: string): Promise<{ id: string; data: any } | null> => {
-  // Ensure Firebase Auth state is fully resolved before querying Firestore
-  // This is critical for anonymous users — without this, the Firestore SDK
-  // may not know the auth state and could return empty results or fail
-  try {
-    await auth.authStateReady();
-  } catch {
-    // authStateReady might not exist in older SDK versions, continue anyway
+  // Anonymous path: use Firestore REST API (100% reliable without auth)
+  if (!authStore.user) {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: 'users' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'username' },
+            op: 'EQUAL',
+            value: { stringValue: uname },
+          },
+        },
+        limit: 1,
+      },
+    };
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Firestore REST query failed: ${resp.status}`);
+    }
+
+    const results = await resp.json();
+    const doc = results[0]?.document;
+    if (!doc) return null;
+
+    // Parse document: name is "projects/.../documents/users/USER_ID"
+    const docId = doc.name.split('/').pop()!;
+    const fields = doc.fields || {};
+
+    // Convert Firestore REST field format to plain object
+    const data: Record<string, any> = {};
+    for (const [key, val] of Object.entries(fields)) {
+      const v = val as any;
+      if (v.stringValue !== undefined) data[key] = v.stringValue;
+      else if (v.integerValue !== undefined) data[key] = Number(v.integerValue);
+      else if (v.doubleValue !== undefined) data[key] = v.doubleValue;
+      else if (v.booleanValue !== undefined) data[key] = v.booleanValue;
+      else if (v.nullValue !== undefined) data[key] = null;
+      else if (v.arrayValue !== undefined) data[key] = v.arrayValue;
+      else if (v.mapValue !== undefined) data[key] = v.mapValue;
+    }
+
+    return { id: docId, data };
   }
 
-  // Use getDocsFromServer to bypass SDK memory cache (which returns empty for anonymous users)
+  // Authenticated path: use SDK (works fine for logged-in users)
   const usersCol = collection(db, 'users');
   const q = query(usersCol, where('username', '==', uname), limit(1));
-  try {
-    const snapshot = await getDocsFromServer(q);
-    const firstDoc = snapshot.docs[0];
-    if (!snapshot.empty && firstDoc) {
-      return { id: firstDoc.id, data: firstDoc.data() };
-    }
-  } catch (err) {
-    // Fallback to getDocs if getDocsFromServer fails (e.g. offline)
-    console.warn('[Profile] getDocsFromServer failed, falling back to getDocs:', err);
-    try {
-      const snapshot = await getDocs(q);
-      const firstDoc = snapshot.docs[0];
-      if (!snapshot.empty && firstDoc) {
-        return { id: firstDoc.id, data: firstDoc.data() };
-      }
-    } catch (fallbackErr) {
-      console.error('[Profile] getDocs fallback also failed:', fallbackErr);
-      throw fallbackErr;
-    }
+  const snapshot = await getDocs(q);
+  const firstDoc = snapshot.docs[0];
+  if (!snapshot.empty && firstDoc) {
+    return { id: firstDoc.id, data: firstDoc.data() };
   }
   return null;
 };

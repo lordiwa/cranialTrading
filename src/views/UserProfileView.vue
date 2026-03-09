@@ -76,6 +76,36 @@ watch(() => route.params.username, (v) => {
   loadProfile();
 });
 
+// Convert Firestore REST API value format to plain JS values
+// e.g. {stringValue: "foo"} → "foo", {arrayValue: {values: [{stringValue: "W"}]}} → ["W"]
+const parseFirestoreValue = (v: any): any => {
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.integerValue !== undefined) return Number(v.integerValue);
+  if (v.doubleValue !== undefined) return v.doubleValue;
+  if (v.booleanValue !== undefined) return v.booleanValue;
+  if (v.nullValue !== undefined) return null;
+  if (v.timestampValue !== undefined) return v.timestampValue;
+  if (v.arrayValue !== undefined) {
+    return (v.arrayValue.values || []).map(parseFirestoreValue);
+  }
+  if (v.mapValue !== undefined) {
+    const result: Record<string, any> = {};
+    for (const [k, mv] of Object.entries(v.mapValue.fields || {})) {
+      result[k] = parseFirestoreValue(mv);
+    }
+    return result;
+  }
+  return v;
+};
+
+const parseFirestoreDoc = (fields: Record<string, any>): Record<string, any> => {
+  const data: Record<string, any> = {};
+  for (const [key, val] of Object.entries(fields)) {
+    data[key] = parseFirestoreValue(val);
+  }
+  return data;
+};
+
 // Helper: query Firestore for user by username
 // Anonymous users use the Firestore REST API directly to bypass SDK bugs
 // (SDK v11 getDocsFromServer fails and getDocs returns empty for unauthenticated queries)
@@ -114,22 +144,7 @@ const findUserByUsername = async (uname: string): Promise<{ id: string; data: an
 
     // Parse document: name is "projects/.../documents/users/USER_ID"
     const docId = doc.name.split('/').pop()!;
-    const fields = doc.fields || {};
-
-    // Convert Firestore REST field format to plain object
-    const data: Record<string, any> = {};
-    for (const [key, val] of Object.entries(fields)) {
-      const v = val as any;
-      if (v.stringValue !== undefined) data[key] = v.stringValue;
-      else if (v.integerValue !== undefined) data[key] = Number(v.integerValue);
-      else if (v.doubleValue !== undefined) data[key] = v.doubleValue;
-      else if (v.booleanValue !== undefined) data[key] = v.booleanValue;
-      else if (v.nullValue !== undefined) data[key] = null;
-      else if (v.arrayValue !== undefined) data[key] = v.arrayValue;
-      else if (v.mapValue !== undefined) data[key] = v.mapValue;
-    }
-
-    return { id: docId, data };
+    return { id: docId, data: parseFirestoreDoc(doc.fields || {}) };
   }
 
   // Authenticated path: use SDK (works fine for logged-in users)
@@ -194,6 +209,38 @@ const loadAllPublicCards = async () => {
   if (!userId.value) return;
 
   try {
+    // Anonymous path: use Firestore REST API (same reason as findUserByUsername)
+    if (!authStore.user) {
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+      const allCards: Card[] = [];
+      let pageToken: string | undefined;
+
+      do {
+        let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId.value}/cards?pageSize=300`;
+        if (pageToken) url += `&pageToken=${pageToken}`;
+
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Firestore REST cards query failed: ${resp.status}`);
+
+        const data = await resp.json();
+        const docs = data.documents || [];
+
+        for (const doc of docs) {
+          const docId = doc.name.split('/').pop()!;
+          const card = { id: docId, ...parseFirestoreDoc(doc.fields || {}) };
+          allCards.push(card as Card);
+        }
+
+        pageToken = data.nextPageToken;
+      } while (pageToken);
+
+      cards.value = allCards.filter((card: any) =>
+        card.status !== 'collection' && card.public !== false
+      );
+      return;
+    }
+
+    // Authenticated path: use SDK
     const cardsCol = collection(db, 'users', userId.value, 'cards');
     const snapshot = await getDocs(query(cardsCol));
 

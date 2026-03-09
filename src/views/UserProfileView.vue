@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -77,8 +77,18 @@ watch(() => route.params.username, (v) => {
 });
 
 // Helper: query Firestore for user by username with retry logic
-// Retries handle transient errors (e.g. Firestore SDK auth sync delay for anonymous users)
+// Retries handle: Firestore SDK auth-sync delay, transient errors, AND empty results
+// (anonymous users may get empty results on first query if SDK hasn't synced auth state)
 const findUserByUsername = async (uname: string): Promise<{ id: string; data: any } | null> => {
+  // Ensure Firebase Auth state is fully resolved before querying Firestore
+  // This is critical for anonymous users — without this, the Firestore SDK
+  // may not know the auth state and could return empty results or fail
+  try {
+    await auth.authStateReady();
+  } catch {
+    // authStateReady might not exist in older SDK versions, continue anyway
+  }
+
   const MAX_RETRIES = 2;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -86,12 +96,18 @@ const findUserByUsername = async (uname: string): Promise<{ id: string; data: an
       const q = query(usersCol, where('username', '==', uname), limit(1));
       const snapshot = await getDocs(q);
       const firstDoc = snapshot.docs[0];
-      if (snapshot.empty || !firstDoc) return null;
-      return { id: firstDoc.id, data: firstDoc.data() };
+      if (!snapshot.empty && firstDoc) {
+        return { id: firstDoc.id, data: firstDoc.data() };
+      }
+      // Empty result — could be SDK timing issue, retry after delay
+      console.warn(`[Profile] Query returned empty for "${uname}" (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
     } catch (err) {
       console.error(`[Profile] Query attempt ${attempt + 1}/${MAX_RETRIES + 1} failed:`, err);
       if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1500));
       } else {
         throw err;
       }

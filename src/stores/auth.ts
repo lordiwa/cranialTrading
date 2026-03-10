@@ -71,7 +71,8 @@ export const useAuthStore = defineStore('auth', () => {
                     user.value = {
                         id: userId,
                         email: firebaseUser.email ?? '',
-                        username: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Usuario',
+                        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback
+                        username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
                         location: '',
                         createdAt: new Date(),
                     };
@@ -95,7 +96,8 @@ export const useAuthStore = defineStore('auth', () => {
                 user.value = {
                     id: userId,
                     email: firebaseUser.email ?? '',
-                    username: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Usuario',
+                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback
+                    username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
                     location: '',
                     createdAt: new Date(),
                 };
@@ -163,10 +165,11 @@ export const useAuthStore = defineStore('auth', () => {
 
             if (!userDoc.exists()) {
                 // Create new user document for Google user
-                const displayNameClean = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '');
-                const emailPrefix = firebaseUser.email?.split('@')[0];
-                // Use displayName if non-empty, then email prefix, then fallback
-                const username = (displayNameClean && displayNameClean.length > 0) ? displayNameClean : (emailPrefix && emailPrefix.length > 0 ? emailPrefix : 'user');
+                /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback */
+                const username = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
+                    || firebaseUser.email?.split('@')[0]
+                    || 'user';
+                /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
                 await setDoc(doc(db, 'users', firebaseUser.uid), {
                     email: firebaseUser.email,
@@ -483,7 +486,10 @@ export const useAuthStore = defineStore('auth', () => {
 
         for (const api of apis) {
             try {
-                const response = await fetch(api.url);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => { controller.abort(); }, 5000);
+                const response = await fetch(api.url, { signal: controller.signal });
+                clearTimeout(timeoutId);
                 if (!response.ok) continue;
                 const data = await response.json() as GeoLocationResponse;
                 const location = api.parse(data);

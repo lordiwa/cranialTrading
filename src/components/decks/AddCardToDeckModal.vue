@@ -235,7 +235,7 @@ const handleAdd = () => {
     quantity: form.value.quantity,
     condition: form.value.condition,
     foil: form.value.foil,
-    price: selectedCard.value.prices?.usd ? Number.parseFloat(selectedCard.value.prices.usd) : 0,
+    price: cardKingdomRetail.value ?? (selectedCard.value.prices?.usd ? Number.parseFloat(selectedCard.value.prices.usd) : 0),
     image: cardImage,
     addToCollection: addMode.value === 'new',
   }
@@ -335,7 +335,7 @@ watch(() => props.show, (newVal) => {
                   </div>
                 </div>
                 <p class="text-tiny text-silver mt-1 truncate group-hover:text-neon">{{ card.name }}</p>
-                <p class="text-tiny text-neon font-bold">${{ card.prices?.usd ?? 'N/A' }}</p>
+                <p class="text-tiny text-silver-50">${{ card.prices?.usd ?? 'N/A' }}</p>
               </div>
             </div>
           </div>
@@ -382,21 +382,21 @@ watch(() => props.show, (newVal) => {
                     <!-- Multi-source prices -->
                     <div class="mb-3 space-y-1">
                       <div class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-70">TCGPlayer:</span>
-                        <span class="text-body font-bold text-neon">
+                        <span class="text-tiny text-silver-70">Card Kingdom:</span>
+                        <span v-if="hasCardKingdomPrices" class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                        <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
+                        <span v-else class="text-small text-silver-50">-</span>
+                      </div>
+                      <div class="flex justify-between items-center">
+                        <span class="text-tiny text-silver-50">CK Buylist:</span>
+                        <span v-if="cardKingdomBuylist" class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                        <span v-else class="text-small text-silver-50">-</span>
+                      </div>
+                      <div class="flex justify-between items-center">
+                        <span class="text-tiny text-silver-50">TCG:</span>
+                        <span class="text-small text-silver-50">
                           ${{ selectedCard.prices?.usd ? Number.parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
                         </span>
-                      </div>
-                      <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-70">Card Kingdom:</span>
-                        <span class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
-                      </div>
-                      <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-50">CK Buylist:</span>
-                        <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
-                      </div>
-                      <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
-                        {{ t('decks.editDeckCard.loadingCKPrices') }}
                       </div>
                     </div>
 

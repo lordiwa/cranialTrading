@@ -163,4 +163,16 @@ router.beforeEach(async (to, _from, next) => {
     next();
 });
 
+// Handle chunk loading failures (stale cache, CDN race during deploy)
+// Forces a full page reload to fetch fresh index.html with correct chunk URLs
+router.onError((error: unknown, to) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+        message.includes('Failed to fetch dynamically imported module') ||
+        message.includes('Importing a module script failed')
+    ) {
+        window.location.assign(to.fullPath);
+    }
+});
+
 export default router;

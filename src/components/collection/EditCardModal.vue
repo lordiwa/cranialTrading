@@ -49,7 +49,7 @@ const showPriceChart = ref(false)
 const chartHistory = ref<CardHistoryPoint[]>([])
 const chartLoading = ref(false)
 type ChartSource = 'tcg' | 'ck' | 'buylist'
-const chartSource = ref<ChartSource>('tcg')
+const chartSource = ref<ChartSource>('ck')
 
 const chartHasData = computed(() => chartHistory.value.length >= 2)
 
@@ -244,8 +244,11 @@ const zoomImage = computed(() => {
   return props.card?.image ?? ''
 })
 
-// Obtener precio actual
+// Obtener precio actual (prefer CK)
 const currentPrice = computed(() => {
+  if (cardKingdomRetail.value != null) {
+    return cardKingdomRetail.value
+  }
   if (selectedPrint.value?.prices?.usd) {
     return Number.parseFloat(selectedPrint.value.prices.usd)
   }
@@ -348,19 +351,19 @@ const handleClose = () => {
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
               <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">TCGPlayer:</span>
-                <span class="text-body font-bold text-neon">${{ currentPrice.toFixed(2) }}</span>
-              </div>
-              <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
                 <span class="text-tiny text-silver-70">Card Kingdom:</span>
-                <span class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
+                <span v-else class="text-small text-silver-50">-</span>
               </div>
-              <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
+              <div class="flex justify-between items-center">
                 <span class="text-tiny text-silver-50">CK Buylist:</span>
-                <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                <span v-if="cardKingdomBuylist" class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                <span v-else class="text-small text-silver-50">-</span>
               </div>
-              <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
-                {{ t('cards.editModal.loadingPrices') }}
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-50">TCG:</span>
+                <span class="text-small text-silver-50">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
               </div>
             </div>
 

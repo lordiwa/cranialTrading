@@ -114,8 +114,8 @@ const formatPrice = (price: string | null | undefined): string => {
             </div>
 
             <!-- Price -->
-            <p class="text-body font-bold text-neon">
-              {{ formatPrice(card.prices?.usd) }}
+            <p class="text-body font-bold text-silver-50">
+              TCG: {{ formatPrice(card.prices?.usd) }}
             </p>
 
             <!-- Actions -->

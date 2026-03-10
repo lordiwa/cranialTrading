@@ -326,8 +326,10 @@ const priceChangeData = computed(() => {
       <p class="text-[14px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
         {{ card.name }}
       </p>
-      <p class="text-[14px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
-      <p class="text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
+      <p v-if="hasCardKingdomPrices" class="text-[14px] text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }} c/u</p>
+      <p v-else class="text-[14px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
+      <p v-if="hasCardKingdomPrices" class="text-[14px] text-[#4CAF50] font-bold">{{ formatPrice((cardKingdomRetail ?? 0) * card.quantity) }}</p>
+      <p v-else class="text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
     </div>
   </div>
 
@@ -498,11 +500,12 @@ const priceChangeData = computed(() => {
 
     <!-- Row 6: Prices -->
     <div class="mt-1 space-y-0.5">
-      <!-- TCGPlayer Price -->
+      <!-- Card Kingdom Price (primary) -->
       <div class="flex items-center gap-1">
-        <p class="text-tiny font-bold text-neon">
-          TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
+        <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
+          CK: {{ formatPrice(cardKingdomRetail) }}
         </p>
+        <p v-else class="text-tiny text-silver-50">CK: -</p>
         <span
             v-if="priceChangeData"
             class="text-[14px] font-bold px-1 rounded"
@@ -511,16 +514,15 @@ const priceChangeData = computed(() => {
           {{ priceChangeData.isPositive ? '&#x25B2;' : '&#x25BC;' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
         </span>
       </div>
-      <!-- Card Kingdom Price -->
-      <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
-        CK: {{ formatPrice(cardKingdomRetail) }}
-      </p>
-      <p v-else class="text-tiny text-silver-50">CK: -</p>
       <!-- CK Buylist -->
       <p v-if="cardKingdomBuylist" class="text-tiny text-[#FF9800]">
         BL: {{ formatPrice(cardKingdomBuylist) }}
       </p>
       <p v-else class="text-tiny text-silver-50">BL: -</p>
+      <!-- TCGPlayer Price (secondary) -->
+      <p class="text-tiny text-silver-50">
+        TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
+      </p>
     </div>
 
     <!-- Row 7: Sparkline (always reserve space) -->

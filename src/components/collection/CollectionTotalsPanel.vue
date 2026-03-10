@@ -18,7 +18,7 @@ const {
 } = useCollectionTotals(() => collectionStore.cards)
 
 type PriceSource = 'tcg' | 'ck' | 'buylist'
-const priceSource = ref<PriceSource>('tcg')
+const priceSource = ref<PriceSource>('ck')
 
 // Mobile expand/collapse
 const mobileExpanded = ref(false)

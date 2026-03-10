@@ -1064,7 +1064,7 @@ const deckWishlistCount = computed(() => {
 
 // ========== DECK PRICE SOURCE ==========
 type DeckPriceSource = 'tcg' | 'ck' | 'buylist'
-const deckPriceSource = ref<DeckPriceSource>('tcg')
+const deckPriceSource = ref<DeckPriceSource>('ck')
 
 // Access shared card prices from useCollectionTotals (populated by CollectionTotalsPanel)
 const { cardPrices: sharedCardPrices } = useCollectionTotals(() => collectionStore.cards)
@@ -1108,6 +1108,12 @@ const deckSourceColor = computed(() => {
 })
 
 const deckStatsExpanded = ref(false)
+
+// Get CK retail price for a card, falling back to stored price
+const getCardCKPrice = (cardId: string, fallbackPrice: number): number => {
+  const prices = sharedCardPrices.value.get(cardId)
+  return prices?.cardKingdom?.retail ?? fallbackPrice
+}
 
 const deckActiveSourceLabel = computed(() => {
   if (deckPriceSource.value === 'ck') return 'CK'
@@ -3897,8 +3903,8 @@ onUnmounted(() => {
                   <div class="text-tiny text-silver-50 flex-shrink-0">
                     x{{ card.quantity }}
                   </div>
-                  <div class="text-tiny font-bold text-neon flex-shrink-0 w-20 text-right">
-                    ${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}
+                  <div class="text-tiny font-bold text-[#4CAF50] flex-shrink-0 w-20 text-right">
+                    ${{ (getCardCKPrice(card.id, card.price) * card.quantity).toFixed(2) }}
                   </div>
                   <div class="flex-shrink-0">
                     <button

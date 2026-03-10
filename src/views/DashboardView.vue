@@ -1331,7 +1331,7 @@ const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
               <!-- Card Info -->
               <p class="text-tiny font-bold text-silver truncate" :title="card.name">{{ card.name }}</p>
               <p class="text-tiny text-silver-70">{{ card.set?.toUpperCase() }}</p>
-              <p class="text-tiny text-neon font-bold">${{ card.prices?.usd || 'N/A' }}</p>
+              <p class="text-tiny text-silver-50">TCG: ${{ card.prices?.usd || 'N/A' }}</p>
               <p class="text-tiny text-silver-50 italic">{{ t('dashboard.searchOthers.noOwner') }}</p>
               <!-- Add to Wishlist Button -->
               <button

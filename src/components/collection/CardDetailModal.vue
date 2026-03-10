@@ -79,7 +79,7 @@ const showPriceChart = ref(false)
 const chartHistory = ref<CardHistoryPoint[]>([])
 const chartLoading = ref(false)
 type ChartSource = 'tcg' | 'ck' | 'buylist'
-const chartSource = ref<ChartSource>('tcg')
+const chartSource = ref<ChartSource>('ck')
 
 const chartHasData = computed(() => chartHistory.value.length >= 2)
 
@@ -207,8 +207,11 @@ const zoomImage = computed(() => {
   return props.card?.image ?? ''
 })
 
-// Current price from selected print or original card
+// Current price from selected print or original card (prefer CK)
 const currentPrice = computed(() => {
+  if (cardKingdomRetail.value != null) {
+    return cardKingdomRetail.value
+  }
   if (selectedPrint.value?.prices?.usd) {
     return Number.parseFloat(selectedPrint.value.prices.usd)
   }
@@ -621,10 +624,6 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
               <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">TCG:</span>
-                <span class="text-body font-bold text-neon">${{ currentPrice.toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between items-center">
                 <span class="text-tiny text-silver-70">CK:</span>
                 <span v-if="hasCardKingdomPrices" class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
                 <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
@@ -634,6 +633,10 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
                 <span class="text-tiny text-silver-70">BL:</span>
                 <span v-if="cardKingdomBuylist" class="text-body font-bold text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
                 <span v-else class="text-small text-silver-50">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">TCG:</span>
+                <span class="text-body text-silver-50">${{ currentPrice.toFixed(2) }}</span>
               </div>
             </div>
 

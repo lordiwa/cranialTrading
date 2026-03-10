@@ -171,7 +171,7 @@ const selectCard = (card: ScryfallCard) => {
                 class="w-full aspect-[3/4] object-cover mb-2"
             />
             <p class="text-tiny text-silver-70">{{ card.set_name }}</p>
-            <p class="text-tiny text-neon">${{ card.prices?.usd || 'N/A' }}</p>
+            <p class="text-tiny text-silver-50">TCG: ${{ card.prices?.usd || 'N/A' }}</p>
           </div>
         </div>
 

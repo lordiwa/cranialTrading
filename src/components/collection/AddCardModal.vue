@@ -226,7 +226,7 @@ const handleAddCard = async () => {
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
+      price: cardKingdomRetail.value ?? Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
       image: imageToSave,
       public: form.public,
       cmc: selectedPrint.value.cmc,
@@ -504,13 +504,7 @@ const handleClose = () => {
 
               <!-- Prices Section -->
               <div class="mt-3 space-y-1">
-                <!-- TCGPlayer Price -->
-                <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">TCG:</span>
-                  <span class="text-[#CCFF00] font-bold">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
-                </div>
-
-                <!-- Card Kingdom Prices -->
+                <!-- Card Kingdom Price (primary) -->
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-[#EEEEEE]/70">CK:</span>
                   <span v-if="hasCardKingdomPrices" class="text-[#4CAF50] font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
@@ -521,6 +515,11 @@ const handleClose = () => {
                   <span class="text-[#EEEEEE]/70">BL:</span>
                   <span v-if="cardKingdomBuylist" class="text-[#FF9800] font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
                   <span v-else class="text-[#EEEEEE]/50">-</span>
+                </div>
+                <!-- TCGPlayer Price (secondary) -->
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">TCG:</span>
+                  <span class="text-[#EEEEEE]/50">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
                 </div>
               </div>
 

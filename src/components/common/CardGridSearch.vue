@@ -229,8 +229,8 @@ defineExpose({
               <p class="text-tiny text-silver-70">
                 {{ card.set.toUpperCase() }}
               </p>
-              <p v-if="showPrice" class="text-tiny font-bold text-neon">
-                ${{ card.prices?.usd ? Number.parseFloat(card.prices.usd).toFixed(2) : 'N/A' }}
+              <p v-if="showPrice" class="text-tiny font-bold text-silver-50">
+                TCG: ${{ card.prices?.usd ? Number.parseFloat(card.prices.usd).toFixed(2) : 'N/A' }}
               </p>
             </div>
           </button>

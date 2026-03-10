@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 interface Props {
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'filled';
   size?: 'normal' | 'small';
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
@@ -32,6 +32,9 @@ const variantClasses = computed(() => ({
   danger: props.disabled
       ? 'border border-silver-50 text-silver-50 cursor-not-allowed'
       : 'border border-rust text-rust hover:border-2 hover:bg-rust-5 active:bg-rust-5',
+  filled: props.disabled
+      ? 'bg-silver-50 text-primary cursor-not-allowed'
+      : 'bg-neon text-primary hover:brightness-110 active:brightness-90',
 }));
 </script>
 

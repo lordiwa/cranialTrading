@@ -38,10 +38,10 @@ const handleOverlayClick = () => {
         <div :class="['relative bg-primary border border-silver-50 shadow-strong w-full p-lg transition-normal max-h-[90vh] overflow-y-auto rounded-lg', maxWidth]">
           <button
               @click="closeModal"
-              class="absolute top-3 right-3 md:top-4 md:right-4 text-silver hover:text-neon transition-fast p-2"
+              class="absolute top-3 right-3 md:top-4 md:right-4 bg-neon text-primary hover:brightness-110 transition-fast p-1.5 rounded"
           >
-            <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
+            <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
 

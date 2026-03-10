@@ -3272,7 +3272,7 @@ onUnmounted(() => {
                 ]"
             >
               {{ t('collection.tabs.decks') }}
-              <span class="ml-1 opacity-70">{{ decksList.length }}</span>
+              <span class="ml-1 opacity-70">({{ decksList.length }})</span>
             </button>
             <button
                 @click="switchToBinders()"
@@ -3284,7 +3284,7 @@ onUnmounted(() => {
                 ]"
             >
               {{ t('collection.tabs.binders') }}
-              <span class="ml-1 opacity-70">{{ bindersList.length }}</span>
+              <span class="ml-1 opacity-70">({{ bindersList.length }})</span>
             </button>
           </div>
 
@@ -3321,12 +3321,9 @@ onUnmounted(() => {
               </span>
             </button>
             <!-- Botón nuevo deck -->
-            <button
-                @click="showCreateDeckModal = true"
-                class="px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2 border-dashed border-silver-30 text-silver-50 hover:border-neon hover:text-neon"
-            >
+            <BaseButton size="small" variant="filled" @click="showCreateDeckModal = true">
               {{ t('collection.actions.new') }}
-            </button>
+            </BaseButton>
           </div>
 
           <!-- Mensaje si no hay mazos -->
@@ -3355,12 +3352,9 @@ onUnmounted(() => {
               <span class="ml-1 opacity-70">{{ binder.stats?.totalCards || 0 }}</span>
             </button>
             <!-- Botón nueva carpeta -->
-            <button
-                @click="showCreateBinderModal = true"
-                class="px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2 border-dashed border-silver-30 text-silver-50 hover:border-neon hover:text-neon"
-            >
+            <BaseButton size="small" variant="filled" @click="showCreateBinderModal = true">
               {{ t('collection.actions.new') }}
-            </button>
+            </BaseButton>
           </div>
 
           <!-- Mensaje si no hay binders -->
@@ -3501,7 +3495,7 @@ onUnmounted(() => {
                 ]"
             >
               {{ getStatusLabel(status) }}
-              <span class="ml-1" :class="statusFilter === status ? 'text-primary' : 'text-neon'">{{ count }}</span>
+              <span class="ml-1" :class="statusFilter === status ? 'text-primary' : 'text-neon'">({{ count }})</span>
             </button>
             <HelpTooltip
                 v-if="status === 'collection'"
@@ -3727,8 +3721,8 @@ onUnmounted(() => {
         <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
         <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
-            <h3 class="text-small font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
-            <span class="text-tiny text-silver-50">
+            <h3 class="text-body font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
+            <span class="text-small text-silver-50">
               ({{ stackVariants ? `${uniqueCardCount} ${t('collection.stack.unique')}` : filteredCards.length }})
             </span>
           </div>
@@ -3846,7 +3840,7 @@ onUnmounted(() => {
         <!-- ========== DECK VIEW: MAZO PRINCIPAL (Visual Grid) ========== -->
         <div v-if="viewMode === 'decks' && selectedDeck && filteredMainboardDisplayCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-neon">
-            <h3 class="text-small font-bold text-neon">{{ t('collection.sections.mainboard') }}</h3>
+            <h3 class="text-body font-bold text-neon">{{ t('collection.sections.mainboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ mainboardOwnedCount + mainboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid

@@ -53,7 +53,7 @@ const loadMore = () => {
   <div>
     <div :class="compact
       ? 'grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2'
-      : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4'"
+      : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4'"
     >
       <CollectionGridCard
           v-for="card in visibleCards"

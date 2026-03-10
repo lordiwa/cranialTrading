@@ -72,7 +72,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
             'flex-shrink-0 h-[40px] w-[40px] flex items-center justify-center rounded border transition-colors',
             activeFilterCount > 0
               ? 'bg-neon-10 border-neon text-neon'
-              : 'border-silver-10 text-silver hover:text-neon hover:border-silver-30'
+              : 'border-silver-10 text-neon hover:border-silver-30'
           ]"
       >
         <SvgIcon name="filter" size="small" />
@@ -125,39 +125,47 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 
     <div class="flex flex-wrap items-center gap-3">
       <!-- Sort By dropdown -->
-      <select
-          :value="sortBy"
-          @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value)"
-          class="bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
-      >
-        <option value="recent">{{ t('collection.sort.recent') }}</option>
-        <option value="name">{{ t('collection.sort.name') }}</option>
-        <option value="price">{{ t('collection.sort.price') }}</option>
-      </select>
+      <div class="relative">
+        <select
+            :value="sortBy"
+            @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value)"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
+        >
+          <option value="recent">{{ t('collection.sort.recent') }}</option>
+          <option value="name">{{ t('collection.sort.name') }}</option>
+          <option value="price">{{ t('collection.sort.price') }}</option>
+        </select>
+        <SvgIcon name="chevron-down" size="tiny" class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+      </div>
 
       <!-- Group By dropdown -->
-      <select
-          :value="groupBy"
-          @change="emit('update:groupBy', ($event.target as HTMLSelectElement).value)"
-          class="bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
-      >
-        <option value="none">{{ t('collection.group.none') }}</option>
-        <option value="type">{{ t('collection.deckStats.type') }}</option>
-        <option value="mana">{{ t('collection.deckStats.mana') }}</option>
-        <option value="color">{{ t('collection.deckStats.color') }}</option>
-      </select>
+      <div class="relative">
+        <select
+            :value="groupBy"
+            @change="emit('update:groupBy', ($event.target as HTMLSelectElement).value)"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
+        >
+          <option value="none">{{ t('collection.group.none') }}</option>
+          <option value="type">{{ t('collection.deckStats.type') }}</option>
+          <option value="mana">{{ t('collection.deckStats.mana') }}</option>
+          <option value="color">{{ t('collection.deckStats.color') }}</option>
+        </select>
+        <SvgIcon name="chevron-down" size="tiny" class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+      </div>
 
       <!-- View type dropdown -->
-      <select
-          v-if="showViewType"
-          :value="viewType"
-          @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'stack' | 'visual' | 'texto')"
-          class="bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 rounded focus:outline-none focus:border-neon"
-      >
-        <option value="visual">{{ t('collection.view.visual') }}</option>
-        <option value="stack">{{ t('collection.view.stack') }}</option>
-        <option value="texto">{{ t('collection.view.texto') }}</option>
-      </select>
+      <div v-if="showViewType" class="relative">
+        <select
+            :value="viewType"
+            @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'stack' | 'visual' | 'texto')"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
+        >
+          <option value="visual">{{ t('collection.view.visual') }}</option>
+          <option value="stack">{{ t('collection.view.stack') }}</option>
+          <option value="texto">{{ t('collection.view.texto') }}</option>
+        </select>
+        <SvgIcon name="chevron-down" size="tiny" class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+      </div>
 
       <!-- Bulk select toggle -->
       <button
@@ -165,7 +173,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
           @click="emit('toggle-bulk-select')"
           :class="[
             'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1',
-            selectionMode ? 'bg-rust/20 text-rust' : 'text-silver-50 hover:text-silver'
+            selectionMode ? 'bg-rust/20 text-rust' : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
           ]"
           :title="t('collection.bulkDelete.toggle')"
       >

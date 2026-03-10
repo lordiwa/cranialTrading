@@ -228,12 +228,14 @@ const handleCsvFile = async (event: Event) => {
 </script>
 
 <template>
-  <BaseModal :show="show" :title="t('decks.importModal.title')" @close="handleClose">
+  <BaseModal :show="show" :close-on-click-outside="false" @close="handleClose">
     <div class="space-y-md">
       <div>
-        <label for="import-deck-input" class="text-small text-silver-70 block mb-2">
-          {{ t('decks.importModal.inputLabel') }}
-        </label>
+        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.importModal.title') }}</h2>
+        <p class="text-small text-silver-70">{{ t('decks.importModal.inputLabel') }}</p>
+      </div>
+
+      <div>
         <textarea
             id="import-deck-input"
             v-model="inputText"
@@ -251,22 +253,23 @@ const handleCsvFile = async (event: Event) => {
         />
         <button
             type="button"
-            class="mt-2 text-tiny text-silver-50 hover:text-neon transition-fast underline"
+            class="mt-2 text-tiny text-neon hover:text-neon/80 transition-fast underline"
             @click="csvFileInput?.click()"
         >
           {{ t('decks.importModal.csvUpload') }}
         </button>
       </div>
 
-      <BaseButton
-          variant="secondary"
-          size="small"
-          @click="handleParse"
-          :disabled="!inputText.trim() || parsing"
-          class="w-full"
-      >
-        {{ parsing ? t('decks.importModal.analyzing') : t('decks.importModal.analyze') }}
-      </BaseButton>
+      <div class="flex justify-end pt-3 border-t border-silver-20">
+        <button
+            type="button"
+            @click="handleParse"
+            :disabled="!inputText.trim() || parsing"
+            class="px-6 py-2.5 bg-neon text-primary font-bold text-small hover:brightness-110 transition-fast rounded disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {{ parsing ? t('decks.importModal.analyzing') : t('decks.importModal.analyze') }}
+        </button>
+      </div>
 
       <!-- Instrucciones para Moxfield -->
       <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="border border-neon bg-neon/10 p-md space-y-2">

@@ -439,7 +439,7 @@ const priceChangeData = computed(() => {
 
       <!-- Status label overlay (bottom center of card) -->
       <span
-          class="absolute bottom-1 left-1/2 -translate-x-1/2 bg-primary/85 border border-silver-20 px-2 py-0.5 rounded text-tiny font-bold uppercase z-10 hidden lg:inline"
+          class="absolute top-1 left-1 bg-primary/85 border border-silver-20 px-2 py-0.5 rounded text-tiny font-bold uppercase z-10 hidden lg:inline"
           :class="getStatusColor(card.status)"
       >
         {{ card.status }}

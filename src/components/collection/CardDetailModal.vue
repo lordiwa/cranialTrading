@@ -177,6 +177,11 @@ const conditionOptions = computed(() => [
   { value: 'PO', label: t('common.conditions.PO') },
 ])
 
+// Card type line from selected print or original card
+const cardTypeLine = computed(() => {
+  return selectedPrint.value?.type_line || props.card?.type_line || ''
+})
+
 // Total quantity across all statuses
 const totalQuantity = computed(() => {
   return Object.values(statusDistribution.value).reduce((sum, qty) => sum + qty, 0)
@@ -596,6 +601,7 @@ watch(selectedPrint, (print) => {
         <div class="flex-1 space-y-3">
           <div>
             <p class="font-bold text-silver text-h3">{{ card.name }}</p>
+            <p v-if="cardTypeLine" class="text-tiny text-silver-50 mt-0.5">{{ cardTypeLine }}</p>
 
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
@@ -692,28 +698,29 @@ watch(selectedPrint, (print) => {
             </div>
           </div>
 
-          <!-- Print Selector -->
-          <div v-if="availablePrints.length > 1">
-            <label for="detail-print-select" class="text-tiny text-silver-70 block mb-1">{{ t('cards.detailModal.editionPrintLabel') }}</label>
-            <select
-                id="detail-print-select"
-                :value="selectedPrint?.id"
-                @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150 rounded"
-            >
-              <option
-                  v-for="print in availablePrints"
-                  :key="print.id"
-                  :value="print.id"
-              >
-                {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
-              </option>
-            </select>
-            <p class="text-tiny text-silver-50 mt-1">{{ t('cards.detailModal.printsAvailable', { count: availablePrints.length }) }}</p>
-          </div>
-          <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('cards.detailModal.loadingPrints') }}</p>
         </div>
       </div>
+
+      <!-- Edition / Print Selector -->
+      <div v-if="availablePrints.length > 1" class="bg-secondary border border-silver-30 p-4 rounded">
+        <p class="text-small font-bold text-silver mb-2">{{ t('cards.detailModal.editionPrintLabel') }}</p>
+        <select
+            id="detail-print-select"
+            :value="selectedPrint?.id"
+            @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
+            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150 rounded"
+        >
+          <option
+              v-for="print in availablePrints"
+              :key="print.id"
+              :value="print.id"
+          >
+            {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+          </option>
+        </select>
+        <p class="text-tiny text-silver-50 mt-1">{{ t('cards.detailModal.printsAvailable', { count: availablePrints.length }) }}</p>
+      </div>
+      <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('cards.detailModal.loadingPrints') }}</p>
 
       <!-- Status Distribution -->
       <div class="bg-secondary border border-silver-30 p-4 rounded">
@@ -726,7 +733,7 @@ watch(selectedPrint, (print) => {
           <!-- Collection -->
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="text-neon">✓</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-neon flex-shrink-0"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span class="text-small text-silver">{{ t('common.status.collection') }}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -740,7 +747,7 @@ watch(selectedPrint, (print) => {
               <span class="w-8 text-center text-small font-bold text-neon">{{ statusDistribution.collection }}</span>
               <button
                 @click="adjustQuantity('collection', 1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
               >
 +
 </button>
@@ -750,7 +757,7 @@ watch(selectedPrint, (print) => {
           <!-- Sale -->
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="text-yellow-400">$</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-yellow-400 flex-shrink-0"><circle cx="12" cy="12" r="10"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="#000">$</text></svg>
               <span class="text-small text-silver">{{ t('common.status.sale') }}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -764,7 +771,7 @@ watch(selectedPrint, (print) => {
               <span class="w-8 text-center text-small font-bold text-yellow-400">{{ statusDistribution.sale }}</span>
               <button
                 @click="adjustQuantity('sale', 1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
               >
 +
 </button>
@@ -774,7 +781,7 @@ watch(selectedPrint, (print) => {
           <!-- Trade -->
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="text-blue-400">~</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400 flex-shrink-0"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
               <span class="text-small text-silver">{{ t('common.status.trade') }}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -788,7 +795,7 @@ watch(selectedPrint, (print) => {
               <span class="w-8 text-center text-small font-bold text-blue-400">{{ statusDistribution.trade }}</span>
               <button
                 @click="adjustQuantity('trade', 1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
               >
 +
 </button>
@@ -798,7 +805,7 @@ watch(selectedPrint, (print) => {
           <!-- Wishlist -->
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="text-red-400">*</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-400 flex-shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               <span class="text-small text-silver">{{ t('common.status.wishlist') }}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -812,7 +819,7 @@ watch(selectedPrint, (print) => {
               <span class="w-8 text-center text-small font-bold text-red-400">{{ statusDistribution.wishlist }}</span>
               <button
                 @click="adjustQuantity('wishlist', 1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
               >
 +
 </button>
@@ -830,20 +837,26 @@ watch(selectedPrint, (print) => {
           ⚠️ {{ allocationWarning }}
         </p>
 
-        <!-- Public option (shown when sale or trade > 0) -->
-        <div v-if="showPublicOption" class="mt-4 pt-3 border-t border-silver-20">
-          <label class="flex items-center gap-3 cursor-pointer p-2 border border-neon/30 hover:border-neon transition-150">
-            <input
-                v-model="isPublic"
-                type="checkbox"
-                class="w-4 h-4 cursor-pointer"
-            />
-            <div>
-              <span class="text-small text-silver">{{ t('cards.statusModal.publishLabel') }}</span>
-              <p class="text-tiny text-silver-50">{{ t('cards.statusModal.publishHint') }}</p>
-            </div>
-          </label>
-        </div>
+      </div>
+
+      <!-- Publish to Profile -->
+      <div v-if="showPublicOption" class="bg-secondary border border-silver-30 p-4 rounded">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-neon flex-shrink-0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <div class="flex-1">
+            <span class="text-small text-silver font-bold">{{ t('cards.statusModal.publishLabel') }}</span>
+            <p class="text-tiny text-silver-50">{{ t('cards.statusModal.publishHint') }}</p>
+          </div>
+          <input
+              v-model="isPublic"
+              type="checkbox"
+              class="w-4 h-4 cursor-pointer flex-shrink-0"
+          />
+        </label>
       </div>
 
       <!-- Condition & Foil -->
@@ -911,7 +924,7 @@ watch(selectedPrint, (print) => {
 
               <button
                 @click="incrementDeckAllocation(deck.id)"
-                class="w-7 h-7 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150"
+                class="w-7 h-7 flex items-center justify-center bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
               >
 +
 </button>

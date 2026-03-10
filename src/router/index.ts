@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { clearChunkReloadFlag, handleChunkLoadError } from '../utils/chunkReload';
 
 const router = createRouter({
     history: createWebHistory(),
@@ -163,15 +164,19 @@ router.beforeEach(async (to, _from, next) => {
     next();
 });
 
-// Handle chunk loading failures (stale cache, CDN race during deploy)
-// Forces a full page reload to fetch fresh index.html with correct chunk URLs
+// Clear chunk-reload flag after successful navigation
+router.afterEach((to) => {
+    clearChunkReloadFlag(to.fullPath);
+});
+
+// Handle chunk loading failures with single-retry protection
 router.onError((error: unknown, to) => {
     const message = error instanceof Error ? error.message : String(error);
     if (
         message.includes('Failed to fetch dynamically imported module') ||
         message.includes('Importing a module script failed')
     ) {
-        window.location.assign(to.fullPath);
+        handleChunkLoadError(to.fullPath);
     }
 });
 

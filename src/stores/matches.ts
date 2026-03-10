@@ -9,6 +9,7 @@ import {
     or,
     query,
     where,
+    writeBatch,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
@@ -298,24 +299,40 @@ export const useMatchesStore = defineStore('matches', () => {
             const now = new Date();
             const allCollections = ['matches_nuevos', 'matches_guardados', 'matches_eliminados'];
 
-            for (const colName of allCollections) {
-                const colRef = collection(db, 'users', authStore.user.id, colName);
-                const snapshot = await getDocs(colRef);
+            // Fetch all 3 collections in parallel
+            const snapshots = await Promise.all(
+                allCollections.map(colName =>
+                    getDocs(collection(db, 'users', authStore.user!.id, colName))
+                )
+            );
 
+            // Collect all expired document refs
+            const expiredRefs: ReturnType<typeof doc>[] = [];
+            for (const snapshot of snapshots) {
                 for (const docSnap of snapshot.docs) {
                     const data = docSnap.data();
                     let expiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
 
-                    // If no lifeExpiresAt, calculate from createdAt
                     if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
                         const createdAt = toDate(data.createdAt);
                         expiresAt = calculateExpirationDate(createdAt);
                     }
 
                     if (expiresAt && expiresAt <= now && !Number.isNaN(expiresAt.getTime())) {
-                        await deleteDoc(docSnap.ref);
+                        expiredRefs.push(docSnap.ref);
                     }
                 }
+            }
+
+            // Batch delete expired docs (max 500 per batch)
+            const BATCH_SIZE = 500;
+            for (let i = 0; i < expiredRefs.length; i += BATCH_SIZE) {
+                const chunk = expiredRefs.slice(i, i + BATCH_SIZE);
+                const batch = writeBatch(db);
+                for (const ref of chunk) {
+                    batch.delete(ref);
+                }
+                await batch.commit();
             }
         } catch {
             // silent fail

@@ -595,44 +595,58 @@ export const useCollectionStore = defineStore('collection', () => {
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
 
-            // Process in batches of 50 to avoid overwhelming Firestore
-            const BATCH_SIZE = 50
+            // Use writeBatch for atomic bulk writes (max 500 per batch)
+            const BATCH_SIZE = 400
             const createdIds: string[] = []
+            const createdCards: Card[] = []
             let failCount = 0
 
             for (let i = 0; i < cardsToSave.length; i += BATCH_SIZE) {
-                const batch = cardsToSave.slice(i, i + BATCH_SIZE)
-                const addPromises = batch.map(async card => {
+                const chunk = cardsToSave.slice(i, i + BATCH_SIZE)
+                const batch = writeBatch(db)
+                const chunkRefs: { ref: ReturnType<typeof doc>; card: Omit<Card, 'id'> }[] = []
+
+                for (const card of chunk) {
                     const { id: _id, ...cardWithoutId } = card as any
                     // Strip undefined values that Firestore rejects
                     const cleanData: Record<string, any> = {}
                     for (const [key, value] of Object.entries(cardWithoutId)) {
                         if (value !== undefined) cleanData[key] = value
                     }
-                    return addDoc(colRef, {
+                    const docRef = doc(colRef)
+                    batch.set(docRef, {
                         ...cleanData,
                         createdAt: Timestamp.now(),
                         updatedAt: Timestamp.now(),
                     })
-                })
-
-                const results = await Promise.allSettled(addPromises)
-                for (const result of results) {
-                    if (result.status === 'fulfilled') {
-                        createdIds.push(result.value.id)
-                    } else {
-                        failCount++
-                        console.error('Error saving card:', result.reason)
-                    }
+                    chunkRefs.push({ ref: docRef, card })
                 }
 
-                // Throttle between batches to avoid exhausting Firestore write stream
+                try {
+                    await batch.commit()
+                    for (const { ref: docRef, card } of chunkRefs) {
+                        createdIds.push(docRef.id)
+                        createdCards.push({
+                            ...card,
+                            id: docRef.id,
+                            updatedAt: new Date(),
+                            createdAt: new Date(),
+                        } as Card)
+                    }
+                } catch (err) {
+                    failCount += chunk.length
+                    console.error('Batch import commit failed:', err)
+                }
+
+                // Throttle between batches
                 if (i + BATCH_SIZE < cardsToSave.length) {
                     await new Promise(resolve => setTimeout(resolve, 200))
                 }
             }
 
-            await loadCollection()
+            // Push created cards directly into local state (avoids re-reading ALL cards)
+            cards.value.push(...createdCards)
+
             if (!silent) {
                 if (failCount > 0) {
                     toastStore.show(t('collection.messages.imported', { count: createdIds.length }) + ` (${failCount} fallaron)`, 'info')

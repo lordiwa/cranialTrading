@@ -1,4 +1,4 @@
-import { ref, onUnmounted, type Ref } from 'vue';
+import { onUnmounted, ref, type Ref } from 'vue';
 
 export function useCountUp(target: Ref<number>, duration = 1500) {
   const display = ref(0);
@@ -23,7 +23,7 @@ export function useCountUp(target: Ref<number>, duration = 1500) {
     animationId = requestAnimationFrame(tick);
   }
 
-  onUnmounted(() => cancelAnimationFrame(animationId));
+  onUnmounted(() => { cancelAnimationFrame(animationId); });
 
   return { display, start };
 }

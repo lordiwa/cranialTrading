@@ -16,7 +16,7 @@ export function useScrollReveal(selector = '.scroll-reveal') {
       { threshold: 0.15 }
     );
 
-    document.querySelectorAll(selector).forEach((el) => observer!.observe(el));
+    document.querySelectorAll(selector).forEach((el) => { observer!.observe(el); });
   });
 
   onUnmounted(() => observer?.disconnect());

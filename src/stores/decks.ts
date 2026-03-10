@@ -11,7 +11,7 @@ import {
     updateDoc,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
-import { getCardById as getScryfallCard } from '../services/scryfall'
+import { getCardsByIds } from '../services/scryfall'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { useCollectionStore } from './collection'
@@ -208,35 +208,42 @@ export const useDecksStore = defineStore('decks', () => {
 
         if (itemsToMigrate.length === 0) return wishlist
 
+        // Batch fetch all missing cards from Scryfall in one call (handles 75 per batch internally)
+        const uniqueIds = [...new Set(itemsToMigrate.map(item => item.scryfallId))]
+        const identifiers = uniqueIds.map(id => ({ id }))
+        let scryfallCards: Awaited<ReturnType<typeof getCardsByIds>> = []
+        try {
+            scryfallCards = await getCardsByIds(identifiers)
+        } catch (e) {
+            console.warn('[migrateWishlistMetadata] Batch fetch failed:', e)
+            return wishlist
+        }
+
+        const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]))
+
         let updated = false
         const updatedWishlist = [...wishlist]
 
         for (const item of itemsToMigrate) {
-            try {
-                const scryfallCard = await getScryfallCard(item.scryfallId)
-                if (scryfallCard) {
-                    const index = updatedWishlist.findIndex(
-                        w => w.scryfallId === item.scryfallId &&
-                            w.edition === item.edition &&
-                            w.condition === item.condition &&
-                            w.foil === item.foil &&
-                            w.isInSideboard === item.isInSideboard
-                    )
-                    const existingItem = updatedWishlist[index]
-                    if (index >= 0 && existingItem) {
-                        updatedWishlist[index] = {
-                            ...existingItem,
-                            type_line: scryfallCard.type_line,
-                            colors: scryfallCard.colors || [],
-                            cmc: scryfallCard.cmc,
-                        }
-                        updated = true
+            const scryfallCard = scryfallMap.get(item.scryfallId)
+            if (scryfallCard) {
+                const index = updatedWishlist.findIndex(
+                    w => w.scryfallId === item.scryfallId &&
+                        w.edition === item.edition &&
+                        w.condition === item.condition &&
+                        w.foil === item.foil &&
+                        w.isInSideboard === item.isInSideboard
+                )
+                const existingItem = updatedWishlist[index]
+                if (index >= 0 && existingItem) {
+                    updatedWishlist[index] = {
+                        ...existingItem,
+                        type_line: scryfallCard.type_line,
+                        colors: scryfallCard.colors || [],
+                        cmc: scryfallCard.cmc,
                     }
+                    updated = true
                 }
-                // Small delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 100))
-            } catch (e) {
-                console.warn(`[migrateWishlistMetadata] Failed to fetch ${item.name}:`, e)
             }
         }
 

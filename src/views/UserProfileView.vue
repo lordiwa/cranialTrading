@@ -183,7 +183,7 @@ const loadProfile = async () => {
       }
 
       userId.value = result.id;
-      userInfo.value = result.data as any;
+      userInfo.value = result.data;
     }
 
     // Load all cards at once, then filter for public ones client-side

@@ -19,7 +19,7 @@ export interface FormatStaples {
         spells: StapleCard[]
         lands: StapleCard[]
     }
-    updatedAt: any
+    updatedAt: unknown
 }
 
 export interface PriceMover {
@@ -37,7 +37,7 @@ export interface PriceMovers {
     winners: PriceMover[]
     losers: PriceMover[]
     sourceDate: string
-    updatedAt: any
+    updatedAt: unknown
 }
 
 export type FormatKey = 'standard' | 'modern' | 'pioneer' | 'legacy' | 'vintage' | 'pauper' | 'commander'

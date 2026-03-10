@@ -42,7 +42,7 @@ const {
 // Fetch CK prices when card changes
 watch(() => props.card, (card) => {
   if (card?.scryfallId && card?.setCode) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 }, { immediate: true })
 
@@ -67,6 +67,7 @@ const getStatusIcon = (status: CardStatus) => {
     trade: '🔄',
     wishlist: '⭐',
   }
+  // eslint-disable-next-line security/detect-object-injection
   return icons[status]
 }
 

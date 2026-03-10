@@ -65,7 +65,7 @@ export const parseDeckLine = (line: string): ParsedDeckLine | null => {
   const matchRemainder = match?.[2]
   if (!match || !matchQty || !matchRemainder) return null
 
-  const quantity = Number.parseInt(matchQty)
+  const quantity = Number.parseInt(matchQty, 10)
   const remainder = matchRemainder.trim()
 
   // Check for foil indicator in the original line
@@ -194,7 +194,7 @@ export const buildMoxfieldCsv = (cards: {
       escapeCsvField(card.name),      // Name
       card.setCode,                   // Edition
       conditionToCsv(card.condition), // Condition
-      (card.language || 'en').toUpperCase(), // Language
+      (card.language ?? 'en').toUpperCase(), // Language
       card.foil ? 'foil' : '',        // Foil
       '',                             // Collector Number (not stored)
       '',                             // Alter
@@ -232,12 +232,12 @@ export const buildManaboxCsv = (cards: {
       '',                                   // Rarity (not stored)
       String(card.quantity),                // Quantity
       '',                                   // ManaBox ID (not stored)
-      card.scryfallId || '',                // Scryfall ID
+      card.scryfallId ?? '',                // Scryfall ID
       card.price ? card.price.toFixed(2) : '', // Purchase price
       '',                                   // Misprint
       '',                                   // Altered
       conditionToManabox(card.condition),   // Condition
-      (card.language || 'en').toLowerCase(), // Language
+      (card.language ?? 'en').toLowerCase(), // Language
       '',                                   // Purchase currency
     ].join(','))
   }
@@ -254,6 +254,7 @@ const parseCsvLine = (line: string): string[] => {
   let inQuotes = false
 
   for (let i = 0; i < line.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
     const char = line[i]
     if (char === '"') {
       if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
@@ -266,7 +267,7 @@ const parseCsvLine = (line: string): string[] => {
       fields.push(current)
       current = ''
     } else {
-      current += char
+      current += char ?? ''
     }
   }
   fields.push(current)
@@ -291,7 +292,7 @@ export interface ParsedCsvCard {
  * Detect if text is a CSV export (ManaBox or Moxfield)
  */
 export const isCsvFormat = (text: string): boolean => {
-  const firstLine = text.split('\n')[0]?.trim() || ''
+  const firstLine = text.split('\n')[0]?.trim() ?? ''
   // ManaBox: headers contain "Name,Set code" or "Scryfall ID"
   // Moxfield: headers contain "Count,Name,Edition" or "Collector Number"
   return firstLine.includes('Name,Set code') || firstLine.includes('Scryfall ID')
@@ -334,17 +335,19 @@ export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
 
   const getField = (fields: string[], idx: number | undefined): string => {
     if (idx === undefined) return ''
+    // eslint-disable-next-line security/detect-object-injection
     return fields[idx] ?? ''
   }
 
   const cards: ParsedCsvCard[] = []
 
   for (let i = 1; i < lines.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
     const line = lines[i]
     if (!line) continue
     const fields = parseCsvLine(line)
     const name = getField(fields, nameIdx).trim()
-    const quantity = Number.parseInt(getField(fields, quantityIdx) || '0')
+    const quantity = Number.parseInt(getField(fields, quantityIdx) || '0', 10)
 
     if (!name || !quantity || quantity <= 0) continue
 

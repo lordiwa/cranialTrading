@@ -20,23 +20,46 @@ import type {
     CreateDeckInput,
     Deck,
     DeckCardAllocation,
+    DeckFormat,
     DeckStats,
     DeckWishlistItem,
 } from '../types/deck'
 import { t } from '../composables/useI18n'
 
 // Helper to remove undefined values from objects (Firebase doesn't accept undefined)
-const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
+const removeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
     return Object.fromEntries(
         Object.entries(obj).filter(([_, v]) => v !== undefined)
     ) as T
 }
 
+interface FirestoreDateItem {
+    addedAt?: { toDate?: () => Date } | Date | string | number;
+    [key: string]: unknown;
+}
+
+interface FirestoreDeckData {
+    name: string;
+    format: DeckFormat;
+    description: string;
+    colors?: string[];
+    commander?: string;
+    allocations: FirestoreDateItem[];
+    wishlist: FirestoreDateItem[];
+    thumbnail?: string;
+    createdAt?: { toDate: () => Date };
+    updatedAt?: { toDate: () => Date };
+    isPublic?: boolean;
+    stats?: DeckStats;
+}
+
 // Helper to process Firestore dates in deck items (allocations/wishlist)
-const processFirestoreDates = <T extends { addedAt?: any }>(items: any[]): T[] => {
-    return (items || []).map((item: any) => ({
+const processFirestoreDates = <T extends { addedAt?: Date }>(items: FirestoreDateItem[]): T[] => {
+    return (items || []).map((item: FirestoreDateItem) => ({
         ...item,
-        addedAt: item.addedAt?.toDate?.() || new Date(item.addedAt) || new Date(),
+        addedAt: (typeof item.addedAt === 'object' && item.addedAt !== null && 'toDate' in item.addedAt && typeof item.addedAt.toDate === 'function')
+            ? item.addedAt.toDate()
+            : (item.addedAt ? new Date(item.addedAt as string | number) : new Date()),
     })) as T[]
 }
 
@@ -234,12 +257,14 @@ export const useDecksStore = defineStore('decks', () => {
                         w.foil === item.foil &&
                         w.isInSideboard === item.isInSideboard
                 )
+                // eslint-disable-next-line security/detect-object-injection
                 const existingItem = updatedWishlist[index]
                 if (index >= 0 && existingItem) {
+                    // eslint-disable-next-line security/detect-object-injection
                     updatedWishlist[index] = {
                         ...existingItem,
                         type_line: scryfallCard.type_line,
-                        colors: scryfallCard.colors || [],
+                        colors: scryfallCard.colors ?? [],
                         cmc: scryfallCard.cmc,
                     }
                     updated = true
@@ -278,9 +303,10 @@ export const useDecksStore = defineStore('decks', () => {
             const decksRef = collection(db, 'users', authStore.user.id, 'decks')
             const snapshot = await getDocs(decksRef)
 
+            const userId = authStore.user.id
             // First pass: load all decks
             const loadedDecks: Deck[] = snapshot.docs.map(docSnap => {
-                const data = docSnap.data()
+                const data = docSnap.data() as FirestoreDeckData
 
                 // Convert dates in allocations and wishlist
                 const processedAllocations = processFirestoreDates<DeckCardAllocation>(data.allocations)
@@ -288,19 +314,19 @@ export const useDecksStore = defineStore('decks', () => {
 
                 return {
                     id: docSnap.id,
-                    userId: authStore.user!.id,
+                    userId,
                     name: data.name,
                     format: data.format,
                     description: data.description,
-                    colors: data.colors || [],
-                    commander: data.commander || '',
+                    colors: data.colors ?? [],
+                    commander: data.commander ?? '',
                     allocations: processedAllocations,
                     wishlist: processedWishlist,
-                    thumbnail: data.thumbnail || '',
-                    createdAt: data.createdAt?.toDate() || new Date(),
-                    updatedAt: data.updatedAt?.toDate() || new Date(),
-                    isPublic: data.isPublic || false,
-                    stats: data.stats || calculateEmptyStats(),
+                    thumbnail: data.thumbnail ?? '',
+                    createdAt: data.createdAt?.toDate() ?? new Date(),
+                    updatedAt: data.updatedAt?.toDate() ?? new Date(),
+                    isPublic: data.isPublic ?? false,
+                    stats: data.stats ?? calculateEmptyStats(),
                 } as Deck
             })
 
@@ -338,7 +364,7 @@ export const useDecksStore = defineStore('decks', () => {
                 return null
             }
 
-            const data = docSnap.data()
+            const data = docSnap.data() as FirestoreDeckData
             const allocations = processFirestoreDates<DeckCardAllocation>(data.allocations)
             let wishlist = processFirestoreDates<DeckWishlistItem>(data.wishlist)
 
@@ -351,20 +377,21 @@ export const useDecksStore = defineStore('decks', () => {
                 name: data.name,
                 format: data.format,
                 description: data.description,
-                colors: data.colors || [],
-                commander: data.commander || '',
+                colors: data.colors ?? [],
+                commander: data.commander ?? '',
                 allocations,
                 wishlist,
-                thumbnail: data.thumbnail || '',
-                createdAt: data.createdAt?.toDate() || new Date(),
-                updatedAt: data.updatedAt?.toDate() || new Date(),
-                isPublic: data.isPublic || false,
-                stats: data.stats || calculateEmptyStats(),
+                thumbnail: data.thumbnail ?? '',
+                createdAt: data.createdAt?.toDate() ?? new Date(),
+                updatedAt: data.updatedAt?.toDate() ?? new Date(),
+                isPublic: data.isPublic ?? false,
+                stats: data.stats ?? calculateEmptyStats(),
             }
 
             // Also add/update in decks array so allocateCardToDeck can find it
             const existingIndex = decks.value.findIndex(d => d.id === deckId)
             if (existingIndex >= 0) {
+                // eslint-disable-next-line security/detect-object-injection
                 decks.value[existingIndex] = deck
             } else {
                 decks.value.push(deck)
@@ -399,7 +426,7 @@ export const useDecksStore = defineStore('decks', () => {
                 format: input.format,
                 description: input.description,
                 colors: input.colors,
-                commander: input.commander || '',
+                commander: input.commander ?? '',
                 allocations: [],
                 wishlist: [],
                 thumbnail: '',
@@ -416,7 +443,7 @@ export const useDecksStore = defineStore('decks', () => {
                 format: input.format,
                 description: input.description,
                 colors: input.colors,
-                commander: input.commander || '',
+                commander: input.commander ?? '',
                 allocations: [],
                 wishlist: [],
                 thumbnail: '',
@@ -713,7 +740,9 @@ export const useDecksStore = defineStore('decks', () => {
             let totalWishlisted = 0
 
             for (let i = 0; i < items.length; i++) {
-                const item = items[i]!
+                // eslint-disable-next-line security/detect-object-injection
+                const item = items[i]
+                if (!item) continue
                 const card = collectionStore.getCardById(item.cardId)
                 if (!card) continue
 
@@ -1001,85 +1030,77 @@ export const useDecksStore = defineStore('decks', () => {
      * Reduce allocations when a card's quantity is reduced in collection
      * Converts excess allocations to wishlist items
      */
+    /** Adjust a single deck's allocations, converting excess owned copies to wishlist references */
+    const adjustDeckAllocation = (
+        deck: Deck, cardId: string, wishCardId: string, excessToRemove: number, collectionStore: ReturnType<typeof useCollectionStore>,
+    ): number => {
+        if (!deck.allocations) return 0
+
+        const alloc = deck.allocations.find(a => a.cardId === cardId)
+        if (!alloc) return 0
+
+        const toConvert = Math.min(alloc.quantity, excessToRemove)
+        if (toConvert <= 0) return 0
+
+        alloc.quantity -= toConvert
+
+        // Add or merge wishlist allocation
+        const existingWishAlloc = deck.allocations.find(
+            a => a.cardId === wishCardId && a.isInSideboard === alloc.isInSideboard
+        )
+        if (existingWishAlloc) {
+            existingWishAlloc.quantity += toConvert
+        } else {
+            deck.allocations.push(removeUndefined({
+                cardId: wishCardId, quantity: toConvert,
+                isInSideboard: alloc.isInSideboard, notes: alloc.notes, addedAt: new Date(),
+            }))
+        }
+
+        // Remove zero-quantity allocation
+        if (alloc.quantity <= 0) {
+            deck.allocations = deck.allocations.filter(a => a.cardId !== cardId || a.isInSideboard !== alloc.isInSideboard)
+        }
+
+        deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
+        deck.updatedAt = new Date()
+        return toConvert
+    }
+
     const reduceAllocationsForCard = async (card: Card, newQuantity: number): Promise<void> => {
         if (!authStore.user?.id) return
 
         const totalAllocated = getTotalAllocatedForCard(card.id)
-        if (newQuantity >= totalAllocated) return // No reduction needed
+        if (newQuantity >= totalAllocated) return
 
         const collectionStore = useCollectionStore()
         let excessToRemove = totalAllocated - newQuantity
 
-        // First, create a single wishlist card in collection for the total excess
         const wishCardId = await collectionStore.ensureCollectionWishlistCard({
-            scryfallId: card.scryfallId,
-            name: card.name,
-            edition: card.edition,
-            quantity: excessToRemove,
-            condition: card.condition,
-            foil: card.foil,
-            price: card.price ?? 0,
-            image: card.image ?? '',
-            cmc: card.cmc,
-            type_line: card.type_line,
-            colors: card.colors,
+            scryfallId: card.scryfallId, name: card.name, edition: card.edition,
+            quantity: excessToRemove, condition: card.condition, foil: card.foil,
+            price: card.price ?? 0, image: card.image ?? '',
+            cmc: card.cmc, type_line: card.type_line, colors: card.colors,
         })
-
         if (!wishCardId) return
 
         const updatePromises: Promise<void>[] = []
 
         for (const deck of decks.value) {
-            if (!deck.allocations || excessToRemove <= 0) continue
+            if (excessToRemove <= 0) break
+            const converted = adjustDeckAllocation(deck, card.id, wishCardId, excessToRemove, collectionStore)
+            if (converted <= 0) continue
+            excessToRemove -= converted
 
-            const alloc = deck.allocations.find(a => a.cardId === card.id)
-            if (!alloc) continue
-
-            const toConvert = Math.min(alloc.quantity, excessToRemove)
-            if (toConvert <= 0) continue
-
-            // Reduce owned allocation
-            alloc.quantity -= toConvert
-            excessToRemove -= toConvert
-
-            // Add allocation pointing to wishlist card
-            const existingWishAlloc = deck.allocations.find(
-                a => a.cardId === wishCardId && a.isInSideboard === alloc.isInSideboard
-            )
-            if (existingWishAlloc) {
-                existingWishAlloc.quantity += toConvert
-            } else {
-                deck.allocations.push(removeUndefined({
-                    cardId: wishCardId,
-                    quantity: toConvert,
-                    isInSideboard: alloc.isInSideboard,
-                    notes: alloc.notes,
-                    addedAt: new Date(),
-                }))
-            }
-
-            // Remove allocation if quantity is 0
-            if (alloc.quantity <= 0) {
-                deck.allocations = deck.allocations.filter(a => a.cardId !== card.id || a.isInSideboard !== alloc.isInSideboard)
-            }
-
-            // Recalculate stats
-            deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
-            deck.updatedAt = new Date()
-
-            // Queue Firestore update (parallel)
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
             updatePromises.push(
                 updateDoc(deckRef, {
-                    allocations: deck.allocations,
-                    wishlist: deck.wishlist || [],
-                    stats: deck.stats,
-                    updatedAt: Timestamp.now(),
+                    allocations: deck.allocations, wishlist: deck.wishlist || [],
+                    stats: deck.stats, updatedAt: Timestamp.now(),
                 })
             )
         }
 
-        // Execute all updates in parallel
         const results = await Promise.allSettled(updatePromises)
         const failures = results.filter(r => r.status === 'rejected')
         if (failures.length > 0) {

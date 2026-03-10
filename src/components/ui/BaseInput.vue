@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   error: '',
   disabled: false,
   required: false,
+  id: undefined,
   clearable: false,
 });
 

@@ -126,9 +126,9 @@ const displaySets = computed(() => {
 
 const getSetName = (code: string): string => {
   if (props.mode === 'local') {
-    return props.localSets.find(s => s.code === code)?.name || code.toUpperCase()
+    return props.localSets.find(s => s.code === code)?.name ?? code.toUpperCase()
   }
-  return allSets.value.find(s => s.code === code)?.name || code.toUpperCase()
+  return allSets.value.find(s => s.code === code)?.name ?? code.toUpperCase()
 }
 
 // ========== Mana values ==========
@@ -139,7 +139,7 @@ const isManaValueSelected = (value: number) => {
 }
 
 const toggleManaValue = (value: number) => {
-  const current = f.value.manaValue.values || []
+  const current = f.value.manaValue.values ?? []
   const index = current.indexOf(value)
   if (index > -1) {
     current.splice(index, 1)
@@ -202,7 +202,7 @@ const getCreatureTypeLabel = (value: string): string => {
     const found = props.localCreatureTypes.find(ct => ct.value === value)
     if (found) return found.label
   }
-  return allCreatureTypes.find(ct => ct.value === value)?.label || value.charAt(0).toUpperCase() + value.slice(1)
+  return allCreatureTypes.find(ct => ct.value === value)?.label ?? value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 // ========== Counting ==========
@@ -256,10 +256,10 @@ const rarityOptions = [
   { value: 'mythic', label: 'Mythic' },
 ]
 
-const getColorLabel = (value: string): string => colorOptions.find(c => c.value === value)?.label || value
-const getTypeLabel = (value: string): string => typeOptions.find(t => t.value === value)?.label || value
-const getRarityLabel = (value: string): string => rarityOptions.find(r => r.value === value)?.label || value
-const getFormatLabel = (value: string): string => formatOptions.find(f => f.value === value)?.label || value
+const getColorLabel = (value: string): string => colorOptions.find(c => c.value === value)?.label ?? value
+const getTypeLabel = (value: string): string => typeOptions.find(t => t.value === value)?.label ?? value
+const getRarityLabel = (value: string): string => rarityOptions.find(r => r.value === value)?.label ?? value
+const getFormatLabel = (value: string): string => formatOptions.find(f => f.value === value)?.label ?? value
 
 // ========== Remove individual filter ==========
 const removeFilter = (type: string, value?: string) => {

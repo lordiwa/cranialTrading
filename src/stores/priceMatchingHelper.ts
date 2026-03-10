@@ -57,7 +57,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
         const myOffering: Card[] = []
         let myValue = 0
 
-        console.log('🔍 Bidireccional check:', {
+        console.info('Bidireccional check:', {
             myCards: myCards.filter(c => c.status !== 'wishlist').map(c => ({ name: c.name, edition: c.edition })),
             myPrefs: myPreferences.filter(p => p.type === 'BUSCO').map(p => ({ name: p.name, edition: p.edition })),
             theirCards: theirCards.filter(c => c.status !== 'wishlist').map(c => ({ name: c.name, edition: c.edition })),
@@ -83,7 +83,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 const adjustedCard = { ...myCard, quantity: matchQty }
                 myOffering.push(adjustedCard)
                 myValue += (myCard.price || 0) * matchQty
-                console.log(`✅ Mi carta "${myCard.name}" x${matchQty} (buscan ${theirWantedQty}, tengo ${myAvailableQty})`)
+                console.info(`Mi carta "${myCard.name}" x${matchQty} (buscan ${theirWantedQty}, tengo ${myAvailableQty})`)
             }
         }
 
@@ -110,11 +110,11 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 const adjustedCard = { ...card, quantity: matchQty }
                 theirOffering.push(adjustedCard)
                 theirValue += (card.price || 0) * matchQty
-                console.log(`✅ Su carta "${card.name}" x${matchQty} (busco ${wantedQty}, tiene ${availableQty})`)
+                console.info(`Su carta "${card.name}" x${matchQty} (busco ${wantedQty}, tiene ${availableQty})`)
             }
         }
 
-        console.log('📊 Resultado bidireccional:', {
+        console.info('Resultado bidireccional:', {
             myOffering: myOffering.length,
             theirOffering: theirOffering.length,
             myValue,
@@ -123,7 +123,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
         // BIDIRECCIONAL: ambos lados deben tener cartas
         if (myOffering.length === 0 || theirOffering.length === 0) {
-            console.log('❌ Bidireccional fallido: un lado vacío')
+            console.info('Bidireccional fallido: un lado vacío')
             return null
         }
 

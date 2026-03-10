@@ -38,7 +38,7 @@ export function useCardPrices(scryfallId: () => string | undefined, setCode: () 
     // Check global cache first (key: scryfallId_setCode or just scryfallId)
     const cacheKey = set ? `${id}_${set}` : id
     if (pricesCache.has(cacheKey)) {
-      prices.value = pricesCache.get(cacheKey)!
+      prices.value = pricesCache.get(cacheKey) ?? null
       return
     }
 

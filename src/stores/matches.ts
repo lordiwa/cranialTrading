@@ -16,21 +16,43 @@ import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
 
+export interface MatchCard {
+    scryfallId: string;
+    name: string;
+    edition: string;
+    quantity: number;
+    condition: string;
+    foil: boolean;
+    price: number;
+    image: string;
+    status: string;
+}
+
+export interface MatchPreference {
+    scryfallId: string;
+    name: string;
+    type: string;
+    quantity: number;
+    condition: string;
+    edition: string;
+    image: string;
+}
+
 export interface SimpleMatch {
     id: string;
-    type: 'VENDO' | 'BUSCO';
+    type: 'VENDO' | 'BUSCO' | 'BIDIRECTIONAL';
     otherUserId: string;
     otherUsername: string;
     otherLocation?: string;
     otherEmail?: string;
     otherAvatarUrl?: string | null;
-    myCard?: any;
-    otherCard?: any;
-    otherPreference?: any;
-    myPreference?: any;
+    myCard?: MatchCard | null;
+    otherCard?: MatchCard | null;
+    otherPreference?: MatchPreference | null;
+    myPreference?: MatchPreference | null;
     // MatchCard.vue format (arrays + totals)
-    myCards?: any[];
-    otherCards?: any[];
+    myCards?: MatchCard[];
+    otherCards?: MatchCard[];
     myTotalValue?: number;
     theirTotalValue?: number;
     valueDifference?: number;
@@ -42,6 +64,43 @@ export interface SimpleMatch {
     // Shared match fields
     isSharedMatch?: boolean;
     isSender?: boolean;
+}
+
+interface FirestoreMatchData {
+    id?: string;
+    type?: string;
+    otherUserId?: string;
+    otherUsername?: string;
+    otherLocation?: string;
+    otherEmail?: string;
+    otherAvatarUrl?: string | null;
+    myCard?: MatchCard | null;
+    otherCard?: MatchCard | null;
+    myPreference?: MatchPreference | null;
+    otherPreference?: MatchPreference | null;
+    myCards?: MatchCard[];
+    otherCards?: MatchCard[];
+    myTotalValue?: number;
+    theirTotalValue?: number;
+    valueDifference?: number;
+    compatibility?: number;
+    status?: string;
+    createdAt?: unknown;
+    lifeExpiresAt?: unknown;
+}
+
+interface SharedMatchData extends FirestoreMatchData {
+    senderId?: string;
+    receiverId?: string;
+    senderUsername?: string;
+    receiverUsername?: string;
+    senderLocation?: string;
+    receiverLocation?: string;
+    senderEmail?: string;
+    senderAvatarUrl?: string | null;
+    receiverAvatarUrl?: string | null;
+    card?: MatchCard;
+    cardType?: string;
 }
 
 const MATCH_LIFETIME_DAYS = 15;
@@ -56,45 +115,45 @@ const getExpirationDate = () => {
  * Factory: Create a clean, serializable match payload
  * Extracts only the fields we need from ANY match source
  */
-function createCleanMatchPayload(match: SimpleMatch, overrides: any = {}) {
+function createCleanMatchPayload(match: SimpleMatch, overrides: Record<string, unknown> = {}): Record<string, unknown> {
     // Helper to extract card fields
-    const cleanCard = (card: any) => {
+    const cleanCard = (card: MatchCard | null | undefined): MatchCard | null => {
         if (!card) return null;
         return {
-            scryfallId: card.scryfallId || '',
-            name: card.name || '',
-            edition: card.edition || '',
-            quantity: card.quantity || 0,
-            condition: card.condition || 'NM',
-            foil: card.foil || false,
+            scryfallId: card.scryfallId ?? '',
+            name: card.name ?? '',
+            edition: card.edition ?? '',
+            quantity: card.quantity ?? 0,
+            condition: card.condition ?? 'NM',
+            foil: card.foil ?? false,
             price: typeof card.price === 'number' ? card.price : 0,
-            image: card.image || '',
-            status: card.status || 'collection',
+            image: card.image ?? '',
+            status: card.status ?? 'collection',
         };
     };
 
     // Helper to extract preference fields
-    const cleanPref = (pref: any) => {
+    const cleanPref = (pref: MatchPreference | null | undefined): MatchPreference | null => {
         if (!pref) return null;
         return {
-            scryfallId: pref.scryfallId || '',
-            name: pref.name || '',
-            type: pref.type || 'BUSCO',
-            quantity: pref.quantity || 0,
-            condition: pref.condition || 'NM',
-            edition: pref.edition || '',
-            image: pref.image || '',
+            scryfallId: pref.scryfallId ?? '',
+            name: pref.name ?? '',
+            type: pref.type ?? 'BUSCO',
+            quantity: pref.quantity ?? 0,
+            condition: pref.condition ?? 'NM',
+            edition: pref.edition ?? '',
+            image: pref.image ?? '',
         };
     };
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
         id: match.id || '',
         type: match.type || 'BUSCO',
         otherUserId: match.otherUserId || '',
         otherUsername: match.otherUsername || '',
-        otherLocation: match.otherLocation || '',
-        otherAvatarUrl: match.otherAvatarUrl || null,
-        status: match.status || 'nuevo',
+        otherLocation: match.otherLocation ?? '',
+        otherAvatarUrl: match.otherAvatarUrl ?? null,
+        status: match.status ?? 'nuevo',
         createdAt: match.createdAt instanceof Date ? match.createdAt : new Date(),
         lifeExpiresAt: match.lifeExpiresAt instanceof Date ? match.lifeExpiresAt : new Date(),
         myCard: cleanCard(match.myCard),
@@ -120,10 +179,12 @@ export const useMatchesStore = defineStore('matches', () => {
     /**
      * Helper to safely convert any value to a Date
      */
-    const toDate = (value: any): Date => {
+    const toDate = (value: unknown): Date => {
         if (!value) return new Date();
         if (value instanceof Date) return value;
-        if (typeof value.toDate === 'function') return value.toDate(); // Firestore Timestamp
+        if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+            return (value as { toDate: () => Date }).toDate(); // Firestore Timestamp
+        }
         if (typeof value === 'number') return new Date(value); // Unix timestamp
         if (typeof value === 'string') return new Date(value); // ISO string
         return new Date(); // fallback
@@ -141,7 +202,8 @@ export const useMatchesStore = defineStore('matches', () => {
     /**
      * Convert Firestore document data to a clean SimpleMatch object
      */
-    const parseFirestoreMatch = (docId: string, data: any): SimpleMatch => {
+    const parseFirestoreMatch = (docId: string, rawData: Record<string, unknown>): SimpleMatch => {
+        const data = rawData as unknown as FirestoreMatchData;
         const createdAt = toDate(data.createdAt);
 
         // If lifeExpiresAt is missing or invalid, calculate from createdAt + 15 days
@@ -151,26 +213,26 @@ export const useMatchesStore = defineStore('matches', () => {
         }
 
         return {
-            id: data.id || '',
-            type: data.type || 'BUSCO',
-            otherUserId: data.otherUserId || '',
-            otherUsername: data.otherUsername || '',
+            id: data.id ?? '',
+            type: (data.type as SimpleMatch['type']) ?? 'BUSCO',
+            otherUserId: data.otherUserId ?? '',
+            otherUsername: data.otherUsername ?? '',
             otherLocation: data.otherLocation,
             otherEmail: data.otherEmail,
-            otherAvatarUrl: data.otherAvatarUrl || null,
+            otherAvatarUrl: data.otherAvatarUrl ?? null,
             myCard: data.myCard,
             otherCard: data.otherCard,
             myPreference: data.myPreference,
             otherPreference: data.otherPreference,
             // Support for MatchCard.vue format (arrays + totals)
-            myCards: data.myCards || [],
-            otherCards: data.otherCards || [],
+            myCards: data.myCards ?? [],
+            otherCards: data.otherCards ?? [],
             myTotalValue: data.myTotalValue ?? 0,
             theirTotalValue: data.theirTotalValue ?? 0,
             valueDifference: data.valueDifference ?? 0,
             compatibility: data.compatibility ?? 0,
             createdAt,
-            status: data.status,
+            status: data.status as SimpleMatch['status'],
             lifeExpiresAt,
             docId,
         };
@@ -179,12 +241,13 @@ export const useMatchesStore = defineStore('matches', () => {
     /**
      * Convert shared match to SimpleMatch format for MatchCard.vue
      */
-    const parseSharedMatch = (docId: string, data: any, currentUserId: string): SimpleMatch => {
+    const parseSharedMatch = (docId: string, rawData: Record<string, unknown>, currentUserId: string): SimpleMatch => {
+        const data = rawData as unknown as SharedMatchData;
         const createdAt = toDate(data.createdAt);
         const lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : calculateExpirationDate(createdAt);
 
         const isSender = data.senderId === currentUserId;
-        const card = data.card || {};
+        const card: MatchCard = data.card ?? { scryfallId: '', name: '', edition: '', quantity: 0, condition: 'NM', foil: false, price: 0, image: '', status: 'collection' };
         const cardPrice = card.price || 0;
         const totalValue = cardPrice * (card.quantity || 1);
 
@@ -192,11 +255,11 @@ export const useMatchesStore = defineStore('matches', () => {
             id: docId,
             docId,
             type: (data.cardType === 'sale' && !isSender) ? 'VENDO' : 'BUSCO',
-            otherUserId: isSender ? data.receiverId : data.senderId,
-            otherUsername: isSender ? data.receiverUsername : data.senderUsername,
-            otherLocation: isSender ? data.receiverLocation : data.senderLocation,
-            otherEmail: isSender ? '' : data.senderEmail,
-            otherAvatarUrl: isSender ? data.receiverAvatarUrl : data.senderAvatarUrl,
+            otherUserId: isSender ? (data.receiverId ?? '') : (data.senderId ?? ''),
+            otherUsername: isSender ? (data.receiverUsername ?? '') : (data.senderUsername ?? ''),
+            otherLocation: isSender ? (data.receiverLocation ?? '') : (data.senderLocation ?? ''),
+            otherEmail: isSender ? '' : (data.senderEmail ?? ''),
+            otherAvatarUrl: isSender ? (data.receiverAvatarUrl ?? null) : (data.senderAvatarUrl ?? null),
             // For sender: they want the card (otherCards), for receiver: it's their card (myCards)
             myCards: isSender ? [] : [card],
             otherCards: isSender ? [card] : [],
@@ -210,7 +273,7 @@ export const useMatchesStore = defineStore('matches', () => {
             // Extra fields for shared match handling
             isSharedMatch: true,
             isSender,
-        } as SimpleMatch;
+        };
     };
 
     /**
@@ -243,8 +306,9 @@ export const useMatchesStore = defineStore('matches', () => {
             ]);
 
             // Parse shared matches and separate by role
-            const parsedShared = sharedDocs.docs.map(doc =>
-                parseSharedMatch(doc.id, doc.data(), authStore.user!.id)
+            const userId = authStore.user.id;
+            const parsedShared = sharedDocs.docs.map(d =>
+                parseSharedMatch(d.id, d.data() as Record<string, unknown>, userId)
             );
 
             // Shared matches: sender sees in sent, receiver sees in new
@@ -252,12 +316,12 @@ export const useMatchesStore = defineStore('matches', () => {
             const sharedForSent = parsedShared.filter(m => m.isSender);
 
             // Parse saved matches from Firestore
-            const savedFromFirestore = savedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            const savedFromFirestore = savedDocs.docs.map(d => parseFirestoreMatch(d.id, d.data() as Record<string, unknown>));
 
             // NUEVOS: received from others (not sent by me)
             // Deduplicate: calculated matches (matches_nuevos) keep only the latest per otherUserId,
             // shared matches (from "Me Interesa") are unique by docId and kept as-is
-            const parsedNewDocs = newDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            const parsedNewDocs = newDocs.docs.map(d => parseFirestoreMatch(d.id, d.data() as Record<string, unknown>));
             const seenUserIds = new Set<string>();
             const dedupedNewDocs = parsedNewDocs.filter(m => {
                 const key = m.otherUserId;
@@ -279,9 +343,9 @@ export const useMatchesStore = defineStore('matches', () => {
                 ...sharedForSent,
             ];
 
-            deletedMatches.value = deletedDocs.docs.map(doc => parseFirestoreMatch(doc.id, doc.data()));
+            deletedMatches.value = deletedDocs.docs.map(d => parseFirestoreMatch(d.id, d.data() as Record<string, unknown>));
             sharedMatches.value = parsedShared;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('loadAllMatches error:', error);
             toastStore.show(t('matches.messages.loadError'), 'error');
         } finally {
@@ -292,37 +356,39 @@ export const useMatchesStore = defineStore('matches', () => {
     /**
      * Limpia matches expirados de todas las colecciones
      */
+    /** Resolve the effective expiration date for a match document */
+    const resolveExpirationDate = (data: FirestoreMatchData): Date | null => {
+        const expiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
+        if (expiresAt && !Number.isNaN(expiresAt.getTime())) return expiresAt;
+        const createdAt = toDate(data.createdAt);
+        const fallback = calculateExpirationDate(createdAt);
+        return Number.isNaN(fallback.getTime()) ? null : fallback;
+    };
+
+    /** Check if a match document is expired */
+    const isMatchExpired = (data: FirestoreMatchData, now: Date): boolean => {
+        const expiresAt = resolveExpirationDate(data);
+        return expiresAt !== null && expiresAt <= now;
+    };
+
     const cleanExpiredMatches = async () => {
         if (!authStore.user) return;
 
+        const userId = authStore.user.id;
         try {
             const now = new Date();
             const allCollections = ['matches_nuevos', 'matches_guardados', 'matches_eliminados'];
 
-            // Fetch all 3 collections in parallel
             const snapshots = await Promise.all(
                 allCollections.map(colName =>
-                    getDocs(collection(db, 'users', authStore.user!.id, colName))
+                    getDocs(collection(db, 'users', userId, colName))
                 )
             );
 
-            // Collect all expired document refs
-            const expiredRefs: ReturnType<typeof doc>[] = [];
-            for (const snapshot of snapshots) {
-                for (const docSnap of snapshot.docs) {
-                    const data = docSnap.data();
-                    let expiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
-
-                    if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
-                        const createdAt = toDate(data.createdAt);
-                        expiresAt = calculateExpirationDate(createdAt);
-                    }
-
-                    if (expiresAt && expiresAt <= now && !Number.isNaN(expiresAt.getTime())) {
-                        expiredRefs.push(docSnap.ref);
-                    }
-                }
-            }
+            const expiredRefs = snapshots
+                .flatMap(snapshot => snapshot.docs)
+                .filter(docSnap => isMatchExpired(docSnap.data() as FirestoreMatchData, now))
+                .map(docSnap => docSnap.ref);
 
             // Batch delete expired docs (max 500 per batch)
             const BATCH_SIZE = 500;
@@ -370,9 +436,10 @@ export const useMatchesStore = defineStore('matches', () => {
 
             toastStore.show(t('matches.messages.saved'), 'success');
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error);
             console.error('saveMatch error:', error);
-            toastStore.show(t('matches.messages.saveError') + ': ' + error.message, 'error');
+            toastStore.show(t('matches.messages.saveError') + ': ' + errMsg, 'error');
             return false;
         }
     };
@@ -396,7 +463,7 @@ export const useMatchesStore = defineStore('matches', () => {
             }
 
             // Use docId for Firestore operations
-            const firestoreDocId = match.docId || matchId;
+            const firestoreDocId = match.docId ?? matchId;
 
             // Create clean payload for eliminados
             const payload = createCleanMatchPayload(match, {
@@ -433,9 +500,10 @@ export const useMatchesStore = defineStore('matches', () => {
 
             toastStore.show(t('matches.messages.deleted'), 'info');
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error);
             console.error('discardMatch error:', error);
-            toastStore.show(t('matches.messages.deleteError') + ': ' + error.message, 'error');
+            toastStore.show(t('matches.messages.deleteError') + ': ' + errMsg, 'error');
             return false;
         }
     };
@@ -454,7 +522,7 @@ export const useMatchesStore = defineStore('matches', () => {
                     otherUserId: authStore.user.id,
                     otherUsername: authStore.user.username,
                     otherLocation: authStore.user.location,
-                    otherAvatarUrl: authStore.user.avatarUrl || null,
+                    otherAvatarUrl: authStore.user.avatarUrl ?? null,
                     status: 'nuevo',
                     createdAt: new Date(),
                     lifeExpiresAt: getExpirationDate(),
@@ -488,21 +556,22 @@ export const useMatchesStore = defineStore('matches', () => {
     const deleteAllMatches = async (): Promise<boolean> => {
         if (!authStore.user?.id) return false;
 
+        const userId = authStore.user.id;
         try {
             // Delete from user's sent_matches
-            const sentRef = collection(db, 'users', authStore.user.id, 'sent_matches');
+            const sentRef = collection(db, 'users', userId, 'sent_matches');
             const sentSnapshot = await getDocs(sentRef);
-            await Promise.all(sentSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'sent_matches', docSnap.id))));
+            await Promise.all(sentSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', userId, 'sent_matches', docSnap.id))));
 
             // Delete from user's saved_matches
-            const savedRef = collection(db, 'users', authStore.user.id, 'saved_matches');
+            const savedRef = collection(db, 'users', userId, 'saved_matches');
             const savedSnapshot = await getDocs(savedRef);
-            await Promise.all(savedSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'saved_matches', docSnap.id))));
+            await Promise.all(savedSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', userId, 'saved_matches', docSnap.id))));
 
             // Delete from user's discarded_matches
-            const discardedRef = collection(db, 'users', authStore.user.id, 'discarded_matches');
+            const discardedRef = collection(db, 'users', userId, 'discarded_matches');
             const discardedSnapshot = await getDocs(discardedRef);
-            await Promise.all(discardedSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'discarded_matches', docSnap.id))));
+            await Promise.all(discardedSnapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', userId, 'discarded_matches', docSnap.id))));
 
             // Clear local state
             newMatches.value = [];

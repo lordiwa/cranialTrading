@@ -29,7 +29,7 @@ const { t } = useI18n()
 
 // Preview state
 const hoveredCard = ref<DisplayDeckCard | null>(null)
-const previewCard = computed(() => hoveredCard.value || props.cards[0] || null)
+const previewCard = computed(() => hoveredCard.value ?? props.cards[0] ?? null)
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Type guard
@@ -104,8 +104,10 @@ const sortCards = (cards: DisplayDeckCard[]): DisplayDeckCard[] => {
   switch (props.sortBy) {
     case 'recent':
       sorted.sort((a, b) => {
-        const dateA = (a as any).addedAt ? new Date((a as any).addedAt).getTime() : 0
-        const dateB = (b as any).addedAt ? new Date((b as any).addedAt).getTime() : 0
+        const aRecord = a as unknown as Record<string, unknown>
+        const bRecord = b as unknown as Record<string, unknown>
+        const dateA = aRecord.addedAt ? new Date(aRecord.addedAt as string).getTime() : 0
+        const dateB = bRecord.addedAt ? new Date(bRecord.addedAt as string).getTime() : 0
         return dateB - dateA
       })
       break
@@ -137,9 +139,9 @@ const passesFilters = (card: DisplayDeckCard): boolean => {
 
 const hasActiveFilters = computed(() => {
   return (props.selectedColors && props.selectedColors.size < deckColorOrder.length)
-    || (props.selectedManaValues && props.selectedManaValues.size < deckManaOrder.length)
-    || (props.selectedTypes && props.selectedTypes.size < deckTypeOrder.length)
-    || (props.selectedRarities && props.selectedRarities.size < rarityOrder.length)
+    ?? (props.selectedManaValues && props.selectedManaValues.size < deckManaOrder.length)
+    ?? (props.selectedTypes && props.selectedTypes.size < deckTypeOrder.length)
+    ?? (props.selectedRarities && props.selectedRarities.size < rarityOrder.length)
 })
 
 // Build ordered groups from source cards
@@ -147,19 +149,27 @@ const buildGroups = (source: DisplayDeckCard[], getCategoryFn: (card: DisplayDec
   const groups: Record<string, DisplayDeckCard[]> = {}
   for (const card of source) {
     const category = getCategoryFn(card)
-    if (!groups[category]) groups[category] = []
+    // eslint-disable-next-line security/detect-object-injection
+    groups[category] ??= []
+    // eslint-disable-next-line security/detect-object-injection
     groups[category].push(card)
   }
   for (const category in groups) {
+    // eslint-disable-next-line security/detect-object-injection
     const group = groups[category]
+    // eslint-disable-next-line security/detect-object-injection
     if (group) groups[category] = sortCards(group)
   }
   const result: { type: string; cards: DisplayDeckCard[] }[] = []
   for (const category of order) {
-    if (groups[category]?.length) result.push({ type: category, cards: groups[category] })
+    // eslint-disable-next-line security/detect-object-injection
+    const g = groups[category]
+    if (g?.length) result.push({ type: category, cards: g })
   }
   for (const category in groups) {
-    if (!order.includes(category) && groups[category]?.length) result.push({ type: category, cards: groups[category] })
+    // eslint-disable-next-line security/detect-object-injection
+    const g = groups[category]
+    if (!order.includes(category) && g?.length) result.push({ type: category, cards: g })
   }
   return result
 }
@@ -202,32 +212,36 @@ const handleCardClick = (card: DisplayDeckCard) => {
 }
 
 // Get card image
+interface ParsedCardImage {
+  card_faces?: { image_uris?: { normal?: string; small?: string } }[]
+}
+
 const getCardImage = (card: DisplayDeckCard): string => {
   if (card.image && typeof card.image === 'string') {
     try {
-      const parsed = JSON.parse(card.image)
+      const parsed = JSON.parse(card.image) as ParsedCardImage
       if (parsed.card_faces && parsed.card_faces.length > 0) {
-        return parsed.card_faces[0]?.image_uris?.normal || ''
+        return parsed.card_faces[0]?.image_uris?.normal ?? ''
       }
     } catch {
       return card.image
     }
   }
-  return card.image || ''
+  return card.image ?? ''
 }
 
 const getCardImageSmall = (card: DisplayDeckCard): string => {
   if (card.image && typeof card.image === 'string') {
     try {
-      const parsed = JSON.parse(card.image)
+      const parsed = JSON.parse(card.image) as ParsedCardImage
       if (parsed.card_faces && parsed.card_faces.length > 0) {
-        return parsed.card_faces[0]?.image_uris?.small || ''
+        return parsed.card_faces[0]?.image_uris?.small ?? ''
       }
     } catch {
       return card.image.replace('/normal/', '/small/')
     }
   }
-  return card.image?.replace('/normal/', '/small/') || ''
+  return card.image?.replace('/normal/', '/small/') ?? ''
 }
 
 </script>
@@ -344,7 +358,6 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
         </div>
       </div>
     </div>
-
   </div>
 </template>
 

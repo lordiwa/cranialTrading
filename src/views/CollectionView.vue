@@ -9,7 +9,7 @@ let isDeleteRunning = false
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
-import { useToastStore } from '../stores/toast'
+import { type ToastType, useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
@@ -25,11 +25,11 @@ import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import type { CreateBinderInput } from '../types/binder'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
-import type { DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
+import type { CreateDeckInput, DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { getCardsByIds, searchCards } from '../services/scryfall'
+import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfall'
 import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
@@ -65,7 +65,7 @@ const showLocalFilters = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
-const selectedScryfallCard = ref<any>(null)
+const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 
 // ✅ Filtros de COLECCIÓN (no Scryfall)
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
@@ -83,6 +83,46 @@ interface CardGroup {
   totalQuantity: number
   totalValue: number
   representativeCard: Card  // First variant, used for image
+}
+
+// Moxfield import card shape (from moxfieldToCardList)
+interface MoxfieldImportCard {
+  quantity: number
+  name: string
+  setCode: string
+  collectorNumber: string
+  scryfallId: string
+  isInSideboard: boolean
+  isCommander: boolean
+}
+
+// Shape of a collection card being built for import (before it gets an id)
+interface ImportCardData {
+  scryfallId: string
+  name: string
+  edition: string
+  quantity: number
+  condition: CardCondition
+  foil: boolean
+  price: number
+  image: string
+  status: CardStatus
+  public: boolean
+  isInSideboard?: boolean
+  setCode?: string
+  language?: string
+  cmc?: number
+  type_line?: string
+  colors: string[]
+  rarity?: string
+  power?: string
+  toughness?: string
+  oracle_text?: string
+  keywords: string[]
+  legalities?: Record<string, string>
+  full_art: boolean
+  produced_mana?: string[]
+  updatedAt: Date
 }
 
 // Toggle expansion of a card group
@@ -104,28 +144,34 @@ const stackedCards = computed((): CardGroup[] => {
 
   for (const card of filteredCards.value) {
     const name = card.name
-    if (!groups[name]) groups[name] = []
+    // eslint-disable-next-line security/detect-object-injection
+    groups[name] ??= []
+    // eslint-disable-next-line security/detect-object-injection
     groups[name].push(card)
   }
 
   // Convert to array and calculate totals
   const result: CardGroup[] = []
   for (const name in groups) {
+    // eslint-disable-next-line security/detect-object-injection
     const variants = groups[name]
     if (!variants || variants.length === 0) continue
 
     // Sort variants by price descending
-    variants.sort((a, b) => (b.price || 0) - (a.price || 0))
+    variants.sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
 
     const totalQuantity = variants.reduce((sum, c) => sum + c.quantity, 0)
-    const totalValue = variants.reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0)
+    const totalValue = variants.reduce((sum, c) => sum + (c.price ?? 0) * c.quantity, 0)
+
+    const firstVariant = variants[0]
+    if (!firstVariant) continue
 
     result.push({
       name,
       variants,
       totalQuantity,
       totalValue,
-      representativeCard: variants[0]!
+      representativeCard: firstVariant
     })
   }
 
@@ -140,8 +186,8 @@ const stackedCards = computed((): CardGroup[] => {
     case 'recent':
     default:
       result.sort((a, b) => {
-        const aDate = a.representativeCard.createdAt?.getTime() || 0
-        const bDate = b.representativeCard.createdAt?.getTime() || 0
+        const aDate = a.representativeCard.createdAt?.getTime() ?? 0
+        const bDate = b.representativeCard.createdAt?.getTime() ?? 0
         return bDate - aDate
       })
   }
@@ -199,7 +245,7 @@ const bindersList = computed(() => binderStore.binders)
 
 const selectedBinder = computed(() => {
   if (binderFilter.value === 'all') return null
-  return binderStore.binders.find(b => b.id === binderFilter.value) || null
+  return binderStore.binders.find(b => b.id === binderFilter.value) ?? null
 })
 
 const binderDisplayCards = computed(() => {
@@ -214,7 +260,7 @@ interface ImportState {
   status: 'fetching' | 'processing' | 'saving' | 'allocating' | 'complete' | 'error'
   totalCards: number
   currentCard: number
-  cards: any[]
+  cards: Omit<Card, 'id'>[]
   cardMeta: { quantity: number; isInSideboard: boolean }[]
   createdCardIds: string[]
   allocatedCount: number
@@ -243,7 +289,7 @@ const loadImportState = (): ImportState | null => {
   try {
     const saved = localStorage.getItem(IMPORT_STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      return JSON.parse(saved) as ImportState
     }
   } catch (e) {
     console.warn('[Import] Failed to load state from localStorage:', e)
@@ -320,7 +366,7 @@ const loadDeleteDeckState = (): DeleteDeckState | null => {
   try {
     const saved = localStorage.getItem(DELETE_DECK_STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      return JSON.parse(saved) as DeleteDeckState
     }
   } catch (e) {
     console.warn('[DeleteDeck] Failed to load state:', e)
@@ -373,7 +419,7 @@ const wishlistCards = computed(() => {
       cards = [...cards].sort((a, b) => a.name.localeCompare(b.name))
       break
     case 'price':
-      cards = [...cards].sort((a, b) => (b.price || 0) - (a.price || 0))
+      cards = [...cards].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
       break
   }
 
@@ -407,7 +453,8 @@ const getStatusLabel = (status: string): string => {
     'trade': t('common.status.trade'),
     'wishlist': t('collection.filters.wishlist'),
   }
-  return labels[status] || status.toUpperCase()
+  // eslint-disable-next-line security/detect-object-injection
+  return labels[status] ?? status.toUpperCase()
 }
 
 // Decks del store de decks
@@ -416,7 +463,7 @@ const decksList = computed(() => decksStore.decks)
 // Deck seleccionado actualmente
 const selectedDeck = computed(() => {
   if (deckFilter.value === 'all') return null
-  return decksStore.decks.find(d => d.id === deckFilter.value) || null
+  return decksStore.decks.find(d => d.id === deckFilter.value) ?? null
 })
 
 // Stats del deck seleccionado
@@ -437,7 +484,7 @@ const deckOwnedCards = computed(() => {
 // Wishlist del deck actual (legacy DeckWishlistItem[])
 const deckWishlistCards = computed(() => {
   if (!selectedDeck.value) return []
-  return selectedDeck.value.wishlist || []
+  return selectedDeck.value.wishlist ?? []
 })
 
 // Wishlist cards del nuevo modelo: allocations que apuntan a cartas de colección con status='wishlist'
@@ -503,13 +550,13 @@ const deckSideboardCards = computed(() => {
 // Wishlist del mainboard
 const deckMainboardWishlist = computed(() => {
   if (!selectedDeck.value) return []
-  return (selectedDeck.value.wishlist || []).filter(w => !w.isInSideboard)
+  return (selectedDeck.value.wishlist ?? []).filter(w => !w.isInSideboard)
 })
 
 // Wishlist del sideboard
 const deckSideboardWishlist = computed(() => {
   if (!selectedDeck.value || isCommanderFormat.value) return []
-  return (selectedDeck.value.wishlist || []).filter(w => w.isInSideboard)
+  return (selectedDeck.value.wishlist ?? []).filter(w => w.isInSideboard)
 })
 
 // Conteo de cartas por sección
@@ -517,7 +564,7 @@ const mainboardOwnedCount = computed(() => {
   return deckMainboardCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && !a.isInSideboard)
-    return sum + (deckAlloc?.quantity || 0)
+    return sum + (deckAlloc?.quantity ?? 0)
   }, 0)
 })
 
@@ -525,7 +572,7 @@ const sideboardOwnedCount = computed(() => {
   return deckSideboardCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && a.isInSideboard)
-    return sum + (deckAlloc?.quantity || 0)
+    return sum + (deckAlloc?.quantity ?? 0)
   }, 0)
 })
 
@@ -615,6 +662,7 @@ const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'unc
 const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' }
 
 // When all items are selected (= no filter), pass empty array so the modal shows nothing selected
+/* eslint-disable security/detect-object-injection */
 const localAdvancedFilters = computed<AdvancedFilters>(() => ({
   colors: selectedColors.value.size < colorOrder.length
     ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
@@ -623,7 +671,7 @@ const localAdvancedFilters = computed<AdvancedFilters>(() => ({
     ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
     : [],
   manaValue: selectedManaValues.value.size < manaOrder.length
-    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v)).filter(v => !Number.isNaN(v)) }
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
     : { min: undefined, max: undefined, values: undefined },
   rarity: selectedRarities.value.size < rarityOrder.length
     ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
@@ -638,7 +686,9 @@ const localAdvancedFilters = computed<AdvancedFilters>(() => ({
   isFoil: advFoilFilter.value === 'foil',
   isFullArt: advFullArtOnly.value,
 }))
+/* eslint-enable security/detect-object-injection */
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
 const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   // Sync sets
   advSelectedSets.value = [...updated.sets]
@@ -647,7 +697,7 @@ const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   // Sync formats
   advSelectedFormats.value = [...updated.formatLegal]
   // Sync creature types
-  advSelectedCreatureTypes.value = [...(updated.creatureTypes || [])]
+  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])]
   // Sync price
   advPriceMin.value = updated.priceUSD.min
   advPriceMax.value = updated.priceUSD.max
@@ -676,6 +726,7 @@ const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v)
   selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder)
 }
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
 
 // Active chip filter count for badge
 const activeChipFilterCount = computed(() => {
@@ -738,18 +789,22 @@ const groupedWishlistCards = computed(() => {
 
   for (const card of source) {
     const category = getCardCategory(card)
-    if (!groups[category]) groups[category] = []
+    // eslint-disable-next-line security/detect-object-injection
+    groups[category] ??= []
+    // eslint-disable-next-line security/detect-object-injection
     groups[category].push(card)
   }
 
   const sortedGroups: { type: string; cards: Card[] }[] = []
   for (const category of order) {
+    // eslint-disable-next-line security/detect-object-injection
     const group = groups[category]
     if (group && group.length > 0) {
       sortedGroups.push({ type: category, cards: group })
     }
   }
   for (const category in groups) {
+    // eslint-disable-next-line security/detect-object-injection
     const group = groups[category]
     if (!order.includes(category) && group && group.length > 0) {
       sortedGroups.push({ type: category, cards: group })
@@ -791,12 +846,12 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
       type_line: card.type_line,
       colors: card.colors,
       produced_mana: card.produced_mana,
-      allocatedQuantity: deckAlloc?.quantity || 0,
+      allocatedQuantity: deckAlloc?.quantity ?? 0,
       isInSideboard: false,
       notes: undefined,
-      addedAt: card.createdAt || new Date(),
+      addedAt: card.createdAt ?? new Date(),
       isWishlist: false as const,
-      availableInCollection: card.quantity - (deckAlloc?.quantity || 0),
+      availableInCollection: card.quantity - (deckAlloc?.quantity ?? 0),
       totalInCollection: card.quantity,
     }
   })
@@ -813,7 +868,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
     image: item.image,
     cmc: item.cmc,
     type_line: item.type_line,
-    colors: (item as any).colors,
+    colors: item.colors,
     requestedQuantity: item.quantity,
     allocatedQuantity: item.quantity,
     isInSideboard: false,
@@ -829,7 +884,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
   const ownedByScryfallId = new Map<string, number>()
   for (const c of collectionStore.cards) {
     if (c.status !== 'wishlist') {
-      ownedByScryfallId.set(c.scryfallId, (ownedByScryfallId.get(c.scryfallId) || 0) + c.quantity)
+      ownedByScryfallId.set(c.scryfallId, (ownedByScryfallId.get(c.scryfallId) ?? 0) + c.quantity)
     }
   }
 
@@ -855,7 +910,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
         addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
         isWishlist: true as const,
         availableInCollection: 0,
-        totalInCollection: ownedByScryfallId.get(card.scryfallId) || 0,
+        totalInCollection: ownedByScryfallId.get(card.scryfallId) ?? 0,
       }))
 
   return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
@@ -881,12 +936,12 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
       type_line: card.type_line,
       colors: card.colors,
       produced_mana: card.produced_mana,
-      allocatedQuantity: deckAlloc?.quantity || 0,
+      allocatedQuantity: deckAlloc?.quantity ?? 0,
       isInSideboard: true,
       notes: undefined,
-      addedAt: card.createdAt || new Date(),
+      addedAt: card.createdAt ?? new Date(),
       isWishlist: false as const,
-      availableInCollection: card.quantity - (deckAlloc?.quantity || 0),
+      availableInCollection: card.quantity - (deckAlloc?.quantity ?? 0),
       totalInCollection: card.quantity,
     }
   })
@@ -903,7 +958,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
     image: item.image,
     cmc: item.cmc,
     type_line: item.type_line,
-    colors: (item as any).colors,
+    colors: item.colors,
     requestedQuantity: item.quantity,
     allocatedQuantity: item.quantity,
     isInSideboard: true,
@@ -919,7 +974,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
   const sideboardOwnedByScryfallId = new Map<string, number>()
   for (const c of collectionStore.cards) {
     if (c.status !== 'wishlist') {
-      sideboardOwnedByScryfallId.set(c.scryfallId, (sideboardOwnedByScryfallId.get(c.scryfallId) || 0) + c.quantity)
+      sideboardOwnedByScryfallId.set(c.scryfallId, (sideboardOwnedByScryfallId.get(c.scryfallId) ?? 0) + c.quantity)
     }
   }
 
@@ -945,7 +1000,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
         addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
         isWishlist: true as const,
         availableInCollection: 0,
-        totalInCollection: sideboardOwnedByScryfallId.get(card.scryfallId) || 0,
+        totalInCollection: sideboardOwnedByScryfallId.get(card.scryfallId) ?? 0,
       }))
 
   return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
@@ -996,7 +1051,7 @@ const deckOwnedCount = computed(() => {
   return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + (deckAlloc?.quantity || 0)
+    return sum + (deckAlloc?.quantity ?? 0)
   }, 0)
 })
 
@@ -1015,11 +1070,11 @@ const deckPriceSource = ref<DeckPriceSource>('tcg')
 const { cardPrices: sharedCardPrices } = useCollectionTotals(() => collectionStore.cards)
 
 const getCardPriceBySource = (cardId: string, cardPrice: number, source: DeckPriceSource): number => {
-  if (source === 'tcg') return cardPrice || 0
+  if (source === 'tcg') return cardPrice ?? 0
   const prices = sharedCardPrices.value.get(cardId)
-  if (!prices) return cardPrice || 0
-  if (source === 'ck') return prices.cardKingdom?.retail || cardPrice || 0
-  return prices.cardKingdom?.buylist || 0
+  if (!prices) return cardPrice ?? 0
+  if (source === 'ck') return prices.cardKingdom?.retail ?? cardPrice ?? 0
+  return prices.cardKingdom?.buylist ?? 0
 }
 
 const deckOwnedCostBySource = computed(() => {
@@ -1027,14 +1082,14 @@ const deckOwnedCostBySource = computed(() => {
   return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
     const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * (deckAlloc?.quantity || 0)
+    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * (deckAlloc?.quantity ?? 0)
   }, 0)
 })
 
 const deckWishlistCostBySource = computed(() => {
   if (deckFilter.value === 'all') return 0
   const legacyCost = deckWishlistCards.value.reduce((sum, item) =>
-    sum + (item.price || 0) * item.quantity, 0
+    sum + (item.price ?? 0) * item.quantity, 0
   )
   const allocCost = deckAllocWishlistCards.value.reduce((sum, { card, alloc }) =>
     sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * alloc.quantity, 0
@@ -1261,9 +1316,9 @@ const handleBulkCreateBinder = () => {
 // Click on local card suggestion
 const handleLocalCardSelect = (card: Card) => {
   if (viewMode.value === 'decks' && deckFilter.value !== 'all') {
-    quickAllocateCardToDeck(card)
+    void quickAllocateCardToDeck(card)
   } else if (viewMode.value === 'binders' && binderFilter.value !== 'all') {
-    quickAllocateCardToBinder(card)
+    void quickAllocateCardToBinder(card)
   } else {
     selectedCard.value = card
     showCardDetailModal.value = true
@@ -1296,16 +1351,16 @@ const handleScryfallSuggestionSelect = async (cardName: string) => {
 
 // Click on "Advanced search" → navigate to /search (collection mode only)
 const handleOpenAdvancedSearch = () => {
-  router.push({ path: '/search' })
+  void router.push({ path: '/search' })
 }
 
 // Cerrar modal de agregar carta y limpiar URL
 const handleAddCardModalClose = () => {
   showAddCardModal.value = false
-  selectedScryfallCard.value = null
+  selectedScryfallCard.value = undefined
   // Clear addCard query param if present
   if (route.query.addCard) {
-    router.replace({ path: '/collection', query: { ...route.query, addCard: undefined } })
+    void router.replace({ path: '/collection', query: { ...route.query, addCard: undefined } })
   }
 }
 
@@ -1455,6 +1510,38 @@ const handleDeckGridToggleCommander = async (displayCard: DisplayDeckCard) => {
 
 // ========== BINDER EVENT HANDLERS ==========
 
+/** Deallocate selected cards from other binders, then allocate to target binder */
+const performBulkBinderAllocate = async (binderId: string) => {
+  const cardIds = [...selectedCardIds.value]
+
+  // Move: deallocate selected cards from any OTHER binders first
+  let totalMoved = 0
+  for (const binder of binderStore.binders) {
+    if (binder.id === binderId) continue
+    const cardsInBinder = cardIds.filter(
+      id => binder.allocations?.some(a => a.cardId === id)
+    )
+    if (cardsInBinder.length > 0) {
+      totalMoved += await binderStore.bulkDeallocateCardsFromBinder(binder.id, cardsInBinder)
+    }
+  }
+
+  const items = cardIds.map(cardId => {
+    const card = collectionStore.getCardById(cardId)
+    return { cardId, quantity: card?.quantity ?? 1 }
+  })
+  const allocated = await binderStore.bulkAllocateCardsToBinder(binderId, items)
+
+  const msgKey = allocated > 0
+    ? (totalMoved > 0 ? 'collection.bulkEdit.binderMoveSuccess' : 'collection.bulkEdit.binderSuccess')
+    : 'collection.bulkEdit.binderSuccess'
+  const msgType: ToastType = allocated > 0 ? 'success' : 'info'
+  toastStore.show(t(msgKey, { count: allocated }), msgType)
+
+  selectedCardIds.value = new Set()
+  selectionMode.value = false
+}
+
 const handleCreateBinder = async (data: CreateBinderInput) => {
   const modalRef = createBinderModalRef.value
   try {
@@ -1468,44 +1555,14 @@ const handleCreateBinder = async (data: CreateBinderInput) => {
       pendingBulkAllocateBinder.value = false
       bulkActionLoading.value = true
       try {
-        const cardIds = [...selectedCardIds.value]
-
-        // Move: deallocate selected cards from any OTHER binders first
-        let totalMoved = 0
-        for (const binder of binderStore.binders) {
-          if (binder.id === binderId) continue
-          const cardsInBinder = cardIds.filter(
-            id => binder.allocations?.some(a => a.cardId === id)
-          )
-          if (cardsInBinder.length > 0) {
-            totalMoved += await binderStore.bulkDeallocateCardsFromBinder(binder.id, cardsInBinder)
-          }
-        }
-
-        const items = cardIds.map(cardId => {
-          const card = collectionStore.getCardById(cardId)
-          return { cardId, quantity: card?.quantity ?? 1 }
-        })
-        const allocated = await binderStore.bulkAllocateCardsToBinder(binderId, items)
-        if (allocated > 0) {
-          const msgKey = totalMoved > 0
-            ? 'collection.bulkEdit.binderMoveSuccess'
-            : 'collection.bulkEdit.binderSuccess'
-          toastStore.show(t(msgKey, { count: allocated }), 'success')
-        } else {
-          toastStore.show(t('collection.bulkEdit.binderSuccess', { count: 0 }), 'info')
-        }
-        selectedCardIds.value = new Set()
-        selectionMode.value = false
+        await performBulkBinderAllocate(binderId)
       } finally {
         bulkActionLoading.value = false
       }
-      viewMode.value = 'binders'
-      binderFilter.value = binderId
-    } else {
-      viewMode.value = 'binders'
-      binderFilter.value = binderId
     }
+
+    viewMode.value = 'binders'
+    binderFilter.value = binderId
   } catch (error) {
     console.error('Error in handleCreateBinder:', error)
     toastStore.show(t('binders.errors.create'), 'error')
@@ -1527,12 +1584,32 @@ const toggleBinderForSale = async () => {
 // ========== SHARED HELPERS (reduce cognitive complexity) ==========
 
 /** Extract the normal image URL from a Scryfall card object */
-const extractScryfallImage = (card: any): string => {
-  return card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ''
+const extractScryfallImage = (card: ScryfallCard | null | undefined): string => {
+  return card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal ?? ''
+}
+
+/** Extracted card data from Scryfall for building collection cards */
+interface ExtractedScryfallData {
+  scryfallId: string
+  image: string
+  price: number
+  edition: string
+  setCode: string
+  cmc: number | undefined
+  type_line: string
+  colors: string[]
+  rarity: string
+  power: string | undefined
+  toughness: string | undefined
+  oracle_text: string | undefined
+  keywords: string[]
+  legalities: Record<string, string> | undefined
+  full_art: boolean
+  produced_mana: string[] | undefined
 }
 
 /** Extract all relevant card data fields from a Scryfall result */
-const extractScryfallCardData = (card: any) => {
+const extractScryfallCardData = (card: ScryfallCard): ExtractedScryfallData => {
   return {
     scryfallId: card.id,
     image: extractScryfallImage(card),
@@ -1541,15 +1618,15 @@ const extractScryfallCardData = (card: any) => {
     setCode: card.set.toUpperCase(),
     cmc: card.cmc,
     type_line: card.type_line,
-    colors: card.colors || [],
+    colors: card.colors ?? [],
     rarity: card.rarity,
     power: card.power,
     toughness: card.toughness,
     oracle_text: card.oracle_text,
-    keywords: card.keywords || [],
+    keywords: card.keywords ?? [],
     legalities: card.legalities,
-    full_art: card.full_art || false,
-    produced_mana: card.produced_mana || undefined,
+    full_art: card.full_art ?? false,
+    produced_mana: card.produced_mana,
   }
 }
 
@@ -1572,21 +1649,23 @@ const executeBinderDeletion = async (binderId: string, cardIds: string[], delete
   const success = await binderStore.deleteBinder(binderId)
   if (success) {
     const remaining = binderStore.binders
-    binderFilter.value = remaining.length > 0 ? remaining[0]!.id : 'all'
+    const firstBinder = remaining[0]
+    binderFilter.value = firstBinder ? firstBinder.id : 'all'
   }
 }
 
 /** Parse a single text line into card data for import (shared by deck and binder text import) */
 const parseTextImportLine = (trimmed: string): { quantity: number; cardName: string; setCode: string | null; isFoil: boolean } | null => {
+  // eslint-disable-next-line security/detect-unsafe-regex
   const match = /^(\d+)x?\s+(.+?)(?:\s+\((\w+)\))?(?:\s+[\w-]+)?(?:\s+\*f\*?)?$/i.exec(trimmed)
   const matchQty = match?.[1]
   const matchName = match?.[2]
   if (!match || !matchQty || !matchName) return null
 
   return {
-    quantity: Number.parseInt(matchQty),
+    quantity: Number.parseInt(matchQty, 10),
     cardName: cleanCardName(matchName.trim()),
-    setCode: match[3] || null,
+    setCode: match[3] ?? null,
     isFoil: /\*[fF]\*?\s*$/.test(trimmed),
   }
 }
@@ -1598,57 +1677,58 @@ const buildCollectionCardFromScryfall = (opts: {
   condition: CardCondition,
   isFoil: boolean,
   setCode: string | null,
-  scryfallData: { scryfallId: string; image: string; price: number; edition: string; setCode: string; cmc: any; type_line: any; colors: string[]; rarity: any; power: any; toughness: any; oracle_text: any; keywords: string[]; legalities: any; full_art: boolean } | null | undefined,
+  scryfallData: ExtractedScryfallData | null | undefined,
   status: CardStatus | undefined,
   makePublic: boolean,
   isInSideboard: boolean,
-}): any => {
+}): ImportCardData => {
   const { cardName, quantity, condition, isFoil, setCode, scryfallData, status, makePublic, isInSideboard } = opts
-  const cardData: any = {
-    scryfallId: scryfallData?.scryfallId || '',
+  const cardData: ImportCardData = {
+    scryfallId: scryfallData?.scryfallId ?? '',
     name: cardName,
-    edition: scryfallData?.edition || setCode || 'Unknown',
+    edition: scryfallData?.edition ?? setCode ?? 'Unknown',
     quantity,
     condition,
     foil: isFoil,
-    price: scryfallData?.price || 0,
-    image: scryfallData?.image || '',
-    status: status || 'collection',
+    price: scryfallData?.price ?? 0,
+    image: scryfallData?.image ?? '',
+    status: status ?? 'collection',
     public: makePublic,
     isInSideboard,
     cmc: scryfallData?.cmc,
     type_line: scryfallData?.type_line,
-    colors: scryfallData?.colors || [],
+    colors: scryfallData?.colors ?? [],
     rarity: scryfallData?.rarity,
     power: scryfallData?.power,
     toughness: scryfallData?.toughness,
     oracle_text: scryfallData?.oracle_text,
-    keywords: scryfallData?.keywords || [],
+    keywords: scryfallData?.keywords ?? [],
     legalities: scryfallData?.legalities,
-    full_art: scryfallData?.full_art || false,
+    full_art: scryfallData?.full_art ?? false,
+    updatedAt: new Date(),
   }
-  if (scryfallData?.setCode || setCode) {
-    cardData.setCode = scryfallData?.setCode || setCode
+  if (scryfallData?.setCode ?? setCode) {
+    cardData.setCode = scryfallData?.setCode ?? setCode ?? undefined
   }
   return cardData
 }
 
 /** Process a single card from Moxfield import into a collection card object (shared by deck and binder) */
 const processImportCard = (
-  card: any,
-  scryfallDataMap: Map<string, any>,
+  card: MoxfieldImportCard,
+  scryfallDataMap: Map<string, ScryfallCard>,
   condition: CardCondition,
   status: CardStatus | undefined,
   makePublic: boolean,
-): { cardData: any; needsSearch: boolean } => {
-  let cardName = card.name
+): { cardData: ImportCardData; needsSearch: boolean } => {
+  let cardName: string = card.name
   const isFoil = /\*[fF]\*?\s*$/.test(cardName)
   if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
 
   let image = ''
   let price = 0
-  const finalScryfallId = card.scryfallId || ''
-  let finalEdition = card.setCode || 'Unknown'
+  const finalScryfallId = card.scryfallId ?? ''
+  let finalEdition = card.setCode ?? 'Unknown'
   let cmc: number | undefined = undefined
   let type_line: string | undefined = undefined
   let colors: string[] = []
@@ -1663,21 +1743,21 @@ const processImportCard = (
   if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
     const scryfallCard = scryfallDataMap.get(card.scryfallId)
     image = extractScryfallImage(scryfallCard)
-    price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
-    finalEdition = scryfallCard.set?.toUpperCase() || finalEdition
-    cmc = scryfallCard.cmc
-    type_line = scryfallCard.type_line
-    colors = scryfallCard.colors || []
-    rarity = scryfallCard.rarity
-    power = scryfallCard.power
-    toughness = scryfallCard.toughness
-    oracle_text = scryfallCard.oracle_text
-    keywords = scryfallCard.keywords || []
-    legalities = scryfallCard.legalities
-    full_art = scryfallCard.full_art || false
+    price = scryfallCard?.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
+    finalEdition = scryfallCard?.set?.toUpperCase() ?? finalEdition
+    cmc = scryfallCard?.cmc
+    type_line = scryfallCard?.type_line
+    colors = scryfallCard?.colors ?? []
+    rarity = scryfallCard?.rarity
+    power = scryfallCard?.power
+    toughness = scryfallCard?.toughness
+    oracle_text = scryfallCard?.oracle_text
+    keywords = scryfallCard?.keywords ?? []
+    legalities = scryfallCard?.legalities
+    full_art = scryfallCard?.full_art ?? false
   }
 
-  const cardData = {
+  const cardData: ImportCardData = {
     scryfallId: finalScryfallId,
     name: cardName,
     edition: finalEdition,
@@ -1686,7 +1766,7 @@ const processImportCard = (
     foil: isFoil,
     price,
     image,
-    status: status || 'collection',
+    status: status ?? 'collection',
     public: makePublic,
     cmc,
     type_line,
@@ -1698,17 +1778,18 @@ const processImportCard = (
     keywords,
     legalities,
     full_art,
+    updatedAt: new Date(),
   }
 
   return { cardData, needsSearch: price === 0 || !image }
 }
 
 /** Apply best search result to a card's data (used by enrichCardsWithFallbackSearch) */
-const applySearchResultToCard = (cardData: any, results: any[]) => {
+const applySearchResultToCard = (cardData: ImportCardData, results: ScryfallCard[]) => {
   const printWithPrice = results.find(r =>
     r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-    (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-  ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
+    (r.image_uris?.normal ?? r.card_faces?.[0]?.image_uris?.normal)
+  ) ?? results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 
   if (printWithPrice?.prices?.usd) {
     Object.assign(cardData, extractScryfallCardData(printWithPrice))
@@ -1736,9 +1817,11 @@ const applySearchResultToCard = (cardData: any, results: any[]) => {
 }
 
 /** Enrich collection cards that are missing price/image with fallback Scryfall search */
-const enrichCardsWithFallbackSearch = async (collectionCardsToAdd: any[], cardsNeedingSearch: number[]) => {
+const enrichCardsWithFallbackSearch = async (collectionCardsToAdd: ImportCardData[], cardsNeedingSearch: number[]) => {
   for (const idx of cardsNeedingSearch) {
+    // eslint-disable-next-line security/detect-object-injection
     const cardData = collectionCardsToAdd[idx]
+    if (!cardData) continue
     try {
       const results = await searchCards(`!"${cardData.name}"`)
       applySearchResultToCard(cardData, results)
@@ -1751,35 +1834,36 @@ const enrichCardsWithFallbackSearch = async (collectionCardsToAdd: any[], cardsN
 /** Build a collection card from CSV import data + Scryfall batch data (shared by deck and binder) */
 const buildCsvCollectionCard = (
   card: ParsedCsvCard,
-  scryfallDataMap: Map<string, any>,
+  scryfallDataMap: Map<string, ScryfallCard>,
   status: CardStatus | undefined,
   makePublic: boolean,
-): any => {
+): ImportCardData => {
   const sc = scryfallDataMap.get(card.scryfallId)
   const image = extractScryfallImage(sc)
   const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
 
-  const cardData: any = {
-    scryfallId: card.scryfallId || '',
+  const cardData: ImportCardData = {
+    scryfallId: card.scryfallId ?? '',
     name: card.name,
-    edition: sc?.set_name || card.setCode || 'Unknown',
+    edition: sc?.set_name ?? card.setCode ?? 'Unknown',
     quantity: card.quantity,
     condition: card.condition,
     foil: card.foil,
     price,
     image,
-    status: status || 'collection',
+    status: status ?? 'collection',
     public: makePublic,
     cmc: sc?.cmc,
     type_line: sc?.type_line,
-    colors: sc?.colors || [],
+    colors: sc?.colors ?? [],
     rarity: sc?.rarity,
     power: sc?.power,
     toughness: sc?.toughness,
     oracle_text: sc?.oracle_text,
-    keywords: sc?.keywords || [],
+    keywords: sc?.keywords ?? [],
     legalities: sc?.legalities,
-    full_art: sc?.full_art || false,
+    full_art: sc?.full_art ?? false,
+    updatedAt: new Date(),
   }
   if (card.setCode) {
     cardData.setCode = card.setCode.toUpperCase()
@@ -1898,7 +1982,7 @@ const handleDeleteBinder = async () => {
   isDeletingBinder.value = false
 }
 
-const handleBinderGridEdit = async (displayCard: DisplayDeckCard) => {
+const handleBinderGridEdit = (displayCard: DisplayDeckCard) => {
   if (!displayCard.isWishlist) {
     const card = collectionStore.cards.find(c => c.id === displayCard.cardId)
     if (card) {
@@ -1945,7 +2029,7 @@ const quickAllocateCardToBinder = async (card: Card) => {
 // ========== DECK MANAGEMENT ==========
 
 // Crear deck
-const handleCreateDeck = async (deckData: any) => {
+const handleCreateDeck = async (deckData: CreateDeckInput) => {
   const modalRef = createDeckModalRef.value
   try {
     modalRef?.setLoading(true)
@@ -1986,7 +2070,7 @@ const handleCreateDeck = async (deckData: any) => {
 }
 
 // Helper: Buscar carta en Scryfall
-const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
+const fetchCardFromScryfall = async (cardName: string, setCode?: string): Promise<ExtractedScryfallData | null> => {
   try {
     const cleanName = cleanCardName(cardName)
     if (setCode) {
@@ -2003,8 +2087,8 @@ const fetchCardFromScryfall = async (cardName: string, setCode?: string) => {
     if (allResults.length > 0) {
       const printWithPrice = allResults.find(r =>
         r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-        (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-      ) || allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || allResults[0]
+        (r.image_uris?.normal ?? r.card_faces?.[0]?.image_uris?.normal)
+      ) ?? allResults.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) ?? allResults[0]
       if (!printWithPrice) return null
       return extractScryfallCardData(printWithPrice)
     }
@@ -2020,12 +2104,12 @@ const handleImport = async (opts: {
   deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
 }) => {
   const { deckText, condition, includeSideboard, deckName, makePublic, format, commander, status } = opts
-  const finalDeckName = deckName || `Deck${Date.now()}`
+  const finalDeckName = deckName ?? `Deck${Date.now()}`
   showImportDeckModal.value = false
   toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
 
   const lines = deckText.split('\n').filter(l => l.trim())
-  const collectionCardsToAdd: any[] = []
+  const collectionCardsToAdd: ImportCardData[] = []
   let inSideboard = false
 
   for (const line of lines) {
@@ -2037,20 +2121,20 @@ const handleImport = async (opts: {
     if (!parsed) continue
     if (inSideboard && !includeSideboard) continue
 
-    const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode || undefined)
+    const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode ?? undefined)
     const cardData = buildCollectionCardFromScryfall({
       cardName: parsed.cardName, quantity: parsed.quantity, condition, isFoil: parsed.isFoil, setCode: parsed.setCode,
-      scryfallData, status, makePublic: makePublic || false, isInSideboard: inSideboard,
+      scryfallData, status, makePublic: makePublic ?? false, isInSideboard: inSideboard,
     })
     collectionCardsToAdd.push(cardData)
   }
 
   const deckId = await decksStore.createDeck({
     name: finalDeckName,
-    format: format || 'custom',
+    format: format ?? 'custom',
     description: '',
     colors: [],
-    commander: commander || '',
+    commander: commander ?? '',
   })
 
   if (collectionCardsToAdd.length > 0) {
@@ -2063,7 +2147,7 @@ const handleImport = async (opts: {
           const collectionCard = collectionStore.cards.find(
             c => c.scryfallId === cardData.scryfallId && c.edition === cardData.edition
           )
-          return collectionCard ? { cardId: collectionCard.id, quantity: cardData.quantity, isInSideboard: cardData.isInSideboard } : null
+          return collectionCard ? { cardId: collectionCard.id, quantity: cardData.quantity, isInSideboard: cardData.isInSideboard ?? false } : null
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
@@ -2079,7 +2163,7 @@ const handleImport = async (opts: {
 
 // Importar desde Moxfield (OPTIMIZADO con batch API y progress tracking)
 const handleImportDirect = async (
-  cards: any[],
+  cards: MoxfieldImportCard[],
   deckName: string | undefined,
   condition: CardCondition,
   makePublic?: boolean,
@@ -2093,7 +2177,7 @@ const handleImportDirect = async (
   }
   isImportRunning = true
 
-  const finalDeckName = deckName || `Deck${Date.now()}`
+  const finalDeckName = deckName ?? `Deck${Date.now()}`
   showImportDeckModal.value = false
 
   // Create progress toast
@@ -2104,10 +2188,10 @@ const handleImportDirect = async (
     progressToast.update(5, `Creando deck "${finalDeckName}"...`)
     const deckId = await decksStore.createDeck({
       name: finalDeckName,
-      format: format || 'custom',
+      format: format ?? 'custom',
       description: '',
       colors: [],
-      commander: commander || '',
+      commander: commander ?? '',
     })
 
     if (!deckId) {
@@ -2146,7 +2230,7 @@ const handleImportDirect = async (
 
     // PASO 3: Obtener todos los datos de Scryfall en batch
     progressToast.update(15, `Obteniendo datos de ${dedupedIdentifiers.length} cartas...`)
-    const scryfallDataMap = new Map<string, any>()
+    const scryfallDataMap = new Map<string, ScryfallCard>()
     if (dedupedIdentifiers.length > 0) {
       const scryfallCards = await getCardsByIds(dedupedIdentifiers)
       scryfallCards.forEach(sc => scryfallDataMap.set(sc.id, sc))
@@ -2156,13 +2240,15 @@ const handleImportDirect = async (
     // PASO 4: Procesar cada carta con los datos obtenidos
     saveImportState({ ...initialState, status: 'processing' })
 
-    const collectionCardsToAdd: any[] = []
+    const collectionCardsToAdd: ImportCardData[] = []
     const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
     const cardsNeedingSearch: number[] = []
 
     for (let i = 0; i < cards.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
-      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, makePublic || false)
+      if (!card) continue
+      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, makePublic ?? false)
 
       if (needsSearch) {
         cardsNeedingSearch.push(i)
@@ -2171,7 +2257,7 @@ const handleImportDirect = async (
       collectionCardsToAdd.push(cardData)
       cardMeta.push({
         quantity: card.quantity,
-        isInSideboard: card.isInSideboard || false
+        isInSideboard: card.isInSideboard ?? false
       })
 
       // Update progress (25-45% range for processing)
@@ -2224,6 +2310,7 @@ const handleImportDirect = async (
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
+          // eslint-disable-next-line security/detect-object-injection
           const meta = cardMeta[i]
           return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
         })
@@ -2288,7 +2375,7 @@ const handleImportCsv = async (
   commander?: string,
   status?: CardStatus
 ) => {
-  const finalDeckName = deckName || `CSV Import ${Date.now()}`
+  const finalDeckName = deckName ?? `CSV Import ${Date.now()}`
   showImportDeckModal.value = false
 
   // Progress toast like handleImport
@@ -2299,10 +2386,10 @@ const handleImportCsv = async (
     progressToast.update(5, `Creando deck "${finalDeckName}"...`)
     const deckId = await decksStore.createDeck({
       name: finalDeckName,
-      format: format || 'custom',
+      format: format ?? 'custom',
       description: '',
       colors: [],
-      commander: commander || '',
+      commander: commander ?? '',
     })
 
     if (!deckId) {
@@ -2320,7 +2407,7 @@ const handleImportCsv = async (
       .map(c => ({ id: c.scryfallId }))
     const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
 
-    const scryfallDataMap = new Map<string, any>()
+    const scryfallDataMap = new Map<string, ScryfallCard>()
     if (uniqueIds.length > 0) {
       const scryfallCards = await getCardsByIds(uniqueIds)
       for (const sc of scryfallCards) {
@@ -2330,12 +2417,14 @@ const handleImportCsv = async (
     progressToast.update(25, `Procesando ${cards.length} cartas...`)
 
     // PASO 3: Build collection cards
-    const collectionCardsToAdd: any[] = []
+    const collectionCardsToAdd: ImportCardData[] = []
     const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
 
     for (let i = 0; i < cards.length; i++) {
-      const card = cards[i]!
-      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, makePublic || false)
+      // eslint-disable-next-line security/detect-object-injection
+      const card = cards[i]
+      if (!card) continue
+      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, makePublic ?? false)
       collectionCardsToAdd.push(cardData)
       cardMeta.push({ quantity: card.quantity, isInSideboard: false })
 
@@ -2357,6 +2446,7 @@ const handleImportCsv = async (
       // PASO 5: Asignar al deck (bulk — single Firestore write)
       const bulkItems = createdCardIds
         .map((cardId, i) => {
+          // eslint-disable-next-line security/detect-object-injection
           const meta = cardMeta[i]
           return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
         })
@@ -2386,12 +2476,12 @@ const handleImportBinder = async (opts: {
   deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
 }) => {
   const { deckText, condition, includeSideboard, deckName, status } = opts
-  const finalName = deckName || `Binder${Date.now()}`
+  const finalName = deckName ?? `Binder${Date.now()}`
   showImportBinderModal.value = false
   toastStore.show(`Importing "${finalName}"...`, 'info')
 
   const lines = deckText.split('\n').filter(l => l.trim())
-  const collectionCardsToAdd: any[] = []
+  const collectionCardsToAdd: ImportCardData[] = []
   let inSideboard = false
 
   for (const line of lines) {
@@ -2403,7 +2493,7 @@ const handleImportBinder = async (opts: {
     if (!parsed) continue
     if (inSideboard && !includeSideboard) continue
 
-    const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode || undefined)
+    const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode ?? undefined)
     const cardData = buildCollectionCardFromScryfall({
       cardName: parsed.cardName, quantity: parsed.quantity, condition, isFoil: parsed.isFoil, setCode: parsed.setCode,
       scryfallData, status, makePublic: false, isInSideboard: false,
@@ -2440,7 +2530,7 @@ const handleImportBinder = async (opts: {
 
 // Import binder from Moxfield (batch API)
 const handleImportBinderDirect = async (
-  cards: any[],
+  cards: MoxfieldImportCard[],
   deckName: string | undefined,
   condition: CardCondition,
   _makePublic?: boolean,
@@ -2448,7 +2538,7 @@ const handleImportBinderDirect = async (
   _commander?: string,
   status?: CardStatus
 ) => {
-  const finalName = deckName || `Binder${Date.now()}`
+  const finalName = deckName ?? `Binder${Date.now()}`
   showImportBinderModal.value = false
 
   const progressToast = toastStore.showProgress(`Importing "${finalName}"...`, 0)
@@ -2472,18 +2562,20 @@ const handleImportBinderDirect = async (
     const cardIndexMap = new Map<string, number[]>()
 
     for (let i = 0; i < cards.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
+      if (!card) continue
       if (card.scryfallId) {
         if (!cardIndexMap.has(card.scryfallId)) {
           cardIndexMap.set(card.scryfallId, [])
           identifiers.push({ id: card.scryfallId })
         }
-        cardIndexMap.get(card.scryfallId)!.push(i)
+        cardIndexMap.get(card.scryfallId)?.push(i)
       }
     }
 
     progressToast.update(15, `Fetching data for ${identifiers.length} cards...`)
-    const scryfallDataMap = new Map<string, any>()
+    const scryfallDataMap = new Map<string, ScryfallCard>()
     if (identifiers.length > 0) {
       const scryfallCards = await getCardsByIds(identifiers)
       for (const sc of scryfallCards) {
@@ -2493,11 +2585,13 @@ const handleImportBinderDirect = async (
     progressToast.update(25, `Processing cards...`)
 
     // Process each card
-    const collectionCardsToAdd: any[] = []
+    const collectionCardsToAdd: ImportCardData[] = []
     const cardsNeedingSearch: number[] = []
 
     for (let i = 0; i < cards.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
+      if (!card) continue
       const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, false)
 
       if (needsSearch) {
@@ -2524,6 +2618,7 @@ const handleImportBinderDirect = async (
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
+          // eslint-disable-next-line security/detect-object-injection
           const meta = collectionCardsToAdd[i]
           return cardId && meta ? { cardId, quantity: meta.quantity } : null
         })
@@ -2550,7 +2645,7 @@ const handleImportBinderCsv = async (
   _commander?: string,
   status?: CardStatus
 ) => {
-  const finalName = deckName || `Binder CSV ${Date.now()}`
+  const finalName = deckName ?? `Binder CSV ${Date.now()}`
   showImportBinderModal.value = false
 
   const progressToast = toastStore.showProgress(`Importing "${finalName}"...`, 0)
@@ -2575,7 +2670,7 @@ const handleImportBinderCsv = async (
       .map(c => ({ id: c.scryfallId }))
     const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
 
-    const scryfallDataMap = new Map<string, any>()
+    const scryfallDataMap = new Map<string, ScryfallCard>()
     if (uniqueIds.length > 0) {
       const scryfallCards = await getCardsByIds(uniqueIds)
       for (const sc of scryfallCards) {
@@ -2585,10 +2680,12 @@ const handleImportBinderCsv = async (
     progressToast.update(25, `Processing ${cards.length} cards...`)
 
     // Build collection cards
-    const collectionCardsToAdd: any[] = []
+    const collectionCardsToAdd: ImportCardData[] = []
 
     for (let i = 0; i < cards.length; i++) {
-      const card = cards[i]!
+      // eslint-disable-next-line security/detect-object-injection
+      const card = cards[i]
+      if (!card) continue
       const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, false)
       collectionCardsToAdd.push(cardData)
 
@@ -2608,6 +2705,7 @@ const handleImportBinderCsv = async (
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
+          // eslint-disable-next-line security/detect-object-injection
           const meta = collectionCardsToAdd[i]
           return cardId && meta ? { cardId, quantity: meta.quantity } : null
         })
@@ -2795,12 +2893,12 @@ const handleExportDeck = async () => {
   }
 
   const getQty = (card: DisplayDeckCard): number => {
-    return card.isWishlist ? card.requestedQuantity : (card as any).allocatedQuantity
+    return card.isWishlist ? card.requestedQuantity : card.allocatedQuantity
   }
 
   const getSet = (card: DisplayDeckCard): string => {
     if (!card.isWishlist) {
-      const code = setCodeMap.get((card as any).cardId)
+      const code = setCodeMap.get(card.cardId)
       if (code) return code.toUpperCase()
     }
     return card.edition
@@ -2847,10 +2945,10 @@ const handleExportDeckCsv = async () => {
   const csvCards: Parameters<typeof buildMoxfieldCsv>[0] = []
 
   for (const card of allCards) {
-    const qty = card.isWishlist ? card.requestedQuantity : (card as any).allocatedQuantity
+    const qty = card.isWishlist ? card.requestedQuantity : card.allocatedQuantity
     let setCode = card.edition
     if (!card.isWishlist) {
-      const col = cardMap.get((card as any).cardId)
+      const col = cardMap.get(card.cardId)
       if (col?.setCode) setCode = col.setCode.toUpperCase()
     }
 
@@ -2884,7 +2982,7 @@ const handleExportBinder = async () => {
 
   const lines: string[] = []
   for (const card of binderDisplayCards.value) {
-    const code = setCodeMap.get((card as any).cardId)?.toUpperCase() || card.edition
+    const code = setCodeMap.get(card.cardId)?.toUpperCase() ?? card.edition
     lines.push(`${card.allocatedQuantity} ${card.name} (${code})`)
   }
 
@@ -2914,8 +3012,8 @@ const handleExportBinderCsv = async () => {
 
   const csvCards: Parameters<typeof buildMoxfieldCsv>[0] = []
   for (const card of binderDisplayCards.value) {
-    const col = cardMap.get((card as any).cardId)
-    const setCode = col?.setCode?.toUpperCase() || card.edition
+    const col = cardMap.get(card.cardId)
+    const setCode = col?.setCode?.toUpperCase() ?? card.edition
 
     csvCards.push({
       name: card.name,
@@ -3025,6 +3123,7 @@ const resumeImport = async (savedState: ImportState) => {
       // Continuar con allocations (bulk — single Firestore write)
       const bulkItems = createdCardIds
         .map((cardId, i) => {
+          // eslint-disable-next-line security/detect-object-injection
           const meta = savedState.cardMeta[i]
           return cardId && meta ? { cardId, quantity: meta.quantity, isInSideboard: meta.isInSideboard } : null
         })
@@ -3149,7 +3248,7 @@ watch(() => route.query.filter, (newFilter, oldFilter) => {
 // Watch for addCard query parameter (from GlobalSearch) — redirect to search view
 watch(() => route.query.addCard, (cardName) => {
   if (cardName && typeof cardName === 'string') {
-    router.replace({ path: '/search', query: { q: cardName } })
+    void router.replace({ path: '/search', query: { q: cardName } })
   }
 }, { immediate: true })
 
@@ -3237,7 +3336,7 @@ onUnmounted(() => {
         <BaseButton v-else size="small" @click="showCreateDeckModal = true">
           {{ t('collection.actions.newDeck') }}
         </BaseButton>
-        <BaseButton size="small" variant="secondary" @click="selectedScryfallCard = null; showAddCardModal = true">
+        <BaseButton size="small" variant="secondary" @click="selectedScryfallCard = undefined; showAddCardModal = true">
           <SvgIcon name="plus" size="tiny" class="inline-block mr-1" />
           {{ t('collection.actions.addCard') }}
         </BaseButton>
@@ -3315,9 +3414,9 @@ onUnmounted(() => {
               <span class="relative z-10">
                 {{ deck.name }}
                 <span v-if="isDeckImporting(deck.id)" class="ml-1 text-neon font-bold">
-                  {{ importProgress?.currentCard || 0 }}/{{ importProgress?.totalCards || 0 }}
+                  {{ importProgress?.currentCard ?? 0 }}/{{ importProgress?.totalCards ?? 0 }}
                 </span>
-                <span v-else class="ml-1 opacity-70">{{ deck.stats?.ownedCards || 0 }}</span>
+                <span v-else class="ml-1 opacity-70">{{ deck.stats?.ownedCards ?? 0 }}</span>
               </span>
             </button>
             <!-- Botón nuevo deck -->
@@ -3349,7 +3448,7 @@ onUnmounted(() => {
                 ]"
             >
               {{ binder.name }}
-              <span class="ml-1 opacity-70">{{ binder.stats?.totalCards || 0 }}</span>
+              <span class="ml-1 opacity-70">{{ binder.stats?.totalCards ?? 0 }}</span>
             </button>
             <!-- Botón nueva carpeta -->
             <BaseButton size="small" variant="filled" @click="showCreateBinderModal = true">
@@ -3449,9 +3548,9 @@ onUnmounted(() => {
                 {{ t('binders.header.forSale') }}
               </button>
               <span class="text-silver-30">|</span>
-              <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards || 0 }} cards</span>
+              <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards ?? 0 }} cards</span>
               <span class="text-silver-30">|</span>
-              <span class="text-tiny text-silver-50">${{ (selectedBinder.stats?.totalPrice || 0).toFixed(2) }}</span>
+              <span class="text-tiny text-silver-50">${{ (selectedBinder.stats?.totalPrice ?? 0).toFixed(2) }}</span>
               <BaseButton size="small" variant="secondary" @click="handleExportBinder">
                 <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
                 <span class="sm:hidden">📋</span>
@@ -3486,7 +3585,7 @@ onUnmounted(() => {
               class="flex items-center gap-1"
           >
             <button
-                @click="statusFilter = status as any"
+                @click="statusFilter = status as typeof statusFilter"
                 :class="[
                   'px-3 py-1 text-tiny font-bold whitespace-nowrap transition-150 rounded',
                   statusFilter === status
@@ -4032,8 +4131,7 @@ onUnmounted(() => {
         @click="showAddCardModal = true"
         :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[90px]' : ''"
     />
-
-  </AppContainer>
+</AppContainer>
 
   <!-- ========== DECK STATS FOOTER (fijo abajo cuando hay deck seleccionado) ========== -->
   <Teleport to="body">
@@ -4071,9 +4169,9 @@ onUnmounted(() => {
           <span class="text-silver-50">{{ t('collection.deckStats.valueTotal') }} <span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span></span>
           <div v-if="selectedDeckStats" class="flex items-center gap-2 flex-1 ml-2">
             <div class="flex-1 h-2 bg-primary rounded overflow-hidden border border-silver-30/30">
-              <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"></div>
+              <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage ?? 0}%` }"></div>
             </div>
-            <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
+            <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage ?? 0).toFixed(0) }}%</span>
           </div>
         </div>
         <!-- Mobile: thin collapsed bar + expandable detail -->
@@ -4089,7 +4187,7 @@ onUnmounted(() => {
               <span class="text-neon font-bold">{{ deckOwnedCount }}</span><span class="text-silver-50 text-[11px]">/{{ deckOwnedCount + deckWishlistCount }}</span>
               <span class="text-silver-30">|</span>
               <span class="text-silver-50">${{ deckTotalCostBySource.toFixed(2) }}</span>
-              <span v-if="selectedDeckStats" class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
+              <span v-if="selectedDeckStats" class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage ?? 0).toFixed(0) }}%</span>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                  class="text-silver-50 transition-transform duration-200" :class="deckStatsExpanded ? 'rotate-180' : ''">
@@ -4132,9 +4230,9 @@ onUnmounted(() => {
             <!-- Progress bar -->
             <div v-if="selectedDeckStats" class="flex items-center gap-2">
               <div class="flex-1 h-1.5 bg-primary rounded overflow-hidden border border-silver-30/30">
-                <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage || 0}%` }"></div>
+                <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage ?? 0}%` }"></div>
               </div>
-              <span class="text-[11px] font-bold text-neon">{{ (selectedDeckStats.completionPercentage || 0).toFixed(0) }}%</span>
+              <span class="text-[11px] font-bold text-neon">{{ (selectedDeckStats.completionPercentage ?? 0).toFixed(0) }}%</span>
             </div>
           </div>
         </div>

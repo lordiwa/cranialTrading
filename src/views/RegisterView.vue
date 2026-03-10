@@ -46,13 +46,13 @@ const handleCheckVerification = async () => {
   checkingVerification.value = false;
 
   if (verified) {
-    router.push(route.query.returnUrl as string || '/dashboard');
+    void router.push(route.query.returnUrl as string || '/dashboard');
   }
 };
 
 onMounted(() => {
   if (authStore.user && authStore.emailVerified) {
-    router.push(route.query.returnUrl as string || '/dashboard');
+    void router.push(route.query.returnUrl as string || '/dashboard');
   }
 });
 </script>

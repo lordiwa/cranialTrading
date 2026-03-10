@@ -11,10 +11,10 @@ import { getAvatarUrlForUser } from '../utils/avatar'
 import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
-import { useMatchesStore } from '../stores/matches'
+import { type MatchCard as MatchCardType, type SimpleMatch, useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
 import { useDecksStore } from '../stores/decks'
-import { addDoc, collection, deleteDoc, doc, getDocs, limit, query, where } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, type DocumentData, getDocs, limit, query, where } from 'firebase/firestore'
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
@@ -25,8 +25,46 @@ import {
   type PublicCard,
   type PublicPreference,
 } from '../services/publicCards'
-import { getCardSuggestions, searchCards } from '../services/scryfall'
+import { getCardSuggestions, type ScryfallCard, searchCards } from '../services/scryfall'
 import { notifyMatchUser } from '../services/cloudFunctions'
+import { type CardCondition, type CardStatus } from '../types/card'
+
+/** Calculated match shape produced by the dashboard matching logic */
+interface CalculatedMatch {
+  id: string
+  otherUserId: string
+  otherUsername: string
+  otherLocation: string
+  otherEmail: string
+  myCards: unknown[]
+  otherCards: unknown[]
+  myTotalValue: number
+  theirTotalValue: number
+  valueDifference: number
+  compatibility: number
+  type: 'VENDO' | 'BUSCO' | 'BIDIRECTIONAL' | 'UNIDIRECTIONAL'
+  createdAt: Date
+  lifeExpiresAt: Date
+}
+
+/** Shape of a public_cards search result from Firestore */
+interface PublicCardSearchResult extends DocumentData {
+  id: string
+  cardName?: string
+  userId?: string
+  edition?: string
+  condition?: string
+  price?: number
+  image?: string
+  username?: string
+  avatarUrl?: string
+  status?: string
+  scryfallId?: string
+  cardId?: string
+  quantity?: number
+  foil?: boolean
+  location?: string
+}
 
 const router = useRouter()
 const collectionStore = useCollectionStore()
@@ -41,7 +79,7 @@ const { t } = useI18n()
 
 const loading = ref(false)
 const syncing = ref(false)
-const calculatedMatches = ref<any[]>([])
+const calculatedMatches = ref<CalculatedMatch[]>([])
 const progressCurrent = ref(0)
 const progressTotal = ref(0)
 const totalUsers = ref(0)
@@ -87,7 +125,7 @@ const loadClearDataState = (): ClearDataState | null => {
   try {
     const saved = localStorage.getItem(CLEAR_DATA_STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      return JSON.parse(saved) as ClearDataState
     }
   } catch (e) {
     console.warn('[ClearData] Failed to load state:', e)
@@ -109,7 +147,7 @@ const discardedMatchIds = ref<Set<string>>(new Set())
 
 // Card search
 const searchQuery = ref('')
-const searchResults = ref<any[]>([])
+const searchResults = ref<PublicCardSearchResult[]>([])
 const searching = ref(false)
 const searchedOnce = ref(false)
 const sentInterestIds = ref<Set<string>>(new Set())
@@ -122,7 +160,7 @@ const searchContainer = ref<HTMLElement | null>(null)
 const suggestLoading = ref(false)
 
 // Scryfall fallback results (when no public_cards found)
-const scryfallResults = ref<any[]>([])
+const scryfallResults = ref<ScryfallCard[]>([])
 const showScryfallFallback = ref(false)
 
 /**
@@ -141,7 +179,7 @@ const loadDiscardedMatches = async () => {
       const data = docSnap.data()
       // Track by otherUserId to prevent matches with same user from reappearing
       if (data.otherUserId) {
-        ids.add(data.otherUserId)
+        ids.add(data.otherUserId as string)
       }
     }
     discardedMatchIds.value = ids
@@ -154,7 +192,7 @@ const loadDiscardedMatches = async () => {
 /**
  * Discard a match by moving it to matches_eliminados in Firestore
  */
-const discardMatchToFirestore = async (match: any) => {
+const discardMatchToFirestore = async (match: CalculatedMatch) => {
   if (!authStore.user) return
 
   try {
@@ -164,8 +202,8 @@ const discardMatchToFirestore = async (match: any) => {
       otherUserId: match.otherUserId,
       otherUsername: match.otherUsername,
       otherLocation: match.otherLocation,
-      myCards: match.myCards || [],
-      otherCards: match.otherCards || [],
+      myCards: match.myCards ?? [],
+      otherCards: match.otherCards ?? [],
       status: 'eliminado',
       eliminatedAt: new Date(),
       lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
@@ -198,7 +236,7 @@ const syncPublicData = async () => {
   try {
     // collectionStore ahora sincroniza tanto sale/trade como wishlist
     await collectionStore.syncAllToPublic()
-    console.log('✅ Datos sincronizados a colecciones públicas')
+    console.info('Datos sincronizados a colecciones publicas')
   } catch (error) {
     console.error('Error sincronizando datos públicos:', error)
   } finally {
@@ -210,30 +248,30 @@ const syncPublicData = async () => {
  * DEBUG: Check what's in public collections
  */
 const debugPublicCollections = async () => {
-  console.log('🔍 [DEBUG] Checking public collections...')
+  console.info('[DEBUG] Checking public collections...')
 
   // Check public_cards
   const cardsRef = collection(db, 'public_cards')
   const cardsSnap = await getDocs(cardsRef)
-  console.log(`📦 [DEBUG] public_cards: ${cardsSnap.size} total cards`)
+  console.info(`[DEBUG] public_cards: ${cardsSnap.size} total cards`)
   cardsSnap.docs.forEach(d => {
     const data = d.data()
-    console.log(`  - ${data.cardName} (${data.status}) by ${data.username}`)
+    console.info(`  - ${String(data.cardName)} (${String(data.status)}) by ${String(data.username)}`)
   })
 
   // Check public_preferences
   const prefsRef = collection(db, 'public_preferences')
   const prefsSnap = await getDocs(prefsRef)
-  console.log(`🔖 [DEBUG] public_preferences: ${prefsSnap.size} total preferences`)
+  console.info(`[DEBUG] public_preferences: ${prefsSnap.size} total preferences`)
   prefsSnap.docs.forEach(d => {
     const data = d.data()
-    console.log(`  - ${data.cardName} wanted by ${data.username}`)
+    console.info(`  - ${String(data.cardName)} wanted by ${String(data.username)}`)
   })
 }
 
 // Expose to window for debugging
 if (globalThis.window !== undefined) {
-  (globalThis as any).debugPublicCollections = debugPublicCollections
+  (globalThis as unknown as Record<string, unknown>).debugPublicCollections = debugPublicCollections
 }
 
 // ========== BLOCKED USERS MANAGEMENT ==========
@@ -269,16 +307,23 @@ const loadBlockedUsers = async () => {
       const data = docSnap.data()
       if (!data.otherUserId) continue
 
-      if (!userMap.has(data.otherUserId)) {
-        userMap.set(data.otherUserId, {
-          odifUserId: data.otherUserId,
-          username: data.otherUsername || 'Unknown',
-          location: data.otherLocation,
-          blockedAt: data.eliminatedAt?.toDate?.() || new Date(),
+      const otherUserId = data.otherUserId as string
+      const otherUsername = (data.otherUsername as string) ?? 'Unknown'
+      const otherLocation = data.otherLocation as string | undefined
+      const eliminatedAt = data.eliminatedAt as { toDate?: () => Date } | undefined
+      if (!userMap.has(otherUserId)) {
+        userMap.set(otherUserId, {
+          odifUserId: otherUserId,
+          username: otherUsername,
+          location: otherLocation,
+          blockedAt: eliminatedAt?.toDate?.() ?? new Date(),
           docIds: []
         })
       }
-      userMap.get(data.otherUserId)!.docIds.push(docSnap.id)
+      const blockedUser = userMap.get(otherUserId)
+      if (blockedUser) {
+        blockedUser.docIds.push(docSnap.id)
+      }
     }
 
     blockedUsers.value = Array.from(userMap.values()).sort((a, b) =>
@@ -349,7 +394,9 @@ const handleBlockByUsername = async () => {
       return
     }
 
-    const userDoc = snapshot.docs[0]!
+    const userDoc = snapshot.docs[0]
+    if (!userDoc) return
+
     const userId = userDoc.id
     const userData = userDoc.data()
 
@@ -362,8 +409,8 @@ const handleBlockByUsername = async () => {
     const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
     await addDoc(discardedRef, {
       otherUserId: userId,
-      otherUsername: userData.username || username,
-      otherLocation: userData.location || '',
+      otherUsername: (userData.username as string) ?? username,
+      otherLocation: (userData.location as string) ?? '',
       status: 'eliminado',
       eliminatedAt: new Date(),
       lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
@@ -371,7 +418,7 @@ const handleBlockByUsername = async () => {
 
     discardedMatchIds.value.add(userId)
     blockUsernameInput.value = ''
-    toastStore.show(t('dashboard.blockedUsersModal.userBlocked', { username: userData.username || username }), 'success')
+    toastStore.show(t('dashboard.blockedUsersModal.userBlocked', { username: (userData.username as string) ?? username }), 'success')
 
     await loadBlockedUsers()
     await calculateMatches()
@@ -390,7 +437,7 @@ onMounted(async () => {
   // Check for incomplete clear data operation and resume if needed
   const savedClearState = loadClearDataState()
   if (savedClearState?.status === 'in_progress') {
-    resumeClearData(savedClearState)
+    void resumeClearData(savedClearState)
     return // Don't load other data, we're clearing everything
   } else if (savedClearState?.status === 'complete') {
     clearClearDataState()
@@ -441,6 +488,7 @@ const deleteCollectionStep = async (userId: string, step: ClearDataStep): Promis
     'decks': 'decks'
   }
 
+  // eslint-disable-next-line security/detect-object-injection
   const colName = collectionMap[step]
   try {
     const colRef = collection(db, 'users', userId, colName)
@@ -448,7 +496,7 @@ const deleteCollectionStep = async (userId: string, step: ClearDataStep): Promis
     for (const docItem of snapshot.docs) {
       await deleteDoc(doc(db, 'users', userId, colName, docItem.id))
     }
-    console.log(`🗑️ ${snapshot.docs.length} ${step} borrados`)
+    console.info(`${snapshot.docs.length} ${step} borrados`)
     return true
   } catch (e) {
     console.error(`Error borrando ${step}:`, e)
@@ -477,7 +525,7 @@ const executeClearData = async (startFromState?: ClearDataState, progressToast?:
   const userId = authStore.user.id
 
   // Initialize or use existing state
-  const state: ClearDataState = startFromState || {
+  const state: ClearDataState = startFromState ?? {
     status: 'in_progress',
     completedSteps: [],
     currentStep: null,
@@ -485,7 +533,7 @@ const executeClearData = async (startFromState?: ClearDataState, progressToast?:
   }
 
   // Create progress toast if not provided
-  const progress = progressToast || toastStore.showProgress('Borrando datos...', 0)
+  const progress = progressToast ?? toastStore.showProgress('Borrando datos...', 0)
 
   // Get remaining steps
   const remainingSteps = ALL_CLEAR_STEPS.filter(step => !state.completedSteps.includes(step))
@@ -498,6 +546,7 @@ const executeClearData = async (startFromState?: ClearDataState, progressToast?:
     // Update progress toast
     const currentStepIndex = state.completedSteps.length
     const percent = Math.round((currentStepIndex / totalSteps) * 100)
+    // eslint-disable-next-line security/detect-object-injection
     progress.update(percent, `Borrando ${STEP_LABELS[step]}...`)
 
     const success = await deleteCollectionStep(userId, step)
@@ -541,7 +590,7 @@ const executeClearData = async (startFromState?: ClearDataState, progressToast?:
  * Resume incomplete clear data operation
  */
 const resumeClearData = async (savedState: ClearDataState) => {
-  console.log('[ClearData] Resuming clear operation, completed:', savedState.completedSteps)
+  console.info('[ClearData] Resuming clear operation, completed:', savedState.completedSteps)
 
   if (savedState.status === 'complete') {
     clearClearDataState()
@@ -576,7 +625,7 @@ const clearAllData = async () => {
 
 // Export to avoid unused warning (can be called from dev tools)
 if (import.meta.env.DEV) {
-  (globalThis as any).__clearAllData = clearAllData
+  (globalThis as unknown as Record<string, unknown>).__clearAllData = clearAllData
 }
 
 /**
@@ -601,11 +650,14 @@ const groupMatchesByUser = (
         cards: [],
         prefs: [],
         username: card.username,
-        location: card.location || 'Unknown',
-        email: card.email || ''
+        location: card.location ?? 'Unknown',
+        email: card.email ?? ''
       })
     }
-    userMatches.get(card.userId)!.cards.push(card)
+    const entry = userMatches.get(card.userId)
+    if (entry) {
+      entry.cards.push(card)
+    }
   }
 
   for (const pref of matchingPrefs) {
@@ -614,11 +666,14 @@ const groupMatchesByUser = (
         cards: [],
         prefs: [],
         username: pref.username,
-        location: pref.location || 'Unknown',
-        email: pref.email || ''
+        location: pref.location ?? 'Unknown',
+        email: pref.email ?? ''
       })
     }
-    userMatches.get(pref.userId)!.prefs.push(pref)
+    const entry = userMatches.get(pref.userId)
+    if (entry) {
+      entry.prefs.push(pref)
+    }
   }
 
   return userMatches
@@ -653,12 +708,12 @@ const calculateMatches = async () => {
       condition: c.condition,
       edition: c.edition,
       image: c.image,
-      createdAt: c.createdAt || new Date(),
+      createdAt: c.createdAt ?? new Date(),
     }))
-    const foundMatches: any[] = []
+    const foundMatches: CalculatedMatch[] = []
 
-    console.log('🔍 Iniciando cálculo de matches (optimizado)...')
-    console.log(`Mis cartas: ${myCards.length}, Mi wishlist: ${myWishlist.length}`)
+    console.info('Iniciando calculo de matches (optimizado)...')
+    console.info(`Mis cartas: ${myCards.length}, Mi wishlist: ${myWishlist.length}`)
 
     // PASO 1: Buscar cartas que coincidan con mi wishlist (lo que BUSCO)
     progressTotal.value = 2
@@ -666,10 +721,10 @@ const calculateMatches = async () => {
 
     // Debug: mostrar qué nombres estamos buscando
     const myWishlistNames = myWishlist.map(c => c.name).filter(Boolean)
-    console.log(`🔍 Buscando cartas por nombre:`, myWishlistNames)
+    console.info('Buscando cartas por nombre:', myWishlistNames)
 
     const matchingCards = await findCardsMatchingPreferences(myWishlist, authStore.user.id)
-    console.log(`📦 Encontradas ${matchingCards.length} cartas que busco`)
+    console.info(`Encontradas ${matchingCards.length} cartas que busco`)
 
     // PASO 2: Buscar preferencias que coincidan con mis cartas (VENDO)
     progressCurrent.value = 2
@@ -677,10 +732,10 @@ const calculateMatches = async () => {
     // Debug: mostrar qué nombres tengo para vender
     const myTradeable = myCards.filter(c => c.status === 'trade' || c.status === 'sale')
     const myCardNames = myTradeable.map(c => c.name).filter(Boolean)
-    console.log(`🏷️ Mis cartas para vender (${myTradeable.length}):`, myCardNames)
+    console.info(`Mis cartas para vender (${myTradeable.length}):`, myCardNames)
 
     const matchingPrefs = await findPreferencesMatchingCards(myCards, authStore.user.id)
-    console.log(`🔎 Encontradas ${matchingPrefs.length} personas buscando mis cartas`)
+    console.info(`Encontradas ${matchingPrefs.length} personas buscando mis cartas`)
 
     // Agrupar por usuario
     const userMatches = groupMatchesByUser(matchingCards, matchingPrefs)
@@ -700,13 +755,13 @@ const calculateMatches = async () => {
         scryfallId: c.scryfallId,
         price: c.price,
         edition: c.edition,
-        condition: c.condition as any,
+        condition: c.condition as CardCondition,
         foil: c.foil,
         quantity: c.quantity,
         image: c.image,
-        status: c.status as any,
-        updatedAt: c.updatedAt?.toDate() || new Date(),
-        createdAt: c.updatedAt?.toDate() || new Date(),
+        status: c.status as CardStatus,
+        updatedAt: c.updatedAt?.toDate() ?? new Date(),
+        createdAt: c.updatedAt?.toDate() ?? new Date(),
       }))
 
       const theirPreferences = data.prefs.map(p => ({
@@ -722,7 +777,7 @@ const calculateMatches = async () => {
         condition: 'NM' as const,
         edition: '',
         image: '',
-        createdAt: p.updatedAt?.toDate() || new Date(),
+        createdAt: p.updatedAt?.toDate() ?? new Date(),
       }))
 
       // INTENTAR MATCH BIDIRECCIONAL PRIMERO
@@ -734,14 +789,12 @@ const calculateMatches = async () => {
       )
 
       // SI NO HAY BIDIRECCIONAL, INTENTAR UNIDIRECCIONAL
-      if (!matchCalc) {
-        matchCalc = priceMatching.calculateUnidirectionalMatch(
-            myCards,
-            myPreferences,
-            theirCards,
-            theirPreferences
-        )
-      }
+      matchCalc ??= priceMatching.calculateUnidirectionalMatch(
+          myCards,
+          myPreferences,
+          theirCards,
+          theirPreferences
+      )
 
       if (matchCalc?.isValid) {
         const match = {
@@ -750,19 +803,19 @@ const calculateMatches = async () => {
           otherUsername: data.username,
           otherLocation: data.location,
           otherEmail: data.email,
-          myCards: matchCalc.myCardsInfo || [],
-          otherCards: matchCalc.theirCardsInfo || [],
+          myCards: matchCalc.myCardsInfo ?? [],
+          otherCards: matchCalc.theirCardsInfo ?? [],
           myTotalValue: matchCalc.myTotalValue,
           theirTotalValue: matchCalc.theirTotalValue,
           valueDifference: matchCalc.valueDifference,
           compatibility: matchCalc.compatibility,
-          type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' : 'UNIDIRECTIONAL',
+          type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' as const : 'UNIDIRECTIONAL' as const,
           createdAt: new Date(),
           lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
         }
 
         foundMatches.push(match)
-        console.log(`✅ Match con ${data.username}: ${matchCalc.compatibility}%`)
+        console.info(`Match con ${data.username}: ${matchCalc.compatibility}%`)
       }
     }
 
@@ -778,7 +831,7 @@ const calculateMatches = async () => {
     // Reload matches from Firestore to sync store state with what was just written
     await matchesStore.loadAllMatches()
 
-    console.log(`✅ Total de matches: ${foundMatches.length} (de ${userMatches.size} usuarios potenciales)`)
+    console.info(`Total de matches: ${foundMatches.length} (de ${userMatches.size} usuarios potenciales)`)
   } catch (error) {
     console.error('Error calculando matches:', error)
   } finally {
@@ -793,7 +846,7 @@ const calculateMatches = async () => {
  * Limpia los matches_nuevos existentes antes de guardar los nuevos
  * Also notifies the other user via Cloud Function (Bug #2 fix)
  */
-const saveMatchesToFirebase = async (matches: any[]) => {
+const saveMatchesToFirebase = async (matches: CalculatedMatch[]) => {
   if (!authStore.user) return
 
   try {
@@ -803,7 +856,7 @@ const saveMatchesToFirebase = async (matches: any[]) => {
     // (notification docs have _notificationOf field set by the cloud function)
     const existingSnapshot = await getDocs(matchesRef)
     for (const docSnap of existingSnapshot.docs) {
-      if (!docSnap.data()._notificationOf) {
+      if (!(docSnap.data())._notificationOf) {
         await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
       }
     }
@@ -816,8 +869,8 @@ const saveMatchesToFirebase = async (matches: any[]) => {
         otherUsername: match.otherUsername,
         otherLocation: match.otherLocation,
         otherEmail: match.otherEmail,
-        myCards: match.myCards || [],
-        otherCards: match.otherCards || [],
+        myCards: match.myCards ?? [],
+        otherCards: match.otherCards ?? [],
         myTotalValue: match.myTotalValue,
         theirTotalValue: match.theirTotalValue,
         valueDifference: match.valueDifference,
@@ -838,22 +891,22 @@ const saveMatchesToFirebase = async (matches: any[]) => {
           fromUsername: authStore.user.username,
           fromLocation: authStore.user.location,
           fromAvatarUrl: authStore.user.avatarUrl,
-          myCards: match.myCards || [],
-          otherCards: match.otherCards || [],
+          myCards: (match.myCards ?? []) as Record<string, unknown>[],
+          otherCards: (match.otherCards ?? []) as Record<string, unknown>[],
           myTotalValue: match.myTotalValue,
           theirTotalValue: match.theirTotalValue,
           valueDifference: match.valueDifference,
           compatibility: match.compatibility,
           type: match.type as 'BIDIRECTIONAL' | 'UNIDIRECTIONAL',
         })
-        console.log(`📨 Notified ${match.otherUsername} about match`)
+        console.info(`Notified ${match.otherUsername} about match`)
       } catch (notifyErr) {
         // Log but don't fail the whole operation if notification fails
-        console.warn(`⚠️ Could not notify ${match.otherUsername}:`, notifyErr)
+        console.warn(`Could not notify ${match.otherUsername}:`, notifyErr)
       }
     }
 
-    console.log(`💾 ${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`)
+    console.info(`${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`)
   } catch (err) {
     console.error('Error guardando matches:', err)
   }
@@ -862,23 +915,25 @@ const saveMatchesToFirebase = async (matches: any[]) => {
 /**
  * CAMBIO 3: Integrar con matches.ts store
  */
-const handleSaveMatch = async (match: any) => {
+const handleSaveMatch = async (match: CalculatedMatch) => {
   // Convertir match a formato SimpleMatch del store
-  const matchToSave = {
+  const matchToSave: SimpleMatch = {
     id: match.id,
     type: (match.type === 'VENDO' ? 'VENDO' : 'BUSCO'),
     otherUserId: match.otherUserId,
     otherUsername: match.otherUsername,
     otherLocation: match.otherLocation,
-    myCard: match.myCard,
-    otherCard: match.otherCard,
-    myPreference: match.myPreference,
-    otherPreference: match.otherPreference,
+    myCards: (match.myCards ?? []) as MatchCardType[],
+    otherCards: (match.otherCards ?? []) as MatchCardType[],
+    myTotalValue: match.myTotalValue,
+    theirTotalValue: match.theirTotalValue,
+    valueDifference: match.valueDifference,
+    compatibility: match.compatibility,
     createdAt: match.createdAt,
     status: 'nuevo' as const,
   }
 
-  await matchesStore.saveMatch(matchToSave as any)
+  await matchesStore.saveMatch(matchToSave)
 
   // Remover del dashboard
   calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== match.id)
@@ -930,7 +985,7 @@ const selectSuggestion = (cardName: string) => {
   suppressSuggestions.value = true
   showSuggestions.value = false
   suggestions.value = []
-  searchPublicCards()
+  void searchPublicCards()
 }
 
 // Click outside to close suggestions
@@ -960,11 +1015,12 @@ const searchPublicCards = async () => {
     const snapshot = await getDocs(publicCardsRef)
 
     const searchLower = searchQuery.value.toLowerCase()
+    const currentUserId = authStore.user?.id
     const results = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((card: any) =>
+      .map(d => ({ id: d.id, ...d.data() } as PublicCardSearchResult))
+      .filter((card: PublicCardSearchResult) =>
         card.cardName?.toLowerCase().includes(searchLower) &&
-        card.userId !== authStore.user!.id // Exclude own cards
+        card.userId !== currentUserId // Exclude own cards
       )
       .slice(0, 20) // Limit results
 
@@ -986,19 +1042,19 @@ const searchPublicCards = async () => {
 }
 
 // Add card to wishlist from Scryfall results
-const addToWishlist = async (card: any) => {
+const addToWishlist = async (card: ScryfallCard) => {
   if (!authStore.user) return
 
   // Get the image URL (handle split cards)
-  let imageUrl = card.image_uris?.normal || ''
+  let imageUrl = card.image_uris?.normal ?? ''
   if (!imageUrl && card.card_faces?.[0]?.image_uris) {
-    imageUrl = card.card_faces[0].image_uris.normal || ''
+    imageUrl = card.card_faces[0].image_uris.normal ?? ''
   }
 
   const cardData = {
     name: card.name,
     scryfallId: card.id,
-    edition: card.set?.toUpperCase() || '',
+    edition: card.set?.toUpperCase() ?? '',
     quantity: 1,
     condition: 'NM' as const,
     foil: false,
@@ -1020,19 +1076,19 @@ const addToWishlist = async (card: any) => {
 }
 
 // Send interest from search result
-const sendInterestFromSearch = async (card: any) => {
+const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
   if (!authStore.user || sentInterestIds.value.has(card.id)) return
 
   try {
-    const scryfallId = card.scryfallId || ''
-    const edition = card.edition || ''
+    const scryfallId = card.scryfallId ?? ''
+    const edition = card.edition ?? ''
 
     // Check for existing duplicate match (same sender, receiver, card, and edition)
     const sharedMatchesRef = collection(db, 'shared_matches')
     const existingQuery = query(
       sharedMatchesRef,
       where('senderId', '==', authStore.user.id),
-      where('receiverId', '==', card.userId),
+      where('receiverId', '==', card.userId ?? ''),
       where('card.scryfallId', '==', scryfallId)
     )
     const existingSnapshot = await getDocs(existingQuery)
@@ -1040,13 +1096,13 @@ const sendInterestFromSearch = async (card: any) => {
     // Check if any existing match has the same edition (allow different prints)
     const hasDuplicate = existingSnapshot.docs.some(docSnap => {
       const data = docSnap.data()
-      return data.card?.edition === edition
+      return (data.card as DocumentData | undefined)?.edition === edition
     })
 
     if (hasDuplicate) {
-      console.log('[Interest] Duplicate match already exists, skipping')
+      console.info('[Interest] Duplicate match already exists, skipping')
       sentInterestIds.value.add(card.id)
-      toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'info')
+      toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'info')
       return
     }
 
@@ -1058,30 +1114,30 @@ const sendInterestFromSearch = async (card: any) => {
     }
 
     const cardData = {
-      id: card.cardId || card.id,
+      id: card.cardId ?? card.id,
       scryfallId,
-      name: card.cardName || '',
+      name: card.cardName ?? '',
       edition,
-      quantity: card.quantity || 1,
-      condition: card.condition || 'NM',
-      foil: card.foil || false,
-      price: card.price || 0,
-      image: card.image || '',
-      status: card.status || 'sale',
+      quantity: card.quantity ?? 1,
+      condition: card.condition ?? 'NM',
+      foil: card.foil ?? false,
+      price: card.price ?? 0,
+      image: card.image ?? '',
+      status: card.status ?? 'sale',
     }
 
-    const totalValue = (card.price || 0) * (card.quantity || 1)
+    const totalValue = (card.price ?? 0) * (card.quantity ?? 1)
 
     const sharedMatchPayload = {
       senderId: authStore.user.id,
       senderUsername: authStore.user.username,
-      senderLocation: authStore.user.location || '',
-      senderEmail: authStore.user.email || '',
-      receiverId: card.userId,
-      receiverUsername: card.username || '',
-      receiverLocation: card.location || '',
+      senderLocation: authStore.user.location ?? '',
+      senderEmail: authStore.user.email ?? '',
+      receiverId: card.userId ?? '',
+      receiverUsername: card.username ?? '',
+      receiverLocation: card.location ?? '',
       card: cardData,
-      cardType: card.status || 'sale',
+      cardType: card.status ?? 'sale',
       totalValue,
       status: 'pending',
       senderStatus: 'interested',
@@ -1093,7 +1149,7 @@ const sendInterestFromSearch = async (card: any) => {
     await addDoc(sharedMatchesRef, sharedMatchPayload)
 
     sentInterestIds.value.add(card.id)
-    toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'success')
+    toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'success')
   } catch (error) {
     console.error('Error sending interest:', error)
     toastStore.show(t('dashboard.interest.error'), 'error')
@@ -1231,7 +1287,7 @@ const sendInterestFromSearch = async (card: any) => {
             <p class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) || '0.00' }}</p>
             <p class="text-tiny text-silver-50 truncate flex items-center gap-1">
               <img
-                  :src="getAvatarUrlForUser(card.username, 16, card.avatarUrl)"
+                  :src="getAvatarUrlForUser(card.username ?? '', 16, card.avatarUrl)"
                   alt=""
                   class="w-4 h-4 rounded-full"
               />
@@ -1336,7 +1392,7 @@ const sendInterestFromSearch = async (card: any) => {
         <MatchCard
             v-for="match in calculatedMatches"
             :key="match.id"
-            :match="match"
+            :match="(match as unknown as SimpleMatch)"
             tab="new"
             @save="handleSaveMatch"
             @discard="handleDiscardMatch"

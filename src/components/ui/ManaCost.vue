@@ -21,6 +21,7 @@ const symbols = computed(() => {
   // Parse {X}, {2/W}, {W/U}, {W}, {10}, etc. or bare symbols like 2WU
   let i = 0
   while (i < cost.length) {
+    // eslint-disable-next-line security/detect-object-injection
     if (cost[i] !== '{') {
       const nextBrace = cost.indexOf('{', i)
       if (nextBrace === -1) {
@@ -50,6 +51,7 @@ function parseBareSymbols(str: string): string[] {
   let i = 0
 
   while (i < str.length) {
+    // eslint-disable-next-line security/detect-object-injection
     const char = str[i]
     if (!char) break
 
@@ -57,6 +59,7 @@ function parseBareSymbols(str: string): string[] {
     if (/\d/.test(char)) {
       let num = ''
       while (i < str.length) {
+        // eslint-disable-next-line security/detect-object-injection
         const digit = str[i]
         if (!digit || !/\d/.test(digit)) break
         num += digit

@@ -19,8 +19,12 @@ const props = withDefaults(defineProps<{
   compact: false,
   readonly: false,
   showInterest: false,
+  interestedCards: () => new Set<string>(),
   showCart: false,
+  cartItemIds: () => new Set<string>(),
+  deletingCardIds: () => new Set<string>(),
   selectionMode: false,
+  selectedCardIds: () => new Set<string>(),
 })
 
 const emit = defineEmits<{

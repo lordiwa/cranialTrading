@@ -6,6 +6,7 @@ import ChatModal from '../chat/ChatModal.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 import { useContactsStore } from '../../stores/contacts'
+import { type SimpleMatch } from '../../stores/matches'
 import { useToastStore } from '../../stores/toast'
 import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
@@ -21,7 +22,7 @@ const emit = defineEmits(['save', 'discard'])
 const { t } = useI18n()
 
 interface Props {
-  match: any
+  match: SimpleMatch
   matchIndex?: number
   tab?: 'new' | 'sent' | 'saved' | 'deleted'
 }
@@ -35,7 +36,7 @@ const toastStore = useToastStore()
 const messagesStore = useMessagesStore()
 
 // TAB: NEW - Guardar match
-const handleSaveMatch = async () => {
+const handleSaveMatch = () => {
   saving.value = true
   try {
     emit('save', props.match)
@@ -46,12 +47,12 @@ const handleSaveMatch = async () => {
 
 // TAB: NEW/SAVED/DELETED - Descartar match
 const handleDiscard = () => {
-  emit('discard', props.match.id || props.match.docId)
+  emit('discard', props.match.id ?? props.match.docId)
 }
 
 // TAB: SAVED - Marcar como completado
 const handleMarcarCompletado = () => {
-  emit('discard', props.match.id || props.match.docId)
+  emit('discard', props.match.id ?? props.match.docId)
 }
 
 // TAB: DELETED - Recuperar match
@@ -61,13 +62,13 @@ const handleRecuperar = () => {
 
 // TAB: DELETED - Eliminar permanentemente
 const handleDeletePermanent = () => {
-  emit('discard', props.match.id || props.match.docId)
+  emit('discard', props.match.id ?? props.match.docId)
 }
 
 // CONTACTO - Copiar email
 const copyEmailToClipboard = async () => {
   try {
-    await navigator.clipboard.writeText(props.match.otherEmail)
+    await navigator.clipboard.writeText(props.match.otherEmail ?? '')
     toastStore.show(t('matches.contactModal.emailCopied'), 'success')
   } catch {
     toastStore.show(t('messages.errors.sendError'), 'error')
@@ -106,9 +107,9 @@ const handleSaveContact = async () => {
     await contactsStore.saveContact({
       userId: otherUserId,
       username: props.match.otherUsername,
-      email: props.match.otherEmail,
-      location: props.match.otherLocation || 'Unknown',
-      avatarUrl: props.match.otherAvatarUrl || null,
+      email: props.match.otherEmail ?? '',
+      location: props.match.otherLocation ?? 'Unknown',
+      avatarUrl: props.match.otherAvatarUrl ?? null,
     })
 
     toastStore.show(t('matches.contactModal.contactSaved', { username: props.match.otherUsername }), 'success')
@@ -129,14 +130,14 @@ const handleSaveContact = async () => {
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
         <h3 class="text-h3 text-silver font-bold flex items-center gap-2">
-          {{ t('matches.card.header', { index: matchIndex, compatibility: match.compatibility }) }}
+          {{ t('matches.card.header', { index: matchIndex, compatibility: match.compatibility ?? 0 }) }}
           <HelpTooltip
               :text="t('help.tooltips.matches.compatibility')"
               :title="t('help.titles.compatibility')"
           />
         </h3>
         <p class="text-small text-silver-70 mt-1 flex items-center gap-2">
-          {{ t('matches.card.with', { username: '', location: match.otherLocation }).split('@')[0] }}
+          {{ t('matches.card.with', { username: '', location: match.otherLocation ?? '' }).split('@')[0] }}
           <router-link
               :to="`/@${match.otherUsername}`"
               class="text-neon hover:underline font-bold inline-flex items-center gap-1"
@@ -163,7 +164,7 @@ const handleSaveContact = async () => {
         <h4 class="text-small font-bold text-silver-70 uppercase mb-4">{{ t('matches.card.youOffer') }}</h4>
         <div class="space-y-2">
           <div v-if="match.myCards && match.myCards.length > 0">
-            <div v-for="card in match.myCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded">
+            <div v-for="card in match.myCards" :key="card.scryfallId" class="bg-silver-5 border border-silver-20 p-3 rounded">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
               <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
@@ -182,7 +183,7 @@ const handleSaveContact = async () => {
         <h4 class="text-small font-bold text-silver-70 uppercase mb-4">{{ t('matches.card.youReceive') }}</h4>
         <div class="space-y-2">
           <div v-if="match.otherCards && match.otherCards.length > 0">
-            <div v-for="card in match.otherCards" :key="card.id" class="bg-silver-5 border border-silver-20 p-3 rounded">
+            <div v-for="card in match.otherCards" :key="card.scryfallId" class="bg-silver-5 border border-silver-20 p-3 rounded">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
               <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
@@ -203,13 +204,13 @@ const handleSaveContact = async () => {
         <p class="text-small text-silver-70">{{ t('matches.card.priceDifference') }}</p>
         <p :class="[
           'text-h3 font-bold',
-          match.valueDifference >= 0 ? 'text-neon' : 'text-silver-50'
+          (match.valueDifference ?? 0) >= 0 ? 'text-neon' : 'text-silver-50'
         ]">
-          {{ match.valueDifference >= 0 ? '+' : '' }}${{ Math.abs(match.valueDifference).toFixed(2) }}
+          {{ (match.valueDifference ?? 0) >= 0 ? '+' : '' }}${{ Math.abs(match.valueDifference ?? 0).toFixed(2) }}
         </p>
       </div>
       <p class="text-tiny text-silver-70 mt-2">
-        {{ match.valueDifference >= 0 ? t('matches.card.youReceiveAdvantage') : t('matches.card.otherReceivesAdvantage') }}
+        {{ (match.valueDifference ?? 0) >= 0 ? t('matches.card.youReceiveAdvantage') : t('matches.card.otherReceivesAdvantage') }}
       </p>
     </div>
 

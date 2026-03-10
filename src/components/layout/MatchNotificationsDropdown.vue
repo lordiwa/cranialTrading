@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMatchesStore } from '../../stores/matches'
+import { type SimpleMatch, useMatchesStore } from '../../stores/matches'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
 
@@ -30,7 +30,7 @@ const ensureLoaded = async () => {
 }
 
 onMounted(() => {
-  ensureLoaded()
+  void ensureLoaded()
 })
 
 // Show up to 6 most recent new matches
@@ -67,12 +67,12 @@ onUnmounted(() => {
   document.removeEventListener('mousedown', handleMouseDown)
 })
 
-const getAlertDescription = (match: any): string => {
+const getAlertDescription = (match: SimpleMatch): string => {
   if (match.type === 'VENDO') {
-    const cardName = match.myCards?.[0]?.name || match.myCard?.name || '?'
+    const cardName = match.myCards?.[0]?.name ?? match.myCard?.name ?? '?'
     return t('matches.notifications.wantsYourCard', { card: cardName })
   } else {
-    const cardName = match.otherCards?.[0]?.name || match.otherCard?.name || '?'
+    const cardName = match.otherCards?.[0]?.name ?? match.otherCard?.name ?? '?'
     return t('matches.notifications.hasCardYouWant', { card: cardName })
   }
 }
@@ -93,13 +93,13 @@ const timeAgo = (date: Date | string | number): string => {
 
 const goToMatches = () => {
   closeDropdown()
-  router.push('/saved-matches')
+  void router.push('/saved-matches')
 }
 
-const goToMatch = (match: any) => {
+const goToMatch = (match: SimpleMatch) => {
   closeDropdown()
-  const matchId = match.docId || match.id
-  router.push({ path: '/saved-matches', query: { match: matchId } })
+  const matchId = match.docId ?? match.id
+  void router.push({ path: '/saved-matches', query: { match: matchId } })
 }
 </script>
 

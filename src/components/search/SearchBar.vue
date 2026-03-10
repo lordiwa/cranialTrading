@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { getCardSuggestions, searchCards } from '../../services/scryfall'
+import { getCardSuggestions, type ScryfallCard, searchCards } from '../../services/scryfall'
 import { useToastStore } from '../../stores/toast'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 
 const emit = defineEmits<{
-  'add-card': [card: any]
+  'add-card': [card: ScryfallCard]
 }>()
 const { t } = useI18n()
 const toastStore = useToastStore()
@@ -94,9 +94,9 @@ onUnmounted(() => {
 
 // Modal para seleccionar edición
 const showSelectCardModal = ref(false)
-const availableCards = ref<any[]>([])
+const availableCards = ref<ScryfallCard[]>([])
 
-const selectCard = (card: any) => {
+const selectCard = (card: ScryfallCard) => {
   emit('add-card', card)
   showSelectCardModal.value = false
   searchQuery.value = ''

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import type { ScryfallCard } from '../../services/scryfall'
 import { useSearchStore } from '../../stores/search'
 import BaseLoader from '../ui/BaseLoader.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseBadge from '../ui/BaseBadge.vue'
 
 const emit = defineEmits<{
-  'add-to-collection': [card: any]
-  'add-preference': [card: any]
+  'add-to-collection': [card: ScryfallCard]
+  'add-preference': [card: ScryfallCard]
 }>()
 const { t } = useI18n()
 const searchStore = useSearchStore()
@@ -18,11 +19,11 @@ const loading = computed(() => searchStore.loading)
 const totalResults = computed(() => searchStore.totalResults)
 const hasResults = computed(() => searchStore.hasResults && !loading.value)
 
-const handleAddToCollection = async (card: any) => {
+const handleAddToCollection = (card: ScryfallCard) => {
   emit('add-to-collection', card)
 }
 
-const handleAddAsPreference = (card: any) => {
+const handleAddAsPreference = (card: ScryfallCard) => {
   emit('add-preference', card)
 }
 

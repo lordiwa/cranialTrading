@@ -2,17 +2,18 @@
 import { onMounted } from 'vue'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
+import type { ScryfallCard } from '../../services/scryfall'
 import ManaCost from '../ui/ManaCost.vue'
 
 const props = withDefaults(defineProps<{
-  card: any
+  card: ScryfallCard
   ownedCount?: number
 }>(), {
   ownedCount: 0
 })
 
 const emit = defineEmits<{
-  click: [card: any]
+  click: [card: ScryfallCard]
 }>()
 
 const { t } = useI18n()
@@ -32,12 +33,12 @@ const {
 // Fetch CK prices on mount
 onMounted(() => {
   if (props.card?.id && props.card?.set) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 })
 
-const getCardImage = (card: any): string => {
-  return card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ''
+const getCardImage = (card: ScryfallCard): string => {
+  return card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small ?? card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? ''
 }
 </script>
 
@@ -67,7 +68,7 @@ const getCardImage = (card: any): string => {
 
     <!-- Multi-source prices -->
     <div class="space-y-0.5 mt-1">
-      <p class="text-tiny font-bold text-neon">${{ card.prices?.usd || 'N/A' }}</p>
+      <p class="text-tiny font-bold text-neon">${{ card.prices?.usd ?? 'N/A' }}</p>
       <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
         CK: {{ formatPrice(cardKingdomRetail) }}
       </p>

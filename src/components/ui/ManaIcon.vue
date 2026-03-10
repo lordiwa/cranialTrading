@@ -123,7 +123,8 @@ const aliases: Record<string, string> = {
 
 const normalizedSymbol = computed(() => {
   const s = props.symbol.trim()
-  return aliases[s.toLowerCase()] || aliases[s] || s
+  // eslint-disable-next-line security/detect-object-injection
+  return aliases[s.toLowerCase()] ?? aliases[s] ?? s
 })
 
 const position = computed(() => {

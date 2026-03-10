@@ -23,6 +23,32 @@ import ExchangeCartDrawer from '../components/cart/ExchangeCartDrawer.vue';
 import type { Card } from '../types/card';
 import { getAvatarUrlForUser } from '../utils/avatar';
 
+// Firestore REST API types
+interface FirestoreValue {
+  stringValue?: string;
+  integerValue?: string;
+  doubleValue?: number;
+  booleanValue?: boolean;
+  nullValue?: string;
+  timestampValue?: string;
+  arrayValue?: { values?: FirestoreValue[] };
+  mapValue?: { fields?: Record<string, FirestoreValue> };
+}
+
+interface FirestoreRestDoc {
+  name: string;
+  fields?: Record<string, FirestoreValue>;
+}
+
+interface FirestoreRestQueryResult {
+  document?: FirestoreRestDoc;
+}
+
+interface FirestoreRestListResult {
+  documents?: FirestoreRestDoc[];
+  nextPageToken?: string;
+}
+
 const route = useRoute();
 const router = useRouter();
 const toastStore = useToastStore();
@@ -67,18 +93,18 @@ const profileAvatarUrl = computed(() => {
   if (isOwnProfile.value) {
     return authStore.getAvatarUrl(64);
   }
-  return getAvatarUrlForUser(userInfo.value?.username || '', 64, userInfo.value?.avatarUrl);
+  return getAvatarUrlForUser(userInfo.value?.username ?? '', 64, userInfo.value?.avatarUrl);
 });
 
 // Watchers
 watch(() => route.params.username, (v) => {
   username.value = v as string;
-  loadProfile();
+  void loadProfile();
 });
 
 // Convert Firestore REST API value format to plain JS values
 // e.g. {stringValue: "foo"} → "foo", {arrayValue: {values: [{stringValue: "W"}]}} → ["W"]
-const parseFirestoreValue = (v: any): any => {
+const parseFirestoreValue = (v: FirestoreValue): unknown => {
   if (v.stringValue !== undefined) return v.stringValue;
   if (v.integerValue !== undefined) return Number(v.integerValue);
   if (v.doubleValue !== undefined) return v.doubleValue;
@@ -86,11 +112,12 @@ const parseFirestoreValue = (v: any): any => {
   if (v.nullValue !== undefined) return null;
   if (v.timestampValue !== undefined) return v.timestampValue;
   if (v.arrayValue !== undefined) {
-    return (v.arrayValue.values || []).map(parseFirestoreValue);
+    return (v.arrayValue.values ?? []).map(parseFirestoreValue);
   }
   if (v.mapValue !== undefined) {
-    const result: Record<string, any> = {};
-    for (const [k, mv] of Object.entries(v.mapValue.fields || {})) {
+    const result: Record<string, unknown> = {};
+    for (const [k, mv] of Object.entries(v.mapValue.fields ?? {})) {
+      // eslint-disable-next-line security/detect-object-injection
       result[k] = parseFirestoreValue(mv);
     }
     return result;
@@ -98,9 +125,10 @@ const parseFirestoreValue = (v: any): any => {
   return v;
 };
 
-const parseFirestoreDoc = (fields: Record<string, any>): Record<string, any> => {
-  const data: Record<string, any> = {};
+const parseFirestoreDoc = (fields: Record<string, FirestoreValue>): Record<string, unknown> => {
+  const data: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
+    // eslint-disable-next-line security/detect-object-injection
     data[key] = parseFirestoreValue(val);
   }
   return data;
@@ -109,7 +137,7 @@ const parseFirestoreDoc = (fields: Record<string, any>): Record<string, any> => 
 // Helper: query Firestore for user by username
 // Anonymous users use the Firestore REST API directly to bypass SDK bugs
 // (SDK v11 getDocsFromServer fails and getDocs returns empty for unauthenticated queries)
-const findUserByUsername = async (uname: string): Promise<{ id: string; data: any } | null> => {
+const findUserByUsername = async (uname: string): Promise<{ id: string; data: Record<string, unknown> } | null> => {
   // Anonymous path: use Firestore REST API (100% reliable without auth)
   if (!authStore.user) {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
@@ -138,13 +166,14 @@ const findUserByUsername = async (uname: string): Promise<{ id: string; data: an
       throw new Error(`Firestore REST query failed: ${resp.status}`);
     }
 
-    const results = await resp.json();
+    const results = await resp.json() as FirestoreRestQueryResult[];
     const doc = results[0]?.document;
     if (!doc) return null;
 
     // Parse document: name is "projects/.../documents/users/USER_ID"
-    const docId = doc.name.split('/').pop()!;
-    return { id: docId, data: parseFirestoreDoc(doc.fields || {}) };
+    const nameParts = doc.name.split('/');
+    const docId = nameParts[nameParts.length - 1] ?? '';
+    return { id: docId, data: parseFirestoreDoc(doc.fields ?? {}) };
   }
 
   // Authenticated path: use SDK (works fine for logged-in users)
@@ -153,7 +182,7 @@ const findUserByUsername = async (uname: string): Promise<{ id: string; data: an
   const snapshot = await getDocs(q);
   const firstDoc = snapshot.docs[0];
   if (!snapshot.empty && firstDoc) {
-    return { id: firstDoc.id, data: firstDoc.data() };
+    return { id: firstDoc.id, data: firstDoc.data() as Record<string, unknown> };
   }
   return null;
 };
@@ -183,7 +212,7 @@ const loadProfile = async () => {
       }
 
       userId.value = result.id;
-      userInfo.value = result.data;
+      userInfo.value = result.data as { username?: string; location?: string; avatarUrl?: string | null };
     }
 
     // Load all cards at once, then filter for public ones client-side
@@ -201,7 +230,7 @@ const loadProfile = async () => {
 
   // Post-auth cart conversion: if logged in and cart exists for this profile
   if (authStore.user && !isOwnProfile.value && cartStore.getCartItemCount(username.value) > 0) {
-    convertCartToMatches();
+    void convertCartToMatches();
   }
 };
 
@@ -222,19 +251,20 @@ const loadAllPublicCards = async () => {
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`Firestore REST cards query failed: ${resp.status}`);
 
-        const data = await resp.json();
-        const docs = data.documents || [];
+        const data = await resp.json() as FirestoreRestListResult;
+        const docs = data.documents ?? [];
 
         for (const doc of docs) {
-          const docId = doc.name.split('/').pop()!;
-          const card = { id: docId, ...parseFirestoreDoc(doc.fields || {}) };
+          const nameParts = doc.name.split('/');
+          const docId = nameParts[nameParts.length - 1] ?? '';
+          const card = { id: docId, ...parseFirestoreDoc(doc.fields ?? {}) };
           allCards.push(card as Card);
         }
 
         pageToken = data.nextPageToken;
       } while (pageToken);
 
-      cards.value = allCards.filter((card: any) =>
+      cards.value = allCards.filter((card: Card) =>
         card.status !== 'collection' && card.public !== false
       );
       return;
@@ -247,7 +277,7 @@ const loadAllPublicCards = async () => {
     // Filter: show public cards (sale/trade/wishlist only, never collection)
     cards.value = snapshot.docs
       .map(d => ({ id: d.id, ...d.data() }) as Card)
-      .filter((card: any) =>
+      .filter((card: Card) =>
         card.status !== 'collection' && card.public !== false
       );
   } catch (err) {
@@ -308,15 +338,18 @@ const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'U
 
 const localAdvancedFilters = computed<AdvancedFilters>(() => ({
   colors: selectedColors.value.size < colorOrder.length
+    // eslint-disable-next-line security/detect-object-injection
     ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
     : [],
   types: selectedTypes.value.size < typeOrder.length
+    // eslint-disable-next-line security/detect-object-injection
     ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
     : [],
   manaValue: selectedManaValues.value.size < manaOrder.length
-    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v)).filter(v => !Number.isNaN(v)) }
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
     : { min: undefined, max: undefined, values: undefined },
   rarity: selectedRarities.value.size < rarityOrder.length
+    // eslint-disable-next-line security/detect-object-injection
     ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
     : [],
   sets: advSelectedSets.value,
@@ -330,11 +363,12 @@ const localAdvancedFilters = computed<AdvancedFilters>(() => ({
   isFullArt: advFullArtOnly.value,
 }));
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
 const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   advSelectedSets.value = [...updated.sets];
   advSelectedKeywords.value = [...updated.keywords];
   advSelectedFormats.value = [...updated.formatLegal];
-  advSelectedCreatureTypes.value = [...(updated.creatureTypes || [])];
+  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])];
   advPriceMin.value = updated.priceUSD.min;
   advPriceMax.value = updated.priceUSD.max;
   advPowerMin.value = updated.power.min;
@@ -356,6 +390,7 @@ const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
   const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v);
   selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder);
 };
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
 
 const activeChipFilterCount = computed(() => {
   let count = 0;
@@ -404,12 +439,12 @@ const handleInterest = async (card: Card) => {
 
     // Check if any existing match has the same edition (allow different prints)
     const hasDuplicate = existingSnapshot.docs.some(docSnap => {
-      const data = docSnap.data();
-      return data.card?.edition === edition;
+      const data = docSnap.data() as Record<string, unknown>;
+      return (data.card as Record<string, unknown> | undefined)?.edition === edition;
     });
 
     if (hasDuplicate) {
-      console.log('[Interest] Duplicate match already exists, skipping');
+      console.info('[Interest] Duplicate match already exists, skipping');
       interestedCards.value.add(cardKey);
       toastStore.show(t('dashboard.interest.sent', { username: userInfo.value?.username ?? '' }), 'info');
       return;
@@ -443,13 +478,13 @@ const handleInterest = async (card: Card) => {
       // Participants
       senderId: authStore.user.id,
       senderUsername: authStore.user.username,
-      senderLocation: authStore.user.location || '',
-      senderEmail: authStore.user.email || '',
-      senderAvatarUrl: authStore.user.avatarUrl || null,
+      senderLocation: authStore.user.location ?? '',
+      senderEmail: authStore.user.email ?? '',
+      senderAvatarUrl: authStore.user.avatarUrl ?? null,
       receiverId: userId.value,
-      receiverUsername: userInfo.value?.username || '',
-      receiverLocation: userInfo.value?.location || '',
-      receiverAvatarUrl: (userInfo.value as any)?.avatarUrl || null,
+      receiverUsername: userInfo.value?.username ?? '',
+      receiverLocation: userInfo.value?.location ?? '',
+      receiverAvatarUrl: userInfo.value?.avatarUrl ?? null,
       // Card info
       card: cardData,
       cardType: card.status, // 'sale' or 'trade'
@@ -505,12 +540,12 @@ const handleShareCart = async () => {
 
 const handleLoginToMatch = () => {
   const profilePath = `/@${username.value}`;
-  router.push(buildLoginUrl(profilePath));
+  void router.push(buildLoginUrl(profilePath));
 };
 
 const handleRegisterToMatch = () => {
   const profilePath = `/@${username.value}`;
-  router.push(buildRegisterUrl(profilePath));
+  void router.push(buildRegisterUrl(profilePath));
 };
 
 const convertCartToMatches = async () => {
@@ -549,7 +584,7 @@ const convertCartToMatches = async () => {
 
 // Initialize on mount
 onMounted(() => {
-  loadProfile();
+  void loadProfile();
 });
 </script>
 
@@ -607,7 +642,7 @@ onMounted(() => {
           <BaseButton
               v-if="authStore.user && !isOwnProfile"
               size="small"
-              @click="handleContact(userId!, userInfo?.username || '')"
+              @click="userId && handleContact(userId, userInfo?.username ?? '')"
           >
             {{ t('profile.contact') }}
           </BaseButton>

@@ -180,6 +180,7 @@ function getLatestPrice(pricePoint?: MTGJSONPricePoint): number | null {
   const dates = Object.keys(pricePoint).sort((a, b) => b.localeCompare(a))
   const latestDate = dates[0]
   if (!latestDate) return null
+  // eslint-disable-next-line security/detect-object-injection
   return pricePoint[latestDate] ?? null
 }
 
@@ -266,10 +267,10 @@ async function fetchGzippedJson<T>(url: string): Promise<T> {
     const decompressedStream = blob.stream().pipeThrough(ds)
     const decompressedBlob = await new Response(decompressedStream).blob()
     const text = await decompressedBlob.text()
-    return JSON.parse(text)
+    return JSON.parse(text) as T
   }
 
-  return response.json()
+  return response.json() as Promise<T>
 }
 
 /**
@@ -288,7 +289,7 @@ async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
     return cachedData
   }
 
-  console.log('Fetching MTGJSON price data...')
+  console.info('Fetching MTGJSON price data...')
 
   try {
     const response = await fetchGzippedJson<{ data: Record<string, MTGJSONPriceFormats> }>(
@@ -299,12 +300,12 @@ async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
 
     // Save to IndexedDB (async, don't await)
     savePriceDataToCache(response.data).then(() => {
-      console.log('MTGJSON price data cached to IndexedDB')
+      console.info('MTGJSON price data cached to IndexedDB')
     }).catch((e: unknown) => {
       console.warn('Failed to cache price data:', e)
     })
 
-    console.log('MTGJSON price data loaded')
+    console.info('MTGJSON price data loaded')
     return response.data
   } catch (error) {
     console.error('Error fetching MTGJSON price data:', error)
@@ -316,7 +317,7 @@ async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
  * Fetch set data from MTGJSON and build scryfallId -> uuid mapping
  */
 async function fetchSetMapping(setCode: string): Promise<void> {
-  console.log(`Fetching MTGJSON set data for ${setCode}...`)
+  console.info(`Fetching MTGJSON set data for ${setCode}...`)
 
   try {
     const response = await fetchGzippedJson<{ data: { cards: { uuid: string; identifiers: { scryfallId?: string } }[] } }>(
@@ -331,7 +332,7 @@ async function fetchSetMapping(setCode: string): Promise<void> {
       }
     }
 
-    console.log(`Loaded ${count} cards from ${setCode}`)
+    console.info(`Loaded ${count} cards from ${setCode}`)
   } catch (error) {
     console.warn(`[MTGJSON] Set ${setCode} failed (will skip for this session):`, error)
     failedSets.add(setCode.toUpperCase())
@@ -355,7 +356,7 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
     if (!scryfallToUuidMap.has(scryfallId) && setCode && !failedSets.has(setCode.toUpperCase())) {
       await fetchSetMapping(setCode)
       // Save updated mapping (async)
-      saveMappingToCache(scryfallToUuidMap)
+      void saveMappingToCache(scryfallToUuidMap)
     }
 
     const uuid = scryfallToUuidMap.get(scryfallId)
@@ -366,6 +367,7 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
 
     // Fetch price data
     const priceData = await fetchPriceData()
+    // eslint-disable-next-line security/detect-object-injection
     const cardPrices = priceData[uuid]
 
     if (!cardPrices?.paper) {
@@ -414,7 +416,7 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
 export async function preloadPriceData(): Promise<void> {
   try {
     await fetchPriceData()
-    console.log('MTGJSON price data preloaded')
+    console.info('MTGJSON price data preloaded')
   } catch (error) {
     console.warn('Failed to preload MTGJSON price data:', error)
   }

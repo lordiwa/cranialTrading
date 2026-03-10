@@ -14,10 +14,10 @@ const confirmStore = useConfirmStore()
 const { t } = useI18n()
 
 const showChat = ref(false)
-const selectedContact = ref<any>(null)
+const selectedContact = ref<{ id: string; userId?: string; username: string; email?: string } | null>(null)
 
-onMounted(async () => {
-  await contactsStore.loadSavedContacts()
+onMounted(() => {
+  contactsStore.loadSavedContacts()
 })
 
 onUnmounted(() => {
@@ -38,7 +38,7 @@ const handleDelete = async (contactId: string) => {
   }
 }
 
-const handleChat = (contact: any) => {
+const handleChat = (contact: { id: string; userId?: string; username: string; email?: string }) => {
   selectedContact.value = contact
   showChat.value = true
 }

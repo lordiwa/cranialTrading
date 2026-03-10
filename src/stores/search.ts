@@ -144,14 +144,14 @@ export const useSearchStore = defineStore('search', () => {
         // Verificar caché
         const cached = searchCache.get(query)
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-            console.log('⚡ Usando caché para:', query)
+            console.info('Usando caché para:', query)
             results.value = cached.results
             return
         }
 
         loading.value = true
         try {
-            console.log('🔍 Buscando con query:', query)
+            console.info('Buscando con query:', query)
 
             const searchResults = await searchAdvanced(query, {
                 unique: 'prints',
@@ -173,7 +173,7 @@ export const useSearchStore = defineStore('search', () => {
             if (searchResults.length === 0) {
                 toastStore.show(t('search.messages.noResults'), 'info')
             } else {
-                console.log(`✅ ${searchResults.length} cartas encontradas`)
+                console.info(`${searchResults.length} cartas encontradas`)
             }
         } catch (err) {
             console.error('Error en búsqueda:', err)

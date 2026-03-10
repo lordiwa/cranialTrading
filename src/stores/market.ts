@@ -128,7 +128,8 @@ export const useMarketStore = defineStore('market', () => {
             if (isFoilType !== card.foil) continue
             const matched = moverLookup.value.get(card.name.toLowerCase())
             if (!matched?.length) continue
-            const mover = matched[0]!
+            const mover = matched[0]
+            if (!mover) continue
             const dollarChange = mover.presentPrice - mover.pastPrice
             results.push({ card, mover, dollarChange, totalImpact: dollarChange * card.quantity })
         }
@@ -183,7 +184,7 @@ export const useMarketStore = defineStore('market', () => {
 
     // Actions
     async function loadStaples(format?: FormatKey) {
-        const fmt = format || selectedFormat.value
+        const fmt = format ?? selectedFormat.value
         selectedFormat.value = fmt
 
         // Check cache
@@ -211,7 +212,7 @@ export const useMarketStore = defineStore('market', () => {
     }
 
     async function loadMovers(type?: MoverType) {
-        const mt = type || selectedMoverType.value
+        const mt = type ?? selectedMoverType.value
         selectedMoverType.value = mt
 
         // Check cache

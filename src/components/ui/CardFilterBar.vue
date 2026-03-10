@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<{
   viewMode: 'collection',
   activeFilterCount: 0,
   showSuggestions: true,
+  viewType: undefined,
 })
 
 const emit = defineEmits<{

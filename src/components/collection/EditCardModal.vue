@@ -6,7 +6,7 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards } from '../../services/scryfall'
+import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
@@ -146,8 +146,8 @@ const isLoading = ref(false)
 const showZoom = ref(false)
 
 // Prints disponibles
-const availablePrints = ref<any[]>([])
-const selectedPrint = ref<any>(null)
+const availablePrints = ref<ScryfallCard[]>([])
+const selectedPrint = ref<ScryfallCard | null>(null)
 const loadingPrints = ref(false)
 
 const conditionOptions = computed(() => [
@@ -198,8 +198,8 @@ watch(() => props.show, async (show) => {
       availablePrints.value = results
 
       // Buscar el print actual
-      const currentPrint = results.find(p => p.id === props.card!.scryfallId)
-      selectedPrint.value = currentPrint || results[0] || null
+      const currentPrint = results.find(p => p.id === props.card?.scryfallId)
+      selectedPrint.value = currentPrint ?? results[0] ?? null
     } catch (err) {
       console.error('Error loading prints:', err)
       availablePrints.value = []
@@ -218,30 +218,30 @@ const handlePrintChange = (scryfallId: string) => {
 }
 
 // Fetch CK prices when print changes
-watch(selectedPrint, (print) => {
+watch(selectedPrint, (print: ScryfallCard | null) => {
   if (print?.id && print?.set) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 })
 
 // Obtener imagen actual
 const currentImage = computed(() => {
   if (selectedPrint.value) {
-    return selectedPrint.value.image_uris?.normal ||
-           selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
+    return selectedPrint.value.image_uris?.normal
+           ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
   }
-  return props.card?.image || ''
+  return props.card?.image ?? ''
 })
 
 // Large image for zoom view
 const zoomImage = computed(() => {
   if (selectedPrint.value) {
-    return selectedPrint.value.image_uris?.large ||
-           selectedPrint.value.image_uris?.normal ||
-           selectedPrint.value.card_faces?.[0]?.image_uris?.large ||
-           selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
+    return selectedPrint.value.image_uris?.large
+           ?? selectedPrint.value.image_uris?.normal
+           ?? selectedPrint.value.card_faces?.[0]?.image_uris?.large
+           ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
   }
-  return props.card?.image || ''
+  return props.card?.image ?? ''
 })
 
 // Obtener precio actual
@@ -249,13 +249,13 @@ const currentPrice = computed(() => {
   if (selectedPrint.value?.prices?.usd) {
     return Number.parseFloat(selectedPrint.value.prices.usd)
   }
-  return props.card?.price || 0
+  return props.card?.price ?? 0
 })
 
 const handleSave = async () => {
   if (!props.card) return
 
-  if ((form.value.quantity!) < 1) {
+  if ((form.value.quantity ?? 0) < 1) {
     toastStore.show(t('cards.detailModal.quantityMin'), 'error')
     return
   }
@@ -277,13 +277,13 @@ const handleSave = async () => {
   try {
     const updatedCard: Card = {
       ...props.card,
-      quantity: form.value.quantity!,
-      condition: form.value.condition!,
-      foil: form.value.foil!,
+      quantity: form.value.quantity ?? 1,
+      condition: form.value.condition ?? 'NM',
+      foil: form.value.foil ?? false,
       // Actualizar con el print seleccionado
-      scryfallId: selectedPrint.value?.id || props.card.scryfallId,
-      edition: selectedPrint.value?.set_name || props.card.edition,
-      setCode: selectedPrint.value?.set || props.card.setCode,
+      scryfallId: selectedPrint.value?.id ?? props.card.scryfallId,
+      edition: selectedPrint.value?.set_name ?? props.card.edition,
+      setCode: selectedPrint.value?.set ?? props.card.setCode,
       price: currentPrice.value,
       image: currentImage.value,
     }
@@ -454,7 +454,7 @@ const handleClose = () => {
                   :key="print.id"
                   :value="print.id"
               >
-                {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+                {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
               </option>
             </select>
             <p class="text-tiny text-silver-50 mt-1">{{ t('cards.addModal.printsAvailable', { count: availablePrints.length }) }}</p>

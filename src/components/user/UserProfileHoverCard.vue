@@ -15,7 +15,7 @@ const cardCount = ref(0);
 const loading = ref(false);
 
 const displayLocation = computed(() => {
-  return userInfo.value?.location || 'Ubicación no disponida';
+  return userInfo.value?.location ?? 'Ubicación no disponida';
 });
 
 const loadUserInfo = async () => {
@@ -32,7 +32,7 @@ const loadUserInfo = async () => {
     if (!snapshot.empty && firstDoc) {
       const userData = firstDoc.data();
       const userId = firstDoc.id;
-      userInfo.value = userData as any;
+      userInfo.value = userData as { username: string; location?: string; avatarUrl?: string | null };
 
       // Count public cards
       const cardsCol = collection(db, 'users', userId, 'cards');
@@ -48,7 +48,7 @@ const loadUserInfo = async () => {
 };
 
 onMounted(() => {
-  loadUserInfo();
+  void loadUserInfo();
 });
 </script>
 

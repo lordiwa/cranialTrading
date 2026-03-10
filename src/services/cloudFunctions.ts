@@ -20,8 +20,8 @@ export interface MatchNotificationData {
   fromUsername: string
   fromLocation?: string | null
   fromAvatarUrl?: string | null
-  myCards: any[]
-  otherCards: any[]
+  myCards: Record<string, unknown>[]
+  otherCards: Record<string, unknown>[]
   myTotalValue?: number
   theirTotalValue?: number
   valueDifference?: number
@@ -69,17 +69,18 @@ export async function notifyMatchUser(
   try {
     const result: HttpsCallableResult<NotifyMatchResponse> = await callable(data)
     return result.data
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[CloudFunctions] notifyMatchUser error:', error)
 
     // Handle specific error codes
-    if (error.code === 'functions/unauthenticated') {
+    const firebaseError = error as { code?: string; message?: string }
+    if (firebaseError.code === 'functions/unauthenticated') {
       throw new Error('User must be authenticated to send match notifications')
     }
-    if (error.code === 'functions/invalid-argument') {
-      throw new Error(error.message || 'Invalid match notification data')
+    if (firebaseError.code === 'functions/invalid-argument') {
+      throw new Error(firebaseError.message ?? 'Invalid match notification data')
     }
-    if (error.code === 'functions/permission-denied') {
+    if (firebaseError.code === 'functions/permission-denied') {
       throw new Error('Permission denied')
     }
 

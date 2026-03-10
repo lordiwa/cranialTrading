@@ -25,7 +25,7 @@ import type { DisplayDeckCard } from '../types/deck'
 import { t } from '../composables/useI18n'
 
 // Helper to remove undefined values from objects (Firebase doesn't accept undefined)
-const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
+const removeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
     return Object.fromEntries(
         Object.entries(obj).filter(([_, v]) => v !== undefined)
     ) as T
@@ -137,24 +137,42 @@ export const useBindersStore = defineStore('binders', () => {
             const bindersRef = collection(db, 'users', authStore.user.id, 'binders')
             const snapshot = await getDocs(bindersRef)
 
+            const userId = authStore.user.id
             binders.value = snapshot.docs.map(docSnap => {
-                const data = docSnap.data()
+                interface FirestoreBinderData {
+                    name: string;
+                    description?: string;
+                    allocations?: {
+                        cardId: string;
+                        quantity: number;
+                        addedAt?: { toDate?: () => Date } | Date | string | number;
+                    }[];
+                    thumbnail?: string;
+                    createdAt?: { toDate: () => Date };
+                    updatedAt?: { toDate: () => Date };
+                    stats?: BinderStats;
+                    isPublic?: boolean;
+                    forSale?: boolean;
+                }
+                const data = docSnap.data() as FirestoreBinderData
 
-                const allocations: BinderAllocation[] = (data.allocations || []).map((a: any) => ({
+                const allocations: BinderAllocation[] = (data.allocations ?? []).map(a => ({
                     ...a,
-                    addedAt: a.addedAt?.toDate?.() || new Date(a.addedAt) || new Date(),
+                    addedAt: (typeof a.addedAt === 'object' && a.addedAt !== null && 'toDate' in a.addedAt && typeof a.addedAt.toDate === 'function')
+                        ? a.addedAt.toDate()
+                        : (a.addedAt ? new Date(a.addedAt as string | number) : new Date()),
                 }))
 
                 return {
                     id: docSnap.id,
-                    userId: authStore.user!.id,
+                    userId,
                     name: data.name,
-                    description: data.description || '',
+                    description: data.description ?? '',
                     allocations,
-                    thumbnail: data.thumbnail || '',
-                    createdAt: data.createdAt?.toDate() || new Date(),
-                    updatedAt: data.updatedAt?.toDate() || new Date(),
-                    stats: data.stats || { totalCards: 0, totalPrice: 0 },
+                    thumbnail: data.thumbnail ?? '',
+                    createdAt: data.createdAt?.toDate() ?? new Date(),
+                    updatedAt: data.updatedAt?.toDate() ?? new Date(),
+                    stats: data.stats ?? { totalCards: 0, totalPrice: 0 },
                     isPublic: data.isPublic ?? true,
                     forSale: data.forSale ?? true,
                 } as Binder

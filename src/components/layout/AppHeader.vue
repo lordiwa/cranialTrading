@@ -42,7 +42,7 @@ const closeHelpMenu = () => {
 const goToFaq = () => {
   closeHelpMenu()
   closeMobileMenu()
-  router.push('/faq')
+  void router.push('/faq')
 }
 
 const restartTour = async () => {
@@ -88,7 +88,7 @@ const checkLocation = async () => {
 // Watch for user login to check location
 watch(() => authStore.user, (newUser) => {
   if (newUser && !detectedLocation.value) {
-    checkLocation()
+    void checkLocation()
   }
 }, { immediate: true })
 
@@ -123,11 +123,12 @@ const isActive = (path: string) => {
   // Handle paths with query params like /collection?filter=wishlist
   if (path.includes('?')) {
     const parts = path.split('?')
-    const basePath = parts[0] || ''
-    const query = parts[1] || ''
+    const basePath = parts[0] ?? ''
+    const query = parts[1] ?? ''
     if (!route.path.startsWith(basePath)) return false
     const params = new URLSearchParams(query)
     for (const [key, value] of params) {
+      // eslint-disable-next-line security/detect-object-injection
       if (route.query[key] !== value) return false
     }
     return true
@@ -363,7 +364,6 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-
     </div>
 
     <!-- Location suggestion banner -->

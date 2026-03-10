@@ -68,7 +68,7 @@ export function useHelpStore() {
   }
 
   // Current item
-  const currentItem = computed(() => items.value[currentIndex.value] || null)
+  const currentItem = computed(() => items.value[currentIndex.value] ?? null)
   const totalItems = computed(() => items.value.length)
 
   return {

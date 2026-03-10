@@ -70,8 +70,8 @@ export function useCollectionTotals(cards: () => Card[]) {
         // Find print with price, preferring one with image
         const printWithPrice = results.find(r =>
           r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-          (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-        ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) || results[0]
+          (r.image_uris?.normal ?? r.card_faces?.[0]?.image_uris?.normal)
+        ) ?? results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0) ?? results[0]
 
         if (!printWithPrice) return null
 
@@ -79,10 +79,10 @@ export function useCollectionTotals(cards: () => Card[]) {
         const setCode = printWithPrice.set?.toUpperCase()
         const edition = printWithPrice.set_name
         const price = printWithPrice.prices?.usd ? Number.parseFloat(printWithPrice.prices.usd) : 0
-        let image = printWithPrice.image_uris?.normal || ''
+        let image = printWithPrice.image_uris?.normal ?? ''
         const firstFace = printWithPrice.card_faces?.[0]
         if (!image && firstFace) {
-          image = firstFace.image_uris?.normal || ''
+          image = firstFace.image_uris?.normal ?? ''
         }
 
         // Update card in collection store only if it still exists
@@ -96,7 +96,7 @@ export function useCollectionTotals(cards: () => Card[]) {
             image: image || card.image,
           })
           if (ok) {
-            console.log(`✅ Auto-fixed card: ${card.name}`)
+            console.info(`Auto-fixed card: ${card.name}`)
           }
         }
 
@@ -115,7 +115,7 @@ export function useCollectionTotals(cards: () => Card[]) {
 
     // If no scryfallId, try to auto-fix the card
     if (!scryfallId) {
-      scryfallId = await autoFixCard(card) || ''
+      scryfallId = await autoFixCard(card) ?? ''
       if (!scryfallId) {
         return null
       }
@@ -123,7 +123,7 @@ export function useCollectionTotals(cards: () => Card[]) {
 
     // Check cache first
     if (pricesCache.has(scryfallId)) {
-      return pricesCache.get(scryfallId) || null
+      return pricesCache.get(scryfallId) ?? null
     }
 
     let setCode = card.setCode
@@ -230,8 +230,8 @@ export function useCollectionTotals(cards: () => Card[]) {
     for (const card of cardList) {
       const tcgPrice = (card.price || 0) * card.quantity
       const ckPrices = cardPrices.value.get(card.id)
-      const ckRetail = (ckPrices?.cardKingdom?.retail || 0) * card.quantity
-      const ckBuylist = (ckPrices?.cardKingdom?.buylist || 0) * card.quantity
+      const ckRetail = (ckPrices?.cardKingdom?.retail ?? 0) * card.quantity
+      const ckBuylist = (ckPrices?.cardKingdom?.buylist ?? 0) * card.quantity
 
       // By status
       switch (card.status) {

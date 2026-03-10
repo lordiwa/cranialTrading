@@ -35,7 +35,7 @@ export function useCardAllocation() {
             if (!deck.allocations) continue
 
             for (const alloc of deck.allocations) {
-                const existing = index.get(alloc.cardId) || []
+                const existing = index.get(alloc.cardId) ?? []
                 existing.push({
                     deckId: deck.id,
                     deckName: deck.name,
@@ -50,7 +50,7 @@ export function useCardAllocation() {
             if (!binder.allocations) continue
 
             for (const alloc of binder.allocations) {
-                const existing = index.get(alloc.cardId) || []
+                const existing = index.get(alloc.cardId) ?? []
                 existing.push({
                     deckId: binder.id,
                     deckName: binder.name,
@@ -69,7 +69,7 @@ export function useCardAllocation() {
      * Now uses memoized index for O(1) lookup instead of O(decks × allocations)
      */
     const getAllocationsForCard = (cardId: string): DeckAllocation[] => {
-        return allocationIndex.value.get(cardId) || []
+        return allocationIndex.value.get(cardId) ?? []
     }
 
     /**

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { useSearchStore } from '../stores/search'
 import { useI18n } from '../composables/useI18n'
+import type { ScryfallCard } from '../services/scryfall'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -16,10 +17,10 @@ const collectionStore = useCollectionStore()
 const searchStore = useSearchStore()
 const { t } = useI18n()
 
-const selectedScryfallCard = ref<any>(null)
+const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 const showAddCardModal = ref(false)
 
-const getOwnedCount = (scryfallCard: any): number => {
+const getOwnedCount = (scryfallCard: ScryfallCard): number => {
   const cardName = scryfallCard.name?.toLowerCase()
   if (!cardName) return 0
   return collectionStore.cards
@@ -27,13 +28,13 @@ const getOwnedCount = (scryfallCard: any): number => {
     .reduce((sum, c) => sum + c.quantity, 0)
 }
 
-const handleCardSelected = (card: any) => {
+const handleCardSelected = (card: ScryfallCard) => {
   selectedScryfallCard.value = card
   showAddCardModal.value = true
 }
 
 const handleBack = () => {
-  router.push({ path: '/collection' })
+  void router.push({ path: '/collection' })
 }
 </script>
 
@@ -72,8 +73,8 @@ const handleBack = () => {
     <AddCardModal
       :show="showAddCardModal"
       :scryfall-card="selectedScryfallCard"
-      @close="showAddCardModal = false; selectedScryfallCard = null"
-      @added="showAddCardModal = false; selectedScryfallCard = null"
+      @close="showAddCardModal = false; selectedScryfallCard = undefined"
+      @added="showAddCardModal = false; selectedScryfallCard = undefined"
     />
   </AppContainer>
 </template>

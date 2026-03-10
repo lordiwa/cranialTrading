@@ -54,6 +54,20 @@ const locationSuggestions = ref<string[]>([]);
 const searchingLocations = ref(false);
 let locationSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+interface NominatimAddress {
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  state?: string;
+  country?: string;
+}
+
+interface NominatimResult {
+  display_name: string;
+  address?: NominatimAddress;
+}
+
 const handleLocationInput = () => {
   if (locationSearchTimeout) {
     clearTimeout(locationSearchTimeout);
@@ -70,11 +84,11 @@ const handleLocationInput = () => {
             `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newLocation.value)}&limit=5&addressdetails=1`,
             { headers: { 'Accept-Language': 'es' } }
           );
-          const data = await response.json();
-          locationSuggestions.value = data.map((item: any) => {
-            const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || '';
-            const state = item.address?.state || '';
-            const country = item.address?.country || '';
+          const data = await response.json() as NominatimResult[];
+          locationSuggestions.value = data.map((item: NominatimResult) => {
+            const city = item.address?.city ?? item.address?.town ?? item.address?.village ?? item.address?.municipality ?? '';
+            const state = item.address?.state ?? '';
+            const country = item.address?.country ?? '';
             if (city && country) {
               return state ? `${city}, ${state}, ${country}` : `${city}, ${country}`;
             }
@@ -238,7 +252,7 @@ const handleChangeLocation = async () => {
 
 const openLocationForm = () => {
   showLocationForm.value = true;
-  newLocation.value = authStore.user?.location || '';
+  newLocation.value = authStore.user?.location ?? '';
 };
 
 const handleChangeAvatar = async () => {
@@ -318,7 +332,7 @@ const handleLogout = async () => {
 
   if (confirmed) {
     await authStore.logout();
-    router.push('/login');
+    void router.push('/login');
   }
 };
 
@@ -378,8 +392,8 @@ const handleDeleteAllData = async () => {
 
 const handleRestartTour = () => {
   resetTour();
-  router.push('/collection').then(() => {
-    setTimeout(() => { startTour(); }, 500);
+  void router.push('/collection').then(() => {
+    setTimeout(() => { void startTour(); }, 500);
   });
 };
 </script>

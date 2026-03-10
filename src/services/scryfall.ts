@@ -17,7 +17,7 @@ async function rateLimitedFetch(url: string): Promise<Response> {
     // Retry once on 429 with backoff
     if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After')
-        const delay = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000
+        const delay = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : 2000
         await new Promise(resolve => setTimeout(resolve, delay))
         lastRequestTime = Date.now()
         return fetch(url)
@@ -43,6 +43,12 @@ export interface ScryfallSet {
 
 // Cache para sets (1 hora)
 const SETS_CACHE_TTL = 60 * 60 * 1000
+
+interface ScryfallListResponse {
+    data?: ScryfallCard[]
+    has_more?: boolean
+    total_cards?: number
+}
 
 export interface ScryfallCard {
     id: string
@@ -114,7 +120,7 @@ export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
 
         const encodedQuery = encodeURIComponent(finalQuery)
 
-        console.log(`🔍 Query enviada a Scryfall: ${finalQuery}`)
+        console.info(`Query enviada a Scryfall: ${finalQuery}`)
 
         const response = await rateLimitedFetch(
             `${SCRYFALL_API}/cards/search?q=${encodedQuery}&unique=prints&order=released&dir=desc`
@@ -122,15 +128,15 @@ export const searchCards = async (query: string): Promise<ScryfallCard[]> => {
 
         if (!response.ok) {
             if (response.status === 404) {
-                console.warn(`⚠️ No se encontraron cartas: ${finalQuery}`)
+                console.warn(`No se encontraron cartas: ${finalQuery}`)
                 return []
             }
             throw new Error(`Scryfall API error: ${response.status}`)
         }
 
-        const data = await response.json()
-        const results = data.data || []
-        console.log(`✅ ${results.length} cartas encontradas`)
+        const data = await response.json() as ScryfallListResponse
+        const results = data.data ?? []
+        console.info(`${results.length} cartas encontradas`)
         return results
     } catch (error) {
         console.error('Error en searchCards:', error)
@@ -149,7 +155,7 @@ export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
             throw new Error(`Scryfall API error: ${response.status}`)
         }
 
-        return await response.json()
+        return await response.json() as ScryfallCard
     } catch (error) {
         console.error('Error en getCardById:', error)
         return null
@@ -181,26 +187,26 @@ export const searchAdvanced = async (
 
         const params = new URLSearchParams()
         params.append('q', query.trim())
-        params.append('unique', options?.unique || 'prints')
+        params.append('unique', options?.unique ?? 'prints')
         if (options?.order) params.append('order', options.order)
         if (options?.dir) params.append('dir', options.dir)
         if (options?.page) params.append('page', options.page.toString())
 
-        console.log(`🔍 Buscando con query: ${query}`)
+        console.info(`Buscando con query: ${query}`)
 
         const response = await rateLimitedFetch(`${SCRYFALL_API}/cards/search?${params.toString()}`)
 
         if (!response.ok) {
             if (response.status === 404) {
-                console.warn('⚠️ No se encontraron cartas con estos filtros')
+                console.warn('No se encontraron cartas con estos filtros')
                 return []
             }
             throw new Error(`Scryfall API error: ${response.status}`)
         }
 
-        const data = await response.json()
-        const results = data.data || []
-        console.log(`✅ ${results.length} cartas encontradas`)
+        const data = await response.json() as ScryfallListResponse
+        const results = data.data ?? []
+        console.info(`${results.length} cartas encontradas`)
         return results
     } catch (error) {
         console.error('Error en searchAdvanced:', error)
@@ -271,8 +277,8 @@ export const getCardSuggestions = async (query: string): Promise<string[]> => {
             return []
         }
 
-        const data = await response.json()
-        const results = data.data || []
+        const data = await response.json() as { data?: string[] }
+        const results = data.data ?? []
 
         // Guardar en caché
         suggestionsCache.set(trimmedQuery, { results, timestamp: Date.now() })
@@ -462,7 +468,7 @@ async function fetchCollectionBatch(
 
             if (response.status === 429) {
                 const retryAfter = response.headers.get('Retry-After')
-                const delay = retryAfter ? Number.parseInt(retryAfter) * 1000 : 2000
+                const delay = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : 2000
                 await new Promise(resolve => setTimeout(resolve, delay))
                 retries--
                 continue
@@ -473,8 +479,8 @@ async function fetchCollectionBatch(
                 return []
             }
 
-            const data = await response.json()
-            return data.data || []
+            const data = await response.json() as ScryfallListResponse
+            return data.data ?? []
         } catch (error) {
             console.error('Error en getCardsByIds batch:', error)
             retries--
@@ -501,7 +507,7 @@ export const getCardsByIds = async (
         }
     }
 
-    console.log(`✅ Obtenidas ${results.length}/${identifiers.length} cartas en batch`)
+    console.info(`Obtenidas ${results.length}/${identifiers.length} cartas en batch`)
     return results
 }
 
@@ -515,19 +521,19 @@ export const getAllSets = async (): Promise<ScryfallSet[]> => {
     try {
         // Verificar caché
         if (cachedSets && Date.now() - cachedSets.timestamp < SETS_CACHE_TTL) {
-            console.log('⚡ Usando caché para sets')
+            console.info('Usando cache para sets')
             return cachedSets.sets
         }
 
-        console.log('🔍 Obteniendo sets de Scryfall...')
+        console.info('Obteniendo sets de Scryfall...')
         const response = await rateLimitedFetch(`${SCRYFALL_API}/sets`)
 
         if (!response.ok) {
             throw new Error(`Scryfall sets API error: ${response.status}`)
         }
 
-        const data = await response.json()
-        const allSets: ScryfallSet[] = data.data || []
+        const data = await response.json() as { data?: ScryfallSet[] }
+        const allSets: ScryfallSet[] = data.data ?? []
 
         // Filtrar solo sets relevantes (excluir tokens, memorabilia, etc.)
         const relevantTypes = new Set(['core', 'expansion', 'masters', 'draft_innovation', 'commander', 'starter', 'reprint', 'box', 'from_the_vault', 'premium_deck', 'duel_deck', 'archenemy', 'planechase', 'conspiracy'])
@@ -546,7 +552,7 @@ export const getAllSets = async (): Promise<ScryfallSet[]> => {
         // Guardar en caché
         cachedSets = { sets: filteredSets, timestamp: Date.now() }
 
-        console.log(`✅ ${filteredSets.length} sets obtenidos`)
+        console.info(`${filteredSets.length} sets obtenidos`)
         return filteredSets
     } catch (error) {
         console.error('Error en getAllSets:', error)

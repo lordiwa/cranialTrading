@@ -37,7 +37,7 @@ const handleReset = async () => {
 
   if (success) {
     setTimeout(() => {
-      router.push('/login');
+      void router.push('/login');
     }, 1500);
   }
 };

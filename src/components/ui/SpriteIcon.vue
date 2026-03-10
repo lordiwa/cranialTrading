@@ -8,7 +8,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  size: 'small'
+  size: 'small',
+  class: '',
 })
 
 // Sprite grid: 7 columns x 4 rows
@@ -67,6 +68,7 @@ const sizes = {
 }
 
 const getPosition = (name: string) => {
+  // eslint-disable-next-line security/detect-object-injection
   const pos = iconPositions[name]
   if (!pos) return { x: 0, y: 0 }
   return {

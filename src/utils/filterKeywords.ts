@@ -434,5 +434,5 @@ const allKeywords: KeywordOption[] = [
 ]
 
 export const getKeywordLabel = (value: string): string => {
-  return allKeywords.find(kw => kw.value === value)?.label || value
+  return allKeywords.find(kw => kw.value === value)?.label ?? value
 }

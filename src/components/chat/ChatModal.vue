@@ -96,7 +96,7 @@ const handleSendMessage = async () => {
 const handleKeyPress = (event: KeyboardEvent) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
-    handleSendMessage();
+    void handleSendMessage();
   }
 };
 

@@ -47,6 +47,25 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
     return false
 }
 
+/** Strip undefined values from an object (Firestore rejects undefined) */
+const stripUndefined = (obj: Record<string, unknown>): Record<string, unknown> => {
+    const clean: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj)) {
+        // eslint-disable-next-line security/detect-object-injection
+        if (value !== undefined) clean[key] = value
+    }
+    return clean
+}
+
+/** Split an array into chunks of a given size */
+const chunkArray = <T>(arr: T[], size: number): T[][] => {
+    const chunks: T[][] = []
+    for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size))
+    }
+    return chunks
+}
+
 const deletePublicCardBatches = async (
     publicCardIds: string[],
     userId: string,
@@ -91,7 +110,7 @@ export const useCollectionStore = defineStore('collection', () => {
         if (!authStore.user) return null
         return {
             userId: authStore.user.id,
-            username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown',
+            username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback
             location: authStore.user.location,
             email: authStore.user.email,
             avatarUrl: authStore.user.avatarUrl,
@@ -113,12 +132,19 @@ export const useCollectionStore = defineStore('collection', () => {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
             const snapshot = await getDocs(colRef)
 
-            cards.value = snapshot.docs.map((doc) => ({
-                ...doc.data(),
-                id: doc.id,
-                updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-                createdAt: doc.data().createdAt?.toDate() || new Date(),
-            })) as Card[]
+            cards.value = snapshot.docs.map((d) => {
+                const data = d.data() as Record<string, unknown>
+                const firestoreData = data as Record<string, unknown> & {
+                    updatedAt?: { toDate: () => Date };
+                    createdAt?: { toDate: () => Date };
+                }
+                return {
+                    ...data,
+                    id: d.id,
+                    updatedAt: firestoreData.updatedAt?.toDate() ?? new Date(),
+                    createdAt: firestoreData.createdAt?.toDate() ?? new Date(),
+                } as Card
+            })
 
             // Enrich cards missing metadata (non-blocking)
             enrichCardsWithMissingMetadata().catch((err: unknown) => {
@@ -133,55 +159,31 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /**
-     * Enrich cards missing type_line (and other Scryfall metadata) in background.
-     * Fetches from Scryfall by scryfallId and updates both local state and Firestore.
+     * Build a patch of missing metadata fields from a Scryfall card.
+     * Returns an empty object if nothing needs updating.
      */
-    const enrichCardsWithMissingMetadata = async () => {
-        if (!authStore.user?.id) return
-
-        const cardsToEnrich = cards.value.filter(c => c.scryfallId && (!c.type_line || c.produced_mana === undefined))
-        if (cardsToEnrich.length === 0) return
-
-        console.log(`[Enrichment] ${cardsToEnrich.length} cards missing metadata, fetching from Scryfall...`)
-
-        const identifiers = cardsToEnrich.map(c => ({ id: c.scryfallId }))
-        const scryfallCards = await getCardsByIds(identifiers)
-
-        if (scryfallCards.length === 0) return
-
-        const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]))
-
-        const BATCH_SIZE = 400
-        const updates: { card: Card; data: Partial<Card> }[] = []
-
-        for (const card of cardsToEnrich) {
-            const sc = scryfallMap.get(card.scryfallId)
-            if (!sc) continue
-
-            const patch: Partial<Card> = {}
-            if (!card.type_line && sc.type_line) patch.type_line = sc.type_line
-            if (!card.colors && sc.colors) patch.colors = sc.colors
-            if (card.cmc === undefined && sc.cmc !== undefined) patch.cmc = sc.cmc
-            if (!card.rarity && sc.rarity) patch.rarity = sc.rarity
-            if (!card.oracle_text && sc.oracle_text) patch.oracle_text = sc.oracle_text
-            if (!card.keywords && sc.keywords) patch.keywords = sc.keywords
-            if (!card.legalities && sc.legalities) patch.legalities = sc.legalities
-            if (!card.power && sc.power) patch.power = sc.power
-            if (!card.toughness && sc.toughness) patch.toughness = sc.toughness
-            if (card.full_art === undefined && sc.full_art !== undefined) patch.full_art = sc.full_art
-            if (card.produced_mana === undefined && sc.produced_mana) patch.produced_mana = sc.produced_mana
-
-            if (Object.keys(patch).length > 0) {
-                // Update local state immediately
-                Object.assign(card, patch)
-                updates.push({ card, data: patch })
-            }
+    const buildEnrichmentPatch = (card: Card, sc: Record<string, unknown>): Partial<Card> => {
+        const patch: Record<string, unknown> = {}
+        // Fields where falsy means missing
+        const falsyFields = ['type_line', 'colors', 'rarity', 'oracle_text', 'keywords', 'legalities', 'power', 'toughness'] as const
+        for (const field of falsyFields) {
+            // eslint-disable-next-line security/detect-object-injection
+            if (!card[field] && sc[field]) patch[field] = sc[field]
         }
+        // Fields where undefined means missing
+        const undefinedFields = ['cmc', 'full_art', 'produced_mana'] as const
+        for (const field of undefinedFields) {
+            // eslint-disable-next-line security/detect-object-injection
+            if (card[field] === undefined && sc[field] !== undefined) patch[field] = sc[field]
+        }
+        return patch as Partial<Card>
+    }
 
-        if (updates.length === 0) return
-
-        // Persist to Firestore in batches (use set+merge to avoid NOT_FOUND errors)
-        const userId = authStore.user.id
+    /**
+     * Persist enrichment updates to Firestore in batches.
+     */
+    const persistEnrichmentBatches = async (updates: { card: Card; data: Partial<Card> }[], userId: string) => {
+        const BATCH_SIZE = 400
         for (let i = 0; i < updates.length; i += BATCH_SIZE) {
             const chunk = updates.slice(i, i + BATCH_SIZE)
             const batch = writeBatch(db)
@@ -195,8 +197,42 @@ export const useCollectionStore = defineStore('collection', () => {
                 console.warn(`[Enrichment] Batch ${i / BATCH_SIZE + 1} failed, skipping:`, err)
             }
         }
+    }
 
-        console.log(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
+    /**
+     * Enrich cards missing type_line (and other Scryfall metadata) in background.
+     * Fetches from Scryfall by scryfallId and updates both local state and Firestore.
+     */
+    const enrichCardsWithMissingMetadata = async () => {
+        if (!authStore.user?.id) return
+
+        const cardsToEnrich = cards.value.filter(c => c.scryfallId && (!c.type_line || c.produced_mana === undefined))
+        if (cardsToEnrich.length === 0) return
+
+        console.info(`[Enrichment] ${cardsToEnrich.length} cards missing metadata, fetching from Scryfall...`)
+
+        const identifiers = cardsToEnrich.map(c => ({ id: c.scryfallId }))
+        const scryfallCards = await getCardsByIds(identifiers)
+        if (scryfallCards.length === 0) return
+
+        const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]))
+        const updates: { card: Card; data: Partial<Card> }[] = []
+
+        for (const card of cardsToEnrich) {
+            const sc = scryfallMap.get(card.scryfallId)
+            if (!sc) continue
+
+            const patch = buildEnrichmentPatch(card, sc as unknown as Record<string, unknown>)
+            if (Object.keys(patch).length === 0) continue
+
+            Object.assign(card, patch)
+            updates.push({ card, data: patch })
+        }
+
+        if (updates.length === 0) return
+
+        await persistEnrichmentBatches(updates, authStore.user.id)
+        console.info(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
     }
 
     /**
@@ -208,11 +244,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
-            // Strip undefined values — Firestore rejects them
-            const cleanData: Record<string, unknown> = {}
-            for (const [key, value] of Object.entries(cardData)) {
-                if (value !== undefined) cleanData[key] = value
-            }
+            const cleanData = stripUndefined(cardData as Record<string, unknown>)
             const docRef = await addDoc(colRef, {
                 ...cleanData,
                 createdAt: Timestamp.now(),
@@ -255,9 +287,11 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Optimistic update: apply to UI immediately
         const index = cards.value.findIndex((c) => c.id === cardId)
+        // eslint-disable-next-line security/detect-object-injection
         const existingCard = cards.value[index]
         const snapshot = existingCard ? { ...existingCard } : null
         if (index > -1 && existingCard) {
+            // eslint-disable-next-line security/detect-object-injection
             cards.value[index] = { ...existingCard, ...updates, updatedAt: new Date() }
         }
 
@@ -265,6 +299,7 @@ export const useCollectionStore = defineStore('collection', () => {
             // Strip undefined values — Firestore rejects them
             const cleanUpdates: Record<string, unknown> = {}
             for (const [key, value] of Object.entries(updates)) {
+                // eslint-disable-next-line security/detect-object-injection
                 if (value !== undefined) cleanUpdates[key] = value
             }
 
@@ -275,6 +310,7 @@ export const useCollectionStore = defineStore('collection', () => {
             })
 
             // Sync to public collection (non-blocking, log-only on failure)
+            // eslint-disable-next-line security/detect-object-injection
             const updatedCard = cards.value[index]
             if (updatedCard) {
                 const userInfo = getUserInfo()
@@ -290,6 +326,7 @@ export const useCollectionStore = defineStore('collection', () => {
         } catch (error) {
             // Rollback on failure
             if (index > -1 && snapshot) {
+                // eslint-disable-next-line security/detect-object-injection
                 cards.value[index] = snapshot
             }
             console.error('Error updating card:', error)
@@ -306,71 +343,37 @@ export const useCollectionStore = defineStore('collection', () => {
         if (!authStore.user || cardIds.length === 0) return false
 
         try {
-            // Firestore batches have a limit of 500 operations
-            const BATCH_SIZE = 500
-            const chunks = []
-            for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
-                chunks.push(cardIds.slice(i, i + BATCH_SIZE))
-            }
-
+            const chunks = chunkArray(cardIds, 500)
             const firestoreChunkCount = chunks.length
             const publicSyncChunkCount = Math.ceil(cardIds.length / 400)
             const totalSteps = firestoreChunkCount + publicSyncChunkCount
             let completedSteps = 0
 
+            const cleanUpdates = stripUndefined(updates as Record<string, unknown>)
+
             for (const chunk of chunks) {
                 const batch = writeBatch(db)
-
-                // Strip undefined values — Firestore rejects them
-                const cleanUpdates: Record<string, unknown> = {}
-                for (const [key, value] of Object.entries(updates)) {
-                    if (value !== undefined) cleanUpdates[key] = value
-                }
-
                 for (const cardId of chunk) {
                     const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
-                    batch.update(cardRef, {
-                        ...cleanUpdates,
-                        updatedAt: Timestamp.now(),
-                    })
+                    batch.update(cardRef, { ...cleanUpdates, updatedAt: Timestamp.now() })
                 }
-
                 await batch.commit()
                 completedSteps++
                 onProgress?.(Math.round((completedSteps / totalSteps) * 100))
             }
 
             // Update local state
-            const userInfo = getUserInfo()
-            const updatedCards: Card[] = []
-            for (const cardId of cardIds) {
-                const index = cards.value.findIndex((c) => c.id === cardId)
-                const existingCard = cards.value[index]
-                if (index > -1 && existingCard) {
-                    const updatedCard = {
-                        ...existingCard,
-                        ...updates,
-                        updatedAt: new Date(),
-                    }
-                    cards.value[index] = updatedCard
-                    updatedCards.push(updatedCard)
-                }
-            }
+            const updatedCards = applyLocalCardUpdates(cardIds, updates)
 
             // Batch sync to public_cards
+            const userInfo = getUserInfo()
             if (userInfo && updatedCards.length > 0) {
-                if (onProgress) {
-                    // Await with progress tracking
-                    await batchSyncCardsToPublic(updatedCards, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, (completed) => {
-                        onProgress(Math.round(((firestoreChunkCount + completed) / totalSteps) * 100))
-                    })
-                } else {
-                    // Fire and forget (original behavior)
-                    batchSyncCardsToPublic(updatedCards, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
-                        .catch((err: unknown) => {
-                            console.error(`[PublicSync] Batch sync failed:`, err)
-                        })
-                }
+                const progressCb = onProgress
+                    ? (completed: number) => { onProgress(Math.round(((firestoreChunkCount + completed) / totalSteps) * 100)) }
+                    : undefined
+                const syncPromise = batchSyncCardsToPublic(updatedCards, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, progressCb)
+                if (!onProgress) syncPromise.catch((err: unknown) => { console.error(`[PublicSync] Batch sync failed:`, err) })
+                else await syncPromise
             }
 
             return true
@@ -379,6 +382,22 @@ export const useCollectionStore = defineStore('collection', () => {
             toastStore.show(t('collection.messages.batchUpdateError'), 'error')
             return false
         }
+    }
+
+    /** Apply updates to local card state and return the updated cards */
+    const applyLocalCardUpdates = (cardIds: string[], updates: Partial<Card>): Card[] => {
+        const updatedCards: Card[] = []
+        for (const cardId of cardIds) {
+            const index = cards.value.findIndex((c) => c.id === cardId)
+            // eslint-disable-next-line security/detect-object-injection
+            const existingCard = cards.value[index]
+            if (index === -1 || !existingCard) continue
+            const updatedCard = { ...existingCard, ...updates, updatedAt: new Date() }
+            // eslint-disable-next-line security/detect-object-injection
+            cards.value[index] = updatedCard
+            updatedCards.push(updatedCard)
+        }
+        return updatedCards
     }
 
     /**
@@ -391,6 +410,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Find and remove card optimistically (immediate UI update)
         const cardIndex = cards.value.findIndex(c => c.id === cardId)
+        // eslint-disable-next-line security/detect-object-injection
         const deletedCard = cards.value[cardIndex]
         if (cardIndex === -1 || !deletedCard) return false
 
@@ -589,49 +609,42 @@ export const useCollectionStore = defineStore('collection', () => {
     /**
      * Batch import cards - returns array of created card IDs
      */
+    /** Prepare a single card for Firestore batch import */
+    const prepareCardForBatch = (
+        card: Omit<Card, 'id'>,
+        colRef: ReturnType<typeof collection>,
+        batch: ReturnType<typeof writeBatch>,
+    ) => {
+        const cardRecord = card as Record<string, unknown>
+        const { id: _id, ...cardWithoutId } = cardRecord
+        const cleanData = stripUndefined(cardWithoutId as Record<string, unknown>)
+        const docRef = doc(colRef)
+        batch.set(docRef, { ...cleanData, createdAt: Timestamp.now(), updatedAt: Timestamp.now() })
+        return { ref: docRef, card }
+    }
+
     const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent = false): Promise<string[]> => {
         if (!authStore.user) return []
 
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
-
-            // Use writeBatch for atomic bulk writes (max 500 per batch)
-            const BATCH_SIZE = 400
+            const chunks = chunkArray(cardsToSave, 400)
             const createdIds: string[] = []
             const createdCards: Card[] = []
             let failCount = 0
 
-            for (let i = 0; i < cardsToSave.length; i += BATCH_SIZE) {
-                const chunk = cardsToSave.slice(i, i + BATCH_SIZE)
+            for (let ci = 0; ci < chunks.length; ci++) {
+                // eslint-disable-next-line security/detect-object-injection
+                const chunk = chunks[ci]
+                if (!chunk) continue
                 const batch = writeBatch(db)
-                const chunkRefs: { ref: ReturnType<typeof doc>; card: Omit<Card, 'id'> }[] = []
-
-                for (const card of chunk) {
-                    const { id: _id, ...cardWithoutId } = card as any
-                    // Strip undefined values that Firestore rejects
-                    const cleanData: Record<string, any> = {}
-                    for (const [key, value] of Object.entries(cardWithoutId)) {
-                        if (value !== undefined) cleanData[key] = value
-                    }
-                    const docRef = doc(colRef)
-                    batch.set(docRef, {
-                        ...cleanData,
-                        createdAt: Timestamp.now(),
-                        updatedAt: Timestamp.now(),
-                    })
-                    chunkRefs.push({ ref: docRef, card })
-                }
+                const chunkRefs = chunk.map(card => prepareCardForBatch(card, colRef, batch))
 
                 try {
                     await batch.commit()
                     for (const { ref: docRef, card } of chunkRefs) {
                         createdIds.push(docRef.id)
-                        createdCards.push({
-                            ...card,
-                            id: docRef.id,
-                            updatedAt: new Date(),
-                            createdAt: new Date(),
-                        } as Card)
+                        createdCards.push({ ...card, id: docRef.id, updatedAt: new Date(), createdAt: new Date() } as Card)
                     }
                 } catch (err) {
                     failCount += chunk.length
@@ -639,20 +652,17 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
 
                 // Throttle between batches
-                if (i + BATCH_SIZE < cardsToSave.length) {
+                if (ci < chunks.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 200))
                 }
             }
 
-            // Push created cards directly into local state (avoids re-reading ALL cards)
             cards.value.push(...createdCards)
 
             if (!silent) {
-                if (failCount > 0) {
-                    toastStore.show(t('collection.messages.imported', { count: createdIds.length }) + ` (${failCount} fallaron)`, 'info')
-                } else {
-                    toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')
-                }
+                const msg = t('collection.messages.imported', { count: createdIds.length })
+                const type = failCount > 0 ? 'info' : 'success'
+                toastStore.show(failCount > 0 ? msg + ` (${failCount} fallaron)` : msg, type)
             }
             return createdIds
         } catch (error) {

@@ -3,8 +3,11 @@ import { computed, ref } from 'vue'
 // Tipo para los locales soportados
 export type SupportedLocale = 'es' | 'en' | 'pt'
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface LocaleMessages extends Record<string, string | LocaleMessages> {}
+
 // Locales cargados dinámicamente (solo el activo al inicio)
-const locales = ref<Record<string, Record<string, any>>>({})
+const locales = ref<Record<string, LocaleMessages>>({})
 
 // Estado global del idioma actual
 const currentLocale = ref<SupportedLocale>('es')
@@ -13,8 +16,10 @@ const currentLocale = ref<SupportedLocale>('es')
  * Carga un locale dinámicamente
  */
 async function loadLocale(lang: SupportedLocale): Promise<void> {
+  // eslint-disable-next-line security/detect-object-injection
   if (locales.value[lang]) return
-  const module = await import(`../locales/${lang}.json`)
+  const module = await import(`../locales/${lang}.json`) as { default: LocaleMessages }
+  // eslint-disable-next-line security/detect-object-injection
   locales.value[lang] = module.default
 }
 
@@ -22,15 +27,20 @@ async function loadLocale(lang: SupportedLocale): Promise<void> {
  * Obtiene un valor anidado de un objeto usando notación de punto
  * Ejemplo: getNestedValue(obj, 'common.actions.save') => 'GUARDAR'
  */
-function getNestedValue(obj: Record<string, any>, path: string): string | undefined {
+function getNestedValue(obj: LocaleMessages, path: string): string | undefined {
   const keys = path.split('.')
-  let current: any = obj
+  let current: string | LocaleMessages = obj
 
   for (const key of keys) {
-    if (current === undefined || current === null) {
+    if (typeof current === 'string') {
       return undefined
     }
-    current = current[key]
+    // eslint-disable-next-line security/detect-object-injection
+    const next: string | LocaleMessages | undefined = current[key] as string | LocaleMessages | undefined
+    if (next === undefined) {
+      return undefined
+    }
+    current = next
   }
 
   return typeof current === 'string' ? current : undefined
@@ -41,7 +51,8 @@ function getNestedValue(obj: Record<string, any>, path: string): string | undefi
  * Ejemplo: interpolate('Hola {name}', { name: 'Juan' }) => 'Hola Juan'
  */
 function interpolate(template: string, params: Record<string, string | number>): string {
-  return template.replaceAll(/\{(\w+)\}/g, (_, key) => {
+  return template.replaceAll(/\{(\w+)\}/g, (_, key: string) => {
+    // eslint-disable-next-line security/detect-object-injection
     return params[key]?.toString() ?? `{${key}}`
   })
 }
@@ -68,7 +79,7 @@ function getAvailableLocales(): SupportedLocale[] {
  */
 export function useI18n() {
   const locale = computed(() => currentLocale.value)
-  const messages = computed(() => locales.value[currentLocale.value] ?? {})
+  const messages = computed((): LocaleMessages => locales.value[currentLocale.value] ?? {})
 
   /**
    * Traduce una clave a su valor en el idioma actual

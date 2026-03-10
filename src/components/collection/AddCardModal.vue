@@ -11,13 +11,13 @@ import { useDecksStore } from '../../stores/decks'
 import { useBindersStore } from '../../stores/binders'
 import { useRouter } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
-import { getCardSuggestions, searchCards } from '../../services/scryfall'
+import { getCardSuggestions, type ScryfallCard, searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
 import type { CardCondition, CardStatus } from '../../types/card'
 
 interface Props {
   show: boolean
-  scryfallCard?: any
+  scryfallCard?: ScryfallCard
   selectedDeckId?: string
   selectedBinderId?: string
 }
@@ -30,7 +30,7 @@ const router = useRouter()
 
 // Search state (when no card pre-selected)
 const searchQuery = ref('')
-const searchResults = ref<any[]>([])
+const searchResults = ref<ScryfallCard[]>([])
 const searching = ref(false)
 const suggestions = ref<string[]>([])
 const showSuggestions = ref(false)
@@ -48,12 +48,12 @@ const bindersStore = useBindersStore()
 const loading = ref(false)
 
 // Prints disponibles
-const availablePrints = ref<any[]>([])
-const selectedPrint = ref<any>(null)
+const availablePrints = ref<ScryfallCard[]>([])
+const selectedPrint = ref<ScryfallCard | null>(null)
 const loadingPrints = ref(false)
 
 // Cargar todos los prints cuando cambia la carta
-watch(() => props.scryfallCard, async (card) => {
+watch(() => props.scryfallCard, async (card: ScryfallCard | undefined) => {
   if (card) {
     selectedPrint.value = card
     loadingPrints.value = true
@@ -104,9 +104,9 @@ const {
 )
 
 // Fetch CK prices when print changes
-watch(selectedPrint, (print) => {
+watch(selectedPrint, (print: ScryfallCard | null) => {
   if (print?.id && print?.set) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 })
 
@@ -140,11 +140,11 @@ const conditionOptions = computed(() => [
 ])
 
 // ✅ NUEVO: Función para obtener imagen correcta de split cards
-const getCardImage = (card: any): string => {
+const getCardImage = (card: ScryfallCard): string => {
   if (card.card_faces && card.card_faces.length > 0) {
-    return card.card_faces[0].image_uris?.normal || ''
+    return card.card_faces[0]?.image_uris?.normal ?? ''
   }
-  return card.image_uris?.normal || ''
+  return card.image_uris?.normal ?? ''
 }
 
 // ✅ NUEVO: Verificar si es split card
@@ -155,8 +155,9 @@ const isSplitCard = computed(() => {
 // ✅ NUEVO: Obtener imagen actual según el lado
 const currentCardImage = computed(() => {
   if (!selectedPrint.value) return ''
-  if (selectedPrint.value.card_faces?.[cardFaceIndex.value]) {
-    return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
+  const face = selectedPrint.value.card_faces?.[cardFaceIndex.value]
+  if (face) {
+    return face.image_uris?.normal ?? ''
   }
   return getCardImage(selectedPrint.value)
 })
@@ -164,18 +165,19 @@ const currentCardImage = computed(() => {
 // Large image for zoom view
 const zoomImage = computed(() => {
   if (!selectedPrint.value) return ''
-  if (selectedPrint.value.card_faces?.[cardFaceIndex.value]) {
-    return selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.large ||
-           selectedPrint.value.card_faces[cardFaceIndex.value].image_uris?.normal || ''
+  const face = selectedPrint.value.card_faces?.[cardFaceIndex.value]
+  if (face) {
+    return face.image_uris?.large ?? face.image_uris?.normal ?? ''
   }
-  return selectedPrint.value.image_uris?.large || selectedPrint.value.image_uris?.normal || ''
+  return selectedPrint.value.image_uris?.large ?? selectedPrint.value.image_uris?.normal ?? ''
 })
 
 // ✅ NUEVO: Obtener nombre del lado actual
 const currentCardName = computed(() => {
   if (!selectedPrint.value) return ''
-  if (selectedPrint.value.card_faces?.[cardFaceIndex.value]) {
-    return selectedPrint.value.card_faces[cardFaceIndex.value].name
+  const face = selectedPrint.value.card_faces?.[cardFaceIndex.value]
+  if (face) {
+    return face.name
   }
   return selectedPrint.value.name
 })
@@ -210,10 +212,10 @@ const handleAddCard = async () => {
   try {
     // ✅ CORREGIDO: Guardar el nombre del lado actual (para split cards)
     const cardName = isSplitCard.value
-        ? selectedPrint.value.card_faces[cardFaceIndex.value].name
+        ? (selectedPrint.value.card_faces?.[cardFaceIndex.value]?.name ?? selectedPrint.value.name)
         : selectedPrint.value.name
 
-    const imageToSave = currentCardImage.value || ''
+    const imageToSave = currentCardImage.value ?? ''
 
     const cardId = await collectionStore.addCard({
       scryfallId: selectedPrint.value.id,
@@ -224,19 +226,19 @@ const handleAddCard = async () => {
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: Number.parseFloat(selectedPrint.value.prices?.usd || '0'),
+      price: Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
       image: imageToSave,
       public: form.public,
       cmc: selectedPrint.value.cmc,
       type_line: selectedPrint.value.type_line,
-      colors: selectedPrint.value.colors || [],
+      colors: selectedPrint.value.colors ?? [],
       rarity: selectedPrint.value.rarity,
       power: selectedPrint.value.power,
       toughness: selectedPrint.value.toughness,
       oracle_text: selectedPrint.value.oracle_text,
-      keywords: selectedPrint.value.keywords || [],
+      keywords: selectedPrint.value.keywords ?? [],
       legalities: selectedPrint.value.legalities,
-      full_art: selectedPrint.value.full_art || false,
+      full_art: selectedPrint.value.full_art ?? false,
     })
 
     // Si se seleccionó un deck, asignar la carta al deck
@@ -259,7 +261,7 @@ const handleAddCard = async () => {
     }
 
     // Si es wishlist, crear preferencia BUSCO automáticamente
-    if (form.status === 'wishlist') {
+    if (form.status === 'wishlist' && selectedPrint.value) {
       await preferencesStore.addPreference({
         scryfallId: selectedPrint.value.id,
         name: cardName,
@@ -333,7 +335,7 @@ const performSearch = async () => {
   }
 }
 
-const selectSearchResult = (card: any) => {
+const selectSearchResult = (card: ScryfallCard) => {
   selectedPrint.value = card
   searchResults.value = []
   searchQuery.value = ''
@@ -497,7 +499,7 @@ const handleClose = () => {
             <div class="text-center w-full">
               <p class="font-bold text-[#EEEEEE]">{{ currentCardName }}</p>
               <p v-if="isSplitCard" class="text-xs text-[#CCFF00] mt-1">
-                {{ t('cards.addModal.splitCardSide', { current: cardFaceIndex + 1, total: selectedPrint?.card_faces?.length }) }}
+                {{ t('cards.addModal.splitCardSide', { current: cardFaceIndex + 1, total: selectedPrint?.card_faces?.length ?? 0 }) }}
               </p>
 
               <!-- Prices Section -->
@@ -505,7 +507,7 @@ const handleClose = () => {
                 <!-- TCGPlayer Price -->
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-[#EEEEEE]/70">TCG:</span>
-                  <span class="text-[#CCFF00] font-bold">${{ selectedPrint?.prices?.usd || 'N/A' }}</span>
+                  <span class="text-[#CCFF00] font-bold">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
                 </div>
 
                 <!-- Card Kingdom Prices -->
@@ -536,7 +538,7 @@ const handleClose = () => {
                       :key="print.id"
                       :value="print.id"
                   >
-                    {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+                    {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
                   </option>
                 </select>
                 <p class="text-xs text-[#EEEEEE]/50 mt-1">{{ t('cards.addModal.printsAvailable', { count: availablePrints.length }) }}</p>

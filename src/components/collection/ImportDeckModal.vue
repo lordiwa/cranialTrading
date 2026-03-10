@@ -8,7 +8,7 @@ import BaseInput from '../ui/BaseInput.vue'
 import { useI18n } from '../../composables/useI18n'
 import { type CardCondition, type CardStatus } from '../../types/card'
 import { type DeckFormat } from '../../types/deck'
-import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
+import { extractDeckId, fetchMoxfieldDeck, type MoxfieldCard, type MoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 import { isCsvFormat, parseCsvDeckImport, type ParsedCsvCard } from '../../utils/cardHelpers'
 
 const props = withDefaults(defineProps<{
@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'import', opts: { deckText: string, condition: CardCondition, includeSideboard: boolean, deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus }): void
-  (e: 'importDirect', cards: any[], deckName: string | undefined, condition: CardCondition, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus): void
+  (e: 'importDirect', cards: ReturnType<typeof moxfieldToCardList>, deckName: string | undefined, condition: CardCondition, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus): void
   (e: 'importCsv', cards: ParsedCsvCard[], deckName: string | undefined, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus): void
 }>()
 
@@ -36,7 +36,7 @@ const parsing = ref(false)
 const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string; cards?: string[] } | null>(null)
 const errorMsg = ref('')
 const isLink = ref(false)
-const moxfieldDeckData = ref<any>(null)
+const moxfieldDeckData = ref<MoxfieldDeck | null>(null)
 const isCsv = ref(false)
 const csvParsedCards = ref<ParsedCsvCard[]>([])
 const csvFileInput = ref<HTMLInputElement | null>(null)
@@ -104,23 +104,24 @@ interface ParsePreview { total: number; mainboard: number; sideboard: number; na
 const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> => {
   const result = await fetchMoxfieldDeck(deckId)
   if (!result.data) {
-    errorMsg.value = result.error || 'Error desconocido'
+    errorMsg.value = result.error ?? 'Error desconocido'
     return null
   }
   const deck = result.data
   moxfieldDeckData.value = deck
-  const mainboardCards = deck.boards?.mainboard?.cards || {}
-  const sideboardCards = deck.boards?.sideboard?.cards || {}
-  const commanderCards = deck.boards?.commanders?.cards || {}
-  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-  const cardNames = Object.values(mainboardCards).map((item: any) => item.card?.name || '').filter(Boolean)
-  deckNameInput.value = deck.name || ''
+  const mainboardCards = deck.boards?.mainboard?.cards ?? {}
+  const sideboardCards = deck.boards?.sideboard?.cards ?? {}
+  const commanderCards = deck.boards?.commanders?.cards ?? {}
+  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
+  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
+  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
+  const cardNames = Object.values(mainboardCards).map((item: MoxfieldCard) => item.card?.name ?? '').filter(Boolean)
+  deckNameInput.value = deck.name ?? ''
   if (deck.format === 'commander' || deck.format === 'edh') {
     deckFormat.value = 'commander'
     if (Object.keys(commanderCards).length > 0) {
-      commanderName.value = (Object.values(commanderCards)[0] as any)?.card?.name || ''
+      const firstCommander = Object.values(commanderCards)[0] as MoxfieldCard | undefined
+      commanderName.value = firstCommander?.card?.name ?? ''
     }
   }
   return { total: mainboardCount + sideboardCount + commanderCount, mainboard: mainboardCount + commanderCount, sideboard: sideboardCount, name: deck.name, cards: cardNames }
@@ -142,11 +143,12 @@ const parsePlainTextInput = (text: string): ParsePreview => {
   for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed === 'SIDEBOARD:') { inSideboard = true; continue }
+    // eslint-disable-next-line security/detect-unsafe-regex
     const match = /^(\d+)\s+(.+?)(?:\s*\([^)]+\).*)?$/.exec(trimmed)
     const matchQty = match?.[1]
     const matchName = match?.[2]
     if (match && matchQty && matchName) {
-      const qty = Number.parseInt(matchQty)
+      const qty = Number.parseInt(matchQty, 10)
       if (!inSideboard) cardNames.push(matchName.trim())
       if (inSideboard) sideboard += qty
       else mainboard += qty

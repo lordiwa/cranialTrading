@@ -1,4 +1,4 @@
-import { createApp } from 'vue';
+import { type Component, createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
@@ -6,8 +6,8 @@ import { useAuthStore } from './stores/auth';
 import { initI18n } from './composables/useI18n';
 import './style.css';
 
-(async () => {
-  const app = createApp(App);
+void (async () => {
+  const app = createApp(App as Component);
   const pinia = createPinia();
 
   app.use(pinia);

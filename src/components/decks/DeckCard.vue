@@ -23,7 +23,7 @@ const formatLabel = computed(() => {
     standard: 'STANDARD',
     custom: 'CUSTOM',
   }
-  return labels[props.deck.format] || 'CUSTOM'
+  return labels[props.deck.format] ?? 'CUSTOM'
 })
 
 const completionPercent = computed(() => {

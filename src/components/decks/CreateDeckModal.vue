@@ -46,7 +46,7 @@ const deckListPreview = computed(() => {
     const match = /^(\d+)/.exec(line)
     const matchQty = match?.[1]
     if (match && matchQty) {
-      const qty = Number.parseInt(matchQty)
+      const qty = Number.parseInt(matchQty, 10)
       if (inSideboard) {
         sideboard += qty
       } else {

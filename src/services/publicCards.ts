@@ -43,6 +43,15 @@ export interface PublicCard {
   updatedAt: Timestamp
 }
 
+export interface PreferenceInput {
+  id: string
+  cardName?: string
+  name?: string
+  scryfallId?: string
+  maxPrice?: number
+  minCondition?: string
+}
+
 export interface PublicPreference {
   docId: string // Firestore document ID
   prefId: string // matches the user's preference document ID
@@ -81,7 +90,7 @@ export async function syncCardToPublic(
       cardId: card.id,
       userId,
       username,
-      avatarUrl: userAvatarUrl || null,
+      avatarUrl: userAvatarUrl ?? null,
       cardName: card.name,
       scryfallId: card.scryfallId,
       status: card.status as 'trade' | 'sale',
@@ -135,7 +144,7 @@ export async function batchSyncCardsToPublic(
           cardId: card.id,
           userId,
           username,
-          avatarUrl: userAvatarUrl || null,
+          avatarUrl: userAvatarUrl ?? null,
           cardName: card.name,
           scryfallId: card.scryfallId,
           status: card.status as 'trade' | 'sale',
@@ -172,7 +181,7 @@ export async function removeCardFromPublic(cardId: string, userId: string): Prom
  * Sync a preference to public_preferences collection
  */
 export async function syncPreferenceToPublic(
-  preference: any,
+  preference: PreferenceInput,
   userId: string,
   username: string,
   userLocation?: string,
@@ -183,13 +192,13 @@ export async function syncPreferenceToPublic(
   const publicPrefRef = doc(db, 'public_preferences', publicPrefId)
 
   // Filter out undefined values (Firestore doesn't accept them)
-  const publicPref: Record<string, any> = {
+  const publicPref: Record<string, string | number | Timestamp | null> = {
     prefId: preference.id,
     userId,
     username,
-    avatarUrl: userAvatarUrl || null,
-    cardName: preference.cardName || preference.name || '',
-    scryfallId: preference.scryfallId || '',
+    avatarUrl: userAvatarUrl ?? null,
+    cardName: preference.cardName ?? preference.name ?? '',
+    scryfallId: preference.scryfallId ?? '',
     updatedAt: Timestamp.now(),
   }
   if (preference.maxPrice !== undefined) publicPref.maxPrice = preference.maxPrice
@@ -252,7 +261,7 @@ export async function syncAllUserCards(
         cardId: card.id,
         userId,
         username,
-        avatarUrl: userAvatarUrl || null,
+        avatarUrl: userAvatarUrl ?? null,
         cardName: card.name,
         scryfallId: card.scryfallId,
         status: card.status,
@@ -262,8 +271,8 @@ export async function syncAllUserCards(
         foil: card.foil || false,
         quantity: card.quantity || 1,
         image: card.image || '',
-        location: userLocation || '',
-        email: userEmail || '',
+        location: userLocation ?? '',
+        email: userEmail ?? '',
         updatedAt: Timestamp.now(),
       })
     }
@@ -275,20 +284,20 @@ export async function syncAllUserCards(
  * Bulk sync all user's preferences to public collection
  */
 function buildPreferenceData(
-  pref: any,
+  pref: PreferenceInput,
   userId: string,
   username: string,
   userAvatarUrl?: string | null,
   userLocation?: string,
   userEmail?: string
-): Record<string, any> {
-  const data: Record<string, any> = {
+): Record<string, string | number | Timestamp | null> {
+  const data: Record<string, string | number | Timestamp | null> = {
     prefId: pref.id,
     userId,
     username,
-    avatarUrl: userAvatarUrl || null,
-    cardName: pref.cardName || pref.name || '',
-    scryfallId: pref.scryfallId || '',
+    avatarUrl: userAvatarUrl ?? null,
+    cardName: pref.cardName ?? pref.name ?? '',
+    scryfallId: pref.scryfallId ?? '',
     updatedAt: Timestamp.now(),
   }
   if (pref.maxPrice !== undefined) data.maxPrice = pref.maxPrice
@@ -299,7 +308,7 @@ function buildPreferenceData(
 }
 
 export async function syncAllUserPreferences(
-  preferences: any[],
+  preferences: PreferenceInput[],
   userId: string,
   username: string,
   userLocation?: string,
@@ -344,7 +353,7 @@ export async function syncAllUserPreferences(
  * Matches by card NAME (any printing), not exact scryfallId
  */
 export async function findCardsMatchingPreferences(
-  preferences: any[],
+  preferences: PreferenceInput[],
   excludeUserId: string
 ): Promise<PublicCard[]> {
   if (preferences.length === 0) {
@@ -354,8 +363,8 @@ export async function findCardsMatchingPreferences(
   // Get unique card names from preferences
   const cardNames = [...new Set(
     preferences
-      .map(p => p.cardName || p.name || '')
-      .filter(name => name && name.length > 0)
+      .map(p => p.cardName ?? p.name ?? '')
+      .filter((name): name is string => !!name && name.length > 0)
   )]
 
   if (cardNames.length === 0) {

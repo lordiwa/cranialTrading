@@ -26,7 +26,7 @@ export interface FilterableCard {
 /** Get a card's timestamp for sorting by date (handles createdAt or addedAt fields) */
 const getCardTimestamp = (card: FilterableCard): number => {
   if (card.createdAt) return new Date(card.createdAt).getTime()
-  const addedAt = (card as any).addedAt
+  const addedAt = (card as FilterableCard & { addedAt?: Date | string }).addedAt
   if (addedAt) return new Date(addedAt).getTime()
   return 0
 }
@@ -34,7 +34,7 @@ const getCardTimestamp = (card: FilterableCard): number => {
 // ========== Category helpers ==========
 
 export const getCardRarityCategory = (card: FilterableCard): string => {
-  const rarity = card.rarity?.toLowerCase() || ''
+  const rarity = card.rarity?.toLowerCase() ?? ''
   if (rarity === 'common') return 'Common'
   if (rarity === 'uncommon') return 'Uncommon'
   if (rarity === 'rare') return 'Rare'
@@ -43,7 +43,7 @@ export const getCardRarityCategory = (card: FilterableCard): string => {
 }
 
 export const getCardTypeCategory = (card: FilterableCard): string => {
-  const typeLine = card.type_line?.toLowerCase() || ''
+  const typeLine = card.type_line?.toLowerCase() ?? ''
   if (typeLine.includes('creature')) return 'Creatures'
   if (typeLine.includes('instant')) return 'Instants'
   if (typeLine.includes('sorcery')) return 'Sorceries'
@@ -55,7 +55,7 @@ export const getCardTypeCategory = (card: FilterableCard): string => {
 }
 
 export const getCardManaCategory = (card: FilterableCard): string => {
-  const typeLine = card.type_line?.toLowerCase() || ''
+  const typeLine = card.type_line?.toLowerCase() ?? ''
   if (typeLine.includes('land')) return 'Lands'
   const cmc = card.cmc ?? 0
   if (cmc >= 10) return '10+'
@@ -79,11 +79,12 @@ const categorizeManaColors = (colorLetters: string[]): string => {
   const valid = colorLetters.filter(c => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
   if (valid.length === 0) return 'Colorless'
   if (valid.length >= 2) return 'Multicolor'
-  return colorLetterToName(valid[0]!)
+  const first = valid[0]
+  return first ? colorLetterToName(first) : 'Colorless'
 }
 
 export const getCardColorCategory = (card: FilterableCard): string => {
-  const typeLine = card.type_line?.toLowerCase() || ''
+  const typeLine = card.type_line?.toLowerCase() ?? ''
 
   // Lands: categorize by produced mana colors if available
   if (typeLine.includes('land')) {
@@ -93,7 +94,7 @@ export const getCardColorCategory = (card: FilterableCard): string => {
     return 'Lands'
   }
 
-  return categorizeManaColors(card.colors || [])
+  return categorizeManaColors(card.colors ?? [])
 }
 
 /**
@@ -103,7 +104,7 @@ export const getCardColorCategory = (card: FilterableCard): string => {
  * For non-land cards: passes if the single color category is in the selected set.
  */
 export const passesColorFilter = (card: FilterableCard, selected: Set<string>, exact = false): boolean => {
-  const typeLine = card.type_line?.toLowerCase() || ''
+  const typeLine = card.type_line?.toLowerCase() ?? ''
   if (typeLine.includes('land') && card.produced_mana && card.produced_mana.length > 0) {
     const validColors = card.produced_mana.filter(c => ['W', 'U', 'B', 'R', 'G'].includes(c?.toUpperCase()))
     if (validColors.length === 0) return selected.has('Colorless')
@@ -266,15 +267,15 @@ export function useCardFilter<T extends FilterableCard>(
 
   const passesSets = (card: T): boolean => {
     if (advSelectedSets.value.length === 0) return true
-    const cardSet = card.setCode?.toLowerCase() || ''
+    const cardSet = card.setCode?.toLowerCase() ?? ''
     return advSelectedSets.value.some(s => s.toLowerCase() === cardSet)
   }
 
   const passesKeywords = (card: T): boolean => {
     if (advSelectedKeywords.value.length === 0) return true
-    const oracleText = card.oracle_text?.toLowerCase() || ''
-    const cardKeywords = card.keywords?.map(k => k.toLowerCase()) || []
-    const typeLine = card.type_line?.toLowerCase() || ''
+    const oracleText = card.oracle_text?.toLowerCase() ?? ''
+    const cardKeywords = card.keywords?.map(k => k.toLowerCase()) ?? []
+    const typeLine = card.type_line?.toLowerCase() ?? ''
     return advSelectedKeywords.value.every(kw => {
       const kwLower = kw.toLowerCase()
       return oracleText.includes(kwLower) || cardKeywords.includes(kwLower) || typeLine.includes(kwLower)
@@ -284,12 +285,13 @@ export function useCardFilter<T extends FilterableCard>(
   const passesFormats = (card: T): boolean => {
     if (advSelectedFormats.value.length === 0) return true
     if (!card.legalities) return false
-    return advSelectedFormats.value.every(fmt => card.legalities![fmt] === 'legal')
+    // eslint-disable-next-line security/detect-object-injection
+    return advSelectedFormats.value.every(fmt => card.legalities?.[fmt] === 'legal')
   }
 
   const passesCreatureTypes = (card: T): boolean => {
     if (advSelectedCreatureTypes.value.length === 0) return true
-    const subtypes = extractCreatureSubtypes(card.type_line || '')
+    const subtypes = extractCreatureSubtypes(card.type_line ?? '')
     return advSelectedCreatureTypes.value.some(ct => subtypes.includes(ct.toLowerCase()))
   }
 
@@ -371,8 +373,8 @@ export function useCardFilter<T extends FilterableCard>(
   const collectionCreatureTypes = computed(() => {
     const typeCount = new Map<string, number>()
     for (const card of cards.value) {
-      for (const st of extractCreatureSubtypes(card.type_line || '')) {
-        typeCount.set(st, (typeCount.get(st) || 0) + 1)
+      for (const st of extractCreatureSubtypes(card.type_line ?? '')) {
+        typeCount.set(st, (typeCount.get(st) ?? 0) + 1)
       }
     }
     return [...typeCount.entries()]
@@ -410,7 +412,7 @@ export function useCardFilter<T extends FilterableCard>(
         sorted.sort((a, b) => a.name.localeCompare(b.name))
         break
       case 'price':
-        sorted.sort((a, b) => (b.price || 0) - (a.price || 0))
+        sorted.sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
         break
     }
     return sorted
@@ -477,20 +479,25 @@ export function useCardFilter<T extends FilterableCard>(
 
     for (const card of source) {
       const category = getCardCategory(card)
+      // eslint-disable-next-line security/detect-object-injection
       groups[category] ??= []
+      // eslint-disable-next-line security/detect-object-injection
       groups[category].push(card)
     }
 
     // Sort within groups
     for (const category in groups) {
+      // eslint-disable-next-line security/detect-object-injection
       const group = groups[category]
       if (group) {
+        // eslint-disable-next-line security/detect-object-injection
         groups[category] = sortCards(group)
       }
     }
 
     const sortedGroups: { type: string; cards: T[] }[] = []
     for (const category of order) {
+      // eslint-disable-next-line security/detect-object-injection
       const group = groups[category]
       if (group && group.length > 0) {
         sortedGroups.push({ type: category, cards: group })
@@ -498,6 +505,7 @@ export function useCardFilter<T extends FilterableCard>(
     }
     // Any categories not in the predefined order
     for (const category in groups) {
+      // eslint-disable-next-line security/detect-object-injection
       const group = groups[category]
       if (!order.includes(category) && group && group.length > 0) {
         sortedGroups.push({ type: category, cards: group })

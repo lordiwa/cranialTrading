@@ -7,7 +7,7 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards } from '../../services/scryfall'
+import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -38,8 +38,8 @@ const loadingPrints = ref(false)
 const showZoom = ref(false)
 
 // Print selection
-const availablePrints = ref<any[]>([])
-const selectedPrint = ref<any>(null)
+const availablePrints = ref<ScryfallCard[]>([])
+const selectedPrint = ref<ScryfallCard | null>(null)
 
 // Card properties (shared across all status entries)
 const condition = ref<CardCondition>('NM')
@@ -69,8 +69,8 @@ const {
   fetchPrices: fetchCKPrices,
   formatPrice,
 } = useCardPrices(
-  () => selectedPrint.value?.id || props.card?.scryfallId,
-  () => selectedPrint.value?.set || props.card?.setCode
+  () => selectedPrint.value?.id ?? props.card?.scryfallId,
+  () => selectedPrint.value?.set ?? props.card?.setCode
 )
 
 // ========== PRICE HISTORY CHART ==========
@@ -179,7 +179,7 @@ const conditionOptions = computed(() => [
 
 // Card type line from selected print or original card
 const cardTypeLine = computed(() => {
-  return selectedPrint.value?.type_line || props.card?.type_line || ''
+  return selectedPrint.value?.type_line ?? props.card?.type_line ?? ''
 })
 
 // Total quantity across all statuses
@@ -190,21 +190,21 @@ const totalQuantity = computed(() => {
 // Current image from selected print or original card
 const currentImage = computed(() => {
   if (selectedPrint.value) {
-    return selectedPrint.value.image_uris?.normal ||
-           selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
+    return selectedPrint.value.image_uris?.normal
+           ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
   }
-  return props.card?.image || ''
+  return props.card?.image ?? ''
 })
 
 // Large image for zoom view
 const zoomImage = computed(() => {
   if (selectedPrint.value) {
-    return selectedPrint.value.image_uris?.large ||
-           selectedPrint.value.image_uris?.normal ||
-           selectedPrint.value.card_faces?.[0]?.image_uris?.large ||
-           selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
+    return selectedPrint.value.image_uris?.large
+           ?? selectedPrint.value.image_uris?.normal
+           ?? selectedPrint.value.card_faces?.[0]?.image_uris?.large
+           ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
   }
-  return props.card?.image || ''
+  return props.card?.image ?? ''
 })
 
 // Current price from selected print or original card
@@ -212,7 +212,7 @@ const currentPrice = computed(() => {
   if (selectedPrint.value?.prices?.usd) {
     return Number.parseFloat(selectedPrint.value.prices.usd)
   }
-  return props.card?.price || 0
+  return props.card?.price ?? 0
 })
 
 // All available decks
@@ -263,7 +263,7 @@ const initializeForm = async () => {
   if (!props.card) return
 
   // Get fresh card data from store (props.card might be stale reference)
-  const freshCard = collectionStore.cards.find(c => c.id === props.card!.id) || props.card
+  const freshCard = collectionStore.cards.find(c => c.id === props.card?.id) ?? props.card
 
   // Find all related cards (same scryfallId + edition) from store
   relatedCards.value = collectionStore.cards.filter(c =>
@@ -293,9 +293,10 @@ const initializeForm = async () => {
   for (const card of relatedCards.value) {
     const allocations = getAllocationsForCard(card.id)
     for (const alloc of allocations) {
+      const existingAlloc = deckAllocations.value[alloc.deckId]
       deckAllocations.value[alloc.deckId] = {
-        quantity: (deckAllocations.value[alloc.deckId]?.quantity || 0) + alloc.quantity,
-        isInSideboard: alloc.isInSideboard || false
+        quantity: (existingAlloc?.quantity ?? 0) + alloc.quantity,
+        isInSideboard: alloc.isInSideboard ?? false
       }
     }
   }
@@ -309,7 +310,7 @@ const initializeForm = async () => {
 
     // Find current print
     const currentPrint = results.find(p => p.id === freshCard.scryfallId)
-    selectedPrint.value = currentPrint || results[0] || null
+    selectedPrint.value = currentPrint ?? results[0] ?? null
   } catch (err) {
     console.error('Error loading prints:', err)
     availablePrints.value = []
@@ -328,8 +329,10 @@ const handlePrintChange = (scryfallId: string) => {
 
 // Adjust quantity for a status
 const adjustQuantity = (status: CardStatus, delta: number) => {
+  // eslint-disable-next-line security/detect-object-injection
   const newValue = statusDistribution.value[status] + delta
   if (newValue >= 0) {
+    // eslint-disable-next-line security/detect-object-injection
     statusDistribution.value[status] = newValue
   }
 }
@@ -338,20 +341,25 @@ const adjustQuantity = (status: CardStatus, delta: number) => {
 
 // Get allocation for a specific deck
 const getDeckAllocation = (deckId: string) => {
-  return deckAllocations.value[deckId]?.quantity || 0
+  // eslint-disable-next-line security/detect-object-injection
+  return deckAllocations.value[deckId]?.quantity ?? 0
 }
 
 // Check if deck allocation is in sideboard
 const isInSideboard = (deckId: string) => {
-  return deckAllocations.value[deckId]?.isInSideboard || false
+  // eslint-disable-next-line security/detect-object-injection
+  return deckAllocations.value[deckId]?.isInSideboard ?? false
 }
 
 // Increment deck allocation (no limit - excess goes to deck wishlist)
 const incrementDeckAllocation = (deckId: string) => {
   const current = getDeckAllocation(deckId)
+  // eslint-disable-next-line security/detect-object-injection
+  const existing = deckAllocations.value[deckId]
+  // eslint-disable-next-line security/detect-object-injection
   deckAllocations.value[deckId] = {
     quantity: current + 1,
-    isInSideboard: deckAllocations.value[deckId]?.isInSideboard || false
+    isInSideboard: existing?.isInSideboard ?? false
   }
 }
 
@@ -361,19 +369,25 @@ const decrementDeckAllocation = (deckId: string) => {
   if (current <= 0) return
 
   if (current === 1) {
+    // eslint-disable-next-line security/detect-object-injection
     delete deckAllocations.value[deckId]
   } else {
+    // eslint-disable-next-line security/detect-object-injection
+    const existing = deckAllocations.value[deckId]
+    // eslint-disable-next-line security/detect-object-injection
     deckAllocations.value[deckId] = {
       quantity: current - 1,
-      isInSideboard: deckAllocations.value[deckId]?.isInSideboard || false
+      isInSideboard: existing?.isInSideboard ?? false
     }
   }
 }
 
 // Toggle sideboard for a deck
 const toggleSideboard = (deckId: string) => {
-  if (deckAllocations.value[deckId]) {
-    deckAllocations.value[deckId].isInSideboard = !deckAllocations.value[deckId].isInSideboard
+  // eslint-disable-next-line security/detect-object-injection
+  const alloc = deckAllocations.value[deckId]
+  if (alloc) {
+    alloc.isInSideboard = !alloc.isInSideboard
   }
 }
 
@@ -413,6 +427,7 @@ const processStatusEntries = async (
 ): Promise<string[]> => {
   const updatedCardIds: string[] = []
   for (const status of statuses) {
+    // eslint-disable-next-line security/detect-object-injection
     const targetQty = savedDistribution[status]
     const existingCard = savedRelatedCards.find(c => c.status === status)
     const cardId = await upsertStatusCard(status, targetQty, existingCard, cardData)
@@ -451,17 +466,17 @@ const syncOneDeckAllocation = async (
   const hasNew = !!newAlloc && newAlloc.quantity > 0
   if (!hasNew && !origAlloc) return
 
-  if (!hasNew) {
-    await deallocateFromAll(deckId, nonWishlistCards, origAlloc!.isInSideboard)
+  if (!hasNew && origAlloc) {
+    await deallocateFromAll(deckId, nonWishlistCards, origAlloc.isInSideboard)
     return
   }
 
-  if (!origAlloc) {
+  if (!origAlloc && newAlloc) {
     await decksStore.allocateCardToDeck(deckId, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
     return
   }
 
-  if (origAlloc.quantity !== newAlloc.quantity || origAlloc.isInSideboard !== newAlloc.isInSideboard) {
+  if (newAlloc && origAlloc && (origAlloc.quantity !== newAlloc.quantity || origAlloc.isInSideboard !== newAlloc.isInSideboard)) {
     await deallocateFromAll(deckId, nonWishlistCards, origAlloc.isInSideboard)
     await decksStore.allocateCardToDeck(deckId, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
   }
@@ -499,9 +514,9 @@ const handleSave = async () => {
 
     const cardData = {
       name: savedCard.name,
-      scryfallId: selectedPrint.value?.id || savedCard.scryfallId,
-      edition: selectedPrint.value?.set_name || savedCard.edition,
-      setCode: selectedPrint.value?.set?.toUpperCase() || savedCard.setCode,
+      scryfallId: selectedPrint.value?.id ?? savedCard.scryfallId,
+      edition: selectedPrint.value?.set_name ?? savedCard.edition,
+      setCode: selectedPrint.value?.set?.toUpperCase() ?? savedCard.setCode ?? '',
       image: currentImage.value,
       price: currentPrice.value,
       condition: condition.value,
@@ -552,14 +567,14 @@ const handleClose = () => {
 
 watch(() => props.show, (show) => {
   if (show && props.card) {
-    initializeForm()
+    void initializeForm()
   }
 }, { immediate: true })
 
 // Fetch CK prices when print changes
-watch(selectedPrint, (print) => {
+watch(selectedPrint, (print: ScryfallCard | null) => {
   if (print?.id && print?.set) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 })
 </script>
@@ -697,7 +712,6 @@ watch(selectedPrint, (print) => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -715,7 +729,7 @@ watch(selectedPrint, (print) => {
               :key="print.id"
               :value="print.id"
           >
-            {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+            {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
           </option>
         </select>
         <p class="text-tiny text-silver-50 mt-1">{{ t('cards.detailModal.printsAvailable', { count: availablePrints.length }) }}</p>
@@ -836,7 +850,6 @@ watch(selectedPrint, (print) => {
         <p v-if="allocationWarning && !validationError" class="text-tiny text-yellow-400 mt-3">
           ⚠️ {{ allocationWarning }}
         </p>
-
       </div>
 
       <!-- Publish to Profile -->

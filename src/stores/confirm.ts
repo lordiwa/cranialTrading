@@ -25,11 +25,11 @@ export const useConfirmStore = defineStore('confirm', () => {
 
   const show = (opts: ConfirmOptions): Promise<boolean> => {
     options.value = {
-      title: opts.title || '',
+      title: opts.title ?? '',
       message: opts.message,
-      confirmText: opts.confirmText || 'ACEPTAR',
-      cancelText: opts.cancelText || 'CANCELAR',
-      confirmVariant: opts.confirmVariant || 'primary',
+      confirmText: opts.confirmText ?? 'ACEPTAR',
+      cancelText: opts.cancelText ?? 'CANCELAR',
+      confirmVariant: opts.confirmVariant ?? 'primary',
       showCancel: opts.showCancel !== false
     }
     isOpen.value = true

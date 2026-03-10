@@ -37,21 +37,22 @@ const filters = reactive<FilterOptions>({
 
 // Bridge: FilterOptions reactive <-> AdvancedFilters for the modal
 const advancedFiltersForModal = computed<AdvancedFilters>(() => ({
-  colors: filters.colors || [],
-  types: filters.types || [],
-  manaValue: filters.manaValue || { min: undefined, max: undefined, values: undefined },
-  rarity: filters.rarity || [],
-  sets: filters.sets || [],
-  power: filters.power || { min: undefined, max: undefined },
-  toughness: filters.toughness || { min: undefined, max: undefined },
-  formatLegal: filters.formatLegal || [],
-  priceUSD: filters.priceUSD || { min: undefined, max: undefined },
-  keywords: filters.keywords || [],
-  creatureTypes: filters.creatureTypes || [],
-  isFoil: filters.isFoil || false,
-  isFullArt: filters.isFullArt || false,
+  colors: filters.colors ?? [],
+  types: filters.types ?? [],
+  manaValue: filters.manaValue ?? { min: undefined, max: undefined, values: undefined },
+  rarity: filters.rarity ?? [],
+  sets: filters.sets ?? [],
+  power: filters.power ?? { min: undefined, max: undefined },
+  toughness: filters.toughness ?? { min: undefined, max: undefined },
+  formatLegal: filters.formatLegal ?? [],
+  priceUSD: filters.priceUSD ?? { min: undefined, max: undefined },
+  keywords: filters.keywords ?? [],
+  creatureTypes: filters.creatureTypes ?? [],
+  isFoil: filters.isFoil ?? false,
+  isFullArt: filters.isFullArt ?? false,
 }))
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 const handleAdvancedFiltersUpdate = (updated: AdvancedFilters) => {
   filters.colors = updated.colors
   filters.types = updated.types
@@ -67,6 +68,7 @@ const handleAdvancedFiltersUpdate = (updated: AdvancedFilters) => {
   filters.isFoil = updated.isFoil
   filters.isFullArt = updated.isFullArt
 }
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
 const handleAdvancedReset = () => {
   filters.colors = []
@@ -108,14 +110,14 @@ watch(
     if (activeFilterCount() > 0 || filters.name?.trim()) {
       clearTimeout(filterDebounceTimeout)
       filterDebounceTimeout = setTimeout(() => {
-        handleSearch()
+        void handleSearch()
       }, 500)
     }
   },
   { deep: true }
 )
 
-const handleNameInput = async (value: string) => {
+const handleNameInput = (value: string) => {
   filters.name = value
   suppressSuggestions.value = false
   clearTimeout(suggestionTimeout)
@@ -143,7 +145,7 @@ const selectSuggestion = (suggestion: string) => {
   suppressSuggestions.value = true
   showSuggestions.value = false
   suggestions.value = []
-  handleSearch()
+  void handleSearch()
 }
 
 const handleClickOutside = (e: MouseEvent) => {
@@ -158,7 +160,7 @@ onMounted(() => {
   const q = route.query.q
   if (q && typeof q === 'string' && q.trim()) {
     filters.name = q.trim()
-    handleSearch()
+    void handleSearch()
   }
 })
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
@@ -193,21 +195,24 @@ const rarityOptions = [
 const selectedManaValues = ref<number[]>([])
 
 const toggleColor = (color: string) => {
-  const index = filters.colors!.indexOf(color)
-  if (index > -1) filters.colors!.splice(index, 1)
-  else filters.colors!.push(color)
+  filters.colors ??= []
+  const index = filters.colors.indexOf(color)
+  if (index > -1) filters.colors.splice(index, 1)
+  else filters.colors.push(color)
 }
 
 const toggleType = (type: string) => {
-  const index = filters.types!.indexOf(type)
-  if (index > -1) filters.types!.splice(index, 1)
-  else filters.types!.push(type)
+  filters.types ??= []
+  const index = filters.types.indexOf(type)
+  if (index > -1) filters.types.splice(index, 1)
+  else filters.types.push(type)
 }
 
 const toggleRarity = (rarity: string) => {
-  const index = filters.rarity!.indexOf(rarity)
-  if (index > -1) filters.rarity!.splice(index, 1)
-  else filters.rarity!.push(rarity)
+  filters.rarity ??= []
+  const index = filters.rarity.indexOf(rarity)
+  if (index > -1) filters.rarity.splice(index, 1)
+  else filters.rarity.push(rarity)
 }
 
 const handleSearch = async () => {
@@ -243,10 +248,10 @@ const activeFilterCount = () => {
 }
 
 // Label helpers for pills
-const getColorLabel = (value: string): string => colorOptions.find(c => c.value === value)?.label || value
-const getTypeLabel = (value: string): string => typeOptions.find(t => t.value === value)?.label || value
-const getRarityLabel = (value: string): string => rarityOptions.find(r => r.value === value)?.label || value
-const getFormatLabel = (value: string): string => formatOptions.find(f => f.value === value)?.label || value
+const getColorLabel = (value: string): string => colorOptions.find(c => c.value === value)?.label ?? value
+const getTypeLabel = (value: string): string => typeOptions.find(t => t.value === value)?.label ?? value
+const getRarityLabel = (value: string): string => rarityOptions.find(r => r.value === value)?.label ?? value
+const getFormatLabel = (value: string): string => formatOptions.find(f => f.value === value)?.label ?? value
 
 const removeFilter = (type: string, value?: string) => {
   switch (type) {

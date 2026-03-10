@@ -23,7 +23,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         if (!authStore.user) return null
         return {
             userId: authStore.user.id,
-            username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown',
+            username: authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback
             location: authStore.user.location,
             email: authStore.user.email,
             avatarUrl: authStore.user.avatarUrl,
@@ -50,7 +50,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
                 ...doc.data(),
             })) as Preference[]
 
-            console.log(`✅ Loaded ${_preferences.value.length} preferences for user ${authStore.user.id}`)
+            console.info(`Loaded ${_preferences.value.length} preferences for user ${authStore.user.id}`)
 
         } catch (error) {
             console.error('❌ Error loading preferences:', error)
@@ -94,7 +94,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
                     })
             }
 
-            console.log('✅ Preference added:', prefData.name)
+            console.info('Preference added:', prefData.name)
             return newPref
         } catch (error) {
             console.error('❌ Error adding preference:', error)
@@ -119,7 +119,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
                 userInfo.email,
                 userInfo.avatarUrl
             )
-            console.log('✅ Preferences synced to public')
+            console.info('Preferences synced to public')
         } catch (error) {
             console.error('[PublicSync] Error bulk syncing preferences:', error)
         }

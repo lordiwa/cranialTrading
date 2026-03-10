@@ -26,7 +26,7 @@ const handleStartTour = async () => {
     await router.push('/collection')
   }
   setTimeout(() => {
-    startTour()
+    void startTour()
   }, 500)
 }
 

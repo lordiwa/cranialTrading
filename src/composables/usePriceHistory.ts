@@ -115,8 +115,8 @@ export function usePriceHistory() {
 
       const tcg = card.price || 0
       const ckData = cardPricesMap.get(card.id)
-      const ck = ckData?.cardKingdom?.retail || 0
-      const bl = ckData?.cardKingdom?.buylist || 0
+      const ck = ckData?.cardKingdom?.retail ?? 0
+      const bl = ckData?.cardKingdom?.buylist ?? 0
 
       // Skip cards with no prices at all
       if (tcg === 0 && ck === 0 && bl === 0) continue

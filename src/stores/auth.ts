@@ -48,23 +48,30 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const userDoc = await getDoc(doc(db, 'users', userId));
             if (userDoc.exists()) {
-                const data = userDoc.data();
+                const data = userDoc.data() as {
+                    email: string;
+                    username: string;
+                    location: string;
+                    createdAt: { toDate: () => Date };
+                    lastUsernameChange?: { toDate: () => Date } | null;
+                    avatarUrl?: string | null;
+                };
                 user.value = {
                     id: userId,
                     email: data.email,
                     username: data.username,
                     location: data.location,
                     createdAt: data.createdAt.toDate(),
-                    lastUsernameChange: data.lastUsernameChange?.toDate() || null,
-                    avatarUrl: data.avatarUrl || null,
+                    lastUsernameChange: data.lastUsernameChange?.toDate() ?? null,
+                    avatarUrl: data.avatarUrl ?? null,
                 };
             } else {
                 const firebaseUser = auth.currentUser;
                 if (firebaseUser) {
                     user.value = {
                         id: userId,
-                        email: firebaseUser.email || '',
-                        username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
+                        email: firebaseUser.email ?? '',
+                        username: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Usuario',
                         location: '',
                         createdAt: new Date(),
                     };
@@ -87,8 +94,8 @@ export const useAuthStore = defineStore('auth', () => {
             if (firebaseUser) {
                 user.value = {
                     id: userId,
-                    email: firebaseUser.email || '',
-                    username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
+                    email: firebaseUser.email ?? '',
+                    username: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Usuario',
                     location: '',
                     createdAt: new Date(),
                 };
@@ -120,8 +127,9 @@ export const useAuthStore = defineStore('auth', () => {
             await loadUserData(userId);
             toastStore.show(t('auth.messages.accountCreated'), 'success');
             return true;
-        } catch (error: any) {
-            toastStore.show(error.message || t('auth.messages.registerError'), 'error');
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : t('auth.messages.registerError');
+            toastStore.show(errMsg, 'error');
             return false;
         }
     };
@@ -155,16 +163,17 @@ export const useAuthStore = defineStore('auth', () => {
 
             if (!userDoc.exists()) {
                 // Create new user document for Google user
-                const username = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
-                    || firebaseUser.email?.split('@')[0]
-                    || 'user';
+                const displayNameClean = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '');
+                const emailPrefix = firebaseUser.email?.split('@')[0];
+                // Use displayName if non-empty, then email prefix, then fallback
+                const username = (displayNameClean && displayNameClean.length > 0) ? displayNameClean : (emailPrefix && emailPrefix.length > 0 ? emailPrefix : 'user');
 
                 await setDoc(doc(db, 'users', firebaseUser.uid), {
                     email: firebaseUser.email,
                     username,
                     location: '',
                     createdAt: new Date(),
-                    avatarUrl: firebaseUser.photoURL || null,
+                    avatarUrl: firebaseUser.photoURL ?? null,
                 });
             }
 
@@ -172,9 +181,10 @@ export const useAuthStore = defineStore('auth', () => {
             emailVerified.value = true; // Google accounts are always verified
             toastStore.show(t('auth.messages.loginSuccess'), 'success');
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Google login error:', error);
-            if (error.code === 'auth/popup-closed-by-user') {
+            const firebaseError = error as { code?: string };
+            if (firebaseError.code === 'auth/popup-closed-by-user') {
                 // User closed popup, no error message needed
                 return false;
             }
@@ -192,7 +202,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.logoutSuccess'), 'success');
             globalThis.location.reload();
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Logout error:', error);
             toastStore.show(t('auth.messages.logoutError'), 'error');
             isLoggingOut.value = false;
@@ -205,8 +215,9 @@ export const useAuthStore = defineStore('auth', () => {
             await sendPasswordResetEmail(auth, email);
             toastStore.show(t('auth.messages.recoveryEmailSent'), 'success');
             return true;
-        } catch (error: any) {
-            if (error.code === 'auth/user-not-found') {
+        } catch (error: unknown) {
+            const firebaseError = error as { code?: string };
+            if (firebaseError.code === 'auth/user-not-found') {
                 toastStore.show(t('auth.messages.emailNotRegistered'), 'error');
             } else {
                 toastStore.show(t('auth.messages.sendEmailError'), 'error');
@@ -220,10 +231,11 @@ export const useAuthStore = defineStore('auth', () => {
             await confirmPasswordReset(auth, code, newPassword);
             toastStore.show(t('auth.messages.passwordReset'), 'success');
             return true;
-        } catch (error: any) {
-            if (error.code === 'auth/invalid-action-code') {
+        } catch (error: unknown) {
+            const firebaseError = error as { code?: string };
+            if (firebaseError.code === 'auth/invalid-action-code') {
                 toastStore.show(t('auth.messages.linkExpired'), 'error');
-            } else if (error.code === 'auth/weak-password') {
+            } else if (firebaseError.code === 'auth/weak-password') {
                 toastStore.show(t('auth.messages.weakPassword'), 'error');
             } else {
                 toastStore.show(t('auth.messages.resetError'), 'error');
@@ -245,10 +257,11 @@ export const useAuthStore = defineStore('auth', () => {
             await updatePassword(firebaseUser, newPassword);
             toastStore.show(t('auth.messages.passwordUpdated'), 'success');
             return true;
-        } catch (error: any) {
-            if (error.code === 'auth/wrong-password') {
+        } catch (error: unknown) {
+            const firebaseError = error as { code?: string };
+            if (firebaseError.code === 'auth/wrong-password') {
                 toastStore.show(t('auth.messages.wrongCurrentPassword'), 'error');
-            } else if (error.code === 'auth/weak-password') {
+            } else if (firebaseError.code === 'auth/weak-password') {
                 toastStore.show(t('auth.messages.weakNewPassword'), 'error');
             } else {
                 toastStore.show(t('auth.messages.changePasswordError'), 'error');
@@ -452,14 +465,19 @@ export const useAuthStore = defineStore('auth', () => {
      * Used for automatic suggestions
      */
     const detectLocationSilent = async (): Promise<string | null> => {
+        interface GeoLocationResponse {
+            city?: string;
+            country?: string;
+        }
+
         const apis = [
             {
                 url: 'https://ipwho.is/',
-                parse: (data: any) => data.city && data.country ? `${data.city}, ${data.country}` : null
+                parse: (data: GeoLocationResponse) => data.city && data.country ? `${data.city}, ${data.country}` : null
             },
             {
                 url: 'https://get.geojs.io/v1/ip/geo.json',
-                parse: (data: any) => data.city && data.country ? `${data.city}, ${data.country}` : null
+                parse: (data: GeoLocationResponse) => data.city && data.country ? `${data.city}, ${data.country}` : null
             }
         ];
 
@@ -467,7 +485,7 @@ export const useAuthStore = defineStore('auth', () => {
             try {
                 const response = await fetch(api.url);
                 if (!response.ok) continue;
-                const data = await response.json();
+                const data = await response.json() as GeoLocationResponse;
                 const location = api.parse(data);
                 if (location) return location;
             } catch (error) {
@@ -504,11 +522,20 @@ export const useAuthStore = defineStore('auth', () => {
                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
                 { headers: { 'Accept-Language': 'es' } }
             );
-            const data = await response.json();
+            interface NominatimResponse {
+                address?: {
+                    city?: string;
+                    town?: string;
+                    village?: string;
+                    municipality?: string;
+                    country?: string;
+                };
+            }
+            const data = await response.json() as NominatimResponse;
 
             if (data.address) {
-                const city = data.address.city || data.address.town || data.address.village || data.address.municipality || '';
-                const country = data.address.country || '';
+                const city = data.address.city ?? data.address.town ?? data.address.village ?? data.address.municipality ?? '';
+                const country = data.address.country ?? '';
                 if (city && country) {
                     return `${city}, ${country}`;
                 }
@@ -530,7 +557,7 @@ export const useAuthStore = defineStore('auth', () => {
             return user.value.avatarUrl;
         }
         // Generate avatar using DiceBear (identicon style)
-        const username = user.value?.username || 'user';
+        const username = user.value?.username ?? 'user';
         return `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(username)}&size=${size}`;
     };
 

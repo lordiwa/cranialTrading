@@ -70,10 +70,10 @@ const STATUS_VISUALS: Record<string, Visual> = {
   'collection': { badge: 'solo', border: 'border-silver-20', label: 'COLECCIÓN' },
 };
 
-const getVisualFor = (obj: any): Visual => {
+const getVisualFor = (obj: { type?: string; status?: string } | null | undefined): Visual => {
   if (!obj) return DEFAULT_VISUAL;
-  if (obj.type) return TYPE_VISUALS[String(obj.type).toUpperCase()] || DEFAULT_VISUAL;
-  if (obj.status) return STATUS_VISUALS[String(obj.status).toLowerCase()] || DEFAULT_VISUAL;
+  if (obj.type) return TYPE_VISUALS[obj.type.toUpperCase()] ?? DEFAULT_VISUAL;
+  if (obj.status) return STATUS_VISUALS[obj.status.toLowerCase()] ?? DEFAULT_VISUAL;
   return DEFAULT_VISUAL;
 };
 </script>

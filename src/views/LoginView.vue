@@ -190,8 +190,7 @@ const comparisonRows = computed(() => [
 
       <!-- Left Column: Content (scrollable) -->
       <div class="flex-1 px-6 py-12 lg:px-12 xl:px-16 overflow-y-auto">
-
-        <!-- Section 1: Hero -->
+<!-- Section 1: Hero -->
         <div class="mb-16 relative">
           <!-- Floating card images -->
           <div class="hidden xl:block absolute right-0 top-0 w-20 2xl:w-28 h-full pointer-events-none overflow-hidden" aria-hidden="true">

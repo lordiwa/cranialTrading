@@ -3,12 +3,13 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCollectionStore } from '../../stores/collection'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards } from '../../services/scryfall'
+import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toast'
 import { getAvatarUrlForUser } from '../../utils/avatar'
+import type { Card } from '../../types/card'
 import SvgIcon from './SvgIcon.vue'
 import ManaCost from './ManaCost.vue'
 
@@ -18,15 +19,34 @@ const authStore = useAuthStore()
 const toastStore = useToastStore()
 const { t } = useI18n()
 
+interface PublicCardResult {
+  id: string
+  cardId?: string
+  scryfallId?: string
+  cardName?: string
+  cardNameLower?: string
+  edition?: string
+  userId?: string
+  username?: string
+  location?: string
+  avatarUrl?: string
+  quantity?: number
+  condition?: string
+  foil?: boolean
+  price?: number
+  image?: string
+  status?: string
+}
+
 const searchQuery = ref('')
 const isOpen = ref(false)
 const loading = ref(false)
 const activeTab = ref<'collection' | 'users' | 'scryfall'>('collection')
 
 // Results
-const collectionResults = ref<any[]>([])
-const usersResults = ref<any[]>([])
-const scryfallResults = ref<any[]>([])
+const collectionResults = ref<Card[]>([])
+const usersResults = ref<PublicCardResult[]>([])
+const scryfallResults = ref<ScryfallCard[]>([])
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
@@ -43,7 +63,7 @@ const handleInput = () => {
   }
 
   searchTimeout = setTimeout(() => {
-    performSearch()
+    void performSearch()
   }, 300)
 }
 
@@ -62,9 +82,9 @@ const performSearch = async () => {
   const query = searchQuery.value.toLowerCase()
 
   try {
-    // Search in parallel
+    // Search: collection is sync, others in parallel
+    searchCollection(query)
     await Promise.all([
-      searchCollection(query),
       searchUsers(query),
       searchScryfall(query)
     ])
@@ -82,10 +102,10 @@ const performSearch = async () => {
   }
 }
 
-const searchCollection = async (query: string) => {
+const searchCollection = (q: string) => {
   // Search in local collection
   collectionResults.value = collectionStore.cards
-    .filter(card => card.name.toLowerCase().includes(query))
+    .filter(card => card.name.toLowerCase().includes(q))
     .slice(0, 8)
 }
 
@@ -103,8 +123,8 @@ const searchUsers = async (searchQuery: string) => {
     const snapshot = await getDocs(q)
 
     usersResults.value = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((card: any) => card.userId !== authStore.user?.id)
+      .map(doc => ({ id: doc.id, ...doc.data() } as PublicCardResult))
+      .filter((card: PublicCardResult) => card.userId !== authStore.user?.id)
       .slice(0, 8)
   } catch {
     // Fallback: if Firestore index not ready, use client-side filter
@@ -112,8 +132,8 @@ const searchUsers = async (searchQuery: string) => {
       const publicCardsRef = collection(db, 'public_cards')
       const snapshot = await getDocs(publicCardsRef)
       usersResults.value = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((card: any) =>
+        .map(doc => ({ id: doc.id, ...doc.data() } as PublicCardResult))
+        .filter((card: PublicCardResult) =>
           card.cardName?.toLowerCase().includes(searchQuery) &&
           card.userId !== authStore.user?.id
         )
@@ -160,36 +180,36 @@ const clearSearch = () => {
 }
 
 // Navigation
-const goToCollection = (card: any) => {
+const goToCollection = (card: Card) => {
   isOpen.value = false
   searchQuery.value = ''
-  router.push({ path: '/collection', query: { search: card.name } })
+  void router.push({ path: '/collection', query: { search: card.name } })
 }
 
-const goToUserCard = (card: any) => {
+const goToUserCard = (card: PublicCardResult) => {
   isOpen.value = false
   searchQuery.value = ''
-  router.push(`/@${card.username}`)
+  void router.push(`/@${card.username}`)
 }
 
-const goToScryfall = (card: any) => {
+const goToScryfall = (card: ScryfallCard) => {
   isOpen.value = false
   searchQuery.value = ''
   // Navigate to collection with the card name to add it
-  router.push({ path: '/collection', query: { addCard: card.name } })
+  void router.push({ path: '/collection', query: { addCard: card.name } })
 }
 
 // ME INTERESA - send interest from search results
 const sentInterestIds = ref<Set<string>>(new Set())
 const sendingInterest = ref(false)
 
-const sendInterestFromSearch = async (card: any) => {
+const sendInterestFromSearch = async (card: PublicCardResult) => {
   if (!authStore.user || sentInterestIds.value.has(card.id) || sendingInterest.value) return
 
   sendingInterest.value = true
   try {
-    const scryfallId = card.scryfallId || ''
-    const edition = card.edition || ''
+    const scryfallId = card.scryfallId ?? ''
+    const edition = card.edition ?? ''
 
     // Check for existing duplicate match
     const sharedMatchesRef = collection(db, 'shared_matches')
@@ -202,13 +222,14 @@ const sendInterestFromSearch = async (card: any) => {
     const existingSnapshot = await getDocs(existingQuery)
 
     const hasDuplicate = existingSnapshot.docs.some(docSnap => {
-      const data = docSnap.data()
-      return data.card?.edition === edition
+      const data = docSnap.data() as Record<string, unknown>
+      const cardField = data.card as Record<string, unknown> | undefined
+      return cardField?.edition === edition
     })
 
     if (hasDuplicate) {
       sentInterestIds.value.add(card.id)
-      toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'info')
+      toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'info')
       return
     }
 
@@ -220,30 +241,30 @@ const sendInterestFromSearch = async (card: any) => {
     }
 
     const cardData = {
-      id: card.cardId || card.id,
+      id: card.cardId ?? card.id,
       scryfallId,
-      name: card.cardName || '',
+      name: card.cardName ?? '',
       edition,
-      quantity: card.quantity || 1,
-      condition: card.condition || 'NM',
-      foil: card.foil || false,
-      price: card.price || 0,
-      image: card.image || '',
-      status: card.status || 'sale',
+      quantity: card.quantity ?? 1,
+      condition: card.condition ?? 'NM',
+      foil: card.foil ?? false,
+      price: card.price ?? 0,
+      image: card.image ?? '',
+      status: card.status ?? 'sale',
     }
 
-    const totalValue = (card.price || 0) * (card.quantity || 1)
+    const totalValue = (card.price ?? 0) * (card.quantity ?? 1)
 
     const sharedMatchPayload = {
       senderId: authStore.user.id,
       senderUsername: authStore.user.username,
-      senderLocation: authStore.user.location || '',
-      senderEmail: authStore.user.email || '',
+      senderLocation: authStore.user.location ?? '',
+      senderEmail: authStore.user.email ?? '',
       receiverId: card.userId,
-      receiverUsername: card.username || '',
-      receiverLocation: card.location || '',
+      receiverUsername: card.username ?? '',
+      receiverLocation: card.location ?? '',
       card: cardData,
-      cardType: card.status || 'sale',
+      cardType: card.status ?? 'sale',
       totalValue,
       status: 'pending',
       senderStatus: 'interested',
@@ -255,7 +276,7 @@ const sendInterestFromSearch = async (card: any) => {
     await addDoc(sharedMatchesRef, sharedMatchPayload)
 
     sentInterestIds.value.add(card.id)
-    toastStore.show(t('dashboard.interest.sent', { username: card.username }), 'success')
+    toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'success')
   } catch (error) {
     console.error('Error sending interest:', error)
     toastStore.show(t('dashboard.interest.error'), 'error')
@@ -390,7 +411,7 @@ defineExpose({
               <p class="text-small font-bold text-silver truncate">{{ card.name }}</p>
               <p class="text-tiny text-silver-50">{{ card.edition }} · x{{ card.quantity }}</p>
             </div>
-            <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) || 'N/A' }}</span>
+            <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
           </button>
         </div>
 
@@ -416,7 +437,7 @@ defineExpose({
               <p class="text-small font-bold text-silver truncate">{{ card.cardName }}</p>
               <p class="text-tiny text-silver-50 flex items-center gap-1">
                 <img
-                  :src="getAvatarUrlForUser(card.username, 14, card.avatarUrl)"
+                  :src="getAvatarUrlForUser(card.username ?? '', 14, card.avatarUrl)"
                   :alt="`${card.username} avatar`"
                   class="w-3.5 h-3.5 rounded-full"
                 />
@@ -424,7 +445,7 @@ defineExpose({
               </p>
             </div>
             <div class="flex flex-col items-end gap-1 flex-shrink-0">
-              <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) || 'N/A' }}</span>
+              <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
               <button
                 v-if="!sentInterestIds.has(card.id)"
                 @click.stop="sendInterestFromSearch(card)"

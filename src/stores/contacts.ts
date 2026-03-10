@@ -64,7 +64,7 @@ export const useContactsStore = defineStore('contacts', () => {
         }
     }
 
-    const loadSavedContacts = async () => {
+    const loadSavedContacts = () => {
         if (!authStore.user?.id) return
 
         loading.value = true
@@ -75,11 +75,16 @@ export const useContactsStore = defineStore('contacts', () => {
             unsubscribe = onSnapshot(
                 contactsRef,
                 (snapshot) => {
-                    contacts.value = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data(),
-                        savedAt: doc.data().savedAt?.toDate() || new Date(),
-                    })) as Contact[]
+                    contacts.value = snapshot.docs.map(d => {
+                        const data = d.data() as Record<string, unknown> & {
+                            savedAt?: { toDate: () => Date };
+                        }
+                        return {
+                            id: d.id,
+                            ...data,
+                            savedAt: data.savedAt?.toDate() ?? new Date(),
+                        } as Contact
+                    })
                     loading.value = false
                 },
                 (error) => {
@@ -107,11 +112,12 @@ export const useContactsStore = defineStore('contacts', () => {
     const deleteAllContacts = async (): Promise<boolean> => {
         if (!authStore.user?.id) return false
 
+        const userId = authStore.user.id
         try {
-            const contactsRef = collection(db, 'users', authStore.user.id, 'contactos_guardados')
+            const contactsRef = collection(db, 'users', userId, 'contactos_guardados')
             const snapshot = await getDocs(contactsRef)
 
-            await Promise.all(snapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', authStore.user!.id, 'contactos_guardados', docSnap.id))))
+            await Promise.all(snapshot.docs.map(docSnap => deleteDoc(doc(db, 'users', userId, 'contactos_guardados', docSnap.id))))
 
             contacts.value = []
             return true

@@ -100,13 +100,17 @@ const removeItem = (scryfallId: string, cardId: string) => {
                     @click="updateQty(item.scryfallId, item.cardId, item.quantity - 1)"
                     :disabled="item.quantity <= 1"
                     class="w-6 h-6 border border-silver-30 text-silver text-tiny font-bold flex items-center justify-center rounded hover:border-neon disabled:opacity-30 disabled:cursor-not-allowed"
-                  >-</button>
+                  >
+                    -
+                  </button>
                   <span class="text-small font-bold text-neon w-6 text-center">{{ item.quantity }}</span>
                   <button
                     @click="updateQty(item.scryfallId, item.cardId, item.quantity + 1)"
                     :disabled="item.quantity >= item.maxQuantity"
                     class="w-6 h-6 border border-silver-30 text-silver text-tiny font-bold flex items-center justify-center rounded hover:border-neon disabled:opacity-30 disabled:cursor-not-allowed"
-                  >+</button>
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 

@@ -4,7 +4,7 @@ import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards } from '../../services/scryfall'
+import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -45,8 +45,8 @@ const form = ref({
 })
 
 // Prints disponibles
-const availablePrints = ref<any[]>([])
-const selectedPrint = ref<any>(null)
+const availablePrints = ref<ScryfallCard[]>([])
+const selectedPrint = ref<ScryfallCard | null>(null)
 const loadingPrints = ref(false)
 
 // Card Kingdom prices
@@ -63,9 +63,9 @@ const {
 )
 
 // Fetch CK prices when print changes
-watch(selectedPrint, (print) => {
+watch(selectedPrint, (print: ScryfallCard | null) => {
   if (print?.id && print?.set) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 })
 
@@ -118,7 +118,7 @@ watch(() => props.card, async (card) => {
 
       // Seleccionar el print actual si está en la lista
       const currentPrint = results.find(p => p.id === card.scryfallId)
-      selectedPrint.value = currentPrint || results[0] || null
+      selectedPrint.value = currentPrint ?? results[0] ?? null
     } catch (err) {
       console.error('Error loading prints:', err)
       availablePrints.value = []
@@ -153,8 +153,8 @@ watch(() => props.show, async (show) => {
       const cardName = cleanCardName(props.card.name)
       const results = await searchCards(`!"${cardName}"`)
       availablePrints.value = results
-      const currentPrint = results.find(p => p.id === props.card!.scryfallId)
-      selectedPrint.value = currentPrint || results[0] || null
+      const currentPrint = results.find(p => p.id === props.card?.scryfallId)
+      selectedPrint.value = currentPrint ?? results[0] ?? null
     } catch {
       availablePrints.value = []
     } finally {
@@ -173,14 +173,14 @@ const handlePrintChange = (scryfallId: string) => {
 
 // Obtener imagen actual
 const currentImage = computed(() => {
-  if (!selectedPrint.value) return props.card?.image || ''
-  return selectedPrint.value.image_uris?.normal ||
-      selectedPrint.value.card_faces?.[0]?.image_uris?.normal || ''
+  if (!selectedPrint.value) return props.card?.image ?? ''
+  return selectedPrint.value.image_uris?.normal
+      ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
 })
 
 // Obtener precio actual
 const currentPrice = computed(() => {
-  if (!selectedPrint.value) return props.card?.price || 0
+  if (!selectedPrint.value) return props.card?.price ?? 0
   return selectedPrint.value.prices?.usd ? Number.parseFloat(selectedPrint.value.prices.usd) : 0
 })
 
@@ -199,8 +199,8 @@ const handleSave = () => {
   }
 
   const updatedData = {
-    scryfallId: selectedPrint.value?.id || props.card.scryfallId,
-    edition: selectedPrint.value?.set?.toUpperCase() || props.card.edition,
+    scryfallId: selectedPrint.value?.id ?? props.card.scryfallId,
+    edition: selectedPrint.value?.set?.toUpperCase() ?? props.card.edition,
     quantity: form.value.quantity,
     condition: form.value.condition,
     foil: form.value.foil,
@@ -316,7 +316,7 @@ const handleClose = () => {
                     :key="print.id"
                     :value="print.id"
                 >
-                  {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+                  {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
                 </option>
               </select>
               <p class="text-tiny text-silver-50 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>

@@ -19,7 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  add: [prefData: any];
+  add: [prefData: { scryfallId: string; name: string; type: string; quantity: number; condition: string; edition: string; image: string }];
 }>();
 
 const { t } = useI18n();
@@ -118,7 +118,7 @@ const handleAdd = () => {
     quantity: quantity.value,
     condition: condition.value,
     edition: selectedCard.value.set_name,
-    image: selectedCard.value.image_uris?.normal || '',
+    image: selectedCard.value.image_uris?.normal ?? '',
   });
 
   handleClose();
@@ -128,7 +128,7 @@ const handleClose = () => {
   searchQuery.value = '';
   searchResults.value = [];
   selectedCard.value = null;
-  type.value = props.defaultType || 'BUSCO';
+  type.value = props.defaultType ?? 'BUSCO';
   quantity.value = 1;
   condition.value = 'NM';
   emit('close');

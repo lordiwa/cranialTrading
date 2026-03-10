@@ -187,30 +187,31 @@ function formatDollarChange(val: number): string {
   return `${sign}$${val.toFixed(2)}`
 }
 
-function formatUpdatedAt(timestamp: any): string {
+function formatUpdatedAt(timestamp: unknown): string {
   if (!timestamp) return ''
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+  const ts = timestamp as { toDate?: () => Date }
+  const date: Date = typeof ts.toDate === 'function' ? ts.toDate() : new Date(timestamp as string | number)
   return date.toLocaleString()
 }
 
 function handleMoverTypeChange(val: string) {
-  marketStore.loadMovers(val as MoverType)
+  void marketStore.loadMovers(val as MoverType)
 }
 
 function handleFormatChange(val: string) {
-  marketStore.loadStaples(val as FormatKey)
+  void marketStore.loadStaples(val as FormatKey)
 }
 
 // Load initial data based on active tab
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   if (marketStore.activeTab === 'movers') {
-    marketStore.loadMovers()
+    void marketStore.loadMovers()
   } else if (marketStore.activeTab === 'staples') {
-    marketStore.loadStaples()
+    void marketStore.loadStaples()
   } else if (marketStore.activeTab === 'portfolio') {
-    if (!marketStore.movers) marketStore.loadMovers()
-    if (authStore.user && !collectionStore.cards.length) collectionStore.loadCollection()
+    if (!marketStore.movers) void marketStore.loadMovers()
+    if (authStore.user && !collectionStore.cards.length) void collectionStore.loadCollection()
   }
 })
 
@@ -221,12 +222,12 @@ onUnmounted(() => {
 // Load data when tab changes
 watch(() => marketStore.activeTab, (tab) => {
   if (tab === 'movers' && !marketStore.movers) {
-    marketStore.loadMovers()
+    void marketStore.loadMovers()
   } else if (tab === 'staples' && !marketStore.staples) {
-    marketStore.loadStaples()
+    void marketStore.loadStaples()
   } else if (tab === 'portfolio') {
-    if (!marketStore.movers) marketStore.loadMovers()
-    if (authStore.user && !collectionStore.cards.length) collectionStore.loadCollection()
+    if (!marketStore.movers) void marketStore.loadMovers()
+    if (authStore.user && !collectionStore.cards.length) void collectionStore.loadCollection()
   }
 })
 </script>
@@ -283,17 +284,17 @@ watch(() => marketStore.activeTab, (tab) => {
           <label for="movers-type-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.movers.typeLabel') }}</label>
           <BaseSelect
               id="movers-type-select"
-              :modelValue="marketStore.selectedMoverType"
+              :model-value="marketStore.selectedMoverType"
               :options="moverTypeOptions"
-              @update:modelValue="handleMoverTypeChange"
+              @update:model-value="handleMoverTypeChange"
           />
         </div>
         <div ref="setFilterRef" class="w-48 relative" @focusin="showSetDropdown = true">
           <label for="movers-set-filter" class="text-tiny text-silver-50 mb-1 block">{{ t('market.setFilter.label') }}</label>
           <BaseInput
               id="movers-set-filter"
-              :modelValue="setFilterQuery"
-              @update:modelValue="(val: string | number) => { setFilterQuery = String(val); showSetDropdown = true; if (!String(val)) { marketStore.moversSetFilter = '' } }"
+              :model-value="setFilterQuery"
+              @update:model-value="(val: string | number) => { setFilterQuery = String(val); showSetDropdown = true; if (!String(val)) { marketStore.moversSetFilter = '' } }"
               placeholder="All sets"
               :clearable="true"
           />
@@ -375,8 +376,8 @@ watch(() => marketStore.activeTab, (tab) => {
       <!-- Controls Row 2: Search -->
       <div ref="moversSearchRef" class="mb-4 relative" @focusin="showMoversSuggestions = true">
         <BaseInput
-            :modelValue="marketStore.moversSearch"
-            @update:modelValue="(val: string | number) => { marketStore.moversSearch = String(val); showMoversSuggestions = true }"
+            :model-value="marketStore.moversSearch"
+            @update:model-value="(val: string | number) => { marketStore.moversSearch = String(val); showMoversSuggestions = true }"
             :placeholder="t('market.search')"
             :clearable="true"
         />
@@ -486,18 +487,18 @@ watch(() => marketStore.activeTab, (tab) => {
           <label for="staples-format-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.staples.formatLabel') }}</label>
           <BaseSelect
               id="staples-format-select"
-              :modelValue="marketStore.selectedFormat"
+              :model-value="marketStore.selectedFormat"
               :options="formatOptions"
-              @update:modelValue="handleFormatChange"
+              @update:model-value="handleFormatChange"
           />
         </div>
         <div class="w-40">
           <label for="staples-category-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.staples.categoryLabel') }}</label>
           <BaseSelect
               id="staples-category-select"
-              :modelValue="marketStore.currentStapleCategory"
+              :model-value="marketStore.currentStapleCategory"
               :options="categoryOptions"
-              @update:modelValue="(val: string) => marketStore.currentStapleCategory = val as any"
+              @update:model-value="(val: string) => marketStore.currentStapleCategory = val as any"
           />
         </div>
       </div>
@@ -505,8 +506,8 @@ watch(() => marketStore.activeTab, (tab) => {
       <!-- Controls Row 2: Search -->
       <div ref="staplesSearchRef" class="mb-4 relative" @focusin="showStaplesSuggestions = true">
         <BaseInput
-            :modelValue="marketStore.staplesSearch"
-            @update:modelValue="(val: string | number) => { marketStore.staplesSearch = String(val); showStaplesSuggestions = true }"
+            :model-value="marketStore.staplesSearch"
+            @update:model-value="(val: string | number) => { marketStore.staplesSearch = String(val); showStaplesSuggestions = true }"
             :placeholder="t('market.search')"
             :clearable="true"
         />
@@ -611,9 +612,9 @@ watch(() => marketStore.activeTab, (tab) => {
             <label for="portfolio-type-select" class="text-tiny text-silver-50 mb-1 block">{{ t('market.movers.typeLabel') }}</label>
             <BaseSelect
                 id="portfolio-type-select"
-                :modelValue="marketStore.selectedMoverType"
+                :model-value="marketStore.selectedMoverType"
                 :options="moverTypeOptions"
-                @update:modelValue="handleMoverTypeChange"
+                @update:model-value="handleMoverTypeChange"
             />
           </div>
           <div>
@@ -648,8 +649,8 @@ watch(() => marketStore.activeTab, (tab) => {
         <!-- Controls Row 2: Search -->
         <div ref="portfolioSearchRef" class="mb-4 relative" @focusin="showPortfolioSuggestions = true">
           <BaseInput
-              :modelValue="marketStore.portfolioSearch"
-              @update:modelValue="(val: string | number) => { marketStore.portfolioSearch = String(val); showPortfolioSuggestions = true }"
+              :model-value="marketStore.portfolioSearch"
+              @update:model-value="(val: string | number) => { marketStore.portfolioSearch = String(val); showPortfolioSuggestions = true }"
               :placeholder="t('market.search')"
               :clearable="true"
           />

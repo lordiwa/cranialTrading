@@ -55,17 +55,17 @@ export const useMessagesStore = defineStore('messages', () => {
                         [otherUserId]: otherUsername,
                     },
                     participantAvatars: {
-                        [authStore.user.id]: authStore.user.avatarUrl || null,
-                        [otherUserId]: otherAvatarUrl || null,
+                        [authStore.user.id]: authStore.user.avatarUrl ?? null,
+                        [otherUserId]: otherAvatarUrl ?? null,
                     },
                     createdAt: Timestamp.now(),
                     lastMessage: '',
                     lastMessageTime: Timestamp.now(),
                 });
 
-                console.log(`✅ Conversación creada: ${conversationId}`);
+                console.info(`Conversación creada: ${conversationId}`);
             } else {
-                console.log(`✅ Conversación existe: ${conversationId}`);
+                console.info(`Conversación existe: ${conversationId}`);
             }
 
             return conversationId;
@@ -112,7 +112,7 @@ export const useMessagesStore = defineStore('messages', () => {
                 lastMessageTime: Timestamp.now(),
             }, { merge: true });
 
-            console.log(`✅ Mensaje enviado`);
+            console.info(`Mensaje enviado`);
             return true;
         } catch (error) {
             console.error('❌ Error enviando mensaje:', error);
@@ -136,22 +136,30 @@ export const useMessagesStore = defineStore('messages', () => {
             const q = query(conversationsRef, where('participantIds', 'array-contains', authStore.user.id));
             const snapshot = await getDocs(q);
 
+            interface FirestoreConversationData {
+                id: string;
+                participantIds?: string[];
+                participantNames?: Record<string, string>;
+                participantAvatars?: Record<string, string | null>;
+                lastMessage?: string;
+                lastMessageTime?: { toDate: () => Date };
+            }
             conversations.value = snapshot.docs
-                .map(doc => {
-                    const data = doc.data();
+                .map(d => {
+                    const data = d.data() as FirestoreConversationData;
                     return {
                         id: data.id,
-                        participantIds: data.participantIds || [],
-                        participantNames: data.participantNames || {},
-                        participantAvatars: data.participantAvatars || {},
-                        lastMessage: data.lastMessage || '',
-                        lastMessageTime: data.lastMessageTime?.toDate() || new Date(),
+                        participantIds: data.participantIds ?? [],
+                        participantNames: data.participantNames ?? {},
+                        participantAvatars: data.participantAvatars ?? {},
+                        lastMessage: data.lastMessage ?? '',
+                        lastMessageTime: data.lastMessageTime?.toDate() ?? new Date(),
                         unreadCount: 0, // TODO: implementar contador de no leídos
-                    } as Conversation;
+                    } as unknown as Conversation;
                 })
                 .sort((a, b) => (b.lastMessageTime?.getTime() ?? 0) - (a.lastMessageTime?.getTime() ?? 0));
 
-            console.log(`✅ ${conversations.value.length} conversaciones cargadas`);
+            console.info(`${conversations.value.length} conversaciones cargadas`);
         } catch (error) {
             console.error('❌ Error cargando conversaciones:', error);
             toastStore.show(t('messages.errors.loadError'), 'error');
@@ -172,7 +180,7 @@ export const useMessagesStore = defineStore('messages', () => {
 
         // Desuscribirse del listener anterior si existe
         if (unsubscribe) {
-            console.log('🔴 Deteniendo listener anterior');
+            console.info('Deteniendo listener anterior');
             unsubscribe();
             unsubscribe = null;
         }
@@ -183,22 +191,30 @@ export const useMessagesStore = defineStore('messages', () => {
         unsubscribe = onSnapshot(
             messagesRef,
             (snapshot) => {
+                interface FirestoreMessageData {
+                    senderId: string;
+                    senderUsername: string;
+                    recipientId: string;
+                    content: string;
+                    createdAt?: { toDate: () => Date };
+                    read?: boolean;
+                }
                 currentMessages.value = snapshot.docs
-                    .map(doc => {
-                        const data = doc.data();
+                    .map(d => {
+                        const data = d.data() as FirestoreMessageData;
                         return {
-                            id: doc.id,
+                            id: d.id,
                             senderId: data.senderId,
                             senderUsername: data.senderUsername,
                             recipientId: data.recipientId,
                             content: data.content,
-                            createdAt: data.createdAt?.toDate() || new Date(),
-                            read: data.read || false,
+                            createdAt: data.createdAt?.toDate() ?? new Date(),
+                            read: data.read ?? false,
                         } as Message;
                     })
                     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-                console.log(`✅ ${currentMessages.value.length} mensajes cargados`);
+                console.info(`${currentMessages.value.length} mensajes cargados`);
                 loading.value = false;
             },
             (error) => {
@@ -215,7 +231,7 @@ export const useMessagesStore = defineStore('messages', () => {
      */
     const stopListeningMessages = () => {
         if (unsubscribe) {
-            console.log('🔴 Deteniendo listener de mensajes');
+            console.info('Deteniendo listener de mensajes');
             unsubscribe();
             unsubscribe = null;
         }

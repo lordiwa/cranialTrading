@@ -14,10 +14,34 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
-import { type CardCondition, type CardStatus } from '../types/card'
-import { getCardById, getCardsByIds, searchCards } from '../services/scryfall'
-import type { DeckFormat } from '../types/deck'
+import { type Card, type CardCondition, type CardStatus } from '../types/card'
+import { getCardById, getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfall'
+import type { CreateDeckInput, DeckFormat } from '../types/deck'
 import { type ParsedCsvCard, parseDeckLine } from '../utils/cardHelpers'
+
+interface ImportedCardData {
+  scryfallId: string;
+  name: string;
+  edition: string;
+  quantity: number;
+  condition: CardCondition;
+  foil: boolean;
+  price: number;
+  image: string;
+  status: string;
+  public: boolean;
+  isInSideboard: boolean;
+  setCode?: string;
+  deckName?: string;
+  language?: string;
+}
+
+interface MoxfieldCard {
+  scryfallId: string;
+  name: string;
+  quantity: number;
+  setCode?: string;
+}
 
 const router = useRouter()
 const decksStore = useDecksStore()
@@ -61,12 +85,12 @@ const formats = computed(() => {
 // --- Shared helpers to reduce cognitive complexity ---
 
 // Extract image from a Scryfall card, handling split/dual-faced cards
-const extractScryfallImage = (card: any): string => {
-  return card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ''
+const extractScryfallImage = (card: ScryfallCard | undefined): string => {
+  return card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal ?? ''
 }
 
 // Extract standardized card data from a Scryfall card object
-const extractCardData = (card: any) => {
+const extractCardData = (card: ScryfallCard) => {
   return {
     scryfallId: card.id,
     image: extractScryfallImage(card),
@@ -77,11 +101,11 @@ const extractCardData = (card: any) => {
 }
 
 // Find a print with price from a list of Scryfall results, preferring one with both price and image
-const findPrintWithPrice = (results: any[]) => {
+const findPrintWithPrice = (results: ScryfallCard[]): ScryfallCard | undefined => {
   return results.find(r =>
     r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
-    (r.image_uris?.normal || r.card_faces?.[0]?.image_uris?.normal)
-  ) || results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
+    (r.image_uris?.normal ?? r.card_faces?.[0]?.image_uris?.normal)
+  ) ?? results.find(r => r.prices?.usd && Number.parseFloat(r.prices.usd) > 0)
 }
 
 // Helper: Buscar carta en Scryfall y obtener datos completos
@@ -130,8 +154,8 @@ const parseLinesIntoCards = async (
   condition: CardCondition,
   makePublic: boolean,
   includeSideboard: boolean
-) => {
-  const collectionCards: any[] = []
+): Promise<ImportedCardData[]> => {
+  const collectionCards: ImportedCardData[] = []
   let inSideboard = false
 
   for (const line of lines) {
@@ -151,23 +175,23 @@ const parseLinesIntoCards = async (
     // Skip sideboard if not included
     if (inSideboard && !includeSideboard) continue
 
-    const scryfallData = await fetchCardFromScryfall(cardName, setCode || undefined)
+    const scryfallData = await fetchCardFromScryfall(cardName, setCode ?? undefined)
 
-    const cardData: any = {
-      scryfallId: scryfallData?.scryfallId || '',
+    const cardData: ImportedCardData = {
+      scryfallId: scryfallData?.scryfallId ?? '',
       name: cardName,
-      edition: scryfallData?.edition || setCode || 'Unknown',
+      edition: scryfallData?.edition ?? setCode ?? 'Unknown',
       quantity,
       condition,
       foil: isFoil,
-      price: scryfallData?.price || 0,
-      image: scryfallData?.image || '',
+      price: scryfallData?.price ?? 0,
+      image: scryfallData?.image ?? '',
       status: 'collection',
       public: makePublic,
       isInSideboard: inSideboard,
     }
 
-    const finalSetCode = scryfallData?.setCode || setCode
+    const finalSetCode = scryfallData?.setCode ?? setCode
     if (finalSetCode) {
       cardData.setCode = finalSetCode
     }
@@ -179,7 +203,7 @@ const parseLinesIntoCards = async (
 }
 
 // Allocate parsed collection cards to a deck by matching scryfallId+edition
-const allocateCollectionCardsToDeck = async (deckId: string, collectionCards: any[]) => {
+const allocateCollectionCardsToDeck = async (deckId: string, collectionCards: ImportedCardData[]) => {
   await collectionStore.loadCollection()
   for (const cardData of collectionCards) {
     const collectionCard = collectionStore.cards.find(
@@ -197,11 +221,11 @@ const allocateCollectionCardsToDeck = async (deckId: string, collectionCards: an
 }
 
 // Enrich a single card with Scryfall data (used in handleImportDirect)
-const enrichCardFromScryfall = async (card: any) => {
+const enrichCardFromScryfall = async (card: MoxfieldCard) => {
   let image = ''
   let price = 0
-  const finalScryfallId = card.scryfallId || ''
-  const finalEdition = card.setCode || 'Unknown'
+  const finalScryfallId = card.scryfallId ?? ''
+  const finalEdition = card.setCode ?? 'Unknown'
   let cmc: number | undefined = undefined
   let type_line: string | undefined = undefined
   let colors: string[] = []
@@ -213,7 +237,7 @@ const enrichCardFromScryfall = async (card: any) => {
       price = scryfallCard.prices?.usd ? Number.parseFloat(scryfallCard.prices.usd) : 0
       cmc = scryfallCard.cmc
       type_line = scryfallCard.type_line
-      colors = scryfallCard.colors || []
+      colors = scryfallCard.colors ?? []
     }
   }
 
@@ -237,7 +261,7 @@ const findBestPrintFallback = async (
       result.image = extractScryfallImage(printWithPrice)
       result.cmc = printWithPrice.cmc
       result.type_line = printWithPrice.type_line
-      result.colors = printWithPrice.colors || []
+      result.colors = printWithPrice.colors ?? []
     } else if (!result.image && results[0]) {
       const anyPrint = results[0]
       result.image = extractScryfallImage(anyPrint)
@@ -245,7 +269,7 @@ const findBestPrintFallback = async (
       if (result.finalEdition === 'Unknown') result.finalEdition = anyPrint.set.toUpperCase()
       result.cmc = anyPrint.cmc
       result.type_line = anyPrint.type_line
-      result.colors = anyPrint.colors || []
+      result.colors = anyPrint.colors ?? []
     }
   } catch {
     console.warn(`Could not find alternate print for: ${cardName}`)
@@ -254,15 +278,15 @@ const findBestPrintFallback = async (
 }
 
 // Build a single collection card data object from CSV card + Scryfall data map
-const buildCsvCardData = (card: ParsedCsvCard, scryfallDataMap: Map<string, any>, makePublic: boolean) => {
+const buildCsvCardData = (card: ParsedCsvCard, scryfallDataMap: Map<string, ScryfallCard>, makePublic: boolean): ImportedCardData => {
   const sc = scryfallDataMap.get(card.scryfallId)
   const image = extractScryfallImage(sc)
   const price = sc?.prices?.usd ? Number.parseFloat(sc.prices.usd) : card.price
 
-  const cardData: any = {
-    scryfallId: card.scryfallId || '',
+  const cardData: ImportedCardData = {
+    scryfallId: card.scryfallId ?? '',
     name: card.name,
-    edition: sc?.set_name || card.setCode || 'Unknown',
+    edition: sc?.set_name ?? card.setCode ?? 'Unknown',
     quantity: card.quantity,
     condition: card.condition,
     foil: card.foil,
@@ -270,6 +294,7 @@ const buildCsvCardData = (card: ParsedCsvCard, scryfallDataMap: Map<string, any>
     image,
     status: 'collection',
     public: makePublic,
+    isInSideboard: false,
   }
   if (card.setCode) {
     cardData.setCode = card.setCode.toUpperCase()
@@ -282,7 +307,7 @@ const buildCsvCardData = (card: ParsedCsvCard, scryfallDataMap: Map<string, any>
 
 // --- End shared helpers ---
 
-const handleCreateDeck = async (deckData: any) => {
+const handleCreateDeck = async (deckData: { deckList?: string } & CreateDeckInput) => {
   const { deckList, ...deckInfo } = deckData
 
   const deckId = await decksStore.createDeck(deckInfo)
@@ -296,7 +321,7 @@ const handleCreateDeck = async (deckData: any) => {
     const collectionCards = await parseLinesIntoCards(lines, 'NM' as CardCondition, false, true)
 
     if (collectionCards.length > 0) {
-      await collectionStore.confirmImport(collectionCards)
+      await collectionStore.confirmImport(collectionCards as unknown as Omit<Card, 'id'>[])
       await allocateCollectionCardsToDeck(deckId, collectionCards)
       toastStore.show(t('collection.messages.imported', { count: collectionCards.length }), 'success')
     }
@@ -307,7 +332,7 @@ const handleCreateDeck = async (deckData: any) => {
 }
 
 const handleEditDeck = (deckId: string) => {
-  router.push(`/decks/${deckId}/edit`)
+  void router.push(`/decks/${deckId}/edit`)
 }
 
 const handleDeleteDeck = async (deckId: string) => {
@@ -330,7 +355,7 @@ const handleImport = async (opts: {
   deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
 }) => {
   const { deckText, condition, includeSideboard, deckName, makePublic, format, commander } = opts
-  const finalDeckName = deckName || `Deck${Date.now()}`
+  const finalDeckName = deckName ?? `Deck${Date.now()}`
 
   // Close modal immediately and show background toast
   showImportModal.value = false
@@ -338,20 +363,20 @@ const handleImport = async (opts: {
 
   // Parsear el texto
   const lines = deckText.split('\n').filter(l => l.trim())
-  const collectionCards = await parseLinesIntoCards(lines, condition, makePublic || false, includeSideboard)
+  const collectionCards = await parseLinesIntoCards(lines, condition, makePublic ?? false, includeSideboard)
 
   // 1. Crear el deck
   const deckId = await decksStore.createDeck({
     name: finalDeckName,
-    format: format || 'custom',
+    format: format ?? 'custom',
     description: '',
     colors: [],
-    commander: commander || '',
+    commander: commander ?? '',
   })
 
   // 2. Agregar cartas a la colección y asignar al deck
   if (collectionCards.length > 0) {
-    await collectionStore.confirmImport(collectionCards)
+    await collectionStore.confirmImport(collectionCards as unknown as Omit<Card, 'id'>[])
     if (deckId) {
       await allocateCollectionCardsToDeck(deckId, collectionCards)
     }
@@ -366,14 +391,14 @@ const handleImport = async (opts: {
 
 // Importar directamente desde Moxfield API
 const handleImportDirect = async (
-  cards: any[],
+  cards: MoxfieldCard[],
   deckName: string | undefined,
   condition: CardCondition,
   makePublic?: boolean,
   format?: DeckFormat,
   commander?: string
 ) => {
-  const finalDeckName = deckName || `Deck${Date.now()}`
+  const finalDeckName = deckName ?? `Deck${Date.now()}`
 
   // Close modal immediately and show background toast
   showImportModal.value = false
@@ -382,18 +407,18 @@ const handleImportDirect = async (
   // 1. Crear el deck
   const deckId = await decksStore.createDeck({
     name: finalDeckName,
-    format: format || 'custom',
+    format: format ?? 'custom',
     description: '',
     colors: [],
-    commander: commander || '',
+    commander: commander ?? '',
   })
 
-  const collectionCards: any[] = []
+  const collectionCards: ImportedCardData[] = []
 
   // 2. Procesar cada carta
   for (const card of cards) {
     // Check if card name ends with foil indicator (*f, *F, *f*, *F*)
-    let cardName = card.name
+    let cardName: string = card.name
     const isFoil = /\*[fF]\*?\s*$/.test(cardName)
     if (isFoil) {
       cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
@@ -428,7 +453,7 @@ const handleImportDirect = async (
     }
 
     // Agregar a colección - only include setCode if it's a valid set code (not 'Unknown')
-    const collectionCardData: any = {
+    const collectionCardData: ImportedCardData = {
       scryfallId: finalScryfallId,
       name: cardName,
       edition: finalEdition,
@@ -439,7 +464,8 @@ const handleImportDirect = async (
       image,
       status: 'collection',
       deckName: finalDeckName,
-      public: makePublic || false,
+      public: makePublic ?? false,
+      isInSideboard: false,
     }
 
     // Only add setCode if we have a valid one (Firebase rejects undefined)
@@ -452,7 +478,7 @@ const handleImportDirect = async (
 
   // 3. Guardar en colección
   if (collectionCards.length > 0) {
-    await collectionStore.confirmImport(collectionCards)
+    await collectionStore.confirmImport(collectionCards as unknown as Omit<Card, 'id'>[])
   }
 
   toastStore.show(t('decks.messages.created', { name: finalDeckName }), 'success')
@@ -470,17 +496,17 @@ const handleImportCsv = async (
   format?: DeckFormat,
   commander?: string
 ) => {
-  const finalDeckName = deckName || `CSV Import ${Date.now()}`
+  const finalDeckName = deckName ?? `CSV Import ${Date.now()}`
   showImportModal.value = false
   toastStore.show(t('decks.importModal.analyzing'), 'info')
 
   // 1. Create deck
   const deckId = await decksStore.createDeck({
     name: finalDeckName,
-    format: format || 'custom',
+    format: format ?? 'custom',
     description: '',
     colors: [],
-    commander: commander || '',
+    commander: commander ?? '',
   })
 
   // 2. Batch fetch Scryfall data using IDs from CSV
@@ -490,7 +516,7 @@ const handleImportCsv = async (
   // Deduplicate
   const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
 
-  const scryfallDataMap = new Map<string, any>()
+  const scryfallDataMap = new Map<string, ScryfallCard>()
   if (uniqueIds.length > 0) {
     const scryfallCards = await getCardsByIds(uniqueIds)
     for (const sc of scryfallCards) {
@@ -499,11 +525,11 @@ const handleImportCsv = async (
   }
 
   // 3. Build collection cards
-  const collectionCards = cards.map(card => buildCsvCardData(card, scryfallDataMap, makePublic || false))
+  const collectionCards = cards.map(card => buildCsvCardData(card, scryfallDataMap, makePublic ?? false))
 
   // 4. Save to collection and allocate to deck
   if (collectionCards.length > 0) {
-    await collectionStore.confirmImport(collectionCards)
+    await collectionStore.confirmImport(collectionCards as unknown as Omit<Card, 'id'>[])
     await collectionStore.loadCollection()
 
     if (deckId) {

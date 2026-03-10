@@ -7,6 +7,7 @@ import { useMessagesStore } from '../stores/messages';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
 import { getAvatarUrlForUser } from '../utils/avatar';
+import type { Conversation, Message } from '../types/message';
 
 const messagesStore = useMessagesStore();
 const authStore = useAuthStore();
@@ -32,23 +33,24 @@ const filteredConversations = computed(() => {
   });
 });
 
-const getOtherParticipantInfo = (conv: any): { username: string; userId: string; avatarUrl: string | null } => {
-  const entry = Object.entries(conv.participantNames as Record<string, string>).find(
+const getOtherParticipantInfo = (conv: Conversation): { username: string; userId: string; avatarUrl: string | null } => {
+  const entry = Object.entries(conv.participantNames).find(
       ([id]) => id !== authStore.user?.id
   );
-  const otherUserId = entry?.[0] || '';
-  const avatarUrl = conv.participantAvatars?.[otherUserId] || null;
+  const otherUserId = entry?.[0] ?? '';
+  // eslint-disable-next-line security/detect-object-injection
+  const avatarUrl = conv.participantAvatars?.[otherUserId] ?? null;
   return {
-    username: entry?.[1] || 'Unknown',
+    username: entry?.[1] ?? 'Unknown',
     userId: otherUserId,
     avatarUrl,
   };
 };
 
-const getLastMessagePreview = (lastMessage: any) => {
+const getLastMessagePreview = (lastMessage: Message | undefined): string => {
   if (!lastMessage) return 'Sin mensajes aún...';
-  const text = typeof lastMessage === 'string' ? lastMessage : lastMessage.content || '';
-  const preview = text.substring(0, 50);
+  const text: string = lastMessage.content ?? '';
+  const preview: string = text.substring(0, 50);
   return preview.length < text.length ? preview + '...' : preview;
 };
 

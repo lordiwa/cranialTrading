@@ -12,6 +12,18 @@ const router = useRouter()
 const authStore = useAuthStore()
 const { t } = useI18n()
 
+interface NominatimResult {
+  display_name: string
+  address?: {
+    city?: string
+    town?: string
+    village?: string
+    municipality?: string
+    state?: string
+    country?: string
+  }
+}
+
 const isOpen = ref(false)
 const popoverRef = ref<HTMLElement | null>(null)
 const avatarError = ref(false)
@@ -66,7 +78,7 @@ onUnmounted(() => {
 
 // Location functions
 const startEditLocation = () => {
-  newLocation.value = authStore.user?.location || ''
+  newLocation.value = authStore.user?.location ?? ''
   locationSuggestions.value = []
   editingLocation.value = true
 }
@@ -87,11 +99,11 @@ const handleLocationInput = () => {
             `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newLocation.value)}&limit=5&addressdetails=1`,
             { headers: { 'Accept-Language': 'es' } }
           )
-          const data = await response.json()
-          locationSuggestions.value = data.map((item: any) => {
-            const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || ''
-            const state = item.address?.state || ''
-            const country = item.address?.country || ''
+          const data = (await response.json()) as NominatimResult[]
+          locationSuggestions.value = data.map((item: NominatimResult) => {
+            const city = item.address?.city ?? item.address?.town ?? item.address?.village ?? item.address?.municipality ?? ''
+            const state = item.address?.state ?? ''
+            const country = item.address?.country ?? ''
             if (city && country) {
               return state ? `${city}, ${state}, ${country}` : `${city}, ${country}`
             }
@@ -206,7 +218,7 @@ const cancelEditAvatar = () => {
 const handleLogout = async () => {
   closePopover()
   await authStore.logout()
-  router.push('/login')
+  void router.push('/login')
 }
 </script>
 

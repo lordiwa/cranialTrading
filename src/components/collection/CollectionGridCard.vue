@@ -58,6 +58,10 @@ const isSwiping = ref(false)
 const startX = ref(0)
 const SWIPE_THRESHOLD = 80
 
+interface ParsedCardImage {
+  card_faces?: { image_uris?: { normal?: string; small?: string } }[]
+}
+
 // Status cycle order
 const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
 
@@ -104,6 +108,7 @@ const handleTouchEnd = async () => {
     // Swipe right = cycle status
     const currentIndex = STATUS_ORDER.indexOf(props.card.status)
     const nextIndex = (currentIndex + 1) % STATUS_ORDER.length
+    // eslint-disable-next-line security/detect-object-injection
     const nextStatus = STATUS_ORDER[nextIndex] ?? 'collection'
     try {
       await collectionStore.updateCard(props.card.id, { status: nextStatus })
@@ -175,6 +180,7 @@ const sparklinePoints = computed(() => {
   const h = 24
   return cardHistory.value.map((_, i) => {
     const x = (i / (values.length - 1)) * w
+    // eslint-disable-next-line security/detect-object-injection
     const y = h - (((values[i] ?? 0) - min) / range) * (h - 2) - 1
     return `${x},${y}`
   }).join(' ')
@@ -185,9 +191,9 @@ let priceObserver: IntersectionObserver | null = null
 
 onMounted(() => {
   if (!props.card.scryfallId) return
-  const el = cardRef.value || compactCardRef.value
+  const el = cardRef.value ?? compactCardRef.value
   if (!el) {
-    fetchCKPrices()
+    void fetchCKPrices()
     if (!props.compact) {
       loadCardHistory(props.card.scryfallId).then(h => { cardHistory.value = h }).catch(() => {})
     }
@@ -195,7 +201,7 @@ onMounted(() => {
   }
   priceObserver = new IntersectionObserver((entries) => {
     if (entries[0]?.isIntersecting) {
-      fetchCKPrices()
+      void fetchCKPrices()
       if (!props.compact && props.card.scryfallId) {
         loadCardHistory(props.card.scryfallId).then(h => { cardHistory.value = h }).catch(() => {})
       }
@@ -215,10 +221,10 @@ onUnmounted(() => {
 const cardFaceIndex = ref(0)
 
 // Cache parsed image JSON to avoid repeated JSON.parse calls
-const parsedImage = computed(() => {
+const parsedImage = computed((): ParsedCardImage | null => {
   if (props.card.image && typeof props.card.image === 'string') {
     try {
-      const parsed = JSON.parse(props.card.image)
+      const parsed = JSON.parse(props.card.image) as ParsedCardImage
       if (parsed.card_faces) return parsed
     } catch {
       // Not valid JSON — plain URL string
@@ -231,10 +237,10 @@ const getCardImage = (card: Card): string => {
   if (parsedImage.value) {
     const faces = parsedImage.value.card_faces
     if (faces && faces.length > 0) {
-      return faces[cardFaceIndex.value]?.image_uris?.normal || faces[0]?.image_uris?.normal || ''
+      return faces[cardFaceIndex.value]?.image_uris?.normal ?? faces[0]?.image_uris?.normal ?? ''
     }
   }
-  return card.image || ''
+  return card.image ?? ''
 }
 
 const isSplitCard = computed((): boolean => {
@@ -288,7 +294,9 @@ const priceChangeData = computed(() => {
   if (!movers?.length) return null
   const isFoilType = marketStore.selectedMoverType.includes('foil')
   if (isFoilType !== props.card.foil) return null
-  return { percentChange: movers[0]!.percentChange, isPositive: movers[0]!.percentChange > 0 }
+  const firstMover = movers[0]
+  if (!firstMover) return null
+  return { percentChange: firstMover.percentChange, isPositive: firstMover.percentChange > 0 }
 })
 </script>
 

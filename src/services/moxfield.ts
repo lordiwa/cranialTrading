@@ -48,14 +48,14 @@ export const fetchMoxfieldDeck = async (deckId: string): Promise<{ data: Moxfiel
         const response = await fetch(`https://moxfield-proxy.srparca.workers.dev?id=${deckId}`);
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
+            const errorData = await response.json().catch(() => ({})) as { error?: string };
             return {
                 data: null,
-                error: errorData.error || `Error ${response.status}: No se pudo obtener el deck`
+                error: errorData.error ?? `Error ${response.status}: No se pudo obtener el deck`
             };
         }
 
-        return { data: await response.json() };
+        return { data: await response.json() as MoxfieldDeck };
     } catch {
         // Si el worker no está disponible, mostrar instrucciones
         return {
@@ -74,7 +74,15 @@ export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard = true):
     isInSideboard: boolean
     isCommander: boolean
 }[] => {
-    const cards: any[] = [];
+    const cards: {
+        quantity: number
+        name: string
+        setCode: string
+        collectorNumber: string
+        scryfallId: string
+        isInSideboard: boolean
+        isCommander: boolean
+    }[] = [];
 
     // Commanders (para Commander format)
     if (deck.boards?.commanders?.cards) {

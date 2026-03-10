@@ -35,7 +35,7 @@ const currentAllocations = computed(() => {
 })
 
 // Total quantity in the card
-const totalQty = computed(() => props.card?.quantity || 0)
+const totalQty = computed(() => props.card?.quantity ?? 0)
 
 // Currently allocated (sum of all deck allocations)
 const allocatedQty = computed(() => {
@@ -56,7 +56,7 @@ watch(() => [props.show, props.card], () => {
     for (const alloc of currentAllocations.value) {
       newAllocations[alloc.deckId] = {
         quantity: alloc.quantity,
-        isInSideboard: alloc.isInSideboard || false
+        isInSideboard: alloc.isInSideboard ?? false
       }
     }
 
@@ -66,12 +66,14 @@ watch(() => [props.show, props.card], () => {
 
 // Get allocation for a specific deck
 const getDeckAllocation = (deckId: string) => {
-  return allocations.value[deckId]?.quantity || 0
+  // eslint-disable-next-line security/detect-object-injection
+  return allocations.value[deckId]?.quantity ?? 0
 }
 
 // Check if deck is in sideboard
 const isInSideboard = (deckId: string) => {
-  return allocations.value[deckId]?.isInSideboard || false
+  // eslint-disable-next-line security/detect-object-injection
+  return allocations.value[deckId]?.isInSideboard ?? false
 }
 
 // Update allocation for a deck
@@ -79,7 +81,8 @@ const updateAllocation = (deckId: string, quantity: number) => {
   if (quantity < 0) quantity = 0
 
   // Check if we have enough available
-  const currentForDeck = allocations.value[deckId]?.quantity || 0
+  // eslint-disable-next-line security/detect-object-injection
+  const currentForDeck = allocations.value[deckId]?.quantity ?? 0
   const newTotal = allocatedQty.value - currentForDeck + quantity
 
   if (newTotal > totalQty.value) {
@@ -88,19 +91,25 @@ const updateAllocation = (deckId: string, quantity: number) => {
   }
 
   if (quantity === 0) {
+    // eslint-disable-next-line security/detect-object-injection
     delete allocations.value[deckId]
   } else {
+    // eslint-disable-next-line security/detect-object-injection
+    const existing = allocations.value[deckId]
+    // eslint-disable-next-line security/detect-object-injection
     allocations.value[deckId] = {
       quantity,
-      isInSideboard: allocations.value[deckId]?.isInSideboard || false
+      isInSideboard: existing?.isInSideboard ?? false
     }
   }
 }
 
 // Toggle sideboard
 const toggleSideboard = (deckId: string) => {
-  if (allocations.value[deckId]) {
-    allocations.value[deckId].isInSideboard = !allocations.value[deckId].isInSideboard
+  // eslint-disable-next-line security/detect-object-injection
+  const alloc = allocations.value[deckId]
+  if (alloc) {
+    alloc.isInSideboard = !alloc.isInSideboard
   }
 }
 
@@ -131,7 +140,7 @@ const updateSideAllocation = async (deckId: string, cardId: string, isSide: bool
 }
 
 // Remove the opposite side allocation if it existed
-const removeOppositeAllocation = async (deckId: string, cardId: string, isSide: boolean, origAllocations: Map<string, any>) => {
+const removeOppositeAllocation = async (deckId: string, cardId: string, isSide: boolean, origAllocations: Map<string, { quantity: number; isInSideboard: boolean }>) => {
   const oppositeKey = `${deckId}-${!isSide}`
   const opposite = origAllocations.get(oppositeKey)
   if (opposite) await decksStore.deallocateCard(deckId, cardId, !isSide)
@@ -151,8 +160,8 @@ const handleSave = async () => {
 
     for (const deck of decksStore.decks) {
       const newAlloc = allocations.value[deck.id]
-      const newQty = newAlloc?.quantity || 0
-      const newSideboard = newAlloc?.isInSideboard || false
+      const newQty = newAlloc?.quantity ?? 0
+      const newSideboard = newAlloc?.isInSideboard ?? false
       const origForSide = originalAllocations.get(`${deck.id}-${newSideboard}`)
 
       await removeOppositeAllocation(deck.id, cardId, newSideboard, originalAllocations)

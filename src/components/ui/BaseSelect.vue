@@ -10,6 +10,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   placeholder: 'Seleccionar',
   disabled: false,
+  id: undefined,
 });
 
 const emit = defineEmits<{

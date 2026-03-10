@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { debounce } from 'lodash-es'
+import type { ScryfallCard } from '../../services/scryfall'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
 import ManaCost from '../ui/ManaCost.vue'
@@ -20,13 +21,13 @@ const props = withDefaults(defineProps<CardGridSearchProps>(), {
 })
 
 const emit = defineEmits<{
-  cardSelected: [card: any]
-  searchChanged: [query: string, results: any[]]
+  cardSelected: [card: ScryfallCard]
+  searchChanged: [query: string, results: ScryfallCard[]]
   search: [query: string]
 }>()
 
 const searchQuery = ref('')
-const searchResults = ref<any[]>([])
+const searchResults = ref<ScryfallCard[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -34,7 +35,7 @@ const error = ref<string | null>(null)
 const cardFaceIndex = ref<Record<string, number>>({})
 
 // ✅ NUEVO: Función para obtener el precio de una carta
-const getCardPrice = (card: any): number | null => {
+const getCardPrice = (card: ScryfallCard): number | null => {
   if (card.prices?.usd) {
     const price = Number.parseFloat(card.prices.usd)
     return Number.isNaN(price) ? null : price
@@ -60,29 +61,32 @@ const displayResults = computed(() =>
 )
 
 // ✅ NUEVO: Detectar split cards
-const isSplitCard = (card: any): boolean => {
-  return card.card_faces && card.card_faces.length > 1
+const isSplitCard = (card: ScryfallCard): boolean => {
+  return (card.card_faces && card.card_faces.length > 1) ?? false
 }
 
 // ✅ NUEVO: Obtener imagen correcta según split card
-const getCardImage = (card: any): string => {
+const getCardImage = (card: ScryfallCard): string => {
   if (isSplitCard(card)) {
-    const faceIndex = cardFaceIndex.value[card.id] || 0
-    return card.card_faces[faceIndex]?.image_uris?.small || card.card_faces[0]?.image_uris?.small || ''
+    const faceIndex = cardFaceIndex.value[card.id] ?? 0
+    // eslint-disable-next-line security/detect-object-injection
+    return card.card_faces?.[faceIndex]?.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small ?? ''
   }
   // Carta normal
-  return card.image_uris?.small || ''
+  return card.image_uris?.small ?? ''
 }
 
 // ✅ NUEVO: Toggle entre lados de split card
 const toggleCardFace = (cardId: string) => {
-  const currentIndex = cardFaceIndex.value[cardId] || 0
+  // eslint-disable-next-line security/detect-object-injection
+  const currentIndex = cardFaceIndex.value[cardId] ?? 0
   const newIndex = currentIndex === 0 ? 1 : 0
+  // eslint-disable-next-line security/detect-object-injection
   cardFaceIndex.value[cardId] = newIndex
 }
 
 // Debounced search function
-const performSearch = debounce(async () => {
+const performSearch = debounce(() => {
   if (!searchQuery.value.trim()) {
     searchResults.value = []
     loading.value = false
@@ -98,7 +102,7 @@ const performSearch = debounce(async () => {
   emit('search', searchQuery.value)
 }, 300)
 
-const handleCardClick = (card: any) => {
+const handleCardClick = (card: ScryfallCard) => {
   emit('cardSelected', card)
 }
 
@@ -112,7 +116,7 @@ defineExpose({
     cardFaceIndex.value = {}
   },
   getSelectedQuery: () => searchQuery.value,
-  setResults: (results: any[]) => {
+  setResults: (results: ScryfallCard[]) => {
     searchResults.value = results
     cardFaceIndex.value = {}
     emit('searchChanged', searchQuery.value, results)

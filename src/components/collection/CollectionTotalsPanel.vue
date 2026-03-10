@@ -31,13 +31,13 @@ const history = ref<PriceSnapshot[]>([])
 // Fetch prices when collection loads
 watch(() => collectionStore.cards.length, (newLen, oldLen) => {
   if (newLen > 0 && oldLen === 0) {
-    fetchAllPrices()
+    void fetchAllPrices()
   }
 })
 
 onMounted(() => {
   if (collectionStore.cards.length > 0) {
-    fetchAllPrices()
+    void fetchAllPrices()
   }
 })
 

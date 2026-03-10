@@ -6,7 +6,7 @@ import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import { type CardCondition } from '../../types/card'
-import { extractDeckId, fetchMoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
+import { extractDeckId, fetchMoxfieldDeck, type MoxfieldCard, type MoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 
 defineProps<{
   show: boolean
@@ -15,7 +15,7 @@ defineProps<{
 const emit = defineEmits<{
   close: []
   import: [deckText: string, condition: CardCondition, includeSideboard: boolean]
-  importDirect: [cards: any[], condition: CardCondition]
+  importDirect: [cards: ReturnType<typeof moxfieldToCardList>, condition: CardCondition]
 }>()
 
 const { t } = useI18n()
@@ -27,7 +27,7 @@ const parsing = ref(false)
 const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string } | null>(null)
 const errorMsg = ref('')
 const isLink = ref(false)
-const moxfieldDeckData = ref<any>(null)
+const moxfieldDeckData = ref<MoxfieldDeck | null>(null)
 
 const conditionOptions = computed(() => [
   { value: 'M', label: t('common.conditions.M') },
@@ -41,17 +41,17 @@ const conditionOptions = computed(() => [
 const parseMoxfieldPreferences = async (deckId: string): Promise<{ total: number; mainboard: number; sideboard: number; name?: string } | null> => {
   const result = await fetchMoxfieldDeck(deckId)
   if (!result.data) {
-    errorMsg.value = result.error || 'Error desconocido'
+    errorMsg.value = result.error ?? 'Error desconocido'
     return null
   }
   const deck = result.data
   moxfieldDeckData.value = deck
-  const mainboardCards = deck.boards?.mainboard?.cards || {}
-  const sideboardCards = deck.boards?.sideboard?.cards || {}
-  const commanderCards = deck.boards?.commanders?.cards || {}
-  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
-  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const mainboardCards = deck.boards?.mainboard?.cards ?? {}
+  const sideboardCards = deck.boards?.sideboard?.cards ?? {}
+  const commanderCards = deck.boards?.commanders?.cards ?? {}
+  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
+  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
+  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
   return { total: mainboardCount + sideboardCount + commanderCount, mainboard: mainboardCount + commanderCount, sideboard: sideboardCount, name: deck.name }
 }
 
@@ -66,7 +66,7 @@ const parseTextPreferences = (text: string): { total: number; mainboard: number;
     const match = /^(\d+)\s+/.exec(trimmed)
     const matchQty = match?.[1]
     if (match && matchQty) {
-      const qty = Number.parseInt(matchQty)
+      const qty = Number.parseInt(matchQty, 10)
       if (inSideboard) sideboard += qty
       else mainboard += qty
     }

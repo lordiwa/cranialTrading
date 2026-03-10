@@ -33,6 +33,7 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
   }
 
   function _findItem(username: string, scryfallId: string, cardId: string) {
+    // eslint-disable-next-line security/detect-object-injection
     const cart = state.carts[username]
     if (!cart) return null
     return cart.items.find(i => i.scryfallId === scryfallId && i.cardId === cardId) ?? null
@@ -41,8 +42,10 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
   // ─── Public API ──────────────────────────────────────────────────────
 
   function addItem(username: string, item: ExchangeCartItem) {
+    // eslint-disable-next-line security/detect-object-injection
     if (!state.carts[username]) {
       const now = Date.now()
+      // eslint-disable-next-line security/detect-object-injection
       state.carts[username] = {
         username,
         items: [],
@@ -55,6 +58,7 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     if (existing) {
       existing.quantity = Math.min(existing.quantity + item.quantity, existing.maxQuantity)
     } else {
+      // eslint-disable-next-line security/detect-object-injection
       state.carts[username].items.push({ ...item })
     }
 
@@ -62,6 +66,7 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
   }
 
   function removeItem(username: string, scryfallId: string, cardId: string) {
+    // eslint-disable-next-line security/detect-object-injection
     const cart = state.carts[username]
     if (!cart) return
 
@@ -71,6 +76,7 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     cart.items.splice(idx, 1)
 
     if (cart.items.length === 0) {
+      // eslint-disable-next-line security/detect-object-injection
       delete state.carts[username]
     }
 
@@ -91,10 +97,12 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
   }
 
   function getCart(username: string): ExchangeCart | null {
+    // eslint-disable-next-line security/detect-object-injection
     const cart = state.carts[username]
     if (!cart) return null
 
     if (Date.now() > cart.expiresAt) {
+      // eslint-disable-next-line security/detect-object-injection
       delete state.carts[username]
       _persist()
       return null
@@ -116,6 +124,7 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
   }
 
   function clearCart(username: string) {
+    // eslint-disable-next-line security/detect-object-injection
     delete state.carts[username]
     _persist()
   }
@@ -130,7 +139,10 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     const now = Date.now()
     let changed = false
     for (const username of Object.keys(state.carts)) {
-      if (now > state.carts[username]!.expiresAt) {
+      // eslint-disable-next-line security/detect-object-injection
+      const cart = state.carts[username]
+      if (cart && now > cart.expiresAt) {
+        // eslint-disable-next-line security/detect-object-injection
         delete state.carts[username]
         changed = true
       }

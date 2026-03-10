@@ -4,13 +4,13 @@ import { useToastStore } from '../../stores/toast'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
-import { searchCards } from '../../services/scryfall'
+import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
-import type { CardCondition } from '../../types/card'
+import type { CardCondition, CardWithAllocation } from '../../types/card'
 
 const props = defineProps<{
   show: boolean
@@ -54,21 +54,21 @@ const {
 
 // Search state (like CollectionView)
 const searchQuery = ref('')
-const searchResults = ref<any[]>([])
+const searchResults = ref<ScryfallCard[]>([])
 const isSearching = ref(false)
 const searchError = ref<string | null>(null)
 
 // Selected card state
-const selectedCard = ref<any>(null)
+const selectedCard = ref<ScryfallCard | null>(null)
 const showForm = ref(false)
 
 // Prints disponibles para la carta seleccionada
-const availablePrints = ref<any[]>([])
+const availablePrints = ref<ScryfallCard[]>([])
 const loadingPrints = ref(false)
 
 // Mode: 'collection' = allocate from collection, 'wishlist' = add to wishlist, 'new' = add to collection then allocate
 const addMode = ref<'collection' | 'wishlist' | 'new'>('wishlist')
-const selectedCollectionCard = ref<any>(null)
+const selectedCollectionCard = ref<CardWithAllocation | null>(null)
 
 // Debounced search
 let searchTimeout: ReturnType<typeof setTimeout>
@@ -133,9 +133,9 @@ const handlePrintChange = (scryfallId: string) => {
 }
 
 // Fetch CK prices when selected card changes
-watch(selectedCard, (card) => {
+watch(selectedCard, (card: ScryfallCard | null) => {
   if (card?.id && card?.set) {
-    fetchCKPrices()
+    void fetchCKPrices()
   }
 })
 
@@ -155,7 +155,7 @@ const conditionOptions = computed(() => [
 ])
 
 // Get card image (handle split cards)
-const getCardImage = (card: any): string => {
+const getCardImage = (card: ScryfallCard): string => {
   if (card.image_uris?.normal) return card.image_uris.normal
   if (card.card_faces?.[0]?.image_uris?.normal) {
     return card.card_faces[0].image_uris.normal
@@ -163,7 +163,7 @@ const getCardImage = (card: any): string => {
   return ''
 }
 
-const getCardImageSmall = (card: any): string => {
+const getCardImageSmall = (card: ScryfallCard): string => {
   if (card.image_uris?.small) return card.image_uris.small
   if (card.card_faces?.[0]?.image_uris?.small) {
     return card.card_faces[0].image_uris.small
@@ -171,7 +171,7 @@ const getCardImageSmall = (card: any): string => {
   return ''
 }
 
-const handleCardSelected = async (card: any) => {
+const handleCardSelected = async (card: ScryfallCard) => {
   selectedCard.value = card
   showForm.value = true
   await loadAllPrints(card.name)
@@ -191,7 +191,7 @@ const handleCardSelected = async (card: any) => {
   }
 }
 
-const selectCollectionCard = (card: any) => {
+const selectCollectionCard = (card: CardWithAllocation) => {
   selectedCollectionCard.value = card
   form.value.condition = card.condition
   form.value.foil = card.foil
@@ -335,7 +335,7 @@ watch(() => props.show, (newVal) => {
                   </div>
                 </div>
                 <p class="text-tiny text-silver mt-1 truncate group-hover:text-neon">{{ card.name }}</p>
-                <p class="text-tiny text-neon font-bold">${{ card.prices?.usd || 'N/A' }}</p>
+                <p class="text-tiny text-neon font-bold">${{ card.prices?.usd ?? 'N/A' }}</p>
               </div>
             </div>
           </div>
@@ -353,7 +353,7 @@ watch(() => props.show, (newVal) => {
       </template>
 
       <!-- Selected Card Form -->
-      <template v-else>
+      <template v-else-if="selectedCard">
         <div class="space-y-6 flex flex-col h-full">
           <div>
             <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.addToDeck.addTo', { section: isSideboard ? 'SIDEBOARD' : 'MAINBOARD' }) }}</h2>
@@ -409,7 +409,7 @@ watch(() => props.show, (newVal) => {
                           class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150"
                       >
                         <option v-for="print in availablePrints" :key="print.id" :value="print.id">
-                          {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd || 'N/A' }}
+                          {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
                         </option>
                       </select>
                       <p class="text-tiny text-silver-50 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>

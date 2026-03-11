@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "dev": "cranial-trading-dev",
+    "prod": "cranial-trading"
+  }
+}

@@ -61,6 +61,71 @@ Cranial Trading is a Magic: The Gathering trading platform built with Vue 3 (Com
 
 ---
 
+## MANDATORY: Branching, Versioning & Deployment
+
+**Every change MUST follow this process. No exceptions.**
+
+### 1. Dev-First Development (MANDATORY)
+
+**All work MUST happen on `develop` branch and be verified on the dev environment before production. No exceptions.**
+
+- **Always check you are on `develop`** before starting any work. If on `main`, switch to `develop` first.
+- All features, fixes, refactors, and config changes go to `develop` first
+- **Never commit directly to `main`** — `main` only receives merges from `develop`
+- Feature branches (optional): branch off `develop`, PR back into `develop`
+- After pushing to `develop`, CI auto-deploys to `cranial-trading-dev.web.app` (if all tests pass)
+- **Verify changes work on the dev environment** (`cranial-trading-dev.web.app`) before considering production
+
+### 2. Semantic Versioning (MANDATORY)
+
+- Version lives in `package.json` `"version"` field
+- **Bump version with every meaningful change** — in the same commit or PR
+- Follow semver strictly:
+  - **patch** (x.y.Z): bug fixes, minor tweaks, dependency updates
+  - **minor** (x.Y.0): new features, new UI screens, new API integrations
+  - **major** (X.0.0): breaking changes, major redesigns, data migration required
+- When unsure which bump, **ask the user**
+- Command: `npm version patch|minor|major --no-git-tag-version`
+
+### 3. Deployment Flow
+
+```
+develop  ──push──▶  CI tests  ──pass──▶  auto-deploy to cranial-trading-dev
+                                              │
+                                         verify on dev
+                                              │
+                                    user approves production
+                                              │
+develop ──merge──▶ main ──push──▶ CI tests ──pass──▶ auto-deploy to cranial-trading (PROD)
+```
+
+- `develop` push → auto-deploys to **dev** (`cranial-trading-dev.web.app`)
+- `main` push → auto-deploys to **production** (`cranial-trading.web.app`)
+- The dev environment uses Firebase project `cranial-trading-dev`
+- Production uses Firebase project `cranial-trading`
+
+### 4. Production Deploy Checklist (before merging develop → main)
+
+**All items must be true. Claude Code must NOT merge to main without explicit user approval.**
+
+1. All unit tests pass (`npm run test:unit`)
+2. Build succeeds (`npx vite build`)
+3. Version bumped appropriately in `package.json`
+4. Changes pushed to `develop` and deployed to dev environment
+5. Feature/fix verified working on `cranial-trading-dev.web.app`
+6. **User explicitly says to deploy to production**
+
+### Quick Reference
+
+| Action | Branch | Deploys to |
+|--------|--------|------------|
+| Day-to-day development | `develop` | cranial-trading-dev (auto) |
+| Verify before prod | — | cranial-trading-dev.web.app |
+| Production release | merge `develop` → `main` | cranial-trading (auto) |
+| Hotfix | `develop` first, then merge to `main` | Both |
+
+---
+
 ## Development Commands
 
 ```bash

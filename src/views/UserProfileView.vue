@@ -23,32 +23,6 @@ import ExchangeCartDrawer from '../components/cart/ExchangeCartDrawer.vue';
 import type { Card } from '../types/card';
 import { getAvatarUrlForUser } from '../utils/avatar';
 
-// Firestore REST API types
-interface FirestoreValue {
-  stringValue?: string;
-  integerValue?: string;
-  doubleValue?: number;
-  booleanValue?: boolean;
-  nullValue?: string;
-  timestampValue?: string;
-  arrayValue?: { values?: FirestoreValue[] };
-  mapValue?: { fields?: Record<string, FirestoreValue> };
-}
-
-interface FirestoreRestDoc {
-  name: string;
-  fields?: Record<string, FirestoreValue>;
-}
-
-interface FirestoreRestQueryResult {
-  document?: FirestoreRestDoc;
-}
-
-interface FirestoreRestListResult {
-  documents?: FirestoreRestDoc[];
-  nextPageToken?: string;
-}
-
 const route = useRoute();
 const router = useRouter();
 const toastStore = useToastStore();
@@ -102,81 +76,9 @@ watch(() => route.params.username, (v) => {
   void loadProfile();
 });
 
-// Convert Firestore REST API value format to plain JS values
-// e.g. {stringValue: "foo"} → "foo", {arrayValue: {values: [{stringValue: "W"}]}} → ["W"]
-const parseFirestoreValue = (v: FirestoreValue): unknown => {
-  if (v.stringValue !== undefined) return v.stringValue;
-  if (v.integerValue !== undefined) return Number(v.integerValue);
-  if (v.doubleValue !== undefined) return v.doubleValue;
-  if (v.booleanValue !== undefined) return v.booleanValue;
-  if (v.nullValue !== undefined) return null;
-  if (v.timestampValue !== undefined) return v.timestampValue;
-  if (v.arrayValue !== undefined) {
-    return (v.arrayValue.values ?? []).map(parseFirestoreValue);
-  }
-  if (v.mapValue !== undefined) {
-    const result: Record<string, unknown> = {};
-    for (const [k, mv] of Object.entries(v.mapValue.fields ?? {})) {
-      // eslint-disable-next-line security/detect-object-injection
-      result[k] = parseFirestoreValue(mv);
-    }
-    return result;
-  }
-  return v;
-};
-
-const parseFirestoreDoc = (fields: Record<string, FirestoreValue>): Record<string, unknown> => {
-  const data: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(fields)) {
-    // eslint-disable-next-line security/detect-object-injection
-    data[key] = parseFirestoreValue(val);
-  }
-  return data;
-};
-
-// Helper: query Firestore for user by username
-// Anonymous users use the Firestore REST API directly to bypass SDK bugs
-// (SDK v11 getDocsFromServer fails and getDocs returns empty for unauthenticated queries)
+// Helper: query Firestore for user by username (SDK works for both anonymous and authenticated users
+// since the switch to memoryLocalCache in commit 5964701)
 const findUserByUsername = async (uname: string): Promise<{ id: string; data: Record<string, unknown> } | null> => {
-  // Anonymous path: use Firestore REST API (100% reliable without auth)
-  if (!authStore.user) {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: 'users' }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: 'username' },
-            op: 'EQUAL',
-            value: { stringValue: uname },
-          },
-        },
-        limit: 1,
-      },
-    };
-
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!resp.ok) {
-      throw new Error(`Firestore REST query failed: ${resp.status}`);
-    }
-
-    const results = await resp.json() as FirestoreRestQueryResult[];
-    const doc = results[0]?.document;
-    if (!doc) return null;
-
-    // Parse document: name is "projects/.../documents/users/USER_ID"
-    const nameParts = doc.name.split('/');
-    const docId = nameParts[nameParts.length - 1] ?? '';
-    return { id: docId, data: parseFirestoreDoc(doc.fields ?? {}) };
-  }
-
-  // Authenticated path: use SDK (works fine for logged-in users)
   const usersCol = collection(db, 'users');
   const q = query(usersCol, where('username', '==', uname), limit(1));
   const snapshot = await getDocs(q);
@@ -238,39 +140,6 @@ const loadAllPublicCards = async () => {
   if (!userId.value) return;
 
   try {
-    // Anonymous path: use Firestore REST API (same reason as findUserByUsername)
-    if (!authStore.user) {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-      const allCards: Card[] = [];
-      let pageToken: string | undefined;
-
-      do {
-        let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId.value}/cards?pageSize=300`;
-        if (pageToken) url += `&pageToken=${pageToken}`;
-
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`Firestore REST cards query failed: ${resp.status}`);
-
-        const data = await resp.json() as FirestoreRestListResult;
-        const docs = data.documents ?? [];
-
-        for (const doc of docs) {
-          const nameParts = doc.name.split('/');
-          const docId = nameParts[nameParts.length - 1] ?? '';
-          const card = { id: docId, ...parseFirestoreDoc(doc.fields ?? {}) };
-          allCards.push(card as Card);
-        }
-
-        pageToken = data.nextPageToken;
-      } while (pageToken);
-
-      cards.value = allCards.filter((card: Card) =>
-        card.status !== 'collection' && card.public !== false
-      );
-      return;
-    }
-
-    // Authenticated path: use SDK
     const cardsCol = collection(db, 'users', userId.value, 'cards');
     const snapshot = await getDocs(query(cardsCol));
 

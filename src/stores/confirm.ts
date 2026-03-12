@@ -12,6 +12,7 @@ export interface ConfirmOptions {
 
 export const useConfirmStore = defineStore('confirm', () => {
   const isOpen = ref(false)
+  const key = ref(0)
   const options = ref<ConfirmOptions>({
     title: '',
     message: '',
@@ -22,6 +23,7 @@ export const useConfirmStore = defineStore('confirm', () => {
   })
 
   let resolvePromise: ((value: boolean) => void) | null = null
+  const pendingResult = ref<boolean | null>(null)
 
   const show = (opts: ConfirmOptions): Promise<boolean> => {
     options.value = {
@@ -32,6 +34,7 @@ export const useConfirmStore = defineStore('confirm', () => {
       confirmVariant: opts.confirmVariant ?? 'primary',
       showCancel: opts.showCancel !== false
     }
+    key.value++
     isOpen.value = true
 
     return new Promise((resolve) => {
@@ -40,26 +43,32 @@ export const useConfirmStore = defineStore('confirm', () => {
   }
 
   const confirm = () => {
+    if (!isOpen.value) return
+    pendingResult.value = true
     isOpen.value = false
-    if (resolvePromise) {
-      resolvePromise(true)
-      resolvePromise = null
-    }
   }
 
   const cancel = () => {
+    if (!isOpen.value) return
+    pendingResult.value = false
     isOpen.value = false
-    if (resolvePromise) {
-      resolvePromise(false)
+  }
+
+  const onAfterLeave = () => {
+    if (resolvePromise !== null && pendingResult.value !== null) {
+      resolvePromise(pendingResult.value)
       resolvePromise = null
+      pendingResult.value = null
     }
   }
 
   return {
     isOpen,
+    key,
     options,
     show,
     confirm,
-    cancel
+    cancel,
+    onAfterLeave
   }
 })

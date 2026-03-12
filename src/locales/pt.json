@@ -682,6 +682,18 @@
       "deleteTitle": "Excluir carta",
       "statusChanged": "Status mudado para {status}",
       "statusError": "Erro ao mudar status"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Quantidade",
+      "minusOne": "-1 Quantidade",
+      "collection": "Coleção",
+      "trade": "Troca",
+      "sale": "Venda",
+      "wishlist": "Desejado",
+      "toggleFoil": "Alternar Foil",
+      "togglePublic": "Alternar Visibilidade",
+      "edit": "Editar",
+      "delete": "Excluir"
     }
   },
 
@@ -1000,7 +1012,39 @@
       "deallocateError": "Erro ao desatribuir carta",
       "removeWishlistError": "Erro ao remover da wishlist",
       "maxAvailable": "Apenas {max} disponíveis",
-      "updateQuantityError": "Erro ao atualizar quantidade"
+      "exceedsAvailable": "Você só tem {max} disponíveis. Deseja adicionar +1 à sua coleção?",
+      "addToCollectionBtn": "ADICIONAR À COLEÇÃO",
+      "addToWishlistBtn": "ADICIONAR À WISHLIST",
+      "addedToCollection": "Carta adicionada à coleção e alocada",
+      "addedToWishlistFromDeck": "Carta adicionada à wishlist e alocada",
+      "removeFromCollectionToo": "Carta removida do deck. Também remover da coleção?",
+      "removedFromCollectionToo": "Carta removida do deck e da coleção",
+      "updateQuantityError": "Erro ao atualizar quantidade",
+      "moveBoardError": "Erro ao mover carta entre boards",
+      "movedToSideboard": "Movida para sideboard",
+      "movedToMainboard": "Movida para mainboard"
+    },
+    "prompt": {
+      "moveBoardTitle": "Mover Cartas",
+      "moveBoardMessage": "Quantas cópias de {name} mover para {target}?",
+      "quantityLabel": "Quantidade",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "addExtrasTitle": "Adicionar Cartas Extra",
+      "addExtrasMessage": "Você só tem {available}. Adicionar {extra} cópias extra?",
+      "addToCollection": "Coleção",
+      "addToWishlist": "Lista de Desejos",
+      "chooseDestination": "Adicionar extras à coleção ou lista de desejos?"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Cópia",
+      "minusOne": "-1 Cópia",
+      "moveToSideboard": "Mover para Sideboard",
+      "moveToMainboard": "Mover para Mainboard",
+      "setCommander": "Definir como Comandante",
+      "removeCommander": "Remover Comandante",
+      "edit": "Editar",
+      "removeFromDeck": "Remover do Deck"
     }
   },
 
@@ -1913,6 +1957,7 @@
     "created": "Pasta \"{name}\" criada",
     "cardAdded": "Carta adicionada à pasta",
     "cardRemoved": "Carta removida da pasta",
+    "quantityUpdated": "Quantidade atualizada",
     "errors": {
       "load": "Erro ao carregar pastas",
       "create": "Erro ao criar pasta",

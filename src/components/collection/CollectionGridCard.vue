@@ -2,13 +2,16 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useContextMenu } from '../../composables/useContextMenu'
 import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useCollectionStore } from '../../stores/collection'
 import { useMarketStore } from '../../stores/market'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
+import ContextMenu from '../ui/ContextMenu.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 import type { Card, CardStatus } from '../../types/card'
+import type { ContextMenuItem } from '../../types/contextMenu'
 
 const props = withDefaults(defineProps<{
   card: Card
@@ -298,6 +301,64 @@ const priceChangeData = computed(() => {
   if (!firstMover) return null
   return { percentChange: firstMover.percentChange, isPositive: firstMover.percentChange > 0 }
 })
+
+// ── Context Menu ──
+const isTouchDevice = 'ontouchstart' in window
+const {
+  isVisible: ctxVisible,
+  position: ctxPosition,
+  open: ctxOpen,
+  close: ctxClose,
+} = useContextMenu<Card>()
+
+const canShowContextMenu = computed(() =>
+  !props.readonly && !props.compact && !props.isBeingDeleted && !props.selectionMode && !isTouchDevice
+)
+
+const handleContextMenu = (e: MouseEvent) => {
+  if (!canShowContextMenu.value) return
+  ctxOpen(e, props.card)
+}
+
+const contextMenuItems = computed((): ContextMenuItem[] => {
+  const card = props.card
+  return [
+    { id: 'plus', label: t('cards.contextMenu.plusOne'), icon: 'plus' },
+    { id: 'minus', label: t('cards.contextMenu.minusOne'), icon: 'x-mark', dividerAfter: true },
+    { id: 'status-collection', label: t('cards.contextMenu.collection'), icon: 'box', active: card.status === 'collection' },
+    { id: 'status-trade', label: t('cards.contextMenu.trade'), icon: 'handshake', active: card.status === 'trade' },
+    { id: 'status-sale', label: t('cards.contextMenu.sale'), icon: 'money', active: card.status === 'sale' },
+    { id: 'status-wishlist', label: t('cards.contextMenu.wishlist'), icon: 'star', active: card.status === 'wishlist', dividerAfter: true },
+    { id: 'toggle-foil', label: t('cards.contextMenu.toggleFoil'), icon: 'fire', active: card.foil },
+    { id: 'toggle-public', label: t('cards.contextMenu.togglePublic'), icon: card.public ? 'eye-open' : 'eye-closed', active: card.public, dividerAfter: true },
+    { id: 'edit', label: t('cards.contextMenu.edit'), icon: 'settings' },
+    { id: 'delete', label: t('cards.contextMenu.delete'), icon: 'trash', danger: true },
+  ]
+})
+
+const handleContextMenuSelect = async (itemId: string) => {
+  const card = props.card
+  if (itemId === 'plus') {
+    await collectionStore.updateCard(card.id, { quantity: card.quantity + 1 })
+  } else if (itemId === 'minus') {
+    if (card.quantity <= 1) {
+      emit('delete', card)
+    } else {
+      await collectionStore.updateCard(card.id, { quantity: card.quantity - 1 })
+    }
+  } else if (itemId.startsWith('status-')) {
+    const status = itemId.replace('status-', '') as CardStatus
+    await setStatus(status)
+  } else if (itemId === 'toggle-foil') {
+    await collectionStore.updateCard(card.id, { foil: !card.foil })
+  } else if (itemId === 'toggle-public') {
+    await togglePublic()
+  } else if (itemId === 'edit') {
+    emit('cardClick', card)
+  } else if (itemId === 'delete') {
+    emit('delete', card)
+  }
+}
 </script>
 
 <template>
@@ -342,6 +403,7 @@ const priceChangeData = computed(() => {
       @touchstart="handleTouchStart"
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
+      @contextmenu.prevent="handleContextMenu"
   >
     <!-- Swipe background indicators (mobile only) -->
     <div v-if="isSwiping && !readonly" class="absolute inset-0 md:hidden flex">
@@ -589,6 +651,16 @@ const priceChangeData = computed(() => {
         {{ t('cart.addToCart') }}
       </button>
     </div>
+
+    <!-- Context Menu -->
+    <ContextMenu
+      :show="ctxVisible"
+      :x="ctxPosition.x"
+      :y="ctxPosition.y"
+      :items="contextMenuItems"
+      @select="handleContextMenuSelect"
+      @close="ctxClose"
+    />
   </div>
 </template>
 

@@ -969,7 +969,8 @@ export const useDecksStore = defineStore('decks', () => {
         deckId: string,
         cardId: string,
         isInSideboard: boolean,
-        newQuantity: number
+        newQuantity: number,
+        silent?: boolean
     ): Promise<boolean> => {
         if (!authStore.user?.id) return false
 
@@ -996,7 +997,7 @@ export const useDecksStore = defineStore('decks', () => {
             const maxAvailable = card.quantity - otherAllocations
 
             if (newQuantity > maxAvailable) {
-                toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
+                if (!silent) toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
                 return false
             }
 
@@ -1220,6 +1221,156 @@ export const useDecksStore = defineStore('decks', () => {
         }
     }
 
+    /**
+     * Move a card allocation between mainboard and sideboard
+     */
+    const moveCardBoard = async (
+        deckId: string,
+        cardId: string,
+        fromSideboard: boolean,
+        quantityToMove?: number
+    ): Promise<boolean> => {
+        if (!authStore.user?.id) return false
+
+        try {
+            const deck = decks.value.find(d => d.id === deckId)
+            if (!deck?.allocations) return false
+
+            const alloc = deck.allocations.find(
+                a => a.cardId === cardId && a.isInSideboard === fromSideboard
+            )
+            if (!alloc) return false
+
+            const qty = Math.min(quantityToMove ?? alloc.quantity, alloc.quantity)
+            const targetSideboard = !fromSideboard
+
+            if (qty < alloc.quantity) {
+                // Partial move: reduce source, upsert target
+                alloc.quantity -= qty
+                upsertAllocation(deck.allocations, cardId, qty, targetSideboard)
+            } else {
+                // Full move (original behavior)
+                const existingTarget = deck.allocations.find(
+                    a => a.cardId === cardId && a.isInSideboard === targetSideboard
+                )
+
+                if (existingTarget) {
+                    // Merge: add quantity to target, remove source
+                    existingTarget.quantity += alloc.quantity
+                    deck.allocations = deck.allocations.filter(a => a !== alloc)
+                } else {
+                    // Flip the board flag
+                    alloc.isInSideboard = targetSideboard
+                }
+            }
+
+            // Recalculate stats
+            const collectionStore = useCollectionStore()
+            deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
+            deck.updatedAt = new Date()
+
+            // Save to Firestore
+            const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
+            await updateDoc(deckRef, {
+                allocations: deck.allocations,
+                stats: deck.stats,
+                updatedAt: Timestamp.now(),
+            })
+
+            if (currentDeck.value?.id === deckId) {
+                currentDeck.value = snapshotDeck(deck)
+            }
+
+            return true
+        } catch (error) {
+            console.error('Error moving card between boards:', error)
+            toastStore.show(t('decks.messages.moveBoardError'), 'error')
+            return false
+        }
+    }
+
+    const addExtraAllocation = async (
+        deckId: string,
+        cardData: {
+            scryfallId: string
+            name: string
+            edition: string
+            condition: CardCondition
+            foil: boolean
+            price: number
+            image: string
+            cmc?: number
+            type_line?: string
+            colors?: string[]
+        },
+        quantity: number,
+        isInSideboard: boolean,
+        target: 'collection' | 'wishlist'
+    ): Promise<boolean> => {
+        if (!authStore.user?.id) return false
+
+        try {
+            const deck = decks.value.find(d => d.id === deckId)
+            if (!deck?.allocations) return false
+
+            let newCardId: string | null = null
+
+            if (target === 'wishlist') {
+                newCardId = await collectionStore.ensureCollectionWishlistCard({
+                    scryfallId: cardData.scryfallId,
+                    name: cardData.name,
+                    edition: cardData.edition,
+                    quantity,
+                    condition: cardData.condition,
+                    foil: cardData.foil,
+                    price: cardData.price,
+                    image: cardData.image,
+                    cmc: cardData.cmc,
+                    type_line: cardData.type_line,
+                    colors: cardData.colors,
+                })
+            } else {
+                newCardId = await collectionStore.addCard({
+                    scryfallId: cardData.scryfallId,
+                    name: cardData.name,
+                    edition: cardData.edition,
+                    quantity,
+                    condition: cardData.condition,
+                    foil: cardData.foil,
+                    price: cardData.price,
+                    image: cardData.image,
+                    status: 'collection',
+                    cmc: cardData.cmc,
+                    type_line: cardData.type_line,
+                    colors: cardData.colors,
+                })
+            }
+
+            if (!newCardId) return false
+
+            upsertAllocation(deck.allocations, newCardId, quantity, isInSideboard)
+
+            deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
+            deck.updatedAt = new Date()
+
+            const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
+            await updateDoc(deckRef, {
+                allocations: deck.allocations,
+                stats: deck.stats,
+                updatedAt: Timestamp.now(),
+            })
+
+            if (currentDeck.value?.id === deckId) {
+                currentDeck.value = snapshotDeck(deck)
+            }
+
+            return true
+        } catch (error) {
+            console.error('Error adding extra allocation:', error)
+            return false
+        }
+    }
+
     return {
         // State
         decks,
@@ -1247,6 +1398,8 @@ export const useDecksStore = defineStore('decks', () => {
         deallocateCard,
         removeFromWishlist,
         updateAllocation,
+        moveCardBoard,
+        addExtraAllocation,
         reduceAllocationsForCard,
         convertAllocationsToWishlist,
 

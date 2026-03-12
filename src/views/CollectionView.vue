@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { type ToastType, useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
+import { usePromptStore } from '../stores/prompt'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
@@ -46,6 +47,7 @@ const decksStore = useDecksStore()
 const binderStore = useBindersStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
+const promptStore = usePromptStore()
 const { t } = useI18n()
 const { getAllocationsForCard } = useCardAllocation()
 
@@ -1450,6 +1452,8 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
 
   const cardName = displayCard.name
+  const cardId = displayCard.cardId
+  const isWishlist = displayCard.isWishlist
   const confirmed = await confirmStore.show({
     title: `Eliminar del deck`,
     message: `¿Eliminar "${cardName}" del deck?`,
@@ -1460,12 +1464,10 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
 
   if (!confirmed) return
 
-  if (displayCard.isWishlist) {
-    if (displayCard.cardId) {
-      // New model: wishlist card is an allocation → deallocate
-      await decksStore.deallocateCard(selectedDeck.value.id, displayCard.cardId, displayCard.isInSideboard)
+  if (isWishlist) {
+    if (cardId) {
+      await decksStore.deallocateCard(selectedDeck.value.id, cardId, displayCard.isInSideboard)
     } else {
-      // Legacy: remove from wishlist array
       await decksStore.removeFromWishlist(
         selectedDeck.value.id,
         displayCard.scryfallId,
@@ -1476,12 +1478,27 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
       )
     }
   } else {
-    // Deallocate from deck (card stays in collection)
-    const ownedCard = displayCard
-    await decksStore.deallocateCard(selectedDeck.value.id, ownedCard.cardId, ownedCard.isInSideboard)
+    await decksStore.deallocateCard(selectedDeck.value.id, cardId, displayCard.isInSideboard)
   }
 
-  toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
+  // Offer to also remove from collection (promise resolves after leave transition)
+  if (cardId) {
+    const removeFromCollection = await confirmStore.show({
+      title: cardName,
+      message: t('decks.messages.removeFromCollectionToo'),
+      confirmText: t('common.actions.delete'),
+      cancelText: t('common.actions.cancel'),
+      confirmVariant: 'danger'
+    })
+    if (removeFromCollection) {
+      await collectionStore.deleteCard(cardId)
+      toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+    } else {
+      toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
+    }
+  } else {
+    toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
+  }
 }
 
 // Handle quantity update from deck grid
@@ -1489,16 +1506,77 @@ const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQua
   if (!selectedDeck.value) return
 
   if (!displayCard.isWishlist || displayCard.cardId) {
-    // Owned cards and new-model wishlist cards both use allocations
     const cardId = displayCard.cardId
-    if (cardId) {
-      await decksStore.updateAllocation(
-        selectedDeck.value.id,
-        cardId,
-        displayCard.isInSideboard,
-        newQuantity
-      )
-      toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+    if (!cardId) return
+
+    const ok = await decksStore.updateAllocation(
+      selectedDeck.value.id,
+      cardId,
+      displayCard.isInSideboard,
+      newQuantity,
+      true // silent — we handle the max-exceeded case ourselves
+    )
+
+    if (ok) {
+      const wasDecrement = newQuantity < (displayCard as unknown as Record<string, number>).allocatedQuantity
+      if (wasDecrement && cardId) {
+        const removeFromCollection = await confirmStore.show({
+          title: displayCard.name,
+          message: t('decks.messages.removeFromCollectionToo'),
+          confirmText: t('common.actions.delete'),
+          cancelText: t('common.actions.cancel'),
+          confirmVariant: 'danger'
+        })
+        if (removeFromCollection) {
+          const card = collectionStore.getCardById(cardId)
+          if (card) {
+            if (card.quantity <= 1) {
+              await collectionStore.deleteCard(cardId)
+            } else {
+              await collectionStore.updateCard(cardId, { quantity: card.quantity - 1 })
+            }
+            toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+          }
+        } else {
+          toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+        }
+      } else {
+        toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+      }
+    } else if (newQuantity > (displayCard as unknown as Record<string, number>).allocatedQuantity) {
+      // Allocation failed likely due to max available — offer to add to collection or wishlist
+      const card = collectionStore.getCardById(cardId)
+      if (!card) return
+      const totalAllocated = decksStore.getTotalAllocatedForCard(cardId)
+      const maxAvailable = card.quantity - totalAllocated + ((displayCard as unknown as Record<string, number>).allocatedQuantity ?? 0)
+
+      const addToCollection = await confirmStore.show({
+        title: displayCard.name,
+        message: t('decks.messages.exceedsAvailable', { max: maxAvailable }),
+        confirmText: t('decks.messages.addToCollectionBtn'),
+        cancelText: t('decks.messages.addToWishlistBtn'),
+      })
+
+      if (addToCollection) {
+        // Bump collection quantity, then retry allocation
+        await collectionStore.updateCard(cardId, { quantity: card.quantity + 1 })
+        await decksStore.updateAllocation(selectedDeck.value.id, cardId, displayCard.isInSideboard, newQuantity)
+        toastStore.show(t('decks.messages.addedToCollection'), 'success')
+      } else {
+        // Add as wishlist allocation
+        await decksStore.addToWishlist(selectedDeck.value.id, {
+          scryfallId: displayCard.scryfallId,
+          name: displayCard.name,
+          edition: displayCard.edition,
+          quantity: 1,
+          isInSideboard: displayCard.isInSideboard,
+          price: displayCard.price ?? 0,
+          image: displayCard.image ?? '',
+          condition: displayCard.condition,
+          foil: displayCard.foil,
+        })
+        toastStore.show(t('decks.messages.addedToWishlistFromDeck'), 'success')
+      }
     }
   }
 }
@@ -1512,6 +1590,81 @@ const handleDeckGridAddToWishlist = (_displayCard: DisplayDeckCard) => {
 const handleDeckGridToggleCommander = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
   await decksStore.toggleCommander(selectedDeck.value.id, displayCard.name)
+}
+
+// Handle move between mainboard/sideboard from deck grid
+const handleDeckGridMoveBoard = async (displayCard: DisplayDeckCard) => {
+  if (!selectedDeck.value) return
+  const record = displayCard as unknown as Record<string, unknown>
+  const isInSideboard = !displayCard.isWishlist && record.isInSideboard === true
+  const cardId = (record.cardId as string) ?? displayCard.id
+  const currentQty = displayCard.isWishlist
+    ? (displayCard as HydratedWishlistCard).requestedQuantity
+    : (displayCard as HydratedDeckCard).allocatedQuantity
+
+  // qty=1 → skip prompt, move directly
+  if (currentQty <= 1) {
+    await decksStore.moveCardBoard(selectedDeck.value.id, cardId, isInSideboard)
+    return
+  }
+
+  const targetBoard = isInSideboard
+    ? t('decks.prompt.mainboard')
+    : t('decks.prompt.sideboard')
+
+  const requestedQty = await promptStore.show({
+    title: t('decks.prompt.moveBoardTitle'),
+    message: t('decks.prompt.moveBoardMessage', { name: displayCard.name, target: targetBoard }),
+    inputLabel: t('decks.prompt.quantityLabel'),
+    defaultValue: currentQty,
+    min: 1,
+  })
+  if (requestedQty === null) return
+
+  if (requestedQty <= currentQty) {
+    // Normal partial/full move
+    await decksStore.moveCardBoard(selectedDeck.value.id, cardId, isInSideboard, requestedQty)
+  } else {
+    // Move all available first
+    await decksStore.moveCardBoard(selectedDeck.value.id, cardId, isInSideboard, currentQty)
+
+    const extraNeeded = requestedQty - currentQty
+    // Ask to add extras
+    const addExtras = await confirmStore.show({
+      title: t('decks.prompt.addExtrasTitle'),
+      message: t('decks.prompt.addExtrasMessage', { available: currentQty, extra: extraNeeded }),
+    })
+    if (!addExtras) return
+
+    // Ask: collection or wishlist?
+    const toCollection = await confirmStore.show({
+      title: t('decks.prompt.chooseDestination'),
+      message: t('decks.prompt.chooseDestination'),
+      confirmText: t('decks.prompt.addToCollection'),
+      cancelText: t('decks.prompt.addToWishlist'),
+    })
+
+    // Add extras — target board is the destination (opposite of source)
+    const targetSideboard = !isInSideboard
+    await decksStore.addExtraAllocation(
+      selectedDeck.value.id,
+      {
+        scryfallId: displayCard.scryfallId,
+        name: displayCard.name,
+        edition: displayCard.edition,
+        condition: displayCard.condition,
+        foil: displayCard.foil,
+        price: displayCard.price,
+        image: displayCard.image,
+        cmc: displayCard.cmc,
+        type_line: displayCard.type_line,
+        colors: displayCard.colors,
+      },
+      extraNeeded,
+      targetSideboard,
+      toCollection ? 'collection' : 'wishlist'
+    )
+  }
 }
 
 // ========== BINDER EVENT HANDLERS ==========
@@ -2001,9 +2154,11 @@ const handleBinderGridEdit = (displayCard: DisplayDeckCard) => {
 const handleBinderGridRemove = async (displayCard: DisplayDeckCard) => {
   if (!selectedBinder.value) return
 
+  const cardName = displayCard.name
+  const cardId = displayCard.cardId
   const confirmed = await confirmStore.show({
     title: t('binders.cardRemoved'),
-    message: `Remove "${displayCard.name}" from binder?`,
+    message: `Remove "${cardName}" from binder?`,
     confirmText: t('binders.header.delete'),
     cancelText: t('binders.create.cancel'),
     confirmVariant: 'danger'
@@ -2011,17 +2166,103 @@ const handleBinderGridRemove = async (displayCard: DisplayDeckCard) => {
 
   if (!confirmed) return
 
-  await binderStore.deallocateCard(selectedBinder.value.id, displayCard.cardId)
-  toastStore.show(t('binders.cardRemoved'), 'success')
+  await binderStore.deallocateCard(selectedBinder.value.id, cardId)
+
+  // Offer to also remove from collection (promise resolves after leave transition)
+  if (cardId) {
+    const removeFromCollection = await confirmStore.show({
+      title: cardName,
+      message: t('decks.messages.removeFromCollectionToo'),
+      confirmText: t('common.actions.delete'),
+      cancelText: t('common.actions.cancel'),
+      confirmVariant: 'danger'
+    })
+    if (removeFromCollection) {
+      await collectionStore.deleteCard(cardId)
+      toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+    } else {
+      toastStore.show(t('binders.cardRemoved'), 'success')
+    }
+  } else {
+    toastStore.show(t('binders.cardRemoved'), 'success')
+  }
 }
 
 const handleBinderGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQuantity: number) => {
   if (!selectedBinder.value) return
 
   const cardId = displayCard.cardId
-  if (cardId) {
-    await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity)
+  if (!cardId) return
+
+  const ok = await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity, true)
+
+  if (ok) {
+    const wasDecrement = newQuantity < (displayCard as unknown as Record<string, number>).allocatedQuantity
+    if (wasDecrement && cardId) {
+      const removeFromCollection = await confirmStore.show({
+        title: displayCard.name,
+        message: t('decks.messages.removeFromCollectionToo'),
+        confirmText: t('common.actions.delete'),
+        cancelText: t('common.actions.cancel'),
+        confirmVariant: 'danger'
+      })
+      if (removeFromCollection) {
+        const card = collectionStore.getCardById(cardId)
+        if (card) {
+          if (card.quantity <= 1) {
+            await collectionStore.deleteCard(cardId)
+          } else {
+            await collectionStore.updateCard(cardId, { quantity: card.quantity - 1 })
+          }
+          toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+        }
+      } else {
+        toastStore.show(t('binders.quantityUpdated'), 'success')
+      }
+    } else {
+      toastStore.show(t('binders.quantityUpdated'), 'success')
+    }
+  } else if (!ok && newQuantity > (displayCard as unknown as Record<string, number>).allocatedQuantity) {
+    const card = collectionStore.getCardById(cardId)
+    if (!card) return
+
+    const addToCollection = await confirmStore.show({
+      title: displayCard.name,
+      message: t('decks.messages.exceedsAvailable', { max: card.quantity }),
+      confirmText: t('decks.messages.addToCollectionBtn'),
+      cancelText: t('common.actions.cancel'),
+    })
+
+    if (addToCollection) {
+      await collectionStore.updateCard(cardId, { quantity: card.quantity + 1 })
+      await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity)
+      toastStore.show(t('decks.messages.addedToCollection'), 'success')
+    }
   }
+}
+
+const handleBinderGridSetStatus = async (displayCard: DisplayDeckCard, status: string) => {
+  const cardId = displayCard.cardId
+  if (!cardId) return
+  const updates: Record<string, unknown> = { status }
+  if (status === 'collection') updates.public = false
+  await collectionStore.updateCard(cardId, updates as Partial<Card>)
+  toastStore.show(t('cards.grid.statusChanged', { status }), 'success')
+}
+
+const handleBinderGridToggleFoil = async (displayCard: DisplayDeckCard) => {
+  const cardId = displayCard.cardId
+  if (!cardId) return
+  await collectionStore.updateCard(cardId, { foil: !displayCard.foil })
+}
+
+const handleBinderGridTogglePublic = async (displayCard: DisplayDeckCard) => {
+  const cardId = displayCard.cardId
+  if (!cardId) return
+  const record = displayCard as unknown as Record<string, unknown>
+  const newPublic = !record.public
+  await collectionStore.updateCard(cardId, { public: newPublic } as Partial<Card>)
+  toastStore.show(newPublic ? t('cards.grid.visibleInProfile') : t('cards.grid.hiddenFromProfile'), 'success')
 }
 
 const quickAllocateCardToBinder = async (card: Card) => {
@@ -3964,6 +4205,7 @@ onUnmounted(() => {
               @update-quantity="handleDeckGridQuantityUpdate"
               @add-to-wishlist="handleDeckGridAddToWishlist"
               @toggle-commander="handleDeckGridToggleCommander"
+              @move-board="handleDeckGridMoveBoard"
           />
         </div>
 
@@ -3994,6 +4236,7 @@ onUnmounted(() => {
               @update-quantity="handleDeckGridQuantityUpdate"
               @add-to-wishlist="handleDeckGridAddToWishlist"
               @toggle-commander="handleDeckGridToggleCommander"
+              @move-board="handleDeckGridMoveBoard"
           />
         </div>
 
@@ -4037,6 +4280,7 @@ onUnmounted(() => {
           <DeckEditorGrid
               :cards="filteredBinderDisplayCards"
               :deck-id="selectedBinder.id"
+              :binder-mode="true"
               :group-by="deckGroupBy"
               :sort-by="sortBy"
               :selected-colors="selectedColors"
@@ -4047,6 +4291,9 @@ onUnmounted(() => {
               @edit="handleBinderGridEdit"
               @remove="handleBinderGridRemove"
               @update-quantity="handleBinderGridQuantityUpdate"
+              @set-status="handleBinderGridSetStatus"
+              @toggle-foil="handleBinderGridToggleFoil"
+              @toggle-public="handleBinderGridTogglePublic"
           />
         </div>
 

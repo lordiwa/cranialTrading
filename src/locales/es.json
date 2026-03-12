@@ -682,6 +682,18 @@
       "deleteTitle": "Eliminar carta",
       "statusChanged": "Status cambiado a {status}",
       "statusError": "Error al cambiar status"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Cantidad",
+      "minusOne": "-1 Cantidad",
+      "collection": "Colección",
+      "trade": "Cambio",
+      "sale": "Venta",
+      "wishlist": "Deseado",
+      "toggleFoil": "Cambiar Foil",
+      "togglePublic": "Cambiar Visibilidad",
+      "edit": "Editar",
+      "delete": "Eliminar"
     }
   },
 
@@ -1000,7 +1012,39 @@
       "deallocateError": "Error al desasignar carta",
       "removeWishlistError": "Error al eliminar de wishlist",
       "maxAvailable": "Solo hay {max} disponibles",
-      "updateQuantityError": "Error al actualizar cantidad"
+      "exceedsAvailable": "Solo tienes {max} disponibles. ¿Quieres agregar +1 a tu colección?",
+      "addToCollectionBtn": "AGREGAR A COLECCIÓN",
+      "addToWishlistBtn": "AGREGAR A WISHLIST",
+      "addedToCollection": "Carta agregada a colección y asignada",
+      "addedToWishlistFromDeck": "Carta agregada a wishlist y asignada",
+      "removeFromCollectionToo": "Carta quitada del mazo. ¿También quitar de la colección?",
+      "removedFromCollectionToo": "Carta quitada del mazo y de la colección",
+      "updateQuantityError": "Error al actualizar cantidad",
+      "moveBoardError": "Error al mover carta entre tableros",
+      "movedToSideboard": "Movida al sideboard",
+      "movedToMainboard": "Movida al mainboard"
+    },
+    "prompt": {
+      "moveBoardTitle": "Mover Cartas",
+      "moveBoardMessage": "¿Cuántas copias de {name} mover al {target}?",
+      "quantityLabel": "Cantidad",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "addExtrasTitle": "Agregar Cartas Extra",
+      "addExtrasMessage": "Solo tienes {available}. ¿Agregar {extra} copias extra?",
+      "addToCollection": "Colección",
+      "addToWishlist": "Lista de Deseos",
+      "chooseDestination": "¿Agregar extras a colección o lista de deseos?"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Copia",
+      "minusOne": "-1 Copia",
+      "moveToSideboard": "Mover a Sideboard",
+      "moveToMainboard": "Mover a Mainboard",
+      "setCommander": "Designar Comandante",
+      "removeCommander": "Quitar Comandante",
+      "edit": "Editar",
+      "removeFromDeck": "Quitar del Mazo"
     }
   },
 
@@ -1913,6 +1957,7 @@
     "created": "Carpeta \"{name}\" creada",
     "cardAdded": "Carta agregada a la carpeta",
     "cardRemoved": "Carta removida de la carpeta",
+    "quantityUpdated": "Cantidad actualizada",
     "errors": {
       "load": "Error al cargar carpetas",
       "create": "Error al crear carpeta",

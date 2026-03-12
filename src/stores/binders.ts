@@ -460,7 +460,8 @@ export const useBindersStore = defineStore('binders', () => {
     const updateAllocation = async (
         binderId: string,
         cardId: string,
-        newQuantity: number
+        newQuantity: number,
+        silent?: boolean
     ): Promise<boolean> => {
         if (!authStore.user?.id) return false
 
@@ -486,7 +487,7 @@ export const useBindersStore = defineStore('binders', () => {
             const maxAvailable = card.quantity - deckAllocated - binderAllocated
 
             if (newQuantity > maxAvailable) {
-                toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
+                if (!silent) toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
                 return false
             }
 

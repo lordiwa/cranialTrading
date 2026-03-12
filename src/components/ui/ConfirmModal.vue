@@ -23,9 +23,9 @@ const getIconName = () => {
 
 <template>
   <Teleport to="body">
-    <Transition name="fade">
+    <Transition name="fade" @after-leave="confirmStore.onAfterLeave">
       <div
-          v-if="confirmStore.isOpen"
+          v-show="confirmStore.isOpen"
           class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 px-4"
           @click.self="confirmStore.cancel"
       >

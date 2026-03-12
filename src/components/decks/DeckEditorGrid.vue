@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { useContextMenu } from '../../composables/useContextMenu'
+import { useCollectionStore } from '../../stores/collection'
 import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder } from '../../composables/useCardFilter'
+import ContextMenu from '../ui/ContextMenu.vue'
+import type { ContextMenuItem } from '../../types/contextMenu'
 import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
 
 const props = defineProps<{
   cards: DisplayDeckCard[]
   deckId: string
   commanderNames?: string[]
+  binderMode?: boolean
   groupBy?: 'none' | 'type' | 'mana' | 'color'
   sortBy?: 'recent' | 'name' | 'price'
   selectedColors?: Set<string>
@@ -23,6 +28,10 @@ const emit = defineEmits<{
   updateQuantity: [card: DisplayDeckCard, newQuantity: number]
   addToWishlist: [card: DisplayDeckCard]
   toggleCommander: [card: DisplayDeckCard]
+  moveBoard: [card: DisplayDeckCard]
+  setStatus: [card: DisplayDeckCard, status: string]
+  toggleFoil: [card: DisplayDeckCard]
+  togglePublic: [card: DisplayDeckCard]
 }>()
 
 const { t } = useI18n()
@@ -244,6 +253,101 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
   return card.image?.replace('/normal/', '/small/') ?? ''
 }
 
+// ── Context Menu ──
+const isTouchDevice = 'ontouchstart' in window
+const {
+  isVisible: ctxVisible,
+  position: ctxPosition,
+  targetData: ctxCard,
+  open: ctxOpen,
+  close: ctxClose,
+} = useContextMenu<DisplayDeckCard>()
+
+const handleContextMenu = (e: MouseEvent, card: DisplayDeckCard) => {
+  if (isTouchDevice) return
+  ctxOpen(e, card)
+}
+
+const deckContextMenuItems = computed((): ContextMenuItem[] => {
+  const card = ctxCard.value
+  if (!card) return []
+  const qty = getQuantity(card)
+
+  const items: ContextMenuItem[] = [
+    { id: 'plus', label: t('decks.contextMenu.plusOne'), icon: 'plus' },
+    { id: 'minus', label: t('decks.contextMenu.minusOne'), icon: 'x-mark', dividerAfter: true },
+  ]
+
+  if (props.binderMode) {
+    // Binder: status, foil, public (like collection cards)
+    const collectionStore = useCollectionStore()
+    const sourceCard = collectionStore.getCardById(card.cardId)
+    const currentStatus = sourceCard?.status ?? 'collection'
+    const isPublic = sourceCard?.public ?? false
+    items.push(
+      { id: 'status-collection', label: t('cards.contextMenu.collection'), icon: 'box', active: currentStatus === 'collection' },
+      { id: 'status-trade', label: t('cards.contextMenu.trade'), icon: 'handshake', active: currentStatus === 'trade' },
+      { id: 'status-sale', label: t('cards.contextMenu.sale'), icon: 'money', active: currentStatus === 'sale' },
+      { id: 'status-wishlist', label: t('cards.contextMenu.wishlist'), icon: 'star', active: currentStatus === 'wishlist', dividerAfter: true },
+      { id: 'toggle-foil', label: t('cards.contextMenu.toggleFoil'), icon: 'fire', active: card.foil },
+      { id: 'toggle-public', label: t('cards.contextMenu.togglePublic'), icon: isPublic ? 'eye-open' : 'eye-closed', dividerAfter: true },
+    )
+  } else {
+    // Deck: move board, commander
+    const isSideboard = card.isWishlist ? false : (card as unknown as Record<string, unknown>).isInSideboard === true
+    items.push({
+      id: 'move-board',
+      label: isSideboard ? t('decks.contextMenu.moveToMainboard') : t('decks.contextMenu.moveToSideboard'),
+      icon: 'flip',
+    })
+    if (props.commanderNames) {
+      const isCmd = isCommander(card)
+      items.push({
+        id: 'toggle-commander',
+        label: isCmd ? t('decks.contextMenu.removeCommander') : t('decks.contextMenu.setCommander'),
+        icon: 'star',
+        active: isCmd,
+      })
+    }
+    items[items.length - 1]!.dividerAfter = true
+  }
+
+  items.push(
+    { id: 'edit', label: t('decks.contextMenu.edit'), icon: 'settings' },
+    { id: 'remove', label: t('decks.contextMenu.removeFromDeck'), icon: 'trash', danger: true },
+  )
+  return items
+})
+
+const handleDeckContextMenuSelect = (itemId: string) => {
+  const card = ctxCard.value
+  if (!card) return
+  const qty = getQuantity(card)
+  if (itemId === 'plus') {
+    emit('updateQuantity', card, qty + 1)
+  } else if (itemId === 'minus') {
+    if (qty <= 1) {
+      emit('remove', card)
+    } else {
+      emit('updateQuantity', card, qty - 1)
+    }
+  } else if (itemId.startsWith('status-')) {
+    emit('setStatus', card, itemId.replace('status-', ''))
+  } else if (itemId === 'toggle-foil') {
+    emit('toggleFoil', card)
+  } else if (itemId === 'toggle-public') {
+    emit('togglePublic', card)
+  } else if (itemId === 'move-board') {
+    emit('moveBoard', card)
+  } else if (itemId === 'toggle-commander') {
+    emit('toggleCommander', card)
+  } else if (itemId === 'edit') {
+    emit('edit', card)
+  } else if (itemId === 'remove') {
+    emit('remove', card)
+  }
+}
+
 </script>
 
 <template>
@@ -332,6 +436,7 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
             @mouseenter="handleMouseEnter(card)"
             @mouseleave="handleMouseLeave"
             @click="handleCardClick(card)"
+            @contextmenu.prevent="handleContextMenu($event, card)"
           >
             <!-- Card miniature - ONLY image -->
             <div
@@ -358,6 +463,16 @@ const getCardImageSmall = (card: DisplayDeckCard): string => {
         </div>
       </div>
     </div>
+
+    <!-- Context Menu -->
+    <ContextMenu
+      :show="ctxVisible"
+      :x="ctxPosition.x"
+      :y="ctxPosition.y"
+      :items="deckContextMenuItems"
+      @select="handleDeckContextMenuSelect"
+      @close="ctxClose"
+    />
   </div>
 </template>
 

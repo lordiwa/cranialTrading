@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/auth';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
+import PromptModal from './components/ui/PromptModal.vue';
 import AppFooter from './components/layout/AppFooter.vue';
 
 const authStore = useAuthStore();
@@ -38,4 +39,5 @@ onMounted(() => {
 
   <BaseToast />
   <ConfirmModal />
+  <PromptModal />
 </template>

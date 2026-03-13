@@ -15,7 +15,7 @@ test.describe('Internationalization', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Click the EN button on the login page language selector
-    await page.getByRole('button', { name: 'EN' }).click();
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     await page.waitForTimeout(500);
 
     const englishText = page.locator('text=/SIGN IN|Sign in|LOG IN/i');
@@ -26,7 +26,7 @@ test.describe('Internationalization', () => {
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByRole('button', { name: 'PT' }).click();
+    await page.getByRole('button', { name: 'PT', exact: true }).click();
     await page.waitForTimeout(500);
 
     const portugueseText = page.locator('text=/ENTRAR|Iniciar sessão|ACESSAR/i');
@@ -37,7 +37,7 @@ test.describe('Internationalization', () => {
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByRole('button', { name: 'EN' }).click();
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     await page.waitForTimeout(500);
 
     await page.reload();
@@ -51,7 +51,7 @@ test.describe('Internationalization', () => {
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByRole('button', { name: 'EN' }).click();
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     await page.waitForTimeout(500);
 
     // Login

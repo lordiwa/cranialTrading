@@ -1269,17 +1269,25 @@ export const useDecksStore = defineStore('decks', () => {
             deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
             deck.updatedAt = new Date()
 
-            // Save to Firestore
+            // Update local state FIRST for instant UI reactivity
+            if (currentDeck.value?.id === deckId) {
+                currentDeck.value = snapshotDeck(deck)
+            }
+
+            // Force shallowRef reactivity so CollectionView's selectedDeck recomputes
+            const idx = decks.value.indexOf(deck)
+            if (idx !== -1) {
+                decks.value[idx] = snapshotDeck(deck)
+                decks.value = [...decks.value]
+            }
+
+            // Save to Firestore (async, UI already updated)
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
             await updateDoc(deckRef, {
                 allocations: deck.allocations,
                 stats: deck.stats,
                 updatedAt: Timestamp.now(),
             })
-
-            if (currentDeck.value?.id === deckId) {
-                currentDeck.value = snapshotDeck(deck)
-            }
 
             return true
         } catch (error) {
@@ -1310,6 +1318,7 @@ export const useDecksStore = defineStore('decks', () => {
         if (!authStore.user?.id) return false
 
         try {
+            const collectionStore = useCollectionStore()
             const deck = decks.value.find(d => d.id === deckId)
             if (!deck?.allocations) return false
 
@@ -1353,16 +1362,23 @@ export const useDecksStore = defineStore('decks', () => {
             deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
             deck.updatedAt = new Date()
 
+            // Update reactive state BEFORE Firestore write (instant UI update)
+            if (currentDeck.value?.id === deckId) {
+                currentDeck.value = snapshotDeck(deck)
+            }
+            const idx = decks.value.indexOf(deck)
+            if (idx !== -1) {
+                decks.value[idx] = snapshotDeck(deck)
+                decks.value = [...decks.value]
+            }
+
+            // Save to Firestore (async, UI already updated)
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
             await updateDoc(deckRef, {
                 allocations: deck.allocations,
                 stats: deck.stats,
                 updatedAt: Timestamp.now(),
             })
-
-            if (currentDeck.value?.id === deckId) {
-                currentDeck.value = snapshotDeck(deck)
-            }
 
             return true
         } catch (error) {

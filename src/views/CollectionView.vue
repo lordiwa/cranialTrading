@@ -534,8 +534,8 @@ const deckMainboardCards = computed(() => {
       }
     }
     const allocations = getAllocationsForCard(c.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return deckAlloc && !deckAlloc.isInSideboard
+    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && !a.isInSideboard)
+    return !!deckAlloc
   })
 })
 
@@ -544,8 +544,8 @@ const deckSideboardCards = computed(() => {
   if (deckFilter.value === 'all' || isCommanderFormat.value) return []
   return deckOwnedCards.value.filter(c => {
     const allocations = getAllocationsForCard(c.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return deckAlloc?.isInSideboard
+    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && a.isInSideboard)
+    return !!deckAlloc
   })
 })
 
@@ -1052,8 +1052,10 @@ const isDeckPublic = computed(() => {
 const deckOwnedCount = computed(() => {
   return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + (deckAlloc?.quantity ?? 0)
+    const totalQty = allocations
+      .filter(a => a.deckId === deckFilter.value)
+      .reduce((s, a) => s + a.quantity, 0)
+    return sum + totalQty
   }, 0)
 })
 
@@ -1083,8 +1085,10 @@ const deckOwnedCostBySource = computed(() => {
   if (deckFilter.value === 'all') return 0
   return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * (deckAlloc?.quantity ?? 0)
+    const totalQty = allocations
+      .filter(a => a.deckId === deckFilter.value)
+      .reduce((s, a) => s + a.quantity, 0)
+    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * totalQty
   }, 0)
 })
 
@@ -1518,7 +1522,7 @@ const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQua
     )
 
     if (ok) {
-      const wasDecrement = newQuantity < (displayCard as unknown as Record<string, number>).allocatedQuantity
+      const wasDecrement = newQuantity < displayCard.allocatedQuantity
       if (wasDecrement && cardId) {
         const removeFromCollection = await confirmStore.show({
           title: displayCard.name,
@@ -1543,12 +1547,12 @@ const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQua
       } else {
         toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
       }
-    } else if (newQuantity > (displayCard as unknown as Record<string, number>).allocatedQuantity) {
+    } else if (newQuantity > displayCard.allocatedQuantity) {
       // Allocation failed likely due to max available — offer to add to collection or wishlist
       const card = collectionStore.getCardById(cardId)
       if (!card) return
       const totalAllocated = decksStore.getTotalAllocatedForCard(cardId)
-      const maxAvailable = card.quantity - totalAllocated + ((displayCard as unknown as Record<string, number>).allocatedQuantity ?? 0)
+      const maxAvailable = card.quantity - totalAllocated + (displayCard.allocatedQuantity ?? 0)
 
       const addToCollection = await confirmStore.show({
         title: displayCard.name,
@@ -1597,10 +1601,10 @@ const handleDeckGridMoveBoard = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
   const record = displayCard as unknown as Record<string, unknown>
   const isInSideboard = !displayCard.isWishlist && record.isInSideboard === true
-  const cardId = (record.cardId as string) ?? displayCard.id
+  const cardId = (record.cardId as string) ?? displayCard.cardId
   const currentQty = displayCard.isWishlist
-    ? (displayCard as HydratedWishlistCard).requestedQuantity
-    : (displayCard as HydratedDeckCard).allocatedQuantity
+    ? displayCard.requestedQuantity
+    : displayCard.allocatedQuantity
 
   // qty=1 → skip prompt, move directly
   if (currentQty <= 1) {
@@ -2197,7 +2201,7 @@ const handleBinderGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQ
   const ok = await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity, true)
 
   if (ok) {
-    const wasDecrement = newQuantity < (displayCard as unknown as Record<string, number>).allocatedQuantity
+    const wasDecrement = newQuantity < displayCard.allocatedQuantity
     if (wasDecrement && cardId) {
       const removeFromCollection = await confirmStore.show({
         title: displayCard.name,
@@ -2222,7 +2226,7 @@ const handleBinderGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQ
     } else {
       toastStore.show(t('binders.quantityUpdated'), 'success')
     }
-  } else if (!ok && newQuantity > (displayCard as unknown as Record<string, number>).allocatedQuantity) {
+  } else if (!ok && newQuantity > displayCard.allocatedQuantity) {
     const card = collectionStore.getCardById(cardId)
     if (!card) return
 

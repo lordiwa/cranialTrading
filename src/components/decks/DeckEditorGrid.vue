@@ -271,7 +271,6 @@ const handleContextMenu = (e: MouseEvent, card: DisplayDeckCard) => {
 const deckContextMenuItems = computed((): ContextMenuItem[] => {
   const card = ctxCard.value
   if (!card) return []
-  const qty = getQuantity(card)
 
   const items: ContextMenuItem[] = [
     { id: 'plus', label: t('decks.contextMenu.plusOne'), icon: 'plus' },

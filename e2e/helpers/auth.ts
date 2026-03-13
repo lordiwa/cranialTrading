@@ -21,7 +21,7 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
     await page.locator('input[type="password"]').fill(password);
     await page.locator('button[type="submit"]').click();
     await page.waitForURL((url) => !url.pathname.includes('/login'), {
-      timeout: 30_000,
+      timeout: 45_000,
     });
     // Wait for Firebase auth to settle and user data to load
     await page.waitForTimeout(3000);

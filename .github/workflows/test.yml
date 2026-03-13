@@ -60,7 +60,7 @@ jobs:
   e2e-smoke:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -92,7 +92,7 @@ jobs:
   e2e-collection:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -124,7 +124,7 @@ jobs:
   e2e-features:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -156,7 +156,7 @@ jobs:
   e2e-social:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}

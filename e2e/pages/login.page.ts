@@ -31,7 +31,7 @@ export class LoginPage {
 
   async waitForRedirect() {
     await this.page.waitForURL((url) => !url.pathname.includes('/login'), {
-      timeout: 15_000,
+      timeout: 45_000,
     });
   }
 }

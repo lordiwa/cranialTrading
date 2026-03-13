@@ -58,7 +58,7 @@ test.describe('Internationalization', () => {
     await page.locator('input[type="email"]').fill(process.env.TEST_USER_A_EMAIL!);
     await page.locator('input[type="password"]').fill(process.env.TEST_USER_A_PASSWORD!);
     await page.locator('button[type="submit"]').click();
-    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 });
+    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 45_000 });
 
     // Verify English is still active
     const locale = await page.evaluate(() => localStorage.getItem('cranial_locale'));

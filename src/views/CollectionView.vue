@@ -3503,6 +3503,14 @@ watch(() => route.query.addCard, (cardName) => {
   }
 }, { immediate: true })
 
+// Watch for action=add query param (from mobile header "+") — open AddCardModal
+watch(() => route.query.action, (action) => {
+  if (action === 'add') {
+    showAddCardModal.value = true
+    void router.replace({ path: '/collection', query: { ...route.query, action: undefined } })
+  }
+}, { immediate: true })
+
 // Warn before leaving if import or delete is in progress
 const handleBeforeUnload = (e: BeforeUnloadEvent) => {
   const importInProgress = importProgress.value && importProgress.value.status !== 'complete' && importProgress.value.status !== 'error'
@@ -4386,7 +4394,7 @@ onUnmounted(() => {
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
-        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[90px]' : ''"
+        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[78px]' : ''"
     />
 </AppContainer>
 

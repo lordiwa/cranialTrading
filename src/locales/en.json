@@ -307,7 +307,9 @@
         "scryfall": "Scryfall"
       },
       "noResults": "No results",
-      "addToCollection": "Add"
+      "addToCollection": "Add",
+      "cancel": "Cancel",
+      "advancedSearch": "Advanced Search"
     }
   },
 

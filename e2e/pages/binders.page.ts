@@ -21,13 +21,13 @@ export class BindersPage {
     this.newBinderButton = page.getByRole('button', { name: /\+ NEW|\+ NUEV/i }).first();
     this.binderList = page.locator('button').filter({ hasText: /binder|carpeta/i });
 
+    // Scope modal buttons to the z-50 overlay to avoid clicking page buttons behind the backdrop
+    const modal = page.locator('.fixed.inset-0.z-50');
     this.createModal = {
       nameInput: page.locator('#create-binder-name'),
       descriptionInput: page.locator('#create-binder-description'),
-      // The modal CREATE button is inside a BaseModal Teleported to body.
-      // Use nth(0) to get the first (modal) CREATE button, not the page one.
-      createButton: page.getByRole('button', { name: 'CREATE', exact: true }).first(),
-      cancelButton: page.getByRole('button', { name: /cancel|cancelar/i }).first(),
+      createButton: modal.getByRole('button', { name: /^CREATE$|^CREAR$/i }),
+      cancelButton: modal.getByRole('button', { name: /cancel|cancelar/i }),
     };
   }
 

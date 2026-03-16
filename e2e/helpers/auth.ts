@@ -242,6 +242,14 @@ export async function waitForLoginResult(page: Page) {
   ]);
   if (result === 'error') {
     const msg = await errorToast.textContent().catch(() => 'unknown error');
+    // Rate-limiting: if Firebase returns wrong-password due to throttling, wait and retry once
+    if (msg?.includes('incorrecto') || msg?.includes('incorrect') || msg?.includes('wrong')) {
+      await page.waitForTimeout(3000);
+      await errorToast.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      await page.locator('button[type="submit"]').click();
+      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 });
+      return;
+    }
     throw new Error(`Login failed: ${msg}. Check credentials and Firebase project.`);
   }
 }

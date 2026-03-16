@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, triggerRef } from 'vue'
 import { defineStore } from 'pinia'
 import {
     addDoc,
@@ -23,6 +23,7 @@ import {
 } from '../services/publicCards'
 import { t } from '../composables/useI18n'
 import { getCardsByIds } from '../services/scryfall'
+import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
 
 /**
  * Commit a Firestore batch with retry logic (skips retries for permission errors)
@@ -101,7 +102,7 @@ export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
 
-    const cards = ref<Card[]>([])
+    const cards = shallowRef<Card[]>([])
     const loading = ref(false)
     const lastSyncAt = ref<Date | null>(null)
 
@@ -230,6 +231,7 @@ export const useCollectionStore = defineStore('collection', () => {
         }
 
         if (updates.length === 0) return
+        triggerRef(cards)
 
         await persistEnrichmentBatches(updates, authStore.user.id)
         console.info(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
@@ -258,6 +260,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 createdAt: new Date(),
             }
             cards.value.push(newCard)
+            triggerRef(cards)
 
             // Sync to public collection (non-blocking, log-only on failure)
             const userInfo = getUserInfo()
@@ -293,6 +296,7 @@ export const useCollectionStore = defineStore('collection', () => {
         if (index > -1 && existingCard) {
             // eslint-disable-next-line security/detect-object-injection
             cards.value[index] = { ...existingCard, ...updates, updatedAt: new Date() }
+            triggerRef(cards)
         }
 
         try {
@@ -328,6 +332,7 @@ export const useCollectionStore = defineStore('collection', () => {
             if (index > -1 && snapshot) {
                 // eslint-disable-next-line security/detect-object-injection
                 cards.value[index] = snapshot
+                triggerRef(cards)
             }
             console.error('Error updating card:', error)
             toastStore.show(t('collection.messages.updateError'), 'error')
@@ -362,18 +367,30 @@ export const useCollectionStore = defineStore('collection', () => {
                 onProgress?.(Math.round((completedSteps / totalSteps) * 100))
             }
 
+            // Save which cards were previously public-eligible (sale/trade)
+            // Only these could have public_cards docs that need cleanup
+            const previouslyPublicIds = new Set<string>()
+            for (const cardId of cardIds) {
+                const card = cards.value.find(c => c.id === cardId)
+                if (card && (card.status === 'sale' || card.status === 'trade')) {
+                    previouslyPublicIds.add(cardId)
+                }
+            }
+
             // Update local state
             const updatedCards = applyLocalCardUpdates(cardIds, updates)
 
-            // Batch sync to public_cards
+            // Only sync cards that transition to/from public state
+            const cardsToSync = getCardsNeedingPublicSync(updatedCards, previouslyPublicIds)
+
+            // Batch sync to public_cards (non-fatal — card updates already succeeded)
             const userInfo = getUserInfo()
-            if (userInfo && updatedCards.length > 0) {
+            if (userInfo && cardsToSync.length > 0) {
                 const progressCb = onProgress
                     ? (completed: number) => { onProgress(Math.round(((firestoreChunkCount + completed) / totalSteps) * 100)) }
                     : undefined
-                const syncPromise = batchSyncCardsToPublic(updatedCards, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, progressCb)
-                if (!onProgress) syncPromise.catch((err: unknown) => { console.error(`[PublicSync] Batch sync failed:`, err) })
-                else await syncPromise
+                batchSyncCardsToPublic(cardsToSync, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, progressCb)
+                    .catch((err: unknown) => { console.error('[PublicSync] Batch sync failed (non-fatal):', err) })
             }
 
             return true
@@ -397,6 +414,7 @@ export const useCollectionStore = defineStore('collection', () => {
             cards.value[index] = updatedCard
             updatedCards.push(updatedCard)
         }
+        if (updatedCards.length > 0) triggerRef(cards)
         return updatedCards
     }
 
@@ -415,6 +433,7 @@ export const useCollectionStore = defineStore('collection', () => {
         if (cardIndex === -1 || !deletedCard) return false
 
         cards.value.splice(cardIndex, 1)
+        triggerRef(cards)
 
         // Sync with Firebase in background
         try {
@@ -432,6 +451,7 @@ export const useCollectionStore = defineStore('collection', () => {
             // Restore card on failure
             console.error('Error deleting card:', error)
             cards.value.splice(cardIndex, 0, deletedCard)
+            triggerRef(cards)
             toastStore.show(t('collection.messages.deleteError'), 'error')
             return false
         }
@@ -658,6 +678,7 @@ export const useCollectionStore = defineStore('collection', () => {
             }
 
             cards.value.push(...createdCards)
+            triggerRef(cards)
 
             if (!silent) {
                 const msg = t('collection.messages.imported', { count: createdIds.length })

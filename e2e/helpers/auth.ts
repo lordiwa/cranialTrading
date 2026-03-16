@@ -14,10 +14,19 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
     throw new Error('Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD');
   }
 
-  // Wait for the page to be ready instead of hardcoded timeout
+  // Wait for Vue to bootstrap and either show login form or authenticated nav.
+  // page.goto resolves on initial HTML load, before Vue's client-side redirect.
   await page.waitForLoadState('domcontentloaded');
+  const loginForm = page.locator('input[type="email"]');
+  const authenticatedNav = page.locator('[data-testid="nav-collection"], [data-tour="nav-collection"]');
+  await Promise.race([
+    loginForm.waitFor({ state: 'visible', timeout: 10_000 }),
+    authenticatedNav.waitFor({ state: 'visible', timeout: 10_000 }),
+  ]).catch(() => {
+    // Neither appeared — fall through to URL check
+  });
 
-  if (page.url().includes('/login')) {
+  if (page.url().includes('/login') || await loginForm.isVisible().catch(() => false)) {
     await page.locator('input[type="email"]').fill(email);
     await page.locator('input[type="password"]').fill(password);
     await page.locator('button[type="submit"]').click();

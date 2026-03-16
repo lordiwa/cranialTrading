@@ -30,8 +30,16 @@ export class LoginPage {
   }
 
   async waitForRedirect() {
-    await this.page.waitForURL((url) => !url.pathname.includes('/login'), {
-      timeout: 15_000,
-    });
+    const errorToast = this.page.locator('.border-rust').first();
+    const result = await Promise.race([
+      this.page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 })
+        .then(() => 'redirected' as const),
+      errorToast.waitFor({ state: 'visible', timeout: 10_000 })
+        .then(() => 'error' as const),
+    ]);
+    if (result === 'error') {
+      const msg = await errorToast.textContent().catch(() => 'unknown error');
+      throw new Error(`Login failed: ${msg}`);
+    }
   }
 }

@@ -88,6 +88,36 @@
     },
     "messages": {
       "loadError": "Erro ao carregar dados"
+    },
+    "import": {
+      "importing": "Importando \"{name}\"...",
+      "creatingDeck": "Criando deck \"{name}\"...",
+      "creatingBinder": "Criando pasta \"{name}\"...",
+      "errorCreatingDeck": "Erro ao criar o deck",
+      "errorCreatingBinder": "Erro ao criar a pasta",
+      "preparing": "Preparando {count} cartas...",
+      "fetchingData": "Obtendo dados de {count} cartas...",
+      "processing": "Processando cartas...",
+      "processingCount": "Processando {count} cartas...",
+      "processingProgress": "Processando {current}/{total}...",
+      "fetchingPrices": "Buscando preços adicionais...",
+      "saving": "Salvando {count} cartas...",
+      "allocatingToDeck": "Alocando cartas ao deck...",
+      "allocatingToDeckCount": "Alocando {count} cartas ao deck...",
+      "allocatingToBinder": "Alocando cartas à pasta...",
+      "allocatingToBinderCount": "Alocando {count} cartas à pasta...",
+      "allocatingProgress": "Alocando {current}/{total}...",
+      "deckComplete": "\"{name}\" importado com {count} cartas",
+      "binderComplete": "\"{name}\" importada com {count} cartas",
+      "errorDeck": "Erro ao importar o deck",
+      "errorBinder": "Erro ao importar a pasta",
+      "errorCsv": "Erro ao importar CSV",
+      "deckCreated": "Deck \"{name}\" criado",
+      "resuming": "Continuando \"{name}\"...",
+      "resumeComplete": "\"{name}\" concluído com {count} cartas",
+      "resumeIncomplete": "Importação incompleta. O deck pode estar vazio.",
+      "resumeError": "Erro ao retomar importação",
+      "resumeFailed": "Importação de \"{name}\" falhou. Limpando..."
     }
   },
 
@@ -307,7 +337,9 @@
         "scryfall": "Scryfall"
       },
       "noResults": "Sem resultados",
-      "addToCollection": "Adicionar"
+      "addToCollection": "Adicionar",
+      "cancel": "Cancelar",
+      "advancedSearch": "Busca avançada"
     }
   },
 
@@ -682,6 +714,18 @@
       "deleteTitle": "Excluir carta",
       "statusChanged": "Status mudado para {status}",
       "statusError": "Erro ao mudar status"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Quantidade",
+      "minusOne": "-1 Quantidade",
+      "collection": "Coleção",
+      "trade": "Troca",
+      "sale": "Venda",
+      "wishlist": "Desejado",
+      "toggleFoil": "Alternar Foil",
+      "togglePublic": "Alternar Visibilidade",
+      "edit": "Editar",
+      "delete": "Excluir"
     }
   },
 
@@ -1000,7 +1044,39 @@
       "deallocateError": "Erro ao desatribuir carta",
       "removeWishlistError": "Erro ao remover da wishlist",
       "maxAvailable": "Apenas {max} disponíveis",
-      "updateQuantityError": "Erro ao atualizar quantidade"
+      "exceedsAvailable": "Você só tem {max} disponíveis. Deseja adicionar +1 à sua coleção?",
+      "addToCollectionBtn": "ADICIONAR À COLEÇÃO",
+      "addToWishlistBtn": "ADICIONAR À WISHLIST",
+      "addedToCollection": "Carta adicionada à coleção e alocada",
+      "addedToWishlistFromDeck": "Carta adicionada à wishlist e alocada",
+      "removeFromCollectionToo": "Carta removida do deck. Também remover da coleção?",
+      "removedFromCollectionToo": "Carta removida do deck e da coleção",
+      "updateQuantityError": "Erro ao atualizar quantidade",
+      "moveBoardError": "Erro ao mover carta entre boards",
+      "movedToSideboard": "Movida para sideboard",
+      "movedToMainboard": "Movida para mainboard"
+    },
+    "prompt": {
+      "moveBoardTitle": "Mover Cartas",
+      "moveBoardMessage": "Quantas cópias de {name} mover para {target}?",
+      "quantityLabel": "Quantidade",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "addExtrasTitle": "Adicionar Cartas Extra",
+      "addExtrasMessage": "Você só tem {available}. Adicionar {extra} cópias extra?",
+      "addToCollection": "Coleção",
+      "addToWishlist": "Lista de Desejos",
+      "chooseDestination": "Adicionar extras à coleção ou lista de desejos?"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Cópia",
+      "minusOne": "-1 Cópia",
+      "moveToSideboard": "Mover para Sideboard",
+      "moveToMainboard": "Mover para Mainboard",
+      "setCommander": "Definir como Comandante",
+      "removeCommander": "Remover Comandante",
+      "edit": "Editar",
+      "removeFromDeck": "Remover do Deck"
     }
   },
 
@@ -1913,10 +1989,17 @@
     "created": "Pasta \"{name}\" criada",
     "cardAdded": "Carta adicionada à pasta",
     "cardRemoved": "Carta removida da pasta",
+    "quantityUpdated": "Quantidade atualizada",
     "errors": {
       "load": "Erro ao carregar pastas",
       "create": "Erro ao criar pasta",
       "delete": "Erro ao excluir pasta"
+    },
+    "importModal": {
+      "title": "IMPORTAR PASTA",
+      "inputLabel": "Link do Moxfield ou texto da pasta",
+      "binderNameLabel": "Nome da pasta (opcional)",
+      "binderNamePlaceholder": "Deixe vazio para gerar um nome aleatório"
     }
   },
 

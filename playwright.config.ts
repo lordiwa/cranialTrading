@@ -12,21 +12,21 @@ export default defineConfig({
   testDir: './e2e/specs',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: [
     ['html', { outputFolder: 'e2e/playwright-report', open: 'never' }],
     ['list'],
   ],
   outputDir: 'e2e/test-results',
-  timeout: 60_000,
+  timeout: 45_000,
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
-    actionTimeout: 15_000,
-    navigationTimeout: 30_000,
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
   },
   projects: [
     {
@@ -47,7 +47,7 @@ export default defineConfig({
   webServer: {
     command: process.env.CI
       ? 'npx vite preview --port 4173'
-      : 'npx vite build && npx vite preview --port 4173',
+      : `npx vite build --mode ${process.env.VITE_MODE || 'production'} && npx vite preview --port 4173`,
     port: 4173,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

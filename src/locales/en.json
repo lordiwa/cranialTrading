@@ -88,6 +88,36 @@
     },
     "messages": {
       "loadError": "Error loading data"
+    },
+    "import": {
+      "importing": "Importing \"{name}\"...",
+      "creatingDeck": "Creating deck \"{name}\"...",
+      "creatingBinder": "Creating binder \"{name}\"...",
+      "errorCreatingDeck": "Error creating deck",
+      "errorCreatingBinder": "Error creating binder",
+      "preparing": "Preparing {count} cards...",
+      "fetchingData": "Fetching data for {count} cards...",
+      "processing": "Processing cards...",
+      "processingCount": "Processing {count} cards...",
+      "processingProgress": "Processing {current}/{total}...",
+      "fetchingPrices": "Fetching additional prices...",
+      "saving": "Saving {count} cards...",
+      "allocatingToDeck": "Allocating cards to deck...",
+      "allocatingToDeckCount": "Allocating {count} cards to deck...",
+      "allocatingToBinder": "Allocating cards to binder...",
+      "allocatingToBinderCount": "Allocating {count} cards to binder...",
+      "allocatingProgress": "Allocating {current}/{total}...",
+      "deckComplete": "\"{name}\" imported with {count} cards",
+      "binderComplete": "\"{name}\" imported with {count} cards",
+      "errorDeck": "Error importing deck",
+      "errorBinder": "Error importing binder",
+      "errorCsv": "Error importing CSV",
+      "deckCreated": "Deck \"{name}\" created",
+      "resuming": "Resuming \"{name}\"...",
+      "resumeComplete": "\"{name}\" completed with {count} cards",
+      "resumeIncomplete": "Import incomplete. Deck may be empty.",
+      "resumeError": "Error resuming import",
+      "resumeFailed": "Import of \"{name}\" failed. Cleaning up..."
     }
   },
 
@@ -307,7 +337,9 @@
         "scryfall": "Scryfall"
       },
       "noResults": "No results",
-      "addToCollection": "Add"
+      "addToCollection": "Add",
+      "cancel": "Cancel",
+      "advancedSearch": "Advanced Search"
     }
   },
 
@@ -682,6 +714,18 @@
       "deleteTitle": "Delete card",
       "statusChanged": "Status changed to {status}",
       "statusError": "Error changing status"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Quantity",
+      "minusOne": "-1 Quantity",
+      "collection": "Collection",
+      "trade": "Trade",
+      "sale": "Sale",
+      "wishlist": "Wishlist",
+      "toggleFoil": "Toggle Foil",
+      "togglePublic": "Toggle Public",
+      "edit": "Edit",
+      "delete": "Delete"
     }
   },
 
@@ -1000,7 +1044,39 @@
       "deallocateError": "Error unassigning card",
       "removeWishlistError": "Error removing from wishlist",
       "maxAvailable": "Only {max} available",
-      "updateQuantityError": "Error updating quantity"
+      "exceedsAvailable": "You only have {max} available. Do you want to add +1 to your collection?",
+      "addToCollectionBtn": "ADD TO COLLECTION",
+      "addToWishlistBtn": "ADD TO WISHLIST",
+      "addedToCollection": "Card added to collection and allocated",
+      "addedToWishlistFromDeck": "Card added to wishlist and allocated",
+      "removeFromCollectionToo": "Card removed from deck. Also remove from collection?",
+      "removedFromCollectionToo": "Card removed from deck and collection",
+      "updateQuantityError": "Error updating quantity",
+      "moveBoardError": "Error moving card between boards",
+      "movedToSideboard": "Moved to sideboard",
+      "movedToMainboard": "Moved to mainboard"
+    },
+    "prompt": {
+      "moveBoardTitle": "Move Cards",
+      "moveBoardMessage": "How many copies of {name} to move to {target}?",
+      "quantityLabel": "Quantity",
+      "mainboard": "Mainboard",
+      "sideboard": "Sideboard",
+      "addExtrasTitle": "Add Extra Cards",
+      "addExtrasMessage": "You only have {available}. Add {extra} extra copies?",
+      "addToCollection": "Collection",
+      "addToWishlist": "Wishlist",
+      "chooseDestination": "Add extras to collection or wishlist?"
+    },
+    "contextMenu": {
+      "plusOne": "+1 Copy",
+      "minusOne": "-1 Copy",
+      "moveToSideboard": "Move to Sideboard",
+      "moveToMainboard": "Move to Mainboard",
+      "setCommander": "Set as Commander",
+      "removeCommander": "Remove Commander",
+      "edit": "Edit",
+      "removeFromDeck": "Remove from Deck"
     }
   },
 
@@ -1913,10 +1989,17 @@
     "created": "Binder \"{name}\" created",
     "cardAdded": "Card added to binder",
     "cardRemoved": "Card removed from binder",
+    "quantityUpdated": "Quantity updated",
     "errors": {
       "load": "Failed to load binders",
       "create": "Failed to create binder",
       "delete": "Failed to delete binder"
+    },
+    "importModal": {
+      "title": "IMPORT BINDER",
+      "inputLabel": "Moxfield link or binder text",
+      "binderNameLabel": "Binder name (optional)",
+      "binderNamePlaceholder": "Leave empty to generate a random name"
     }
   },
 

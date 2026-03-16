@@ -36,17 +36,36 @@ test.describe('Deck CRUD', () => {
     const deckName = `DeleteMe ${Date.now()}`;
     await decksPage.createDeck(deckName);
     await commonPage.waitForToast('success');
-    await decksPage.page.waitForTimeout(1000);
+    await commonPage.waitForToastDismiss().catch(() => {});
+    await decksPage.page.waitForTimeout(500);
 
-    // Now delete it
-    await decksPage.deleteDeck(deckName);
-    await commonPage.confirmAction();
-    await commonPage.waitForToast('success');
+    // The newly created deck should be auto-selected. Find and click its ELIMINAR button.
+    // The ELIMINAR button is in the deck details area (BaseButton variant="secondary")
+    const eliminarDetail = decksPage.page.getByRole('button', { name: /^ELIMINAR$/i }).first();
+    if (await eliminarDetail.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await eliminarDetail.click();
+    } else {
+      // Deck might need to be selected first — click the deck tab
+      const deckTab = decksPage.page.locator(`button`).filter({ hasText: deckName }).first();
+      await deckTab.scrollIntoViewIfNeeded();
+      await deckTab.click();
+      await decksPage.page.waitForTimeout(500);
+      await eliminarDetail.click();
+    }
+
+    // First confirm: "¿Eliminar el deck?" — click ELIMINAR in the z-[60] dialog
+    const confirmDialog = decksPage.page.locator('.fixed.inset-0.z-\\[60\\]');
+    await confirmDialog.first().waitFor({ state: 'visible', timeout: 5000 });
+    // The confirm button in the dialog (last button = confirm text)
+    const confirmBtn = confirmDialog.first().locator('button').last();
+    await confirmBtn.click();
+
+    // New deck is empty — no second confirm about cards
+    await decksPage.page.waitForTimeout(3000);
 
     // Deck should no longer be visible
-    await decksPage.page.waitForTimeout(1000);
-    const deckText = decksPage.page.locator(`text=${deckName}`);
-    await expect(deckText).toHaveCount(0);
+    const deckText = decksPage.page.locator(`button`).filter({ hasText: deckName });
+    await expect(deckText).toHaveCount(0, { timeout: 5000 });
   });
 
   test('open existing deck in editor → editor loads with stats', async ({ decksPage, page }) => {

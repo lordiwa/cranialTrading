@@ -50,17 +50,18 @@ export class CollectionPage {
     this.selectModeButton = page.locator('button').filter({ hasText: /select|seleccionar/i });
     this.bulkActions = page.locator('[class*="bulk"]');
 
-    // Add Card Modal — results are in a max-h-[300px] scrollable grid
+    // Add Card Modal — scoped to the z-50 modal overlay
+    const addModalContainer = page.locator('.fixed.inset-0.z-50').first();
     this.addModal = {
-      searchInput: page.locator('input[placeholder*="earch"]').last(),
-      searchButton: page.getByRole('button', { name: /^search$|^buscar$/i }).first(),
-      resultCards: page.locator('.max-h-\\[300px\\] img'),
-      quantityInput: page.locator('input[type="number"]').first(),
-      conditionSelect: page.locator('select').filter({ has: page.locator('option[value="NM"]') }),
-      statusSelect: page.locator('select').filter({ has: page.locator('option[value="collection"]') }),
-      foilCheckbox: page.locator('input[type="checkbox"]').first(),
-      saveButton: page.getByRole('button', { name: /^add$|agregar/i }),
-      cancelButton: page.getByRole('button', { name: /cancel|close|cerrar/i }),
+      searchInput: addModalContainer.locator('input[placeholder*="earch"]').first(),
+      searchButton: addModalContainer.getByRole('button', { name: /^search$|^buscar$/i }).first(),
+      resultCards: addModalContainer.locator('.max-h-\\[300px\\] img'),
+      quantityInput: addModalContainer.locator('input[type="number"]').first(),
+      conditionSelect: addModalContainer.locator('select').filter({ has: page.locator('option[value="NM"]') }),
+      statusSelect: addModalContainer.locator('select').filter({ has: page.locator('option[value="collection"]') }),
+      foilCheckbox: addModalContainer.locator('input[type="checkbox"]').first(),
+      saveButton: addModalContainer.getByRole('button', { name: /^add$|agregar/i }),
+      cancelButton: addModalContainer.getByRole('button', { name: /cancel|close|cerrar/i }),
     };
 
     // Edit Card Modal — scoped inside z-50 modal overlay to avoid matching grid elements

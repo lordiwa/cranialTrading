@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/auth';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
+import PromptModal from './components/ui/PromptModal.vue';
 import AppFooter from './components/layout/AppFooter.vue';
 
 const authStore = useAuthStore();
@@ -30,7 +31,7 @@ onMounted(() => {
   </div>
 
   <div v-else class="min-h-screen flex flex-col">
-    <div :class="['flex-1', authStore.user ? 'pb-14 md:pb-0' : '']">
+    <div :class="['flex-1', authStore.user ? 'pb-12 md:pb-0' : '']">
       <RouterView />
     </div>
     <AppFooter v-if="showFooter" />
@@ -38,4 +39,5 @@ onMounted(() => {
 
   <BaseToast />
   <ConfirmModal />
+  <PromptModal />
 </template>

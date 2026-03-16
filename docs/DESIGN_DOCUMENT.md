@@ -46,9 +46,9 @@ Cranial Trading is a Magic: The Gathering trading platform that enables players 
 
 - **Background:** #000000 (black)
 - **Text:** #EEEEEE (silver)
-- **Accents:** #CCFF00 (neon)
+- **Accents:** #5AC168 (neon)
 - **Errors:** #8B2E1F (rust)
-- **Font:** IBM Plex Mono (monospace throughout)
+- **Font:** Open Sans (sans-serif throughout)
 
 ---
 

@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { type ToastType, useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
+import { usePromptStore } from '../stores/prompt'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
@@ -46,6 +47,7 @@ const decksStore = useDecksStore()
 const binderStore = useBindersStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
+const promptStore = usePromptStore()
 const { t } = useI18n()
 const { getAllocationsForCard } = useCardAllocation()
 
@@ -388,10 +390,19 @@ const clearDeleteDeckState = () => {
 // Cartas según status
 const collectionCards = computed(() => collectionStore.cards)
 
-// Cartas que TENGO (no wishlist)
-const ownedCards = computed(() =>
-    collectionCards.value.filter(c => c.status !== 'wishlist')
-)
+// Single-pass status counts (avoids 4 separate filter passes over 10k cards)
+const statusCounts = computed(() => {
+  let owned = 0, collectionSt = 0, available = 0, wishlist = 0
+  for (const c of collectionCards.value) {
+    if (c.status === 'wishlist') { wishlist++ }
+    else {
+      owned++
+      if (c.status === 'collection') collectionSt++
+      else if (c.status === 'sale' || c.status === 'trade') available++
+    }
+  }
+  return { owned, collection: collectionSt, available, wishlist }
+})
 
 // Cartas que NECESITO (wishlist) - con filtro de búsqueda y ordenamiento
 const wishlistCards = computed(() => {
@@ -426,19 +437,11 @@ const wishlistCards = computed(() => {
   return cards
 })
 
-// Contadores por status (totales, sin filtrar por búsqueda)
-const ownedCount = computed(() => ownedCards.value.length)
-const collectionCount = computed(() =>
-    collectionCards.value.filter(c => c.status === 'collection').length
-)
-// Combinamos sale + trade en "disponible" (para venta o cambio)
-const availableCount = computed(() =>
-    collectionCards.value.filter(c => c.status === 'sale' || c.status === 'trade').length
-)
-// Total de wishlist (sin filtrar, para mostrar en badges)
-const wishlistTotalCount = computed(() =>
-    collectionCards.value.filter(c => c.status === 'wishlist').length
-)
+// Contadores por status (totales, sin filtrar por búsqueda) — from single-pass statusCounts
+const ownedCount = computed(() => statusCounts.value.owned)
+const collectionCount = computed(() => statusCounts.value.collection)
+const availableCount = computed(() => statusCounts.value.available)
+const wishlistTotalCount = computed(() => statusCounts.value.wishlist)
 // Wishlist filtrada (para mostrar en la sección)
 const wishlistCount = computed(() => wishlistCards.value.length)
 
@@ -472,13 +475,19 @@ const selectedDeckStats = computed(() => {
   return selectedDeck.value.stats
 })
 
-// Cartas del deck actual (owned)
+// Cartas del deck actual (owned) — iterates allocations (O(60-100)) instead of collection (O(3000))
 const deckOwnedCards = computed(() => {
-  if (deckFilter.value === 'all') return []
-  return ownedCards.value.filter(c => {
-    const allocations = getAllocationsForCard(c.id)
-    return allocations.some(a => a.deckId === deckFilter.value)
-  })
+  if (!selectedDeck.value?.allocations) return []
+  const cardMap = new Map(collectionStore.cards.map(c => [c.id, c]))
+  const seen = new Set<string>()
+  const result: Card[] = []
+  for (const alloc of selectedDeck.value.allocations) {
+    if (seen.has(alloc.cardId)) continue
+    seen.add(alloc.cardId)
+    const card = cardMap.get(alloc.cardId)
+    if (card && card.status !== 'wishlist') result.push(card)
+  }
+  return result
 })
 
 // Wishlist del deck actual (legacy DeckWishlistItem[])
@@ -511,42 +520,6 @@ const commanderNames = computed((): string[] => {
   return names.map(n => n.trim()).filter(n => n.length > 0)
 })
 
-// Cartas del comandante (owned) - puede haber varias
-// Solo busca en cartas asignadas al deck
-const deckCommanderCards = computed(() => {
-  if (!selectedDeck.value || !isCommanderFormat.value || commanderNames.value.length === 0) return []
-  return deckOwnedCards.value.filter(c =>
-    commanderNames.value.some(name => c.name.toLowerCase() === name.toLowerCase())
-  )
-})
-
-// Cartas del mainboard (owned, no sideboard, no commander)
-const deckMainboardCards = computed(() => {
-  if (deckFilter.value === 'all') return []
-  return deckOwnedCards.value.filter(c => {
-    // Excluir comandantes (pueden ser varios con Partner)
-    if (isCommanderFormat.value && commanderNames.value.length > 0) {
-      const cardNameLower = c.name.toLowerCase()
-      if (commanderNames.value.some(name => name.toLowerCase() === cardNameLower)) {
-        return false
-      }
-    }
-    const allocations = getAllocationsForCard(c.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return deckAlloc && !deckAlloc.isInSideboard
-  })
-})
-
-// Cartas del sideboard (owned)
-const deckSideboardCards = computed(() => {
-  if (deckFilter.value === 'all' || isCommanderFormat.value) return []
-  return deckOwnedCards.value.filter(c => {
-    const allocations = getAllocationsForCard(c.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return deckAlloc?.isInSideboard
-  })
-})
-
 // Wishlist del mainboard
 const deckMainboardWishlist = computed(() => {
   if (!selectedDeck.value) return []
@@ -559,21 +532,24 @@ const deckSideboardWishlist = computed(() => {
   return (selectedDeck.value.wishlist ?? []).filter(w => w.isInSideboard)
 })
 
-// Conteo de cartas por sección
+// Conteo de cartas por sección — derived from display cards (no redundant allocation lookups)
 const mainboardOwnedCount = computed(() => {
-  return deckMainboardCards.value.reduce((sum, card) => {
-    const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && !a.isInSideboard)
-    return sum + (deckAlloc?.quantity ?? 0)
-  }, 0)
+  return mainboardDisplayCards.value
+    .filter(c => !c.isWishlist)
+    .reduce((sum, c) => {
+      // Exclude commander cards from mainboard count (matches previous behavior)
+      if (isCommanderFormat.value && commanderNames.value.length > 0 &&
+        commanderNames.value.some(name => name.toLowerCase() === c.name.toLowerCase())) {
+        return sum
+      }
+      return sum + c.allocatedQuantity
+    }, 0)
 })
 
 const sideboardOwnedCount = computed(() => {
-  return deckSideboardCards.value.reduce((sum, card) => {
-    const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && a.isInSideboard)
-    return sum + (deckAlloc?.quantity ?? 0)
-  }, 0)
+  return sideboardDisplayCards.value
+    .filter(c => !c.isWishlist)
+    .reduce((sum, c) => sum + c.allocatedQuantity, 0)
 })
 
 const mainboardWishlistCount = computed(() => {
@@ -820,20 +796,22 @@ const getGroupCardCount = (cards: Card[]): number => {
 }
 
 // Convert owned cards to DisplayDeckCard format for DeckEditorGrid
+// Consolidated: iterates deck allocations directly (O(allocations)) instead of going through
+// deckMainboardCards chain which filtered the entire collection
 const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
   if (!selectedDeck.value) return []
 
-  // Include commander cards if applicable (can have multiple with Partner)
-  const cardsToConvert = [...deckMainboardCards.value]
-  if (isCommanderFormat.value && deckCommanderCards.value.length > 0) {
-    cardsToConvert.unshift(...deckCommanderCards.value)
-  }
+  const cardMap = new Map(collectionStore.cards.map(c => [c.id, c]))
+  const commanderDisplay: HydratedDeckCard[] = []
+  const mainboardOwned: HydratedDeckCard[] = []
 
-  // Convert owned cards to HydratedDeckCard format
-  const ownedDisplay: HydratedDeckCard[] = cardsToConvert.map(card => {
-    const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && !a.isInSideboard)
-    return {
+  // Iterate allocations directly (O(60-100)) instead of filtering collection (O(3000))
+  for (const alloc of selectedDeck.value.allocations ?? []) {
+    if (alloc.isInSideboard) continue
+    const card = cardMap.get(alloc.cardId)
+    if (!card || card.status === 'wishlist') continue
+
+    const hydratedCard: HydratedDeckCard = {
       cardId: card.id,
       scryfallId: card.scryfallId,
       name: card.name,
@@ -846,15 +824,25 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
       type_line: card.type_line,
       colors: card.colors,
       produced_mana: card.produced_mana,
-      allocatedQuantity: deckAlloc?.quantity ?? 0,
+      allocatedQuantity: alloc.quantity,
       isInSideboard: false,
       notes: undefined,
       addedAt: card.createdAt ?? new Date(),
       isWishlist: false as const,
-      availableInCollection: card.quantity - (deckAlloc?.quantity ?? 0),
+      availableInCollection: card.quantity - alloc.quantity,
       totalInCollection: card.quantity,
     }
-  })
+
+    // Separate commander cards (displayed first in mainboard)
+    const isCommander = isCommanderFormat.value && commanderNames.value.length > 0 &&
+      commanderNames.value.some(name => name.toLowerCase() === card.name.toLowerCase())
+
+    if (isCommander) {
+      commanderDisplay.push(hydratedCard)
+    } else {
+      mainboardOwned.push(hydratedCard)
+    }
+  }
 
   // Convert legacy wishlist items to HydratedWishlistCard format
   const wishlistDisplay: HydratedWishlistCard[] = deckMainboardWishlist.value.map(item => ({
@@ -913,17 +901,23 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
         totalInCollection: ownedByScryfallId.get(card.scryfallId) ?? 0,
       }))
 
-  return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
+  return [...commanderDisplay, ...mainboardOwned, ...wishlistDisplay, ...allocWishlistDisplay]
 })
 
+// Consolidated: iterates deck allocations directly for sideboard
 const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
   if (!selectedDeck.value || isCommanderFormat.value) return []
 
-  // Convert owned cards to HydratedDeckCard format
-  const ownedDisplay: HydratedDeckCard[] = deckSideboardCards.value.map(card => {
-    const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value && a.isInSideboard)
-    return {
+  const cardMap = new Map(collectionStore.cards.map(c => [c.id, c]))
+  const sideboardOwned: HydratedDeckCard[] = []
+
+  // Iterate allocations directly (O(allocations)) instead of filtering collection
+  for (const alloc of selectedDeck.value.allocations ?? []) {
+    if (!alloc.isInSideboard) continue
+    const card = cardMap.get(alloc.cardId)
+    if (!card || card.status === 'wishlist') continue
+
+    sideboardOwned.push({
       cardId: card.id,
       scryfallId: card.scryfallId,
       name: card.name,
@@ -936,15 +930,15 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
       type_line: card.type_line,
       colors: card.colors,
       produced_mana: card.produced_mana,
-      allocatedQuantity: deckAlloc?.quantity ?? 0,
+      allocatedQuantity: alloc.quantity,
       isInSideboard: true,
       notes: undefined,
       addedAt: card.createdAt ?? new Date(),
       isWishlist: false as const,
-      availableInCollection: card.quantity - (deckAlloc?.quantity ?? 0),
+      availableInCollection: card.quantity - alloc.quantity,
       totalInCollection: card.quantity,
-    }
-  })
+    })
+  }
 
   // Convert legacy wishlist items to HydratedWishlistCard format
   const wishlistDisplay: HydratedWishlistCard[] = deckSideboardWishlist.value.map(item => ({
@@ -969,12 +963,11 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
     totalInCollection: 0,
   }))
 
-  // Convert new-model wishlist allocation cards (collection cards with status='wishlist')
-  // Look up actual owned count (non-wishlist cards) by scryfallId for proxy detection
-  const sideboardOwnedByScryfallId = new Map<string, number>()
+  // Convert new-model wishlist allocation cards
+  const ownedByScryfallId = new Map<string, number>()
   for (const c of collectionStore.cards) {
     if (c.status !== 'wishlist') {
-      sideboardOwnedByScryfallId.set(c.scryfallId, (sideboardOwnedByScryfallId.get(c.scryfallId) ?? 0) + c.quantity)
+      ownedByScryfallId.set(c.scryfallId, (ownedByScryfallId.get(c.scryfallId) ?? 0) + c.quantity)
     }
   }
 
@@ -1000,10 +993,10 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
         addedAt: alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt),
         isWishlist: true as const,
         availableInCollection: 0,
-        totalInCollection: sideboardOwnedByScryfallId.get(card.scryfallId) ?? 0,
+        totalInCollection: ownedByScryfallId.get(card.scryfallId) ?? 0,
       }))
 
-  return [...ownedDisplay, ...wishlistDisplay, ...allocWishlistDisplay]
+  return [...sideboardOwned, ...wishlistDisplay, ...allocWishlistDisplay]
 })
 
 // Text-search filtered versions of deck/binder display cards (filterQuery is handled by useCardFilter for collection mode only)
@@ -1050,8 +1043,10 @@ const isDeckPublic = computed(() => {
 const deckOwnedCount = computed(() => {
   return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + (deckAlloc?.quantity ?? 0)
+    const totalQty = allocations
+      .filter(a => a.deckId === deckFilter.value)
+      .reduce((s, a) => s + a.quantity, 0)
+    return sum + totalQty
   }, 0)
 })
 
@@ -1081,8 +1076,10 @@ const deckOwnedCostBySource = computed(() => {
   if (deckFilter.value === 'all') return 0
   return deckOwnedCards.value.reduce((sum, card) => {
     const allocations = getAllocationsForCard(card.id)
-    const deckAlloc = allocations.find(a => a.deckId === deckFilter.value)
-    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * (deckAlloc?.quantity ?? 0)
+    const totalQty = allocations
+      .filter(a => a.deckId === deckFilter.value)
+      .reduce((s, a) => s + a.quantity, 0)
+    return sum + getCardPriceBySource(card.id, card.price, deckPriceSource.value) * totalQty
   }, 0)
 })
 
@@ -1450,6 +1447,8 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
 
   const cardName = displayCard.name
+  const cardId = displayCard.cardId
+  const isWishlist = displayCard.isWishlist
   const confirmed = await confirmStore.show({
     title: `Eliminar del deck`,
     message: `¿Eliminar "${cardName}" del deck?`,
@@ -1460,12 +1459,10 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
 
   if (!confirmed) return
 
-  if (displayCard.isWishlist) {
-    if (displayCard.cardId) {
-      // New model: wishlist card is an allocation → deallocate
-      await decksStore.deallocateCard(selectedDeck.value.id, displayCard.cardId, displayCard.isInSideboard)
+  if (isWishlist) {
+    if (cardId) {
+      await decksStore.deallocateCard(selectedDeck.value.id, cardId, displayCard.isInSideboard)
     } else {
-      // Legacy: remove from wishlist array
       await decksStore.removeFromWishlist(
         selectedDeck.value.id,
         displayCard.scryfallId,
@@ -1476,12 +1473,27 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
       )
     }
   } else {
-    // Deallocate from deck (card stays in collection)
-    const ownedCard = displayCard
-    await decksStore.deallocateCard(selectedDeck.value.id, ownedCard.cardId, ownedCard.isInSideboard)
+    await decksStore.deallocateCard(selectedDeck.value.id, cardId, displayCard.isInSideboard)
   }
 
-  toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
+  // Offer to also remove from collection (promise resolves after leave transition)
+  if (cardId) {
+    const removeFromCollection = await confirmStore.show({
+      title: cardName,
+      message: t('decks.messages.removeFromCollectionToo'),
+      confirmText: t('common.actions.delete'),
+      cancelText: t('common.actions.cancel'),
+      confirmVariant: 'danger'
+    })
+    if (removeFromCollection) {
+      await collectionStore.deleteCard(cardId)
+      toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+    } else {
+      toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
+    }
+  } else {
+    toastStore.show(t('decks.editor.messages.cardRemoved'), 'success')
+  }
 }
 
 // Handle quantity update from deck grid
@@ -1489,16 +1501,77 @@ const handleDeckGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQua
   if (!selectedDeck.value) return
 
   if (!displayCard.isWishlist || displayCard.cardId) {
-    // Owned cards and new-model wishlist cards both use allocations
     const cardId = displayCard.cardId
-    if (cardId) {
-      await decksStore.updateAllocation(
-        selectedDeck.value.id,
-        cardId,
-        displayCard.isInSideboard,
-        newQuantity
-      )
-      toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+    if (!cardId) return
+
+    const ok = await decksStore.updateAllocation(
+      selectedDeck.value.id,
+      cardId,
+      displayCard.isInSideboard,
+      newQuantity,
+      true // silent — we handle the max-exceeded case ourselves
+    )
+
+    if (ok) {
+      const wasDecrement = newQuantity < displayCard.allocatedQuantity
+      if (wasDecrement && cardId) {
+        const removeFromCollection = await confirmStore.show({
+          title: displayCard.name,
+          message: t('decks.messages.removeFromCollectionToo'),
+          confirmText: t('common.actions.delete'),
+          cancelText: t('common.actions.cancel'),
+          confirmVariant: 'danger'
+        })
+        if (removeFromCollection) {
+          const card = collectionStore.getCardById(cardId)
+          if (card) {
+            if (card.quantity <= 1) {
+              await collectionStore.deleteCard(cardId)
+            } else {
+              await collectionStore.updateCard(cardId, { quantity: card.quantity - 1 })
+            }
+            toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+          }
+        } else {
+          toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+        }
+      } else {
+        toastStore.show(t('decks.editor.messages.quantityUpdated'), 'success')
+      }
+    } else if (newQuantity > displayCard.allocatedQuantity) {
+      // Allocation failed likely due to max available — offer to add to collection or wishlist
+      const card = collectionStore.getCardById(cardId)
+      if (!card) return
+      const totalAllocated = decksStore.getTotalAllocatedForCard(cardId)
+      const maxAvailable = card.quantity - totalAllocated + (displayCard.allocatedQuantity ?? 0)
+
+      const addToCollection = await confirmStore.show({
+        title: displayCard.name,
+        message: t('decks.messages.exceedsAvailable', { max: maxAvailable }),
+        confirmText: t('decks.messages.addToCollectionBtn'),
+        cancelText: t('decks.messages.addToWishlistBtn'),
+      })
+
+      if (addToCollection) {
+        // Bump collection quantity, then retry allocation
+        await collectionStore.updateCard(cardId, { quantity: card.quantity + 1 })
+        await decksStore.updateAllocation(selectedDeck.value.id, cardId, displayCard.isInSideboard, newQuantity)
+        toastStore.show(t('decks.messages.addedToCollection'), 'success')
+      } else {
+        // Add as wishlist allocation
+        await decksStore.addToWishlist(selectedDeck.value.id, {
+          scryfallId: displayCard.scryfallId,
+          name: displayCard.name,
+          edition: displayCard.edition,
+          quantity: 1,
+          isInSideboard: displayCard.isInSideboard,
+          price: displayCard.price ?? 0,
+          image: displayCard.image ?? '',
+          condition: displayCard.condition,
+          foil: displayCard.foil,
+        })
+        toastStore.show(t('decks.messages.addedToWishlistFromDeck'), 'success')
+      }
     }
   }
 }
@@ -1512,6 +1585,81 @@ const handleDeckGridAddToWishlist = (_displayCard: DisplayDeckCard) => {
 const handleDeckGridToggleCommander = async (displayCard: DisplayDeckCard) => {
   if (!selectedDeck.value) return
   await decksStore.toggleCommander(selectedDeck.value.id, displayCard.name)
+}
+
+// Handle move between mainboard/sideboard from deck grid
+const handleDeckGridMoveBoard = async (displayCard: DisplayDeckCard) => {
+  if (!selectedDeck.value) return
+  const record = displayCard as unknown as Record<string, unknown>
+  const isInSideboard = !displayCard.isWishlist && record.isInSideboard === true
+  const cardId = (record.cardId as string) ?? displayCard.cardId
+  const currentQty = displayCard.isWishlist
+    ? displayCard.requestedQuantity
+    : displayCard.allocatedQuantity
+
+  // qty=1 → skip prompt, move directly
+  if (currentQty <= 1) {
+    await decksStore.moveCardBoard(selectedDeck.value.id, cardId, isInSideboard)
+    return
+  }
+
+  const targetBoard = isInSideboard
+    ? t('decks.prompt.mainboard')
+    : t('decks.prompt.sideboard')
+
+  const requestedQty = await promptStore.show({
+    title: t('decks.prompt.moveBoardTitle'),
+    message: t('decks.prompt.moveBoardMessage', { name: displayCard.name, target: targetBoard }),
+    inputLabel: t('decks.prompt.quantityLabel'),
+    defaultValue: currentQty,
+    min: 1,
+  })
+  if (requestedQty === null) return
+
+  if (requestedQty <= currentQty) {
+    // Normal partial/full move
+    await decksStore.moveCardBoard(selectedDeck.value.id, cardId, isInSideboard, requestedQty)
+  } else {
+    // Move all available first
+    await decksStore.moveCardBoard(selectedDeck.value.id, cardId, isInSideboard, currentQty)
+
+    const extraNeeded = requestedQty - currentQty
+    // Ask to add extras
+    const addExtras = await confirmStore.show({
+      title: t('decks.prompt.addExtrasTitle'),
+      message: t('decks.prompt.addExtrasMessage', { available: currentQty, extra: extraNeeded }),
+    })
+    if (!addExtras) return
+
+    // Ask: collection or wishlist?
+    const toCollection = await confirmStore.show({
+      title: t('decks.prompt.chooseDestination'),
+      message: t('decks.prompt.chooseDestination'),
+      confirmText: t('decks.prompt.addToCollection'),
+      cancelText: t('decks.prompt.addToWishlist'),
+    })
+
+    // Add extras — target board is the destination (opposite of source)
+    const targetSideboard = !isInSideboard
+    await decksStore.addExtraAllocation(
+      selectedDeck.value.id,
+      {
+        scryfallId: displayCard.scryfallId,
+        name: displayCard.name,
+        edition: displayCard.edition,
+        condition: displayCard.condition,
+        foil: displayCard.foil,
+        price: displayCard.price,
+        image: displayCard.image,
+        cmc: displayCard.cmc,
+        type_line: displayCard.type_line,
+        colors: displayCard.colors,
+      },
+      extraNeeded,
+      targetSideboard,
+      toCollection ? 'collection' : 'wishlist'
+    )
+  }
 }
 
 // ========== BINDER EVENT HANDLERS ==========
@@ -2001,9 +2149,11 @@ const handleBinderGridEdit = (displayCard: DisplayDeckCard) => {
 const handleBinderGridRemove = async (displayCard: DisplayDeckCard) => {
   if (!selectedBinder.value) return
 
+  const cardName = displayCard.name
+  const cardId = displayCard.cardId
   const confirmed = await confirmStore.show({
     title: t('binders.cardRemoved'),
-    message: `Remove "${displayCard.name}" from binder?`,
+    message: `Remove "${cardName}" from binder?`,
     confirmText: t('binders.header.delete'),
     cancelText: t('binders.create.cancel'),
     confirmVariant: 'danger'
@@ -2011,17 +2161,103 @@ const handleBinderGridRemove = async (displayCard: DisplayDeckCard) => {
 
   if (!confirmed) return
 
-  await binderStore.deallocateCard(selectedBinder.value.id, displayCard.cardId)
-  toastStore.show(t('binders.cardRemoved'), 'success')
+  await binderStore.deallocateCard(selectedBinder.value.id, cardId)
+
+  // Offer to also remove from collection (promise resolves after leave transition)
+  if (cardId) {
+    const removeFromCollection = await confirmStore.show({
+      title: cardName,
+      message: t('decks.messages.removeFromCollectionToo'),
+      confirmText: t('common.actions.delete'),
+      cancelText: t('common.actions.cancel'),
+      confirmVariant: 'danger'
+    })
+    if (removeFromCollection) {
+      await collectionStore.deleteCard(cardId)
+      toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+    } else {
+      toastStore.show(t('binders.cardRemoved'), 'success')
+    }
+  } else {
+    toastStore.show(t('binders.cardRemoved'), 'success')
+  }
 }
 
 const handleBinderGridQuantityUpdate = async (displayCard: DisplayDeckCard, newQuantity: number) => {
   if (!selectedBinder.value) return
 
   const cardId = displayCard.cardId
-  if (cardId) {
-    await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity)
+  if (!cardId) return
+
+  const ok = await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity, true)
+
+  if (ok) {
+    const wasDecrement = newQuantity < displayCard.allocatedQuantity
+    if (wasDecrement && cardId) {
+      const removeFromCollection = await confirmStore.show({
+        title: displayCard.name,
+        message: t('decks.messages.removeFromCollectionToo'),
+        confirmText: t('common.actions.delete'),
+        cancelText: t('common.actions.cancel'),
+        confirmVariant: 'danger'
+      })
+      if (removeFromCollection) {
+        const card = collectionStore.getCardById(cardId)
+        if (card) {
+          if (card.quantity <= 1) {
+            await collectionStore.deleteCard(cardId)
+          } else {
+            await collectionStore.updateCard(cardId, { quantity: card.quantity - 1 })
+          }
+          toastStore.show(t('decks.messages.removedFromCollectionToo'), 'success')
+        }
+      } else {
+        toastStore.show(t('binders.quantityUpdated'), 'success')
+      }
+    } else {
+      toastStore.show(t('binders.quantityUpdated'), 'success')
+    }
+  } else if (!ok && newQuantity > displayCard.allocatedQuantity) {
+    const card = collectionStore.getCardById(cardId)
+    if (!card) return
+
+    const addToCollection = await confirmStore.show({
+      title: displayCard.name,
+      message: t('decks.messages.exceedsAvailable', { max: card.quantity }),
+      confirmText: t('decks.messages.addToCollectionBtn'),
+      cancelText: t('common.actions.cancel'),
+    })
+
+    if (addToCollection) {
+      await collectionStore.updateCard(cardId, { quantity: card.quantity + 1 })
+      await binderStore.updateAllocation(selectedBinder.value.id, cardId, newQuantity)
+      toastStore.show(t('decks.messages.addedToCollection'), 'success')
+    }
   }
+}
+
+const handleBinderGridSetStatus = async (displayCard: DisplayDeckCard, status: string) => {
+  const cardId = displayCard.cardId
+  if (!cardId) return
+  const updates: Record<string, unknown> = { status }
+  if (status === 'collection') updates.public = false
+  await collectionStore.updateCard(cardId, updates as Partial<Card>)
+  toastStore.show(t('cards.grid.statusChanged', { status }), 'success')
+}
+
+const handleBinderGridToggleFoil = async (displayCard: DisplayDeckCard) => {
+  const cardId = displayCard.cardId
+  if (!cardId) return
+  await collectionStore.updateCard(cardId, { foil: !displayCard.foil })
+}
+
+const handleBinderGridTogglePublic = async (displayCard: DisplayDeckCard) => {
+  const cardId = displayCard.cardId
+  if (!cardId) return
+  const record = displayCard as unknown as Record<string, unknown>
+  const newPublic = !record.public
+  await collectionStore.updateCard(cardId, { public: newPublic } as Partial<Card>)
+  toastStore.show(newPublic ? t('cards.grid.visibleInProfile') : t('cards.grid.hiddenFromProfile'), 'success')
 }
 
 const quickAllocateCardToBinder = async (card: Card) => {
@@ -2065,7 +2301,7 @@ const handleCreateDeck = async (deckData: CreateDeckInput) => {
       deckFilter.value = deckId
     } else {
       deckFilter.value = deckId
-      toastStore.show(`Deck "${deckData.name}" creado`, 'success')
+      toastStore.show(t('common.import.deckCreated', { name: deckData.name }), 'success')
     }
   } catch (error) {
     console.error('Error in handleCreateDeck:', error)
@@ -2112,7 +2348,7 @@ const handleImport = async (opts: {
   const { deckText, condition, includeSideboard, deckName, makePublic, format, commander, status } = opts
   const finalDeckName = deckName ?? `Deck${Date.now()}`
   showImportDeckModal.value = false
-  toastStore.show(`Importando "${finalDeckName}" en segundo plano...`, 'info')
+  toastStore.show(t('common.import.importing', { name: finalDeckName }), 'info')
 
   const lines = deckText.split('\n').filter(l => l.trim())
   const collectionCardsToAdd: ImportCardData[] = []
@@ -2161,7 +2397,7 @@ const handleImport = async (opts: {
     }
   }
 
-  toastStore.show(`Deck "${finalDeckName}" importado con ${collectionCardsToAdd.length} cartas`, 'success')
+  toastStore.show(t('common.import.deckComplete', { name: finalDeckName, count: collectionCardsToAdd.length }), 'success')
   if (deckId) {
     deckFilter.value = deckId
   }
@@ -2187,11 +2423,11 @@ const handleImportDirect = async (
   showImportDeckModal.value = false
 
   // Create progress toast
-  const progressToast = toastStore.showProgress(`Importando "${finalDeckName}"...`, 0)
+  const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalDeckName }), 0)
 
   try {
     // PASO 1: Crear el deck primero
-    progressToast.update(5, `Creando deck "${finalDeckName}"...`)
+    progressToast.update(5, t('common.import.creatingDeck', { name: finalDeckName }))
     const deckId = await decksStore.createDeck({
       name: finalDeckName,
       format: format ?? 'custom',
@@ -2201,7 +2437,7 @@ const handleImportDirect = async (
     })
 
     if (!deckId) {
-      progressToast.error('Error al crear el deck')
+      progressToast.error(t('common.import.errorCreatingDeck'))
       return
     }
 
@@ -2224,7 +2460,7 @@ const handleImportDirect = async (
     deckFilter.value = deckId
 
     // PASO 2: Recolectar todos los scryfallIds para batch request
-    progressToast.update(10, `Preparando ${cards.length} cartas...`)
+    progressToast.update(10, t('common.import.preparing', { count: cards.length }))
     const identifiers: { id: string }[] = []
     cards.forEach((card) => {
       if (!card.scryfallId) return
@@ -2235,13 +2471,13 @@ const handleImportDirect = async (
     const dedupedIdentifiers = uniqueIds.map(id => ({ id }))
 
     // PASO 3: Obtener todos los datos de Scryfall en batch
-    progressToast.update(15, `Obteniendo datos de ${dedupedIdentifiers.length} cartas...`)
+    progressToast.update(15, t('common.import.fetchingData', { count: dedupedIdentifiers.length }))
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (dedupedIdentifiers.length > 0) {
       const scryfallCards = await getCardsByIds(dedupedIdentifiers)
       scryfallCards.forEach(sc => scryfallDataMap.set(sc.id, sc))
     }
-    progressToast.update(25, `Procesando cartas...`)
+    progressToast.update(25, t('common.import.processing'))
 
     // PASO 4: Procesar cada carta con los datos obtenidos
     saveImportState({ ...initialState, status: 'processing' })
@@ -2268,7 +2504,7 @@ const handleImportDirect = async (
 
       // Update progress (25-45% range for processing)
       const processPercent = 25 + Math.round((i / cards.length) * 20)
-      progressToast.update(processPercent, `Procesando ${i + 1}/${cards.length}...`)
+      progressToast.update(processPercent, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
       saveImportState({
         ...initialState,
         status: 'processing',
@@ -2279,11 +2515,11 @@ const handleImportDirect = async (
     }
 
     // PASO 5: Búsqueda individual para cartas sin precio/imagen
-    progressToast.update(45, `Buscando precios adicionales...`)
+    progressToast.update(45, t('common.import.fetchingPrices'))
     await enrichCardsWithFallbackSearch(collectionCardsToAdd, cardsNeedingSearch)
 
     // PASO 6: Importar cartas a la colección
-    progressToast.update(50, `Guardando ${collectionCardsToAdd.length} cartas...`)
+    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
     saveImportState({
       deckId,
       deckName: finalDeckName,
@@ -2299,7 +2535,7 @@ const handleImportDirect = async (
     let allocatedCount = 0
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
-      progressToast.update(60, `Asignando cartas al deck...`)
+      progressToast.update(60, t('common.import.allocatingToDeck'))
 
       // PASO 7: Asignar cartas al deck con progreso
       saveImportState({
@@ -2322,7 +2558,7 @@ const handleImportDirect = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(65, `Asignando ${bulkItems.length} cartas al deck...`)
+      progressToast.update(65, t('common.import.allocatingToDeckCount', { count: bulkItems.length }))
       const bulkResult = await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems)
       allocatedCount = bulkResult.allocated
 
@@ -2361,13 +2597,13 @@ const handleImportDirect = async (
       isImportRunning = false
     }, 2000)
 
-    progressToast.complete(`"${finalDeckName}" importado con ${allocatedCount} cartas`)
+    progressToast.complete(t('common.import.deckComplete', { name: finalDeckName, count: allocatedCount }))
   } catch (error) {
     console.error('[Import] Error during import:', error)
     if (importProgress.value) {
       saveImportState({ ...importProgress.value, status: 'error' })
     }
-    progressToast.error('Error al importar el deck')
+    progressToast.error(t('common.import.errorDeck'))
     isImportRunning = false
   }
 }
@@ -2385,11 +2621,11 @@ const handleImportCsv = async (
   showImportDeckModal.value = false
 
   // Progress toast like handleImport
-  const progressToast = toastStore.showProgress(`Importando "${finalDeckName}"...`, 0)
+  const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalDeckName }), 0)
 
   try {
     // PASO 1: Crear deck
-    progressToast.update(5, `Creando deck "${finalDeckName}"...`)
+    progressToast.update(5, t('common.import.creatingDeck', { name: finalDeckName }))
     const deckId = await decksStore.createDeck({
       name: finalDeckName,
       format: format ?? 'custom',
@@ -2399,7 +2635,7 @@ const handleImportCsv = async (
     })
 
     if (!deckId) {
-      progressToast.error('Error al crear el deck')
+      progressToast.error(t('common.import.errorCreatingDeck'))
       return
     }
 
@@ -2407,7 +2643,7 @@ const handleImportCsv = async (
     deckFilter.value = deckId
 
     // PASO 2: Batch fetch Scryfall data
-    progressToast.update(10, `Obteniendo datos de ${cards.length} cartas...`)
+    progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
     const identifiers = cards
       .filter(c => c.scryfallId)
       .map(c => ({ id: c.scryfallId }))
@@ -2420,7 +2656,7 @@ const handleImportCsv = async (
         scryfallDataMap.set(sc.id, sc)
       }
     }
-    progressToast.update(25, `Procesando ${cards.length} cartas...`)
+    progressToast.update(25, t('common.import.processingCount', { count: cards.length }))
 
     // PASO 3: Build collection cards
     const collectionCardsToAdd: ImportCardData[] = []
@@ -2437,17 +2673,17 @@ const handleImportCsv = async (
       // Update progress (25-45% range)
       if (i % 50 === 0) {
         const pct = 25 + Math.round((i / cards.length) * 20)
-        progressToast.update(pct, `Procesando ${i + 1}/${cards.length}...`)
+        progressToast.update(pct, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
       }
     }
 
     // PASO 4: Guardar en colección
-    progressToast.update(50, `Guardando ${collectionCardsToAdd.length} cartas...`)
+    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
-      progressToast.update(60, `Asignando cartas al deck...`)
+      progressToast.update(60, t('common.import.allocatingToDeck'))
 
       // PASO 5: Asignar al deck (bulk — single Firestore write)
       const bulkItems = createdCardIds
@@ -2460,17 +2696,17 @@ const handleImportCsv = async (
 
       const bulkResult = await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems, (current, total) => {
         const pct = 60 + Math.round((current / total) * 35)
-        progressToast.update(pct, `Asignando ${current}/${total}...`)
+        progressToast.update(pct, t('common.import.allocatingProgress', { current, total }))
       })
       allocatedCount = bulkResult.allocated
     }
 
     // PASO 6: Completar
     await decksStore.loadDecks()
-    progressToast.complete(`"${finalDeckName}" importado con ${allocatedCount} cartas`)
+    progressToast.complete(t('common.import.deckComplete', { name: finalDeckName, count: allocatedCount }))
   } catch (error) {
     console.error('[CSV Import] Error:', error)
-    progressToast.error('Error al importar CSV')
+    progressToast.error(t('common.import.errorCsv'))
   }
 }
 
@@ -2481,10 +2717,10 @@ const handleImportBinder = async (opts: {
   deckText: string, condition: CardCondition, includeSideboard: boolean,
   deckName?: string, makePublic?: boolean, format?: DeckFormat, commander?: string, status?: CardStatus,
 }) => {
-  const { deckText, condition, includeSideboard, deckName, status } = opts
+  const { deckText, condition, includeSideboard, deckName, makePublic, status } = opts
   const finalName = deckName ?? `Binder${Date.now()}`
   showImportBinderModal.value = false
-  toastStore.show(`Importing "${finalName}"...`, 'info')
+  toastStore.show(t('common.import.importing', { name: finalName }), 'info')
 
   const lines = deckText.split('\n').filter(l => l.trim())
   const collectionCardsToAdd: ImportCardData[] = []
@@ -2502,7 +2738,7 @@ const handleImportBinder = async (opts: {
     const scryfallData = await fetchCardFromScryfall(parsed.cardName, parsed.setCode ?? undefined)
     const cardData = buildCollectionCardFromScryfall({
       cardName: parsed.cardName, quantity: parsed.quantity, condition, isFoil: parsed.isFoil, setCode: parsed.setCode,
-      scryfallData, status, makePublic: false, isInSideboard: false,
+      scryfallData, status, makePublic: makePublic ?? false, isInSideboard: false,
     })
     collectionCardsToAdd.push(cardData)
   }
@@ -2527,7 +2763,7 @@ const handleImportBinder = async (opts: {
     }
   }
 
-  toastStore.show(`Binder "${finalName}" imported with ${collectionCardsToAdd.length} cards`, 'success')
+  toastStore.show(t('common.import.binderComplete', { name: finalName, count: collectionCardsToAdd.length }), 'success')
   if (binderId) {
     viewMode.value = 'binders'
     binderFilter.value = binderId
@@ -2539,7 +2775,7 @@ const handleImportBinderDirect = async (
   cards: MoxfieldImportCard[],
   deckName: string | undefined,
   condition: CardCondition,
-  _makePublic?: boolean,
+  makePublic?: boolean,
   _format?: DeckFormat,
   _commander?: string,
   status?: CardStatus
@@ -2547,15 +2783,15 @@ const handleImportBinderDirect = async (
   const finalName = deckName ?? `Binder${Date.now()}`
   showImportBinderModal.value = false
 
-  const progressToast = toastStore.showProgress(`Importing "${finalName}"...`, 0)
+  const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalName }), 0)
 
   try {
     // Create binder
-    progressToast.update(5, `Creating binder "${finalName}"...`)
+    progressToast.update(5, t('common.import.creatingBinder', { name: finalName }))
     const binderId = await binderStore.createBinder({ name: finalName, description: '' })
 
     if (!binderId) {
-      progressToast.error('Error creating binder')
+      progressToast.error(t('common.import.errorCreatingBinder'))
       return
     }
 
@@ -2563,7 +2799,7 @@ const handleImportBinderDirect = async (
     binderFilter.value = binderId
 
     // Batch fetch Scryfall data
-    progressToast.update(10, `Fetching ${cards.length} cards...`)
+    progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
     const identifiers: { id: string }[] = []
     const cardIndexMap = new Map<string, number[]>()
 
@@ -2580,7 +2816,7 @@ const handleImportBinderDirect = async (
       }
     }
 
-    progressToast.update(15, `Fetching data for ${identifiers.length} cards...`)
+    progressToast.update(15, t('common.import.fetchingData', { count: identifiers.length }))
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (identifiers.length > 0) {
       const scryfallCards = await getCardsByIds(identifiers)
@@ -2588,7 +2824,7 @@ const handleImportBinderDirect = async (
         scryfallDataMap.set(sc.id, sc)
       }
     }
-    progressToast.update(25, `Processing cards...`)
+    progressToast.update(25, t('common.import.processing'))
 
     // Process each card
     const collectionCardsToAdd: ImportCardData[] = []
@@ -2598,7 +2834,7 @@ const handleImportBinderDirect = async (
       // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
       if (!card) continue
-      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, false)
+      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, makePublic ?? false)
 
       if (needsSearch) {
         cardsNeedingSearch.push(i)
@@ -2607,20 +2843,20 @@ const handleImportBinderDirect = async (
       collectionCardsToAdd.push(cardData)
 
       const processPercent = 25 + Math.round((i / cards.length) * 20)
-      progressToast.update(processPercent, `Processing ${i + 1}/${cards.length}...`)
+      progressToast.update(processPercent, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
     }
 
     // Search for cards missing price/image
-    progressToast.update(45, `Fetching additional prices...`)
+    progressToast.update(45, t('common.import.fetchingPrices'))
     await enrichCardsWithFallbackSearch(collectionCardsToAdd, cardsNeedingSearch)
 
     // Import cards to collection
-    progressToast.update(50, `Saving ${collectionCardsToAdd.length} cards...`)
+    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
-      progressToast.update(60, `Allocating cards to binder...`)
+      progressToast.update(60, t('common.import.allocatingToBinder'))
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
@@ -2630,15 +2866,15 @@ const handleImportBinderDirect = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(65, `Allocating ${bulkItems.length} cards to binder...`)
+      progressToast.update(65, t('common.import.allocatingToBinderCount', { count: bulkItems.length }))
       allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
     }
 
     await binderStore.loadBinders()
-    progressToast.complete(`"${finalName}" imported with ${allocatedCount} cards`)
+    progressToast.complete(t('common.import.binderComplete', { name: finalName, count: allocatedCount }))
   } catch (error) {
     console.error('[Binder Import] Error:', error)
-    progressToast.error('Error importing binder')
+    progressToast.error(t('common.import.errorBinder'))
   }
 }
 
@@ -2646,7 +2882,7 @@ const handleImportBinderDirect = async (
 const handleImportBinderCsv = async (
   cards: ParsedCsvCard[],
   deckName?: string,
-  _makePublic?: boolean,
+  makePublic?: boolean,
   _format?: DeckFormat,
   _commander?: string,
   status?: CardStatus
@@ -2654,15 +2890,15 @@ const handleImportBinderCsv = async (
   const finalName = deckName ?? `Binder CSV ${Date.now()}`
   showImportBinderModal.value = false
 
-  const progressToast = toastStore.showProgress(`Importing "${finalName}"...`, 0)
+  const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalName }), 0)
 
   try {
     // Create binder
-    progressToast.update(5, `Creating binder "${finalName}"...`)
+    progressToast.update(5, t('common.import.creatingBinder', { name: finalName }))
     const binderId = await binderStore.createBinder({ name: finalName, description: '' })
 
     if (!binderId) {
-      progressToast.error('Error creating binder')
+      progressToast.error(t('common.import.errorCreatingBinder'))
       return
     }
 
@@ -2670,7 +2906,7 @@ const handleImportBinderCsv = async (
     binderFilter.value = binderId
 
     // Batch fetch Scryfall data
-    progressToast.update(10, `Fetching data for ${cards.length} cards...`)
+    progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
     const identifiers = cards
       .filter(c => c.scryfallId)
       .map(c => ({ id: c.scryfallId }))
@@ -2683,7 +2919,7 @@ const handleImportBinderCsv = async (
         scryfallDataMap.set(sc.id, sc)
       }
     }
-    progressToast.update(25, `Processing ${cards.length} cards...`)
+    progressToast.update(25, t('common.import.processingCount', { count: cards.length }))
 
     // Build collection cards
     const collectionCardsToAdd: ImportCardData[] = []
@@ -2692,22 +2928,22 @@ const handleImportBinderCsv = async (
       // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
       if (!card) continue
-      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, false)
+      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, makePublic ?? false)
       collectionCardsToAdd.push(cardData)
 
       if (i % 50 === 0) {
         const pct = 25 + Math.round((i / cards.length) * 20)
-        progressToast.update(pct, `Processing ${i + 1}/${cards.length}...`)
+        progressToast.update(pct, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
       }
     }
 
     // Save to collection
-    progressToast.update(50, `Saving ${collectionCardsToAdd.length} cards...`)
+    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
-      progressToast.update(60, `Allocating cards to binder...`)
+      progressToast.update(60, t('common.import.allocatingToBinder'))
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
@@ -2721,10 +2957,10 @@ const handleImportBinderCsv = async (
     }
 
     await binderStore.loadBinders()
-    progressToast.complete(`"${finalName}" imported with ${allocatedCount} cards`)
+    progressToast.complete(t('common.import.binderComplete', { name: finalName, count: allocatedCount }))
   } catch (error) {
     console.error('[Binder CSV Import] Error:', error)
-    progressToast.error('Error importing CSV')
+    progressToast.error(t('common.import.errorCsv'))
   }
 }
 
@@ -3058,7 +3294,7 @@ const resumeImport = async (savedState: ImportState) => {
 
   // Si hubo error, preguntar si quiere reintentar
   if (savedState.status === 'error') {
-    toastStore.show(`Import de "${savedState.deckName}" falló. Limpiando...`, 'error')
+    toastStore.show(t('common.import.resumeFailed', { name: savedState.deckName }), 'error')
     clearImportState()
     return
   }
@@ -3081,7 +3317,7 @@ const resumeImport = async (savedState: ImportState) => {
   }
 
   const progressToast = toastStore.showProgress(
-    `Continuando "${savedState.deckName}"...`,
+    t('common.import.resuming', { name: savedState.deckName }),
     initialProgress
   )
 
@@ -3098,7 +3334,7 @@ const resumeImport = async (savedState: ImportState) => {
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(65, `Asignando ${bulkItems.length} cartas al deck...`)
+      progressToast.update(65, t('common.import.allocatingToDeckCount', { count: bulkItems.length }))
       const bulkResult = await decksStore.bulkAllocateCardsToDeck(savedState.deckId, bulkItems)
       const allocatedCount = savedState.allocatedCount + bulkResult.allocated
 
@@ -3109,14 +3345,14 @@ const resumeImport = async (savedState: ImportState) => {
         clearImportState()
         isImportRunning = false
       }, 2000)
-      progressToast.complete(`"${savedState.deckName}" completado con ${allocatedCount} cartas`)
+      progressToast.complete(t('common.import.resumeComplete', { name: savedState.deckName, count: allocatedCount }))
 
     } else if (savedState.status === 'saving' && savedState.cards.length > 0) {
       // Si estaba guardando cartas, reiniciar desde guardado
-      progressToast.update(55, `Guardando ${savedState.cards.length} cartas...`)
+      progressToast.update(55, t('common.import.saving', { count: savedState.cards.length }))
 
       const createdCardIds = await collectionStore.confirmImport(savedState.cards, true)
-      progressToast.update(60, `Asignando cartas al deck...`)
+      progressToast.update(60, t('common.import.allocatingToDeck'))
 
       saveImportState({
         ...savedState,
@@ -3135,7 +3371,7 @@ const resumeImport = async (savedState: ImportState) => {
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(65, `Asignando ${bulkItems.length} cartas al deck...`)
+      progressToast.update(65, t('common.import.allocatingToDeckCount', { count: bulkItems.length }))
       const bulkResult = await decksStore.bulkAllocateCardsToDeck(savedState.deckId, bulkItems)
       const allocatedCount = bulkResult.allocated
 
@@ -3145,18 +3381,18 @@ const resumeImport = async (savedState: ImportState) => {
         clearImportState()
         isImportRunning = false
       }, 2000)
-      progressToast.complete(`"${savedState.deckName}" completado con ${allocatedCount} cartas`)
+      progressToast.complete(t('common.import.resumeComplete', { name: savedState.deckName, count: allocatedCount }))
 
     } else {
       // Para otros estados (fetching, processing), limpiar y avisar
-      progressToast.error(`Import incompleto. El deck puede estar vacío.`)
+      progressToast.error(t('common.import.resumeIncomplete'))
       clearImportState()
       isImportRunning = false
     }
   } catch (error) {
     console.error('[Import] Error resuming import:', error)
     saveImportState({ ...savedState, status: 'error' })
-    progressToast.error('Error al resumir importación')
+    progressToast.error(t('common.import.resumeError'))
     isImportRunning = false
   }
 }
@@ -3255,6 +3491,14 @@ watch(() => route.query.filter, (newFilter, oldFilter) => {
 watch(() => route.query.addCard, (cardName) => {
   if (cardName && typeof cardName === 'string') {
     void router.replace({ path: '/search', query: { q: cardName } })
+  }
+}, { immediate: true })
+
+// Watch for action=add query param (from mobile header "+") — open AddCardModal
+watch(() => route.query.action, (action) => {
+  if (action === 'add') {
+    showAddCardModal.value = true
+    void router.replace({ path: '/collection', query: { ...route.query, action: undefined } })
   }
 }, { immediate: true })
 
@@ -3903,7 +4147,7 @@ onUnmounted(() => {
                   <div class="text-tiny text-silver-50 flex-shrink-0">
                     x{{ card.quantity }}
                   </div>
-                  <div class="text-tiny font-bold text-[#4CAF50] flex-shrink-0 w-20 text-right">
+                  <div class="text-tiny font-bold text-neon flex-shrink-0 w-20 text-right">
                     ${{ (getCardCKPrice(card.id, card.price) * card.quantity).toFixed(2) }}
                   </div>
                   <div class="flex-shrink-0">
@@ -3964,6 +4208,7 @@ onUnmounted(() => {
               @update-quantity="handleDeckGridQuantityUpdate"
               @add-to-wishlist="handleDeckGridAddToWishlist"
               @toggle-commander="handleDeckGridToggleCommander"
+              @move-board="handleDeckGridMoveBoard"
           />
         </div>
 
@@ -3994,6 +4239,7 @@ onUnmounted(() => {
               @update-quantity="handleDeckGridQuantityUpdate"
               @add-to-wishlist="handleDeckGridAddToWishlist"
               @toggle-commander="handleDeckGridToggleCommander"
+              @move-board="handleDeckGridMoveBoard"
           />
         </div>
 
@@ -4037,6 +4283,7 @@ onUnmounted(() => {
           <DeckEditorGrid
               :cards="filteredBinderDisplayCards"
               :deck-id="selectedBinder.id"
+              :binder-mode="true"
               :group-by="deckGroupBy"
               :sort-by="sortBy"
               :selected-colors="selectedColors"
@@ -4047,6 +4294,9 @@ onUnmounted(() => {
               @edit="handleBinderGridEdit"
               @remove="handleBinderGridRemove"
               @update-quantity="handleBinderGridQuantityUpdate"
+              @set-status="handleBinderGridSetStatus"
+              @toggle-foil="handleBinderGridToggleFoil"
+              @toggle-public="handleBinderGridTogglePublic"
           />
         </div>
 
@@ -4135,7 +4385,7 @@ onUnmounted(() => {
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
-        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[90px]' : ''"
+        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[78px]' : ''"
     />
 </AppContainer>
 

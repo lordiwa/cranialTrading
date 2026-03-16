@@ -86,7 +86,7 @@ const chartHasData = computed(() => chartHistory.value.length >= 2)
 const chartSourceColor = computed(() => {
   if (chartSource.value === 'ck') return '#4CAF50'
   if (chartSource.value === 'buylist') return '#FF9800'
-  return '#CCFF00'
+  return '#5AC168'
 })
 
 const getChartValue = (p: { ck: number; buylist: number; tcg: number }) => {
@@ -624,19 +624,19 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
               <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">TCG:</span>
+                <span class="text-body font-bold text-neon">${{ currentPrice.toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
                 <span class="text-tiny text-silver-70">CK:</span>
-                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
                 <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
                 <span v-else class="text-small text-silver-50">-</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-tiny text-silver-70">BL:</span>
-                <span v-if="cardKingdomBuylist" class="text-body font-bold text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                <span v-if="cardKingdomBuylist" class="text-body font-bold text-silver">{{ formatPrice(cardKingdomBuylist) }}</span>
                 <span v-else class="text-small text-silver-50">-</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">TCG:</span>
-                <span class="text-body text-silver-50">${{ currentPrice.toFixed(2) }}</span>
               </div>
             </div>
 
@@ -1016,11 +1016,11 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
 
 <style scoped>
 .border-neon-30 {
-  border-color: rgba(0, 255, 136, 0.3);
+  border-color: rgba(90, 193, 104, 0.3);
 }
 
 .bg-neon-5 {
-  background-color: rgba(204, 255, 0, 0.05);
+  background-color: rgba(90, 193, 104, 0.05);
 }
 
 button:disabled {

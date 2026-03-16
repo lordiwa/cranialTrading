@@ -2,13 +2,16 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useContextMenu } from '../../composables/useContextMenu'
 import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
 import { useCollectionStore } from '../../stores/collection'
 import { useMarketStore } from '../../stores/market'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
+import ContextMenu from '../ui/ContextMenu.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 import type { Card, CardStatus } from '../../types/card'
+import type { ContextMenuItem } from '../../types/contextMenu'
 
 const props = withDefaults(defineProps<{
   card: Card
@@ -298,6 +301,64 @@ const priceChangeData = computed(() => {
   if (!firstMover) return null
   return { percentChange: firstMover.percentChange, isPositive: firstMover.percentChange > 0 }
 })
+
+// ── Context Menu ──
+const isTouchDevice = 'ontouchstart' in window
+const {
+  isVisible: ctxVisible,
+  position: ctxPosition,
+  open: ctxOpen,
+  close: ctxClose,
+} = useContextMenu<Card>()
+
+const canShowContextMenu = computed(() =>
+  !props.readonly && !props.compact && !props.isBeingDeleted && !props.selectionMode && !isTouchDevice
+)
+
+const handleContextMenu = (e: MouseEvent) => {
+  if (!canShowContextMenu.value) return
+  ctxOpen(e, props.card)
+}
+
+const contextMenuItems = computed((): ContextMenuItem[] => {
+  const card = props.card
+  return [
+    { id: 'plus', label: t('cards.contextMenu.plusOne'), icon: 'plus' },
+    { id: 'minus', label: t('cards.contextMenu.minusOne'), icon: 'x-mark', dividerAfter: true },
+    { id: 'status-collection', label: t('cards.contextMenu.collection'), icon: 'box', active: card.status === 'collection' },
+    { id: 'status-trade', label: t('cards.contextMenu.trade'), icon: 'handshake', active: card.status === 'trade' },
+    { id: 'status-sale', label: t('cards.contextMenu.sale'), icon: 'money', active: card.status === 'sale' },
+    { id: 'status-wishlist', label: t('cards.contextMenu.wishlist'), icon: 'star', active: card.status === 'wishlist', dividerAfter: true },
+    { id: 'toggle-foil', label: t('cards.contextMenu.toggleFoil'), icon: 'fire', active: card.foil },
+    { id: 'toggle-public', label: t('cards.contextMenu.togglePublic'), icon: card.public ? 'eye-open' : 'eye-closed', active: card.public, dividerAfter: true },
+    { id: 'edit', label: t('cards.contextMenu.edit'), icon: 'settings' },
+    { id: 'delete', label: t('cards.contextMenu.delete'), icon: 'trash', danger: true },
+  ]
+})
+
+const handleContextMenuSelect = async (itemId: string) => {
+  const card = props.card
+  if (itemId === 'plus') {
+    await collectionStore.updateCard(card.id, { quantity: card.quantity + 1 })
+  } else if (itemId === 'minus') {
+    if (card.quantity <= 1) {
+      emit('delete', card)
+    } else {
+      await collectionStore.updateCard(card.id, { quantity: card.quantity - 1 })
+    }
+  } else if (itemId.startsWith('status-')) {
+    const status = itemId.replace('status-', '') as CardStatus
+    await setStatus(status)
+  } else if (itemId === 'toggle-foil') {
+    await collectionStore.updateCard(card.id, { foil: !card.foil })
+  } else if (itemId === 'toggle-public') {
+    await togglePublic()
+  } else if (itemId === 'edit') {
+    emit('cardClick', card)
+  } else if (itemId === 'delete') {
+    emit('delete', card)
+  }
+}
 </script>
 
 <template>
@@ -326,9 +387,9 @@ const priceChangeData = computed(() => {
       <p class="text-[14px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
         {{ card.name }}
       </p>
-      <p v-if="hasCardKingdomPrices" class="text-[14px] text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }} c/u</p>
+      <p v-if="hasCardKingdomPrices" class="text-[14px] text-neon">{{ formatPrice(cardKingdomRetail) }} c/u</p>
       <p v-else class="text-[14px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
-      <p v-if="hasCardKingdomPrices" class="text-[14px] text-[#4CAF50] font-bold">{{ formatPrice((cardKingdomRetail ?? 0) * card.quantity) }}</p>
+      <p v-if="hasCardKingdomPrices" class="text-[14px] text-neon font-bold">{{ formatPrice((cardKingdomRetail ?? 0) * card.quantity) }}</p>
       <p v-else class="text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
     </div>
   </div>
@@ -342,6 +403,7 @@ const priceChangeData = computed(() => {
       @touchstart="handleTouchStart"
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
+      @contextmenu.prevent="handleContextMenu"
   >
     <!-- Swipe background indicators (mobile only) -->
     <div v-if="isSwiping && !readonly" class="absolute inset-0 md:hidden flex">
@@ -500,12 +562,11 @@ const priceChangeData = computed(() => {
 
     <!-- Row 6: Prices -->
     <div class="mt-1 space-y-0.5">
-      <!-- Card Kingdom Price (primary) -->
+      <!-- TCGPlayer Price -->
       <div class="flex items-center gap-1">
-        <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-[#4CAF50]">
-          CK: {{ formatPrice(cardKingdomRetail) }}
+        <p class="text-tiny font-bold text-neon">
+          TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
         </p>
-        <p v-else class="text-tiny text-silver-50">CK: -</p>
         <span
             v-if="priceChangeData"
             class="text-[14px] font-bold px-1 rounded"
@@ -514,15 +575,16 @@ const priceChangeData = computed(() => {
           {{ priceChangeData.isPositive ? '&#x25B2;' : '&#x25BC;' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
         </span>
       </div>
+      <!-- Card Kingdom Price -->
+      <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-neon">
+        CK: {{ formatPrice(cardKingdomRetail) }}
+      </p>
+      <p v-else class="text-tiny text-silver-50">CK: -</p>
       <!-- CK Buylist -->
-      <p v-if="cardKingdomBuylist" class="text-tiny text-[#FF9800]">
+      <p v-if="cardKingdomBuylist" class="text-tiny text-silver">
         BL: {{ formatPrice(cardKingdomBuylist) }}
       </p>
       <p v-else class="text-tiny text-silver-50">BL: -</p>
-      <!-- TCGPlayer Price (secondary) -->
-      <p class="text-tiny text-silver-50">
-        TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
-      </p>
     </div>
 
     <!-- Row 7: Sparkline (always reserve space) -->
@@ -536,7 +598,7 @@ const priceChangeData = computed(() => {
         <polyline
           :points="sparklinePoints"
           fill="none"
-          stroke="#CCFF00"
+          stroke="#5AC168"
           stroke-width="1.5"
           stroke-linejoin="round"
           stroke-linecap="round"
@@ -589,6 +651,16 @@ const priceChangeData = computed(() => {
         {{ t('cart.addToCart') }}
       </button>
     </div>
+
+    <!-- Context Menu -->
+    <ContextMenu
+      :show="ctxVisible"
+      :x="ctxPosition.x"
+      :y="ctxPosition.y"
+      :items="contextMenuItems"
+      @select="handleContextMenuSelect"
+      @close="ctxClose"
+    />
   </div>
 </template>
 

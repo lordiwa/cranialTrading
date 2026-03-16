@@ -217,10 +217,10 @@ VITE_FIREBASE_MEASUREMENT_ID
 Tailwind custom palette:
 - `primary`: #000000 (black)
 - `silver`: #EEEEEE (text)
-- `neon`: #CCFF00 (accents)
+- `neon`: #5AC168 (accents)
 - `rust`: #8B2E1F (errors)
 
-Font: IBM Plex Mono (monospace throughout)
+Font: Open Sans (sans-serif throughout)
 
 ## Implementation Rules
 
@@ -262,3 +262,59 @@ Auto-dismiss after 4 seconds.
 - `CollectionView.vue` ↔ `CollectionGrid.vue`
 - `AddCardModal.vue` ↔ `EditCardModal.vue`
 - `CardGridSearch.vue` ↔ Scryfall service + AddCardModal
+
+---
+
+## Anti-Loop Rules
+
+**Rules derived from recurring mistakes. These prevent loops where Claude gives bad responses, breaks working code, or makes incomplete changes requiring multiple correction rounds.**
+
+### Rule 1: READ Before Touching — Full Trace Required
+
+- Before modifying ANY function, read the entire file and trace all callers/callees
+- If a function has a parallel "sibling" (e.g., `handleDeckGridRemove` / `handleBinderGridRemove`, or `*QuantityUpdate` for deck and binder), identify BOTH and apply the change to both
+- If a component is used in multiple views (e.g., BlockedUsersModal in SavedMatchesView AND DashboardView), change ALL usages
+- **Never assume "there's only one"** — always search with Grep/Glob for parallel instances
+
+### Rule 2: Do NOT "Improve" Code You Weren't Asked to Change
+
+- If the user asks for X, do ONLY X — don't touch adjacent code that "looks improvable"
+- **NEVER** change Vue lifecycle patterns (onMounted, watch, computed) unless explicitly part of the request
+- **NEVER** convert synchronous callbacks to async/await "for readability" — it can break timing
+- If you see improvable code that isn't part of the request, mention it to the user without touching it
+
+### Rule 3: Verify i18n Keys BEFORE Using Them
+
+- Before using `t('some.key')`, verify with Grep that the key exists in all 3 locale files (en.json, es.json, pt.json)
+- If the key doesn't exist, create it in all 3 files in the same step
+- **NEVER** assume a key exists because it "sounds logical" — always verify
+
+### Rule 4: One Confirm Modal at a Time — Respect the Resolution Flow
+
+- The confirm store uses `pendingResult` + `onAfterLeave` — the second `show()` MUST wait for the first to finish its animation
+- If you need sequential confirms, the second `await confirmStore.show()` already waits correctly thanks to `onAfterLeave`, but never launch two in parallel
+- Test manually that sequential confirms work (the second appears after the first disappears)
+
+### Rule 5: When Something Fails, Diagnose BEFORE Changing
+
+- If a change doesn't work as expected, STOP and read the code/error carefully before attempting another fix
+- After 2 failed attempts on the same problem, explain to the user what's happening and propose a different approach instead of continuing to patch
+- Never do mass `git revert` or undo changes as a "solution" — understand what went wrong first
+- If the error is at runtime (production/dev), ask the user for the exact console error before guessing
+
+### Rule 6: Parallel Changes = Atomic Change
+
+- Identify ALL parallel points BEFORE starting to code (list them in the plan)
+- Apply the change to ALL points in the same step — never "I'll do the other one later"
+- **Parallelism checklist for this project:**
+  - Deck handlers ↔ Binder handlers (always come in pairs)
+  - SavedMatchesView ↔ DashboardView (BlockedUsersModal)
+  - en.json ↔ es.json ↔ pt.json (always all 3)
+  - AddCardModal ↔ EditCardModal (shared behavior)
+
+### Rule 7: Build + Tests = Definition of "Done"
+
+- **ALWAYS** run `npm run test:unit` after any logic change
+- **ALWAYS** run `npx vite build` before considering work finished
+- If either fails, fix it before reporting to the user
+- Use `npx vite build` (NOT `npm run build` which includes lint with pre-existing errors)

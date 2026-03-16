@@ -11,6 +11,7 @@ import SvgIcon from '../ui/SvgIcon.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import MatchNotificationsDropdown from './MatchNotificationsDropdown.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
+import MobileSearchOverlay from '../ui/MobileSearchOverlay.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -157,6 +158,18 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
+// Mobile search overlay
+const showMobileSearch = ref(false)
+
+// Mobile "+" add card handler
+const handleMobileAdd = () => {
+  if (route.path === '/collection') {
+    void router.push({ path: '/collection', query: { ...route.query, action: 'add' } })
+  } else {
+    void router.push({ path: '/collection', query: { action: 'add' } })
+  }
+}
+
 onMounted(() => {
   globalThis.addEventListener('keydown', handleKeydown)
   document.addEventListener('click', handleHelpClickOutside)
@@ -211,6 +224,23 @@ onUnmounted(() => {
         <div class="flex items-center gap-2 md:gap-4 flex-shrink-0 ml-2">
           <!-- User Menu -->
           <div v-if="isAuthenticated" class="flex items-center">
+            <!-- Mobile search icon -->
+            <button
+                @click="showMobileSearch = true"
+                class="md:hidden p-1.5 text-silver-50 hover:text-neon transition-fast flex items-center justify-center rounded"
+                :title="t('header.search.placeholder')"
+            >
+              <SvgIcon name="search" size="small" />
+            </button>
+            <!-- Mobile "+" add card button -->
+            <button
+                @click="handleMobileAdd"
+                class="md:hidden p-1.5 text-neon hover:text-neon/80 transition-fast flex items-center justify-center rounded"
+                :title="t('header.search.addToCollection')"
+            >
+              <SvgIcon name="plus" size="small" />
+            </button>
+
             <!-- Divider -->
             <div class="hidden md:block w-px h-6 bg-silver-30 mr-4"></div>
 
@@ -393,27 +423,30 @@ onUnmounted(() => {
     </div>
   </header>
 
+  <!-- Mobile Search Overlay -->
+  <MobileSearchOverlay v-if="isAuthenticated" :open="showMobileSearch" @close="showMobileSearch = false" />
+
   <!-- Bottom Tab Bar (mobile only) -->
   <nav v-if="isAuthenticated" class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-primary border-t border-silver-20 tab-bar-safe">
-    <div class="flex items-center justify-around h-14 px-1">
+    <div class="flex items-center justify-around h-12 px-1">
       <!-- Collection -->
       <router-link
           to="/collection"
           data-testid="nav-collection-mobile"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
+            'flex flex-col items-center gap-0 py-1 px-1 transition-fast min-w-0',
             isActive('/collection') ? 'text-neon' : 'text-silver-50'
           ]"
       >
         <SvgIcon name="collection" size="small" />
-        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.collection') }}</span>
+        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.collection') }}</span>
       </router-link>
       <!-- Matches -->
       <router-link
           to="/saved-matches"
           data-testid="nav-matches-mobile"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast relative min-w-0',
+            'flex flex-col items-center gap-0 py-1 px-1 transition-fast relative min-w-0',
             isMatchesActive ? 'text-neon' : 'text-silver-50'
           ]"
       >
@@ -426,29 +459,29 @@ onUnmounted(() => {
             {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
           </span>
         </span>
-        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.matches') }}</span>
+        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.matches') }}</span>
       </router-link>
       <!-- Wishlist -->
       <router-link
           to="/collection?filter=wishlist"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
+            'flex flex-col items-center gap-0 py-1 px-1 transition-fast min-w-0',
             isActive('/collection?filter=wishlist') ? 'text-neon' : 'text-silver-50'
           ]"
       >
         <SvgIcon name="star" size="small" />
-        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.wishlist') }}</span>
+        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.wishlist') }}</span>
       </router-link>
       <!-- Market -->
       <router-link
           to="/market"
           :class="[
-            'flex flex-col items-center gap-0.5 py-1 px-1 transition-fast min-w-0',
+            'flex flex-col items-center gap-0 py-1 px-1 transition-fast min-w-0',
             isActive('/market') ? 'text-neon' : 'text-silver-50'
           ]"
       >
         <SvgIcon name="fire" size="small" />
-        <span class="text-[11px] font-bold uppercase truncate max-w-full">{{ t('header.nav.market') }}</span>
+        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.market') }}</span>
       </router-link>
     </div>
   </nav>

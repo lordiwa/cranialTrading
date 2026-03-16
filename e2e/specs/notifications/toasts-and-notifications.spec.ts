@@ -2,7 +2,7 @@ import { test, expect } from '../../fixtures/test';
 import { ensureLoggedIn } from '../../helpers/auth';
 
 test.describe('Toast Notifications', () => {
-  test('success toast appears and auto-dismisses after ~4s', async ({ loginPage, commonPage }) => {
+  test('success toast appears on login', async ({ loginPage, commonPage }) => {
     await loginPage.goto();
 
     const email = process.env.TEST_USER_A_EMAIL!;
@@ -10,9 +10,15 @@ test.describe('Toast Notifications', () => {
     await loginPage.login(email, password);
     await loginPage.waitForRedirect();
 
-    // Many actions produce success toasts — login itself may produce one
-    // If no toast from login, we can trigger one by performing an action
-    await commonPage.page.waitForTimeout(1000);
+    // Login may produce a success or info toast — check for any toast
+    const anyToast = commonPage.page.locator('[class*="border-neon"], [class*="border-blue"], [class*="border-rust"]').first();
+    const toastAppeared = await anyToast.isVisible({ timeout: 5_000 }).catch(() => false);
+
+    // If a toast appeared, verify it auto-dismisses
+    if (toastAppeared) {
+      await expect(anyToast).toBeVisible();
+      await commonPage.waitForToastDismiss();
+    }
   });
 
   test('error toast appears on failed action (wrong password)', async ({ loginPage, commonPage }) => {

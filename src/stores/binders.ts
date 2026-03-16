@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import {
     addDoc,
     collection,
@@ -110,19 +110,25 @@ export const useBindersStore = defineStore('binders', () => {
     // ========================================================================
 
     /**
-     * Get total allocated quantity for a card across ALL binders
+     * Cached index: cardId → total allocated across ALL binders.
+     * Rebuilt automatically when binders change. O(1) lookups.
      */
-    const getTotalAllocatedForCard = (cardId: string): number => {
-        let total = 0
+    const binderAllocationTotalIndex = computed((): Map<string, number> => {
+        const index = new Map<string, number>()
         for (const binder of binders.value) {
             if (!binder.allocations) continue
             for (const alloc of binder.allocations) {
-                if (alloc.cardId === cardId) {
-                    total += alloc.quantity
-                }
+                index.set(alloc.cardId, (index.get(alloc.cardId) ?? 0) + alloc.quantity)
             }
         }
-        return total
+        return index
+    })
+
+    /**
+     * Get total allocated quantity for a card across ALL binders (O(1) via cached index)
+     */
+    const getTotalAllocatedForCard = (cardId: string): number => {
+        return binderAllocationTotalIndex.value.get(cardId) ?? 0
     }
 
     // ========================================================================
@@ -460,7 +466,8 @@ export const useBindersStore = defineStore('binders', () => {
     const updateAllocation = async (
         binderId: string,
         cardId: string,
-        newQuantity: number
+        newQuantity: number,
+        silent?: boolean
     ): Promise<boolean> => {
         if (!authStore.user?.id) return false
 
@@ -486,7 +493,7 @@ export const useBindersStore = defineStore('binders', () => {
             const maxAvailable = card.quantity - deckAllocated - binderAllocated
 
             if (newQuantity > maxAvailable) {
-                toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
+                if (!silent) toastStore.show(t('decks.messages.maxAvailable', { max: maxAvailable }), 'error')
                 return false
             }
 

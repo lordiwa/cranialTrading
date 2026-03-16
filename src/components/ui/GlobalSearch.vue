@@ -1,162 +1,36 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCollectionStore } from '../../stores/collection'
 import { useI18n } from '../../composables/useI18n'
-import { type ScryfallCard, searchCards } from '../../services/scryfall'
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
-import { db } from '../../services/firebase'
-import { useAuthStore } from '../../stores/auth'
-import { useToastStore } from '../../stores/toast'
+import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import { getAvatarUrlForUser } from '../../utils/avatar'
-import type { Card } from '../../types/card'
 import SvgIcon from './SvgIcon.vue'
 import ManaCost from './ManaCost.vue'
 
 const router = useRouter()
-const collectionStore = useCollectionStore()
-const authStore = useAuthStore()
-const toastStore = useToastStore()
 const { t } = useI18n()
 
-interface PublicCardResult {
-  id: string
-  cardId?: string
-  scryfallId?: string
-  cardName?: string
-  cardNameLower?: string
-  edition?: string
-  userId?: string
-  username?: string
-  location?: string
-  avatarUrl?: string
-  quantity?: number
-  condition?: string
-  foil?: boolean
-  price?: number
-  image?: string
-  status?: string
-}
-
-const searchQuery = ref('')
-const isOpen = ref(false)
-const loading = ref(false)
-const activeTab = ref<'collection' | 'users' | 'scryfall'>('collection')
-
-// Results
-const collectionResults = ref<Card[]>([])
-const usersResults = ref<PublicCardResult[]>([])
-const scryfallResults = ref<ScryfallCard[]>([])
+const {
+  searchQuery,
+  isOpen,
+  loading,
+  activeTab,
+  collectionResults,
+  usersResults,
+  scryfallResults,
+  handleInput,
+  clearSearch,
+  totalResults,
+  goToCollection,
+  goToUserCard,
+  goToScryfall,
+  sentInterestIds,
+  sendingInterest,
+  sendInterestFromSearch,
+} = useGlobalSearch()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
-
-// Debounced search
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-
-const handleInput = () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-
-  if (searchQuery.value.length < 2) {
-    clearResults()
-    return
-  }
-
-  searchTimeout = setTimeout(() => {
-    void performSearch()
-  }, 300)
-}
-
-const clearResults = () => {
-  collectionResults.value = []
-  usersResults.value = []
-  scryfallResults.value = []
-}
-
-const performSearch = async () => {
-  if (searchQuery.value.length < 2) return
-
-  loading.value = true
-  isOpen.value = true
-
-  const query = searchQuery.value.toLowerCase()
-
-  try {
-    // Search: collection is sync, others in parallel
-    searchCollection(query)
-    await Promise.all([
-      searchUsers(query),
-      searchScryfall(query)
-    ])
-
-    // Auto-select first tab with results
-    if (collectionResults.value.length > 0) {
-      activeTab.value = 'collection'
-    } else if (usersResults.value.length > 0) {
-      activeTab.value = 'users'
-    } else if (scryfallResults.value.length > 0) {
-      activeTab.value = 'scryfall'
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-const searchCollection = (q: string) => {
-  // Search in local collection
-  collectionResults.value = collectionStore.cards
-    .filter(card => card.name.toLowerCase().includes(q))
-    .slice(0, 8)
-}
-
-const searchUsers = async (searchQuery: string) => {
-  if (!authStore.user) return
-
-  try {
-    // Query public_cards with server-side prefix filter
-    const publicCardsRef = collection(db, 'public_cards')
-    const q = query(
-      publicCardsRef,
-      where('cardNameLower', '>=', searchQuery),
-      where('cardNameLower', '<=', searchQuery + '\uf8ff')
-    )
-    const snapshot = await getDocs(q)
-
-    usersResults.value = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as PublicCardResult))
-      .filter((card: PublicCardResult) => card.userId !== authStore.user?.id)
-      .slice(0, 8)
-  } catch {
-    // Fallback: if Firestore index not ready, use client-side filter
-    try {
-      const publicCardsRef = collection(db, 'public_cards')
-      const snapshot = await getDocs(publicCardsRef)
-      usersResults.value = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as PublicCardResult))
-        .filter((card: PublicCardResult) =>
-          card.cardName?.toLowerCase().includes(searchQuery) &&
-          card.userId !== authStore.user?.id
-        )
-        .slice(0, 8)
-    } catch (error) {
-      console.error('Error searching users:', error)
-      usersResults.value = []
-    }
-  }
-}
-
-const searchScryfall = async (query: string) => {
-  try {
-    const results = await searchCards(query)
-    scryfallResults.value = results.slice(0, 8)
-  } catch {
-    scryfallResults.value = []
-  }
-}
-
-const totalResults = computed(() =>
-  collectionResults.value.length + usersResults.value.length + scryfallResults.value.length
-)
 
 const handleClickOutside = (e: MouseEvent) => {
   if (containerRef.value && !containerRef.value.contains(e.target as Node)) {
@@ -171,118 +45,9 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
-// Clear search
-const clearSearch = () => {
-  searchQuery.value = ''
-  clearResults()
-  isOpen.value = false
+const handleClearSearch = () => {
+  clearSearch()
   inputRef.value?.focus()
-}
-
-// Navigation
-const goToCollection = (card: Card) => {
-  isOpen.value = false
-  searchQuery.value = ''
-  void router.push({ path: '/collection', query: { search: card.name } })
-}
-
-const goToUserCard = (card: PublicCardResult) => {
-  isOpen.value = false
-  searchQuery.value = ''
-  void router.push(`/@${card.username}`)
-}
-
-const goToScryfall = (card: ScryfallCard) => {
-  isOpen.value = false
-  searchQuery.value = ''
-  // Navigate to collection with the card name to add it
-  void router.push({ path: '/collection', query: { addCard: card.name } })
-}
-
-// ME INTERESA - send interest from search results
-const sentInterestIds = ref<Set<string>>(new Set())
-const sendingInterest = ref(false)
-
-const sendInterestFromSearch = async (card: PublicCardResult) => {
-  if (!authStore.user || sentInterestIds.value.has(card.id) || sendingInterest.value) return
-
-  sendingInterest.value = true
-  try {
-    const scryfallId = card.scryfallId ?? ''
-    const edition = card.edition ?? ''
-
-    // Check for existing duplicate match
-    const sharedMatchesRef = collection(db, 'shared_matches')
-    const existingQuery = query(
-      sharedMatchesRef,
-      where('senderId', '==', authStore.user.id),
-      where('receiverId', '==', card.userId),
-      where('card.scryfallId', '==', scryfallId)
-    )
-    const existingSnapshot = await getDocs(existingQuery)
-
-    const hasDuplicate = existingSnapshot.docs.some(docSnap => {
-      const data = docSnap.data() as Record<string, unknown>
-      const cardField = data.card as Record<string, unknown> | undefined
-      return cardField?.edition === edition
-    })
-
-    if (hasDuplicate) {
-      sentInterestIds.value.add(card.id)
-      toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'info')
-      return
-    }
-
-    const MATCH_LIFETIME_DAYS = 15
-    const getExpirationDate = () => {
-      const date = new Date()
-      date.setDate(date.getDate() + MATCH_LIFETIME_DAYS)
-      return date
-    }
-
-    const cardData = {
-      id: card.cardId ?? card.id,
-      scryfallId,
-      name: card.cardName ?? '',
-      edition,
-      quantity: card.quantity ?? 1,
-      condition: card.condition ?? 'NM',
-      foil: card.foil ?? false,
-      price: card.price ?? 0,
-      image: card.image ?? '',
-      status: card.status ?? 'sale',
-    }
-
-    const totalValue = (card.price ?? 0) * (card.quantity ?? 1)
-
-    const sharedMatchPayload = {
-      senderId: authStore.user.id,
-      senderUsername: authStore.user.username,
-      senderLocation: authStore.user.location ?? '',
-      senderEmail: authStore.user.email ?? '',
-      receiverId: card.userId,
-      receiverUsername: card.username ?? '',
-      receiverLocation: card.location ?? '',
-      card: cardData,
-      cardType: card.status ?? 'sale',
-      totalValue,
-      status: 'pending',
-      senderStatus: 'interested',
-      receiverStatus: 'new',
-      createdAt: new Date(),
-      lifeExpiresAt: getExpirationDate(),
-    }
-
-    await addDoc(sharedMatchesRef, sharedMatchPayload)
-
-    sentInterestIds.value.add(card.id)
-    toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'success')
-  } catch (error) {
-    console.error('Error sending interest:', error)
-    toastStore.show(t('dashboard.interest.error'), 'error')
-  } finally {
-    sendingInterest.value = false
-  }
 }
 
 onMounted(() => {
@@ -322,7 +87,7 @@ defineExpose({
       <!-- Clear button (shows when there's text) -->
       <button
         v-if="searchQuery.length > 0"
-        @click.stop="clearSearch"
+        @click.stop="handleClearSearch"
         class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
         type="button"
       >
@@ -349,7 +114,7 @@ defineExpose({
     <!-- Results Dropdown -->
     <div
       v-if="isOpen && (loading || totalResults > 0)"
-      class="absolute top-full left-0 right-0 mt-2 bg-primary border border-silver-30 rounded shadow-lg max-h-[70vh] overflow-hidden z-50"
+      class="absolute top-full right-0 mt-2 w-[420px] bg-primary border border-silver-30 rounded shadow-lg max-h-[70vh] overflow-hidden z-50"
     >
       <!-- Tabs -->
       <div class="flex border-b border-silver-20">

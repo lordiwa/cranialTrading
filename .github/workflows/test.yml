@@ -60,7 +60,7 @@ jobs:
   e2e-smoke:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -81,6 +81,12 @@ jobs:
         run: |
           echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
           echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Validate test credentials
+        run: |
+          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
+            echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
+            exit 1
+          fi
       - name: Run smoke & auth tests
         run: npx playwright test e2e/specs/auth e2e/specs/smoke e2e/specs/help e2e/specs/i18n e2e/specs/notifications
       - uses: actions/upload-artifact@v4
@@ -92,7 +98,7 @@ jobs:
   e2e-collection:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -113,6 +119,12 @@ jobs:
         run: |
           echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
           echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Validate test credentials
+        run: |
+          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
+            echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
+            exit 1
+          fi
       - name: Run collection & search tests
         run: npx playwright test e2e/specs/collection e2e/specs/search e2e/specs/preferences
       - uses: actions/upload-artifact@v4
@@ -124,7 +136,7 @@ jobs:
   e2e-features:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -145,6 +157,12 @@ jobs:
         run: |
           echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
           echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Validate test credentials
+        run: |
+          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
+            echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
+            exit 1
+          fi
       - name: Run deck, binder & settings tests
         run: npx playwright test e2e/specs/decks e2e/specs/binders e2e/specs/settings e2e/specs/market
       - uses: actions/upload-artifact@v4
@@ -156,7 +174,7 @@ jobs:
   e2e-social:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: true
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
@@ -177,6 +195,12 @@ jobs:
         run: |
           echo "TEST_USER_A_EMAIL=${TEST_USER_A_EMAIL}" >> .env.local
           echo "TEST_USER_A_PASSWORD=${TEST_USER_A_PASSWORD}" >> .env.local
+      - name: Validate test credentials
+        run: |
+          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
+            echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
+            exit 1
+          fi
       - name: Run matches, messages, contacts & profile tests
         run: npx playwright test e2e/specs/matches e2e/specs/messages e2e/specs/contacts e2e/specs/user-profile
       - uses: actions/upload-artifact@v4

@@ -42,7 +42,11 @@ export class SearchPage {
     await this.searchInput.press('Escape');
     await this.page.waitForTimeout(300);
     await this.searchButton.click();
-    await this.page.waitForTimeout(4000);
+    // Wait for results to render OR no-results message (up to 10s)
+    await Promise.race([
+      this.resultCards.first().waitFor({ state: 'visible', timeout: 10_000 }),
+      this.noResultsMessage.waitFor({ state: 'visible', timeout: 10_000 }),
+    ]).catch(() => {});
   }
 
   async typeForAutocomplete(query: string) {

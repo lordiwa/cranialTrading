@@ -89,6 +89,6 @@ onMounted(() => {
 
 <style scoped>
 .shadow-glow-strong {
-  box-shadow: 0 0 12px rgba(204, 255, 0, 0.15);
+  box-shadow: 0 0 12px rgba(90, 193, 104, 0.15);
 }
 </style>

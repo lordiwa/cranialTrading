@@ -101,5 +101,10 @@ export class SettingsPage {
     await this.page.goto('/settings');
     await ensureLoggedIn(this.page, '/settings');
     await this.page.waitForLoadState('domcontentloaded');
+    // Wait for settings content to render (not just loading spinner)
+    await this.page.locator('text=/CHANGE PASSWORD|CAMBIAR|PASSWORD|USERNAME|USUARIO/i')
+      .first()
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => {});
   }
 }

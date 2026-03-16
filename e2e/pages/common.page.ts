@@ -23,7 +23,8 @@ export class CommonPage {
     this.infoToast = page.locator('.border-silver-50.text-silver').last();
 
     // ConfirmModal: z-[60], with CANCEL (btn-secondary) and CONFIRM (btn-primary/btn-danger) buttons
-    const dialog = page.locator('.fixed.inset-0.z-\\[60\\]');
+    // Use .first() to avoid strict mode violation when multiple z-[60] modals exist
+    const dialog = page.locator('.fixed.inset-0.z-\\[60\\]').first();
     this.confirmDialog = {
       container: dialog,
       // Confirm = last button (right side), Cancel = first button (left side)
@@ -46,13 +47,22 @@ export class CommonPage {
   }
 
   async confirmAction() {
+    // Wait for any z-[60] confirm dialog to be visible
     await this.confirmDialog.container.waitFor({ state: 'visible', timeout: 5000 });
-    await this.confirmDialog.confirmButton.click();
+    // Find ALL visible z-[60] dialogs and click the confirm button on the LAST one
+    // (the most recently opened). ConfirmModal defaults to ACEPTAR/CANCELAR buttons.
+    const visibleDialogs = this.page.locator('.fixed.inset-0.z-\\[60\\]:visible');
+    const lastDialog = visibleDialogs.last();
+    const confirmBtn = lastDialog.locator('button').last();
+    await confirmBtn.click();
   }
 
   async cancelAction() {
     await this.confirmDialog.container.waitFor({ state: 'visible', timeout: 5000 });
-    await this.confirmDialog.cancelButton.click();
+    const visibleDialogs = this.page.locator('.fixed.inset-0.z-\\[60\\]:visible');
+    const lastDialog = visibleDialogs.last();
+    const cancelBtn = lastDialog.locator('button').first();
+    await cancelBtn.click();
   }
 
   async getToastText(): Promise<string> {

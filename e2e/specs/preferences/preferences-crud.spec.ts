@@ -39,12 +39,20 @@ test.describe('Preferences (Wishlist) CRUD', () => {
     const count = await cards.count();
     if (count > 0) {
       await cards.first().click();
-      // Look for delete button in the card detail modal
-      const deleteBtn = page.getByRole('button', { name: /delete|eliminar/i });
+      // CardDetailModal opens — look for delete button INSIDE the modal only
+      const modal = page.locator('.fixed.inset-0.z-50').first();
+      await modal.waitFor({ state: 'visible', timeout: 5000 });
+      const deleteBtn = modal.getByRole('button', { name: /delete|eliminar/i });
       if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await deleteBtn.click();
         await commonPage.confirmAction();
         await commonPage.waitForToast('success');
+      } else {
+        // Modal has no delete button — close it and skip
+        const closeBtn = modal.getByRole('button', { name: /cancel|close|cerrar|×/i }).first();
+        if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await closeBtn.click();
+        }
       }
     }
   });

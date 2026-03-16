@@ -17,9 +17,8 @@ export class BindersPage {
   constructor(page: Page) {
     this.page = page;
     this.binderTab = page.getByRole('button', { name: /binder/i });
-    // Button text is "+ NEW FOLDER" (header) or "+ NEW" (dashed sub-tab)
-    // Use the dashed sub-tab which appears after clicking the BINDERS tab
-    this.newBinderButton = page.locator('button.border-dashed').filter({ hasText: /\+ NEW|nueva/i });
+    // "+ NEW" button in the binder sub-tabs row (BaseButton variant="filled" with bg-neon)
+    this.newBinderButton = page.getByRole('button', { name: /\+ NEW|\+ NUEV/i }).first();
     this.binderList = page.locator('button').filter({ hasText: /binder|carpeta/i });
 
     this.createModal = {

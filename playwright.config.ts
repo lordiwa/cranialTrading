@@ -19,14 +19,14 @@ export default defineConfig({
     ['list'],
   ],
   outputDir: 'e2e/test-results',
-  timeout: 60_000,
+  timeout: 45_000,
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
-    actionTimeout: 15_000,
-    navigationTimeout: 30_000,
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
   },
   projects: [
     {

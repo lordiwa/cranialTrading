@@ -16,6 +16,11 @@ export class ContactsPage {
     await this.page.goto('/contacts');
     await ensureLoggedIn(this.page, '/contacts');
     await this.page.waitForLoadState('domcontentloaded');
+    // Wait for Firebase data to load — either contacts or empty state
+    await Promise.race([
+      this.contactCards.first().waitFor({ state: 'visible', timeout: 10_000 }),
+      this.emptyState.waitFor({ state: 'visible', timeout: 10_000 }),
+    ]).catch(() => {});
   }
 
   chatButton(contactIndex = 0): Locator {

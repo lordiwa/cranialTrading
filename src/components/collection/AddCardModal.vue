@@ -485,11 +485,11 @@ const handleClose = () => {
               <button
                   v-if="isSplitCard"
                   @click.stop="toggleCardFace"
-                  class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#CCFF00] p-2 hover:bg-[#CCFF00]/20 transition-all rounded z-10"
+                  class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#5AC168] p-2 hover:bg-[#5AC168]/20 transition-all rounded z-10"
                   :title="`Ver lado ${cardFaceIndex === 0 ? 2 : 1}`"
                   aria-label="Ver otro lado de la carta"
               >
-                <svg class="w-5 h-5 text-[#CCFF00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-[#5AC168]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
                 </svg>
               </button>
@@ -498,28 +498,29 @@ const handleClose = () => {
             <!-- Info bajo la imagen -->
             <div class="text-center w-full">
               <p class="font-bold text-[#EEEEEE]">{{ currentCardName }}</p>
-              <p v-if="isSplitCard" class="text-xs text-[#CCFF00] mt-1">
+              <p v-if="isSplitCard" class="text-xs text-[#5AC168] mt-1">
                 {{ t('cards.addModal.splitCardSide', { current: cardFaceIndex + 1, total: selectedPrint?.card_faces?.length ?? 0 }) }}
               </p>
 
               <!-- Prices Section -->
               <div class="mt-3 space-y-1">
-                <!-- Card Kingdom Price (primary) -->
+                <!-- TCGPlayer Price -->
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">TCG:</span>
+                  <span class="text-neon font-bold">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
+                </div>
+                <!-- Card Kingdom Price -->
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-[#EEEEEE]/70">CK:</span>
-                  <span v-if="hasCardKingdomPrices" class="text-[#4CAF50] font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                  <span v-if="hasCardKingdomPrices" class="text-neon font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
                   <span v-else-if="loadingCKPrices" class="text-[#EEEEEE]/50">...</span>
                   <span v-else class="text-[#EEEEEE]/50">-</span>
                 </div>
+                <!-- Buylist -->
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-[#EEEEEE]/70">BL:</span>
-                  <span v-if="cardKingdomBuylist" class="text-[#FF9800] font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
+                  <span v-if="cardKingdomBuylist" class="text-silver font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
                   <span v-else class="text-[#EEEEEE]/50">-</span>
-                </div>
-                <!-- TCGPlayer Price (secondary) -->
-                <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">TCG:</span>
-                  <span class="text-[#EEEEEE]/50">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
                 </div>
               </div>
 
@@ -530,7 +531,7 @@ const handleClose = () => {
                     id="print-select"
                     :value="selectedPrint?.id"
                     @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#CCFF00] rounded"
+                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#5AC168] rounded"
                 >
                   <option
                       v-for="print in availablePrints"
@@ -595,7 +596,7 @@ const handleClose = () => {
             </div>
 
             <!-- Publicar en perfil (solo para sale/trade) -->
-            <div v-if="showPublicOption" class="flex items-center gap-2 p-3 bg-[#111111] border border-[#CCFF00]/30 rounded">
+            <div v-if="showPublicOption" class="flex items-center gap-2 p-3 bg-[#111111] border border-[#5AC168]/30 rounded">
               <input
                   v-model="form.public"
                   type="checkbox"

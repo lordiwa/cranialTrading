@@ -284,6 +284,6 @@ const cardImage = computed(() => {
 
 <style scoped>
 .bg-neon-5 {
-  background-color: rgba(204, 255, 0, 0.05);
+  background-color: rgba(90, 193, 104, 0.05);
 }
 </style>

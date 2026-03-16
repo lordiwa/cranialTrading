@@ -115,7 +115,7 @@ const activeSourceLabel = computed(() => {
 const sourceStrokeColor = computed(() => {
   if (priceSource.value === 'ck') return '#4CAF50'
   if (priceSource.value === 'buylist') return '#FF9800'
-  return '#CCFF00'
+  return '#5AC168'
 })
 
 const getPriceValue = (s: { ck: number; buylist: number; tcg: number }) => {

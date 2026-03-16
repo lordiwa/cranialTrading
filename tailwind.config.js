@@ -62,7 +62,7 @@ export default {
                 'subtle': '0 2px 4px rgba(0, 0, 0, 0.2)',
                 'medium': '0 4px 12px rgba(0, 0, 0, 0.3)',
                 'strong': '0 8px 24px rgba(0, 0, 0, 0.4)',
-                'glow-strong': '0 0 12px rgba(204, 255, 0, 0.15)',
+                'glow-strong': '0 0 12px rgba(90, 193, 104, 0.15)',
             },
             borderRadius: {
                 'none': '0px',

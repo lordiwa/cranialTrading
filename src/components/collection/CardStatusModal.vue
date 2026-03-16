@@ -124,11 +124,11 @@ watch(() => props.card, (newCard) => {
           </div>
           <div v-if="hasCardKingdomPrices" class="flex justify-between items-center">
             <span class="text-tiny text-silver-50">Card Kingdom:</span>
-            <span class="text-small font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+            <span class="text-small font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
           </div>
           <div v-if="cardKingdomBuylist" class="flex justify-between items-center">
             <span class="text-tiny text-silver-50">CK Buylist:</span>
-            <span class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+            <span class="text-small text-silver">{{ formatPrice(cardKingdomBuylist) }}</span>
           </div>
           <div v-else-if="loadingCKPrices" class="text-tiny text-silver-50">
             {{ t('cards.statusModal.loadingCKPrices') }}

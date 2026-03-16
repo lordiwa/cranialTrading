@@ -388,13 +388,13 @@ const comparisonRows = computed(() => [
 
 <style scoped>
 .border-neon-30 {
-  border-color: rgba(204, 255, 0, 0.3);
+  border-color: rgba(90, 193, 104, 0.3);
 }
 .bg-neon-10 {
-  background-color: rgba(204, 255, 0, 0.1);
+  background-color: rgba(90, 193, 104, 0.1);
 }
 .bg-neon-20 {
-  background-color: rgba(204, 255, 0, 0.2);
+  background-color: rgba(90, 193, 104, 0.2);
 }
 
 /* Floating card animation */

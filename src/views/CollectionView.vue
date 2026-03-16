@@ -4147,7 +4147,7 @@ onUnmounted(() => {
                   <div class="text-tiny text-silver-50 flex-shrink-0">
                     x{{ card.quantity }}
                   </div>
-                  <div class="text-tiny font-bold text-[#4CAF50] flex-shrink-0 w-20 text-right">
+                  <div class="text-tiny font-bold text-neon flex-shrink-0 w-20 text-right">
                     ${{ (getCardCKPrice(card.id, card.price) * card.quantity).toFixed(2) }}
                   </div>
                   <div class="flex-shrink-0">

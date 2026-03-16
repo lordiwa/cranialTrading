@@ -217,10 +217,10 @@ VITE_FIREBASE_MEASUREMENT_ID
 Tailwind custom palette:
 - `primary`: #000000 (black)
 - `silver`: #EEEEEE (text)
-- `neon`: #CCFF00 (accents)
+- `neon`: #5AC168 (accents)
 - `rust`: #8B2E1F (errors)
 
-Font: IBM Plex Mono (monospace throughout)
+Font: Open Sans (sans-serif throughout)
 
 ## Implementation Rules
 

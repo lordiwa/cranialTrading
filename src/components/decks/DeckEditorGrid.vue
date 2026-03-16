@@ -46,7 +46,7 @@ watch(() => props.cards, () => {
 
 // Preview state
 const hoveredCard = ref<DisplayDeckCard | null>(null)
-const previewCard = computed(() => hoveredCard.value ?? props.cards[0] ?? null)
+const previewCard = computed(() => hoveredCard.value)
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Type guard
@@ -232,7 +232,6 @@ const handleMouseEnter = (card: DisplayDeckCard) => {
 const handleMouseLeave = () => {
   if (hoverTimeout) clearTimeout(hoverTimeout)
   hoverTimeout = null
-  hoveredCard.value = null
 }
 
 onUnmounted(() => {

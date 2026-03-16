@@ -56,7 +56,7 @@ const chartHasData = computed(() => chartHistory.value.length >= 2)
 const chartSourceColor = computed(() => {
   if (chartSource.value === 'ck') return '#4CAF50'
   if (chartSource.value === 'buylist') return '#FF9800'
-  return '#CCFF00'
+  return '#5AC168'
 })
 
 const getChartValue = (p: { ck: number; buylist: number; tcg: number }) => {
@@ -351,19 +351,19 @@ const handleClose = () => {
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
               <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">Card Kingdom:</span>
-                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-[#4CAF50]">{{ formatPrice(cardKingdomRetail) }}</span>
+                <span class="text-tiny text-silver-70">TCG:</span>
+                <span class="text-body font-bold text-neon">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">CK:</span>
+                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
                 <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
                 <span v-else class="text-small text-silver-50">-</span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-50">CK Buylist:</span>
-                <span v-if="cardKingdomBuylist" class="text-small text-[#FF9800]">{{ formatPrice(cardKingdomBuylist) }}</span>
+                <span class="text-tiny text-silver-70">BL:</span>
+                <span v-if="cardKingdomBuylist" class="text-body font-bold text-silver">{{ formatPrice(cardKingdomBuylist) }}</span>
                 <span v-else class="text-small text-silver-50">-</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-50">TCG:</span>
-                <span class="text-small text-silver-50">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
               </div>
             </div>
 

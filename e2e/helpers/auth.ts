@@ -14,19 +14,25 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
     throw new Error('Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD');
   }
 
-  // Check if we're redirected to login
-  await page.waitForTimeout(2000);
+  // Wait for the page to be ready instead of hardcoded timeout
+  await page.waitForLoadState('domcontentloaded');
+
   if (page.url().includes('/login')) {
     await page.locator('input[type="email"]').fill(email);
     await page.locator('input[type="password"]').fill(password);
     await page.locator('button[type="submit"]').click();
-    await page.waitForURL((url) => !url.pathname.includes('/login'), {
-      timeout: 45_000,
-    });
-    // Wait for Firebase auth to settle and user data to load
-    await page.waitForTimeout(3000);
 
-    // Now on /saved-matches with user authenticated.
+    // Race: redirect away from /login vs error toast
+    await waitForLoginResult(page);
+
+    // Wait for authenticated UI to be ready instead of hardcoded timeout
+    await page.waitForSelector(
+      '[data-testid="nav-collection"], [data-tour="nav-collection"], nav, .nav',
+      { timeout: 10_000 },
+    ).catch(() => {
+      // Not critical — some pages may not have nav visible immediately
+    });
+
     // Set locale and mark tour completed BEFORE any navigation.
     await page.evaluate(() => {
       localStorage.setItem('cranial_locale', 'en');
@@ -39,7 +45,6 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
     const dest = targetUrl || '/collection';
     await page.goto(dest);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
 
     // Dismiss any overlay that still appears (shouldn't with tour key set)
     await dismissTourOverlay(page);
@@ -53,11 +58,28 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
       await markTourCompletedForCurrentUser(page);
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(1000);
     } else {
       await markTourCompletedForCurrentUser(page);
     }
     await dismissTourOverlay(page);
+  }
+}
+
+/**
+ * Race between successful redirect and error toast after login submission.
+ * Throws immediately if an error toast appears instead of waiting 45s.
+ */
+export async function waitForLoginResult(page: Page) {
+  const errorToast = page.locator('.border-rust').first();
+  const result = await Promise.race([
+    page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 })
+      .then(() => 'redirected' as const),
+    errorToast.waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => 'error' as const),
+  ]);
+  if (result === 'error') {
+    const msg = await errorToast.textContent().catch(() => 'unknown error');
+    throw new Error(`Login failed: ${msg}. Check credentials and Firebase project.`);
   }
 }
 

@@ -47,7 +47,7 @@ export default defineConfig({
   webServer: {
     command: process.env.CI
       ? 'npx vite preview --port 4173'
-      : 'npx vite build && npx vite preview --port 4173',
+      : `npx vite build --mode ${process.env.VITE_MODE || 'production'} && npx vite preview --port 4173`,
     port: 4173,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

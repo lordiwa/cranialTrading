@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/test';
+import { waitForLoginResult } from '../../helpers/auth';
 
 test.describe('Internationalization', () => {
   test('default language is Spanish on login page', async ({ page }) => {
@@ -41,7 +42,7 @@ test.describe('Internationalization', () => {
     await page.waitForTimeout(500);
 
     await page.reload();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('domcontentloaded');
 
     const englishText = page.locator('text=/SIGN IN|Sign in|LOG IN/i');
     await expect(englishText.first()).toBeVisible();
@@ -54,11 +55,20 @@ test.describe('Internationalization', () => {
     await page.getByRole('button', { name: 'EN', exact: true }).click();
     await page.waitForTimeout(500);
 
-    // Login
+    // Login with fail-fast race pattern
     await page.locator('input[type="email"]').fill(process.env.TEST_USER_A_EMAIL!);
     await page.locator('input[type="password"]').fill(process.env.TEST_USER_A_PASSWORD!);
     await page.locator('button[type="submit"]').click();
-    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 45_000 });
+    await waitForLoginResult(page);
+
+    // Dismiss any tour overlay that may appear after login
+    const overlay = page.locator('.fixed.inset-0.z-\\[9999\\]');
+    const skipButton = page.locator('button').filter({ hasText: /skip|saltar|omitir/i });
+    if (await overlay.isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (await skipButton.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+        await skipButton.first().click({ force: true });
+      }
+    }
 
     // Verify English is still active
     const locale = await page.evaluate(() => localStorage.getItem('cranial_locale'));

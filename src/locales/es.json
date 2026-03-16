@@ -88,6 +88,36 @@
     },
     "messages": {
       "loadError": "Error cargando datos"
+    },
+    "import": {
+      "importing": "Importando \"{name}\"...",
+      "creatingDeck": "Creando mazo \"{name}\"...",
+      "creatingBinder": "Creando carpeta \"{name}\"...",
+      "errorCreatingDeck": "Error al crear el mazo",
+      "errorCreatingBinder": "Error al crear la carpeta",
+      "preparing": "Preparando {count} cartas...",
+      "fetchingData": "Obteniendo datos de {count} cartas...",
+      "processing": "Procesando cartas...",
+      "processingCount": "Procesando {count} cartas...",
+      "processingProgress": "Procesando {current}/{total}...",
+      "fetchingPrices": "Buscando precios adicionales...",
+      "saving": "Guardando {count} cartas...",
+      "allocatingToDeck": "Asignando cartas al mazo...",
+      "allocatingToDeckCount": "Asignando {count} cartas al mazo...",
+      "allocatingToBinder": "Asignando cartas a la carpeta...",
+      "allocatingToBinderCount": "Asignando {count} cartas a la carpeta...",
+      "allocatingProgress": "Asignando {current}/{total}...",
+      "deckComplete": "\"{name}\" importado con {count} cartas",
+      "binderComplete": "\"{name}\" importada con {count} cartas",
+      "errorDeck": "Error al importar el mazo",
+      "errorBinder": "Error al importar la carpeta",
+      "errorCsv": "Error al importar CSV",
+      "deckCreated": "Mazo \"{name}\" creado",
+      "resuming": "Continuando \"{name}\"...",
+      "resumeComplete": "\"{name}\" completado con {count} cartas",
+      "resumeIncomplete": "Importación incompleta. El mazo puede estar vacío.",
+      "resumeError": "Error al resumir importación",
+      "resumeFailed": "Importación de \"{name}\" falló. Limpiando..."
     }
   },
 
@@ -1964,6 +1994,12 @@
       "load": "Error al cargar carpetas",
       "create": "Error al crear carpeta",
       "delete": "Error al eliminar carpeta"
+    },
+    "importModal": {
+      "title": "IMPORTAR CARPETA",
+      "inputLabel": "Link de Moxfield o texto de la carpeta",
+      "binderNameLabel": "Nombre de la carpeta (opcional)",
+      "binderNamePlaceholder": "Dejar vacío para generar un nombre aleatorio"
     }
   },
 

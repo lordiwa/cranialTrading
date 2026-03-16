@@ -233,8 +233,8 @@ const handleCsvFile = async (event: Event) => {
   <BaseModal :show="show" :close-on-click-outside="false" @close="handleClose">
     <div class="space-y-md">
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.importModal.title') }}</h2>
-        <p class="text-small text-silver-70">{{ t('decks.importModal.inputLabel') }}</p>
+        <h2 class="text-h2 font-bold text-silver mb-1">{{ isBinder ? t('binders.importModal.title') : t('decks.importModal.title') }}</h2>
+        <p class="text-small text-silver-70">{{ isBinder ? t('binders.importModal.inputLabel') : t('decks.importModal.inputLabel') }}</p>
       </div>
 
       <div>
@@ -332,10 +332,10 @@ const handleCsvFile = async (event: Event) => {
         </label>
       </div>
 
-      <!-- Deck name input (optional) -->
+      <!-- Deck/Binder name input (optional) -->
       <div v-if="preview">
-        <label for="import-deck-name" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.deckNameLabel') }}</label>
-        <BaseInput id="import-deck-name" v-model="deckNameInput" :placeholder="t('decks.importModal.options.deckNamePlaceholder')" />
+        <label for="import-deck-name" class="text-small text-silver-70 block mb-2">{{ isBinder ? t('binders.importModal.binderNameLabel') : t('decks.importModal.options.deckNameLabel') }}</label>
+        <BaseInput id="import-deck-name" v-model="deckNameInput" :placeholder="isBinder ? t('binders.importModal.binderNamePlaceholder') : t('decks.importModal.options.deckNamePlaceholder')" />
       </div>
 
       <!-- Formato del deck (hidden for binders) -->

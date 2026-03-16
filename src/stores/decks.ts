@@ -188,19 +188,25 @@ export const useDecksStore = defineStore('decks', () => {
     // ========================================================================
 
     /**
-     * Get total allocated quantity for a card across ALL decks
+     * Cached index: cardId → total allocated across ALL decks.
+     * Rebuilt automatically when decks change. O(1) lookups.
      */
-    const getTotalAllocatedForCard = (cardId: string): number => {
-        let total = 0
+    const deckAllocationTotalIndex = computed((): Map<string, number> => {
+        const index = new Map<string, number>()
         for (const deck of decks.value) {
             if (!deck.allocations) continue
             for (const alloc of deck.allocations) {
-                if (alloc.cardId === cardId) {
-                    total += alloc.quantity
-                }
+                index.set(alloc.cardId, (index.get(alloc.cardId) ?? 0) + alloc.quantity)
             }
         }
-        return total
+        return index
+    })
+
+    /**
+     * Get total allocated quantity for a card across ALL decks (O(1) via cached index)
+     */
+    const getTotalAllocatedForCard = (cardId: string): number => {
+        return deckAllocationTotalIndex.value.get(cardId) ?? 0
     }
 
     /**

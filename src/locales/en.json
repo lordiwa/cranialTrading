@@ -88,6 +88,36 @@
     },
     "messages": {
       "loadError": "Error loading data"
+    },
+    "import": {
+      "importing": "Importing \"{name}\"...",
+      "creatingDeck": "Creating deck \"{name}\"...",
+      "creatingBinder": "Creating binder \"{name}\"...",
+      "errorCreatingDeck": "Error creating deck",
+      "errorCreatingBinder": "Error creating binder",
+      "preparing": "Preparing {count} cards...",
+      "fetchingData": "Fetching data for {count} cards...",
+      "processing": "Processing cards...",
+      "processingCount": "Processing {count} cards...",
+      "processingProgress": "Processing {current}/{total}...",
+      "fetchingPrices": "Fetching additional prices...",
+      "saving": "Saving {count} cards...",
+      "allocatingToDeck": "Allocating cards to deck...",
+      "allocatingToDeckCount": "Allocating {count} cards to deck...",
+      "allocatingToBinder": "Allocating cards to binder...",
+      "allocatingToBinderCount": "Allocating {count} cards to binder...",
+      "allocatingProgress": "Allocating {current}/{total}...",
+      "deckComplete": "\"{name}\" imported with {count} cards",
+      "binderComplete": "\"{name}\" imported with {count} cards",
+      "errorDeck": "Error importing deck",
+      "errorBinder": "Error importing binder",
+      "errorCsv": "Error importing CSV",
+      "deckCreated": "Deck \"{name}\" created",
+      "resuming": "Resuming \"{name}\"...",
+      "resumeComplete": "\"{name}\" completed with {count} cards",
+      "resumeIncomplete": "Import incomplete. Deck may be empty.",
+      "resumeError": "Error resuming import",
+      "resumeFailed": "Import of \"{name}\" failed. Cleaning up..."
     }
   },
 
@@ -1964,6 +1994,12 @@
       "load": "Failed to load binders",
       "create": "Failed to create binder",
       "delete": "Failed to delete binder"
+    },
+    "importModal": {
+      "title": "IMPORT BINDER",
+      "inputLabel": "Moxfield link or binder text",
+      "binderNameLabel": "Binder name (optional)",
+      "binderNamePlaceholder": "Leave empty to generate a random name"
     }
   },
 

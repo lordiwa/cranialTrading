@@ -88,6 +88,36 @@
     },
     "messages": {
       "loadError": "Erro ao carregar dados"
+    },
+    "import": {
+      "importing": "Importando \"{name}\"...",
+      "creatingDeck": "Criando deck \"{name}\"...",
+      "creatingBinder": "Criando pasta \"{name}\"...",
+      "errorCreatingDeck": "Erro ao criar o deck",
+      "errorCreatingBinder": "Erro ao criar a pasta",
+      "preparing": "Preparando {count} cartas...",
+      "fetchingData": "Obtendo dados de {count} cartas...",
+      "processing": "Processando cartas...",
+      "processingCount": "Processando {count} cartas...",
+      "processingProgress": "Processando {current}/{total}...",
+      "fetchingPrices": "Buscando preços adicionais...",
+      "saving": "Salvando {count} cartas...",
+      "allocatingToDeck": "Alocando cartas ao deck...",
+      "allocatingToDeckCount": "Alocando {count} cartas ao deck...",
+      "allocatingToBinder": "Alocando cartas à pasta...",
+      "allocatingToBinderCount": "Alocando {count} cartas à pasta...",
+      "allocatingProgress": "Alocando {current}/{total}...",
+      "deckComplete": "\"{name}\" importado com {count} cartas",
+      "binderComplete": "\"{name}\" importada com {count} cartas",
+      "errorDeck": "Erro ao importar o deck",
+      "errorBinder": "Erro ao importar a pasta",
+      "errorCsv": "Erro ao importar CSV",
+      "deckCreated": "Deck \"{name}\" criado",
+      "resuming": "Continuando \"{name}\"...",
+      "resumeComplete": "\"{name}\" concluído com {count} cartas",
+      "resumeIncomplete": "Importação incompleta. O deck pode estar vazio.",
+      "resumeError": "Erro ao retomar importação",
+      "resumeFailed": "Importação de \"{name}\" falhou. Limpando..."
     }
   },
 
@@ -1964,6 +1994,12 @@
       "load": "Erro ao carregar pastas",
       "create": "Erro ao criar pasta",
       "delete": "Erro ao excluir pasta"
+    },
+    "importModal": {
+      "title": "IMPORTAR PASTA",
+      "inputLabel": "Link do Moxfield ou texto da pasta",
+      "binderNameLabel": "Nome da pasta (opcional)",
+      "binderNamePlaceholder": "Deixe vazio para gerar um nome aleatório"
     }
   },
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { useContextMenu } from '../../composables/useContextMenu'
 import { useCollectionStore } from '../../stores/collection'
@@ -35,6 +35,14 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+// Binder pagination
+const BINDER_PAGE_SIZE = 50
+const displayCount = ref(BINDER_PAGE_SIZE)
+
+watch(() => props.cards, () => {
+  displayCount.value = BINDER_PAGE_SIZE
+})
 
 // Preview state
 const hoveredCard = ref<DisplayDeckCard | null>(null)
@@ -183,12 +191,28 @@ const buildGroups = (source: DisplayDeckCard[], getCategoryFn: (card: DisplayDec
   return result
 }
 
+// Filtered source shared by groupedCards and remaining count
+const filteredSource = computed(() => {
+  return hasActiveFilters.value ? props.cards.filter(passesFilters) : props.cards
+})
+
 // Group cards by selected mode
 const groupedCards = computed(() => {
-  const source = hasActiveFilters.value ? props.cards.filter(passesFilters) : props.cards
+  const source = props.binderMode
+    ? filteredSource.value.slice(0, displayCount.value)
+    : filteredSource.value
   if (props.groupBy === 'none') return [{ type: 'all', cards: sortCards(source) }]
   return buildGroups(source, getCategory, getCategoryOrder())
 })
+
+const remaining = computed(() => {
+  if (!props.binderMode) return 0
+  return Math.max(0, filteredSource.value.length - displayCount.value)
+})
+
+const loadMore = () => {
+  displayCount.value += BINDER_PAGE_SIZE
+}
 
 // Count total cards by category
 const getTypeCount = (type: string): number => {
@@ -460,6 +484,16 @@ const handleDeckContextMenuSelect = (itemId: string) => {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Load More (binder pagination) -->
+      <div v-if="remaining > 0" class="flex justify-center mt-6">
+        <button
+          @click="loadMore"
+          class="px-6 py-2 bg-primary border border-neon text-neon text-small font-bold hover:bg-neon/10 transition-colors rounded"
+        >
+          {{ t('common.actions.loadMore') }} ({{ remaining }})
+        </button>
       </div>
     </div>
 

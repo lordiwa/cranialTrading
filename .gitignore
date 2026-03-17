@@ -34,3 +34,7 @@ e2e/.auth/
 e2e/test-results/
 e2e/playwright-report/
 e2e/blob-report/
+
+# Claude Code - ephemeral/local artifacts
+.claude/worktrees/
+.claude/plans/

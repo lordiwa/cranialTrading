@@ -1870,9 +1870,10 @@
     "title": "MARKET INSIGHTS",
     "subtitle": "Price movers, format staples, and market trends",
     "tabs": {
-      "movers": "MOVERS",
+      "movers": "SET TRENDS",
       "staples": "STAPLES",
-      "portfolio": "MY CARDS"
+      "portfolio": "MY PORTFOLIO",
+      "wishlist": "WISHLIST"
     },
     "movers": {
       "winners": "WINNERS",
@@ -1937,12 +1938,57 @@
     "lastUpdated": "Last updated: {date}",
     "portfolio": {
       "totalChange": "Portfolio impact",
+      "totalValue": "Total value",
       "affected": "{count} cards affected",
       "up": "{count} up",
       "down": "{count} down",
       "empty": "None of your cards match current price movers. Load your collection and check back later.",
       "sortImpact": "$ Impact",
       "sortPercent": "% Change",
+      "sortPrice": "Price",
+      "sortName": "Name",
+      "statusLabel": "Status",
+      "directionLabel": "Direction",
+      "statusFilter": {
+        "all": "All",
+        "collection": "Collection",
+        "sale": "For Sale",
+        "trade": "For Trade"
+      },
+      "directionFilter": {
+        "all": "All",
+        "winners": "Gainers",
+        "losers": "Losers"
+      },
+      "table": {
+        "card": "Card",
+        "set": "Set",
+        "qty": "Qty",
+        "condition": "Cond",
+        "was": "Was",
+        "now": "Now",
+        "adjValue": "Adj. Value",
+        "change": "% Chg",
+        "impact": "Impact"
+      },
+      "loginRequired": "Log in to see how price movements affect your collection."
+    },
+    "wishlist": {
+      "totalChange": "Wishlist impact",
+      "affected": "{count} cards tracked",
+      "up": "{count} up",
+      "down": "{count} down",
+      "empty": "None of your wishlist cards match current price movers.",
+      "sortImpact": "$ Impact",
+      "sortPercent": "% Change",
+      "sortPrice": "Price",
+      "sortName": "Name",
+      "directionLabel": "Direction",
+      "directionFilter": {
+        "all": "All",
+        "winners": "Gainers",
+        "losers": "Losers"
+      },
       "table": {
         "card": "Card",
         "set": "Set",
@@ -1952,7 +1998,26 @@
         "change": "% Chg",
         "impact": "Impact"
       },
-      "loginRequired": "Log in to see how price movements affect your collection."
+      "loginRequired": "Log in to track price changes on your wishlist."
+    },
+    "setTrends": {
+      "editionSummary": {
+        "avgChange": "avg. change",
+        "cards": "{count} cards",
+        "topGainer": "Top gainer",
+        "topLoser": "Top loser"
+      }
+    },
+    "editionFilter": {
+      "locked": "Edition filter locked"
+    },
+    "conditionLabel": {
+      "M": "M",
+      "NM": "NM",
+      "LP": "LP",
+      "MP": "MP",
+      "HP": "HP",
+      "PO": "PO"
     },
     "errors": {
       "loadMovers": "Failed to load price movers",

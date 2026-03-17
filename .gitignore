@@ -38,6 +38,7 @@ e2e/blob-report/
 # Claude Code - ephemeral/local artifacts
 .claude/worktrees/
 .claude/plans/
+.claude/settings.local.json
 
 # Build/tool artifacts
 eslint-out.json

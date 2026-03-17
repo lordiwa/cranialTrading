@@ -38,3 +38,15 @@ e2e/blob-report/
 # Claude Code - ephemeral/local artifacts
 .claude/worktrees/
 .claude/plans/
+
+# Build/tool artifacts
+eslint-out.json
+NUL
+.firebase/hosting.*.cache
+
+# Retired tools
+testsprite_tests/
+
+# Unused public mockups/screenshots
+public/*.png
+public/*.jpeg

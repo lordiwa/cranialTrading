@@ -5,6 +5,8 @@ import { useCollectionTotals } from '../../composables/useCollectionTotals'
 import { useI18n } from '../../composables/useI18n'
 import { type PriceSnapshot, usePriceHistory } from '../../composables/usePriceHistory'
 
+const emit = defineEmits<(e: 'update:expanded', val: boolean) => void>()
+
 const { t } = useI18n()
 const collectionStore = useCollectionStore()
 const { saveSnapshot, loadHistory, saveCardPrices } = usePriceHistory()
@@ -22,6 +24,7 @@ const priceSource = ref<PriceSource>('ck')
 
 // Mobile expand/collapse
 const mobileExpanded = ref(false)
+watch(mobileExpanded, (val) => { emit('update:expanded', val) })
 
 // Chart state
 const showChart = ref(false)
@@ -203,7 +206,7 @@ async function toggleChart() {
 </script>
 
 <template>
-  <div class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden">
+  <div class="fixed md:!bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
     <!-- Loading bar -->
     <div v-if="loading" class="h-1 bg-primary overflow-hidden">
       <div

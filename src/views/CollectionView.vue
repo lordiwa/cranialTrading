@@ -66,6 +66,9 @@ const showImportDeckModal = ref(false)
 const showImportBinderModal = ref(false)
 const showLocalFilters = ref(false)
 
+// Totals panel expanded state (for FAB positioning)
+const totalsPanelExpanded = ref(false)
+
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
@@ -1111,6 +1114,14 @@ const deckSourceColor = computed(() => {
 })
 
 const deckStatsExpanded = ref(false)
+
+const fabBottomStyle = computed(() => {
+  const hasPanel = viewMode.value === 'collection' || (viewMode.value === 'decks' && selectedDeck.value) || (viewMode.value === 'binders' && selectedBinder.value)
+  if (!hasPanel) return { bottom: '4rem' }
+  const panelExpanded = viewMode.value === 'collection' ? totalsPanelExpanded.value : deckStatsExpanded.value
+  if (panelExpanded) return { bottom: 'calc(10rem + env(safe-area-inset-bottom, 0px))' }
+  return { bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }
+})
 
 // Get CK retail price for a card, falling back to stored price
 const getCardCKPrice = (cardId: string, fallbackPrice: number): number => {
@@ -3604,11 +3615,11 @@ onUnmounted(() => {
       <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
-          <div class="flex gap-1 mb-4 overflow-x-auto">
+          <div class="flex gap-1 mb-4">
             <button
                 @click="switchToCollection"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
+                  'flex-1 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 whitespace-nowrap rounded text-center',
                   viewMode === 'collection'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -3620,7 +3631,7 @@ onUnmounted(() => {
                 data-tour="deck-tab"
                 @click="switchToDecks()"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
+                  'flex-1 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 whitespace-nowrap rounded text-center',
                   viewMode === 'decks'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -3632,7 +3643,7 @@ onUnmounted(() => {
             <button
                 @click="switchToBinders()"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
+                  'flex-1 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 whitespace-nowrap rounded text-center',
                   viewMode === 'binders'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -4408,19 +4419,22 @@ onUnmounted(() => {
         @import-csv="handleImportBinderCsv"
     />
 
-    <!-- Floating Action Button (mobile) -->
+</AppContainer>
+
+  <!-- Floating Action Button (mobile) — teleported for z-index above panels -->
+  <Teleport to="body">
     <FloatingActionButton
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
-        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[78px]' : ''"
+        :style="fabBottomStyle"
     />
-</AppContainer>
+  </Teleport>
 
   <!-- ========== DECK STATS FOOTER (fijo abajo cuando hay deck seleccionado) ========== -->
   <Teleport to="body">
     <div v-if="viewMode === 'decks' && selectedDeck"
-         class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden">
+         class="fixed md:!bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
       <div class="container mx-auto max-w-[1200px]">
         <!-- Desktop: fila única (unchanged) -->
         <div class="hidden md:flex items-center gap-4 text-tiny px-4 py-2">
@@ -4526,7 +4540,7 @@ onUnmounted(() => {
 
   <!-- ========== COLLECTION STATS FOOTER (fijo abajo en modo colección) ========== -->
   <Teleport to="body">
-    <CollectionTotalsPanel v-if="viewMode === 'collection'" />
+    <CollectionTotalsPanel v-if="viewMode === 'collection'" @update:expanded="totalsPanelExpanded = $event" />
   </Teleport>
 </template>
 

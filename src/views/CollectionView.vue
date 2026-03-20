@@ -24,6 +24,7 @@ import CreateBinderModal from '../components/binders/CreateBinderModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import type { CreateBinderInput } from '../types/binder'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import type { CreateDeckInput, DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
@@ -721,6 +722,11 @@ const resetAllChipFilters = () => {
   selectedTypes.value = new Set(typeOrder)
   selectedRarities.value = new Set(rarityOrder)
   resetAdvancedFilters()
+}
+
+const clearAllFilters = () => {
+  filterQuery.value = ''
+  resetAllChipFilters()
 }
 
 // Wishlist grouping — reuses the same filter state from the main composable
@@ -4067,6 +4073,13 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Loading skeleton -->
+        <div v-if="viewMode === 'collection' && collectionStore.loading && collectionStore.cards.length === 0">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <SkeletonCard v-for="n in 10" :key="n" />
+          </div>
+        </div>
+
         <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
         <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
@@ -4307,8 +4320,23 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Empty State: Colección sin cartas -->
-        <div v-if="viewMode === 'collection' && filteredCards.length === 0 && wishlistCards.length === 0" class="flex justify-center items-center h-64">
+        <!-- Empty State: No filter results (cards exist but all hidden by filters) -->
+        <div v-if="viewMode === 'collection' && !collectionStore.loading
+                    && collectionStore.cards.length > 0
+                    && filteredCards.length === 0 && wishlistCards.length === 0"
+             class="flex justify-center items-center h-64">
+          <div class="text-center">
+            <p class="text-small text-silver-70">{{ t('collection.empty.noFilterResults') }}</p>
+            <button class="mt-3 text-tiny text-neon hover:underline" @click="clearAllFilters">
+              {{ t('collection.empty.clearFilters') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State: Genuinely empty collection -->
+        <div v-if="viewMode === 'collection' && !collectionStore.loading
+                    && collectionStore.cards.length === 0"
+             class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">{{ t('collection.empty.noCards') }}</p>
             <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.searchToAdd') }}</p>

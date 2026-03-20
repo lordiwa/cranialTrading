@@ -467,7 +467,9 @@
       "deckEmpty": "Empty deck",
       "deckNoCards": "This deck has no assigned cards",
       "noCards": "No cards",
-      "searchToAdd": "Search cards above to add them"
+      "searchToAdd": "Search cards above to add them",
+      "noFilterResults": "No cards match your current filters",
+      "clearFilters": "Clear filters"
     },
     "deckStats": {
       "have": "Have",

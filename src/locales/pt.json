@@ -467,7 +467,9 @@
       "deckEmpty": "Deck vazio",
       "deckNoCards": "Este deck não tem cartas atribuídas",
       "noCards": "Sem cartas",
-      "searchToAdd": "Busque cartas acima para adicioná-las"
+      "searchToAdd": "Busque cartas acima para adicioná-las",
+      "noFilterResults": "Nenhuma carta corresponde aos seus filtros atuais",
+      "clearFilters": "Limpar filtros"
     },
     "deckStats": {
       "have": "Tenho",

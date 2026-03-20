@@ -4,6 +4,7 @@ import { type FormatKey, type FormatStaples, getFormatStaples, getPriceMovers, t
 import { useToastStore } from './toast'
 import { useCollectionStore } from './collection'
 import { t } from '../composables/useI18n'
+import { getConditionAdjustedPrice } from '../utils/conditionMultiplier'
 
 // Cache with 10min TTL
 const staplesCache = new Map<string, { data: FormatStaples; timestamp: number }>()
@@ -15,7 +16,7 @@ export const useMarketStore = defineStore('market', () => {
     const toastStore = useToastStore()
 
     // State
-    const activeTab = ref<'movers' | 'staples' | 'portfolio'>('movers')
+    const activeTab = ref<'portfolio' | 'wishlist' | 'movers' | 'staples'>('portfolio')
     const selectedFormat = ref<FormatKey>('modern')
     const staples = ref<FormatStaples | null>(null)
     const staplesLoading = ref(false)
@@ -44,7 +45,19 @@ export const useMarketStore = defineStore('market', () => {
     // Portfolio state
     const portfolioSearch = ref('')
     const portfolioPage = ref(1)
-    const portfolioSort = ref<'impact' | 'percent'>('impact')
+    const portfolioSort = ref<'impact' | 'percent' | 'price' | 'name'>('impact')
+    const portfolioSortAsc = ref(false)
+    const portfolioStatusFilter = ref<'all' | 'collection' | 'sale' | 'trade'>('all')
+    const portfolioEditionFilter = ref('')
+    const portfolioDirection = ref<'all' | 'winners' | 'losers'>('all')
+
+    // Wishlist state
+    const wishlistSearch = ref('')
+    const wishlistPage = ref(1)
+    const wishlistSort = ref<'impact' | 'percent' | 'price' | 'name'>('impact')
+    const wishlistSortAsc = ref(false)
+    const wishlistEditionFilter = ref('')
+    const wishlistDirection = ref<'all' | 'winners' | 'losers'>('all')
 
     // Computed — Movers pipeline
     const currentMovers = computed(() => {
@@ -88,6 +101,23 @@ export const useMarketStore = defineStore('market', () => {
         return sortedMovers.value.slice(start, start + PAGE_SIZE)
     })
 
+    // Computed — Set Trends summary (when edition selected in movers/Set Trends tab)
+    const setTrendSummary = computed(() => {
+        if (!moversSetFilter.value || !movers.value) return null
+        const allMovers = [...movers.value.winners, ...movers.value.losers]
+        const setMovers = allMovers.filter(m => m.setName === moversSetFilter.value)
+        if (!setMovers.length) return null
+        const avgChange = setMovers.reduce((s, m) => s + m.percentChange, 0) / setMovers.length
+        const sorted = [...setMovers].sort((a, b) => b.percentChange - a.percentChange)
+        return {
+            editionName: moversSetFilter.value,
+            avgChange,
+            topGainer: sorted[0]?.name ?? '',
+            topLoser: sorted[sorted.length - 1]?.name ?? '',
+            cardCount: setMovers.length,
+        }
+    })
+
     // Computed — Staples pipeline
     const currentStaples = computed(() => {
         if (!staples.value) return []
@@ -119,35 +149,71 @@ export const useMarketStore = defineStore('market', () => {
         return map
     })
 
-    const portfolioImpacts = computed((): PortfolioImpact[] => {
+    /** Build PortfolioImpact array for cards matching the given status filter */
+    function buildImpacts(statusFilter: 'owned' | 'wishlist'): PortfolioImpact[] {
         const collectionStore = useCollectionStore()
         if (!movers.value || !collectionStore.cards.length) return []
         const isFoilType = selectedMoverType.value.includes('foil')
         const results: PortfolioImpact[] = []
         for (const card of collectionStore.cards) {
+            if (statusFilter === 'wishlist') {
+                if (card.status !== 'wishlist') continue
+            } else {
+                if (card.status === 'wishlist') continue
+            }
             if (isFoilType !== card.foil) continue
             const matched = moverLookup.value.get(card.name.toLowerCase())
             if (!matched?.length) continue
-            const mover = matched[0]
+            const mover = matched.find(m => m.setName === card.edition) ?? matched[0]
             if (!mover) continue
             const dollarChange = mover.presentPrice - mover.pastPrice
-            results.push({ card, mover, dollarChange, totalImpact: dollarChange * card.quantity })
+            const adjustedCurrentPrice = getConditionAdjustedPrice(mover.presentPrice, card.condition)
+            const adjustedPastPrice = getConditionAdjustedPrice(mover.pastPrice, card.condition)
+            const adjustedImpact = Math.round((adjustedCurrentPrice - adjustedPastPrice) * card.quantity * 100) / 100
+            results.push({
+                card, mover, dollarChange,
+                totalImpact: dollarChange * card.quantity,
+                adjustedCurrentPrice,
+                adjustedPastPrice,
+                adjustedImpact,
+            })
         }
         return results
-    })
+    }
+
+    const portfolioImpacts = computed((): PortfolioImpact[] => buildImpacts('owned'))
 
     const filteredPortfolio = computed(() => {
+        let result = portfolioImpacts.value
         const search = portfolioSearch.value.toLowerCase().trim()
-        if (!search) return portfolioImpacts.value
-        return portfolioImpacts.value.filter(p => p.card.name.toLowerCase().includes(search))
+        if (search) {
+            result = result.filter(p => p.card.name.toLowerCase().includes(search))
+        }
+        if (portfolioStatusFilter.value !== 'all') {
+            result = result.filter(p => p.card.status === portfolioStatusFilter.value)
+        }
+        if (portfolioEditionFilter.value) {
+            result = result.filter(p => p.card.edition === portfolioEditionFilter.value)
+        }
+        if (portfolioDirection.value === 'winners') {
+            result = result.filter(p => p.adjustedImpact > 0)
+        } else if (portfolioDirection.value === 'losers') {
+            result = result.filter(p => p.adjustedImpact < 0)
+        }
+        return result
     })
 
     const sortedPortfolio = computed(() => {
         const arr = [...filteredPortfolio.value]
+        const dir = portfolioSortAsc.value ? 1 : -1
         if (portfolioSort.value === 'percent') {
-            arr.sort((a, b) => Math.abs(b.mover.percentChange) - Math.abs(a.mover.percentChange))
+            arr.sort((a, b) => dir * (a.mover.percentChange - b.mover.percentChange))
+        } else if (portfolioSort.value === 'price') {
+            arr.sort((a, b) => dir * (a.mover.presentPrice - b.mover.presentPrice))
+        } else if (portfolioSort.value === 'name') {
+            arr.sort((a, b) => dir * a.card.name.localeCompare(b.card.name))
         } else {
-            arr.sort((a, b) => Math.abs(b.totalImpact) - Math.abs(a.totalImpact))
+            arr.sort((a, b) => dir * (a.adjustedImpact - b.adjustedImpact))
         }
         return arr
     })
@@ -162,15 +228,83 @@ export const useMarketStore = defineStore('market', () => {
     const portfolioSummary = computed(() => {
         const impacts = portfolioImpacts.value
         return {
-            totalChange: impacts.reduce((s, p) => s + p.totalImpact, 0),
+            totalChange: Math.round(impacts.reduce((s, p) => s + p.adjustedImpact, 0) * 100) / 100,
             affectedCards: impacts.length,
-            gainers: impacts.filter(p => p.totalImpact > 0).length,
-            losers: impacts.filter(p => p.totalImpact < 0).length,
+            gainers: impacts.filter(p => p.adjustedImpact > 0).length,
+            losers: impacts.filter(p => p.adjustedImpact < 0).length,
+            totalValue: Math.round(impacts.reduce((s, p) => s + p.adjustedCurrentPrice * p.card.quantity, 0) * 100) / 100,
         }
     })
 
+    const portfolioAvailableEditions = computed(() => {
+        const editions = new Set(portfolioImpacts.value.map(p => p.card.edition))
+        return [...editions].sort((a, b) => a.localeCompare(b))
+    })
+
+    // Computed — Wishlist pipeline
+    const wishlistImpacts = computed((): PortfolioImpact[] => buildImpacts('wishlist'))
+
+    const filteredWishlist = computed(() => {
+        let result = wishlistImpacts.value
+        const search = wishlistSearch.value.toLowerCase().trim()
+        if (search) {
+            result = result.filter(p => p.card.name.toLowerCase().includes(search))
+        }
+        if (wishlistEditionFilter.value) {
+            result = result.filter(p => p.card.edition === wishlistEditionFilter.value)
+        }
+        if (wishlistDirection.value === 'winners') {
+            result = result.filter(p => p.adjustedImpact > 0)
+        } else if (wishlistDirection.value === 'losers') {
+            result = result.filter(p => p.adjustedImpact < 0)
+        }
+        return result
+    })
+
+    const sortedWishlist = computed(() => {
+        const arr = [...filteredWishlist.value]
+        const dir = wishlistSortAsc.value ? 1 : -1
+        if (wishlistSort.value === 'percent') {
+            arr.sort((a, b) => dir * (a.mover.percentChange - b.mover.percentChange))
+        } else if (wishlistSort.value === 'price') {
+            arr.sort((a, b) => dir * (a.mover.presentPrice - b.mover.presentPrice))
+        } else if (wishlistSort.value === 'name') {
+            arr.sort((a, b) => dir * a.card.name.localeCompare(b.card.name))
+        } else {
+            arr.sort((a, b) => dir * (a.adjustedImpact - b.adjustedImpact))
+        }
+        return arr
+    })
+
+    const totalWishlistPages = computed(() => Math.max(1, Math.ceil(sortedWishlist.value.length / PAGE_SIZE)))
+
+    const paginatedWishlist = computed(() => {
+        const start = (wishlistPage.value - 1) * PAGE_SIZE
+        return sortedWishlist.value.slice(start, start + PAGE_SIZE)
+    })
+
+    const wishlistSummary = computed(() => {
+        const impacts = wishlistImpacts.value
+        return {
+            totalChange: Math.round(impacts.reduce((s, p) => s + p.adjustedImpact, 0) * 100) / 100,
+            affectedCards: impacts.length,
+            gainers: impacts.filter(p => p.adjustedImpact > 0).length,
+            losers: impacts.filter(p => p.adjustedImpact < 0).length,
+        }
+    })
+
+    const wishlistAvailableEditions = computed(() => {
+        const editions = new Set(wishlistImpacts.value.map(p => p.card.edition))
+        return [...editions].sort((a, b) => a.localeCompare(b))
+    })
+
     // Reset page to 1 when filters/search/sort/direction change
-    watch([moversSearch, moversSetFilter, moversSort, moversDirection], () => {
+    watch([moversSearch, moversSetFilter, moversSort], () => {
+        moversPage.value = 1
+    })
+
+    watch(moversDirection, () => {
+        moversSetFilter.value = ''
         moversPage.value = 1
     })
 
@@ -178,8 +312,12 @@ export const useMarketStore = defineStore('market', () => {
         staplesPage.value = 1
     })
 
-    watch([portfolioSearch, portfolioSort], () => {
+    watch([portfolioSearch, portfolioSort, portfolioSortAsc, portfolioStatusFilter, portfolioEditionFilter, portfolioDirection], () => {
         portfolioPage.value = 1
+    })
+
+    watch([wishlistSearch, wishlistSort, wishlistSortAsc, wishlistEditionFilter, wishlistDirection], () => {
+        wishlistPage.value = 1
     })
 
     // Actions
@@ -263,13 +401,28 @@ export const useMarketStore = defineStore('market', () => {
         portfolioSearch,
         portfolioPage,
         portfolioSort,
+        portfolioSortAsc,
+        portfolioStatusFilter,
+        portfolioEditionFilter,
+        portfolioDirection,
 
-        // Computed
+        // Wishlist state
+        wishlistSearch,
+        wishlistPage,
+        wishlistSort,
+        wishlistSortAsc,
+        wishlistEditionFilter,
+        wishlistDirection,
+
+        // Computed — Movers
         currentMovers,
         availableSets,
         sortedMovers,
         totalMoversPages,
         paginatedMovers,
+        setTrendSummary,
+
+        // Computed — Staples
         currentStaples,
         filteredStaples,
         totalStaplesPages,
@@ -278,10 +431,21 @@ export const useMarketStore = defineStore('market', () => {
         // Portfolio computed
         moverLookup,
         portfolioImpacts,
+        filteredPortfolio,
         sortedPortfolio,
         totalPortfolioPages,
         paginatedPortfolio,
         portfolioSummary,
+        portfolioAvailableEditions,
+
+        // Wishlist computed
+        wishlistImpacts,
+        filteredWishlist,
+        sortedWishlist,
+        totalWishlistPages,
+        paginatedWishlist,
+        wishlistSummary,
+        wishlistAvailableEditions,
 
         // Actions
         loadStaples,

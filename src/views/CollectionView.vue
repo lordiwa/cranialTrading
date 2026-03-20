@@ -24,6 +24,7 @@ import CreateBinderModal from '../components/binders/CreateBinderModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import type { CreateBinderInput } from '../types/binder'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import type { CreateDeckInput, DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
@@ -64,6 +65,9 @@ const createBinderModalRef = ref<{ setLoading: (v: boolean) => void } | null>(nu
 const showImportDeckModal = ref(false)
 const showImportBinderModal = ref(false)
 const showLocalFilters = ref(false)
+
+// Totals panel expanded state (for FAB positioning)
+const totalsPanelExpanded = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
@@ -723,6 +727,11 @@ const resetAllChipFilters = () => {
   resetAdvancedFilters()
 }
 
+const clearAllFilters = () => {
+  filterQuery.value = ''
+  resetAllChipFilters()
+}
+
 // Wishlist grouping — reuses the same filter state from the main composable
 const passesChipFilters = (card: Card): boolean => {
   if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !passesColorFilter(card, selectedColors.value, exactColorMode.value)) return false
@@ -1105,6 +1114,14 @@ const deckSourceColor = computed(() => {
 })
 
 const deckStatsExpanded = ref(false)
+
+const fabBottomStyle = computed(() => {
+  const hasPanel = viewMode.value === 'collection' || (viewMode.value === 'decks' && selectedDeck.value) || (viewMode.value === 'binders' && selectedBinder.value)
+  if (!hasPanel) return { bottom: '4rem' }
+  const panelExpanded = viewMode.value === 'collection' ? totalsPanelExpanded.value : deckStatsExpanded.value
+  if (panelExpanded) return { bottom: 'calc(10rem + env(safe-area-inset-bottom, 0px))' }
+  return { bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }
+})
 
 // Get CK retail price for a card, falling back to stored price
 const getCardCKPrice = (cardId: string, fallbackPrice: number): number => {
@@ -3598,11 +3615,11 @@ onUnmounted(() => {
       <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS ========== -->
         <div class="mb-6">
-          <div class="flex gap-1 mb-4 overflow-x-auto">
+          <div class="flex gap-1 mb-4">
             <button
                 @click="switchToCollection"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
+                  'flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center',
                   viewMode === 'collection'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -3614,7 +3631,7 @@ onUnmounted(() => {
                 data-tour="deck-tab"
                 @click="switchToDecks()"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
+                  'flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center',
                   viewMode === 'decks'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -3626,7 +3643,7 @@ onUnmounted(() => {
             <button
                 @click="switchToBinders()"
                 :class="[
-                  'px-4 md:px-6 py-3 text-body font-bold transition-150 whitespace-nowrap rounded',
+                  'flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center',
                   viewMode === 'binders'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -4067,6 +4084,13 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Loading skeleton -->
+        <div v-if="viewMode === 'collection' && collectionStore.loading && collectionStore.cards.length === 0">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <SkeletonCard v-for="n in 10" :key="n" />
+          </div>
+        </div>
+
         <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
         <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
@@ -4307,8 +4331,23 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Empty State: Colección sin cartas -->
-        <div v-if="viewMode === 'collection' && filteredCards.length === 0 && wishlistCards.length === 0" class="flex justify-center items-center h-64">
+        <!-- Empty State: No filter results (cards exist but all hidden by filters) -->
+        <div v-if="viewMode === 'collection' && !collectionStore.loading
+                    && collectionStore.cards.length > 0
+                    && filteredCards.length === 0 && wishlistCards.length === 0"
+             class="flex justify-center items-center h-64">
+          <div class="text-center">
+            <p class="text-small text-silver-70">{{ t('collection.empty.noFilterResults') }}</p>
+            <button class="mt-3 text-tiny text-neon hover:underline" @click="clearAllFilters">
+              {{ t('collection.empty.clearFilters') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State: Genuinely empty collection -->
+        <div v-if="viewMode === 'collection' && !collectionStore.loading
+                    && collectionStore.cards.length === 0"
+             class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">{{ t('collection.empty.noCards') }}</p>
             <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.searchToAdd') }}</p>
@@ -4380,19 +4419,22 @@ onUnmounted(() => {
         @import-csv="handleImportBinderCsv"
     />
 
-    <!-- Floating Action Button (mobile) -->
+</AppContainer>
+
+  <!-- Floating Action Button (mobile) — teleported for z-index above panels -->
+  <Teleport to="body">
     <FloatingActionButton
         icon="plus"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
-        :class="viewMode === 'collection' || (viewMode === 'decks' && selectedDeck) || (viewMode === 'binders' && selectedBinder) ? '!bottom-[78px]' : ''"
+        :style="fabBottomStyle"
     />
-</AppContainer>
+  </Teleport>
 
   <!-- ========== DECK STATS FOOTER (fijo abajo cuando hay deck seleccionado) ========== -->
   <Teleport to="body">
     <div v-if="viewMode === 'decks' && selectedDeck"
-         class="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden">
+         class="fixed md:!bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
       <div class="container mx-auto max-w-[1200px]">
         <!-- Desktop: fila única (unchanged) -->
         <div class="hidden md:flex items-center gap-4 text-tiny px-4 py-2">
@@ -4498,7 +4540,7 @@ onUnmounted(() => {
 
   <!-- ========== COLLECTION STATS FOOTER (fijo abajo en modo colección) ========== -->
   <Teleport to="body">
-    <CollectionTotalsPanel v-if="viewMode === 'collection'" />
+    <CollectionTotalsPanel v-if="viewMode === 'collection'" @update:expanded="totalsPanelExpanded = $event" />
   </Teleport>
 </template>
 

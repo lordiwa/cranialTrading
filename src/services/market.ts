@@ -49,8 +49,11 @@ export type StapleCategory = 'overall' | 'creatures' | 'spells' | 'lands'
 export interface PortfolioImpact {
     card: Card
     mover: PriceMover
-    dollarChange: number   // presentPrice - pastPrice
-    totalImpact: number    // dollarChange * card.quantity
+    dollarChange: number          // presentPrice - pastPrice
+    totalImpact: number           // dollarChange * card.quantity
+    adjustedCurrentPrice: number  // presentPrice * conditionMultiplier
+    adjustedPastPrice: number     // pastPrice * conditionMultiplier
+    adjustedImpact: number        // (adjustedCurrent - adjustedPast) * quantity
 }
 
 // Service functions

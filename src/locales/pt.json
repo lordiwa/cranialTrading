@@ -467,7 +467,9 @@
       "deckEmpty": "Deck vazio",
       "deckNoCards": "Este deck não tem cartas atribuídas",
       "noCards": "Sem cartas",
-      "searchToAdd": "Busque cartas acima para adicioná-las"
+      "searchToAdd": "Busque cartas acima para adicioná-las",
+      "noFilterResults": "Nenhuma carta corresponde aos seus filtros atuais",
+      "clearFilters": "Limpar filtros"
     },
     "deckStats": {
       "have": "Tenho",
@@ -1870,9 +1872,10 @@
     "title": "MERCADO",
     "subtitle": "Movimentos de preço, staples por formato e tendências",
     "tabs": {
-      "movers": "MOVIMENTOS",
+      "movers": "TENDÊNCIAS",
       "staples": "STAPLES",
-      "portfolio": "MINHAS CARTAS"
+      "portfolio": "MEU PORTFÓLIO",
+      "wishlist": "DESEJADOS"
     },
     "movers": {
       "winners": "ALTAS",
@@ -1937,12 +1940,57 @@
     "lastUpdated": "Atualizado: {date}",
     "portfolio": {
       "totalChange": "Impacto no portfólio",
+      "totalValue": "Valor total",
       "affected": "{count} cartas afetadas",
       "up": "{count} subiram",
       "down": "{count} caíram",
       "empty": "Nenhuma das suas cartas corresponde aos movimentos de preço atuais.",
       "sortImpact": "$ Impacto",
       "sortPercent": "% Variação",
+      "sortPrice": "Preço",
+      "sortName": "Nome",
+      "statusLabel": "Status",
+      "directionLabel": "Direção",
+      "statusFilter": {
+        "all": "Todas",
+        "collection": "Coleção",
+        "sale": "À venda",
+        "trade": "Para troca"
+      },
+      "directionFilter": {
+        "all": "Todas",
+        "winners": "Altas",
+        "losers": "Baixas"
+      },
+      "table": {
+        "card": "Carta",
+        "set": "Edição",
+        "qty": "Qtd",
+        "condition": "Estado",
+        "was": "Antes",
+        "now": "Agora",
+        "adjValue": "Val. Aj.",
+        "change": "% Var.",
+        "impact": "Impacto"
+      },
+      "loginRequired": "Faça login para ver como os movimentos de preço afetam sua coleção."
+    },
+    "wishlist": {
+      "totalChange": "Impacto nos desejados",
+      "affected": "{count} cartas rastreadas",
+      "up": "{count} subiram",
+      "down": "{count} caíram",
+      "empty": "Nenhuma das suas cartas desejadas corresponde aos movimentos atuais.",
+      "sortImpact": "$ Impacto",
+      "sortPercent": "% Variação",
+      "sortPrice": "Preço",
+      "sortName": "Nome",
+      "directionLabel": "Direção",
+      "directionFilter": {
+        "all": "Todas",
+        "winners": "Altas",
+        "losers": "Baixas"
+      },
       "table": {
         "card": "Carta",
         "set": "Edição",
@@ -1952,7 +2000,26 @@
         "change": "% Var.",
         "impact": "Impacto"
       },
-      "loginRequired": "Faça login para ver como os movimentos de preço afetam sua coleção."
+      "loginRequired": "Faça login para rastrear preços das suas cartas desejadas."
+    },
+    "setTrends": {
+      "editionSummary": {
+        "avgChange": "var. média",
+        "cards": "{count} cartas",
+        "topGainer": "Maior alta",
+        "topLoser": "Maior baixa"
+      }
+    },
+    "editionFilter": {
+      "locked": "Filtro de edição fixado"
+    },
+    "conditionLabel": {
+      "M": "M",
+      "NM": "NM",
+      "LP": "LP",
+      "MP": "MP",
+      "HP": "HP",
+      "PO": "PO"
     },
     "errors": {
       "loadMovers": "Erro ao carregar movimentos de preço",

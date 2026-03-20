@@ -39,32 +39,32 @@ export class MarketPage {
     this.page = page;
 
     this.tabs = {
-      movers: page.getByRole('button', { name: /movers|movimientos/i }),
-      staples: page.getByRole('button', { name: /staples|básicas/i }),
-      portfolio: page.getByRole('button', { name: /my cards|mis cartas|cartera/i }),
+      movers: page.getByRole('button', { name: /set trends|tendencias|tendências/i }),
+      staples: page.getByRole('button', { name: /staples/i }),
+      portfolio: page.getByRole('button', { name: /my portfolio|mi portafolio|meu portfólio/i }),
     };
 
     this.movers = {
-      winnersButton: page.getByRole('button', { name: /winner|ganad/i }),
-      losersButton: page.getByRole('button', { name: /loser|perdedor/i }),
-      formatSelect: page.locator('select').first(),
-      priceTypeSelect: page.locator('select').nth(1),
+      winnersButton: page.getByRole('button', { name: /winners|subidas|altas/i }),
+      losersButton: page.getByRole('button', { name: /losers|bajadas|baixas/i }),
+      formatSelect: page.locator('#movers-type-select'),
+      priceTypeSelect: page.locator('#movers-type-select'),
       table: page.locator('table, [class*="grid"]').first(),
       searchInput: page.locator('input[type="text"]').first(),
-      nextPageButton: page.getByRole('button', { name: /next|siguiente|→/i }),
-      prevPageButton: page.getByRole('button', { name: /prev|anterior|←/i }),
+      nextPageButton: page.getByRole('button', { name: /next|siguiente|→|►/i }),
+      prevPageButton: page.getByRole('button', { name: /prev|anterior|←|◄/i }),
     };
 
     this.staples = {
       formatSelect: page.locator('select').first(),
-      categoryButtons: page.locator('button').filter({ hasText: /creature|spell|land|overall|criatura|hechizo|tierra/i }),
+      categoryButtons: page.locator('button').filter({ hasText: /creature|spell|land|overall|general|criatura|hechizo|tierra/i }),
       table: page.locator('table, [class*="grid"]').first(),
     };
 
     this.portfolio = {
       totalDelta: page.locator('[class*="text-h"]').first(),
       table: page.locator('table, [class*="grid"]').first(),
-      sortButtons: page.getByRole('button', { name: /sort|impact|percent|ordenar/i }),
+      sortButtons: page.getByRole('button', { name: /% change|% cambio|price|precio|preço/i }),
     };
   }
 

@@ -1,3 +1,4 @@
+import { ref, nextTick, effectScope } from 'vue'
 import {
   getCardRarityCategory,
   getCardTypeCategory,
@@ -5,8 +6,13 @@ import {
   getCardColorCategory,
   passesColorFilter,
   extractCreatureSubtypes,
+  useCardFilter,
 } from '@/composables/useCardFilter'
 import { makeFilterableCard } from '../helpers/fixtures'
+
+vi.mock('@/composables/useI18n', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
 
 describe('getCardRarityCategory', () => {
   it('returns Common for common rarity', () => {
@@ -197,5 +203,85 @@ describe('extractCreatureSubtypes', () => {
 
   it('returns empty array for empty string', () => {
     expect(extractCreatureSubtypes('')).toEqual([])
+  })
+})
+
+describe('filterQuery debounce', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const makeCards = () => ref([
+    makeFilterableCard({ name: 'Lightning Bolt', edition: 'M21' }),
+    makeFilterableCard({ name: 'Llanowar Elves', edition: 'DOM' }),
+    makeFilterableCard({ name: 'Counterspell', edition: 'MH2' }),
+  ])
+
+  it('filteredCards does not update immediately when filterQuery changes', async () => {
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(makeCards()))!
+
+    result.filterQuery.value = 'lightning'
+    await nextTick()
+
+    expect(result.filteredCards.value).toHaveLength(3)
+    scope.stop()
+  })
+
+  it('filteredCards updates after 200ms debounce', async () => {
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(makeCards()))!
+
+    result.filterQuery.value = 'lightning'
+    await nextTick() // flush the watch
+    vi.advanceTimersByTime(200) // fire the setTimeout
+    await nextTick() // flush computed re-evaluation
+
+    expect(result.filteredCards.value).toHaveLength(1)
+    expect(result.filteredCards.value[0].name).toBe('Lightning Bolt')
+    scope.stop()
+  })
+
+  it('clearing filterQuery updates filteredCards immediately', async () => {
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(makeCards()))!
+
+    result.filterQuery.value = 'lightning'
+    await nextTick()
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(result.filteredCards.value).toHaveLength(1)
+
+    result.filterQuery.value = ''
+    await nextTick() // watch fires synchronously for instant-clear path
+    await nextTick()
+
+    // Should immediately show all cards without waiting 200ms
+    expect(result.filteredCards.value).toHaveLength(3)
+    scope.stop()
+  })
+
+  it('rapid typing only applies the last value', async () => {
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(makeCards()))!
+
+    result.filterQuery.value = 'l'
+    await nextTick()
+    vi.advanceTimersByTime(100)
+    result.filterQuery.value = 'll'
+    await nextTick()
+    vi.advanceTimersByTime(100)
+    result.filterQuery.value = 'llanowar'
+    await nextTick()
+    vi.advanceTimersByTime(200)
+    await nextTick()
+
+    expect(result.filteredCards.value).toHaveLength(1)
+    expect(result.filteredCards.value[0].name).toBe('Llanowar Elves')
+    scope.stop()
   })
 })

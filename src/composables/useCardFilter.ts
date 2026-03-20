@@ -1,4 +1,4 @@
-import { computed, type ComputedRef, ref, type Ref, watch } from 'vue'
+import { computed, type ComputedRef, onScopeDispose, ref, type Ref, watch } from 'vue'
 import { useI18n } from './useI18n'
 
 // Minimal shape a card must satisfy to be filterable
@@ -167,6 +167,23 @@ export function useCardFilter<T extends FilterableCard>(
 
   // --- State ---
   const filterQuery = ref('')
+  const _debouncedQuery = ref('')
+  let _debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+  watch(filterQuery, (val) => {
+    if (_debounceTimer !== null) clearTimeout(_debounceTimer)
+    // Instant clear when input is emptied
+    if (val.trim() === '') {
+      _debouncedQuery.value = ''
+      return
+    }
+    _debounceTimer = setTimeout(() => { _debouncedQuery.value = val }, 200)
+  })
+
+  onScopeDispose(() => {
+    if (_debounceTimer !== null) clearTimeout(_debounceTimer)
+  })
+
   const sortBy = ref<'recent' | 'name' | 'price'>('recent')
   const groupBy = ref<'none' | 'type' | 'mana' | 'color'>('none')
 
@@ -422,9 +439,9 @@ export function useCardFilter<T extends FilterableCard>(
   const filteredCards = computed(() => {
     let result = cards.value
 
-    // Text search
-    if (filterQuery.value.trim()) {
-      const q = filterQuery.value.toLowerCase()
+    // Text search (debounced)
+    if (_debouncedQuery.value.trim()) {
+      const q = _debouncedQuery.value.toLowerCase()
       result = result.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.edition.toLowerCase().includes(q)

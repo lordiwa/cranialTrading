@@ -1120,7 +1120,7 @@ const fabBottomStyle = computed(() => {
   if (!hasPanel) return { bottom: '4rem' }
   const panelExpanded = viewMode.value === 'collection' ? totalsPanelExpanded.value : deckStatsExpanded.value
   if (panelExpanded) return { bottom: 'calc(10rem + env(safe-area-inset-bottom, 0px))' }
-  return { bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }
+  return { bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }
 })
 
 // Get CK retail price for a card, falling back to stored price
@@ -3619,7 +3619,7 @@ onUnmounted(() => {
             <button
                 @click="switchToCollection"
                 :class="[
-                  'flex-1 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 whitespace-nowrap rounded text-center',
+                  'flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center',
                   viewMode === 'collection'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -3631,7 +3631,7 @@ onUnmounted(() => {
                 data-tour="deck-tab"
                 @click="switchToDecks()"
                 :class="[
-                  'flex-1 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 whitespace-nowrap rounded text-center',
+                  'flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center',
                   viewMode === 'decks'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'
@@ -3643,7 +3643,7 @@ onUnmounted(() => {
             <button
                 @click="switchToBinders()"
                 :class="[
-                  'flex-1 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 whitespace-nowrap rounded text-center',
+                  'flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center',
                   viewMode === 'binders'
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30'

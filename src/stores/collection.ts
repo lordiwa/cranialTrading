@@ -1,4 +1,5 @@
-import { computed, ref, shallowRef, triggerRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
+import { backgroundSafeDelay } from '../utils/backgroundSafeDelay'
 import { defineStore } from 'pinia'
 import {
     addDoc,
@@ -41,7 +42,8 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
                 return false
             }
             if (attempt < maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, 500))
+                const delay = msg.includes('resource-exhausted') ? 1500 : 500
+                await backgroundSafeDelay(delay)
             }
         }
     }
@@ -93,7 +95,7 @@ const deletePublicCardBatches = async (
         }
 
         if (i + batchSize < publicCardIds.length) {
-            await new Promise(resolve => setTimeout(resolve, 200))
+            await backgroundSafeDelay(200)
         }
     }
 }
@@ -167,17 +169,19 @@ export const useCollectionStore = defineStore('collection', () => {
                 const chunk = docs.slice(i, i + CHUNK).map(transformDoc)
                 all.push(...chunk)
                 if (i + CHUNK < docs.length) {
-                    await new Promise(resolve => setTimeout(resolve, 0))
+                    await backgroundSafeDelay(0)
                 }
             }
 
             cards.value = all
             rebuildCardIndex()
 
-            // Enrich cards missing metadata (non-blocking)
-            enrichCardsWithMissingMetadata().catch((err: unknown) => {
-                console.warn('[Enrichment] Background enrichment failed:', err)
-            })
+            // Enrich cards missing metadata (non-blocking, skip during import)
+            if (!importing.value) {
+                enrichCardsWithMissingMetadata().catch((err: unknown) => {
+                    console.warn('[Enrichment] Background enrichment failed:', err)
+                })
+            }
         } catch (error) {
             console.error('Error loading collection:', error)
             toastStore.show(t('collection.messages.loadError'), 'error')
@@ -246,6 +250,7 @@ export const useCollectionStore = defineStore('collection', () => {
         const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]))
         const updates: { card: Card; data: Partial<Card> }[] = []
 
+        const newCards = [...cards.value]
         for (const card of cardsToEnrich) {
             const sc = scryfallMap.get(card.scryfallId)
             if (!sc) continue
@@ -253,12 +258,14 @@ export const useCollectionStore = defineStore('collection', () => {
             const patch = buildEnrichmentPatch(card, sc as unknown as Record<string, unknown>)
             if (Object.keys(patch).length === 0) continue
 
-            Object.assign(card, patch)
-            updates.push({ card, data: patch })
+            const enriched = { ...card, ...patch }
+            const idx = newCards.findIndex(c => c.id === card.id)
+            if (idx > -1) newCards[idx] = enriched
+            updates.push({ card: enriched, data: patch })
         }
 
         if (updates.length === 0) return
-        triggerRef(cards)
+        cards.value = newCards
 
         await persistEnrichmentBatches(updates, authStore.user.id)
         console.info(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
@@ -286,9 +293,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 updatedAt: new Date(),
                 createdAt: new Date(),
             }
-            cards.value.push(newCard)
+            cards.value = [...cards.value, newCard]
             cardsById.set(newCard.id, newCard)
-            triggerRef(cards)
 
             // Sync to public collection (non-blocking, log-only on failure)
             const userInfo = getUserInfo()
@@ -323,10 +329,11 @@ export const useCollectionStore = defineStore('collection', () => {
         const snapshot = existingCard ? { ...existingCard } : null
         if (index > -1 && existingCard) {
             const updated = { ...existingCard, ...updates, updatedAt: new Date() }
+            const newCards = [...cards.value]
             // eslint-disable-next-line security/detect-object-injection
-            cards.value[index] = updated
+            newCards[index] = updated
+            cards.value = newCards
             cardsById.set(cardId, updated)
-            triggerRef(cards)
         }
 
         try {
@@ -360,10 +367,11 @@ export const useCollectionStore = defineStore('collection', () => {
         } catch (error) {
             // Rollback on failure
             if (index > -1 && snapshot) {
+                const rollbackCards = [...cards.value]
                 // eslint-disable-next-line security/detect-object-injection
-                cards.value[index] = snapshot
+                rollbackCards[index] = snapshot
+                cards.value = rollbackCards
                 cardsById.set(cardId, snapshot)
-                triggerRef(cards)
             }
             console.error('Error updating card:', error)
             toastStore.show(t('collection.messages.updateError'), 'error')
@@ -435,18 +443,19 @@ export const useCollectionStore = defineStore('collection', () => {
     /** Apply updates to local card state and return the updated cards */
     const applyLocalCardUpdates = (cardIds: string[], updates: Partial<Card>): Card[] => {
         const updatedCards: Card[] = []
+        const newCards = [...cards.value]
         for (const cardId of cardIds) {
-            const index = cards.value.findIndex((c) => c.id === cardId)
+            const index = newCards.findIndex((c) => c.id === cardId)
             // eslint-disable-next-line security/detect-object-injection
-            const existingCard = cards.value[index]
+            const existingCard = newCards[index]
             if (index === -1 || !existingCard) continue
             const updatedCard = { ...existingCard, ...updates, updatedAt: new Date() }
             // eslint-disable-next-line security/detect-object-injection
-            cards.value[index] = updatedCard
+            newCards[index] = updatedCard
             cardsById.set(cardId, updatedCard)
             updatedCards.push(updatedCard)
         }
-        if (updatedCards.length > 0) triggerRef(cards)
+        if (updatedCards.length > 0) cards.value = newCards
         return updatedCards
     }
 
@@ -464,9 +473,8 @@ export const useCollectionStore = defineStore('collection', () => {
         const deletedCard = cards.value[cardIndex]
         if (cardIndex === -1 || !deletedCard) return false
 
-        cards.value.splice(cardIndex, 1)
+        cards.value = cards.value.filter(c => c.id !== cardId)
         cardsById.delete(cardId)
-        triggerRef(cards)
 
         // Sync with Firebase in background
         try {
@@ -483,9 +491,10 @@ export const useCollectionStore = defineStore('collection', () => {
         } catch (error) {
             // Restore card on failure
             console.error('Error deleting card:', error)
-            cards.value.splice(cardIndex, 0, deletedCard)
+            const restored = [...cards.value]
+            restored.splice(cardIndex, 0, deletedCard)
+            cards.value = restored
             cardsById.set(cardId, deletedCard)
-            triggerRef(cards)
             toastStore.show(t('collection.messages.deleteError'), 'error')
             return false
         }
@@ -504,7 +513,6 @@ export const useCollectionStore = defineStore('collection', () => {
             // Optimistic: clear UI immediately so price fetch stops writing
             cards.value = []
             cardsById.clear()
-            triggerRef(cards)
 
             const BATCH_SIZE = 500
             const docs = snapshot.docs
@@ -516,7 +524,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
                 await batch.commit()
                 if (i + BATCH_SIZE < docs.length) {
-                    await new Promise(resolve => setTimeout(resolve, 50))
+                    await backgroundSafeDelay(50)
                 }
             }
 
@@ -578,7 +586,7 @@ export const useCollectionStore = defineStore('collection', () => {
             if (onProgress) onProgress(Math.round((completedBatches / totalBatches) * 100))
 
             if (i + BATCH_SIZE < cardIds.length) {
-                await new Promise(resolve => setTimeout(resolve, 200))
+                await backgroundSafeDelay(200)
             }
         }
 
@@ -671,60 +679,79 @@ export const useCollectionStore = defineStore('collection', () => {
     /**
      * Batch import cards - returns array of created card IDs
      */
-    /** Prepare a single card for Firestore batch import */
-    const prepareCardForBatch = (
-        card: Omit<Card, 'id'>,
-        colRef: ReturnType<typeof collection>,
-        batch: ReturnType<typeof writeBatch>,
-    ) => {
-        const cardRecord = card as Record<string, unknown>
-        const { id: _id, ...cardWithoutId } = cardRecord
-        const cleanData = stripUndefined(cardWithoutId as Record<string, unknown>)
-        const docRef = doc(colRef)
-        batch.set(docRef, { ...cleanData, createdAt: Timestamp.now(), updatedAt: Timestamp.now() })
-        return { ref: docRef, card }
-    }
-
     const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent = false, onProgress?: (current: number, total: number) => void): Promise<string[]> => {
         if (!authStore.user) return []
 
         importing.value = true
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
-            const chunks = chunkArray(cardsToSave, 500)
+            const BATCH_SIZE = 500
+            const chunks = chunkArray(cardsToSave, BATCH_SIZE)
             const createdIds: string[] = []
             const createdCards: Card[] = []
             let failCount = 0
+
+            // Adaptive delay: starts at 200ms, doubles on failure (cap 2000ms), halves after 3 successes
+            const BASE_DELAY = 200
+            const MAX_DELAY = 2000
+            let currentDelay = BASE_DELAY
+            let consecutiveSuccesses = 0
 
             for (let ci = 0; ci < chunks.length; ci++) {
                 // eslint-disable-next-line security/detect-object-injection
                 const chunk = chunks[ci]
                 if (!chunk) continue
-                const batch = writeBatch(db)
-                const chunkRefs = chunk.map(card => prepareCardForBatch(card, colRef, batch))
 
-                try {
-                    await batch.commit()
-                    for (const { ref: docRef, card } of chunkRefs) {
-                        createdIds.push(docRef.id)
-                        createdCards.push({ ...card, id: docRef.id, updatedAt: new Date(), createdAt: new Date() } as Card)
+                // Pre-generate doc refs so they survive retries (client-side, no network call)
+                const docRefs = chunk.map(() => doc(colRef))
+
+                const ok = await commitBatchWithRetry(() => {
+                    const batch = writeBatch(db)
+                    chunk.forEach((card, i) => {
+                        const cardRecord = card as Record<string, unknown>
+                        const { id: _id, ...cardWithoutId } = cardRecord
+                        const cleanData = stripUndefined(cardWithoutId as Record<string, unknown>)
+                        // eslint-disable-next-line security/detect-object-injection
+                        batch.set(docRefs[i]!, { ...cleanData, createdAt: Timestamp.now(), updatedAt: Timestamp.now() })
+                    })
+                    return batch
+                }, 3)
+
+                if (ok) {
+                    for (let i = 0; i < chunk.length; i++) {
+                        // eslint-disable-next-line security/detect-object-injection
+                        const cardRef = docRefs[i]
+                        // eslint-disable-next-line security/detect-object-injection
+                        const card = chunk[i]
+                        if (cardRef && card) {
+                            createdIds.push(cardRef.id)
+                            createdCards.push({ ...card, id: cardRef.id, updatedAt: new Date(), createdAt: new Date() } as Card)
+                        }
                     }
-                } catch (err) {
+                    consecutiveSuccesses++
+                    if (consecutiveSuccesses >= 3 && currentDelay > BASE_DELAY) {
+                        currentDelay = Math.max(BASE_DELAY, Math.floor(currentDelay / 2))
+                        consecutiveSuccesses = 0
+                    }
+                } else {
                     failCount += chunk.length
-                    console.error('Batch import commit failed:', err)
+                    console.error(`Batch ${ci + 1}/${chunks.length} failed after retries`)
+                    currentDelay = Math.min(MAX_DELAY, currentDelay * 2)
+                    consecutiveSuccesses = 0
                 }
 
-                onProgress?.(Math.min((ci + 1) * 500, cardsToSave.length), cardsToSave.length)
+                onProgress?.(Math.min((ci + 1) * BATCH_SIZE, cardsToSave.length), cardsToSave.length)
 
-                // Throttle between batches
+                // Throttle between batches (background-tab safe)
                 if (ci < chunks.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 50))
+                    await backgroundSafeDelay(currentDelay)
                 }
             }
 
             cards.value = cards.value.concat(createdCards)
             rebuildCardIndex()
-            triggerRef(cards)
+            // Release memory — createdCards can be large (120k objects)
+            createdCards.length = 0
 
             if (!silent) {
                 const msg = t('collection.messages.imported', { count: createdIds.length })

@@ -1912,6 +1912,7 @@ const processImportCard = (
   let keywords: string[] = []
   let legalities: Record<string, string> | undefined = undefined
   let full_art = false
+  let produced_mana: string[] = []
 
   if (card.scryfallId && scryfallDataMap.has(card.scryfallId)) {
     const scryfallCard = scryfallDataMap.get(card.scryfallId)
@@ -1928,6 +1929,7 @@ const processImportCard = (
     keywords = scryfallCard?.keywords ?? []
     legalities = scryfallCard?.legalities
     full_art = scryfallCard?.full_art ?? false
+    produced_mana = scryfallCard?.produced_mana ?? []
   }
 
   const cardData: ImportCardData = {
@@ -1951,6 +1953,7 @@ const processImportCard = (
     keywords,
     legalities,
     full_art,
+    produced_mana,
     updatedAt: new Date(),
   }
 
@@ -2036,6 +2039,7 @@ const buildCsvCollectionCard = (
     keywords: sc?.keywords ?? [],
     legalities: sc?.legalities,
     full_art: sc?.full_art ?? false,
+    produced_mana: sc?.produced_mana ?? [],
     updatedAt: new Date(),
   }
   if (card.setCode) {

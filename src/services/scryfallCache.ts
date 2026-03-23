@@ -5,6 +5,7 @@
  * All other functions pass through to the raw scryfall service unchanged.
  */
 import { Timestamp, collection, doc, documentId, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore' // eslint-disable-line sort-imports
+import { backgroundSafeDelay } from '../utils/backgroundSafeDelay'
 import { db } from './firebase'
 import {
   getCardById as rawGetCardById,
@@ -146,7 +147,7 @@ function l2WriteBatch(cards: ScryfallCard[]): void {
         break
       }
       if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await backgroundSafeDelay(500)
       }
     }
   })().catch((err: unknown) => { console.warn('[ScryfallCache] L2 batch write failed:', err) })

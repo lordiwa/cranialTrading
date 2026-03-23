@@ -117,7 +117,9 @@
       "resumeComplete": "\"{name}\" completed with {count} cards",
       "resumeIncomplete": "Import incomplete. Deck may be empty.",
       "resumeError": "Error resuming import",
-      "resumeFailed": "Import of \"{name}\" failed. Cleaning up..."
+      "resumeFailed": "Import of \"{name}\" failed. Cleaning up...",
+      "fetchingDataProgress": "Fetching card data: {current}/{total}...",
+      "savingProgress": "Saving cards: {current}/{total}..."
     }
   },
 
@@ -788,10 +790,10 @@
       "moxfieldDetected": {
         "title": "Moxfield link detected",
         "instruction": "Moxfield doesn't allow direct imports. Follow these steps:",
-        "step1": "1. Open the deck on Moxfield",
-        "step2": "2. Click on Export (top right)",
-        "step3": "3. Click on Copy to Clipboard",
-        "step4": "4. Paste the text here"
+        "step1": "Open the deck on Moxfield",
+        "step2": "Click on Export (top right)",
+        "step3": "Click on Copy to Clipboard",
+        "step4": "Paste the text here"
       },
       "preview": {
         "total": "Total: {total} cards",
@@ -812,8 +814,10 @@
       "submit": "IMPORT {count} CARDS",
       "csvUpload": "or upload CSV file",
       "csvDetected": "ManaBox CSV detected",
+      "csvDetectedUG": "Urza's Gatherer CSV detected",
       "csvConditionNote": "Conditions will be imported per card from the CSV",
-      "csvCards": "{count} cards found in CSV"
+      "csvCards": "{count} cards found in CSV",
+      "errorUnknown": "Unknown error"
     },
     "editDeckCard": {
       "titleWishlist": "EDIT WISHLIST",
@@ -2064,7 +2068,7 @@
     },
     "importModal": {
       "title": "IMPORT BINDER",
-      "inputLabel": "Moxfield link or binder text",
+      "inputLabel": "Moxfield link, card list, or CSV file",
       "binderNameLabel": "Binder name (optional)",
       "binderNamePlaceholder": "Leave empty to generate a random name"
     }

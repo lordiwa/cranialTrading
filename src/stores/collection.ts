@@ -22,7 +22,7 @@ import {
     syncCardToPublic,
 } from '../services/publicCards'
 import { t } from '../composables/useI18n'
-import { getCardsByIds } from '../services/scryfall'
+import { getCardsByIds } from '../services/scryfallCache'
 import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
 
 /**
@@ -643,7 +643,7 @@ export const useCollectionStore = defineStore('collection', () => {
         return { ref: docRef, card }
     }
 
-    const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent = false): Promise<string[]> => {
+    const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent = false, onProgress?: (current: number, total: number) => void): Promise<string[]> => {
         if (!authStore.user) return []
 
         try {
@@ -670,6 +670,8 @@ export const useCollectionStore = defineStore('collection', () => {
                     failCount += chunk.length
                     console.error('Batch import commit failed:', err)
                 }
+
+                onProgress?.(Math.min((ci + 1) * 400, cardsToSave.length), cardsToSave.length)
 
                 // Throttle between batches
                 if (ci < chunks.length - 1) {

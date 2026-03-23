@@ -3,7 +3,7 @@
  */
 import { computed, ref, shallowRef, triggerRef } from 'vue'
 import { type CardPrices, formatPrice, getCardPrices } from '../services/mtgjson'
-import { getCardById, searchCards } from '../services/scryfall'
+import { getCardById, searchCards } from '../services/scryfallCache'
 import { useCollectionStore } from '../stores/collection'
 import { cleanCardName } from '../utils/cardHelpers'
 import type { Card } from '../types/card'

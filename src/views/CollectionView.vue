@@ -31,7 +31,7 @@ import type { CreateDeckInput, DeckCardAllocation, DeckFormat, DisplayDeckCard, 
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfall'
+import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
@@ -2491,7 +2491,10 @@ const handleImportDirect = async (
     progressToast.update(15, t('common.import.fetchingData', { count: dedupedIdentifiers.length }))
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (dedupedIdentifiers.length > 0) {
-      const scryfallCards = await getCardsByIds(dedupedIdentifiers)
+      const scryfallCards = await getCardsByIds(dedupedIdentifiers, (current, total) => {
+        const pct = 15 + Math.round((current / total) * 10)
+        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
+      })
       scryfallCards.forEach(sc => scryfallDataMap.set(sc.id, sc))
     }
     progressToast.update(25, t('common.import.processing'))
@@ -2551,7 +2554,10 @@ const handleImportDirect = async (
 
     let allocatedCount = 0
     if (collectionCardsToAdd.length > 0) {
-      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
+        const pct = 50 + Math.round((current / total) * 10)
+        progressToast.update(pct, t('common.import.savingProgress', { current, total }))
+      })
       progressToast.update(60, t('common.import.allocatingToDeck'))
 
       // PASO 7: Asignar cartas al deck con progreso
@@ -2668,7 +2674,10 @@ const handleImportCsv = async (
 
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (uniqueIds.length > 0) {
-      const scryfallCards = await getCardsByIds(uniqueIds)
+      const scryfallCards = await getCardsByIds(uniqueIds, (current, total) => {
+        const pct = 10 + Math.round((current / total) * 15)
+        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
+      })
       for (const sc of scryfallCards) {
         scryfallDataMap.set(sc.id, sc)
       }
@@ -2699,7 +2708,10 @@ const handleImportCsv = async (
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
-      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
+        const pct = 50 + Math.round((current / total) * 10)
+        progressToast.update(pct, t('common.import.savingProgress', { current, total }))
+      })
       progressToast.update(60, t('common.import.allocatingToDeck'))
 
       // PASO 5: Asignar al deck (bulk — single Firestore write)
@@ -2836,7 +2848,10 @@ const handleImportBinderDirect = async (
     progressToast.update(15, t('common.import.fetchingData', { count: identifiers.length }))
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (identifiers.length > 0) {
-      const scryfallCards = await getCardsByIds(identifiers)
+      const scryfallCards = await getCardsByIds(identifiers, (current, total) => {
+        const pct = 15 + Math.round((current / total) * 10)
+        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
+      })
       for (const sc of scryfallCards) {
         scryfallDataMap.set(sc.id, sc)
       }
@@ -2872,7 +2887,10 @@ const handleImportBinderDirect = async (
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
-      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
+        const pct = 50 + Math.round((current / total) * 10)
+        progressToast.update(pct, t('common.import.savingProgress', { current, total }))
+      })
       progressToast.update(60, t('common.import.allocatingToBinder'))
 
       const bulkItems = createdCardIds
@@ -2931,7 +2949,10 @@ const handleImportBinderCsv = async (
 
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (uniqueIds.length > 0) {
-      const scryfallCards = await getCardsByIds(uniqueIds)
+      const scryfallCards = await getCardsByIds(uniqueIds, (current, total) => {
+        const pct = 10 + Math.round((current / total) * 15)
+        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
+      })
       for (const sc of scryfallCards) {
         scryfallDataMap.set(sc.id, sc)
       }
@@ -2959,7 +2980,10 @@ const handleImportBinderCsv = async (
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
-      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true)
+      const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
+        const pct = 50 + Math.round((current / total) * 10)
+        progressToast.update(pct, t('common.import.savingProgress', { current, total }))
+      })
       progressToast.update(60, t('common.import.allocatingToBinder'))
 
       const bulkItems = createdCardIds
@@ -3368,7 +3392,10 @@ const resumeImport = async (savedState: ImportState) => {
       // Si estaba guardando cartas, reiniciar desde guardado
       progressToast.update(55, t('common.import.saving', { count: savedState.cards.length }))
 
-      const createdCardIds = await collectionStore.confirmImport(savedState.cards, true)
+      const createdCardIds = await collectionStore.confirmImport(savedState.cards, true, (current, total) => {
+        const pct = 55 + Math.round((current / total) * 5)
+        progressToast.update(pct, t('common.import.savingProgress', { current, total }))
+      })
       progressToast.update(60, t('common.import.allocatingToDeck'))
 
       saveImportState({

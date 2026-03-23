@@ -15,7 +15,7 @@ import DeckCardComponent from '../components/decks/DeckCard.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
-import { getCardById, getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfall'
+import { getCardById, getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfallCache'
 import type { CreateDeckInput, DeckFormat } from '../types/deck'
 import { type ParsedCsvCard, parseDeckLine } from '../utils/cardHelpers'
 

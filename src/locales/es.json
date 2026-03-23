@@ -117,7 +117,9 @@
       "resumeComplete": "\"{name}\" completado con {count} cartas",
       "resumeIncomplete": "Importación incompleta. El mazo puede estar vacío.",
       "resumeError": "Error al resumir importación",
-      "resumeFailed": "Importación de \"{name}\" falló. Limpiando..."
+      "resumeFailed": "Importación de \"{name}\" falló. Limpiando...",
+      "fetchingDataProgress": "Obteniendo datos: {current}/{total}...",
+      "savingProgress": "Guardando cartas: {current}/{total}..."
     }
   },
 
@@ -788,10 +790,10 @@
       "moxfieldDetected": {
         "title": "Link de Moxfield detectado",
         "instruction": "Moxfield no permite importar directamente. Sigue estos pasos:",
-        "step1": "1. Abre el deck en Moxfield",
-        "step2": "2. Click en Export (arriba a la derecha)",
-        "step3": "3. Click en Copy to Clipboard",
-        "step4": "4. Pega el texto aquí"
+        "step1": "Abre el deck en Moxfield",
+        "step2": "Click en Export (arriba a la derecha)",
+        "step3": "Click en Copy to Clipboard",
+        "step4": "Pega el texto aquí"
       },
       "preview": {
         "total": "Total: {total} cartas",
@@ -812,8 +814,10 @@
       "submit": "IMPORTAR {count} CARTAS",
       "csvUpload": "o subir archivo CSV",
       "csvDetected": "CSV de ManaBox detectado",
+      "csvDetectedUG": "CSV de Urza's Gatherer detectado",
       "csvConditionNote": "Las condiciones se importarán por carta desde el CSV",
-      "csvCards": "{count} cartas encontradas en el CSV"
+      "csvCards": "{count} cartas encontradas en el CSV",
+      "errorUnknown": "Error desconocido"
     },
     "editDeckCard": {
       "titleWishlist": "EDITAR WISHLIST",
@@ -2064,7 +2068,7 @@
     },
     "importModal": {
       "title": "IMPORTAR CARPETA",
-      "inputLabel": "Link de Moxfield o texto de la carpeta",
+      "inputLabel": "Link de Moxfield, texto de la carpeta, o archivo CSV",
       "binderNameLabel": "Nombre de la carpeta (opcional)",
       "binderNamePlaceholder": "Dejar vacío para generar un nombre aleatorio"
     }

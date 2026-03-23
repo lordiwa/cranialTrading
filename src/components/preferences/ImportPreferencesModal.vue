@@ -41,7 +41,7 @@ const conditionOptions = computed(() => [
 const parseMoxfieldPreferences = async (deckId: string): Promise<{ total: number; mainboard: number; sideboard: number; name?: string } | null> => {
   const result = await fetchMoxfieldDeck(deckId)
   if (!result.data) {
-    errorMsg.value = result.error ?? 'Error desconocido'
+    errorMsg.value = result.error ?? t('decks.importModal.errorUnknown')
     return null
   }
   const deck = result.data

@@ -8,7 +8,7 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), {
-  placeholder: 'Seleccionar',
+  placeholder: '',
   disabled: false,
   id: undefined,
 });

@@ -3,7 +3,7 @@
  */
 import { computed, ref } from 'vue'
 import { type CardPrices, formatPrice, getCardPrices } from '../services/mtgjson'
-import { getCardById } from '../services/scryfall'
+import { getCardById } from '../services/scryfallCache'
 
 export interface PriceDisplay {
   source: string

@@ -490,7 +490,8 @@ async function fetchCollectionBatch(
 }
 
 export const getCardsByIds = async (
-    identifiers: ({ id: string } | { name: string })[]
+    identifiers: ({ id: string } | { name: string })[],
+    onProgress?: (current: number, total: number) => void
 ): Promise<ScryfallCard[]> => {
     if (identifiers.length === 0) return []
 
@@ -501,6 +502,8 @@ export const getCardsByIds = async (
         const batch = identifiers.slice(i, i + BATCH_SIZE)
         const batchResults = await fetchCollectionBatch(batch)
         results.push(...batchResults)
+
+        onProgress?.(Math.min(i + BATCH_SIZE, identifiers.length), identifiers.length)
 
         if (i + BATCH_SIZE < identifiers.length) {
             await new Promise(resolve => setTimeout(resolve, 50))

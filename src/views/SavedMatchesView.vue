@@ -7,9 +7,7 @@ import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
-import { useDecksStore } from '../stores/decks'
 import { useToastStore } from '../stores/toast'
-import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { db } from '../services/firebase'
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore'
@@ -38,9 +36,7 @@ const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
 const priceMatching = usePriceMatchingStore()
-const decksStore = useDecksStore()
 const toastStore = useToastStore()
-const confirmStore = useConfirmStore()
 const { t } = useI18n()
 
 // State
@@ -70,30 +66,6 @@ const blockedUsers = ref<BlockedUser[]>([])
 const loadingBlockedUsers = ref(false)
 const blockUsernameInput = ref('')
 const blockingUser = ref(false)
-
-// Clear data state
-type ClearDataStep = 'cards' | 'preferences' | 'matches_nuevos' | 'matches_guardados' | 'matches_eliminados' | 'contactos' | 'decks'
-
-interface ClearDataState {
-  status: 'in_progress' | 'complete' | 'error'
-  completedSteps: ClearDataStep[]
-  currentStep: ClearDataStep | null
-  errors: number
-}
-
-const CLEAR_DATA_STORAGE_KEY = 'cranial_clear_data_progress'
-const clearDataProgress = ref<ClearDataState | null>(null)
-const ALL_CLEAR_STEPS: ClearDataStep[] = ['cards', 'preferences', 'matches_nuevos', 'matches_guardados', 'matches_eliminados', 'contactos', 'decks']
-
-const STEP_LABELS: Record<ClearDataStep, string> = {
-  'cards': 'cartas',
-  'preferences': 'preferencias',
-  'matches_nuevos': 'matches nuevos',
-  'matches_guardados': 'matches guardados',
-  'matches_eliminados': 'matches eliminados',
-  'contactos': 'contactos',
-  'decks': 'decks'
-}
 
 // ✅ DATOS REALES desde store
 const newMatches = computed(() => matchesStore.newMatches)
@@ -427,152 +399,6 @@ const handleBlockByUsername = async () => {
   }
 }
 
-// ========== CLEAR DATA ==========
-
-const saveClearDataState = (state: ClearDataState) => {
-  try {
-    localStorage.setItem(CLEAR_DATA_STORAGE_KEY, JSON.stringify(state))
-    clearDataProgress.value = state
-  } catch (e) {
-    console.warn('[ClearData] Failed to save state:', e)
-  }
-}
-
-const loadClearDataState = (): ClearDataState | null => {
-  try {
-    const saved = localStorage.getItem(CLEAR_DATA_STORAGE_KEY)
-    if (saved) {
-      return JSON.parse(saved) as ClearDataState
-    }
-  } catch (e) {
-    console.warn('[ClearData] Failed to load state:', e)
-  }
-  return null
-}
-
-const clearClearDataState = () => {
-  try {
-    localStorage.removeItem(CLEAR_DATA_STORAGE_KEY)
-    clearDataProgress.value = null
-  } catch (e) {
-    console.warn('[ClearData] Failed to clear state:', e)
-  }
-}
-
-const deleteCollectionStep = async (userId: string, step: ClearDataStep): Promise<boolean> => {
-  const collectionMap: Record<ClearDataStep, string> = {
-    'cards': 'cards',
-    'preferences': 'preferences',
-    'matches_nuevos': 'matches_nuevos',
-    'matches_guardados': 'matches_guardados',
-    'matches_eliminados': 'matches_eliminados',
-    'contactos': 'contactos_guardados',
-    'decks': 'decks'
-  }
-
-  // eslint-disable-next-line security/detect-object-injection
-  const colName = collectionMap[step]
-  try {
-    const colRef = collection(db, 'users', userId, colName)
-    const snapshot = await getDocs(colRef)
-    for (const docItem of snapshot.docs) {
-      await deleteDoc(doc(db, 'users', userId, colName, docItem.id))
-    }
-    return true
-  } catch (e) {
-    console.error(`Error borrando ${step}:`, e)
-    return false
-  }
-}
-
-const executeClearData = async (startFromState?: ClearDataState, progressToast?: ReturnType<typeof toastStore.showProgress>) => {
-  if (!authStore.user) return
-
-  loading.value = true
-  const userId = authStore.user.id
-
-  const state: ClearDataState = startFromState ?? {
-    status: 'in_progress',
-    completedSteps: [],
-    currentStep: null,
-    errors: 0
-  }
-
-  const progress = progressToast ?? toastStore.showProgress('Borrando datos...', 0)
-
-  const remainingSteps = ALL_CLEAR_STEPS.filter(step => !state.completedSteps.includes(step))
-  const totalSteps = ALL_CLEAR_STEPS.length
-
-  for (const step of remainingSteps) {
-    state.currentStep = step
-    saveClearDataState(state)
-
-    const currentStepIndex = state.completedSteps.length
-    const percent = Math.round((currentStepIndex / totalSteps) * 100)
-    // eslint-disable-next-line security/detect-object-injection
-    progress.update(percent, `Borrando ${STEP_LABELS[step]}...`)
-
-    const success = await deleteCollectionStep(userId, step)
-
-    if (success) {
-      state.completedSteps.push(step)
-    } else {
-      state.errors++
-    }
-    saveClearDataState(state)
-  }
-
-  collectionStore.clear()
-  preferencesStore.clear()
-  decksStore.clear()
-  calculatedMatches.value = []
-
-  state.status = 'complete'
-  state.currentStep = null
-  saveClearDataState(state)
-
-  loading.value = false
-
-  if (state.errors > 0) {
-    progress.error(`Borrado con ${state.errors} error(es)`)
-  } else {
-    progress.complete('Todos los datos borrados')
-  }
-
-  setTimeout(() => {
-    clearClearDataState()
-    globalThis.location.reload()
-  }, 2000)
-}
-
-const resumeClearData = async (savedState: ClearDataState) => {
-  if (savedState.status === 'complete') {
-    clearClearDataState()
-    return
-  }
-
-  const initialProgress = Math.round((savedState.completedSteps.length / ALL_CLEAR_STEPS.length) * 100)
-  const progress = toastStore.showProgress('Continuando borrado de datos...', initialProgress)
-
-  await executeClearData(savedState, progress)
-}
-
-const clearAllData = async () => {
-  if (!authStore.user) return
-
-  const confirmed = await confirmStore.show({
-    title: t('dashboard.clearData.title'),
-    message: t('dashboard.clearData.message'),
-    confirmText: t('dashboard.clearData.confirm'),
-    cancelText: t('common.actions.cancel'),
-    confirmVariant: 'danger'
-  })
-
-  if (!confirmed) return
-
-  await executeClearData()
-}
-
 // ========== CALCULATE MATCHES ==========
 
 const groupMatchesByUser = (matchingCards: PublicCard[], matchingPrefs: PublicPreference[]) => {
@@ -873,15 +699,6 @@ watch(() => route.query.match, (matchId) => {
 onMounted(async () => {
   if (!authStore.user) return
 
-  // Check for incomplete clear data operation and resume if needed
-  const savedClearState = loadClearDataState()
-  if (savedClearState?.status === 'in_progress') {
-    void resumeClearData(savedClearState)
-    return
-  } else if (savedClearState?.status === 'complete') {
-    clearClearDataState()
-  }
-
   // Load discarded matches from Firestore
   await loadDiscardedMatches()
 
@@ -979,14 +796,6 @@ onUnmounted(() => {
             </BaseButton>
             <HelpTooltip :text="t('help.tooltips.dashboard.blockedUsers')" :title="t('help.titles.blockedUsers')" />
           </div>
-          <BaseButton
-              variant="secondary"
-              size="small"
-              @click="clearAllData"
-              class="w-full md:w-auto text-rust border-rust hover:bg-rust/10"
-          >
-            {{ t('dashboard.clearData.title') }}
-          </BaseButton>
         </div>
       </div>
 

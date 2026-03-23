@@ -31,15 +31,22 @@ const showChart = ref(false)
 const chartLoading = ref(false)
 const history = ref<PriceSnapshot[]>([])
 
-// Fetch prices when collection loads
+// Fetch prices when collection loads (but not during import)
 watch(() => collectionStore.cards.length, (newLen, oldLen) => {
-  if (newLen > 0 && oldLen === 0) {
+  if (newLen > 0 && oldLen === 0 && !collectionStore.importing) {
     void fetchAllPrices()
   }
 })
 
 onMounted(() => {
-  if (collectionStore.cards.length > 0) {
+  if (collectionStore.cards.length > 0 && !collectionStore.importing) {
+    void fetchAllPrices()
+  }
+})
+
+// Fetch prices after import finishes
+watch(() => collectionStore.importing, (newVal, oldVal) => {
+  if (oldVal && !newVal && collectionStore.cards.length > 0) {
     void fetchAllPrices()
   }
 })

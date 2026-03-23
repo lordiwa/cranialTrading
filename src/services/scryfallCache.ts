@@ -4,7 +4,7 @@
  * Transparently caches individual card lookups by scryfallId.
  * All other functions pass through to the raw scryfall service unchanged.
  */
-import { Timestamp, collection, doc, documentId, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore' // eslint-disable-line sort-imports
+import { Timestamp, collection, doc, documentId, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore' // eslint-disable-line sort-imports
 import { db } from './firebase'
 import {
   getCardById as rawGetCardById,
@@ -116,6 +116,42 @@ function l2RefreshPrices(id: string, prices: ScryfallCard['prices']): void {
   }).catch((err: unknown) => { console.warn('[ScryfallCache] price refresh failed:', err) })
 }
 
+function l2WriteBatch(cards: ScryfallCard[]): void {
+  if (cards.length > 2000) return
+
+  const CHUNK_SIZE = 200
+  const chunks: ScryfallCard[][] = []
+  for (let i = 0; i < cards.length; i += CHUNK_SIZE) {
+    chunks.push(cards.slice(i, i + CHUNK_SIZE))
+  }
+
+  ;(async () => {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]!
+      const batch = writeBatch(db)
+      const now = Timestamp.now()
+      for (const card of chunk) {
+        const ref = doc(db, COLLECTION, card.id)
+        batch.set(ref, {
+          ...card,
+          _cachedAt: now,
+          _metadataUpdatedAt: now,
+          _pricesUpdatedAt: now,
+        })
+      }
+      try {
+        await batch.commit()
+      } catch (err: unknown) {
+        console.warn(`[ScryfallCache] L2 batch write failed (chunk ${i + 1}/${chunks.length}), aborting:`, err)
+        break
+      }
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    }
+  })().catch((err: unknown) => { console.warn('[ScryfallCache] L2 batch write failed:', err) })
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 export async function getCardById(id: string): Promise<ScryfallCard | null> {
@@ -186,8 +222,10 @@ export async function getCardsByIds(
   // L2 batch read for id-based misses — bulk query per chunk
   const l2Misses: { id: string }[] = []
   if (l2Needed.length > 0) {
-    const CHUNK_SIZE = 10
+    const CHUNK_SIZE = 30  // Firestore 'in' operator limit
+    const MISS_THRESHOLD = 3  // skip L2 after N consecutive all-miss chunks
     let l2Available = true
+    let consecutiveMissChunks = 0
 
     for (let i = 0; i < l2Needed.length; i += CHUNK_SIZE) {
       const chunk = l2Needed.slice(i, i + CHUNK_SIZE)
@@ -208,6 +246,7 @@ export async function getCardsByIds(
         ))
 
         const returnedIds = new Set<string>()
+        let chunkHits = 0
         for (const snap of snapshot.docs) {
           returnedIds.add(snap.id)
           const data = snap.data() as ScryfallCard & CacheMetadata
@@ -215,6 +254,7 @@ export async function getCardsByIds(
             const card = stripCacheMetadata(data as unknown as Record<string, unknown>)
             l1Set(card)
             results.push(card)
+            chunkHits++
           } else {
             l2Misses.push({ id: snap.id })
           }
@@ -225,6 +265,19 @@ export async function getCardsByIds(
           if (!returnedIds.has(id)) {
             l2Misses.push({ id })
           }
+        }
+
+        // Miss-rate early exit: skip remaining L2 if cache appears empty
+        if (chunkHits === 0) {
+          consecutiveMissChunks++
+          if (consecutiveMissChunks >= MISS_THRESHOLD) {
+            for (let j = i + CHUNK_SIZE; j < l2Needed.length; j++) {
+              l2Misses.push(l2Needed[j]!)
+            }
+            break
+          }
+        } else {
+          consecutiveMissChunks = 0
         }
       } catch {
         l2Available = false
@@ -246,9 +299,9 @@ export async function getCardsByIds(
       : undefined)
     for (const card of scryfallResults) {
       l1Set(card)
-      l2Write(card)
       results.push(card)
     }
+    l2WriteBatch(scryfallResults)
   }
 
   return results

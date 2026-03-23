@@ -10,6 +10,7 @@ import { useMatchesStore } from '../stores/matches';
 import { useContactsStore } from '../stores/contacts';
 import { useI18n } from '../composables/useI18n';
 import { useTour } from '../composables/useTour';
+import { cancelPriceFetch } from '../composables/useCollectionTotals';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
@@ -357,6 +358,7 @@ const handleDeleteAllData = async () => {
 
   try {
     // Step 1: Delete cards (30%)
+    cancelPriceFetch();
     progress.update(10, 'Eliminando cartas...');
     await collectionStore.deleteAllCards();
     progress.update(30, 'Cartas eliminadas');

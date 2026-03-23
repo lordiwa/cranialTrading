@@ -13,6 +13,9 @@ const mockWhere = vi.fn((..._args: unknown[]) => ({ _where: true }))
 const mockDocumentId = vi.fn(() => '__documentId__')
 const mockCollection = vi.fn((..._args: unknown[]) => ({ _collection: true }))
 const mockTimestamp = { now: vi.fn(() => ({ toMillis: () => Date.now() })) }
+const mockBatchCommit = vi.fn().mockResolvedValue(undefined)
+const mockBatchSet = vi.fn()
+const mockWriteBatch = vi.fn(() => ({ set: mockBatchSet, commit: mockBatchCommit }))
 
 vi.mock('firebase/firestore', () => ({
   collection: (...args: unknown[]) => mockCollection(...args),
@@ -25,6 +28,7 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: mockTimestamp,
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
   where: (...args: unknown[]) => mockWhere(...args),
+  writeBatch: (...args: unknown[]) => mockWriteBatch(...args),
 }))
 
 vi.mock('@/services/firebase', () => ({
@@ -343,12 +347,12 @@ describe('getCardsByIds', () => {
 
     mockGetDocs.mockResolvedValueOnce(makeQuerySnapshot([]))
     mockRawGetCardsByIds.mockResolvedValueOnce([card])
-    mockSetDoc.mockResolvedValue(undefined)
 
     await getCardsByIds([{ id: 'id-new' }])
 
-    // L2 write
-    expect(mockSetDoc).toHaveBeenCalledWith(
+    // L2 write via writeBatch (not individual setDoc)
+    expect(mockWriteBatch).toHaveBeenCalled()
+    expect(mockBatchSet).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'id-new' }),
       expect.objectContaining({ id: 'id-new', name: 'New Card' }),
     )
@@ -391,8 +395,8 @@ describe('getCardsByIds', () => {
   })
 
   it('fail-fast: skips remaining L2 chunks after first failure', async () => {
-    // 15 IDs → 2 chunks (10 + 5). First chunk fails → second chunk should be skipped entirely.
-    const ids = Array.from({ length: 15 }, (_, i) => ({ id: `id-${i}` }))
+    // 35 IDs → 2 chunks (30 + 5). First chunk fails → second chunk should be skipped entirely.
+    const ids = Array.from({ length: 35 }, (_, i) => ({ id: `id-${i}` }))
     const cards = ids.map(({ id }) => makeScryfallCard({ id, name: `Card ${id}` }))
 
     mockGetDocs.mockRejectedValueOnce(new Error('Firestore permissions'))
@@ -401,11 +405,62 @@ describe('getCardsByIds', () => {
 
     const result = await getCardsByIds(ids)
 
-    expect(result).toHaveLength(15)
+    expect(result).toHaveLength(35)
     // Only 1 getDocs call — the second chunk was skipped by fail-fast
     expect(mockGetDocs).toHaveBeenCalledTimes(1)
-    // All 15 IDs forwarded to Scryfall
+    // All 35 IDs forwarded to Scryfall
     expect(mockRawGetCardsByIds).toHaveBeenCalledWith(ids, undefined)
+  })
+
+  it('skips remaining L2 chunks after 3 consecutive all-miss chunks', async () => {
+    // 150 IDs → 5 chunks of 30. All chunks return empty.
+    // After 3 consecutive all-miss chunks, remaining 2 chunks should be skipped.
+    const ids = Array.from({ length: 150 }, (_, i) => ({ id: `id-${i}` }))
+    const cards = ids.map(({ id }) => makeScryfallCard({ id, name: `Card ${id}` }))
+
+    // 3 empty snapshots for the first 3 chunks
+    mockGetDocs
+      .mockResolvedValueOnce(makeQuerySnapshot([]))
+      .mockResolvedValueOnce(makeQuerySnapshot([]))
+      .mockResolvedValueOnce(makeQuerySnapshot([]))
+
+    mockRawGetCardsByIds.mockResolvedValueOnce(cards)
+    mockSetDoc.mockResolvedValue(undefined)
+
+    const result = await getCardsByIds(ids)
+
+    expect(result).toHaveLength(150)
+    // Only 3 getDocs calls — remaining 2 chunks skipped by miss-rate early exit
+    expect(mockGetDocs).toHaveBeenCalledTimes(3)
+    // All 150 IDs forwarded to Scryfall
+    expect(mockRawGetCardsByIds).toHaveBeenCalledWith(ids, undefined)
+  })
+
+  it('resets miss counter when a chunk has hits', async () => {
+    // 150 IDs → 5 chunks of 30.
+    // Chunk 1: all miss, Chunk 2: all miss, Chunk 3: has hits → resets counter
+    // Chunk 4: all miss, Chunk 5: all miss — only 2 consecutive misses, no early exit
+    const ids = Array.from({ length: 150 }, (_, i) => ({ id: `id-${i}` }))
+    const hitCard = makeScryfallCard({ id: 'id-60', name: 'Card id-60' })
+    const remainingCards = ids
+      .filter(({ id }) => id !== 'id-60')
+      .map(({ id }) => makeScryfallCard({ id, name: `Card ${id}` }))
+
+    mockGetDocs
+      .mockResolvedValueOnce(makeQuerySnapshot([]))       // chunk 1: all miss
+      .mockResolvedValueOnce(makeQuerySnapshot([]))       // chunk 2: all miss
+      .mockResolvedValueOnce(makeQuerySnapshot([hitCard])) // chunk 3: 1 hit → reset
+      .mockResolvedValueOnce(makeQuerySnapshot([]))       // chunk 4: all miss
+      .mockResolvedValueOnce(makeQuerySnapshot([]))       // chunk 5: all miss
+
+    mockRawGetCardsByIds.mockResolvedValueOnce(remainingCards)
+    mockSetDoc.mockResolvedValue(undefined)
+
+    const result = await getCardsByIds(ids)
+
+    expect(result).toHaveLength(150)
+    // All 5 chunks queried — miss counter reset at chunk 3
+    expect(mockGetDocs).toHaveBeenCalledTimes(5)
   })
 
   it('treats stale metadata as L2 miss in bulk reads', async () => {
@@ -555,5 +610,102 @@ describe('L1 cache eviction', () => {
     vi.clearAllMocks()
     await getCardById('card-2')
     expect(mockGetDoc).not.toHaveBeenCalled()
+  })
+})
+
+// ── l2WriteBatch ─────────────────────────────────────────────────────────────
+
+describe('getCardsByIds L2 batch writes', () => {
+  it('uses writeBatch instead of individual setDoc for Scryfall results', async () => {
+    const cards = Array.from({ length: 5 }, (_, i) =>
+      makeScryfallCard({ id: `id-${i}`, name: `Card ${i}` })
+    )
+
+    mockGetDocs.mockResolvedValueOnce(makeQuerySnapshot([]))
+    mockRawGetCardsByIds.mockResolvedValueOnce(cards)
+
+    await getCardsByIds(cards.map(c => ({ id: c.id })))
+
+    // Should NOT use individual setDoc for L2 writes
+    expect(mockSetDoc).not.toHaveBeenCalled()
+    // Should use writeBatch
+    expect(mockWriteBatch).toHaveBeenCalled()
+    expect(mockBatchSet).toHaveBeenCalledTimes(5)
+    expect(mockBatchCommit).toHaveBeenCalled()
+  })
+
+  it('chunks large batches into groups of 200', async () => {
+    vi.useFakeTimers()
+    const cards = Array.from({ length: 850 }, (_, i) =>
+      makeScryfallCard({ id: `id-${i}`, name: `Card ${i}` })
+    )
+
+    mockGetDocs.mockResolvedValue(makeQuerySnapshot([]))
+    mockRawGetCardsByIds.mockResolvedValueOnce(cards)
+
+    await getCardsByIds(cards.map(c => ({ id: c.id })))
+
+    // Flush the fire-and-forget async batches (500ms delay between chunks)
+    await vi.advanceTimersByTimeAsync(3000)
+
+    // 850 cards → 5 batches (200 + 200 + 200 + 200 + 50)
+    expect(mockWriteBatch).toHaveBeenCalledTimes(5)
+    expect(mockBatchCommit).toHaveBeenCalledTimes(5)
+    expect(mockBatchSet).toHaveBeenCalledTimes(850)
+
+    vi.useRealTimers()
+  })
+
+  it('skips L2 batch writes for large result sets (>2000)', async () => {
+    const cards = Array.from({ length: 2001 }, (_, i) =>
+      makeScryfallCard({ id: `id-${i}`, name: `Card ${i}` })
+    )
+
+    mockGetDocs.mockResolvedValue(makeQuerySnapshot([]))
+    mockRawGetCardsByIds.mockResolvedValueOnce(cards)
+
+    await getCardsByIds(cards.map(c => ({ id: c.id })))
+
+    // L2 batch writes should be completely skipped
+    expect(mockWriteBatch).not.toHaveBeenCalled()
+    expect(mockBatchCommit).not.toHaveBeenCalled()
+    expect(mockBatchSet).not.toHaveBeenCalled()
+  })
+
+  it('stops L2 batch writes on first commit failure', async () => {
+    vi.useFakeTimers()
+    const cards = Array.from({ length: 500 }, (_, i) =>
+      makeScryfallCard({ id: `id-${i}`, name: `Card ${i}` })
+    )
+
+    mockGetDocs.mockResolvedValue(makeQuerySnapshot([]))
+    mockRawGetCardsByIds.mockResolvedValueOnce(cards)
+    // First batch commit fails
+    mockBatchCommit.mockRejectedValueOnce(new Error('Write stream exhausted'))
+
+    await getCardsByIds(cards.map(c => ({ id: c.id })))
+
+    // Flush timers to let fire-and-forget complete
+    await vi.advanceTimersByTimeAsync(3000)
+
+    // Only 1 commit attempted — aborted after first failure
+    expect(mockBatchCommit).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
+  it('does not block return while batches commit', async () => {
+    const card = makeScryfallCard({ id: 'id-1', name: 'Card 1' })
+
+    // Make batch commit hang (never resolve)
+    mockBatchCommit.mockReturnValue(new Promise(() => {}))
+    mockGetDocs.mockResolvedValueOnce(makeQuerySnapshot([]))
+    mockRawGetCardsByIds.mockResolvedValueOnce([card])
+
+    // Should return results without waiting for batch commit
+    const result = await getCardsByIds([{ id: 'id-1' }])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('id-1')
   })
 })

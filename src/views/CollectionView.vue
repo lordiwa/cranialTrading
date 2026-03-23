@@ -39,7 +39,7 @@ import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
-import { useCollectionTotals } from '../composables/useCollectionTotals'
+import { cancelPriceFetch, useCollectionTotals } from '../composables/useCollectionTotals'
 
 const route = useRoute()
 const router = useRouter()
@@ -1189,6 +1189,7 @@ const handleBulkDelete = async () => {
 
   bulkActionLoading.value = true
   try {
+    cancelPriceFetch()
     const ids = [...selectedCardIds.value]
     const result = await collectionStore.batchDeleteCards(ids)
     if (result.success) {
@@ -1805,6 +1806,7 @@ const extractScryfallCardData = (card: ScryfallCard): ExtractedScryfallData => {
 const executeBinderDeletion = async (binderId: string, cardIds: string[], deleteCards: boolean) => {
   if (deleteCards && cardIds.length > 0) {
     try {
+      cancelPriceFetch()
       const result = await collectionStore.batchDeleteCards(cardIds)
       if (result.failed > 0) {
         toastStore.show(t('binders.deletedWithCardWarning', { deleted: result.deleted, failed: result.failed }), 'info')
@@ -2053,6 +2055,7 @@ const executeCardDeletionStep = async (
 ): Promise<void> => {
   if (!state.deleteCards || state.cardIds.length === 0) return
 
+  cancelPriceFetch()
   saveDeleteDeckState(state)
   const result = await collectionStore.batchDeleteCards(state.cardIds, (percent) => {
     onProgress(5 + Math.round(percent * 0.8))
@@ -2487,6 +2490,9 @@ const handleImportDirect = async (
     const uniqueIds = [...new Set(identifiers.map(id => id.id))]
     const dedupedIdentifiers = uniqueIds.map(id => ({ id }))
 
+    // Cancel price fetch to free the write stream for import
+    cancelPriceFetch()
+
     // PASO 3: Obtener todos los datos de Scryfall en batch
     progressToast.update(15, t('common.import.fetchingData', { count: dedupedIdentifiers.length }))
     const scryfallDataMap = new Map<string, ScryfallCard>()
@@ -2664,6 +2670,9 @@ const handleImportCsv = async (
 
     viewMode.value = 'decks'
     deckFilter.value = deckId
+
+    // Cancel price fetch to free the write stream for import
+    cancelPriceFetch()
 
     // PASO 2: Batch fetch Scryfall data
     progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
@@ -2845,6 +2854,9 @@ const handleImportBinderDirect = async (
       }
     }
 
+    // Cancel price fetch to free the write stream for import
+    cancelPriceFetch()
+
     progressToast.update(15, t('common.import.fetchingData', { count: identifiers.length }))
     const scryfallDataMap = new Map<string, ScryfallCard>()
     if (identifiers.length > 0) {
@@ -2939,6 +2951,9 @@ const handleImportBinderCsv = async (
 
     viewMode.value = 'binders'
     binderFilter.value = binderId
+
+    // Cancel price fetch to free the write stream for import
+    cancelPriceFetch()
 
     // Batch fetch Scryfall data
     progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))

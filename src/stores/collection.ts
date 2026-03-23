@@ -722,8 +722,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
-            cards.value.push(...createdCards)
-            for (const c of createdCards) cardsById.set(c.id, c)
+            cards.value = cards.value.concat(createdCards)
+            rebuildCardIndex()
             triggerRef(cards)
 
             if (!silent) {

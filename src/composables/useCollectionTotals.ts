@@ -63,6 +63,8 @@ export function useCollectionTotals(cards: () => Card[]) {
 
   // Auto-fix card with missing scryfallId by searching Scryfall
   const autoFixCard = async (card: Card): Promise<string | null> => {
+    // Skip cards with no name (corrupted/incomplete data)
+    if (!card.name) return null
     // Only try once per card
     if (fixAttemptedCache.has(card.id)) {
       return null

@@ -31,7 +31,7 @@ import type { CreateDeckInput, DeckCardAllocation, DeckFormat, DisplayDeckCard, 
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfallCache'
+import { type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
@@ -1886,8 +1886,8 @@ const buildCollectionCardFromScryfall = (opts: {
   return cardData
 }
 
-/** Process a single card from Moxfield import into a collection card object (shared by deck and binder) */
-const processImportCard = (
+// @ts-expect-error — unused after progressive import refactor, kept for reference
+const _processImportCard = (
   card: MoxfieldImportCard,
   scryfallDataMap: Map<string, ScryfallCard>,
   condition: CardCondition,
@@ -1960,8 +1960,7 @@ const processImportCard = (
   return { cardData, needsSearch: price === 0 || !image }
 }
 
-/** Apply best search result to a card's data (used by enrichCardsWithFallbackSearch) */
-const applySearchResultToCard = (cardData: ImportCardData, results: ScryfallCard[]) => {
+const _applySearchResultToCard = (cardData: ImportCardData, results: ScryfallCard[]) => {
   const printWithPrice = results.find(r =>
     r.prices?.usd && Number.parseFloat(r.prices.usd) > 0 &&
     (r.image_uris?.normal ?? r.card_faces?.[0]?.image_uris?.normal)
@@ -1992,23 +1991,82 @@ const applySearchResultToCard = (cardData: ImportCardData, results: ScryfallCard
   cardData.full_art = extracted.full_art
 }
 
-/** Enrich collection cards that are missing price/image with fallback Scryfall search */
-const enrichCardsWithFallbackSearch = async (collectionCardsToAdd: ImportCardData[], cardsNeedingSearch: number[]) => {
+// @ts-expect-error — unused after progressive import refactor
+const _enrichCardsWithFallbackSearch = async (collectionCardsToAdd: ImportCardData[], cardsNeedingSearch: number[]) => {
   for (const idx of cardsNeedingSearch) {
     // eslint-disable-next-line security/detect-object-injection
     const cardData = collectionCardsToAdd[idx]
     if (!cardData) continue
     try {
       const results = await searchCards(`!"${cardData.name}"`)
-      applySearchResultToCard(cardData, results)
+      _applySearchResultToCard(cardData, results)
     } catch (e) {
       console.warn(`[Import] Failed to search for "${cardData.name}":`, e)
     }
   }
 }
 
-/** Build a collection card from CSV import data + Scryfall batch data (shared by deck and binder) */
-const buildCsvCollectionCard = (
+/** Build a minimal card from Moxfield import data (no Scryfall fetch needed) */
+const buildRawMoxfieldCard = (
+  card: MoxfieldImportCard,
+  condition: CardCondition,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+): ImportCardData => {
+  let cardName = card.name
+  const isFoil = /\*[fF]\*?\s*$/.test(cardName)
+  if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+
+  return {
+    scryfallId: card.scryfallId ?? '',
+    name: cardName,
+    edition: card.setCode?.toUpperCase() ?? 'Unknown',
+    setCode: card.setCode?.toUpperCase(),
+    quantity: card.quantity,
+    condition,
+    foil: isFoil,
+    price: 0,
+    image: '',
+    status: status ?? 'collection',
+    public: makePublic,
+    colors: [],
+    keywords: [],
+    full_art: false,
+    produced_mana: [],
+    updatedAt: new Date(),
+  }
+}
+
+/** Build a minimal card from CSV import data (no Scryfall fetch needed) */
+const buildRawCsvCard = (
+  card: ParsedCsvCard,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+): ImportCardData => {
+  const cardData: ImportCardData = {
+    scryfallId: card.scryfallId ?? '',
+    name: card.name,
+    edition: card.setCode?.toUpperCase() ?? 'Unknown',
+    quantity: card.quantity,
+    condition: card.condition,
+    foil: card.foil,
+    price: card.price ?? 0,
+    image: '',
+    status: status ?? 'collection',
+    public: makePublic,
+    colors: [],
+    keywords: [],
+    full_art: false,
+    produced_mana: [],
+    updatedAt: new Date(),
+  }
+  if (card.setCode) cardData.setCode = card.setCode.toUpperCase()
+  if (card.language) cardData.language = card.language
+  return cardData
+}
+
+// @ts-expect-error — unused after progressive import refactor
+const _buildCsvCollectionCard = (
   card: ParsedCsvCard,
   scryfallDataMap: Map<string, ScryfallCard>,
   status: CardStatus | undefined,
@@ -2483,80 +2541,42 @@ const handleImportDirect = async (
     viewMode.value = 'decks'
     deckFilter.value = deckId
 
-    // PASO 2: Recolectar todos los scryfallIds para batch request
-    progressToast.update(10, t('common.import.preparing', { count: cards.length }))
-    const identifiers: { id: string }[] = []
-    cards.forEach((card) => {
-      if (!card.scryfallId) return
-      identifiers.push({ id: card.scryfallId })
-    })
-    // Deduplicate identifiers
-    const uniqueIds = [...new Set(identifiers.map(id => id.id))]
-    const dedupedIdentifiers = uniqueIds.map(id => ({ id }))
-
     // Cancel price fetch to free the write stream for import
     cancelPriceFetch()
 
-    // PASO 3: Obtener todos los datos de Scryfall en batch
-    progressToast.update(15, t('common.import.fetchingData', { count: dedupedIdentifiers.length }))
-    const scryfallDataMap = new Map<string, ScryfallCard>()
-    if (dedupedIdentifiers.length > 0) {
-      const scryfallCards = await getCardsByIds(dedupedIdentifiers, (current, total) => {
-        const pct = 15 + Math.round((current / total) * 10)
-        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
-      })
-      scryfallCards.forEach(sc => scryfallDataMap.set(sc.id, sc))
-    }
-    progressToast.update(25, t('common.import.processing'))
-
-    // PASO 4: Procesar cada carta con los datos obtenidos
+    // PASO 2: Build raw cards (no Scryfall fetch — enrichment happens in background after)
+    progressToast.update(15, t('common.import.processing'))
     saveImportState({ ...initialState, status: 'processing' })
 
     const collectionCardsToAdd: ImportCardData[] = []
     const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
-    const cardsNeedingSearch: number[] = []
 
     for (let i = 0; i < cards.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
       if (!card) continue
-      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, makePublic ?? false)
-
-      if (needsSearch) {
-        cardsNeedingSearch.push(i)
-      }
-
-      collectionCardsToAdd.push(cardData)
+      collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false))
       cardMeta.push({
         quantity: card.quantity,
         isInSideboard: card.isInSideboard ?? false
       })
 
-      // Update progress (25-45% range for processing)
-      const processPercent = 25 + Math.round((i / cards.length) * 20)
-      progressToast.update(processPercent, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
-      saveImportState({
-        ...initialState,
-        status: 'processing',
-        currentCard: i + 1,
-        cards: collectionCardsToAdd,
-        cardMeta,
-      })
+      // Update progress (15-40% range for processing)
+      if (i % 100 === 0) {
+        const processPercent = 15 + Math.round((i / cards.length) * 25)
+        progressToast.update(processPercent, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
+      }
     }
 
-    // PASO 5: Búsqueda individual para cartas sin precio/imagen
-    progressToast.update(45, t('common.import.fetchingPrices'))
-    await enrichCardsWithFallbackSearch(collectionCardsToAdd, cardsNeedingSearch)
-
-    // PASO 6: Importar cartas a la colección
-    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
+    // PASO 3: Importar cartas a la colección
+    progressToast.update(45, t('common.import.saving', { count: collectionCardsToAdd.length }))
     saveImportState({
       deckId,
       deckName: finalDeckName,
       status: 'saving',
       totalCards: cards.length,
       currentCard: 0,
-      cards: collectionCardsToAdd,
+      cards: [],
       cardMeta,
       createdCardIds: [],
       allocatedCount: 0,
@@ -2565,19 +2585,22 @@ const handleImportDirect = async (
     let allocatedCount = 0
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
-        const pct = 50 + Math.round((current / total) * 10)
+        const pct = 45 + Math.round((current / total) * 25)
         progressToast.update(pct, t('common.import.savingProgress', { current, total }))
       })
-      progressToast.update(60, t('common.import.allocatingToDeck'))
+      // Release memory
+      collectionCardsToAdd.length = 0
 
-      // PASO 7: Asignar cartas al deck con progreso
+      progressToast.update(75, t('common.import.allocatingToDeck'))
+
+      // PASO 4: Asignar cartas al deck
       saveImportState({
         deckId,
         deckName: finalDeckName,
         status: 'allocating',
         totalCards: createdCardIds.length,
         currentCard: 0,
-        cards: collectionCardsToAdd,
+        cards: [],
         cardMeta,
         createdCardIds,
         allocatedCount: 0,
@@ -2591,27 +2614,14 @@ const handleImportDirect = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(65, t('common.import.allocatingToDeckCount', { count: bulkItems.length }))
+      progressToast.update(80, t('common.import.allocatingToDeckCount', { count: bulkItems.length }))
       const bulkResult = await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems)
       allocatedCount = bulkResult.allocated
-
-      saveImportState({
-        deckId,
-        deckName: finalDeckName,
-        status: 'allocating',
-        totalCards: createdCardIds.length,
-        currentCard: createdCardIds.length,
-        cards: collectionCardsToAdd,
-        cardMeta,
-        createdCardIds,
-        allocatedCount,
-      })
     }
 
-    // PASO 8: Completar importación
+    // PASO 5: Completar importación
     await decksStore.loadDecks()
 
-    // Marcar como completo en localStorage antes de limpiar
     saveImportState({
       deckId,
       deckName: finalDeckName,
@@ -2624,13 +2634,17 @@ const handleImportDirect = async (
       allocatedCount,
     })
 
-    // Limpiar después de un momento para que el UI muestre 100%
     setTimeout(() => {
       clearImportState()
       isImportRunning = false
     }, 2000)
 
     progressToast.complete(t('common.import.deckComplete', { name: finalDeckName, count: allocatedCount }))
+
+    // PASO 6: Background enrichment — fetch Scryfall metadata (images, types, prices)
+    collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
+      console.warn('[Import] Background enrichment failed:', err)
+    })
   } catch (error) {
     console.error('[Import] Error during import:', error)
     if (importProgress.value) {
@@ -2678,26 +2692,8 @@ const handleImportCsv = async (
     // Cancel price fetch to free the write stream for import
     cancelPriceFetch()
 
-    // PASO 2: Batch fetch Scryfall data
-    progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
-    const identifiers = cards
-      .filter(c => c.scryfallId)
-      .map(c => ({ id: c.scryfallId }))
-    const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
-
-    const scryfallDataMap = new Map<string, ScryfallCard>()
-    if (uniqueIds.length > 0) {
-      const scryfallCards = await getCardsByIds(uniqueIds, (current, total) => {
-        const pct = 10 + Math.round((current / total) * 15)
-        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
-      })
-      for (const sc of scryfallCards) {
-        scryfallDataMap.set(sc.id, sc)
-      }
-    }
-    progressToast.update(25, t('common.import.processingCount', { count: cards.length }))
-
-    // PASO 3: Build collection cards
+    // PASO 2: Build raw cards (no Scryfall fetch — enrichment happens in background after)
+    progressToast.update(15, t('common.import.processing'))
     const collectionCardsToAdd: ImportCardData[] = []
     const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
 
@@ -2705,29 +2701,30 @@ const handleImportCsv = async (
       // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
       if (!card) continue
-      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, makePublic ?? false)
-      collectionCardsToAdd.push(cardData)
+      collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false))
       cardMeta.push({ quantity: card.quantity, isInSideboard: false })
 
-      // Update progress (25-45% range)
-      if (i % 50 === 0) {
-        const pct = 25 + Math.round((i / cards.length) * 20)
+      if (i % 100 === 0) {
+        const pct = 15 + Math.round((i / cards.length) * 25)
         progressToast.update(pct, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
       }
     }
 
-    // PASO 4: Guardar en colección
-    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
+    // PASO 3: Guardar en colección
+    progressToast.update(45, t('common.import.saving', { count: collectionCardsToAdd.length }))
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
-        const pct = 50 + Math.round((current / total) * 10)
+        const pct = 45 + Math.round((current / total) * 25)
         progressToast.update(pct, t('common.import.savingProgress', { current, total }))
       })
-      progressToast.update(60, t('common.import.allocatingToDeck'))
+      // Release memory
+      collectionCardsToAdd.length = 0
 
-      // PASO 5: Asignar al deck (bulk — single Firestore write)
+      progressToast.update(75, t('common.import.allocatingToDeck'))
+
+      // PASO 4: Asignar al deck (bulk — single Firestore write)
       const bulkItems = createdCardIds
         .map((cardId, i) => {
           // eslint-disable-next-line security/detect-object-injection
@@ -2737,15 +2734,20 @@ const handleImportCsv = async (
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
       const bulkResult = await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems, (current, total) => {
-        const pct = 60 + Math.round((current / total) * 35)
+        const pct = 75 + Math.round((current / total) * 20)
         progressToast.update(pct, t('common.import.allocatingProgress', { current, total }))
       })
       allocatedCount = bulkResult.allocated
     }
 
-    // PASO 6: Completar
+    // PASO 5: Completar
     await decksStore.loadDecks()
     progressToast.complete(t('common.import.deckComplete', { name: finalDeckName, count: allocatedCount }))
+
+    // PASO 6: Background enrichment — fetch Scryfall metadata (images, types, prices)
+    collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
+      console.warn('[CSV Import] Background enrichment failed:', err)
+    })
   } catch (error) {
     console.error('[CSV Import] Error:', error)
     progressToast.error(t('common.import.errorCsv'))
@@ -2840,74 +2842,35 @@ const handleImportBinderDirect = async (
     viewMode.value = 'binders'
     binderFilter.value = binderId
 
-    // Batch fetch Scryfall data
-    progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
-    const identifiers: { id: string }[] = []
-    const cardIndexMap = new Map<string, number[]>()
-
-    for (let i = 0; i < cards.length; i++) {
-      // eslint-disable-next-line security/detect-object-injection
-      const card = cards[i]
-      if (!card) continue
-      if (card.scryfallId) {
-        if (!cardIndexMap.has(card.scryfallId)) {
-          cardIndexMap.set(card.scryfallId, [])
-          identifiers.push({ id: card.scryfallId })
-        }
-        cardIndexMap.get(card.scryfallId)?.push(i)
-      }
-    }
-
     // Cancel price fetch to free the write stream for import
     cancelPriceFetch()
 
-    progressToast.update(15, t('common.import.fetchingData', { count: identifiers.length }))
-    const scryfallDataMap = new Map<string, ScryfallCard>()
-    if (identifiers.length > 0) {
-      const scryfallCards = await getCardsByIds(identifiers, (current, total) => {
-        const pct = 15 + Math.round((current / total) * 10)
-        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
-      })
-      for (const sc of scryfallCards) {
-        scryfallDataMap.set(sc.id, sc)
-      }
-    }
-    progressToast.update(25, t('common.import.processing'))
-
-    // Process each card
+    // Build raw cards (no Scryfall fetch — enrichment happens in background after)
+    progressToast.update(15, t('common.import.processing'))
     const collectionCardsToAdd: ImportCardData[] = []
-    const cardsNeedingSearch: number[] = []
 
     for (let i = 0; i < cards.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
       if (!card) continue
-      const { cardData, needsSearch } = processImportCard(card, scryfallDataMap, condition, status, makePublic ?? false)
+      collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false))
 
-      if (needsSearch) {
-        cardsNeedingSearch.push(i)
+      if (i % 100 === 0) {
+        const processPercent = 15 + Math.round((i / cards.length) * 25)
+        progressToast.update(processPercent, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
       }
-
-      collectionCardsToAdd.push(cardData)
-
-      const processPercent = 25 + Math.round((i / cards.length) * 20)
-      progressToast.update(processPercent, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
     }
 
-    // Search for cards missing price/image
-    progressToast.update(45, t('common.import.fetchingPrices'))
-    await enrichCardsWithFallbackSearch(collectionCardsToAdd, cardsNeedingSearch)
-
     // Import cards to collection
-    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
+    progressToast.update(45, t('common.import.saving', { count: collectionCardsToAdd.length }))
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
-        const pct = 50 + Math.round((current / total) * 10)
+        const pct = 45 + Math.round((current / total) * 25)
         progressToast.update(pct, t('common.import.savingProgress', { current, total }))
       })
-      progressToast.update(60, t('common.import.allocatingToBinder'))
+      progressToast.update(75, t('common.import.allocatingToBinder'))
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
@@ -2917,12 +2880,19 @@ const handleImportBinderDirect = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(65, t('common.import.allocatingToBinderCount', { count: bulkItems.length }))
+      progressToast.update(80, t('common.import.allocatingToBinderCount', { count: bulkItems.length }))
       allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+      // Release memory
+      collectionCardsToAdd.length = 0
     }
 
     await binderStore.loadBinders()
     progressToast.complete(t('common.import.binderComplete', { name: finalName, count: allocatedCount }))
+
+    // Background enrichment — fetch Scryfall metadata (images, types, prices)
+    collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
+      console.warn('[Binder Import] Background enrichment failed:', err)
+    })
   } catch (error) {
     console.error('[Binder Import] Error:', error)
     progressToast.error(t('common.import.errorBinder'))
@@ -2959,51 +2929,32 @@ const handleImportBinderCsv = async (
     // Cancel price fetch to free the write stream for import
     cancelPriceFetch()
 
-    // Batch fetch Scryfall data
-    progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
-    const identifiers = cards
-      .filter(c => c.scryfallId)
-      .map(c => ({ id: c.scryfallId }))
-    const uniqueIds = [...new Map(identifiers.map(i => [i.id, i])).values()]
-
-    const scryfallDataMap = new Map<string, ScryfallCard>()
-    if (uniqueIds.length > 0) {
-      const scryfallCards = await getCardsByIds(uniqueIds, (current, total) => {
-        const pct = 10 + Math.round((current / total) * 15)
-        progressToast.update(pct, t('common.import.fetchingDataProgress', { current, total }))
-      })
-      for (const sc of scryfallCards) {
-        scryfallDataMap.set(sc.id, sc)
-      }
-    }
-    progressToast.update(25, t('common.import.processingCount', { count: cards.length }))
-
-    // Build collection cards
+    // Build raw cards (no Scryfall fetch — enrichment happens in background after)
+    progressToast.update(15, t('common.import.processing'))
     const collectionCardsToAdd: ImportCardData[] = []
 
     for (let i = 0; i < cards.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
       const card = cards[i]
       if (!card) continue
-      const cardData = buildCsvCollectionCard(card, scryfallDataMap, status, makePublic ?? false)
-      collectionCardsToAdd.push(cardData)
+      collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false))
 
-      if (i % 50 === 0) {
-        const pct = 25 + Math.round((i / cards.length) * 20)
+      if (i % 100 === 0) {
+        const pct = 15 + Math.round((i / cards.length) * 25)
         progressToast.update(pct, t('common.import.processingProgress', { current: i + 1, total: cards.length }))
       }
     }
 
     // Save to collection
-    progressToast.update(50, t('common.import.saving', { count: collectionCardsToAdd.length }))
+    progressToast.update(45, t('common.import.saving', { count: collectionCardsToAdd.length }))
     let allocatedCount = 0
 
     if (collectionCardsToAdd.length > 0) {
       const createdCardIds = await collectionStore.confirmImport(collectionCardsToAdd, true, (current, total) => {
-        const pct = 50 + Math.round((current / total) * 10)
+        const pct = 45 + Math.round((current / total) * 25)
         progressToast.update(pct, t('common.import.savingProgress', { current, total }))
       })
-      progressToast.update(60, t('common.import.allocatingToBinder'))
+      progressToast.update(75, t('common.import.allocatingToBinder'))
 
       const bulkItems = createdCardIds
         .map((cardId, i) => {
@@ -3014,10 +2965,17 @@ const handleImportBinderCsv = async (
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
       allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+      // Release memory
+      collectionCardsToAdd.length = 0
     }
 
     await binderStore.loadBinders()
     progressToast.complete(t('common.import.binderComplete', { name: finalName, count: allocatedCount }))
+
+    // Background enrichment — fetch Scryfall metadata (images, types, prices)
+    collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
+      console.warn('[Binder CSV Import] Background enrichment failed:', err)
+    })
   } catch (error) {
     console.error('[Binder CSV Import] Error:', error)
     progressToast.error(t('common.import.errorCsv'))

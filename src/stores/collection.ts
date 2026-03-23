@@ -866,6 +866,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Import
         confirmImport,
+        enrichCardsWithMissingMetadata,
 
         // Public sync
         syncAllToPublic,

@@ -2,7 +2,7 @@
  * Composable for calculating collection totals with multi-source prices
  */
 import { computed, ref, shallowRef, triggerRef } from 'vue'
-import { type CardPrices, formatPrice, getCardPrices } from '../services/mtgjson'
+import { type CardPrices, formatPrice, getCardPrices, preloadSetMappings } from '../services/mtgjson'
 import { getCardById, searchCards } from '../services/scryfallCache'
 import { useCollectionStore } from '../stores/collection'
 import { cleanCardName } from '../utils/cardHelpers'
@@ -17,6 +17,13 @@ const fixAttemptedCache = new Set<string>()
 
 // Abort controller for cancelling in-progress fetches
 let fetchAbortController: AbortController | null = null
+
+export function cancelPriceFetch(): void {
+  if (fetchAbortController) {
+    fetchAbortController.abort()
+    fetchAbortController = null
+  }
+}
 
 // Shared card prices map (by card ID) — shared across all composable instances
 // shallowRef: Map mutations (.set/.delete) don't trigger reactivity automatically.
@@ -173,6 +180,16 @@ export function useCollectionTotals(cards: () => Card[]) {
     processedCards.value = 0
     progress.value = 0
 
+    // O(1) lookup instead of O(N) .find() per card
+    const collectionStore = useCollectionStore()
+    const cardIdSet = new Set(cardList.map(c => c.id))
+
+    // Preload set mappings in parallel batches (turns ~300 sequential downloads into ~60 parallel batches)
+    const uniqueSetCodes = [...new Set(cardList.map(c => c.setCode).filter(Boolean))] as string[]
+    if (uniqueSetCodes.length > 0) {
+      await preloadSetMappings(uniqueSetCodes)
+    }
+
     // Process sequentially — Scryfall rate limiter handles timing
     // Batch reactivity: only trigger totals recalculation every BATCH_TRIGGER_SIZE cards
     // instead of on every single price update (avoids O(N²) re-computation)
@@ -182,9 +199,18 @@ export function useCollectionTotals(cards: () => Card[]) {
     for (const card of cardList) {
       if (signal.aborted) break
 
+      // Stop if a heavy write operation started (import, delete)
+      if (collectionStore.importing) break
+
       // Skip cards that no longer exist in the store (deleted mid-fetch)
-      const collectionStore = useCollectionStore()
-      if (!collectionStore.getCardById(card.id)) continue
+      if (!cardIdSet.has(card.id)) continue
+
+      // Skip if we already have a price for this card (e.g., re-navigation)
+      if (cardPrices.value.has(card.id)) {
+        processedCards.value++
+        progress.value = Math.round((processedCards.value / totalCards.value) * 100)
+        continue
+      }
 
       const prices = await fetchCardPrice(card)
       cardPrices.value.set(card.id, prices) // Raw Map mutation — no reactivity (shallowRef)

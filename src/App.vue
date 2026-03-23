@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from './stores/auth';
+import { preloadPriceData } from './services/mtgjson';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
@@ -21,7 +22,7 @@ const showFooter = computed(() => {
 
 onMounted(() => {
   authStore.initAuth();
-
+  void preloadPriceData(); // fire-and-forget: download AllPricesToday.json.gz in background
 });
 </script>
 

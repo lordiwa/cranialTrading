@@ -390,6 +390,24 @@ describe('getCardsByIds', () => {
     expect(mockRawGetCardsByIds).toHaveBeenCalledWith([{ id: 'id-1' }], undefined)
   })
 
+  it('fail-fast: skips remaining L2 chunks after first failure', async () => {
+    // 15 IDs → 2 chunks (10 + 5). First chunk fails → second chunk should be skipped entirely.
+    const ids = Array.from({ length: 15 }, (_, i) => ({ id: `id-${i}` }))
+    const cards = ids.map(({ id }) => makeScryfallCard({ id, name: `Card ${id}` }))
+
+    mockGetDocs.mockRejectedValueOnce(new Error('Firestore permissions'))
+    mockRawGetCardsByIds.mockResolvedValueOnce(cards)
+    mockSetDoc.mockResolvedValue(undefined)
+
+    const result = await getCardsByIds(ids)
+
+    expect(result).toHaveLength(15)
+    // Only 1 getDocs call — the second chunk was skipped by fail-fast
+    expect(mockGetDocs).toHaveBeenCalledTimes(1)
+    // All 15 IDs forwarded to Scryfall
+    expect(mockRawGetCardsByIds).toHaveBeenCalledWith(ids, undefined)
+  })
+
   it('treats stale metadata as L2 miss in bulk reads', async () => {
     const card = makeScryfallCard({ id: 'id-stale', name: 'Stale Card' })
     const THIRTY_ONE_DAYS = 31 * 24 * 60 * 60 * 1000

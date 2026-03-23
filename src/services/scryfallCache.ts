@@ -187,9 +187,19 @@ export async function getCardsByIds(
   const l2Misses: { id: string }[] = []
   if (l2Needed.length > 0) {
     const CHUNK_SIZE = 10
+    let l2Available = true
+
     for (let i = 0; i < l2Needed.length; i += CHUNK_SIZE) {
       const chunk = l2Needed.slice(i, i + CHUNK_SIZE)
       const chunkIds = chunk.map(ident => ident.id)
+
+      if (!l2Available) {
+        for (const ident of chunk) {
+          l2Misses.push(ident)
+        }
+        onProgress?.(results.length, identifiers.length)
+        continue
+      }
 
       try {
         const snapshot = await getDocs(query(
@@ -217,7 +227,7 @@ export async function getCardsByIds(
           }
         }
       } catch {
-        // On failure, all IDs in chunk become misses
+        l2Available = false
         for (const ident of chunk) {
           l2Misses.push(ident)
         }

@@ -208,6 +208,21 @@ export const useCollectionStore = defineStore('collection', () => {
             // eslint-disable-next-line security/detect-object-injection
             if (card[field] === undefined && sc[field] !== undefined) patch[field] = sc[field]
         }
+        // Image: extract from Scryfall's nested image_uris or card_faces
+        if (!card.image) {
+            const imageUris = sc.image_uris as Record<string, string> | undefined
+            const cardFaces = sc.card_faces as { image_uris?: Record<string, string> }[] | undefined
+            const image = imageUris?.normal ?? cardFaces?.[0]?.image_uris?.normal ?? ''
+            if (image) patch.image = image
+        }
+
+        // Price: extract from Scryfall's nested prices object
+        if (!card.price || card.price === 0) {
+            const prices = sc.prices as Record<string, string | null> | undefined
+            const usd = prices?.usd
+            if (usd) patch.price = Number.parseFloat(usd)
+        }
+
         return patch as Partial<Card>
     }
 

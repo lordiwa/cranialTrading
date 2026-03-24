@@ -256,7 +256,7 @@ const selectedBinder = computed(() => {
 
 const binderDisplayCards = computed(() => {
   if (!selectedBinder.value) return []
-  return binderStore.hydrateBinderCards(selectedBinder.value, collectionStore.cards)
+  return binderStore.hydrateBinderCards(selectedBinder.value, collectionCards.value)
 })
 
 // ========== IMPORT PROGRESS STATE ==========
@@ -489,7 +489,7 @@ const selectedDeckStats = computed(() => {
 // Cartas del deck actual (owned) — iterates allocations (O(60-100)) instead of collection (O(3000))
 const deckOwnedCards = computed(() => {
   if (!selectedDeck.value?.allocations) return []
-  const cardMap = new Map(collectionStore.cards.map(c => [c.id, c]))
+  const cardMap = new Map(collectionCards.value.map(c => [c.id, c]))
   const seen = new Set<string>()
   const result: Card[] = []
   for (const alloc of selectedDeck.value.allocations) {
@@ -817,7 +817,7 @@ const getGroupCardCount = (cards: Card[]): number => {
 const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
   if (!selectedDeck.value) return []
 
-  const cardMap = new Map(collectionStore.cards.map(c => [c.id, c]))
+  const cardMap = new Map(collectionCards.value.map(c => [c.id, c]))
   const commanderDisplay: HydratedDeckCard[] = []
   const mainboardOwned: HydratedDeckCard[] = []
 
@@ -886,7 +886,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
   // Convert new-model wishlist allocation cards (collection cards with status='wishlist')
   // Look up actual owned count (non-wishlist cards) by scryfallId for proxy detection
   const ownedByScryfallId = new Map<string, number>()
-  for (const c of collectionStore.cards) {
+  for (const c of collectionCards.value) {
     if (c.status !== 'wishlist') {
       ownedByScryfallId.set(c.scryfallId, (ownedByScryfallId.get(c.scryfallId) ?? 0) + c.quantity)
     }
@@ -924,7 +924,7 @@ const mainboardDisplayCards = computed((): DisplayDeckCard[] => {
 const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
   if (!selectedDeck.value || isCommanderFormat.value) return []
 
-  const cardMap = new Map(collectionStore.cards.map(c => [c.id, c]))
+  const cardMap = new Map(collectionCards.value.map(c => [c.id, c]))
   const sideboardOwned: HydratedDeckCard[] = []
 
   // Iterate allocations directly (O(allocations)) instead of filtering collection
@@ -981,7 +981,7 @@ const sideboardDisplayCards = computed((): DisplayDeckCard[] => {
 
   // Convert new-model wishlist allocation cards
   const ownedByScryfallId = new Map<string, number>()
-  for (const c of collectionStore.cards) {
+  for (const c of collectionCards.value) {
     if (c.status !== 'wishlist') {
       ownedByScryfallId.set(c.scryfallId, (ownedByScryfallId.get(c.scryfallId) ?? 0) + c.quantity)
     }
@@ -1078,7 +1078,7 @@ type DeckPriceSource = 'tcg' | 'ck' | 'buylist'
 const deckPriceSource = ref<DeckPriceSource>('ck')
 
 // Access shared card prices from useCollectionTotals (populated by CollectionTotalsPanel)
-const { cardPrices: sharedCardPrices } = useCollectionTotals(() => collectionStore.cards)
+const { cardPrices: sharedCardPrices } = useCollectionTotals(() => collectionCards.value)
 
 const getCardPriceBySource = (cardId: string, cardPrice: number, source: DeckPriceSource): number => {
   if (source === 'tcg') return cardPrice ?? 0

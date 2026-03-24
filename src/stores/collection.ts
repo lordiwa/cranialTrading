@@ -748,6 +748,9 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
+            // Yield to let progress UI render to 100% before the reactive cascade
+            await backgroundSafeDelay(50)
+
             cards.value = cards.value.concat(createdCards)
             rebuildCardIndex()
             // Release memory — createdCards can be large (120k objects)

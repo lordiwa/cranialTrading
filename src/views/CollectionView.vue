@@ -391,8 +391,15 @@ const clearDeleteDeckState = () => {
 
 // ========== COMPUTED ==========
 
-// Cartas según status
-const collectionCards = computed(() => collectionStore.cards)
+// Cartas según status — guarded during import to prevent reactive cascade on 59k+ cards.
+// When importing, returns cached ref so downstream computeds don't re-evaluate.
+// When importing finishes, returns fresh array → one single cascade.
+let collectionCardsCache: Card[] = []
+const collectionCards = computed(() => {
+  if (collectionStore.importing) return collectionCardsCache
+  collectionCardsCache = collectionStore.cards
+  return collectionCardsCache
+})
 
 // Single-pass status counts (avoids 4 separate filter passes over 10k cards)
 const statusCounts = computed(() => {

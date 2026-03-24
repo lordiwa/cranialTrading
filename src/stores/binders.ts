@@ -356,9 +356,11 @@ export const useBindersStore = defineStore('binders', () => {
 
             const collectionStore = useCollectionStore()
             const decksStore = useDecksStore()
-            if (!binder.allocations) binder.allocations = []
-
             let totalAllocated = 0
+
+            // Work on a PLAIN array (not Vue-reactive) to avoid 10k reactive triggers
+            const plainAllocations = [...(binder.allocations ?? [])]
+            const allocMap = new Map(plainAllocations.map(a => [a.cardId, a]))
 
             for (const item of items) {
                 const card = collectionStore.getCardById(item.cardId)
@@ -371,18 +373,23 @@ export const useBindersStore = defineStore('binders', () => {
 
                 if (toAllocate <= 0) continue
 
-                const existing = binder.allocations.find(a => a.cardId === item.cardId)
+                const existing = allocMap.get(item.cardId)
                 if (existing) {
                     existing.quantity += toAllocate
                 } else {
-                    binder.allocations.push(removeUndefined({
+                    const newAlloc = removeUndefined({
                         cardId: item.cardId,
                         quantity: toAllocate,
                         addedAt: new Date(),
-                    }))
+                    })
+                    plainAllocations.push(newAlloc)
+                    allocMap.set(item.cardId, newAlloc)
                 }
                 totalAllocated += toAllocate
             }
+
+            // Single reactive assignment (1 trigger instead of 10k)
+            binder.allocations = plainAllocations
 
             // Single Firestore write
             binder.stats = calculateStats(binder.allocations, collectionStore.cards)

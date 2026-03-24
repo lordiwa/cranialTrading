@@ -4,6 +4,7 @@
  * Functions:
  * - moxfieldDeck: Proxy for Moxfield API (CORS bypass)
  * - notifyMatchUser: Cross-user match notification (bypasses security rules)
+ * - bulkImportCards: Server-side bulk card import (bypasses browser write stream limit)
  */
 
 const {setGlobalOptions} = require("firebase-functions");
@@ -419,3 +420,54 @@ exports.refreshMarketData = onRequest({ cors: true, maxInstances: 1, timeoutSeco
     response.status(500).json({ error: 'Failed to refresh market data' });
   }
 });
+
+// ============================================================
+// BULK IMPORT CARDS
+// Server-side batch writes bypass the browser SDK's write stream limit
+// ============================================================
+exports.bulkImportCards = onCall(
+  { maxInstances: 5, timeoutSeconds: 120, memory: '512MiB' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in to import cards");
+    }
+
+    const userId = request.auth.uid;
+    const { cards } = request.data;
+
+    if (!Array.isArray(cards) || cards.length === 0) {
+      throw new HttpsError("invalid-argument", "cards must be a non-empty array");
+    }
+    if (cards.length > 5000) {
+      throw new HttpsError("invalid-argument", "Maximum 5000 cards per call");
+    }
+
+    const colRef = db.collection(`users/${userId}/cards`);
+    const createdIds = [];
+    const BATCH_SIZE = 500;
+
+    for (let i = 0; i < cards.length; i += BATCH_SIZE) {
+      const chunk = cards.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      const refs = [];
+
+      for (const card of chunk) {
+        const ref = colRef.doc();
+        // Strip any client-sent id/createdAt/updatedAt — server controls these
+        const { id, createdAt, updatedAt, ...cardData } = card;
+        batch.set(ref, {
+          ...cardData,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        refs.push(ref);
+      }
+
+      await batch.commit();
+      refs.forEach((r) => createdIds.push(r.id));
+    }
+
+    logger.info(`[bulkImportCards] ${createdIds.length} cards imported for user ${userId}`);
+    return { cardIds: createdIds, count: createdIds.length };
+  }
+);

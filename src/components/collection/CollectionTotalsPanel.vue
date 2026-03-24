@@ -46,8 +46,10 @@ onMounted(() => {
 
 // Fetch prices after import finishes
 watch(() => collectionStore.importing, (newVal, oldVal) => {
-  if (oldVal && !newVal && collectionStore.cards.length > 0) {
-    void fetchAllPrices()
+  if (oldVal && !newVal && collectionStore.cards.length > 0 && collectionStore.cards.length < 10000) {
+    // Delay 3s after import to let UI stabilize before price fetching
+    // Skip for large imports (>10k) — prices load on next page visit
+    setTimeout(() => void fetchAllPrices(), 3000)
   }
 })
 

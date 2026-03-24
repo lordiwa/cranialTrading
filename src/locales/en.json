@@ -4,6 +4,7 @@
       "save": "SAVE",
       "cancel": "CANCEL",
       "delete": "DELETE",
+      "deleting": "DELETING...",
       "edit": "EDIT",
       "add": "ADD",
       "close": "CLOSE",

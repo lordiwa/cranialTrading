@@ -88,3 +88,24 @@ export async function notifyMatchUser(
     throw error
   }
 }
+
+/**
+ * Bulk import cards via Cloud Function (bypasses browser write stream limit).
+ * Accepts up to 5000 cards per call. Caller should chunk larger imports.
+ */
+export interface BulkImportResponse {
+  cardIds: string[]
+  count: number
+}
+
+export async function bulkImportCards(
+  cards: Record<string, unknown>[]
+): Promise<BulkImportResponse> {
+  const callable = httpsCallable<{ cards: Record<string, unknown>[] }, BulkImportResponse>(
+    functions,
+    'bulkImportCards',
+    { timeout: 60000 }
+  )
+  const result = await callable({ cards })
+  return result.data
+}

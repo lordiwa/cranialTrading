@@ -1,9 +1,9 @@
 /**
  * Background-tab-safe delay.
  *
- * Browsers throttle setTimeout to ~1/sec in background tabs.
- * MessageChannel.onmessage is NOT throttled, so we race both:
- * whichever fires first after the requested delay resolves the promise.
+ * In foreground tabs: uses plain setTimeout (no event loop flooding).
+ * In background tabs: uses MessageChannel polling fallback since
+ * browsers throttle setTimeout to ~1/sec in background tabs.
  */
 export function backgroundSafeDelay(ms: number): Promise<void> {
     if (ms <= 0) return Promise.resolve()
@@ -17,20 +17,24 @@ export function backgroundSafeDelay(ms: number): Promise<void> {
             }
         }
 
-        // Primary: setTimeout (works normally in foreground tabs)
+        // setTimeout works fine in foreground — always set it
         const timer = setTimeout(done, ms)
 
-        // Fallback: MessageChannel polling (not throttled in background tabs)
-        const start = performance.now()
-        const ch = new MessageChannel()
-        ch.port1.onmessage = () => {
-            if (performance.now() - start >= ms) {
-                clearTimeout(timer)
-                done()
-            } else {
-                ch.port2.postMessage(null)
+        // Only activate MessageChannel polling in background tabs
+        // (avoids flooding the event loop with macrotasks in foreground)
+        if (typeof document !== 'undefined' && document.hidden) {
+            const start = performance.now()
+            const ch = new MessageChannel()
+            ch.port1.onmessage = () => {
+                if (resolved) return
+                if (performance.now() - start >= ms) {
+                    clearTimeout(timer)
+                    done()
+                } else {
+                    ch.port2.postMessage(null)
+                }
             }
+            ch.port2.postMessage(null)
         }
-        ch.port2.postMessage(null)
     })
 }

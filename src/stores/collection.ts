@@ -41,9 +41,15 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
             if (msg.includes('permission') || msg.includes('Permission')) {
                 return false
             }
+            if (msg.includes('resource-exhausted')) {
+                // SDK is in maximum backoff — don't retry (SDK retries internally)
+                // Wait 30s for the write stream to drain
+                console.warn('[Import] Write stream exhausted, waiting 30s for drain...')
+                await backgroundSafeDelay(30000)
+                return false
+            }
             if (attempt < maxRetries) {
-                const delay = msg.includes('resource-exhausted') ? 1500 : 500
-                await backgroundSafeDelay(delay)
+                await backgroundSafeDelay(500)
             }
         }
     }
@@ -697,92 +703,51 @@ export const useCollectionStore = defineStore('collection', () => {
     const confirmImport = async (cardsToSave: Omit<Card, 'id'>[], silent = false, onProgress?: (current: number, total: number) => void): Promise<string[]> => {
         if (!authStore.user) return []
 
-        importing.value = true
         try {
-            const colRef = collection(db, 'users', authStore.user.id, 'cards')
-            const BATCH_SIZE = 500
-            const chunks = chunkArray(cardsToSave, BATCH_SIZE)
+            const { bulkImportCards } = await import('../services/cloudFunctions')
+            const CHUNK_SIZE = 500
             const createdIds: string[] = []
-            const createdCards: Card[] = []
-            let failCount = 0
 
-            // Adaptive delay: starts at 200ms, doubles on failure (cap 2000ms), halves after 3 successes
-            const BASE_DELAY = 200
-            const MAX_DELAY = 2000
-            let currentDelay = BASE_DELAY
-            let consecutiveSuccesses = 0
+            for (let i = 0; i < cardsToSave.length; i += CHUNK_SIZE) {
+                const chunk = cardsToSave.slice(i, i + CHUNK_SIZE)
+                const cleanChunk = chunk.map(card => {
+                    const record = card as Record<string, unknown>
+                    const { id: _id, ...rest } = record
+                    return stripUndefined(rest)
+                })
 
-            for (let ci = 0; ci < chunks.length; ci++) {
-                // eslint-disable-next-line security/detect-object-injection
-                const chunk = chunks[ci]
-                if (!chunk) continue
-
-                // Pre-generate doc refs so they survive retries (client-side, no network call)
-                const docRefs = chunk.map(() => doc(colRef))
-
-                const ok = await commitBatchWithRetry(() => {
-                    const batch = writeBatch(db)
-                    chunk.forEach((card, i) => {
-                        const cardRecord = card as Record<string, unknown>
-                        const { id: _id, ...cardWithoutId } = cardRecord
-                        const cleanData = stripUndefined(cardWithoutId as Record<string, unknown>)
-                        // eslint-disable-next-line security/detect-object-injection
-                        batch.set(docRefs[i]!, { ...cleanData, createdAt: Timestamp.now(), updatedAt: Timestamp.now() })
-                    })
-                    return batch
-                }, 3)
-
-                if (ok) {
-                    for (let i = 0; i < chunk.length; i++) {
-                        // eslint-disable-next-line security/detect-object-injection
-                        const cardRef = docRefs[i]
-                        // eslint-disable-next-line security/detect-object-injection
-                        const card = chunk[i]
-                        if (cardRef && card) {
-                            createdIds.push(cardRef.id)
-                            createdCards.push({ ...card, id: cardRef.id, updatedAt: new Date(), createdAt: new Date() } as Card)
-                        }
-                    }
-                    consecutiveSuccesses++
-                    if (consecutiveSuccesses >= 3 && currentDelay > BASE_DELAY) {
-                        currentDelay = Math.max(BASE_DELAY, Math.floor(currentDelay / 2))
-                        consecutiveSuccesses = 0
-                    }
-                } else {
-                    failCount += chunk.length
-                    console.error(`Batch ${ci + 1}/${chunks.length} failed after retries`)
-                    currentDelay = Math.min(MAX_DELAY, currentDelay * 2)
-                    consecutiveSuccesses = 0
+                try {
+                    const result = await bulkImportCards(cleanChunk)
+                    createdIds.push(...result.cardIds)
+                } catch (chunkError) {
+                    console.error(`[Import] Chunk ${i} failed:`, chunkError)
                 }
 
-                onProgress?.(Math.min((ci + 1) * BATCH_SIZE, cardsToSave.length), cardsToSave.length)
+                onProgress?.(Math.min(i + CHUNK_SIZE, cardsToSave.length), cardsToSave.length)
+            }
 
-                // Throttle between batches (background-tab safe)
-                if (ci < chunks.length - 1) {
-                    await backgroundSafeDelay(currentDelay)
+            // Push in-place so getCardById works for deck allocation
+            // shallowRef does NOT detect push — zero reactive cascade
+            for (let k = 0; k < createdIds.length; k++) {
+                // eslint-disable-next-line security/detect-object-injection
+                const cardId = createdIds[k]
+                // eslint-disable-next-line security/detect-object-injection
+                const card = cardsToSave[k]
+                if (cardId && card) {
+                    const newCard = { ...card, id: cardId, updatedAt: new Date(), createdAt: new Date() } as Card
+                    cards.value.push(newCard)
+                    cardsById.set(cardId, newCard)
                 }
             }
 
-            // Yield to let progress UI render to 100% before the reactive cascade
-            await backgroundSafeDelay(50)
-
-            cards.value = cards.value.concat(createdCards)
-            rebuildCardIndex()
-            // Release memory — createdCards can be large (120k objects)
-            createdCards.length = 0
-
             if (!silent) {
-                const msg = t('collection.messages.imported', { count: createdIds.length })
-                const type = failCount > 0 ? 'info' : 'success'
-                toastStore.show(failCount > 0 ? msg + ` (${failCount} fallaron)` : msg, type)
+                toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')
             }
             return createdIds
         } catch (error) {
             console.error('Error importing cards:', error)
             toastStore.show(t('collection.messages.importError'), 'error')
             return []
-        } finally {
-            importing.value = false
         }
     }
 
@@ -860,6 +825,12 @@ export const useCollectionStore = defineStore('collection', () => {
         cardsById.clear()
     }
 
+    /** Force a new array reference so Vue computeds re-evaluate. Call AFTER import completes + deck allocation. */
+    const refreshCards = () => {
+        cards.value = [...cards.value]
+        rebuildCardIndex()
+    }
+
     return {
         // State
         cards,
@@ -885,6 +856,7 @@ export const useCollectionStore = defineStore('collection', () => {
         // Import
         confirmImport,
         enrichCardsWithMissingMetadata,
+        refreshCards,
 
         // Public sync
         syncAllToPublic,

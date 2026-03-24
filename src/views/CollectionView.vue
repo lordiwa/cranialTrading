@@ -391,15 +391,8 @@ const clearDeleteDeckState = () => {
 
 // ========== COMPUTED ==========
 
-// Cartas según status — guarded during import to prevent reactive cascade on 59k+ cards.
-// When importing, returns cached ref so downstream computeds don't re-evaluate.
-// When importing finishes, returns fresh array → one single cascade.
-let collectionCardsCache: Card[] = []
-const collectionCards = computed(() => {
-  if (collectionStore.importing) return collectionCardsCache
-  collectionCardsCache = collectionStore.cards
-  return collectionCardsCache
-})
+// Cartas según status (shallowRef protects during import — push in-place is invisible)
+const collectionCards = computed(() => collectionStore.cards)
 
 // Single-pass status counts (avoids 4 separate filter passes over 10k cards)
 const statusCounts = computed(() => {
@@ -2033,7 +2026,7 @@ const buildRawMoxfieldCard = (
     condition,
     foil: isFoil,
     price: 0,
-    image: '',
+    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
     status: status ?? 'collection',
     public: makePublic,
     colors: [],
@@ -2058,7 +2051,7 @@ const buildRawCsvCard = (
     condition: card.condition,
     foil: card.foil,
     price: card.price ?? 0,
-    image: '',
+    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
     status: status ?? 'collection',
     public: makePublic,
     colors: [],
@@ -2515,6 +2508,8 @@ const handleImportDirect = async (
   const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalDeckName }), 0)
 
   try {
+    collectionStore.importing = true
+
     // PASO 1: Crear el deck primero
     progressToast.update(5, t('common.import.creatingDeck', { name: finalDeckName }))
     const deckId = await decksStore.createDeck({
@@ -2595,24 +2590,10 @@ const handleImportDirect = async (
         const pct = 45 + Math.round((current / total) * 25)
         progressToast.update(pct, t('common.import.savingProgress', { current, total }))
       })
-      // Release memory
       collectionCardsToAdd.length = 0
 
+      // PASO 4: Allocate cards to deck (getCardById works — push in-place in confirmImport)
       progressToast.update(75, t('common.import.allocatingToDeck'))
-
-      // PASO 4: Asignar cartas al deck
-      saveImportState({
-        deckId,
-        deckName: finalDeckName,
-        status: 'allocating',
-        totalCards: createdCardIds.length,
-        currentCard: 0,
-        cards: [],
-        cardMeta,
-        createdCardIds,
-        allocatedCount: 0,
-      })
-
       const bulkItems = createdCardIds
         .map((cardId, i) => {
           // eslint-disable-next-line security/detect-object-injection
@@ -2626,7 +2607,6 @@ const handleImportDirect = async (
       allocatedCount = bulkResult.allocated
     }
 
-    // PASO 5: Completar importación
     await decksStore.loadDecks()
 
     saveImportState({
@@ -2648,12 +2628,17 @@ const handleImportDirect = async (
 
     progressToast.complete(t('common.import.deckComplete', { name: finalDeckName, count: allocatedCount }))
 
-    // PASO 6: Background enrichment — fetch Scryfall metadata (images, types, prices)
+    // Trigger reactive cascade (same pattern as page reload: ~160-220ms)
+    collectionStore.refreshCards()
+    collectionStore.importing = false
+
+    // Background enrichment
     collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
       console.warn('[Import] Background enrichment failed:', err)
     })
   } catch (error) {
     console.error('[Import] Error during import:', error)
+    collectionStore.importing = false
     if (importProgress.value) {
       saveImportState({ ...importProgress.value, status: 'error' })
     }
@@ -2673,6 +2658,7 @@ const handleImportCsv = async (
 ) => {
   const finalDeckName = deckName ?? `CSV Import ${Date.now()}`
   showImportDeckModal.value = false
+  collectionStore.importing = true
 
   // Progress toast like handleImport
   const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalDeckName }), 0)
@@ -2752,11 +2738,16 @@ const handleImportCsv = async (
     progressToast.complete(t('common.import.deckComplete', { name: finalDeckName, count: allocatedCount }))
 
     // PASO 6: Background enrichment — fetch Scryfall metadata (images, types, prices)
+    // Flush reactive state AFTER UI shows "complete" — triggers one computed cascade
+    collectionStore.refreshCards()
+    collectionStore.importing = false
+
     collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
       console.warn('[CSV Import] Background enrichment failed:', err)
     })
   } catch (error) {
     console.error('[CSV Import] Error:', error)
+    collectionStore.importing = false
     progressToast.error(t('common.import.errorCsv'))
   }
 }
@@ -2833,21 +2824,12 @@ const handleImportBinderDirect = async (
 ) => {
   const finalName = deckName ?? `Binder${Date.now()}`
   showImportBinderModal.value = false
+  collectionStore.importing = true
 
   const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalName }), 0)
 
   try {
-    // Create binder
-    progressToast.update(5, t('common.import.creatingBinder', { name: finalName }))
-    const binderId = await binderStore.createBinder({ name: finalName, description: '' })
-
-    if (!binderId) {
-      progressToast.error(t('common.import.errorCreatingBinder'))
-      return
-    }
-
     viewMode.value = 'binders'
-    binderFilter.value = binderId
 
     // Cancel price fetch to free the write stream for import
     cancelPriceFetch()
@@ -2887,21 +2869,40 @@ const handleImportBinderDirect = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      progressToast.update(80, t('common.import.allocatingToBinderCount', { count: bulkItems.length }))
-      allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
-      // Release memory
+      // Split into multiple binders if >10k to stay under Firestore 1MB doc limit
+      const MAX_PER_BINDER = 10000
+      if (bulkItems.length > MAX_PER_BINDER) {
+        const totalBinders = Math.ceil(bulkItems.length / MAX_PER_BINDER)
+        for (let b = 0; b < totalBinders; b++) {
+          const binderName = `${finalName} ${b + 1}/${totalBinders}`
+          const chunk = bulkItems.slice(b * MAX_PER_BINDER, (b + 1) * MAX_PER_BINDER)
+          const chunkBinderId = await binderStore.createBinder({ name: binderName, description: '' })
+          if (chunkBinderId) {
+            allocatedCount += await binderStore.bulkAllocateCardsToBinder(chunkBinderId, chunk)
+          }
+          progressToast.update(75 + Math.round(((b + 1) / totalBinders) * 20), t('common.import.allocatingToBinderCount', { count: allocatedCount }))
+        }
+      } else {
+        const binderId = await binderStore.createBinder({ name: finalName, description: '' })
+        if (binderId) {
+          allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+        }
+      }
       collectionCardsToAdd.length = 0
     }
 
     await binderStore.loadBinders()
     progressToast.complete(t('common.import.binderComplete', { name: finalName, count: allocatedCount }))
 
-    // Background enrichment — fetch Scryfall metadata (images, types, prices)
+    collectionStore.refreshCards()
+    collectionStore.importing = false
+
     collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
       console.warn('[Binder Import] Background enrichment failed:', err)
     })
   } catch (error) {
     console.error('[Binder Import] Error:', error)
+    collectionStore.importing = false
     progressToast.error(t('common.import.errorBinder'))
   }
 }
@@ -2917,21 +2918,12 @@ const handleImportBinderCsv = async (
 ) => {
   const finalName = deckName ?? `Binder CSV ${Date.now()}`
   showImportBinderModal.value = false
+  collectionStore.importing = true
 
   const progressToast = toastStore.showProgress(t('common.import.importing', { name: finalName }), 0)
 
   try {
-    // Create binder
-    progressToast.update(5, t('common.import.creatingBinder', { name: finalName }))
-    const binderId = await binderStore.createBinder({ name: finalName, description: '' })
-
-    if (!binderId) {
-      progressToast.error(t('common.import.errorCreatingBinder'))
-      return
-    }
-
     viewMode.value = 'binders'
-    binderFilter.value = binderId
 
     // Cancel price fetch to free the write stream for import
     cancelPriceFetch()
@@ -2971,20 +2963,40 @@ const handleImportBinderCsv = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
-      // Release memory
+      // Split into multiple binders if >10k to stay under Firestore 1MB doc limit
+      const MAX_PER_BINDER = 10000
+      if (bulkItems.length > MAX_PER_BINDER) {
+        const totalBinders = Math.ceil(bulkItems.length / MAX_PER_BINDER)
+        for (let b = 0; b < totalBinders; b++) {
+          const binderName = `${finalName} ${b + 1}/${totalBinders}`
+          const chunk = bulkItems.slice(b * MAX_PER_BINDER, (b + 1) * MAX_PER_BINDER)
+          const chunkBinderId = await binderStore.createBinder({ name: binderName, description: '' })
+          if (chunkBinderId) {
+            allocatedCount += await binderStore.bulkAllocateCardsToBinder(chunkBinderId, chunk)
+          }
+          progressToast.update(75 + Math.round(((b + 1) / totalBinders) * 20), t('common.import.allocatingToBinderCount', { count: allocatedCount }))
+        }
+      } else {
+        const binderId = await binderStore.createBinder({ name: finalName, description: '' })
+        if (binderId) {
+          allocatedCount = await binderStore.bulkAllocateCardsToBinder(binderId, bulkItems)
+        }
+      }
       collectionCardsToAdd.length = 0
     }
 
     await binderStore.loadBinders()
     progressToast.complete(t('common.import.binderComplete', { name: finalName, count: allocatedCount }))
 
-    // Background enrichment — fetch Scryfall metadata (images, types, prices)
+    collectionStore.refreshCards()
+    collectionStore.importing = false
+
     collectionStore.enrichCardsWithMissingMetadata().catch((err: unknown) => {
       console.warn('[Binder CSV Import] Background enrichment failed:', err)
     })
   } catch (error) {
     console.error('[Binder CSV Import] Error:', error)
+    collectionStore.importing = false
     progressToast.error(t('common.import.errorCsv'))
   }
 }

@@ -116,24 +116,24 @@ export async function bulkImportCards(
  */
 export interface CollectionSummary {
   totalCards: number
-  totalValue: number
   statusCounts: Record<string, number>
-  loadedCards: number
 }
 
-export interface LoadCollectionResponse {
+export interface LoadCollectionChunkResponse {
   cards: Record<string, unknown>[]
-  summary: CollectionSummary
+  lastId: string | null
+  hasMore: boolean
+  summary?: CollectionSummary
 }
 
-export async function loadCollectionFromServer(
-  limit = 20000
-): Promise<LoadCollectionResponse> {
-  const callable = httpsCallable<{ limit: number }, LoadCollectionResponse>(
-    functions,
-    'loadCollectionChunk',
-    { timeout: 60000 }
-  )
-  const result = await callable({ limit })
+export async function loadCollectionChunk(
+  startAfterId?: string,
+  includeSummary = false
+): Promise<LoadCollectionChunkResponse> {
+  const callable = httpsCallable<
+    { limit: number; startAfterId?: string; includeSummary: boolean },
+    LoadCollectionChunkResponse
+  >(functions, 'loadCollectionChunk', { timeout: 60000 })
+  const result = await callable({ limit: 10000, startAfterId, includeSummary })
   return result.data
 }

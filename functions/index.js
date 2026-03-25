@@ -478,50 +478,60 @@ exports.bulkImportCards = onCall(
 // Server-side paginated read — 100k cards in ~20s vs 2+ min from browser
 // ============================================================
 exports.loadCollectionChunk = onCall(
-  { maxInstances: 5, timeoutSeconds: 60, memory: '1GiB' },
+  { maxInstances: 5, timeoutSeconds: 60, memory: '512MiB' },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Must be logged in");
     }
 
     const userId = request.auth.uid;
-    const { limit: cardLimit = 20000 } = request.data || {};
-    const effectiveLimit = Math.min(cardLimit, 20000);
+    const { limit: cardLimit = 10000, startAfterId, includeSummary = false } = request.data || {};
+    const effectiveLimit = Math.min(cardLimit, 10000);
 
     const colRef = db.collection(`users/${userId}/cards`);
 
-    // Load cards ordered by most recently updated, capped at limit
-    const snapshot = await colRef
-      .orderBy('updatedAt', 'desc')
-      .limit(effectiveLimit)
-      .get();
+    // Cursor-based pagination (no offset cost)
+    let query = colRef
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .limit(effectiveLimit);
 
+    if (startAfterId) {
+      query = query.startAfter(startAfterId);
+    }
+
+    const snapshot = await query.get();
     const cards = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const lastId = snapshot.docs.length > 0
+      ? snapshot.docs[snapshot.docs.length - 1].id
+      : null;
 
-    // Count aggregations (no docs loaded into memory — just counts)
-    const [totalSnap, collSnap, saleSnap, tradeSnap, wishSnap] = await Promise.all([
-      colRef.count().get(),
-      colRef.where('status', '==', 'collection').count().get(),
-      colRef.where('status', '==', 'sale').count().get(),
-      colRef.where('status', '==', 'trade').count().get(),
-      colRef.where('status', '==', 'wishlist').count().get(),
-    ]);
-
-    const totalCards = totalSnap.data().count;
-    logger.info(`[loadCollectionChunk] Loaded ${cards.length}/${totalCards} cards for user ${userId}`);
-
-    return {
+    const result = {
       cards,
-      summary: {
-        totalCards,
+      lastId,
+      hasMore: snapshot.docs.length === effectiveLimit,
+    };
+
+    // Only calculate summary on first chunk (count aggregation — no docs in memory)
+    if (includeSummary) {
+      const [totalSnap, collSnap, saleSnap, tradeSnap, wishSnap] = await Promise.all([
+        colRef.count().get(),
+        colRef.where('status', '==', 'collection').count().get(),
+        colRef.where('status', '==', 'sale').count().get(),
+        colRef.where('status', '==', 'trade').count().get(),
+        colRef.where('status', '==', 'wishlist').count().get(),
+      ]);
+      result.summary = {
+        totalCards: totalSnap.data().count,
         statusCounts: {
           collection: collSnap.data().count,
           sale: saleSnap.data().count,
           trade: tradeSnap.data().count,
           wishlist: wishSnap.data().count,
         },
-        loadedCards: cards.length,
-      },
-    };
+      };
+      logger.info(`[loadCollectionChunk] First chunk: ${cards.length} cards, total: ${result.summary.totalCards}`);
+    }
+
+    return result;
   }
 );

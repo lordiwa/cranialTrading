@@ -114,6 +114,7 @@ export const useCollectionStore = defineStore('collection', () => {
     const cardsById = new Map<string, Card>()
     const loading = ref(false)
     const importing = ref(false)
+    const collectionSummary = ref<{ totalCards: number; totalValue: number; statusCounts: Record<string, number>; loadedCards: number } | null>(null)
     const lastSyncAt = ref<Date | null>(null)
 
     /** Rebuild the O(1) card lookup index after any mutation to cards.value */
@@ -143,7 +144,7 @@ export const useCollectionStore = defineStore('collection', () => {
     /**
      * Load all cards for current user
      */
-    /** Transform a Firestore doc into a Card */
+    /** Transform a Firestore SDK doc into a Card */
     const transformDoc = (d: { id: string; data: () => Record<string, unknown> }): Card => {
         const data = d.data()
         const firestoreData = data as Record<string, unknown> & {
@@ -170,7 +171,6 @@ export const useCollectionStore = defineStore('collection', () => {
             const CHUNK = 2000
             const docs = snapshot.docs
             const all: Card[] = []
-
             for (let i = 0; i < docs.length; i += CHUNK) {
                 const chunk = docs.slice(i, i + CHUNK).map(transformDoc)
                 all.push(...chunk)
@@ -837,6 +837,7 @@ export const useCollectionStore = defineStore('collection', () => {
         loading,
         importing,
         lastSyncAt,
+        collectionSummary,
 
         // Core operations
         loadCollection,

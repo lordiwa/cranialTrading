@@ -109,3 +109,31 @@ export async function bulkImportCards(
   const result = await callable({ cards })
   return result.data
 }
+
+/**
+ * Load a chunk of the user's card collection via Cloud Function.
+ * Server-side read is ~100x faster than browser SDK for large collections.
+ */
+export interface CollectionSummary {
+  totalCards: number
+  totalValue: number
+  statusCounts: Record<string, number>
+  loadedCards: number
+}
+
+export interface LoadCollectionResponse {
+  cards: Record<string, unknown>[]
+  summary: CollectionSummary
+}
+
+export async function loadCollectionFromServer(
+  limit = 20000
+): Promise<LoadCollectionResponse> {
+  const callable = httpsCallable<{ limit: number }, LoadCollectionResponse>(
+    functions,
+    'loadCollectionChunk',
+    { timeout: 60000 }
+  )
+  const result = await callable({ limit })
+  return result.data
+}

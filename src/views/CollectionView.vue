@@ -119,14 +119,14 @@ interface ImportCardData {
   language?: string
   cmc?: number
   type_line?: string
-  colors: string[]
+  colors?: string[]
   rarity?: string
   power?: string
   toughness?: string
   oracle_text?: string
-  keywords: string[]
+  keywords?: string[]
   legalities?: Record<string, string>
-  full_art: boolean
+  full_art?: boolean
   produced_mana?: string[]
   updatedAt: Date
 }
@@ -2017,6 +2017,8 @@ const buildRawMoxfieldCard = (
   const isFoil = /\*[fF]\*?\s*$/.test(cardName)
   if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
 
+  // User-specific fields + convenience copies (name, edition, image)
+  // Scryfall metadata (colors, keywords, etc.) lives in scryfall_cache
   return {
     scryfallId: card.scryfallId ?? '',
     name: cardName,
@@ -2029,10 +2031,6 @@ const buildRawMoxfieldCard = (
     image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
     status: status ?? 'collection',
     public: makePublic,
-    colors: [],
-    keywords: [],
-    full_art: false,
-    produced_mana: [],
     updatedAt: new Date(),
   }
 }
@@ -2043,6 +2041,8 @@ const buildRawCsvCard = (
   status: CardStatus | undefined,
   makePublic: boolean,
 ): ImportCardData => {
+  // User-specific fields + convenience copies (name, edition, image)
+  // Scryfall metadata (colors, keywords, etc.) lives in scryfall_cache
   const cardData: ImportCardData = {
     scryfallId: card.scryfallId ?? '',
     name: card.name,
@@ -2054,10 +2054,6 @@ const buildRawCsvCard = (
     image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
     status: status ?? 'collection',
     public: makePublic,
-    colors: [],
-    keywords: [],
-    full_art: false,
-    produced_mana: [],
     updatedAt: new Date(),
   }
   if (card.setCode) cardData.setCode = card.setCode.toUpperCase()

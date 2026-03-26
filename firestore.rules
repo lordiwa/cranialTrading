@@ -168,10 +168,10 @@ service cloud.firestore {
       }
     }
 
-    // ========== SCRYFALL CARD CACHE (shared across all users) ==========
+    // ========== SCRYFALL CARD CACHE (shared, written only by Cloud Functions) ==========
     match /scryfall_cache/{cardId} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow create, update: if false;  // Only admin SDK (Cloud Functions) can write
       allow delete: if false;
     }
 

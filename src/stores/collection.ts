@@ -142,40 +142,53 @@ export const useCollectionStore = defineStore('collection', () => {
     // ========================================================================
 
     /**
-     * Load all cards for current user
+     * Load all cards for current user via Cloud Function with server-side join
      */
-    /** Transform a Firestore SDK doc into a Card */
-    const transformDoc = (d: { id: string; data: () => Record<string, unknown> }): Card => {
-        const data = d.data()
-        const firestoreData = data as Record<string, unknown> & {
-            updatedAt?: { toDate: () => Date };
-            createdAt?: { toDate: () => Date };
-        }
-        return {
-            ...data,
-            id: d.id,
-            updatedAt: firestoreData.updatedAt?.toDate() ?? new Date(),
-            createdAt: firestoreData.createdAt?.toDate() ?? new Date(),
-        } as Card
-    }
-
     const loadCollection = async () => {
         if (!authStore.user) return
         loading.value = true
 
         try {
-            const colRef = collection(db, 'users', authStore.user.id, 'cards')
-            const snapshot = await getDocs(colRef)
+            const { loadCollectionChunk } = await import('../services/cloudFunctions')
 
-            // Map in chunks, yielding to keep UI responsive
-            const CHUNK = 2000
-            const docs = snapshot.docs
+            // Cursor-based pagination via Cloud Function with server-side join
             const all: Card[] = []
-            for (let i = 0; i < docs.length; i += CHUNK) {
-                const chunk = docs.slice(i, i + CHUNK).map(transformDoc)
-                all.push(...chunk)
-                if (i + CHUNK < docs.length) {
+            let cursor: string | undefined = undefined
+            let isFirstChunk = true
+
+            while (true) {
+                const chunk = await loadCollectionChunk(cursor, isFirstChunk, true)
+                isFirstChunk = false
+
+                // Store summary from first chunk
+                if (chunk.summary) {
+                    collectionSummary.value = {
+                        totalCards: chunk.summary.totalCards,
+                        totalValue: 0,
+                        statusCounts: chunk.summary.statusCounts,
+                        loadedCards: 0,
+                    }
+                }
+
+                // Transform CF response into Card objects (timestamps come as plain objects)
+                for (const card of chunk.cards) {
+                    all.push({
+                        ...card,
+                        updatedAt: card.updatedAt && typeof (card.updatedAt as Record<string, unknown>)._seconds === 'number'
+                            ? new Date((card.updatedAt as Record<string, unknown>)._seconds as number * 1000)
+                            : new Date(),
+                        createdAt: card.createdAt && typeof (card.createdAt as Record<string, unknown>)._seconds === 'number'
+                            ? new Date((card.createdAt as Record<string, unknown>)._seconds as number * 1000)
+                            : new Date(),
+                    } as Card)
+                }
+
+                // Yield to keep UI responsive between chunks
+                if (chunk.hasMore) {
                     await backgroundSafeDelay(0)
+                    cursor = chunk.lastId ?? undefined
+                } else {
+                    break
                 }
             }
 
@@ -183,6 +196,7 @@ export const useCollectionStore = defineStore('collection', () => {
             rebuildCardIndex()
 
             // Enrich cards missing metadata (non-blocking, skip during import)
+            // With normalized loading, most cards already have full metadata from cache join
             if (!importing.value) {
                 enrichCardsWithMissingMetadata().catch((err: unknown) => {
                     console.warn('[Enrichment] Background enrichment failed:', err)
@@ -233,19 +247,61 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /**
-     * Persist enrichment updates to Firestore in batches.
+     * Persist enrichment updates: Scryfall metadata goes to scryfall_cache,
+     * only user-specific fields (price) go to the user's card doc.
      */
     const persistEnrichmentBatches = async (updates: { card: Card; data: Partial<Card> }[], userId: string) => {
         const BATCH_SIZE = 400
+
+        // Scryfall metadata fields that belong in the cache (not user docs)
+        const CACHE_ONLY_FIELDS = new Set([
+            'type_line', 'colors', 'rarity', 'oracle_text', 'keywords',
+            'legalities', 'power', 'toughness', 'cmc', 'full_art', 'produced_mana',
+        ])
+
         for (let i = 0; i < updates.length; i += BATCH_SIZE) {
             const chunk = updates.slice(i, i + BATCH_SIZE)
-            const batch = writeBatch(db)
+            const cacheBatch = writeBatch(db)
+            const userBatch = writeBatch(db)
+            let hasCacheWrites = false
+            let hasUserWrites = false
+            const writtenCacheIds = new Set<string>()
+
             for (const { card, data } of chunk) {
-                const cardRef = doc(db, 'users', userId, 'cards', card.id)
-                batch.set(cardRef, { ...data, updatedAt: Timestamp.now() }, { merge: true })
+                // Split patch into cache fields and user fields
+                const cacheData: Record<string, unknown> = {}
+                const userData: Record<string, unknown> = {}
+
+                for (const [key, value] of Object.entries(data)) {
+                    if (CACHE_ONLY_FIELDS.has(key)) {
+                        cacheData[key] = value
+                    } else {
+                        // price, image go to user doc
+                        userData[key] = value
+                    }
+                }
+
+                // Write Scryfall metadata to cache (dedup by scryfallId)
+                if (Object.keys(cacheData).length > 0 && card.scryfallId && !writtenCacheIds.has(card.scryfallId)) {
+                    const cacheRef = doc(db, 'scryfall_cache', card.scryfallId)
+                    cacheBatch.set(cacheRef, { ...cacheData, _metadataUpdatedAt: Timestamp.now() }, { merge: true })
+                    writtenCacheIds.add(card.scryfallId)
+                    hasCacheWrites = true
+                }
+
+                // Write user-specific fields (price, image) to user doc
+                if (Object.keys(userData).length > 0) {
+                    const cardRef = doc(db, 'users', userId, 'cards', card.id)
+                    userBatch.set(cardRef, { ...userData, updatedAt: Timestamp.now() }, { merge: true })
+                    hasUserWrites = true
+                }
             }
+
             try {
-                await batch.commit()
+                const commits = []
+                if (hasCacheWrites) commits.push(cacheBatch.commit())
+                if (hasUserWrites) commits.push(userBatch.commit())
+                await Promise.all(commits)
             } catch (err) {
                 console.warn(`[Enrichment] Batch ${i / BATCH_SIZE + 1} failed, skipping:`, err)
             }

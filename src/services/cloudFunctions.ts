@@ -128,12 +128,13 @@ export interface LoadCollectionChunkResponse {
 
 export async function loadCollectionChunk(
   startAfterId?: string,
-  includeSummary = false
+  includeSummary = false,
+  normalized = false
 ): Promise<LoadCollectionChunkResponse> {
   const callable = httpsCallable<
-    { limit: number; startAfterId?: string; includeSummary: boolean },
+    { limit: number; startAfterId?: string; includeSummary: boolean; normalized: boolean },
     LoadCollectionChunkResponse
   >(functions, 'loadCollectionChunk', { timeout: 60000 })
-  const result = await callable({ limit: 10000, startAfterId, includeSummary })
+  const result = await callable({ limit: 10000, startAfterId, includeSummary, normalized })
   return result.data
 }

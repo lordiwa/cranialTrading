@@ -1,11 +1,12 @@
 /**
- * Scryfall Cache Layer — 3-tier: L1 (in-memory) → L2 (Firestore) → L3 (Scryfall API)
+ * Scryfall Cache Layer — 2-tier: L1 (in-memory) → L2 (Firestore read-only) → L3 (Scryfall API)
  *
- * Transparently caches individual card lookups by scryfallId.
+ * L2 (Firestore scryfall_cache) is now written ONLY by Cloud Functions.
+ * Client-side reads from L2 but never writes to it.
+ *
  * All other functions pass through to the raw scryfall service unchanged.
  */
-import { Timestamp, collection, doc, documentId, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore' // eslint-disable-line sort-imports
-import { backgroundSafeDelay } from '../utils/backgroundSafeDelay'
+import { collection, doc, documentId, getDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from './firebase'
 import {
   getCardById as rawGetCardById,
@@ -40,7 +41,6 @@ export type { ScryfallCard, ScryfallSet } from './scryfall'
 const COLLECTION = 'scryfall_cache'
 const L1_MAX_SIZE = 500
 const METADATA_TTL = 30 * 24 * 60 * 60 * 1000 // 30 days
-const PRICES_TTL = 24 * 60 * 60 * 1000         // 24 hours
 
 // ── L1 in-memory cache ─────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ function l1Set(card: ScryfallCard): void {
   l1Cache.set(card.id, { card, insertedAt: Date.now() })
 }
 
-// ── L2 Firestore helpers ───────────────────────────────────────────────────────
+// ── L2 Firestore helpers (read-only) ────────────────────────────────────────────
 
 interface CacheMetadata {
   _cachedAt: { toMillis: () => number }
@@ -76,16 +76,12 @@ function isMetadataFresh(meta: CacheMetadata): boolean {
   return Date.now() - meta._metadataUpdatedAt.toMillis() < METADATA_TTL
 }
 
-function arePricesFresh(meta: CacheMetadata): boolean {
-  return Date.now() - meta._pricesUpdatedAt.toMillis() < PRICES_TTL
-}
-
 function stripCacheMetadata(data: Record<string, unknown>): ScryfallCard {
   const { _cachedAt, _metadataUpdatedAt, _pricesUpdatedAt, ...card } = data
   return card as unknown as ScryfallCard
 }
 
-async function l2Get(id: string): Promise<{ card: ScryfallCard; metaFresh: boolean; pricesFresh: boolean } | null> {
+async function l2Get(id: string): Promise<{ card: ScryfallCard; metaFresh: boolean } | null> {
   const snap = await getDoc(doc(db, COLLECTION, id))
   if (!snap.exists()) return null
 
@@ -94,63 +90,7 @@ async function l2Get(id: string): Promise<{ card: ScryfallCard; metaFresh: boole
   return {
     card,
     metaFresh: isMetadataFresh(data),
-    pricesFresh: arePricesFresh(data),
   }
-}
-
-function l2Write(card: ScryfallCard): void {
-  const now = Timestamp.now()
-  const ref = doc(db, COLLECTION, card.id)
-  setDoc(ref, {
-    ...card,
-    _cachedAt: now,
-    _metadataUpdatedAt: now,
-    _pricesUpdatedAt: now,
-  }).catch((err: unknown) => { console.warn('[ScryfallCache] L2 write failed:', err) })
-}
-
-function l2RefreshPrices(id: string, prices: ScryfallCard['prices']): void {
-  const ref = doc(db, COLLECTION, id)
-  updateDoc(ref, {
-    prices,
-    _pricesUpdatedAt: Timestamp.now(),
-  }).catch((err: unknown) => { console.warn('[ScryfallCache] price refresh failed:', err) })
-}
-
-function l2WriteBatch(cards: ScryfallCard[]): void {
-  if (cards.length > 2000) return
-
-  const CHUNK_SIZE = 200
-  const chunks: ScryfallCard[][] = []
-  for (let i = 0; i < cards.length; i += CHUNK_SIZE) {
-    chunks.push(cards.slice(i, i + CHUNK_SIZE))
-  }
-
-  ;(async () => {
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i]!
-      const batch = writeBatch(db)
-      const now = Timestamp.now()
-      for (const card of chunk) {
-        const ref = doc(db, COLLECTION, card.id)
-        batch.set(ref, {
-          ...card,
-          _cachedAt: now,
-          _metadataUpdatedAt: now,
-          _pricesUpdatedAt: now,
-        })
-      }
-      try {
-        await batch.commit()
-      } catch (err: unknown) {
-        console.warn(`[ScryfallCache] L2 batch write failed (chunk ${i + 1}/${chunks.length}), aborting:`, err)
-        break
-      }
-      if (i < chunks.length - 1) {
-        await backgroundSafeDelay(500)
-      }
-    }
-  })().catch((err: unknown) => { console.warn('[ScryfallCache] L2 batch write failed:', err) })
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -160,36 +100,21 @@ export async function getCardById(id: string): Promise<ScryfallCard | null> {
   const l1Hit = l1Get(id)
   if (l1Hit) return l1Hit
 
-  // L2
+  // L2 (read-only)
   try {
     const l2Result = await l2Get(id)
-    if (l2Result) {
-      if (l2Result.metaFresh) {
-        l1Set(l2Result.card)
-
-        // Background price refresh if stale
-        if (!l2Result.pricesFresh) {
-          rawGetCardById(id).then(fresh => {
-            if (fresh) {
-              l1Set(fresh)
-              l2RefreshPrices(id, fresh.prices)
-            }
-          }).catch(() => {})
-        }
-
-        return l2Result.card
-      }
-      // Stale metadata → treat as miss, fall through to Scryfall
+    if (l2Result?.metaFresh) {
+      l1Set(l2Result.card)
+      return l2Result.card
     }
   } catch (err) {
     console.warn('[ScryfallCache] L2 read failed, falling through to Scryfall:', err)
   }
 
-  // L3 — Scryfall
+  // L3 — Scryfall API (no client-side write to L2 anymore)
   const card = await rawGetCardById(id)
   if (card) {
     l1Set(card)
-    l2Write(card)
   }
   return card
 }
@@ -220,7 +145,7 @@ export async function getCardsByIds(
 
   onProgress?.(results.length, identifiers.length)
 
-  // L2 batch read for id-based misses — bulk query per chunk
+  // L2 batch read for id-based misses — bulk query per chunk (read-only)
   const l2Misses: { id: string }[] = []
   if (l2Needed.length > 0) {
     const CHUNK_SIZE = 30  // Firestore 'in' operator limit
@@ -291,7 +216,7 @@ export async function getCardsByIds(
     }
   }
 
-  // Scryfall for L2 misses + name identifiers
+  // Scryfall API for L2 misses + name identifiers (no client-side L2 write)
   const scryfallNeeded = [...l2Misses, ...nameIdentifiers]
   if (scryfallNeeded.length > 0) {
     const l3Offset = results.length
@@ -302,7 +227,6 @@ export async function getCardsByIds(
       l1Set(card)
       results.push(card)
     }
-    l2WriteBatch(scryfallResults)
   }
 
   return results

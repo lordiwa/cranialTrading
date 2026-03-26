@@ -6,6 +6,8 @@
  * - notifyMatchUser: Cross-user match notification (bypasses security rules)
  * - bulkImportCards: Server-side bulk card import (bypasses browser write stream limit)
  * - loadCollectionChunk: Server-side paginated card read (100k cards in ~20s vs 2+ min from browser)
+ * - refreshScryfallCache: Weekly scheduled bulk population of scryfall_cache from Scryfall bulk data
+ * - populateScryfallCacheManual: HTTP trigger for manual/initial cache population
  */
 
 const {setGlobalOptions} = require("firebase-functions");
@@ -426,6 +428,12 @@ exports.refreshMarketData = onRequest({ cors: true, maxInstances: 1, timeoutSeco
 // BULK IMPORT CARDS
 // Server-side batch writes bypass the browser SDK's write stream limit
 // ============================================================
+// Fields that belong to the user doc (not the cache)
+const USER_CARD_FIELDS = new Set([
+  'scryfallId', 'quantity', 'condition', 'foil', 'status', 'public',
+  'price', 'language', 'name', 'edition', 'setCode', 'image', 'deckName',
+]);
+
 exports.bulkImportCards = onCall(
   { maxInstances: 5, timeoutSeconds: 120, memory: '512MiB' },
   async (request) => {
@@ -455,9 +463,18 @@ exports.bulkImportCards = onCall(
       for (const card of chunk) {
         const ref = colRef.doc();
         // Strip any client-sent id/createdAt/updatedAt — server controls these
-        const { id, createdAt, updatedAt, ...cardData } = card;
+        const { id, createdAt, updatedAt, _cacheFields, ...cardData } = card;
+
+        // Write only user-specific fields + convenience copies to user doc
+        const userFields = {};
+        for (const [key, value] of Object.entries(cardData)) {
+          if (USER_CARD_FIELDS.has(key)) {
+            userFields[key] = value;
+          }
+        }
+
         batch.set(ref, {
-          ...cardData,
+          ...userFields,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -468,6 +485,48 @@ exports.bulkImportCards = onCall(
       refs.forEach((r) => createdIds.push(r.id));
     }
 
+    // Write unique scryfallIds to cache (fire-and-forget, best-effort)
+    // Only writes cards that have _cacheFields or enough Scryfall data
+    const cacheWrites = new Map();
+    for (const card of cards) {
+      if (!card.scryfallId) continue;
+      if (cacheWrites.has(card.scryfallId)) continue;
+      if (card._cacheFields) {
+        cacheWrites.set(card.scryfallId, card._cacheFields);
+      }
+    }
+
+    if (cacheWrites.size > 0) {
+      try {
+        const cacheBatches = [];
+        let cacheBatch = db.batch();
+        let cacheCount = 0;
+        const now = admin.firestore.Timestamp.now();
+
+        for (const [scryfallId, fields] of cacheWrites) {
+          const ref = db.collection(SCRYFALL_CACHE_COLLECTION).doc(scryfallId);
+          cacheBatch.set(ref, {
+            ...fields,
+            _cachedAt: now,
+            _metadataUpdatedAt: now,
+            _pricesUpdatedAt: now,
+          }, { merge: true });
+          cacheCount++;
+
+          if (cacheCount >= BATCH_SIZE) {
+            cacheBatches.push(cacheBatch.commit());
+            cacheBatch = db.batch();
+            cacheCount = 0;
+          }
+        }
+        if (cacheCount > 0) cacheBatches.push(cacheBatch.commit());
+        await Promise.all(cacheBatches);
+        logger.info(`[bulkImportCards] ${cacheWrites.size} unique cards written to scryfall_cache`);
+      } catch (err) {
+        logger.warn('[bulkImportCards] Cache write failed (non-fatal):', err.message);
+      }
+    }
+
     logger.info(`[bulkImportCards] ${createdIds.length} cards imported for user ${userId}`);
     return { cardIds: createdIds, count: createdIds.length };
   }
@@ -476,16 +535,93 @@ exports.bulkImportCards = onCall(
 // ============================================================
 // LOAD COLLECTION CHUNK
 // Server-side paginated read — 100k cards in ~20s vs 2+ min from browser
+// Supports normalized mode: joins slim user docs with scryfall_cache
 // ============================================================
+
+/**
+ * Build the `image` field from a scryfall_cache doc, matching the format
+ * that CollectionGridCard.vue expects:
+ * - Plain URL string for single-face cards
+ * - JSON string with card_faces array for split/dual-face cards
+ */
+function buildImageField(cacheDoc) {
+  if (cacheDoc.card_faces && cacheDoc.card_faces.length > 1) {
+    // Split card: JSON-stringify the faces array (same format the app expects)
+    const faces = cacheDoc.card_faces
+      .filter(f => f.image_uris)
+      .map(f => ({ image_uris: f.image_uris }));
+    if (faces.length > 1) {
+      return JSON.stringify({ card_faces: faces });
+    }
+  }
+  // Single-face: use normal image URI
+  if (cacheDoc.image_uris && cacheDoc.image_uris.normal) {
+    return cacheDoc.image_uris.normal;
+  }
+  // Fallback: try first face's image
+  if (cacheDoc.card_faces && cacheDoc.card_faces[0]?.image_uris?.normal) {
+    return cacheDoc.card_faces[0].image_uris.normal;
+  }
+  return '';
+}
+
+/**
+ * Hydrate a slim user card doc with scryfall_cache data.
+ * Returns a full Card object matching the app's Card interface.
+ */
+function hydrateCard(userDoc, cacheDoc) {
+  if (!cacheDoc) {
+    // Cache miss — return user doc as-is (backward compat)
+    return userDoc;
+  }
+
+  return {
+    // User-specific fields (from user doc, take precedence)
+    id: userDoc.id,
+    scryfallId: userDoc.scryfallId,
+    quantity: userDoc.quantity,
+    condition: userDoc.condition,
+    foil: userDoc.foil,
+    status: userDoc.status,
+    public: userDoc.public,
+    price: userDoc.price,
+    language: userDoc.language,
+    createdAt: userDoc.createdAt,
+    updatedAt: userDoc.updatedAt,
+
+    // Scryfall fields (from cache, fallback to user doc convenience copies)
+    name: cacheDoc.name || userDoc.name,
+    edition: cacheDoc.set_name || userDoc.edition,
+    setCode: (cacheDoc.set || userDoc.setCode || '').toUpperCase(),
+    image: buildImageField(cacheDoc) || userDoc.image,
+    type_line: cacheDoc.type_line || userDoc.type_line,
+    cmc: cacheDoc.cmc ?? userDoc.cmc,
+    colors: cacheDoc.colors || userDoc.colors,
+    rarity: cacheDoc.rarity || userDoc.rarity,
+    power: cacheDoc.power || userDoc.power,
+    toughness: cacheDoc.toughness || userDoc.toughness,
+    oracle_text: cacheDoc.oracle_text || userDoc.oracle_text,
+    keywords: cacheDoc.keywords || userDoc.keywords,
+    legalities: cacheDoc.legalities || userDoc.legalities,
+    full_art: cacheDoc.full_art ?? userDoc.full_art,
+    produced_mana: cacheDoc.produced_mana || userDoc.produced_mana,
+  };
+}
+
 exports.loadCollectionChunk = onCall(
-  { maxInstances: 5, timeoutSeconds: 60, memory: '512MiB' },
+  { maxInstances: 5, timeoutSeconds: 60, memory: '1GiB' },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Must be logged in");
     }
 
     const userId = request.auth.uid;
-    const { limit: cardLimit = 10000, startAfterId, includeSummary = false } = request.data || {};
+    const {
+      limit: cardLimit = 10000,
+      startAfterId,
+      includeSummary = false,
+      normalized = false,
+    } = request.data || {};
     const effectiveLimit = Math.min(cardLimit, 10000);
 
     const colRef = db.collection(`users/${userId}/cards`);
@@ -500,7 +636,39 @@ exports.loadCollectionChunk = onCall(
     }
 
     const snapshot = await query.get();
-    const cards = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let cards;
+
+    if (normalized && snapshot.docs.length > 0) {
+      // ── Normalized mode: join with scryfall_cache ──
+      const userDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      // Collect unique scryfallIds
+      const scryfallIds = [...new Set(
+        userDocs.map(d => d.scryfallId).filter(Boolean)
+      )];
+
+      // Batch-read from scryfall_cache using db.getAll (no 'in' limit)
+      const cacheMap = new Map();
+      if (scryfallIds.length > 0) {
+        const cacheRefs = scryfallIds.map(id =>
+          db.collection(SCRYFALL_CACHE_COLLECTION).doc(id)
+        );
+        const cacheDocs = await db.getAll(...cacheRefs);
+        for (const cDoc of cacheDocs) {
+          if (cDoc.exists) {
+            cacheMap.set(cDoc.id, cDoc.data());
+          }
+        }
+        logger.info(`[loadCollectionChunk] Normalized: ${cacheMap.size}/${scryfallIds.length} cache hits for ${userDocs.length} cards`);
+      }
+
+      // Hydrate each user card
+      cards = userDocs.map(ud => hydrateCard(ud, cacheMap.get(ud.scryfallId)));
+    } else {
+      // ── Legacy mode: return full user docs as-is ──
+      cards = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }
+
     const lastId = snapshot.docs.length > 0
       ? snapshot.docs[snapshot.docs.length - 1].id
       : null;
@@ -533,5 +701,281 @@ exports.loadCollectionChunk = onCall(
     }
 
     return result;
+  }
+);
+
+// ============================================================
+// SCRYFALL CACHE — Bulk population & refresh
+// Downloads Scryfall bulk data and writes to scryfall_cache collection
+// ============================================================
+
+const SCRYFALL_CACHE_COLLECTION = 'scryfall_cache';
+const SCRYFALL_CACHE_FIELDS = [
+  'name', 'set', 'set_name', 'collector_number', 'rarity', 'type_line',
+  'mana_cost', 'cmc', 'colors', 'color_identity', 'power', 'toughness',
+  'image_uris', 'card_faces', 'oracle_text', 'keywords', 'legalities',
+  'full_art', 'produced_mana', 'prices',
+];
+
+function pickCacheFields(card) {
+  const result = {};
+  for (const field of SCRYFALL_CACHE_FIELDS) {
+    if (card[field] !== undefined && card[field] !== null) {
+      result[field] = card[field];
+    }
+  }
+  return result;
+}
+
+/**
+ * refreshScryfallCache — Scheduled weekly.
+ * Downloads Scryfall's default-cards bulk data (~90k printings) and
+ * upserts every card into /scryfall_cache/{scryfallId}.
+ *
+ * Memory: 1GiB (stream-parses ~150MB JSON)
+ * Timeout: 540s (enough for ~90k writes at ~500/batch)
+ */
+exports.refreshScryfallCache = onSchedule(
+  { schedule: 'every monday 04:00', timeZone: 'America/Mexico_City', maxInstances: 1, timeoutSeconds: 540, memory: '1GiB' },
+  async () => {
+    logger.info('[refreshScryfallCache] Starting...');
+    const startTime = Date.now();
+
+    try {
+      // Step 1: Get download URL from Scryfall bulk-data API
+      const catalogRes = await fetch('https://api.scryfall.com/bulk-data');
+      if (!catalogRes.ok) throw new Error(`Scryfall bulk-data API: ${catalogRes.status}`);
+      const catalog = await catalogRes.json();
+      const entry = catalog.data.find(d => d.type === 'default_cards');
+      if (!entry) throw new Error('default_cards not found in Scryfall bulk catalog');
+
+      logger.info(`[refreshScryfallCache] Downloading from ${entry.download_uri} (~${Math.round(entry.size / 1024 / 1024)}MB)`);
+
+      // Step 2: Stream-download and parse
+      const downloadRes = await fetch(entry.download_uri);
+      if (!downloadRes.ok) throw new Error(`Download failed: ${downloadRes.status}`);
+
+      const allCards = await downloadRes.json();
+      logger.info(`[refreshScryfallCache] Downloaded ${allCards.length} cards, writing to Firestore...`);
+
+      let totalWritten = 0;
+      let batchCount = 0;
+      let batch = db.batch();
+      const BATCH_SIZE = 500;
+
+      for (const card of allCards) {
+        if (!card.id) continue;
+
+        const ref = db.collection(SCRYFALL_CACHE_COLLECTION).doc(card.id);
+        const now = admin.firestore.Timestamp.now();
+        batch.set(ref, {
+          ...pickCacheFields(card),
+          _cachedAt: now,
+          _metadataUpdatedAt: now,
+          _pricesUpdatedAt: now,
+        }, { merge: true });
+        batchCount++;
+
+        if (batchCount >= BATCH_SIZE) {
+          await batch.commit();
+          totalWritten += batchCount;
+          batchCount = 0;
+          batch = db.batch();
+        }
+      }
+
+      // Flush remaining
+      if (batchCount > 0) {
+        await batch.commit();
+        totalWritten += batchCount;
+      }
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      logger.info(`[refreshScryfallCache] Done: ${totalWritten} cards written in ${elapsed}s`);
+    } catch (err) {
+      logger.error('[refreshScryfallCache] Failed:', err.message);
+      throw err;
+    }
+  }
+);
+
+/**
+ * populateScryfallCacheManual — HTTP trigger for manual cache population.
+ * Query param: ?type=default_cards|all_cards (defaults to default_cards)
+ *
+ * Use this for initial population or forced refresh.
+ */
+exports.populateScryfallCacheManual = onRequest(
+  { cors: true, maxInstances: 1, timeoutSeconds: 540, memory: '1GiB' },
+  async (request, response) => {
+    const bulkType = request.query.type || 'default_cards';
+    logger.info(`[populateScryfallCacheManual] Starting with type=${bulkType}`);
+    const startTime = Date.now();
+
+    try {
+      const catalogRes = await fetch('https://api.scryfall.com/bulk-data');
+      if (!catalogRes.ok) throw new Error(`Scryfall bulk-data API: ${catalogRes.status}`);
+      const catalog = await catalogRes.json();
+      const entry = catalog.data.find(d => d.type === bulkType);
+      if (!entry) {
+        response.status(400).json({ error: `Bulk type "${bulkType}" not found` });
+        return;
+      }
+
+      const downloadRes = await fetch(entry.download_uri);
+      if (!downloadRes.ok) throw new Error(`Download failed: ${downloadRes.status}`);
+
+      const allCards = await downloadRes.json();
+      logger.info(`[populateScryfallCacheManual] Downloaded ${allCards.length} cards, writing...`);
+
+      let totalWritten = 0;
+      let batchCount = 0;
+      let batch = db.batch();
+      const BATCH_SIZE = 500;
+
+      for (const card of allCards) {
+        if (!card.id) continue;
+
+        const ref = db.collection(SCRYFALL_CACHE_COLLECTION).doc(card.id);
+        const now = admin.firestore.Timestamp.now();
+        batch.set(ref, {
+          ...pickCacheFields(card),
+          _cachedAt: now,
+          _metadataUpdatedAt: now,
+          _pricesUpdatedAt: now,
+        }, { merge: true });
+        batchCount++;
+
+        if (batchCount >= BATCH_SIZE) {
+          await batch.commit();
+          totalWritten += batchCount;
+          batchCount = 0;
+          batch = db.batch();
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+        totalWritten += batchCount;
+      }
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      logger.info(`[populateScryfallCacheManual] Done: ${totalWritten} cards in ${elapsed}s`);
+      response.json({ success: true, totalWritten, elapsed: `${elapsed}s`, bulkType });
+    } catch (err) {
+      logger.error('[populateScryfallCacheManual] Failed:', err.message);
+      response.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ============================================================
+// MIGRATE USER CARDS
+// Strips Scryfall-only fields from user card docs (lazy migration)
+// Requires scryfall_cache to be populated first
+// ============================================================
+
+const SCRYFALL_ONLY_FIELDS = [
+  'type_line', 'cmc', 'colors', 'rarity', 'power', 'toughness',
+  'oracle_text', 'keywords', 'legalities', 'full_art', 'produced_mana',
+];
+
+/**
+ * migrateUserCards — Callable function for lazy data migration.
+ * Strips Scryfall-only fields from a user's card docs after verifying
+ * they exist in scryfall_cache. Keeps convenience copies (name, edition, image, setCode).
+ *
+ * Call with: { userId } (admin) or no args (self-migration)
+ */
+exports.migrateUserCards = onCall(
+  { maxInstances: 3, timeoutSeconds: 300, memory: '512MiB' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in");
+    }
+
+    // Allow self-migration or admin-triggered migration
+    const userId = request.data?.userId || request.auth.uid;
+    logger.info(`[migrateUserCards] Starting migration for user ${userId}`);
+    const startTime = Date.now();
+
+    const colRef = db.collection(`users/${userId}/cards`);
+    const snapshot = await colRef.get();
+
+    if (snapshot.empty) {
+      return { success: true, migrated: 0, skipped: 0, message: 'No cards to migrate' };
+    }
+
+    // Collect all unique scryfallIds and verify they exist in cache
+    const scryfallIds = [...new Set(
+      snapshot.docs.map(d => d.data().scryfallId).filter(Boolean)
+    )];
+
+    const cacheRefs = scryfallIds.map(id =>
+      db.collection(SCRYFALL_CACHE_COLLECTION).doc(id)
+    );
+
+    const cachedIds = new Set();
+    if (cacheRefs.length > 0) {
+      // getAll supports up to ~100 refs per call efficiently
+      const GETALL_CHUNK = 100;
+      for (let i = 0; i < cacheRefs.length; i += GETALL_CHUNK) {
+        const chunk = cacheRefs.slice(i, i + GETALL_CHUNK);
+        const cacheDocs = await db.getAll(...chunk);
+        for (const cDoc of cacheDocs) {
+          if (cDoc.exists) cachedIds.add(cDoc.id);
+        }
+      }
+    }
+
+    logger.info(`[migrateUserCards] Cache coverage: ${cachedIds.size}/${scryfallIds.length} scryfallIds`);
+
+    let migrated = 0;
+    let skipped = 0;
+    const BATCH_SIZE = 500;
+
+    for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
+      const chunk = snapshot.docs.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      let batchHasWrites = false;
+
+      for (const docSnap of chunk) {
+        const data = docSnap.data();
+
+        // Skip if scryfallId not in cache (can't safely strip fields)
+        if (!data.scryfallId || !cachedIds.has(data.scryfallId)) {
+          skipped++;
+          continue;
+        }
+
+        // Check if any Scryfall-only fields exist on this doc
+        const hasFieldsToRemove = SCRYFALL_ONLY_FIELDS.some(f => data[f] !== undefined);
+        if (!hasFieldsToRemove) continue;
+
+        // Build delete update
+        const deleteUpdate = {};
+        for (const field of SCRYFALL_ONLY_FIELDS) {
+          if (data[field] !== undefined) {
+            deleteUpdate[field] = admin.firestore.FieldValue.delete();
+          }
+        }
+
+        batch.update(docSnap.ref, deleteUpdate);
+        batchHasWrites = true;
+        migrated++;
+      }
+
+      if (batchHasWrites) {
+        await batch.commit();
+      }
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.info(`[migrateUserCards] Done: ${migrated} migrated, ${skipped} skipped in ${elapsed}s`);
+
+    // Mark user as migrated
+    await db.doc(`users/${userId}`).set({ _migrated: true }, { merge: true });
+
+    return { success: true, migrated, skipped, elapsed: `${elapsed}s` };
   }
 );

@@ -987,7 +987,7 @@ exports.migrateUserCards = onCall(
 // Stores compact card summaries in chunked docs (5000 cards/chunk)
 // ============================================================
 
-const INDEX_CHUNK_SIZE = 5000;
+const INDEX_CHUNK_SIZE = 2000;
 
 /**
  * Extract compact index fields from a full card document.
@@ -1047,7 +1047,7 @@ function toIndexCard(id, data) {
  * Call with: no args (self) or { userId } (admin-triggered)
  */
 exports.buildCardIndex = onCall(
-  { maxInstances: 5, timeoutSeconds: 300, memory: '512MiB' },
+  { maxInstances: 3, timeoutSeconds: 300, memory: '2GiB' },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Must be logged in");
@@ -1060,13 +1060,22 @@ exports.buildCardIndex = onCall(
     const colRef = db.collection(`users/${userId}/cards`);
     const indexRef = db.collection(`users/${userId}/card_index`);
 
-    // Read all cards with cursor-based pagination
+    // Read all cards with cursor-based pagination + field projection
+    // Only select fields needed for the index (reduces memory ~80%)
+    const INDEX_FIELDS = [
+      'scryfallId', 'name', 'status', 'quantity', 'price', 'cmc',
+      'colors', 'rarity', 'type_line', 'foil', 'setCode', 'power',
+      'toughness', 'full_art', 'produced_mana', 'keywords', 'legalities',
+      'createdAt', 'condition', 'public',
+    ];
+
     const allIndexCards = [];
     let lastDoc = null;
-    const READ_CHUNK = 10000;
+    const READ_CHUNK = 2000;
 
     while (true) {
       let query = colRef
+        .select(...INDEX_FIELDS)
         .orderBy(admin.firestore.FieldPath.documentId())
         .limit(READ_CHUNK);
 
@@ -1087,40 +1096,24 @@ exports.buildCardIndex = onCall(
 
     logger.info(`[buildCardIndex] Read ${allIndexCards.length} cards, writing index chunks...`);
 
-    // Write index in chunks of INDEX_CHUNK_SIZE
+    // Write index chunks individually (batch.set exceeds 10MB limit for large collections)
     const totalChunks = Math.ceil(allIndexCards.length / INDEX_CHUNK_SIZE) || 1;
-    const BATCH_SIZE = 500;
 
-    // We need to write chunks and delete stale ones — batch them
-    const writes = [];
     for (let c = 0; c < totalChunks; c++) {
       const chunkCards = allIndexCards.slice(
         c * INDEX_CHUNK_SIZE,
         (c + 1) * INDEX_CHUNK_SIZE
       );
-      writes.push({
-        ref: indexRef.doc(`chunk_${c}`),
-        data: {
-          cards: chunkCards,
-          count: chunkCards.length,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
+      await indexRef.doc(`chunk_${c}`).set({
+        cards: chunkCards,
+        count: chunkCards.length,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-    }
-
-    // Write in Firestore batches (max 500 ops per batch, but we have few chunks)
-    for (let i = 0; i < writes.length; i += BATCH_SIZE) {
-      const batch = db.batch();
-      const chunk = writes.slice(i, i + BATCH_SIZE);
-      for (const { ref, data } of chunk) {
-        batch.set(ref, data);
-      }
-      await batch.commit();
     }
 
     // Delete stale chunks (if collection shrank)
     const existingChunks = await indexRef.listDocuments();
-    const validChunkIds = new Set(writes.map(w => w.ref.id));
+    const validChunkIds = new Set(Array.from({ length: totalChunks }, (_, i) => `chunk_${i}`));
     const staleRefs = existingChunks.filter(ref => !validChunkIds.has(ref.id));
 
     if (staleRefs.length > 0) {

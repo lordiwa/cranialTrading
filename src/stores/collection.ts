@@ -265,7 +265,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 // Build index in background for next time
                 import('../services/cloudFunctions').then(({ buildCardIndex }) => {
                     buildCardIndex().then(result => {
-                        console.info(`[loadCollection] Index built in background: ${result.totalCards} cards → ${result.chunks} chunks`)
+                        console.info(`[loadCollection] Index built: ${result.totalCards} cards → ${result.chunks} chunks`)
                     }).catch((err: unknown) => {
                         console.warn('[loadCollection] Background index build failed:', err)
                     })
@@ -575,7 +575,7 @@ export const useCollectionStore = defineStore('collection', () => {
     function persistIndexToFirestore() {
         if (!authStore.user) return
         const userId = authStore.user.id
-        const INDEX_CHUNK_SIZE = 5000
+        const INDEX_CHUNK_SIZE = 2000
 
         const allIndex = cardIndexRaw.value
         const totalChunks = Math.ceil(allIndex.length / INDEX_CHUNK_SIZE) || 1

@@ -85,6 +85,12 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
+
+      // Lightweight card index for fast filtering & pagination
+      match /card_index/{chunkId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
     }
 
     // ========== COLECCIONES PÚBLICAS PARA MATCHES OPTIMIZADOS ==========

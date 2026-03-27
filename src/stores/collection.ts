@@ -7,6 +7,7 @@ import {
     deleteDoc,
     doc,
     getDocs,
+    setDoc,
     Timestamp,
     updateDoc,
     writeBatch,
@@ -106,6 +107,105 @@ const deletePublicCardBatches = async (
     }
 }
 
+// ── Index types ─────────────────────────────────────────────────────────────
+/** Compact index card stored in Firestore card_index chunks */
+export interface IndexCard {
+    i: string      // id
+    s: string      // scryfallId
+    n: string      // name
+    st: string     // status
+    q: number      // quantity
+    p: number      // price
+    cm: number     // cmc
+    co: string[]   // colors
+    r: string      // rarity (first char)
+    t: string      // type_line
+    f: boolean     // foil
+    sc: string     // setCode
+    pw: string     // power
+    to: string     // toughness
+    fa: boolean    // full_art
+    pm: string[]   // produced_mana
+    kw: string[]   // keywords
+    lg: string[]   // legal formats
+    ca: number     // createdAt (ms)
+    cn: string     // condition
+    pb: boolean    // public
+}
+
+const RARITY_MAP: Record<string, string> = { c: 'common', u: 'uncommon', r: 'rare', m: 'mythic' }
+
+/** Map an IndexCard to a thin Card object (satisfies FilterableCard + Card interface) */
+function indexToCard(ic: IndexCard): Card {
+    // Expand compact legalities array to Record
+    const legalities: Record<string, string> = {}
+    for (const fmt of ic.lg) {
+        legalities[fmt] = 'legal' // eslint-disable-line security/detect-object-injection
+    }
+
+    return {
+        id: ic.i,
+        scryfallId: ic.s,
+        name: ic.n,
+        edition: ic.sc?.toUpperCase() || '',
+        setCode: ic.sc,
+        status: ic.st as CardStatus,
+        quantity: ic.q,
+        price: ic.p,
+        cmc: ic.cm,
+        colors: ic.co,
+        rarity: RARITY_MAP[ic.r] || ic.r, // eslint-disable-line security/detect-object-injection
+        type_line: ic.t,
+        foil: ic.f,
+        condition: ic.cn as CardCondition,
+        public: ic.pb,
+        power: ic.pw || undefined,
+        toughness: ic.to || undefined,
+        full_art: ic.fa,
+        produced_mana: ic.pm,
+        keywords: ic.kw,
+        legalities,
+        // Construct image from scryfallId (works for single-face cards)
+        image: ic.s ? `https://cards.scryfall.io/normal/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg` : '',
+        createdAt: new Date(ic.ca),
+        updatedAt: new Date(ic.ca),
+    }
+}
+
+/** Build a compact IndexCard from a full Card object */
+function cardToIndex(card: Card): IndexCard {
+    const lg: string[] = []
+    if (card.legalities) {
+        for (const [fmt, status] of Object.entries(card.legalities)) {
+            if (status === 'legal') lg.push(fmt)
+        }
+    }
+    const rarity = card.rarity ? card.rarity.charAt(0) : ''
+    return {
+        i: card.id,
+        s: card.scryfallId,
+        n: card.name,
+        st: card.status,
+        q: card.quantity,
+        p: card.price,
+        cm: card.cmc ?? 0,
+        co: card.colors || [],
+        r: rarity,
+        t: card.type_line || '',
+        f: card.foil,
+        sc: card.setCode || '',
+        pw: card.power || '',
+        to: card.toughness || '',
+        fa: card.full_art || false,
+        pm: card.produced_mana || [],
+        kw: card.keywords || [],
+        lg,
+        ca: card.createdAt ? new Date(card.createdAt).getTime() : Date.now(),
+        cn: card.condition,
+        pb: card.public !== false,
+    }
+}
+
 export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -116,6 +216,10 @@ export const useCollectionStore = defineStore('collection', () => {
     const importing = ref(false)
     const collectionSummary = ref<{ totalCards: number; totalValue: number; statusCounts: Record<string, number>; loadedCards: number } | null>(null)
     const lastSyncAt = ref<Date | null>(null)
+
+    // Card index state — compact index for fast load, kept in sync with cards
+    const cardIndexRaw = shallowRef<IndexCard[]>([])
+    const fullCardCache = new Map<string, Card>() // Cache of full cards fetched via loadCardPage
 
     /** Rebuild the O(1) card lookup index after any mutation to cards.value */
     function rebuildCardIndex() {
@@ -142,65 +246,30 @@ export const useCollectionStore = defineStore('collection', () => {
     // ========================================================================
 
     /**
-     * Load all cards for current user via Cloud Function with server-side join
+     * Load collection via card_index (fast: ~25 reads) with fallback to full load.
+     * Maps IndexCard[] → thin Card[] so the entire filtering pipeline works unchanged.
      */
     const loadCollection = async () => {
         if (!authStore.user) return
         loading.value = true
 
         try {
-            const { loadCollectionChunk } = await import('../services/cloudFunctions')
+            const userId = authStore.user.id
+            const indexLoaded = await loadFromIndex(userId)
 
-            // Cursor-based pagination via Cloud Function with server-side join
-            const all: Card[] = []
-            let cursor: string | undefined = undefined
-            let isFirstChunk = true
+            if (!indexLoaded) {
+                // No index exists — fallback to full load, build index in background
+                console.info('[loadCollection] No card_index found, falling back to full load')
+                await loadFromFullCards()
 
-            while (true) {
-                const chunk = await loadCollectionChunk(cursor, isFirstChunk, true)
-                isFirstChunk = false
-
-                // Store summary from first chunk
-                if (chunk.summary) {
-                    collectionSummary.value = {
-                        totalCards: chunk.summary.totalCards,
-                        totalValue: 0,
-                        statusCounts: chunk.summary.statusCounts,
-                        loadedCards: 0,
-                    }
-                }
-
-                // Transform CF response into Card objects (timestamps come as plain objects)
-                for (const card of chunk.cards) {
-                    all.push({
-                        ...card,
-                        updatedAt: card.updatedAt && typeof (card.updatedAt as Record<string, unknown>)._seconds === 'number'
-                            ? new Date((card.updatedAt as Record<string, unknown>)._seconds as number * 1000)
-                            : new Date(),
-                        createdAt: card.createdAt && typeof (card.createdAt as Record<string, unknown>)._seconds === 'number'
-                            ? new Date((card.createdAt as Record<string, unknown>)._seconds as number * 1000)
-                            : new Date(),
-                    } as Card)
-                }
-
-                // Yield to keep UI responsive between chunks
-                if (chunk.hasMore) {
-                    await backgroundSafeDelay(0)
-                    cursor = chunk.lastId ?? undefined
-                } else {
-                    break
-                }
-            }
-
-            cards.value = all
-            rebuildCardIndex()
-
-            // Enrich cards missing metadata (non-blocking, skip during import)
-            // With normalized loading, most cards already have full metadata from cache join
-            if (!importing.value) {
-                enrichCardsWithMissingMetadata().catch((err: unknown) => {
-                    console.warn('[Enrichment] Background enrichment failed:', err)
-                })
+                // Build index in background for next time
+                import('../services/cloudFunctions').then(({ buildCardIndex }) => {
+                    buildCardIndex().then(result => {
+                        console.info(`[loadCollection] Index built in background: ${result.totalCards} cards → ${result.chunks} chunks`)
+                    }).catch((err: unknown) => {
+                        console.warn('[loadCollection] Background index build failed:', err)
+                    })
+                }).catch(() => {})
             }
         } catch (error) {
             console.error('Error loading collection:', error)
@@ -208,6 +277,140 @@ export const useCollectionStore = defineStore('collection', () => {
         } finally {
             loading.value = false
         }
+    }
+
+    /** Load from card_index chunks. Returns true if index was found and loaded. */
+    const loadFromIndex = async (userId: string): Promise<boolean> => {
+        const indexCol = collection(db, 'users', userId, 'card_index')
+        const snapshot = await getDocs(indexCol)
+
+        if (snapshot.empty) return false
+
+        const allIndex: IndexCard[] = []
+        for (const docSnap of snapshot.docs) {
+            const data = docSnap.data()
+            if (data.cards && Array.isArray(data.cards)) {
+                allIndex.push(...(data.cards as IndexCard[]))
+            }
+        }
+
+        console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks`)
+
+        cardIndexRaw.value = allIndex
+        cards.value = allIndex.map(indexToCard)
+        rebuildCardIndex()
+
+        // Compute summary from index
+        const statusCounts: Record<string, number> = {}
+        let totalValue = 0
+        for (const ic of allIndex) {
+            statusCounts[ic.st] = (statusCounts[ic.st] || 0) + 1 // eslint-disable-line security/detect-object-injection
+            totalValue += ic.p * ic.q
+        }
+        collectionSummary.value = {
+            totalCards: allIndex.length,
+            totalValue,
+            statusCounts,
+            loadedCards: allIndex.length,
+        }
+
+        return true
+    }
+
+    /** Fallback: load all cards via Cloud Function (120k reads). Used when no index exists. */
+    const loadFromFullCards = async () => {
+        const { loadCollectionChunk } = await import('../services/cloudFunctions')
+
+        const all: Card[] = []
+        let cursor: string | undefined = undefined
+        let isFirstChunk = true
+
+        while (true) {
+            const chunk = await loadCollectionChunk(cursor, isFirstChunk, true)
+            isFirstChunk = false
+
+            if (chunk.summary) {
+                collectionSummary.value = {
+                    totalCards: chunk.summary.totalCards,
+                    totalValue: 0,
+                    statusCounts: chunk.summary.statusCounts,
+                    loadedCards: 0,
+                }
+            }
+
+            for (const card of chunk.cards) {
+                all.push({
+                    ...card,
+                    updatedAt: card.updatedAt && typeof (card.updatedAt as Record<string, unknown>)._seconds === 'number'
+                        ? new Date((card.updatedAt as Record<string, unknown>)._seconds as number * 1000)
+                        : new Date(),
+                    createdAt: card.createdAt && typeof (card.createdAt as Record<string, unknown>)._seconds === 'number'
+                        ? new Date((card.createdAt as Record<string, unknown>)._seconds as number * 1000)
+                        : new Date(),
+                } as Card)
+            }
+
+            if (chunk.hasMore) {
+                await backgroundSafeDelay(0)
+                cursor = chunk.lastId ?? undefined
+            } else {
+                break
+            }
+        }
+
+        cards.value = all
+        rebuildCardIndex()
+
+        // Build cardIndexRaw from loaded cards
+        cardIndexRaw.value = all.map(cardToIndex)
+
+        if (!importing.value) {
+            enrichCardsWithMissingMetadata().catch((err: unknown) => {
+                console.warn('[Enrichment] Background enrichment failed:', err)
+            })
+        }
+    }
+
+    /**
+     * Fetch a full Card object (with image, oracle_text, etc.) for detail modals.
+     * Uses cache to avoid re-fetching.
+     */
+    const getFullCard = async (cardId: string): Promise<Card | null> => {
+        // Check cache first
+        const cached = fullCardCache.get(cardId)
+        if (cached) return cached
+
+        try {
+            const { loadCardPage } = await import('../services/cloudFunctions')
+            const response = await loadCardPage([cardId])
+            if (response.cards.length > 0) {
+                const raw = response.cards[0] as unknown as Record<string, unknown>
+                const card: Card = {
+                    ...raw,
+                    updatedAt: raw.updatedAt && typeof (raw.updatedAt as Record<string, unknown>)._seconds === 'number'
+                        ? new Date((raw.updatedAt as Record<string, unknown>)._seconds as number * 1000)
+                        : new Date(),
+                    createdAt: raw.createdAt && typeof (raw.createdAt as Record<string, unknown>)._seconds === 'number'
+                        ? new Date((raw.createdAt as Record<string, unknown>)._seconds as number * 1000)
+                        : new Date(),
+                } as Card
+                fullCardCache.set(cardId, card)
+
+                // Update the thin card in cards.value with full data
+                const idx = cards.value.findIndex(c => c.id === cardId)
+                if (idx > -1) {
+                    const newCards = [...cards.value]
+                    newCards[idx] = card
+                    cards.value = newCards
+                    cardsById.set(cardId, card)
+                }
+
+                return card
+            }
+        } catch (err) {
+            console.warn('[getFullCard] Failed to fetch full card:', err)
+        }
+        return cardsById.get(cardId) ?? null
     }
 
     /**
@@ -348,6 +551,49 @@ export const useCollectionStore = defineStore('collection', () => {
         console.info(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
     }
 
+    // ========================================================================
+    // CARD INDEX SYNC — keeps card_index in sync with card mutations
+    // ========================================================================
+
+    /** Sync a single card add/update to the local cardIndexRaw */
+    function syncIndexLocal(card: Card, action: 'add' | 'update' | 'delete') {
+        const idx = cardIndexRaw.value.findIndex(ic => ic.i === card.id)
+        const newIndex = [...cardIndexRaw.value]
+
+        if (action === 'delete') {
+            if (idx > -1) newIndex.splice(idx, 1)
+        } else if (action === 'add') {
+            newIndex.push(cardToIndex(card))
+        } else if (action === 'update' && idx > -1) {
+            newIndex[idx] = cardToIndex(card)
+        }
+
+        cardIndexRaw.value = newIndex
+    }
+
+    /** Persist the current cardIndexRaw to Firestore card_index chunks (fire-and-forget) */
+    function persistIndexToFirestore() {
+        if (!authStore.user) return
+        const userId = authStore.user.id
+        const INDEX_CHUNK_SIZE = 5000
+
+        const allIndex = cardIndexRaw.value
+        const totalChunks = Math.ceil(allIndex.length / INDEX_CHUNK_SIZE) || 1
+
+        // Write chunks in background (fire-and-forget)
+        void (async () => {
+            try {
+                for (let c = 0; c < totalChunks; c++) {
+                    const chunkCards = allIndex.slice(c * INDEX_CHUNK_SIZE, (c + 1) * INDEX_CHUNK_SIZE)
+                    const chunkRef = doc(db, 'users', userId, 'card_index', `chunk_${c}`)
+                    await setDoc(chunkRef, { cards: chunkCards, count: chunkCards.length, updatedAt: Timestamp.now() })
+                }
+            } catch (err) {
+                console.warn('[IndexSync] Failed to persist index:', err)
+            }
+        })()
+    }
+
     /**
      * Add a new card to collection
      */
@@ -372,6 +618,10 @@ export const useCollectionStore = defineStore('collection', () => {
             }
             cards.value = [...cards.value, newCard]
             cardsById.set(newCard.id, newCard)
+
+            // Sync index
+            syncIndexLocal(newCard, 'add')
+            persistIndexToFirestore()
 
             // Sync to public collection (non-blocking, log-only on failure)
             const userInfo = getUserInfo()
@@ -427,10 +677,14 @@ export const useCollectionStore = defineStore('collection', () => {
                 updatedAt: Timestamp.now(),
             })
 
-            // Sync to public collection (non-blocking, log-only on failure)
+            // Sync index
             // eslint-disable-next-line security/detect-object-injection
             const updatedCard = cards.value[index]
             if (updatedCard) {
+                syncIndexLocal(updatedCard, 'update')
+                persistIndexToFirestore()
+
+                // Sync to public collection (non-blocking, log-only on failure)
                 const userInfo = getUserInfo()
                 if (userInfo) {
                     syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
@@ -557,6 +811,10 @@ export const useCollectionStore = defineStore('collection', () => {
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await deleteDoc(cardRef)
+
+            // Sync index
+            syncIndexLocal(deletedCard, 'delete')
+            persistIndexToFirestore()
 
             // Remove from public collection (non-blocking, log-only on failure)
             removeCardFromPublic(cardId, authStore.user.id)
@@ -796,6 +1054,15 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
+            // Rebuild index after bulk import (more efficient than individual syncs)
+            import('../services/cloudFunctions').then(({ buildCardIndex }) => {
+                buildCardIndex().then(result => {
+                    console.info(`[Import] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
+                }).catch((err: unknown) => {
+                    console.warn('[Import] Index rebuild failed:', err)
+                })
+            }).catch(() => {})
+
             if (!silent) {
                 toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')
             }
@@ -906,6 +1173,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Search
         getCardById,
+        getFullCard,
 
         // Wishlist sync
         ensureCollectionWishlistCard,

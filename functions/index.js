@@ -8,6 +8,8 @@
  * - loadCollectionChunk: Server-side paginated card read (100k cards in ~20s vs 2+ min from browser)
  * - refreshScryfallCache: Weekly scheduled bulk population of scryfall_cache from Scryfall bulk data
  * - populateScryfallCacheManual: HTTP trigger for manual/initial cache population
+ * - buildCardIndex: Builds lightweight card index for fast filtering & pagination
+ * - loadCardPage: Fetches full card objects by IDs with scryfall_cache join
  */
 
 const {setGlobalOptions} = require("firebase-functions");
@@ -977,5 +979,233 @@ exports.migrateUserCards = onCall(
     await db.doc(`users/${userId}`).set({ _migrated: true }, { merge: true });
 
     return { success: true, migrated, skipped, elapsed: `${elapsed}s` };
+  }
+);
+
+// ============================================================
+// CARD INDEX — Lightweight index for fast filtering & pagination
+// Stores compact card summaries in chunked docs (5000 cards/chunk)
+// ============================================================
+
+const INDEX_CHUNK_SIZE = 5000;
+
+/**
+ * Extract compact index fields from a full card document.
+ * Uses short keys to minimize doc size (~170 bytes per card).
+ */
+function toIndexCard(id, data) {
+  // Compact legalities: only store format names where card is legal
+  let lg = [];
+  if (data.legalities && typeof data.legalities === 'object') {
+    lg = Object.entries(data.legalities)
+      .filter(([, v]) => v === 'legal')
+      .map(([k]) => k);
+  }
+
+  // Compact rarity: first char
+  const rarity = data.rarity ? data.rarity.charAt(0) : '';
+
+  // Compact createdAt: timestamp in ms
+  let ca = 0;
+  if (data.createdAt) {
+    if (typeof data.createdAt.toMillis === 'function') {
+      ca = data.createdAt.toMillis();
+    } else if (data.createdAt._seconds) {
+      ca = data.createdAt._seconds * 1000;
+    }
+  }
+
+  return {
+    i: id,
+    s: data.scryfallId || '',
+    n: data.name || '',
+    st: data.status || 'collection',
+    q: data.quantity || 1,
+    p: data.price || 0,
+    cm: data.cmc ?? 0,
+    co: data.colors || [],
+    r: rarity,
+    t: data.type_line || '',
+    f: !!data.foil,
+    sc: data.setCode || '',
+    pw: data.power || '',
+    to: data.toughness || '',
+    fa: !!data.full_art,
+    pm: data.produced_mana || [],
+    kw: data.keywords || [],
+    lg,
+    ca,
+    cn: data.condition || 'NM',
+    pb: data.public !== false,
+  };
+}
+
+/**
+ * buildCardIndex — Builds or rebuilds the card_index for a user.
+ * Reads all card docs, extracts compact fields, writes in chunks of 5000.
+ *
+ * Call with: no args (self) or { userId } (admin-triggered)
+ */
+exports.buildCardIndex = onCall(
+  { maxInstances: 5, timeoutSeconds: 300, memory: '512MiB' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in");
+    }
+
+    const userId = request.data?.userId || request.auth.uid;
+    logger.info(`[buildCardIndex] Starting for user ${userId}`);
+    const startTime = Date.now();
+
+    const colRef = db.collection(`users/${userId}/cards`);
+    const indexRef = db.collection(`users/${userId}/card_index`);
+
+    // Read all cards with cursor-based pagination
+    const allIndexCards = [];
+    let lastDoc = null;
+    const READ_CHUNK = 10000;
+
+    while (true) {
+      let query = colRef
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(READ_CHUNK);
+
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
+
+      const snapshot = await query.get();
+      if (snapshot.empty) break;
+
+      for (const doc of snapshot.docs) {
+        allIndexCards.push(toIndexCard(doc.id, doc.data()));
+      }
+
+      lastDoc = snapshot.docs[snapshot.docs.length - 1];
+      if (snapshot.docs.length < READ_CHUNK) break;
+    }
+
+    logger.info(`[buildCardIndex] Read ${allIndexCards.length} cards, writing index chunks...`);
+
+    // Write index in chunks of INDEX_CHUNK_SIZE
+    const totalChunks = Math.ceil(allIndexCards.length / INDEX_CHUNK_SIZE) || 1;
+    const BATCH_SIZE = 500;
+
+    // We need to write chunks and delete stale ones — batch them
+    const writes = [];
+    for (let c = 0; c < totalChunks; c++) {
+      const chunkCards = allIndexCards.slice(
+        c * INDEX_CHUNK_SIZE,
+        (c + 1) * INDEX_CHUNK_SIZE
+      );
+      writes.push({
+        ref: indexRef.doc(`chunk_${c}`),
+        data: {
+          cards: chunkCards,
+          count: chunkCards.length,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+    }
+
+    // Write in Firestore batches (max 500 ops per batch, but we have few chunks)
+    for (let i = 0; i < writes.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = writes.slice(i, i + BATCH_SIZE);
+      for (const { ref, data } of chunk) {
+        batch.set(ref, data);
+      }
+      await batch.commit();
+    }
+
+    // Delete stale chunks (if collection shrank)
+    const existingChunks = await indexRef.listDocuments();
+    const validChunkIds = new Set(writes.map(w => w.ref.id));
+    const staleRefs = existingChunks.filter(ref => !validChunkIds.has(ref.id));
+
+    if (staleRefs.length > 0) {
+      const batch = db.batch();
+      for (const ref of staleRefs) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+      logger.info(`[buildCardIndex] Deleted ${staleRefs.length} stale chunks`);
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.info(`[buildCardIndex] Done: ${allIndexCards.length} cards → ${totalChunks} chunks in ${elapsed}s`);
+
+    return {
+      success: true,
+      totalCards: allIndexCards.length,
+      chunks: totalChunks,
+      elapsed: `${elapsed}s`,
+    };
+  }
+);
+
+// ============================================================
+// LOAD CARD PAGE — Fetch full cards by IDs with scryfall_cache join
+// Used for paginated grid display (50 cards at a time)
+// ============================================================
+
+/**
+ * loadCardPage — Fetches full card objects for a list of card IDs.
+ * Performs server-side join with scryfall_cache (reuses hydrateCard).
+ *
+ * Input: { cardIds: string[] } (max 200)
+ * Returns: { cards: Card[] }
+ */
+exports.loadCardPage = onCall(
+  { maxInstances: 10, timeoutSeconds: 30, memory: '256MiB' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in");
+    }
+
+    const userId = request.auth.uid;
+    const { cardIds } = request.data || {};
+
+    if (!Array.isArray(cardIds) || cardIds.length === 0) {
+      throw new HttpsError("invalid-argument", "cardIds must be a non-empty array");
+    }
+    if (cardIds.length > 200) {
+      throw new HttpsError("invalid-argument", "Maximum 200 cards per page request");
+    }
+
+    // Read user card docs by ID
+    const cardRefs = cardIds.map(id =>
+      db.collection(`users/${userId}/cards`).doc(id)
+    );
+    const cardDocs = await db.getAll(...cardRefs);
+
+    // Collect scryfallIds for cache join
+    const userCards = [];
+    const scryfallIds = new Set();
+    for (const doc of cardDocs) {
+      if (!doc.exists) continue;
+      const data = { id: doc.id, ...doc.data() };
+      userCards.push(data);
+      if (data.scryfallId) scryfallIds.add(data.scryfallId);
+    }
+
+    // Batch-read from scryfall_cache
+    const cacheMap = new Map();
+    if (scryfallIds.size > 0) {
+      const cacheRefs = [...scryfallIds].map(id =>
+        db.collection(SCRYFALL_CACHE_COLLECTION).doc(id)
+      );
+      const cacheDocs = await db.getAll(...cacheRefs);
+      for (const cDoc of cacheDocs) {
+        if (cDoc.exists) {
+          cacheMap.set(cDoc.id, cDoc.data());
+        }
+      }
+    }
+
+    // Hydrate each card (reuse existing hydrateCard function)
+    const cards = userCards.map(uc => hydrateCard(uc, cacheMap.get(uc.scryfallId)));
+
+    return { cards };
   }
 );

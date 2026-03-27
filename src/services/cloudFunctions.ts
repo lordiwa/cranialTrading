@@ -138,3 +138,44 @@ export async function loadCollectionChunk(
   const result = await callable({ limit: 10000, startAfterId, includeSummary, normalized })
   return result.data
 }
+
+/**
+ * Build or rebuild the lightweight card index for the current user.
+ * Used for fast filtering & pagination without loading full card data.
+ */
+export interface BuildCardIndexResponse {
+  success: boolean
+  totalCards: number
+  chunks: number
+  elapsed: string
+}
+
+export async function buildCardIndex(
+  userId?: string
+): Promise<BuildCardIndexResponse> {
+  const callable = httpsCallable<
+    { userId?: string },
+    BuildCardIndexResponse
+  >(functions, 'buildCardIndex', { timeout: 300000 })
+  const result = await callable({ userId })
+  return result.data
+}
+
+/**
+ * Load full card objects by IDs with scryfall_cache join.
+ * Used for paginated grid display (50-200 cards at a time).
+ */
+export interface LoadCardPageResponse {
+  cards: Record<string, unknown>[]
+}
+
+export async function loadCardPage(
+  cardIds: string[]
+): Promise<LoadCardPageResponse> {
+  const callable = httpsCallable<
+    { cardIds: string[] },
+    LoadCardPageResponse
+  >(functions, 'loadCardPage', { timeout: 30000 })
+  const result = await callable({ cardIds })
+  return result.data
+}

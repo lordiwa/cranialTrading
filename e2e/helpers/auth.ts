@@ -1,4 +1,9 @@
 import { type Page } from '@playwright/test';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
+
+const AUTH_CACHE_DIR = join(process.cwd(), 'e2e', '.auth');
+const AUTH_CACHE_FILE = join(AUTH_CACHE_DIR, 'cached-auth.json');
 
 /**
  * Race a promise against a hard timeout to prevent hangs.
@@ -19,9 +24,31 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Operation'): P
  * Firebase rate-limits sequential signInWithEmailAndPassword calls (~20/min),
  * causing CI failures when 30+ tests each login independently.
  * After the first successful login we cache the IndexedDB + localStorage state
- * and restore it on subsequent test pages, bypassing the login form entirely.
+ * BOTH in-memory AND to a file on disk, so it survives across browser contexts.
  */
 let cachedAuth: { indexedDB: any[]; localStorage: Record<string, string> } | null = null;
+
+/** Load cached auth from disk if available (survives across browser contexts) */
+function loadCachedAuthFromDisk(): typeof cachedAuth {
+  try {
+    if (existsSync(AUTH_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(AUTH_CACHE_FILE, 'utf-8'));
+      // Check if cache is recent (< 30 min old)
+      if (data._savedAt && Date.now() - data._savedAt < 30 * 60 * 1000) {
+        return { indexedDB: data.indexedDB, localStorage: data.localStorage };
+      }
+    }
+  } catch { /* ignore corrupt file */ }
+  return null;
+}
+
+/** Save cached auth to disk for reuse across contexts */
+function saveCachedAuthToDisk(auth: NonNullable<typeof cachedAuth>) {
+  try {
+    if (!existsSync(AUTH_CACHE_DIR)) mkdirSync(AUTH_CACHE_DIR, { recursive: true });
+    writeFileSync(AUTH_CACHE_FILE, JSON.stringify({ ...auth, _savedAt: Date.now() }));
+  } catch { /* non-critical */ }
+}
 
 /**
  * Ensure the page is authenticated. If we're on the login page,
@@ -40,6 +67,10 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
   const dest = targetUrl || '/collection';
 
   // Try restoring cached auth state (avoids Firebase rate-limiting on CI)
+  // Check in-memory first, then disk
+  if (!cachedAuth || cachedAuth.indexedDB.length === 0) {
+    cachedAuth = loadCachedAuthFromDisk();
+  }
   if (cachedAuth && cachedAuth.indexedDB.length > 0) {
     const restored = await restoreCachedAuth(page, dest);
     if (restored) return;
@@ -151,6 +182,7 @@ async function saveAuthState(page: Page) {
 
     if (idb.length > 0) {
       cachedAuth = { indexedDB: idb, localStorage: ls };
+      saveCachedAuthToDisk(cachedAuth);
     }
   } catch {
     // Non-critical — next test will just login via form

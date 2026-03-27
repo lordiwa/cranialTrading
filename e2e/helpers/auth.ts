@@ -274,31 +274,39 @@ export async function waitForLoginResult(page: Page) {
   ]);
   if (result === 'error') {
     const msg = await errorToast.textContent().catch(() => 'unknown error');
-    // Rate-limiting: if Firebase returns wrong-password due to throttling, wait and retry
+    // Rate-limiting: if Firebase returns wrong-password due to throttling, retry with exponential backoff
     if (msg?.includes('incorrecto') || msg?.includes('incorrect') || msg?.includes('wrong')) {
-      // Wait for rate-limit window to pass, then forcibly remove old toast
-      await page.waitForTimeout(5000);
-      await page.evaluate(() => {
-        document.querySelectorAll('.border-rust').forEach((el) => el.remove());
-      });
-      await page.waitForTimeout(300);
+      const MAX_RETRIES = 3;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const backoffMs = attempt * 10_000; // 10s, 20s, 30s
+        await page.waitForTimeout(backoffMs);
+        await page.evaluate(() => {
+          document.querySelectorAll('.border-rust').forEach((el) => el.remove());
+        });
+        await page.waitForTimeout(300);
 
-      // Re-fill credentials defensively and submit
-      await page.locator('input[type="email"]').fill(process.env.TEST_USER_A_EMAIL!);
-      await page.locator('input[type="password"]').fill(process.env.TEST_USER_A_PASSWORD!);
-      await page.locator('button[type="submit"]').click();
+        await page.locator('input[type="email"]').fill(process.env.TEST_USER_A_EMAIL!);
+        await page.locator('input[type="password"]').fill(process.env.TEST_USER_A_PASSWORD!);
+        await page.locator('button[type="submit"]').click();
 
-      // Race again — detect success vs another rate-limit error
-      const retryErrorToast = page.locator('.border-rust').first();
-      const retryResult = await Promise.race([
-        page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 })
-          .then(() => 'redirected' as const),
-        retryErrorToast.waitFor({ state: 'visible', timeout: 10_000 })
-          .then(() => 'error' as const),
-      ]);
-      if (retryResult === 'error') {
-        const retryMsg = await retryErrorToast.textContent().catch(() => 'unknown');
-        throw new Error(`Login failed after retry (Firebase rate-limiting): ${retryMsg}`);
+        const retryErrorToast = page.locator('.border-rust').first();
+        const retryResult = await Promise.race([
+          page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 })
+            .then(() => 'redirected' as const),
+          retryErrorToast.waitFor({ state: 'visible', timeout: 10_000 })
+            .then(() => 'error' as const),
+        ]);
+
+        if (retryResult === 'redirected') {
+          // Save auth on successful retry so subsequent tests don't need to login
+          await saveAuthState(page);
+          return;
+        }
+
+        if (attempt === MAX_RETRIES) {
+          const retryMsg = await retryErrorToast.textContent().catch(() => 'unknown');
+          throw new Error(`Login failed after ${MAX_RETRIES} retries (Firebase rate-limiting): ${retryMsg}`);
+        }
       }
       return;
     }

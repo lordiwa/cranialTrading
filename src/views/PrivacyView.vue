@@ -1,8 +1,18 @@
 <script setup lang="ts">
+import { useSeoMeta } from '@unhead/vue'
 import { useI18n } from '../composables/useI18n'
 
 const { t } = useI18n()
 const lastUpdated = '27 de Enero, 2025';
+
+useSeoMeta({
+  ogTitle: t('seo.pages.privacy.title') + ' | Cranial Trading',
+  ogDescription: t('seo.pages.privacy.description'),
+  ogType: 'website',
+  ogUrl: 'https://cranial-trading.web.app/privacy',
+  ogSiteName: 'Cranial Trading',
+  twitterCard: 'summary_large_image',
+})
 </script>
 
 <template>

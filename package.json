@@ -1,7 +1,7 @@
 {
   "name": "cranial-trading",
   "private": true,
-  "version": "1.16.0",
+  "version": "1.17.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -37,6 +37,7 @@
     "deploy:functions:prod": "firebase deploy --only functions -P prod"
   },
   "dependencies": {
+    "@unhead/vue": "^2.1.12",
     "driver.js": "^1.4.0",
     "firebase": "^11.0.0",
     "lodash-es": "^4.17.22",

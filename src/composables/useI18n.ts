@@ -65,6 +65,7 @@ async function setLocale(newLocale: SupportedLocale): Promise<void> {
   await loadLocale(newLocale)
   currentLocale.value = newLocale
   localStorage.setItem('cranial_locale', newLocale)
+  document.documentElement.lang = newLocale
 }
 
 /**
@@ -127,6 +128,7 @@ export async function initI18n(): Promise<void> {
   const lang = (saved && ['es', 'en', 'pt'].includes(saved)) ? saved : 'es'
   await loadLocale(lang)
   currentLocale.value = lang
+  document.documentElement.lang = lang
 }
 
 // Exportar función t standalone para uso en stores

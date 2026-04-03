@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useSeoMeta } from '@unhead/vue';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
 import BaseInput from '../components/ui/BaseInput.vue';
@@ -10,6 +11,15 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const { t } = useI18n();
+
+useSeoMeta({
+  ogTitle: t('seo.pages.register.title') + ' | Cranial Trading',
+  ogDescription: t('seo.pages.register.description'),
+  ogType: 'website',
+  ogUrl: 'https://cranial-trading.web.app/register',
+  ogSiteName: 'Cranial Trading',
+  twitterCard: 'summary_large_image',
+});
 
 const email = ref('');
 const password = ref('');

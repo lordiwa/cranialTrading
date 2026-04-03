@@ -2077,5 +2077,79 @@
 
   "footer": {
     "language": "Idioma"
+  },
+
+  "seo": {
+    "defaultDescription": "Plataforma de troca de cartas Magic: The Gathering. Gerencie sua colecao, encontre matches e conecte-se com outros jogadores.",
+    "pages": {
+      "login": {
+        "title": "Entrar",
+        "description": "Entre no Cranial Trading para gerenciar sua colecao de cartas MTG e encontrar trocas."
+      },
+      "register": {
+        "title": "Criar Conta",
+        "description": "Cadastre-se no Cranial Trading para trocar cartas Magic: The Gathering com jogadores do mundo todo."
+      },
+      "forgotPassword": {
+        "title": "Esqueci a Senha",
+        "description": "Recupere o acesso a sua conta no Cranial Trading."
+      },
+      "resetPassword": {
+        "title": "Redefinir Senha",
+        "description": "Defina uma nova senha para sua conta no Cranial Trading."
+      },
+      "faq": {
+        "title": "Perguntas Frequentes",
+        "description": "Respostas para as perguntas mais comuns sobre o Cranial Trading: matches, trocas, status de cartas e mais."
+      },
+      "terms": {
+        "title": "Termos de Uso",
+        "description": "Termos e condicoes de uso da plataforma Cranial Trading."
+      },
+      "privacy": {
+        "title": "Politica de Privacidade",
+        "description": "Como o Cranial Trading protege e gerencia seus dados pessoais."
+      },
+      "cookies": {
+        "title": "Politica de Cookies",
+        "description": "Informacoes sobre o uso de cookies no Cranial Trading."
+      },
+      "collection": {
+        "title": "Minha Colecao",
+        "description": "Gerencie sua colecao de cartas Magic: The Gathering."
+      },
+      "search": {
+        "title": "Buscar Cartas",
+        "description": "Busque cartas Magic: The Gathering no banco de dados do Scryfall."
+      },
+      "market": {
+        "title": "Mercado",
+        "description": "Explore cartas a venda e para troca de outros jogadores."
+      },
+      "savedMatches": {
+        "title": "Meus Matches",
+        "description": "Revise seus matches de troca e conecte-se com outros jogadores."
+      },
+      "messages": {
+        "title": "Mensagens",
+        "description": "Mensagens com outros jogadores do Cranial Trading."
+      },
+      "settings": {
+        "title": "Configuracoes",
+        "description": "Configure seu perfil e preferencias no Cranial Trading."
+      },
+      "contacts": {
+        "title": "Contatos",
+        "description": "Seus contatos salvos no Cranial Trading."
+      },
+      "userProfile": {
+        "title": "Perfil de {username}",
+        "description": "Veja as cartas a venda e para troca de {username} no Cranial Trading."
+      },
+      "notFound": {
+        "title": "Pagina Nao Encontrada",
+        "description": "A pagina que voce procura nao existe no Cranial Trading."
+      }
+    }
   }
 }

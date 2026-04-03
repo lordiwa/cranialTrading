@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /collection
+Disallow: /search
+Disallow: /market
+Disallow: /saved-matches
+Disallow: /messages
+Disallow: /settings
+Disallow: /contacts
+Disallow: /dashboard
+Disallow: /forgot-password
+Disallow: /reset-password
+
+Sitemap: https://cranial-trading.web.app/sitemap.xml

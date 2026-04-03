@@ -5,9 +5,53 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cranial Trading</title>
+    <meta name="description" content="Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players." />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Cranial Trading" />
+    <meta property="og:title" content="Cranial Trading" />
+    <meta property="og:description" content="Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players." />
+    <meta property="og:url" content="https://cranial-trading.web.app" />
+    <meta property="og:image" content="https://cranial-trading.web.app/og-default.png" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cranial Trading" />
+    <meta name="twitter:description" content="Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players." />
+    <meta name="twitter:image" content="https://cranial-trading.web.app/og-default.png" />
+
+    <!-- Performance hints -->
+    <link rel="preconnect" href="https://cards.scryfall.io" />
+    <link rel="preload" as="font" href="/Fonts/Open-Sans/static/OpenSans-Regular.ttf" type="font/ttf" crossorigin />
+
+    <!-- Organization JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Cranial Trading",
+      "url": "https://cranial-trading.web.app",
+      "description": "Magic: The Gathering trading platform",
+      "logo": "https://cranial-trading.web.app/vite.svg"
+    }
+    </script>
 </head>
 <body>
 <div id="app"></div>
+<noscript>
+    <div style="padding: 2rem; text-align: center; font-family: sans-serif; background: #000; color: #eee; min-height: 100vh;">
+        <h1>Cranial Trading</h1>
+        <p>Magic: The Gathering trading platform. Manage your collection, find trade matches, and connect with other players.</p>
+        <p>This application requires JavaScript to run. Please enable JavaScript in your browser settings.</p>
+        <nav>
+            <a href="/faq" style="color: #5AC168; margin: 0 0.5rem;">FAQ</a>
+            <a href="/terms" style="color: #5AC168; margin: 0 0.5rem;">Terms</a>
+            <a href="/privacy" style="color: #5AC168; margin: 0 0.5rem;">Privacy</a>
+            <a href="/cookies" style="color: #5AC168; margin: 0 0.5rem;">Cookies</a>
+        </nav>
+    </div>
+</noscript>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

@@ -88,3 +88,94 @@ export async function notifyMatchUser(
     throw error
   }
 }
+
+/**
+ * Bulk import cards via Cloud Function (bypasses browser write stream limit).
+ * Accepts up to 5000 cards per call. Caller should chunk larger imports.
+ */
+export interface BulkImportResponse {
+  cardIds: string[]
+  count: number
+}
+
+export async function bulkImportCards(
+  cards: Record<string, unknown>[]
+): Promise<BulkImportResponse> {
+  const callable = httpsCallable<{ cards: Record<string, unknown>[] }, BulkImportResponse>(
+    functions,
+    'bulkImportCards',
+    { timeout: 60000 }
+  )
+  const result = await callable({ cards })
+  return result.data
+}
+
+/**
+ * Load a chunk of the user's card collection via Cloud Function.
+ * Server-side read is ~100x faster than browser SDK for large collections.
+ */
+export interface CollectionSummary {
+  totalCards: number
+  statusCounts: Record<string, number>
+}
+
+export interface LoadCollectionChunkResponse {
+  cards: Record<string, unknown>[]
+  lastId: string | null
+  hasMore: boolean
+  summary?: CollectionSummary
+}
+
+export async function loadCollectionChunk(
+  startAfterId?: string,
+  includeSummary = false,
+  normalized = false
+): Promise<LoadCollectionChunkResponse> {
+  const callable = httpsCallable<
+    { limit: number; startAfterId?: string; includeSummary: boolean; normalized: boolean },
+    LoadCollectionChunkResponse
+  >(functions, 'loadCollectionChunk', { timeout: 60000 })
+  const result = await callable({ limit: 10000, startAfterId, includeSummary, normalized })
+  return result.data
+}
+
+/**
+ * Build or rebuild the lightweight card index for the current user.
+ * Used for fast filtering & pagination without loading full card data.
+ */
+export interface BuildCardIndexResponse {
+  success: boolean
+  totalCards: number
+  chunks: number
+  elapsed: string
+}
+
+export async function buildCardIndex(
+  userId?: string
+): Promise<BuildCardIndexResponse> {
+  const callable = httpsCallable<
+    { userId?: string },
+    BuildCardIndexResponse
+  >(functions, 'buildCardIndex', { timeout: 300000 })
+  const result = await callable({ userId })
+  return result.data
+}
+
+/**
+ * Load full card objects by IDs with scryfall_cache join.
+ * Used for paginated grid display (50-200 cards at a time).
+ */
+export interface LoadCardPageResponse {
+  cards: Record<string, unknown>[]
+}
+
+export async function loadCardPage(
+  cardIds: string[]
+): Promise<LoadCardPageResponse> {
+  const callable = httpsCallable<
+    { cardIds: string[] },
+    LoadCardPageResponse
+  >(functions, 'loadCardPage', { timeout: 30000 })
+  const result = await callable({ cardIds })
+  return result.data
+}

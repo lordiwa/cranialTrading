@@ -4,6 +4,7 @@
       "save": "SALVAR",
       "cancel": "CANCELAR",
       "delete": "EXCLUIR",
+      "deleting": "EXCLUINDO...",
       "edit": "EDITAR",
       "add": "ADICIONAR",
       "close": "FECHAR",
@@ -117,7 +118,9 @@
       "resumeComplete": "\"{name}\" concluído com {count} cartas",
       "resumeIncomplete": "Importação incompleta. O deck pode estar vazio.",
       "resumeError": "Erro ao retomar importação",
-      "resumeFailed": "Importação de \"{name}\" falhou. Limpando..."
+      "resumeFailed": "Importação de \"{name}\" falhou. Limpando...",
+      "fetchingDataProgress": "Obtendo dados: {current}/{total}...",
+      "savingProgress": "Salvando cartas: {current}/{total}..."
     }
   },
 
@@ -788,10 +791,10 @@
       "moxfieldDetected": {
         "title": "Link do Moxfield detectado",
         "instruction": "O Moxfield não permite importar diretamente. Siga estes passos:",
-        "step1": "1. Abra o deck no Moxfield",
-        "step2": "2. Clique em Export (canto superior direito)",
-        "step3": "3. Clique em Copy to Clipboard",
-        "step4": "4. Cole o texto aqui"
+        "step1": "Abra o deck no Moxfield",
+        "step2": "Clique em Export (canto superior direito)",
+        "step3": "Clique em Copy to Clipboard",
+        "step4": "Cole o texto aqui"
       },
       "preview": {
         "total": "Total: {total} cartas",
@@ -812,8 +815,10 @@
       "submit": "IMPORTAR {count} CARTAS",
       "csvUpload": "ou enviar arquivo CSV",
       "csvDetected": "CSV do ManaBox detectado",
+      "csvDetectedUG": "CSV do Urza's Gatherer detectado",
       "csvConditionNote": "As condições serão importadas por carta do CSV",
-      "csvCards": "{count} cartas encontradas no CSV"
+      "csvCards": "{count} cartas encontradas no CSV",
+      "errorUnknown": "Erro desconhecido"
     },
     "editDeckCard": {
       "titleWishlist": "EDITAR WISHLIST",
@@ -2064,7 +2069,7 @@
     },
     "importModal": {
       "title": "IMPORTAR PASTA",
-      "inputLabel": "Link do Moxfield ou texto da pasta",
+      "inputLabel": "Link do Moxfield, texto da pasta, ou arquivo CSV",
       "binderNameLabel": "Nome da pasta (opcional)",
       "binderNamePlaceholder": "Deixe vazio para gerar um nome aleatório"
     }

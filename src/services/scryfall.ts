@@ -1,3 +1,5 @@
+import { backgroundSafeDelay } from '../utils/backgroundSafeDelay'
+
 const SCRYFALL_API = 'https://api.scryfall.com'
 
 // Rate limiter: Scryfall allows ~10 req/s, we stay safe at ~5 req/s
@@ -8,7 +10,7 @@ async function rateLimitedFetch(url: string): Promise<Response> {
     const now = Date.now()
     const elapsed = now - lastRequestTime
     if (elapsed < MIN_REQUEST_INTERVAL) {
-        await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - elapsed))
+        await backgroundSafeDelay(MIN_REQUEST_INTERVAL - elapsed)
     }
     lastRequestTime = Date.now()
 
@@ -18,7 +20,7 @@ async function rateLimitedFetch(url: string): Promise<Response> {
     if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After')
         const delay = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : 2000
-        await new Promise(resolve => setTimeout(resolve, delay))
+        await backgroundSafeDelay(delay)
         lastRequestTime = Date.now()
         return fetch(url)
     }
@@ -456,7 +458,7 @@ async function fetchCollectionBatch(
             const now = Date.now()
             const elapsed = now - lastRequestTime
             if (elapsed < MIN_REQUEST_INTERVAL) {
-                await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - elapsed))
+                await backgroundSafeDelay(MIN_REQUEST_INTERVAL - elapsed)
             }
             lastRequestTime = Date.now()
 
@@ -469,7 +471,7 @@ async function fetchCollectionBatch(
             if (response.status === 429) {
                 const retryAfter = response.headers.get('Retry-After')
                 const delay = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : 2000
-                await new Promise(resolve => setTimeout(resolve, delay))
+                await backgroundSafeDelay(delay)
                 retries--
                 continue
             }
@@ -490,7 +492,8 @@ async function fetchCollectionBatch(
 }
 
 export const getCardsByIds = async (
-    identifiers: ({ id: string } | { name: string })[]
+    identifiers: ({ id: string } | { name: string })[],
+    onProgress?: (current: number, total: number) => void
 ): Promise<ScryfallCard[]> => {
     if (identifiers.length === 0) return []
 
@@ -502,8 +505,10 @@ export const getCardsByIds = async (
         const batchResults = await fetchCollectionBatch(batch)
         results.push(...batchResults)
 
+        onProgress?.(Math.min(i + BATCH_SIZE, identifiers.length), identifiers.length)
+
         if (i + BATCH_SIZE < identifiers.length) {
-            await new Promise(resolve => setTimeout(resolve, 50))
+            await backgroundSafeDelay(50)
         }
     }
 

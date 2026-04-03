@@ -47,9 +47,14 @@ Wait for their answer, then run: `npm version <patch|minor|major> --no-git-tag-v
 
 Run `git push origin develop`.
 
-## Step 8: Report
+## Step 8: Deploy Cloud Functions
+
+Run `npm run deploy:functions:dev`. If it fails, report the error but continue to Step 9 (the web app deploy is independent).
+
+## Step 9: Report
 
 Tell the user:
 - What version was deployed (from package.json)
 - That it will auto-deploy to `cranial-trading-dev.web.app` once CI passes
+- Whether Cloud Functions deployed successfully
 - Remind them to verify on the dev environment before deploying to production

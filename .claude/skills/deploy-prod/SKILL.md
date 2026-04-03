@@ -58,13 +58,18 @@ If there are merge conflicts, **STOP** and report them. Do not attempt to resolv
 
 Run `git push origin main`.
 
-## Step 6: Return to Develop
+## Step 6: Deploy Cloud Functions to Production
+
+Run `npm run deploy:functions:prod`. If it fails, report the error but continue (the web app deploy is independent).
+
+## Step 7: Return to Develop
 
 Run `git checkout develop` to return to the development branch.
 
-## Step 7: Report
+## Step 8: Report
 
 Tell the user:
 - Version deployed
 - That CI will run and auto-deploy to `cranial-trading.web.app`
+- Whether Cloud Functions deployed successfully
 - Remind them to monitor the deployment and verify on production

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useContextMenu } from '../../composables/useContextMenu'
@@ -246,6 +246,18 @@ const getCardImage = (card: Card): string => {
   return card.image ?? ''
 }
 
+// True when card has a real image URL (not empty, not whitespace)
+const hasImage = computed(() => {
+  const img = getCardImage(props.card)
+  return img.length > 0 && img.startsWith('http')
+})
+
+// Track image loading state for showing spinner overlay
+const imageLoaded = ref(false)
+const onImageLoad = () => { imageLoaded.value = true }
+const onImageError = () => { imageLoaded.value = false }
+watch(() => props.card.image, () => { imageLoaded.value = false })
+
 const isSplitCard = computed((): boolean => {
   const parsed = parsedImage.value
   return !!(parsed?.card_faces && parsed.card_faces.length > 1)
@@ -365,15 +377,22 @@ const handleContextMenuSelect = async (itemId: string) => {
   <!-- COMPACT MODE: For deck view -->
   <div v-if="compact" ref="compactCardRef" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
     <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded">
-      <img
-          v-if="getCardImage(card)"
-          :src="getCardImage(card)"
-          :alt="card.name"
-          loading="lazy"
-          class="w-full h-full object-cover"
-      />
-      <div v-else class="w-full h-full flex items-center justify-center bg-primary">
-        <span class="text-[14px] text-silver-50">{{ t('cards.grid.noImg') }}</span>
+      <template v-if="hasImage">
+        <img
+            :src="getCardImage(card)"
+            :alt="card.name"
+            loading="lazy"
+            class="w-full h-full object-cover"
+            @load="onImageLoad"
+            @error="onImageError"
+        />
+        <div v-if="!imageLoaded" class="absolute inset-0 flex flex-col items-center justify-center bg-primary gap-2">
+          <div class="w-8 h-8 border-2 border-silver-30 border-t-neon rounded-full animate-spin"></div>
+        </div>
+      </template>
+      <div v-else class="w-full h-full flex flex-col items-center justify-center bg-primary gap-2">
+        <div class="w-8 h-8 border-2 border-silver-30 border-t-neon rounded-full animate-spin"></div>
+        <span class="text-[12px] text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
       </div>
 
       <!-- Qty Badge - BIGGER for compact -->
@@ -488,15 +507,22 @@ const handleContextMenuSelect = async (itemId: string) => {
         </div>
       </div>
 
-      <img
-          v-if="getCardImage(card)"
-          :src="getCardImage(card)"
-          :alt="card.name"
-          loading="lazy"
-          class="w-full h-full object-cover"
-      />
-      <div v-else class="w-full h-full flex items-center justify-center bg-primary">
-        <span class="text-tiny text-silver-50">{{ t('cards.grid.noImage') }}</span>
+      <template v-if="hasImage">
+        <img
+            :src="getCardImage(card)"
+            :alt="card.name"
+            loading="lazy"
+            class="w-full h-full object-cover"
+            @load="onImageLoad"
+            @error="onImageError"
+        />
+        <div v-if="!imageLoaded" class="absolute inset-0 flex flex-col items-center justify-center bg-primary gap-2 z-[1]">
+          <div class="w-8 h-8 border-2 border-silver-30 border-t-neon rounded-full animate-spin"></div>
+        </div>
+      </template>
+      <div v-else class="w-full h-full flex flex-col items-center justify-center bg-primary gap-2">
+        <div class="w-8 h-8 border-2 border-silver-30 border-t-neon rounded-full animate-spin"></div>
+        <span class="text-tiny text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
       </div>
 
       <!-- Toggle button for split cards (always visible if split) -->

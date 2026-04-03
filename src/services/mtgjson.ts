@@ -67,6 +67,7 @@ let priceDataCache: Record<string, MTGJSONPriceFormats> | null = null
 let scryfallToUuidMap = new Map<string, string>()
 let dbInstance: IDBDatabase | null = null
 const failedSets = new Set<string>()
+const loadedSets = new Set<string>()
 
 // One-time cleanup of old/bloated localStorage keys (migrating to IndexedDB)
 ;(() => {
@@ -235,7 +236,7 @@ async function loadMappingFromCache(): Promise<Map<string, string> | null> {
  * Save scryfallId -> uuid mapping to IndexedDB
  * Limits cache to avoid excessive storage
  */
-const MAX_MAPPING_ENTRIES = 10000
+const MAX_MAPPING_ENTRIES = 100000
 
 async function saveMappingToCache(map: Map<string, string>): Promise<void> {
   let mapToSave = map
@@ -332,6 +333,7 @@ async function fetchSetMapping(setCode: string): Promise<void> {
       }
     }
 
+    loadedSets.add(setCode.toUpperCase())
     console.info(`Loaded ${count} cards from ${setCode}`)
   } catch (error) {
     console.warn(`[MTGJSON] Set ${setCode} failed (will skip for this session):`, error)
@@ -407,6 +409,41 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
     console.error('Error getting card prices:', error)
     return null
   }
+}
+
+/**
+ * Preload set mappings in parallel batches.
+ * Turns ~300 sequential set downloads into ~60 parallel batches of 5.
+ */
+export async function preloadSetMappings(setCodes: string[]): Promise<void> {
+  // Filter out already-loaded and failed sets
+  const needed = setCodes.filter(sc => {
+    const upper = sc.toUpperCase()
+    return !failedSets.has(upper) && !loadedSets.has(upper)
+  })
+  if (needed.length === 0) return
+
+  // Load mapping from IndexedDB cache if not in memory
+  if (scryfallToUuidMap.size === 0) {
+    const cached = await loadMappingFromCache()
+    if (cached) scryfallToUuidMap = cached
+  }
+
+  // Filter again after loading cache — sets whose cards are already mapped
+  // We can't perfectly know which sets are "loaded" from cache, so just skip sets
+  // that are now in loadedSets (from a prior call in this session)
+  const stillNeeded = needed.filter(sc => !loadedSets.has(sc.toUpperCase()))
+  if (stillNeeded.length === 0) return
+
+  // Fetch in parallel batches of 5
+  const CONCURRENCY = 5
+  for (let i = 0; i < stillNeeded.length; i += CONCURRENCY) {
+    const batch = stillNeeded.slice(i, i + CONCURRENCY)
+    await Promise.allSettled(batch.map(sc => fetchSetMapping(sc)))
+  }
+
+  // Save updated mapping
+  void saveMappingToCache(scryfallToUuidMap)
 }
 
 /**

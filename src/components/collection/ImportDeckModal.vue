@@ -9,7 +9,7 @@ import { useI18n } from '../../composables/useI18n'
 import { type CardCondition, type CardStatus } from '../../types/card'
 import { type DeckFormat } from '../../types/deck'
 import { extractDeckId, fetchMoxfieldDeck, type MoxfieldCard, type MoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
-import { isCsvFormat, parseCsvDeckImport, type ParsedCsvCard } from '../../utils/cardHelpers'
+import { isCsvFormat, isUrzasGathererCsv, parseCsvDeckImport, type ParsedCsvCard, parseUrzasGathererCsv } from '../../utils/cardHelpers'
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -38,6 +38,7 @@ const errorMsg = ref('')
 const isLink = ref(false)
 const moxfieldDeckData = ref<MoxfieldDeck | null>(null)
 const isCsv = ref(false)
+const csvIsUG = ref(false)
 const csvParsedCards = ref<ParsedCsvCard[]>([])
 const csvFileInput = ref<HTMLInputElement | null>(null)
 
@@ -104,7 +105,7 @@ interface ParsePreview { total: number; mainboard: number; sideboard: number; na
 const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> => {
   const result = await fetchMoxfieldDeck(deckId)
   if (!result.data) {
-    errorMsg.value = result.error ?? 'Error desconocido'
+    errorMsg.value = result.error ?? t('decks.importModal.errorUnknown')
     return null
   }
   const deck = result.data
@@ -128,7 +129,9 @@ const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> 
 }
 
 const parseCsvInput = (text: string): ParsePreview => {
-  const cards = parseCsvDeckImport(text)
+  const isUG = isUrzasGathererCsv(text)
+  const cards = isUG ? parseUrzasGathererCsv(text) : parseCsvDeckImport(text)
+  csvIsUG.value = isUG
   csvParsedCards.value = cards
   const totalQty = cards.reduce((sum, c) => sum + c.quantity, 0)
   return { total: totalQty, mainboard: totalQty, sideboard: 0, cards: cards.map(c => c.name) }
@@ -216,6 +219,7 @@ const handleClose = () => {
   isLink.value = false
   moxfieldDeckData.value = null
   isCsv.value = false
+  csvIsUG.value = false
   csvParsedCards.value = []
   importStatus.value = props.defaultStatus
   emit('close')
@@ -230,47 +234,49 @@ const handleCsvFile = async (event: Event) => {
 </script>
 
 <template>
-  <BaseModal :show="show" :close-on-click-outside="false" @close="handleClose">
+  <BaseModal :show="show" :close-on-click-outside="false" :aria-label="isBinder ? t('binders.importModal.title') : t('decks.importModal.title')" @close="handleClose">
     <div class="space-y-md">
       <div>
         <h2 class="text-h2 font-bold text-silver mb-1">{{ isBinder ? t('binders.importModal.title') : t('decks.importModal.title') }}</h2>
-        <p class="text-small text-silver-70">{{ isBinder ? t('binders.importModal.inputLabel') : t('decks.importModal.inputLabel') }}</p>
+        <label for="import-deck-input" class="text-small text-silver-70">{{ isBinder ? t('binders.importModal.inputLabel') : t('decks.importModal.inputLabel') }}</label>
       </div>
 
       <div>
         <textarea
             id="import-deck-input"
             v-model="inputText"
-            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;...&#10;o&#10;CSV (ManaBox / Moxfield)"
+            placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;...&#10;o&#10;CSV (ManaBox / Moxfield / Urza's Gatherer)"
             class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-sans"
             rows="8"
-            @input="preview = null"
+            @input="preview = null; deckNameInput = ''"
         />
         <input
             ref="csvFileInput"
             type="file"
             accept=".csv"
+            :aria-label="t('decks.importModal.csvUpload')"
             class="hidden"
             @change="handleCsvFile"
         />
-        <button
-            type="button"
-            class="mt-2 text-tiny text-neon hover:text-neon/80 transition-fast underline"
+        <BaseButton
+            variant="secondary"
+            size="small"
+            class="mt-2"
             @click="csvFileInput?.click()"
         >
           {{ t('decks.importModal.csvUpload') }}
-        </button>
+        </BaseButton>
       </div>
 
       <div class="flex justify-end pt-3 border-t border-silver-20">
-        <button
-            type="button"
+        <BaseButton
+            variant="filled"
             @click="handleParse"
             :disabled="!inputText.trim() || parsing"
-            class="px-6 py-2.5 bg-neon text-primary font-bold text-small hover:brightness-110 transition-fast rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full sm:w-auto"
         >
           {{ parsing ? t('decks.importModal.analyzing') : t('decks.importModal.analyze') }}
-        </button>
+        </BaseButton>
       </div>
 
       <!-- Instrucciones para Moxfield -->
@@ -286,17 +292,17 @@ const handleCsvFile = async (event: Event) => {
       </div>
 
       <!-- Error message -->
-      <div v-else-if="errorMsg" class="border border-rust bg-rust/10 p-md">
+      <div v-else-if="errorMsg" role="alert" class="border border-rust bg-rust/10 p-md">
         <p class="text-small text-rust">{{ errorMsg }}</p>
       </div>
 
       <!-- CSV detected indicator -->
       <div v-if="preview && isCsv" class="border border-neon bg-neon/10 p-md">
-        <p class="text-small text-neon font-bold">{{ t('decks.importModal.csvDetected') }}</p>
+        <p class="text-small text-neon font-bold">{{ csvIsUG ? t('decks.importModal.csvDetectedUG') : t('decks.importModal.csvDetected') }}</p>
         <p class="text-small text-silver mt-1">{{ t('decks.importModal.csvCards', { count: csvParsedCards.length }) }}</p>
       </div>
 
-      <div v-if="preview" class="border border-silver-30 p-md space-y-xs">
+      <div v-if="preview" aria-live="polite" class="border border-silver-30 p-md space-y-xs">
         <p v-if="preview.name" class="text-body font-bold text-neon mb-3">
           {{ preview.name }}
         </p>

@@ -289,7 +289,91 @@ export interface ParsedCsvCard {
 }
 
 /**
- * Detect if text is a CSV export (ManaBox or Moxfield)
+ * Map Urza's Gatherer condition labels to app's CardCondition type
+ */
+const mapUrzasGathererCondition = (label: string): CardCondition => {
+  switch (label.toLowerCase().trim()) {
+    case 'mint': return 'M'
+    case 'near mint': return 'NM'
+    case 'excellent': return 'LP'
+    case 'good': return 'LP'
+    case 'light played': return 'MP'
+    case 'played': return 'HP'
+    case 'poor': return 'PO'
+    default: return 'NM'
+  }
+}
+
+/**
+ * Map Urza's Gatherer language string (e.g. "1xEnglish") to ISO code
+ */
+const mapUgLanguage = (langStr: string): string | undefined => {
+  if (!langStr.trim()) return undefined
+  // Extract language name: strip "NxLanguage" prefix from first segment
+  const firstSegment = langStr.split(',')[0]?.trim() ?? ''
+  const langName = firstSegment.replace(/^\d+x/i, '').trim()
+  if (!langName) return undefined
+  const map: Record<string, string> = {
+    english: 'en', spanish: 'es', portuguese: 'pt', french: 'fr',
+    german: 'de', italian: 'it', japanese: 'ja', chinese: 'zh',
+    korean: 'ko', russian: 'ru',
+  }
+  return map[langName.toLowerCase()]
+}
+
+/**
+ * Parse Urza's Gatherer condition string (e.g. "2xMint, 1xNear mint")
+ * into an array of { condition, count } entries.
+ */
+export const parseUrzasGathererConditions = (
+  conditionStr: string,
+  totalCount: number,
+): { condition: CardCondition; count: number }[] => {
+  if (!conditionStr.trim()) {
+    return [{ condition: 'NM', count: totalCount }]
+  }
+
+  const segments = conditionStr.split(', ')
+  const result: { condition: CardCondition; count: number }[] = []
+  let parsed = 0
+
+  for (const seg of segments) {
+    const match = /^(\d+)x(.+)$/i.exec(seg.trim())
+    if (match) {
+      const count = Number.parseInt(match[1]!, 10)
+      const condition = mapUrzasGathererCondition(match[2]!)
+      result.push({ condition, count })
+      parsed += count
+    }
+  }
+
+  if (result.length === 0) {
+    return [{ condition: 'NM', count: totalCount }]
+  }
+
+  if (parsed < totalCount) {
+    result.push({ condition: 'NM', count: totalCount - parsed })
+  }
+
+  return result
+}
+
+/**
+ * Detect if text is an Urza's Gatherer CSV export.
+ * UG headers contain "Foil count" AND "Multiverse ID" (unique combination).
+ */
+export const isUrzasGathererCsv = (text: string): boolean => {
+  const lines = text.split('\n')
+  if (lines.length < 2) return false
+  // Skip "sep=," line if present
+  const headerLine = lines[0]?.trim().startsWith('"sep=') || lines[0]?.trim().startsWith('sep=')
+    ? lines[1]?.trim() ?? ''
+    : lines[0]?.trim() ?? ''
+  return headerLine.includes('Foil count') && headerLine.includes('Multiverse ID')
+}
+
+/**
+ * Detect if text is a CSV export (ManaBox, Moxfield, or Urza's Gatherer)
  */
 export const isCsvFormat = (text: string): boolean => {
   const firstLine = text.split('\n')[0]?.trim() ?? ''
@@ -297,6 +381,7 @@ export const isCsvFormat = (text: string): boolean => {
   // Moxfield: headers contain "Count,Name,Edition" or "Collector Number"
   return firstLine.includes('Name,Set code') || firstLine.includes('Scryfall ID')
     || firstLine.includes('Count,Name,Edition') || firstLine.includes('Collector Number')
+    || isUrzasGathererCsv(text)
 }
 
 /**
@@ -362,6 +447,111 @@ export const parseCsvDeckImport = (csvText: string): ParsedCsvCard[] => {
       price: Number.parseFloat(getField(fields, priceIdx) || '0') || 0,
       condition: conditionMapper(getField(fields, conditionIdx)),
     })
+  }
+
+  return cards
+}
+
+/**
+ * Parse Urza's Gatherer CSV text into structured card data.
+ * Handles sep=, prefix, $ prices, condition expansion, foil/non-foil split.
+ */
+export const parseUrzasGathererCsv = (csvText: string): ParsedCsvCard[] => {
+  const lines = csvText.split('\n').filter(l => l.trim())
+  if (lines.length < 2) return []
+
+  // Skip "sep=," line if present
+  let startIdx = 0
+  if (lines[0]?.trim().startsWith('"sep=') || lines[0]?.trim().startsWith('sep=')) {
+    startIdx = 1
+  }
+
+  const headerLine = lines[startIdx]
+  if (!headerLine) return []
+  const headers = parseCsvLine(headerLine)
+  const colIndex = new Map<string, number>()
+  headers.forEach((h, i) => { colIndex.set(h.trim(), i) })
+
+  const nameIdx = colIndex.get('Name')
+  const countIdx = colIndex.get('Count')
+  const foilCountIdx = colIndex.get('Foil count')
+  const specialFoilIdx = colIndex.get('Special foil count')
+  const setCodeIdx = colIndex.get('Set code')
+  const scryfallIdx = colIndex.get('Scryfall ID')
+  const priceIdx = colIndex.get('Price')
+  const foilPriceIdx = colIndex.get('Foil price')
+  const conditionIdx = colIndex.get('Condition')
+  const languageIdx = colIndex.get('Languages')
+
+  if (nameIdx === undefined || countIdx === undefined) return []
+
+  const getField = (fields: string[], idx: number | undefined): string => {
+    if (idx === undefined) return ''
+    // eslint-disable-next-line security/detect-object-injection
+    return fields[idx] ?? ''
+  }
+
+  const cards: ParsedCsvCard[] = []
+
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
+    const line = lines[i]
+    if (!line) continue
+    const fields = parseCsvLine(line)
+
+    const name = getField(fields, nameIdx).trim()
+    const count = Number.parseInt(getField(fields, countIdx) || '0', 10)
+    if (!name || count <= 0) continue
+
+    const foilCount = Number.parseInt(getField(fields, foilCountIdx) || '0', 10)
+    const specialFoilCount = Number.parseInt(getField(fields, specialFoilIdx) || '0', 10)
+    const totalFoil = Math.min(foilCount + specialFoilCount, count)
+    const nonFoilCount = count - totalFoil
+
+    const setCode = getField(fields, setCodeIdx).trim()
+    const scryfallId = getField(fields, scryfallIdx).trim()
+    const rawPrice = getField(fields, priceIdx).replace('$', '')
+    const rawFoilPrice = getField(fields, foilPriceIdx).replace('$', '')
+    const price = Number.parseFloat(rawPrice) || 0
+    const foilPrice = Number.parseFloat(rawFoilPrice) || 0
+    const conditionStr = getField(fields, conditionIdx).trim()
+    const languageStr = getField(fields, languageIdx).trim()
+    const language = mapUgLanguage(languageStr)
+
+    // Expand conditions into per-copy array
+    const conditionEntries = parseUrzasGathererConditions(conditionStr, count)
+    const perCopy: CardCondition[] = []
+    for (const entry of conditionEntries) {
+      for (let j = 0; j < entry.count; j++) {
+        perCopy.push(entry.condition)
+      }
+    }
+    // Pad to count if needed
+    while (perCopy.length < count) {
+      perCopy.push('NM')
+    }
+
+    // Split into non-foil (first nonFoilCount copies) and foil (rest)
+    const nonFoilConditions = perCopy.slice(0, nonFoilCount)
+    const foilConditions = perCopy.slice(nonFoilCount, nonFoilCount + totalFoil)
+
+    // Aggregate non-foil by condition
+    const nonFoilAgg = new Map<CardCondition, number>()
+    for (const cond of nonFoilConditions) {
+      nonFoilAgg.set(cond, (nonFoilAgg.get(cond) ?? 0) + 1)
+    }
+    for (const [cond, qty] of nonFoilAgg) {
+      cards.push({ name, setCode, quantity: qty, foil: false, language, scryfallId, price, condition: cond })
+    }
+
+    // Aggregate foil by condition
+    const foilAgg = new Map<CardCondition, number>()
+    for (const cond of foilConditions) {
+      foilAgg.set(cond, (foilAgg.get(cond) ?? 0) + 1)
+    }
+    for (const [cond, qty] of foilAgg) {
+      cards.push({ name, setCode, quantity: qty, foil: true, language, scryfallId, price: foilPrice, condition: cond })
+    }
   }
 
   return cards

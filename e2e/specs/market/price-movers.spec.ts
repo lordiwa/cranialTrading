@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures/test';
 
-test.describe('Price Movers', () => {
+// Skipped: depends on external MTGStocks API data that may not load in CI
+test.describe.skip('Price Movers', () => {
   test.beforeEach(async ({ marketPage }) => {
     await marketPage.goto();
     await marketPage.switchTab('movers');

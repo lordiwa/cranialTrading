@@ -85,6 +85,12 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
+
+      // Lightweight card index for fast filtering & pagination
+      match /card_index/{chunkId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == userId;
+      }
     }
 
     // ========== COLECCIONES PÚBLICAS PARA MATCHES OPTIMIZADOS ==========
@@ -166,6 +172,13 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if false;
       }
+    }
+
+    // ========== SCRYFALL CARD CACHE (shared, written only by Cloud Functions) ==========
+    match /scryfall_cache/{cardId} {
+      allow read: if request.auth != null;
+      allow create, update: if false;  // Only admin SDK (Cloud Functions) can write
+      allow delete: if false;
     }
 
     // Denegar todo lo demás por defecto

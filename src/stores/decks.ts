@@ -11,7 +11,7 @@ import {
     updateDoc,
 } from 'firebase/firestore'
 import { db } from '../services/firebase'
-import { getCardsByIds } from '../services/scryfall'
+import { getCardsByIds } from '../services/scryfallCache'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { useCollectionStore } from './collection'

@@ -4,6 +4,7 @@ import {
     addDoc,
     collection,
     deleteDoc,
+    deleteField,
     doc,
     getDocs,
     Timestamp,
@@ -29,6 +30,25 @@ const removeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
     return Object.fromEntries(
         Object.entries(obj).filter(([_, v]) => v !== undefined)
     ) as T
+}
+
+/** Serialize allocations array to JSON string for Firestore (avoids 40k index entry limit on maps) */
+export const serializeAllocations = (allocations: BinderAllocation[]): string =>
+    JSON.stringify(Object.fromEntries(allocations.map(a => [a.cardId, a.quantity])))
+
+/** Deserialize JSON string back to BinderAllocation[] */
+export const deserializeAllocationMap = (data: string | null | undefined): BinderAllocation[] => {
+    if (!data || typeof data !== 'string') return []
+    try {
+        const map: Record<string, number> = JSON.parse(data)
+        return Object.entries(map).map(([cardId, quantity]) => ({
+            cardId,
+            quantity,
+            addedAt: new Date(),
+        }))
+    } catch {
+        return []
+    }
 }
 
 export const useBindersStore = defineStore('binders', () => {
@@ -77,7 +97,7 @@ export const useBindersStore = defineStore('binders', () => {
             const card = cardMap.get(alloc.cardId)
             if (!card) continue
 
-            const addedAt = alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt)
+            const addedAt = card.createdAt ?? (alloc.addedAt instanceof Date ? alloc.addedAt : new Date(alloc.addedAt))
 
             result.push({
                 cardId: card.id,
@@ -148,6 +168,7 @@ export const useBindersStore = defineStore('binders', () => {
                 interface FirestoreBinderData {
                     name: string;
                     description?: string;
+                    allocationData?: string;
                     allocations?: {
                         cardId: string;
                         quantity: number;
@@ -162,12 +183,15 @@ export const useBindersStore = defineStore('binders', () => {
                 }
                 const data = docSnap.data() as FirestoreBinderData
 
-                const allocations: BinderAllocation[] = (data.allocations ?? []).map(a => ({
-                    ...a,
-                    addedAt: (typeof a.addedAt === 'object' && a.addedAt !== null && 'toDate' in a.addedAt && typeof a.addedAt.toDate === 'function')
-                        ? a.addedAt.toDate()
-                        : (a.addedAt ? new Date(a.addedAt as string | number) : new Date()),
-                }))
+                // New compact JSON string format takes priority; fall back to old array format
+                const allocations: BinderAllocation[] = data.allocationData
+                    ? deserializeAllocationMap(data.allocationData)
+                    : (data.allocations ?? []).map(a => ({
+                        ...a,
+                        addedAt: (typeof a.addedAt === 'object' && a.addedAt !== null && 'toDate' in a.addedAt && typeof a.addedAt.toDate === 'function')
+                            ? a.addedAt.toDate()
+                            : (a.addedAt ? new Date(a.addedAt as string | number) : new Date()),
+                    }))
 
                 return {
                     id: docSnap.id,
@@ -206,7 +230,7 @@ export const useBindersStore = defineStore('binders', () => {
             const docRef = await addDoc(bindersRef, {
                 name: input.name,
                 description: input.description,
-                allocations: [],
+                allocationData: '{}',
                 thumbnail: '',
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
@@ -328,10 +352,11 @@ export const useBindersStore = defineStore('binders', () => {
             binder.stats = calculateStats(binder.allocations, collectionStore.cards)
             binder.updatedAt = new Date()
 
-            // Save to Firestore
+            // Save to Firestore (compact map format + clean old array field)
             const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
             await updateDoc(binderRef, {
-                allocations: binder.allocations,
+                allocationData: serializeAllocations(binder.allocations),
+                allocations: deleteField(),
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
             })
@@ -397,7 +422,8 @@ export const useBindersStore = defineStore('binders', () => {
 
             const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
             await updateDoc(binderRef, {
-                allocations: binder.allocations,
+                allocationData: serializeAllocations(binder.allocations),
+                allocations: deleteField(),
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
             })
@@ -431,7 +457,8 @@ export const useBindersStore = defineStore('binders', () => {
 
                 const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
                 await updateDoc(binderRef, {
-                    allocations: binder.allocations,
+                    allocationData: serializeAllocations(binder.allocations),
+                    allocations: deleteField(),
                     stats: binder.stats,
                     updatedAt: Timestamp.now(),
                 })
@@ -458,7 +485,8 @@ export const useBindersStore = defineStore('binders', () => {
 
             const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
             await updateDoc(binderRef, {
-                allocations: binder.allocations,
+                allocationData: serializeAllocations(binder.allocations),
+                allocations: deleteField(),
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
             })
@@ -511,7 +539,8 @@ export const useBindersStore = defineStore('binders', () => {
 
             const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
             await updateDoc(binderRef, {
-                allocations: binder.allocations,
+                allocationData: serializeAllocations(binder.allocations),
+                allocations: deleteField(),
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
             })

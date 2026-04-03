@@ -588,6 +588,16 @@ export const useCollectionStore = defineStore('collection', () => {
                     const chunkRef = doc(db, 'users', userId, 'card_index', `chunk_${c}`)
                     await setDoc(chunkRef, { cards: chunkCards, count: chunkCards.length, updatedAt: Timestamp.now() })
                 }
+
+                // Delete orphaned chunks (e.g., collection shrank from 5 chunks to 2)
+                const indexCol = collection(db, 'users', userId, 'card_index')
+                const existingChunks = await getDocs(indexCol)
+                for (const chunkDoc of existingChunks.docs) {
+                    const chunkNum = parseInt(chunkDoc.id.replace('chunk_', ''), 10)
+                    if (!isNaN(chunkNum) && chunkNum >= totalChunks) {
+                        await deleteDoc(chunkDoc.ref)
+                    }
+                }
             } catch (err) {
                 console.warn('[IndexSync] Failed to persist index:', err)
             }
@@ -848,6 +858,23 @@ export const useCollectionStore = defineStore('collection', () => {
             // Optimistic: clear UI immediately so price fetch stops writing
             cards.value = []
             cardsById.clear()
+            cardIndexRaw.value = []
+
+            // Delete card_index chunks so deleted cards don't reappear on reload.
+            // Use batches of 10 to avoid "Transaction too big" (each chunk is ~400KB).
+            const indexCol = collection(db, 'users', authStore.user.id, 'card_index')
+            const indexSnapshot = await getDocs(indexCol)
+            if (!indexSnapshot.empty) {
+                const IDX_BATCH = 10
+                for (let idx = 0; idx < indexSnapshot.docs.length; idx += IDX_BATCH) {
+                    const chunk = indexSnapshot.docs.slice(idx, idx + IDX_BATCH)
+                    const batch = writeBatch(db)
+                    for (const idxDoc of chunk) {
+                        batch.delete(idxDoc.ref)
+                    }
+                    await batch.commit()
+                }
+            }
 
             const BATCH_SIZE = 500
             const docs = snapshot.docs
@@ -931,6 +958,27 @@ export const useCollectionStore = defineStore('collection', () => {
 
         if (totalFailed > 0) {
             console.warn(`Batch delete: ${totalDeleted} deleted, ${totalFailed} failed`)
+        }
+
+        // Delete ALL card_index chunks so deleted cards don't reappear on reload.
+        // Use batches of 10 to avoid "Transaction too big" (each chunk is ~400KB).
+        cardIndexRaw.value = cards.value.map(cardToIndex)
+        try {
+            const indexCol = collection(db, 'users', userId, 'card_index')
+            const indexSnap = await getDocs(indexCol)
+            if (!indexSnap.empty) {
+                const IDX_BATCH = 10
+                for (let idx = 0; idx < indexSnap.docs.length; idx += IDX_BATCH) {
+                    const chunk = indexSnap.docs.slice(idx, idx + IDX_BATCH)
+                    const batch = writeBatch(db)
+                    for (const idxDoc of chunk) {
+                        batch.delete(idxDoc.ref)
+                    }
+                    await batch.commit()
+                }
+            }
+        } catch (err) {
+            console.warn('[batchDelete] Failed to clean card_index:', err)
         }
 
         return { success: totalFailed === 0, deleted: totalDeleted, failed: totalFailed }

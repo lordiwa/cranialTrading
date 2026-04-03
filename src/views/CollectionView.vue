@@ -2865,8 +2865,8 @@ const handleImportBinderDirect = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      // Split into multiple binders if >10k to stay under Firestore 1MB doc limit
-      const MAX_PER_BINDER = 10000
+      // Split into multiple binders if >35k to stay under Firestore 1MB doc limit (compact JSON string format)
+      const MAX_PER_BINDER = 35000
       if (bulkItems.length > MAX_PER_BINDER) {
         const totalBinders = Math.ceil(bulkItems.length / MAX_PER_BINDER)
         for (let b = 0; b < totalBinders; b++) {
@@ -2959,8 +2959,8 @@ const handleImportBinderCsv = async (
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
 
-      // Split into multiple binders if >10k to stay under Firestore 1MB doc limit
-      const MAX_PER_BINDER = 10000
+      // Split into multiple binders if >35k to stay under Firestore 1MB doc limit (compact JSON string format)
+      const MAX_PER_BINDER = 35000
       if (bulkItems.length > MAX_PER_BINDER) {
         const totalBinders = Math.ceil(bulkItems.length / MAX_PER_BINDER)
         for (let b = 0; b < totalBinders; b++) {

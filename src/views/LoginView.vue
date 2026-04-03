@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useSeoMeta } from '@unhead/vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import { type SupportedLocale, useI18n } from '../composables/useI18n';
@@ -28,6 +29,15 @@ const loading = ref(false);
 const googleLoading = ref(false);
 
 useScrollReveal();
+
+useSeoMeta({
+  ogTitle: t('seo.pages.login.title') + ' | Cranial Trading',
+  ogDescription: t('seo.pages.login.description'),
+  ogType: 'website',
+  ogUrl: 'https://cranial-trading.web.app/login',
+  ogSiteName: 'Cranial Trading',
+  twitterCard: 'summary_large_image',
+});
 
 const handleLogin = async () => {
   if (!email.value || !password.value) return;

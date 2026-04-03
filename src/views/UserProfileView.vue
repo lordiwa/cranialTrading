@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useHead, useSeoMeta } from '@unhead/vue';
 import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToastStore } from '../stores/toast';
@@ -68,6 +69,28 @@ const profileAvatarUrl = computed(() => {
     return authStore.getAvatarUrl(64);
   }
   return getAvatarUrlForUser(userInfo.value?.username ?? '', 64, userInfo.value?.avatarUrl);
+});
+
+// SEO: Dynamic meta tags that update when profile data loads
+const profileTitle = computed(() =>
+  userInfo.value?.username ? `@${userInfo.value.username}` : t('seo.pages.userProfile.title', { username: username.value })
+);
+const profileDescription = computed(() =>
+  t('seo.pages.userProfile.description', { username: userInfo.value?.username || username.value })
+);
+
+useHead({
+  title: profileTitle,
+});
+
+useSeoMeta({
+  ogTitle: computed(() => `${profileTitle.value} | Cranial Trading`),
+  ogDescription: profileDescription,
+  ogType: 'profile',
+  ogUrl: computed(() => `https://cranial-trading.web.app/@${username.value}`),
+  ogImage: computed(() => profileAvatarUrl.value || 'https://cranial-trading.web.app/og-default.png'),
+  ogSiteName: 'Cranial Trading',
+  twitterCard: 'summary_large_image',
 });
 
 // Watchers

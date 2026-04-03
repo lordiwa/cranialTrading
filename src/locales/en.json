@@ -2077,5 +2077,79 @@
 
   "footer": {
     "language": "Language"
+  },
+
+  "seo": {
+    "defaultDescription": "Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players.",
+    "pages": {
+      "login": {
+        "title": "Sign In",
+        "description": "Sign in to Cranial Trading to manage your MTG card collection and find trades."
+      },
+      "register": {
+        "title": "Create Account",
+        "description": "Join Cranial Trading to trade Magic: The Gathering cards with players worldwide."
+      },
+      "forgotPassword": {
+        "title": "Forgot Password",
+        "description": "Recover access to your Cranial Trading account."
+      },
+      "resetPassword": {
+        "title": "Reset Password",
+        "description": "Set a new password for your Cranial Trading account."
+      },
+      "faq": {
+        "title": "FAQ",
+        "description": "Answers to common questions about Cranial Trading: matches, trades, card statuses, and more."
+      },
+      "terms": {
+        "title": "Terms of Use",
+        "description": "Terms and conditions for using the Cranial Trading platform."
+      },
+      "privacy": {
+        "title": "Privacy Policy",
+        "description": "How Cranial Trading protects and manages your personal data."
+      },
+      "cookies": {
+        "title": "Cookie Policy",
+        "description": "Information about how Cranial Trading uses cookies."
+      },
+      "collection": {
+        "title": "My Collection",
+        "description": "Manage your Magic: The Gathering card collection."
+      },
+      "search": {
+        "title": "Search Cards",
+        "description": "Search Magic: The Gathering cards from the Scryfall database."
+      },
+      "market": {
+        "title": "Market",
+        "description": "Browse cards for sale and trade from other players."
+      },
+      "savedMatches": {
+        "title": "My Matches",
+        "description": "Review your trade matches and connect with other players."
+      },
+      "messages": {
+        "title": "Messages",
+        "description": "Messages with other Cranial Trading players."
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Configure your profile and preferences on Cranial Trading."
+      },
+      "contacts": {
+        "title": "Contacts",
+        "description": "Your saved contacts on Cranial Trading."
+      },
+      "userProfile": {
+        "title": "{username}'s Profile",
+        "description": "Browse cards for sale and trade from {username} on Cranial Trading."
+      },
+      "notFound": {
+        "title": "Page Not Found",
+        "description": "The page you are looking for does not exist on Cranial Trading."
+      }
+    }
   }
 }

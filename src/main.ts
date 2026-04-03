@@ -1,4 +1,5 @@
 import { type Component, createApp } from 'vue';
+import { createHead } from '@unhead/vue/client';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
@@ -21,8 +22,10 @@ if (!sessionStorage.getItem('firestore-idb-cleaned')) {
 
 void (async () => {
   const app = createApp(App as Component);
+  const head = createHead();
   const pinia = createPinia();
 
+  app.use(head);
   app.use(pinia);
   app.use(router);
 

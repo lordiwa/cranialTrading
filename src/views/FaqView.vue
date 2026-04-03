@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useHead, useSeoMeta } from '@unhead/vue'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import esLocale from '../locales/es.json'
 
 const { t } = useI18n()
+
+// SEO: OG tags for FAQ page
+useSeoMeta({
+  ogTitle: t('seo.pages.faq.title') + ' | Cranial Trading',
+  ogDescription: t('seo.pages.faq.description'),
+  ogType: 'website',
+  ogUrl: 'https://cranial-trading.web.app/faq',
+  ogSiteName: 'Cranial Trading',
+  twitterCard: 'summary_large_image',
+})
 
 // Track which questions are expanded
 const expandedQuestions = ref<Set<number>>(new Set())
@@ -49,6 +60,29 @@ const expandAll = () => {
 const collapseAll = () => {
   expandedQuestions.value = new Set()
 }
+
+// SEO: FAQPage JSON-LD structured data
+const faqJsonLd = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqQuestions.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.a,
+    },
+  })),
+})
+
+useHead({
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: faqJsonLd,
+    },
+  ],
+})
 </script>
 
 <template>

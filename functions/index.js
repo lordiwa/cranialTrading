@@ -988,6 +988,7 @@ exports.migrateUserCards = onCall(
 // ============================================================
 
 const INDEX_CHUNK_SIZE = 2000;
+const INDEX_VERSION = 2; // Bump when index format changes — client auto-rebuilds stale indexes
 
 /**
  * Extract compact index fields from a full card document.
@@ -1037,6 +1038,10 @@ function toIndexCard(id, data) {
     ca,
     cn: data.condition || 'NM',
     pb: data.public !== false,
+    df: (() => {
+      try { return !!(JSON.parse(data.image || '').card_faces?.length > 1); }
+      catch { return false; }
+    })(),
   };
 }
 
@@ -1066,10 +1071,11 @@ exports.buildCardIndex = onCall(
       'scryfallId', 'name', 'status', 'quantity', 'price', 'cmc',
       'colors', 'rarity', 'type_line', 'foil', 'setCode', 'power',
       'toughness', 'full_art', 'produced_mana', 'keywords', 'legalities',
-      'createdAt', 'condition', 'public',
+      'createdAt', 'condition', 'public', 'image',
     ];
 
-    const allIndexCards = [];
+    // Phase 1: Read all user cards
+    const allRawCards = [];
     let lastDoc = null;
     const READ_CHUNK = 2000;
 
@@ -1087,12 +1093,45 @@ exports.buildCardIndex = onCall(
       if (snapshot.empty) break;
 
       for (const doc of snapshot.docs) {
-        allIndexCards.push(toIndexCard(doc.id, doc.data()));
+        allRawCards.push({ id: doc.id, data: doc.data() });
       }
 
       lastDoc = snapshot.docs[snapshot.docs.length - 1];
       if (snapshot.docs.length < READ_CHUNK) break;
     }
+
+    // Phase 2: Batch-read scryfall_cache to detect dual-faced cards accurately
+    const uniqueScryfallIds = [...new Set(allRawCards.map(c => c.data.scryfallId).filter(Boolean))];
+    const dualFacedIds = new Set();
+
+    // db.getAll supports up to ~10k refs per call; batch if needed
+    const CACHE_BATCH = 5000;
+    for (let i = 0; i < uniqueScryfallIds.length; i += CACHE_BATCH) {
+      const batch = uniqueScryfallIds.slice(i, i + CACHE_BATCH);
+      const refs = batch.map(id => db.collection(SCRYFALL_CACHE_COLLECTION).doc(id));
+      if (refs.length === 0) continue;
+      const cacheDocs = await db.getAll(...refs);
+      for (const cDoc of cacheDocs) {
+        if (!cDoc.exists) continue;
+        const cData = cDoc.data();
+        if (cData.card_faces && cData.card_faces.length > 1) {
+          const facesWithImages = cData.card_faces.filter(f => f.image_uris);
+          if (facesWithImages.length > 1) {
+            dualFacedIds.add(cDoc.id);
+          }
+        }
+      }
+    }
+
+    logger.info(`[buildCardIndex] Found ${dualFacedIds.size} dual-faced cards out of ${uniqueScryfallIds.length} unique scryfallIds`);
+
+    // Phase 3: Build index cards with accurate df flag
+    const allIndexCards = allRawCards.map(({ id, data }) => {
+      const ic = toIndexCard(id, data);
+      // Override df with accurate scryfall_cache detection
+      ic.df = dualFacedIds.has(data.scryfallId);
+      return ic;
+    });
 
     logger.info(`[buildCardIndex] Read ${allIndexCards.length} cards, writing index chunks...`);
 
@@ -1107,6 +1146,7 @@ exports.buildCardIndex = onCall(
       await indexRef.doc(`chunk_${c}`).set({
         cards: chunkCards,
         count: chunkCards.length,
+        version: INDEX_VERSION,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }

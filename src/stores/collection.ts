@@ -131,6 +131,7 @@ export interface IndexCard {
     ca: number     // createdAt (ms)
     cn: string     // condition
     pb: boolean    // public
+    df?: boolean   // dual-faced (has card_faces with separate images)
 }
 
 const RARITY_MAP: Record<string, string> = { c: 'common', u: 'uncommon', r: 'rare', m: 'mythic' }
@@ -165,8 +166,15 @@ function indexToCard(ic: IndexCard): Card {
         produced_mana: ic.pm,
         keywords: ic.kw,
         legalities,
-        // Construct image from scryfallId (works for single-face cards)
-        image: ic.s ? `https://cards.scryfall.io/normal/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg` : '',
+        // Construct image from scryfallId — dual-faced cards get card_faces JSON
+        image: ic.s
+          ? (ic.df
+            ? JSON.stringify({ card_faces: [
+                { image_uris: { normal: `https://cards.scryfall.io/normal/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg`, small: `https://cards.scryfall.io/small/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg` } },
+                { image_uris: { normal: `https://cards.scryfall.io/normal/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg`, small: `https://cards.scryfall.io/small/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg` } },
+              ] })
+            : `https://cards.scryfall.io/normal/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg`)
+          : '',
         createdAt: new Date(ic.ca),
         updatedAt: new Date(ic.ca),
     }
@@ -203,6 +211,10 @@ function cardToIndex(card: Card): IndexCard {
         ca: card.createdAt ? new Date(card.createdAt).getTime() : Date.now(),
         cn: card.condition,
         pb: card.public !== false,
+        df: (() => {
+            try { return ((JSON.parse(card.image || '') as { card_faces?: unknown[] }).card_faces?.length ?? 0) > 1 }
+            catch { return false }
+        })(),
     }
 }
 
@@ -279,6 +291,9 @@ export const useCollectionStore = defineStore('collection', () => {
         }
     }
 
+    /** Expected index version — bump in Cloud Function when format changes */
+    const EXPECTED_INDEX_VERSION = 2
+
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {
         try {
@@ -288,14 +303,17 @@ export const useCollectionStore = defineStore('collection', () => {
             if (snapshot.empty) return false
 
             const allIndex: IndexCard[] = []
+            let indexVersion = 1 // default for chunks without version field
             for (const docSnap of snapshot.docs) {
                 const data = docSnap.data()
                 if (data.cards && Array.isArray(data.cards)) {
                     allIndex.push(...(data.cards as IndexCard[]))
                 }
+                if (data.version) indexVersion = data.version as number
             }
 
-            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks`)
+            const dfCount = allIndex.filter(ic => ic.df).length
+            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks (v${indexVersion}), ${dfCount} dual-faced`)
 
             cardIndexRaw.value = allIndex
             cards.value = allIndex.map(indexToCard)
@@ -313,6 +331,18 @@ export const useCollectionStore = defineStore('collection', () => {
                 totalValue,
                 statusCounts,
                 loadedCards: allIndex.length,
+            }
+
+            // Auto-rebuild stale index in background
+            if (indexVersion < EXPECTED_INDEX_VERSION) {
+                console.info(`[loadCollection] Index v${indexVersion} is stale (expected v${EXPECTED_INDEX_VERSION}), rebuilding in background...`)
+                import('../services/cloudFunctions').then(({ buildCardIndex: rebuildIndex }) => {
+                    rebuildIndex().then(result => {
+                        console.info(`[loadCollection] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
+                    }).catch((err: unknown) => {
+                        console.warn('[loadCollection] Background index rebuild failed:', err)
+                    })
+                }).catch(() => {})
             }
 
             return true

@@ -10,6 +10,7 @@ import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
+import SvgIcon from '../ui/SvgIcon.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { Card, CardCondition, CardStatus } from '../../types/card'
@@ -36,6 +37,7 @@ const { getAllocationsForCard } = useCardAllocation()
 const isLoading = ref(false)
 const loadingPrints = ref(false)
 const showZoom = ref(false)
+const cardFaceIndex = ref(0)
 
 // Print selection
 const availablePrints = ref<ScryfallCard[]>([])
@@ -187,11 +189,43 @@ const totalQuantity = computed(() => {
   return Object.values(statusDistribution.value).reduce((sum, qty) => sum + qty, 0)
 })
 
+// Split card detection and face toggle
+const isSplitCard = computed(() => {
+  if (selectedPrint.value?.card_faces && selectedPrint.value.card_faces.length > 1) {
+    return selectedPrint.value.card_faces.filter(f => f.image_uris).length > 1
+  }
+  // Fallback: check card.image JSON for card_faces
+  if (props.card?.image) {
+    try {
+      const parsed = JSON.parse(props.card.image) as { card_faces?: { image_uris?: Record<string, string> }[] }
+      return !!(parsed.card_faces && parsed.card_faces.length > 1)
+    } catch { /* plain URL */ }
+  }
+  return false
+})
+
+const toggleCardFace = () => {
+  if (isSplitCard.value) {
+    cardFaceIndex.value = cardFaceIndex.value === 0 ? 1 : 0
+  }
+}
+
 // Current image from selected print or original card
 const currentImage = computed(() => {
   if (selectedPrint.value) {
+    const face = selectedPrint.value.card_faces?.[cardFaceIndex.value]
+    if (face?.image_uris?.normal) return face.image_uris.normal
     return selectedPrint.value.image_uris?.normal
            ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
+  }
+  // Fallback: parse card.image JSON for card_faces
+  if (props.card?.image) {
+    try {
+      const parsed = JSON.parse(props.card.image) as { card_faces?: { image_uris?: Record<string, string> }[] }
+      if (parsed.card_faces?.[cardFaceIndex.value]?.image_uris?.normal) {
+        return parsed.card_faces[cardFaceIndex.value]!.image_uris!.normal!
+      }
+    } catch { /* plain URL */ }
   }
   return props.card?.image ?? ''
 })
@@ -199,10 +233,19 @@ const currentImage = computed(() => {
 // Large image for zoom view
 const zoomImage = computed(() => {
   if (selectedPrint.value) {
+    const face = selectedPrint.value.card_faces?.[cardFaceIndex.value]
+    if (face?.image_uris) return face.image_uris.large ?? face.image_uris.normal ?? ''
     return selectedPrint.value.image_uris?.large
            ?? selectedPrint.value.image_uris?.normal
            ?? selectedPrint.value.card_faces?.[0]?.image_uris?.large
            ?? selectedPrint.value.card_faces?.[0]?.image_uris?.normal ?? ''
+  }
+  if (props.card?.image) {
+    try {
+      const parsed = JSON.parse(props.card.image) as { card_faces?: { image_uris?: Record<string, string> }[] }
+      const face = parsed.card_faces?.[cardFaceIndex.value]
+      if (face?.image_uris) return face.image_uris.large ?? face.image_uris.normal ?? ''
+    } catch { /* plain URL */ }
   }
   return props.card?.image ?? ''
 })
@@ -560,6 +603,7 @@ const handleClose = () => {
   relatedCards.value = []
   deckAllocations.value = {}
   showZoom.value = false
+  cardFaceIndex.value = 0
   showPriceChart.value = false
   chartHistory.value = []
   chartSource.value = 'tcg'
@@ -609,6 +653,15 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
             <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
               <span class="text-tiny text-silver font-bold">🔍 Zoom</span>
             </div>
+            <!-- Flip button for dual-faced cards -->
+            <button
+                v-if="isSplitCard"
+                @click.stop="toggleCardFace"
+                class="absolute top-1 left-1 bg-primary/90 border border-neon px-1.5 py-0.5 hover:bg-neon/20 transition-all rounded z-10"
+                :title="t('cards.grid.flipTitle')"
+            >
+              <SvgIcon name="flip" size="tiny" />
+            </button>
           </button>
           <div v-else class="w-28 sm:w-32 aspect-[2/3] bg-primary border border-silver-30 flex items-center justify-center rounded">
             <span class="text-tiny text-silver-50">{{ t('cards.detailModal.noImage') }}</span>

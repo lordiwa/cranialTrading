@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useI18n } from '../../composables/useI18n'
+import { computed, toRef } from 'vue'
 import CollectionGridCard from './CollectionGridCard.vue'
 import type { Card } from '../../types/card'
+import { useVirtualGrid } from '../../composables/useVirtualGrid'
 
 const props = withDefaults(defineProps<{
   cards: Card[]
@@ -35,59 +35,56 @@ const emit = defineEmits<{
   toggleSelect: [cardId: string]
 }>()
 
-const { t } = useI18n()
+const cardsRef = computed(() => props.cards)
 
-const PAGE_SIZE = 50
-const displayCount = ref(PAGE_SIZE)
-
-// Reset to first page when cards list changes (filter/sort)
-watch(() => props.cards, () => {
-  displayCount.value = PAGE_SIZE
+const { containerRef, virtualRows, totalSize } = useVirtualGrid({
+  items: cardsRef,
+  compact: toRef(props, 'compact'),
 })
 
-const visibleCards = computed(() => props.cards.slice(0, displayCount.value))
-const remaining = computed(() => Math.max(0, props.cards.length - displayCount.value))
-
-const loadMore = () => {
-  displayCount.value += PAGE_SIZE
-}
+const gridClass = computed(() =>
+  props.compact
+    ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3'
+    : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4',
+)
 </script>
 
 <template>
-  <div>
-    <div :class="compact
-      ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3'
-      : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4'"
-    >
-      <CollectionGridCard
-          v-for="card in visibleCards"
-          :key="card.id"
-          :card="card"
-          :compact="props.compact"
-          :readonly="props.readonly"
-          :show-interest="props.showInterest"
-          :is-interested="props.interestedCards?.has(card.scryfallId || card.id) || false"
-          :show-cart="props.showCart"
-          :is-in-cart="props.cartItemIds?.has(card.scryfallId || card.id) || false"
-          :is-being-deleted="props.deletingCardIds?.has(card.id) || false"
-          :selection-mode="props.selectionMode"
-          :is-selected="props.selectedCardIds?.has(card.id) || false"
-          @card-click="selectionMode ? emit('toggleSelect', $event.id) : emit('cardClick', $event)"
-          @delete="emit('delete', $event)"
-          @interest="emit('interest', $event)"
-          @add-to-cart="emit('addToCart', $event)"
-          @toggle-select="emit('toggleSelect', $event)"
-      />
-    </div>
-
-    <!-- Load More button -->
-    <div v-if="remaining > 0" class="flex justify-center mt-6">
-      <button
-          @click="loadMore"
-          class="px-6 py-2 bg-primary border border-neon text-neon text-small font-bold hover:bg-neon/10 transition-colors rounded"
+  <div ref="containerRef">
+    <div :style="{ height: `${totalSize}px`, width: '100%', position: 'relative' }">
+      <div
+          v-for="vRow in virtualRows"
+          :key="vRow.index"
+          :style="{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            transform: `translateY(${vRow.start}px)`,
+          }"
       >
-        {{ t('common.actions.loadMore') }} ({{ remaining }})
-      </button>
+        <div :class="gridClass">
+          <CollectionGridCard
+              v-for="card in vRow.items"
+              :key="card.id"
+              :card="card"
+              :compact="props.compact"
+              :readonly="props.readonly"
+              :show-interest="props.showInterest"
+              :is-interested="props.interestedCards?.has(card.scryfallId || card.id) || false"
+              :show-cart="props.showCart"
+              :is-in-cart="props.cartItemIds?.has(card.scryfallId || card.id) || false"
+              :is-being-deleted="props.deletingCardIds?.has(card.id) || false"
+              :selection-mode="props.selectionMode"
+              :is-selected="props.selectedCardIds?.has(card.id) || false"
+              @card-click="selectionMode ? emit('toggleSelect', $event.id) : emit('cardClick', $event)"
+              @delete="emit('delete', $event)"
+              @interest="emit('interest', $event)"
+              @add-to-cart="emit('addToCart', $event)"
+              @toggle-select="emit('toggleSelect', $event)"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>

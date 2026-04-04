@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { useContextMenu } from '../../composables/useContextMenu'
 import { useCollectionStore } from '../../stores/collection'
 import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder } from '../../composables/useCardFilter'
+import { useVirtualGrid } from '../../composables/useVirtualGrid'
 import ContextMenu from '../ui/ContextMenu.vue'
 import type { ContextMenuItem } from '../../types/contextMenu'
 import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
@@ -35,14 +36,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-// Binder pagination
-const BINDER_PAGE_SIZE = 50
-const displayCount = ref(BINDER_PAGE_SIZE)
-
-watch(() => props.cards, () => {
-  displayCount.value = BINDER_PAGE_SIZE
-})
 
 // Preview state
 const hoveredCard = ref<DisplayDeckCard | null>(null)
@@ -198,21 +191,42 @@ const filteredSource = computed(() => {
 
 // Group cards by selected mode
 const groupedCards = computed(() => {
-  const source = props.binderMode
-    ? filteredSource.value.slice(0, displayCount.value)
-    : filteredSource.value
+  const source = filteredSource.value
   if (props.groupBy === 'none') return [{ type: 'all', cards: sortCards(source) }]
   return buildGroups(source, getCategory, getCategoryOrder())
 })
 
-const remaining = computed(() => {
-  if (!props.binderMode) return 0
-  return Math.max(0, filteredSource.value.length - displayCount.value)
+// Virtual scroll for binder mode with no grouping (35k+ cards)
+const useBinderVirtualScroll = computed(() => props.binderMode && props.groupBy === 'none')
+
+const binderFlatCards = computed(() => {
+  if (!useBinderVirtualScroll.value) return []
+  const group = groupedCards.value[0]
+  return group ? group.cards : []
 })
 
-const loadMore = () => {
-  displayCount.value += BINDER_PAGE_SIZE
+/** Column count for binder flex-wrap layout based on card widths */
+const BREAKPOINTS_2XL = 1536
+const getBinderColumns = (width: number): number => {
+  // Card widths + gap-2 (8px): 85(md), 105(lg), 130(xl), 182(2xl)
+  if (width >= BREAKPOINTS_2XL) return Math.max(1, Math.floor((width + 8) / (182 + 8)))
+  if (width >= 1280) return Math.max(1, Math.floor((width + 8) / (130 + 8)))
+  if (width >= 1024) return Math.max(1, Math.floor((width + 8) / (105 + 8)))
+  if (width >= 768) return Math.max(1, Math.floor((width + 8) / (85 + 8)))
+  if (width >= 640) return 4 // sm: grid-cols-4
+  return 3 // grid-cols-3
 }
+
+const {
+  containerRef: binderContainerRef,
+  virtualRows: binderVirtualRows,
+  totalSize: binderTotalSize,
+} = useVirtualGrid({
+  items: binderFlatCards,
+  estimateRowHeight: 160,
+  overscan: 5,
+  getColumns: getBinderColumns,
+})
 
 // Count total cards by category
 const getTypeCount = (type: string): number => {
@@ -437,63 +451,99 @@ const handleDeckContextMenuSelect = (itemId: string) => {
         <p class="text-body text-silver-70">{{ t('decks.editorGrid.emptyBoard') }}</p>
       </div>
 
-      <!-- Grouped cards -->
-      <div v-for="group in groupedCards" :key="group.type" class="space-y-2">
-        <!-- Category Header (hidden when groupBy is 'none') -->
-        <h3
-          v-if="group.type !== 'all'"
-          class="text-tiny font-bold uppercase"
-          :class="group.type === 'Commander' ? 'text-purple-400' : 'text-silver-70'"
-        >
-          {{ translateCategoryLabel(group.type) }} ({{ getTypeCount(group.type) }})
-        </h3>
-
-        <!-- All cards in this category -->
-        <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">
+      <!-- ===== Binder Virtual Scroll (groupBy=none, 35k+ cards) ===== -->
+      <div v-else-if="useBinderVirtualScroll" ref="binderContainerRef">
+        <div :style="{ height: `${binderTotalSize}px`, width: '100%', position: 'relative' }">
           <div
-            v-for="card in group.cards"
-            :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
-            class="relative cursor-pointer group"
-            :class="{ 'opacity-75': isProxy(card), 'opacity-60': card.isWishlist && !isProxy(card) }"
-            @mouseenter="handleMouseEnter(card)"
-            @mouseleave="handleMouseLeave"
-            @click="handleCardClick(card)"
-            @contextmenu.prevent="handleContextMenu($event, card)"
+            v-for="vRow in binderVirtualRows"
+            :key="vRow.index"
+            :style="{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${vRow.start}px)`,
+            }"
           >
-            <!-- Card miniature - ONLY image -->
-            <div
-              class="w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
-              :class="[
-                isProxy(card) ? 'border-blue-400' : card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
-                'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
-              ]"
-            >
-              <img
-                v-if="getCardImageSmall(card)"
-                :src="getCardImageSmall(card)"
-                :alt="card.name"
-                loading="lazy"
-                class="w-full h-full object-cover"
-              />
-            </div>
-
-            <!-- Quantity badge -->
-            <div class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1">
-              <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
+            <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">
+              <div
+                v-for="card in vRow.items"
+                :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
+                class="relative cursor-pointer group"
+                :class="{ 'opacity-75': isProxy(card), 'opacity-60': card.isWishlist && !isProxy(card) }"
+                @mouseenter="handleMouseEnter(card)"
+                @mouseleave="handleMouseLeave"
+                @click="handleCardClick(card)"
+                @contextmenu.prevent="handleContextMenu($event, card)"
+              >
+                <div
+                  class="w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+                  :class="[
+                    isProxy(card) ? 'border-blue-400' : card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
+                    'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
+                  ]"
+                >
+                  <img
+                    v-if="getCardImageSmall(card)"
+                    :src="getCardImageSmall(card)"
+                    :alt="card.name"
+                    loading="lazy"
+                    class="w-full h-full object-cover"
+                  />
+                </div>
+                <div class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1">
+                  <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Load More (binder pagination) -->
-      <div v-if="remaining > 0" class="flex justify-center mt-6">
-        <button
-          @click="loadMore"
-          class="px-6 py-2 bg-primary border border-neon text-neon text-small font-bold hover:bg-neon/10 transition-colors rounded"
-        >
-          {{ t('common.actions.loadMore') }} ({{ remaining }})
-        </button>
-      </div>
+      <!-- ===== Regular rendering (decks + grouped binder) ===== -->
+      <template v-else>
+        <div v-for="group in groupedCards" :key="group.type" class="space-y-2">
+          <h3
+            v-if="group.type !== 'all'"
+            class="text-tiny font-bold uppercase"
+            :class="group.type === 'Commander' ? 'text-purple-400' : 'text-silver-70'"
+          >
+            {{ translateCategoryLabel(group.type) }} ({{ getTypeCount(group.type) }})
+          </h3>
+
+          <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">
+            <div
+              v-for="card in group.cards"
+              :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
+              class="relative cursor-pointer group"
+              :class="{ 'opacity-75': isProxy(card), 'opacity-60': card.isWishlist && !isProxy(card) }"
+              @mouseenter="handleMouseEnter(card)"
+              @mouseleave="handleMouseLeave"
+              @click="handleCardClick(card)"
+              @contextmenu.prevent="handleContextMenu($event, card)"
+            >
+              <div
+                class="w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+                :class="[
+                  isProxy(card) ? 'border-blue-400' : card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
+                  'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
+                ]"
+              >
+                <img
+                  v-if="getCardImageSmall(card)"
+                  :src="getCardImageSmall(card)"
+                  :alt="card.name"
+                  loading="lazy"
+                  class="w-full h-full object-cover"
+                />
+              </div>
+              <div class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1">
+                <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Context Menu -->

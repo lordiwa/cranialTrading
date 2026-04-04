@@ -291,6 +291,9 @@ export const useCollectionStore = defineStore('collection', () => {
         }
     }
 
+    /** Expected index version — bump in Cloud Function when format changes */
+    const EXPECTED_INDEX_VERSION = 2
+
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {
         try {
@@ -300,14 +303,16 @@ export const useCollectionStore = defineStore('collection', () => {
             if (snapshot.empty) return false
 
             const allIndex: IndexCard[] = []
+            let indexVersion = 1 // default for chunks without version field
             for (const docSnap of snapshot.docs) {
                 const data = docSnap.data()
                 if (data.cards && Array.isArray(data.cards)) {
                     allIndex.push(...(data.cards as IndexCard[]))
                 }
+                if (data.version) indexVersion = data.version as number
             }
 
-            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks`)
+            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks (v${indexVersion})`)
 
             cardIndexRaw.value = allIndex
             cards.value = allIndex.map(indexToCard)
@@ -325,6 +330,18 @@ export const useCollectionStore = defineStore('collection', () => {
                 totalValue,
                 statusCounts,
                 loadedCards: allIndex.length,
+            }
+
+            // Auto-rebuild stale index in background
+            if (indexVersion < EXPECTED_INDEX_VERSION) {
+                console.info(`[loadCollection] Index v${indexVersion} is stale (expected v${EXPECTED_INDEX_VERSION}), rebuilding in background...`)
+                import('../services/cloudFunctions').then(({ buildCardIndex: rebuildIndex }) => {
+                    rebuildIndex().then(result => {
+                        console.info(`[loadCollection] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
+                    }).catch((err: unknown) => {
+                        console.warn('[loadCollection] Background index rebuild failed:', err)
+                    })
+                }).catch(() => {})
             }
 
             return true

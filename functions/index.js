@@ -988,6 +988,7 @@ exports.migrateUserCards = onCall(
 // ============================================================
 
 const INDEX_CHUNK_SIZE = 2000;
+const INDEX_VERSION = 2; // Bump when index format changes — client auto-rebuilds stale indexes
 
 /**
  * Extract compact index fields from a full card document.
@@ -1145,6 +1146,7 @@ exports.buildCardIndex = onCall(
       await indexRef.doc(`chunk_${c}`).set({
         cards: chunkCards,
         count: chunkCards.length,
+        version: INDEX_VERSION,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }

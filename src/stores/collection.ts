@@ -312,7 +312,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 if (data.version) indexVersion = data.version as number
             }
 
-            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks (v${indexVersion})`)
+            const dfCount = allIndex.filter(ic => ic.df).length
+            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks (v${indexVersion}), ${dfCount} dual-faced`)
 
             cardIndexRaw.value = allIndex
             cards.value = allIndex.map(indexToCard)

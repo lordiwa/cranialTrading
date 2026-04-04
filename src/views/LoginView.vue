@@ -117,7 +117,7 @@ const comparisonRows = computed(() => [
 
             <!-- CTA box above login form -->
             <div class="mb-6 p-4 bg-neon-10 border border-neon-30 rounded-lg text-center">
-              <p class="text-small font-bold text-neon mb-2">{{ t('landing.subtitle') }}</p>
+              <p class="text-small font-bold text-neon mb-2">{{ t('landing.description') }}</p>
               <RouterLink to="/register">
                 <BaseButton class="w-full">{{ t('landing.hero.cta') }}</BaseButton>
               </RouterLink>

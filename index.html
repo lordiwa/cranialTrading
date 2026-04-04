@@ -1,25 +1,26 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" prefix="og: https://ogp.me/ns#">
 <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cranial Trading</title>
+    <title>Cranial Trading — MTG Collection Manager & Trading Platform</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/cranial-trading-logo-color.png" />
     <meta name="description" content="Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players." />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Cranial Trading" />
-    <meta property="og:title" content="Cranial Trading" />
+    <meta property="og:title" content="Cranial Trading — MTG Collection Manager & Trading Platform" />
     <meta property="og:description" content="Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players." />
-    <meta property="og:url" content="https://cranial-trading.web.app" />
-    <meta property="og:image" content="https://cranial-trading.web.app/og-default.png" />
+    <meta property="og:url" content="https://cranialtrading.com" />
+    <meta property="og:image" content="https://cranialtrading.com/og-default.png" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Cranial Trading" />
+    <meta name="twitter:title" content="Cranial Trading — MTG Collection Manager & Trading Platform" />
     <meta name="twitter:description" content="Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players." />
-    <meta name="twitter:image" content="https://cranial-trading.web.app/og-default.png" />
+    <meta name="twitter:image" content="https://cranialtrading.com/og-default.png" />
 
     <!-- Performance hints -->
     <link rel="preconnect" href="https://cards.scryfall.io" />
@@ -31,14 +32,29 @@
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Cranial Trading",
-      "url": "https://cranial-trading.web.app",
+      "url": "https://cranialtrading.com",
       "description": "Magic: The Gathering trading platform",
-      "logo": "https://cranial-trading.web.app/vite.svg"
+      "logo": "https://cranialtrading.com/vite.svg"
     }
     </script>
 </head>
 <body>
-<div id="app"></div>
+<div id="app">
+    <!-- Pre-render content for SEO crawlers — replaced by Vue on mount -->
+    <h1>Cranial Trading — MTG Collection Manager & Trading Platform</h1>
+    <p>Manage your Magic: The Gathering collection, create decks, find trading matches, and connect with other players. Track card prices, import from Moxfield, and discover trades in your community.</p>
+    <nav>
+        <a href="/collection">My Collection</a>
+        <a href="/decks">Decks</a>
+        <a href="/matches">Trade Matches</a>
+        <a href="/market">Market</a>
+        <a href="/search">Search Players</a>
+        <a href="/faq">FAQ</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/cookies">Cookie Policy</a>
+    </nav>
+</div>
 <noscript>
     <div style="padding: 2rem; text-align: center; font-family: sans-serif; background: #000; color: #eee; min-height: 100vh;">
         <h1>Cranial Trading</h1>

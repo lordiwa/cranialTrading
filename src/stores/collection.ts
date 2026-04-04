@@ -281,40 +281,45 @@ export const useCollectionStore = defineStore('collection', () => {
 
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {
-        const indexCol = collection(db, 'users', userId, 'card_index')
-        const snapshot = await getDocs(indexCol)
+        try {
+            const indexCol = collection(db, 'users', userId, 'card_index')
+            const snapshot = await getDocs(indexCol)
 
-        if (snapshot.empty) return false
+            if (snapshot.empty) return false
 
-        const allIndex: IndexCard[] = []
-        for (const docSnap of snapshot.docs) {
-            const data = docSnap.data()
-            if (data.cards && Array.isArray(data.cards)) {
-                allIndex.push(...(data.cards as IndexCard[]))
+            const allIndex: IndexCard[] = []
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data()
+                if (data.cards && Array.isArray(data.cards)) {
+                    allIndex.push(...(data.cards as IndexCard[]))
+                }
             }
+
+            console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks`)
+
+            cardIndexRaw.value = allIndex
+            cards.value = allIndex.map(indexToCard)
+            rebuildCardIndex()
+
+            // Compute summary from index
+            const statusCounts: Record<string, number> = {}
+            let totalValue = 0
+            for (const ic of allIndex) {
+                statusCounts[ic.st] = (statusCounts[ic.st] || 0) + 1 // eslint-disable-line security/detect-object-injection
+                totalValue += ic.p * ic.q
+            }
+            collectionSummary.value = {
+                totalCards: allIndex.length,
+                totalValue,
+                statusCounts,
+                loadedCards: allIndex.length,
+            }
+
+            return true
+        } catch (error) {
+            console.warn('[loadFromIndex] card_index read failed, falling back to full load:', error)
+            return false
         }
-
-        console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks`)
-
-        cardIndexRaw.value = allIndex
-        cards.value = allIndex.map(indexToCard)
-        rebuildCardIndex()
-
-        // Compute summary from index
-        const statusCounts: Record<string, number> = {}
-        let totalValue = 0
-        for (const ic of allIndex) {
-            statusCounts[ic.st] = (statusCounts[ic.st] || 0) + 1 // eslint-disable-line security/detect-object-injection
-            totalValue += ic.p * ic.q
-        }
-        collectionSummary.value = {
-            totalCards: allIndex.length,
-            totalValue,
-            statusCounts,
-            loadedCards: allIndex.length,
-        }
-
-        return true
     }
 
     /** Fallback: load all cards via Cloud Function (120k reads). Used when no index exists. */

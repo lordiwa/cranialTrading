@@ -37,7 +37,7 @@ const emit = defineEmits<{
 
 const cardsRef = computed(() => props.cards)
 
-const { containerRef, virtualRows, totalSize } = useVirtualGrid({
+const { containerRef, virtualRows, totalSize, virtualizer } = useVirtualGrid({
   items: cardsRef,
   compact: toRef(props, 'compact'),
 })
@@ -55,6 +55,8 @@ const gridClass = computed(() =>
       <div
           v-for="vRow in virtualRows"
           :key="vRow.index"
+          :data-index="vRow.index"
+          :ref="(el: any) => { if (el) virtualizer.measureElement(el as HTMLElement) }"
           :style="{
             position: 'absolute',
             top: 0,

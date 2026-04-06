@@ -247,6 +247,7 @@ async function saveMappingToCache(map: Map<string, string>): Promise<void> {
 
   const obj = Object.fromEntries(mapToSave)
   await saveToDB(MAPPING_STORE, 'scryfallToUuid', obj)
+  await saveToDB(MAPPING_STORE, 'loadedSetCodes', Array.from(loadedSets))
 }
 
 /**
@@ -427,11 +428,15 @@ export async function preloadSetMappings(setCodes: string[]): Promise<void> {
   if (scryfallToUuidMap.size === 0) {
     const cached = await loadMappingFromCache()
     if (cached) scryfallToUuidMap = cached
+
+    // Restore which sets were previously cached so we don't re-fetch them
+    const cachedSets = await getFromDB<string[]>(MAPPING_STORE, 'loadedSetCodes')
+    if (cachedSets) {
+      for (const sc of cachedSets) loadedSets.add(sc)
+    }
   }
 
-  // Filter again after loading cache — sets whose cards are already mapped
-  // We can't perfectly know which sets are "loaded" from cache, so just skip sets
-  // that are now in loadedSets (from a prior call in this session)
+  // Filter again after loading cache — skip sets already in loadedSets
   const stillNeeded = needed.filter(sc => !loadedSets.has(sc.toUpperCase()))
   if (stillNeeded.length === 0) return
 

@@ -1337,10 +1337,13 @@ const handleBulkCreateBinder = () => {
 // Click on local card suggestion
 const handleLocalCardSelect = (card: Card) => {
   if (viewMode.value === 'decks' && deckFilter.value !== 'all') {
+    filterQuery.value = ''
     void quickAllocateCardToDeck(card)
   } else if (viewMode.value === 'binders' && binderFilter.value !== 'all') {
+    filterQuery.value = ''
     void quickAllocateCardToBinder(card)
   } else {
+    filterQuery.value = ''
     selectedCard.value = card
     showCardDetailModal.value = true
   }
@@ -1359,6 +1362,7 @@ const quickAllocateCardToDeck = async (card: Card) => {
 
 // Click on Scryfall suggestion → search card and open AddCardModal
 const handleScryfallSuggestionSelect = async (cardName: string) => {
+  filterQuery.value = ''
   try {
     const results = await searchCards(`!"${cardName}"`)
     if (results.length > 0) {

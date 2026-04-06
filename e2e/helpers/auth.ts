@@ -278,7 +278,7 @@ export async function waitForLoginResult(page: Page) {
     if (msg?.includes('incorrecto') || msg?.includes('incorrect') || msg?.includes('wrong')) {
       const MAX_RETRIES = 3;
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        const backoffMs = attempt * 10_000; // 10s, 20s, 30s
+        const backoffMs = attempt * 3_000; // 3s, 6s, 9s — must fit within 45s test timeout
         await page.waitForTimeout(backoffMs);
         await page.evaluate(() => {
           document.querySelectorAll('.border-rust').forEach((el) => el.remove());

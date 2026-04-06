@@ -57,6 +57,7 @@ const gridClass = computed(() =>
           :key="vRow.index"
           :data-index="vRow.index"
           :ref="(el: any) => { if (el) virtualizer.measureElement(el as HTMLElement) }"
+          :class="compact ? 'pb-3' : 'pb-4'"
           :style="{
             position: 'absolute',
             top: 0,

@@ -346,6 +346,7 @@ const comparisonRows = computed(() => [
               <li><RouterLink to="/faq#getting-started" class="hover:text-neon transition-fast">{{ t('landing.footer.gettingStarted') }}</RouterLink></li>
               <li><RouterLink to="/faq#trading" class="hover:text-neon transition-fast">{{ t('landing.footer.howToTrade') }}</RouterLink></li>
               <li><RouterLink to="/faq#safety" class="hover:text-neon transition-fast">{{ t('landing.footer.tradeSafety') }}</RouterLink></li>
+              <li><RouterLink to="/contact" class="hover:text-neon transition-fast">{{ t('landing.footer.contactUs') }}</RouterLink></li>
             </ul>
           </div>
 

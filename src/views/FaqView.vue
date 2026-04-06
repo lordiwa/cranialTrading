@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useHead, useSeoMeta } from '@unhead/vue'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import esLocale from '../locales/es.json'
+
+const route = useRoute()
 
 const { t } = useI18n()
 
@@ -83,6 +86,19 @@ useHead({
     },
   ],
 })
+
+// Handle hash navigation: scroll to section and expand FAQ questions if #trading
+onMounted(() => {
+  const hash = route.hash
+  if (!hash) return
+  // If #trading, expand all FAQ questions so user can browse
+  if (hash === '#trading') expandAll()
+  // Scroll to the target section after Vue renders
+  setTimeout(() => {
+    const el = document.querySelector(hash)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, 300)
+})
 </script>
 
 <template>
@@ -97,7 +113,7 @@ useHead({
       </div>
 
       <!-- Getting Started Guide -->
-      <section class="mb-10">
+      <section id="getting-started" class="mb-10">
         <h2 class="text-h2 font-bold text-neon mb-4 flex items-center gap-2">
           <SvgIcon name="star" size="small" />
           {{ gettingStarted.title }}
@@ -115,7 +131,7 @@ useHead({
       </section>
 
       <!-- FAQ Section -->
-      <section class="mb-10">
+      <section id="trading" class="mb-10">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-h2 font-bold text-neon flex items-center gap-2">
             <SvgIcon name="chat" size="small" />
@@ -179,7 +195,7 @@ useHead({
       </section>
 
       <!-- Trading Safety Tips -->
-      <section class="mb-10">
+      <section id="safety" class="mb-10">
         <h2 class="text-h2 font-bold text-neon mb-4 flex items-center gap-2">
           <SvgIcon name="eye-open" size="small" />
           {{ t('help.guides.tradeSafety.title') }}

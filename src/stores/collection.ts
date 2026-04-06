@@ -606,8 +606,19 @@ export const useCollectionStore = defineStore('collection', () => {
         cardIndexRaw.value = newIndex
     }
 
-    /** Persist the current cardIndexRaw to Firestore card_index chunks (fire-and-forget) */
+    /**
+     * Persist the current cardIndexRaw to Firestore card_index chunks.
+     * Debounced (2s) to avoid flooding the Firestore Write channel —
+     * rapid calls (e.g. addCard + allocateCardToDeck) coalesce into one persist.
+     */
+    let _indexPersistTimer: ReturnType<typeof setTimeout> | null = null
+
     function persistIndexToFirestore() {
+        if (_indexPersistTimer) clearTimeout(_indexPersistTimer)
+        _indexPersistTimer = setTimeout(() => { _doPersistIndex() }, 2000)
+    }
+
+    function _doPersistIndex() {
         if (!authStore.user) return
         const userId = authStore.user.id
         const INDEX_CHUNK_SIZE = 2000

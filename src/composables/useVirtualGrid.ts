@@ -35,7 +35,7 @@ function getColumnCount(width: number, compact: boolean): number {
 export interface VirtualGridOptions<T> {
   items: Ref<T[]>
   compact?: Ref<boolean>
-  /** Estimated row height in px — full ~480, compact ~300 */
+  /** Estimated row height in px — full ~620, compact ~300 */
   estimateRowHeight?: number
   /** Extra overscan rows rendered off-screen */
   overscan?: number
@@ -53,7 +53,7 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
 
   const virtualizer = useWindowVirtualizer(computed(() => ({
     count: rows.value.length,
-    estimateSize: () => options.estimateRowHeight ?? (compact.value ? 300 : 480),
+    estimateSize: () => options.estimateRowHeight ?? (compact.value ? 300 : 620),
     overscan: options.overscan ?? 3,
     scrollMargin: scrollMargin.value,
   })))

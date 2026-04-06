@@ -104,6 +104,12 @@ const router = createRouter({
         },
         // Help & Legal pages (public)
         {
+            path: '/contact',
+            name: 'contact',
+            component: () => import('../views/ContactView.vue'),
+            meta: { title: 'seo.pages.contact.title', description: 'seo.pages.contact.description' },
+        },
+        {
             path: '/faq',
             name: 'faq',
             component: () => import('../views/FaqView.vue'),

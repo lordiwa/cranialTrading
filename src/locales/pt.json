@@ -302,7 +302,8 @@
       "faq": "FAQ / Perguntas Frequentes",
       "gettingStarted": "Guia de Início",
       "howToTrade": "Como Trocar",
-      "tradeSafety": "Segurança em Trades"
+      "tradeSafety": "Segurança em Trades",
+      "contactUs": "Contato"
     }
   },
 
@@ -2079,6 +2080,21 @@
     "language": "Idioma"
   },
 
+  "contact": {
+    "title": "Contato",
+    "subtitle": "Estamos aqui para ajudar. Escolha o canal de sua preferencia para entrar em contato.",
+    "email": {
+      "title": "Email de Suporte",
+      "description": "Envie-nos um email e responderemos o mais rapido possivel."
+    },
+    "social": {
+      "title": "Redes Sociais",
+      "description": "Siga-nos e conecte-se com a comunidade Cranial Trading."
+    },
+    "faqCallout": "Muitas perguntas ja estao respondidas na nossa secao de FAQ.",
+    "faqLink": "Ir para FAQ"
+  },
+
   "seo": {
     "defaultDescription": "Plataforma de troca de cartas Magic: The Gathering. Gerencie sua colecao, encontre matches e conecte-se com outros jogadores.",
     "pages": {
@@ -2097,6 +2113,10 @@
       "resetPassword": {
         "title": "Redefinir Senha",
         "description": "Defina uma nova senha para sua conta no Cranial Trading."
+      },
+      "contact": {
+        "title": "Contato",
+        "description": "Entre em contato com a equipe Cranial Trading. Suporte por email e redes sociais."
       },
       "faq": {
         "title": "Perguntas Frequentes",

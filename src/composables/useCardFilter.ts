@@ -1,5 +1,6 @@
 import { computed, type ComputedRef, onScopeDispose, ref, type Ref, watch } from 'vue'
 import { useI18n } from './useI18n'
+import { getAllSets } from '../services/scryfall'
 
 // Minimal shape a card must satisfy to be filterable
 export interface FilterableCard {
@@ -164,6 +165,14 @@ export function useCardFilter<T extends FilterableCard>(
   cards: Ref<T[]> | ComputedRef<T[]>
 ) {
   const { t } = useI18n()
+
+  // Set code → full name lookup (loaded async from Scryfall)
+  const setNameMap = ref<Map<string, string>>(new Map())
+  getAllSets().then(sets => {
+    const map = new Map<string, string>()
+    for (const s of sets) map.set(s.code.toUpperCase(), s.name)
+    setNameMap.value = map
+  })
 
   // --- State ---
   const filterQuery = ref('')
@@ -374,13 +383,15 @@ export function useCardFilter<T extends FilterableCard>(
     return count
   })
 
-  // Unique sets from the user's cards
+  // Unique sets from the user's cards (resolves codes to full names via Scryfall)
   const collectionSets = computed(() => {
+    const lookup = setNameMap.value
     const setMap = new Map<string, { code: string; name: string }>()
     for (const card of cards.value) {
       const code = card.setCode?.toUpperCase()
       if (code && !setMap.has(code)) {
-        setMap.set(code, { code, name: card.edition })
+        const name = lookup.get(code) ?? card.edition
+        setMap.set(code, { code, name })
       }
     }
     return [...setMap.values()].sort((a, b) => a.name.localeCompare(b.name))

@@ -265,6 +265,76 @@ Auto-dismiss after 4 seconds.
 
 ---
 
+## MANDATORY: Split & Merge Workflow (Parallel Development)
+
+**For features/fixes that span multiple files or logical areas, use the split & merge pattern.**
+
+### Hierarchy: Milestone → Slice → Task
+
+- **Milestone:** The full user request (one milestone per feature/fix)
+- **Slice:** A logical group of related tasks that can be verified together
+- **Task:** One context window of work. Touches ~4 files max. Tagged as `parallel-safe` or `sequential`.
+
+**Sizing rule:** If a task requires reading 8+ files or changing 4+ files, split it further.
+
+### Agent Workflow
+
+```
+1. Planner agent → produces Milestone/Slice/Task plan
+2. Orchestrator agent → reads plan, spawns dev agents
+   - parallel-safe tasks → separate worktrees (isolation: "worktree")
+   - sequential tasks → one dev agent at a time
+3. Dev agent (per task) → TDD implementation in worktree
+4. Review-code agent → verifies each task
+5. Orchestrator → merges task branches to develop
+6. Final verification on merged develop
+```
+
+### Orchestrator Modes
+- **Supervised (default):** Pauses after each slice, waits for user approval
+- **Autonomous:** Runs all slices without pausing. Stops on failure.
+- User controls mode: "go independent" / "go auto" to switch to autonomous
+
+### Branch Naming
+- Task branches: `task/{milestone}-{nn}` (e.g., `task/seo-01`, `task/seo-02`)
+- All task branches fork from current `develop` HEAD
+- Merge back to `develop` after review passes
+
+### Worktree Rules
+- `.worktreeinclude` copies `.env.local`, `.env.development`, `.env.production` to new worktrees
+- Dev agent in worktree stays on its `task/*` branch — does NOT switch to `develop`
+- Commits use format: `task({milestone}): {description}`
+- Worktrees are cleaned up after successful merge
+
+### When to Split vs Stay Sequential
+| Scenario | Approach |
+|----------|----------|
+| 2+ independent file groups (no overlap) | Split into parallel tasks |
+| Feature + its tests (same files) | Single task |
+| Deck handler + Binder handler (parallel pair) | Same task (atomic) |
+| i18n keys (en + es + pt) | Same task (atomic) |
+| Bug fix (single file) | Single task, no split needed |
+| Large feature (8+ files) | Split into slices |
+
+### Quick Reference
+```bash
+# Planner produces the plan
+# Orchestrator reads it and spawns dev agents:
+
+# Parallel tasks → worktree isolation
+Agent(dev, isolation: "worktree")  # Task 1
+Agent(dev, isolation: "worktree")  # Task 2 (parallel)
+
+# Sequential tasks → one at a time
+Agent(dev)  # Task 3 (depends on Task 1)
+
+# After all tasks done:
+# Orchestrator merges task/* branches → develop
+# Final review-code run on develop
+```
+
+---
+
 ## Anti-Loop Rules
 
 **Rules derived from recurring mistakes. These prevent loops where Claude gives bad responses, breaks working code, or makes incomplete changes requiring multiple correction rounds.**

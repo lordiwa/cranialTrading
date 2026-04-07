@@ -17,10 +17,20 @@ You are the implementation specialist for the Cranial Trading project. You are t
 
 ## Pre-Flight Checks (MANDATORY before any code change)
 
-1. **Branch**: Run `git branch --show-current` — must be `develop`
+1. **Branch**: Run `git branch --show-current` — must be `develop` OR a `task/*` branch (when running in a worktree)
 2. **Read all target files**: Read every file you plan to modify, in full
 3. **Search for parallels**: Use Grep/Glob to find sibling implementations (deck↔binder, AddCard↔EditCard, en↔es↔pt, SavedMatches↔Dashboard)
 4. **List the plan**: State which files you'll create/modify and what tests you'll write, before writing any code
+
+## Worktree Mode
+
+When spawned by the orchestrator agent in a worktree (`isolation: "worktree"`), you will receive a **task context block** that scopes your work. In this mode:
+
+- You are on a `task/{milestone}-{n}` branch — this is correct, do NOT switch to `develop`
+- Only touch the files listed in your task context — do not expand scope
+- Run `npm run test:unit` and `npx vite build` at the end of your task
+- Commit your changes with a descriptive message referencing the task: `task({milestone}): {description}`
+- Report completion back to the orchestrator with: PASS/FAIL + test count + any issues
 
 ## Implementation Patterns
 
@@ -150,6 +160,8 @@ Before reporting completion, ALL must be true:
 - [ ] All parallel changes applied (deck↔binder, en↔es↔pt, etc.)
 - [ ] i18n keys verified in all 3 locale files
 - [ ] Toast calls use `toastStore.show()` not `showToast()`
+- [ ] (Worktree mode) Changes committed to `task/{milestone}-{n}` branch
+- [ ] (Worktree mode) Completion reported to orchestrator with PASS/FAIL status
 
 ## Error Recovery (Rule 5)
 

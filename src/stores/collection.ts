@@ -26,6 +26,7 @@ import {
 import { t } from '../composables/useI18n'
 import { getCardsByIds } from '../services/scryfallCache'
 import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
+import type { QueryCardIndexRequest } from '../services/cloudFunctions'
 
 /**
  * Commit a Firestore batch with retry logic (skips retries for permission errors)
@@ -1248,6 +1249,119 @@ export const useCollectionStore = defineStore('collection', () => {
         rebuildCardIndex()
     }
 
+    // ========================================================================
+    // SERVER-SIDE PAGINATION
+    // ========================================================================
+
+    const paginatedCards = shallowRef<Card[]>([])
+    const paginationMeta = ref({
+        page: 0,
+        pageSize: 50,
+        total: 0,
+        hasMore: false,
+        loading: false,
+        loadingMore: false,
+    })
+
+    const _defaultFilters: QueryCardIndexRequest['filters'] = {}
+    const _defaultSort: QueryCardIndexRequest['sort'] = { field: 'name', direction: 'asc' }
+
+    /** Track the last query params so loadNextPage can re-use them */
+    let _lastQueryFilters: QueryCardIndexRequest['filters'] = _defaultFilters
+    let _lastQuerySort: QueryCardIndexRequest['sort'] = _defaultSort
+
+    /**
+     * Query a page of cards from the server-side card_index.
+     * Replaces paginatedCards with the results.
+     */
+    const queryPage = async (
+        filters?: QueryCardIndexRequest['filters'],
+        sort?: QueryCardIndexRequest['sort'],
+        page = 0,
+    ) => {
+        if (!authStore.user) return
+
+        _lastQueryFilters = filters ?? _defaultFilters
+        _lastQuerySort = sort ?? _defaultSort
+
+        paginationMeta.value.loading = true
+
+        try {
+            const { queryCardIndex } = await import('../services/cloudFunctions')
+            const response = await queryCardIndex({
+                userId: authStore.user.id,
+                filters: _lastQueryFilters,
+                sort: _lastQuerySort,
+                page,
+                pageSize: paginationMeta.value.pageSize,
+            })
+
+            // Map CF response records to Card objects via indexToCard
+            paginatedCards.value = response.cards.map(rec => indexToCard(rec as unknown as IndexCard))
+
+            paginationMeta.value.page = response.page
+            paginationMeta.value.total = response.total
+            paginationMeta.value.pageSize = response.pageSize
+            paginationMeta.value.hasMore = response.hasMore
+        } catch (error) {
+            console.error('[queryPage] Error querying card index:', error)
+        } finally {
+            paginationMeta.value.loading = false
+        }
+    }
+
+    /**
+     * Load the next page of results and APPEND to paginatedCards.
+     * Guards against duplicate calls and no-more-pages.
+     */
+    const loadNextPage = async () => {
+        if (paginationMeta.value.loadingMore || paginationMeta.value.loading) return
+        if (!paginationMeta.value.hasMore) return
+        if (!authStore.user) return
+
+        paginationMeta.value.loadingMore = true
+
+        try {
+            const nextPage = paginationMeta.value.page + 1
+            const { queryCardIndex } = await import('../services/cloudFunctions')
+            const response = await queryCardIndex({
+                userId: authStore.user.id,
+                filters: _lastQueryFilters,
+                sort: _lastQuerySort,
+                page: nextPage,
+                pageSize: paginationMeta.value.pageSize,
+            })
+
+            // Append new cards to existing array
+            const newCards = response.cards.map(rec => indexToCard(rec as unknown as IndexCard))
+            paginatedCards.value = [...paginatedCards.value, ...newCards]
+
+            paginationMeta.value.page = response.page
+            paginationMeta.value.total = response.total
+            paginationMeta.value.pageSize = response.pageSize
+            paginationMeta.value.hasMore = response.hasMore
+        } catch (error) {
+            console.error('[loadNextPage] Error loading next page:', error)
+        } finally {
+            paginationMeta.value.loadingMore = false
+        }
+    }
+
+    /** Reset pagination state to defaults */
+    const resetPagination = () => {
+        paginatedCards.value = []
+        paginationMeta.value = {
+            page: 0,
+            pageSize: 50,
+            total: 0,
+            hasMore: false,
+            loading: false,
+            loadingMore: false,
+        }
+        _lastQueryFilters = _defaultFilters
+        _lastQuerySort = _defaultSort
+    }
+
     return {
         // State
         cards,
@@ -1286,5 +1400,12 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Cleanup
         clear,
+
+        // Server-side pagination
+        paginatedCards,
+        paginationMeta,
+        queryPage,
+        loadNextPage,
+        resetPagination,
     }
 })

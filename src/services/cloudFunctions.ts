@@ -179,3 +179,57 @@ export async function loadCardPage(
   const result = await callable({ cardIds })
   return result.data
 }
+
+/**
+ * Query the card_index with server-side filtering, sorting, and pagination.
+ * Used for paginated collection views.
+ */
+export interface QueryCardIndexRequest {
+  userId: string
+  filters?: {
+    search?: string
+    status?: string
+    colors?: string[]
+    rarity?: string[]
+    types?: string[]
+    sets?: string[]
+    formats?: string[]
+    keywords?: string[]
+    foil?: 'any' | 'foil' | 'nonfoil'
+    priceMin?: number
+    priceMax?: number
+    cmcMin?: number
+    cmcMax?: number
+    powerMin?: number
+    powerMax?: number
+    toughnessMin?: number
+    toughnessMax?: number
+    fullArtOnly?: boolean
+    creatureTypes?: string[]
+  }
+  sort?: {
+    field: 'name' | 'price' | 'cmc' | 'recent'
+    direction: 'asc' | 'desc'
+  }
+  page?: number
+  pageSize?: number
+}
+
+export interface QueryCardIndexResponse {
+  cards: Record<string, unknown>[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+export async function queryCardIndex(
+  request: QueryCardIndexRequest
+): Promise<QueryCardIndexResponse> {
+  const callable = httpsCallable<
+    QueryCardIndexRequest,
+    QueryCardIndexResponse
+  >(functions, 'queryCardIndex', { timeout: 30000 })
+  const result = await callable(request)
+  return result.data
+}

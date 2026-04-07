@@ -104,6 +104,24 @@ const router = createRouter({
         },
         // Help & Legal pages (public)
         {
+            path: '/guide/card-conditions',
+            name: 'cardConditionGuide',
+            component: () => import('../views/CardConditionGuideView.vue'),
+            meta: { title: 'seo.pages.cardConditionGuide.title', description: 'seo.pages.cardConditionGuide.description' },
+        },
+        {
+            path: '/guide/how-to-trade',
+            name: 'howToTrade',
+            component: () => import('../views/HowToTradeGuideView.vue'),
+            meta: { title: 'seo.pages.howToTrade.title', description: 'seo.pages.howToTrade.description' },
+        },
+        {
+            path: '/about',
+            name: 'about',
+            component: () => import('../views/AboutView.vue'),
+            meta: { title: 'seo.pages.about.title', description: 'seo.pages.about.description' },
+        },
+        {
             path: '/contact',
             name: 'contact',
             component: () => import('../views/ContactView.vue'),

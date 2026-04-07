@@ -179,3 +179,68 @@ export async function loadCardPage(
   const result = await callable({ cardIds })
   return result.data
 }
+
+/**
+ * Query the card_index for a user with server-side filtering, sorting, and pagination.
+ * Returns one page of results plus total matching count.
+ */
+export interface QueryCardIndexRequest {
+  userId: string
+  filters: {
+    search?: string
+    status?: string[]
+    edition?: string[]
+    color?: string[]
+    rarity?: string[]
+    type?: string[]
+    foil?: boolean
+    condition?: string[]
+    minPrice?: number
+    maxPrice?: number
+  }
+  sort: {
+    field: 'name' | 'price' | 'edition' | 'quantity' | 'dateAdded'
+    direction: 'asc' | 'desc'
+  }
+  page: number
+  pageSize: number
+  mode?: 'cards' | 'ids'
+}
+
+export interface QueryCardIndexResponse {
+  cards: Record<string, unknown>[] | string[]  // Record[] when mode='cards', string[] when mode='ids'
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+export async function queryCardIndex(
+  params: QueryCardIndexRequest
+): Promise<QueryCardIndexResponse> {
+  const callable = httpsCallable<QueryCardIndexRequest, QueryCardIndexResponse>(
+    functions,
+    'queryCardIndex',
+    { timeout: 30000 }
+  )
+
+  try {
+    const result = await callable(params)
+    return result.data
+  } catch (error: unknown) {
+    console.error('[CloudFunctions] queryCardIndex error:', error)
+
+    const firebaseError = error as { code?: string; message?: string }
+    if (firebaseError.code === 'functions/unauthenticated') {
+      throw new Error('User must be authenticated to query card index')
+    }
+    if (firebaseError.code === 'functions/invalid-argument') {
+      throw new Error(firebaseError.message ?? 'Invalid query parameters')
+    }
+    if (firebaseError.code === 'functions/internal') {
+      throw new Error(firebaseError.message ?? 'Internal server error')
+    }
+
+    throw error
+  }
+}

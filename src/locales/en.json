@@ -303,7 +303,10 @@
       "gettingStarted": "Getting Started Guide",
       "howToTrade": "How to Trade",
       "tradeSafety": "Trading Safety",
-      "contactUs": "Contact Us"
+      "contactUs": "Contact Us",
+      "cardConditionGuide": "Card Condition Guide",
+      "howToTradeSafely": "Trade Safely",
+      "about": "About Us"
     }
   },
 
@@ -2113,6 +2116,18 @@
       "resetPassword": {
         "title": "Reset Password",
         "description": "Set a new password for your Cranial Trading account."
+      },
+      "cardConditionGuide": {
+        "title": "MTG Card Condition Guide",
+        "description": "Learn how to identify Magic: The Gathering card conditions. Complete guide: Mint, Near Mint, Lightly Played and more."
+      },
+      "howToTrade": {
+        "title": "How to Trade Cards Safely",
+        "description": "Step-by-step guide for safe MTG card trading. Shipping, authentication and safety tips."
+      },
+      "about": {
+        "title": "About Cranial Trading",
+        "description": "Learn about Cranial Trading: the platform democratizing MTG card trading in Latin America and worldwide."
       },
       "contact": {
         "title": "Contact Us",

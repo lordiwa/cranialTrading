@@ -303,7 +303,10 @@
       "gettingStarted": "Guía de Inicio",
       "howToTrade": "Cómo Intercambiar",
       "tradeSafety": "Seguridad en Trades",
-      "contactUs": "Contacto"
+      "contactUs": "Contacto",
+      "cardConditionGuide": "Guía de Estado de Cartas",
+      "howToTradeSafely": "Intercambiar con Seguridad",
+      "about": "Sobre Nosotros"
     }
   },
 
@@ -2113,6 +2116,18 @@
       "resetPassword": {
         "title": "Restablecer Contrasena",
         "description": "Establece una nueva contrasena para tu cuenta de Cranial Trading."
+      },
+      "cardConditionGuide": {
+        "title": "Guia de Estado de Cartas MTG",
+        "description": "Aprende a identificar el estado de tus cartas Magic: The Gathering. Guia completa de condiciones: Mint, Near Mint, Lightly Played y mas."
+      },
+      "howToTrade": {
+        "title": "Como Intercambiar Cartas de Forma Segura",
+        "description": "Guia paso a paso para intercambiar cartas MTG de forma segura. Consejos de envio, autenticacion y seguridad."
+      },
+      "about": {
+        "title": "Sobre Cranial Trading",
+        "description": "Conoce Cranial Trading: la plataforma que democratiza el intercambio de cartas MTG en Latinoamerica y el mundo."
       },
       "contact": {
         "title": "Contacto",

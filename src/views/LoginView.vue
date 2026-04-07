@@ -343,9 +343,9 @@ const comparisonRows = computed(() => [
             <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.help') }}</h4>
             <ul class="space-y-2 text-tiny text-silver-50">
               <li><RouterLink to="/faq" class="hover:text-neon transition-fast">{{ t('landing.footer.faq') }}</RouterLink></li>
-              <li><RouterLink to="/faq#getting-started" class="hover:text-neon transition-fast">{{ t('landing.footer.gettingStarted') }}</RouterLink></li>
-              <li><RouterLink to="/faq#trading" class="hover:text-neon transition-fast">{{ t('landing.footer.howToTrade') }}</RouterLink></li>
-              <li><RouterLink to="/faq#safety" class="hover:text-neon transition-fast">{{ t('landing.footer.tradeSafety') }}</RouterLink></li>
+              <li><RouterLink to="/guide/card-conditions" class="hover:text-neon transition-fast">{{ t('landing.footer.cardConditionGuide') }}</RouterLink></li>
+              <li><RouterLink to="/guide/how-to-trade" class="hover:text-neon transition-fast">{{ t('landing.footer.howToTradeSafely') }}</RouterLink></li>
+              <li><RouterLink to="/about" class="hover:text-neon transition-fast">{{ t('landing.footer.about') }}</RouterLink></li>
               <li><RouterLink to="/contact" class="hover:text-neon transition-fast">{{ t('landing.footer.contactUs') }}</RouterLink></li>
             </ul>
           </div>

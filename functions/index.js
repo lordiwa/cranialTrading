@@ -1242,3 +1242,250 @@ exports.loadCardPage = onCall(
     return { cards };
   }
 );
+
+// ============================================================
+// QUERY CARD INDEX — Server-side filter, sort & pagination
+// Reads card_index chunks, applies filters/sort, returns one page
+// ============================================================
+
+// ── Pure helper: rarity name → first character ──
+const RARITY_INITIAL = {
+  common: 'c',
+  uncommon: 'u',
+  rare: 'r',
+  mythic: 'm',
+};
+
+/**
+ * Flatten chunked index documents into a single array of index cards.
+ */
+function expandIndexCards(chunks) {
+  const result = [];
+  for (const chunk of chunks) {
+    if (chunk.cards && chunk.cards.length > 0) {
+      for (const card of chunk.cards) {
+        result.push(card);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Apply filters to an array of index cards.
+ * All filters use AND logic; within array-valued filters, OR logic is used.
+ */
+function filterIndexCards(cards, filters) {
+  let result = cards;
+
+  // Search: case-insensitive substring on name
+  if (filters.search && filters.search.trim() !== '') {
+    const q = filters.search.toLowerCase();
+    result = result.filter(c => c.n.toLowerCase().includes(q));
+  }
+
+  // Status
+  if (filters.status && filters.status.length > 0) {
+    const statusSet = new Set(filters.status);
+    result = result.filter(c => statusSet.has(c.st));
+  }
+
+  // Edition (setCode, case-insensitive)
+  if (filters.edition && filters.edition.length > 0) {
+    const editionSet = new Set(filters.edition.map(e => e.toUpperCase()));
+    result = result.filter(c => editionSet.has(c.sc.toUpperCase()));
+  }
+
+  // Color (OR: card has at least one matching color)
+  if (filters.color && filters.color.length > 0) {
+    const colorSet = new Set(filters.color.map(c => c.toUpperCase()));
+    result = result.filter(c => {
+      if (c.co.length === 0) return false;
+      return c.co.some(color => colorSet.has(color.toUpperCase()));
+    });
+  }
+
+  // Rarity (map full names to first char)
+  if (filters.rarity && filters.rarity.length > 0) {
+    const rarityChars = new Set(
+      filters.rarity.map(r => RARITY_INITIAL[r.toLowerCase()] || r.charAt(0).toLowerCase())
+    );
+    result = result.filter(c => rarityChars.has(c.r.toLowerCase()));
+  }
+
+  // Type (substring match, OR across types)
+  if (filters.type && filters.type.length > 0) {
+    const typeTerms = filters.type.map(t => t.toLowerCase());
+    result = result.filter(c => {
+      const typeLine = c.t.toLowerCase();
+      return typeTerms.some(term => typeLine.includes(term));
+    });
+  }
+
+  // Foil
+  if (filters.foil !== undefined && filters.foil !== null) {
+    result = result.filter(c => c.f === filters.foil);
+  }
+
+  // Condition
+  if (filters.condition && filters.condition.length > 0) {
+    const conditionSet = new Set(filters.condition.map(c => c.toUpperCase()));
+    result = result.filter(c => conditionSet.has(c.cn.toUpperCase()));
+  }
+
+  // Price range
+  if (filters.minPrice !== undefined && filters.minPrice !== null) {
+    result = result.filter(c => c.p >= filters.minPrice);
+  }
+  if (filters.maxPrice !== undefined && filters.maxPrice !== null) {
+    result = result.filter(c => c.p <= filters.maxPrice);
+  }
+
+  return result;
+}
+
+/**
+ * Sort index cards by field and direction. Returns a new array.
+ */
+function sortIndexCards(cards, sort) {
+  const sorted = [...cards];
+  const dir = sort.direction === 'desc' ? -1 : 1;
+
+  switch (sort.field) {
+    case 'name':
+      sorted.sort((a, b) => dir * a.n.localeCompare(b.n));
+      break;
+    case 'price':
+      sorted.sort((a, b) => dir * (a.p - b.p));
+      break;
+    case 'edition':
+      sorted.sort((a, b) => dir * a.sc.localeCompare(b.sc));
+      break;
+    case 'quantity':
+      sorted.sort((a, b) => dir * (a.q - b.q));
+      break;
+    case 'dateAdded':
+      sorted.sort((a, b) => dir * (a.ca - b.ca));
+      break;
+    default:
+      sorted.sort((a, b) => b.ca - a.ca);
+      break;
+  }
+
+  return sorted;
+}
+
+/**
+ * Slice for the requested page. If mode is 'ids', return only card IDs.
+ */
+function paginateResults(cards, page, pageSize, mode) {
+  const total = cards.length;
+  const start = page * pageSize;
+  const end = start + pageSize;
+  const pageCards = cards.slice(start, end);
+  const hasMore = end < total;
+
+  return {
+    cards: mode === 'ids' ? pageCards.map(c => c.i) : pageCards,
+    total,
+    page,
+    pageSize,
+    hasMore,
+  };
+}
+
+/**
+ * queryCardIndex — Callable Cloud Function.
+ *
+ * Reads card_index chunks for a user, applies filters/sort, and returns
+ * one page of results plus the total matching count.
+ *
+ * Input:
+ *   userId: string           - whose collection to query
+ *   filters: { search?, status?[], edition?[], color?[], rarity?[],
+ *              type?[], foil?, condition?[], minPrice?, maxPrice? }
+ *   sort: { field, direction }
+ *   page: number             - 0-based
+ *   pageSize: number         - default 50, max 100
+ *   mode?: 'cards' | 'ids'   - 'ids' returns only card IDs (for select-all)
+ *
+ * Returns:
+ *   { cards, total, page, pageSize, hasMore }
+ */
+exports.queryCardIndex = onCall(
+  { maxInstances: 10, timeoutSeconds: 30, memory: '512MiB' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+
+    const {
+      userId,
+      filters = {},
+      sort = { field: 'dateAdded', direction: 'desc' },
+      page = 0,
+      pageSize: rawPageSize = 50,
+      mode = 'cards',
+    } = request.data || {};
+
+    // Validate userId
+    const targetUserId = userId || request.auth.uid;
+    if (!targetUserId || typeof targetUserId !== 'string') {
+      throw new HttpsError('invalid-argument', 'userId must be a non-empty string');
+    }
+
+    // Validate page
+    if (typeof page !== 'number' || page < 0 || !Number.isInteger(page)) {
+      throw new HttpsError('invalid-argument', 'page must be a non-negative integer');
+    }
+
+    // Clamp pageSize to [1, 100]
+    const pageSize = Math.max(1, Math.min(100, rawPageSize || 50));
+
+    // Validate mode
+    if (mode !== 'cards' && mode !== 'ids') {
+      throw new HttpsError('invalid-argument', 'mode must be "cards" or "ids"');
+    }
+
+    // Validate sort
+    const validSortFields = ['name', 'price', 'edition', 'quantity', 'dateAdded'];
+    if (sort.field && !validSortFields.includes(sort.field)) {
+      throw new HttpsError('invalid-argument', `sort.field must be one of: ${validSortFields.join(', ')}`);
+    }
+    if (sort.direction && sort.direction !== 'asc' && sort.direction !== 'desc') {
+      throw new HttpsError('invalid-argument', 'sort.direction must be "asc" or "desc"');
+    }
+
+    try {
+      // Step 1: Read all card_index chunks for the user
+      const indexRef = db.collection(`users/${targetUserId}/card_index`);
+      const snapshot = await indexRef.get();
+
+      if (snapshot.empty) {
+        return { cards: [], total: 0, page, pageSize, hasMore: false };
+      }
+
+      const chunks = snapshot.docs.map(doc => doc.data());
+
+      // Step 2: Expand chunks into flat array
+      const allCards = expandIndexCards(chunks);
+
+      // Step 3: Apply filters
+      const filtered = filterIndexCards(allCards, filters);
+
+      // Step 4: Sort
+      const sorted = sortIndexCards(filtered, sort);
+
+      // Step 5: Paginate
+      const result = paginateResults(sorted, page, pageSize, mode);
+
+      logger.info(`[queryCardIndex] User ${targetUserId}: ${allCards.length} total → ${filtered.length} filtered → page ${page} (${result.cards.length} items)`);
+
+      return result;
+    } catch (error) {
+      if (error.code) throw error; // Re-throw HttpsError
+      logger.error('[queryCardIndex] Error:', error);
+      throw new HttpsError('internal', 'Failed to query card index');
+    }
+  }
+);

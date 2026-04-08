@@ -449,20 +449,11 @@
     "view": {
       "grid": "Visualização em grade",
       "compact": "Visualização compacta",
-      "stack": "Empilhar",
       "visual": "Visual",
       "texto": "Texto"
     },
     "group": {
       "none": "Nenhum"
-    },
-    "stack": {
-      "label": "Empilhar",
-      "tooltip": "Agrupar cartas por nome para ver todas as variantes juntas",
-      "unique": "cartas únicas",
-      "variant": "variante",
-      "variants": "variantes",
-      "copies": "cópias"
     },
     "sections": {
       "myCards": "CARTAS QUE TENHO",

@@ -449,20 +449,11 @@
     "view": {
       "grid": "Vista cuadrícula",
       "compact": "Vista compacta",
-      "stack": "Apilar",
       "visual": "Visual",
       "texto": "Texto"
     },
     "group": {
       "none": "Ninguno"
-    },
-    "stack": {
-      "label": "Apilar",
-      "tooltip": "Agrupar cartas por nombre para ver todas las variantes juntas",
-      "unique": "cartas únicas",
-      "variant": "variante",
-      "variants": "variantes",
-      "copies": "copias"
     },
     "sections": {
       "myCards": "CARTAS QUE TENGO",

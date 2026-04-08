@@ -449,20 +449,11 @@
     "view": {
       "grid": "Grid view",
       "compact": "Compact view",
-      "stack": "Stack",
       "visual": "Visual",
       "texto": "Text"
     },
     "group": {
       "none": "None"
-    },
-    "stack": {
-      "label": "Stack",
-      "tooltip": "Group cards by name to see all variants together",
-      "unique": "unique cards",
-      "variant": "variant",
-      "variants": "variants",
-      "copies": "copies"
     },
     "sections": {
       "myCards": "CARDS I OWN",

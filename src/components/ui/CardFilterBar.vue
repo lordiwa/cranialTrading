@@ -14,7 +14,7 @@ const props = withDefaults(defineProps<{
   showBulkSelect?: boolean
   selectionMode?: boolean
   showViewType?: boolean
-  viewType?: 'stack' | 'visual' | 'texto'
+  viewType?: 'visual' | 'texto'
   activeFilterCount?: number
   showSuggestions?: boolean
 }>(), {
@@ -29,7 +29,7 @@ const emit = defineEmits<{
   'update:sortBy': [value: string]
   'update:groupBy': [value: string]
   'toggle-bulk-select': []
-  'change-view-type': [value: 'stack' | 'visual' | 'texto']
+  'change-view-type': [value: 'visual' | 'texto']
   'select-local-card': [card: Card]
   'select-scryfall-card': [cardName: string]
   'open-advanced-search': []
@@ -158,11 +158,10 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <div v-if="showViewType" class="relative">
         <select
             :value="viewType"
-            @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'stack' | 'visual' | 'texto')"
+            @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'visual' | 'texto')"
             class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
         >
           <option value="visual">{{ t('collection.view.visual') }}</option>
-          <option value="stack">{{ t('collection.view.stack') }}</option>
           <option value="texto">{{ t('collection.view.texto') }}</option>
         </select>
         <SvgIcon name="chevron-down" size="tiny" class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />

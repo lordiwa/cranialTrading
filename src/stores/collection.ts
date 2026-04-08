@@ -1225,6 +1225,34 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     // ========================================================================
+    // SELECT ALL — returns matching card IDs for bulk selection
+    // ========================================================================
+
+    /**
+     * Return all card IDs from the loaded collection, optionally filtered by status.
+     * Currently works off the local cards array. When server-side pagination is added,
+     * this can be swapped to call a Cloud Function with mode='ids'.
+     *
+     * @param filters.status - 'all' | 'owned' | 'available' | CardStatus
+     */
+    const selectAllFilteredIds = (filters?: { status?: string }): string[] => {
+        let filtered = cards.value
+        const status = filters?.status
+
+        if (status && status !== 'all') {
+            if (status === 'owned') {
+                filtered = filtered.filter(c => c.status !== 'wishlist')
+            } else if (status === 'available') {
+                filtered = filtered.filter(c => c.status === 'sale' || c.status === 'trade')
+            } else {
+                filtered = filtered.filter(c => c.status === status)
+            }
+        }
+
+        return filtered.map(c => c.id)
+    }
+
+    // ========================================================================
     // COMPUTED
     // ========================================================================
 
@@ -1382,6 +1410,9 @@ export const useCollectionStore = defineStore('collection', () => {
         // Search
         getCardById,
         getFullCard,
+
+        // Bulk selection
+        selectAllFilteredIds,
 
         // Wishlist sync
         ensureCollectionWishlistCard,

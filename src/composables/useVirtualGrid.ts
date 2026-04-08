@@ -2,6 +2,28 @@ import { computed, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 
 /**
+ * Determine whether the user has scrolled close enough to the bottom
+ * to warrant loading more content.
+ *
+ * Pure function — exported for unit testing.
+ *
+ * @param scrollOffset  Current scroll position (px) — null means not yet measured
+ * @param totalSize     Total virtual content height (px)
+ * @param viewportHeight Visible viewport height (px)
+ * @param threshold     Distance from bottom (px) at which to trigger
+ */
+export function shouldLoadMore(
+  scrollOffset: number | null,
+  totalSize: number,
+  viewportHeight: number,
+  threshold: number,
+): boolean {
+  if (scrollOffset === null || totalSize === 0 || viewportHeight === 0) return false
+  const remaining = totalSize - (scrollOffset + viewportHeight)
+  return remaining <= threshold
+}
+
+/**
  * Chunk a flat array of items into rows of `columns` items each.
  * Exported for unit testing.
  */
@@ -32,6 +54,9 @@ function getColumnCount(width: number, compact: boolean): number {
   return 2
 }
 
+/** Default distance from bottom (px) at which onLoadMore fires */
+const LOAD_MORE_THRESHOLD = 1000
+
 export interface VirtualGridOptions<T> {
   items: Ref<T[]>
   compact?: Ref<boolean>
@@ -41,6 +66,8 @@ export interface VirtualGridOptions<T> {
   overscan?: number
   /** Custom column count calculator — overrides default Tailwind grid logic */
   getColumns?: (containerWidth: number) => number
+  /** Called when user scrolls near bottom — use for loading next page */
+  onLoadMore?: () => void
 }
 
 export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
@@ -122,6 +149,43 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
     virtualizer.value.scrollToOffset(0)
   })
 
+  // --- onLoadMore scroll detection ---
+  const isNearBottom = ref(false)
+  let loadMoreFired = false
+
+  if (options.onLoadMore) {
+    const onLoadMore = options.onLoadMore
+
+    const checkScroll = () => {
+      const offset = virtualizer.value.scrollOffset
+      const total = virtualizer.value.getTotalSize()
+      const viewportHeight = window.innerHeight
+
+      const near = shouldLoadMore(offset, total, viewportHeight, LOAD_MORE_THRESHOLD)
+      isNearBottom.value = near
+
+      if (near && !loadMoreFired) {
+        loadMoreFired = true
+        onLoadMore()
+      }
+    }
+
+    // Reset the guard when totalSize changes (new content loaded)
+    watch(totalSize, () => {
+      loadMoreFired = false
+      // Re-check immediately — user might still be near bottom after new content
+      checkScroll()
+    })
+
+    onMounted(() => {
+      window.addEventListener('scroll', checkScroll, { passive: true })
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('scroll', checkScroll)
+    })
+  }
+
   return {
     containerRef,
     columnCount,
@@ -129,5 +193,6 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
     virtualRows,
     totalSize,
     virtualizer,
+    isNearBottom,
   }
 }

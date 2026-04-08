@@ -461,6 +461,10 @@
       "sideboard": "SIDEBOARD",
       "myWishlist": "MY WISHLIST"
     },
+    "pagination": {
+      "showingOf": "Showing {count} of {total}",
+      "loadingMore": "Loading more..."
+    },
     "empty": {
       "deckEmpty": "Empty deck",
       "deckNoCards": "This deck has no assigned cards",

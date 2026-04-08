@@ -1429,14 +1429,14 @@ export const useCollectionStore = defineStore('collection', () => {
         totalCards,
         totalValue,
 
-        // Cleanup
-        clear,
-
         // Server-side pagination
         paginatedCards,
         paginationMeta,
         queryPage,
         loadNextPage,
         resetPagination,
+
+        // Cleanup
+        clear,
     }
 })

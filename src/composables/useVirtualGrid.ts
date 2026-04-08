@@ -55,7 +55,7 @@ function getColumnCount(width: number, compact: boolean): number {
 }
 
 /** Default distance from bottom (px) at which onLoadMore fires */
-const LOAD_MORE_THRESHOLD = 1000
+// LOAD_MORE_THRESHOLD removed — inline 800px threshold used in handleScroll
 
 export interface VirtualGridOptions<T> {
   items: Ref<T[]>
@@ -140,51 +140,43 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
     }
   })
 
+  // Infinite scroll: detect when user is near the bottom and call onLoadMore
+  const isNearBottom = ref(false)
+  let _loadMoreTriggered = false
+
+  const handleScroll = () => {
+    if (!options.onLoadMore) return
+    const scrollY = window.scrollY || window.pageYOffset
+    const windowHeight = window.innerHeight
+    const docHeight = document.documentElement.scrollHeight
+
+    // Trigger when within 800px of the bottom
+    const nearBottom = scrollY + windowHeight >= docHeight - 800
+    isNearBottom.value = nearBottom
+
+    if (nearBottom && !_loadMoreTriggered) {
+      _loadMoreTriggered = true
+      options.onLoadMore()
+    } else if (!nearBottom) {
+      _loadMoreTriggered = false
+    }
+  }
+
+  if (options.onLoadMore) {
+    onMounted(() => {
+      window.addEventListener('scroll', handleScroll, { passive: true })
+    })
+  }
+
   onUnmounted(() => {
     resizeObserver?.disconnect()
+    window.removeEventListener('scroll', handleScroll)
   })
 
   // Scroll to top when items change (filter/sort)
   watch(() => options.items.value.length, () => {
     virtualizer.value.scrollToOffset(0)
   })
-
-  // --- onLoadMore scroll detection ---
-  const isNearBottom = ref(false)
-  let loadMoreFired = false
-
-  if (options.onLoadMore) {
-    const onLoadMore = options.onLoadMore
-
-    const checkScroll = () => {
-      const offset = virtualizer.value.scrollOffset
-      const total = virtualizer.value.getTotalSize()
-      const viewportHeight = window.innerHeight
-
-      const near = shouldLoadMore(offset, total, viewportHeight, LOAD_MORE_THRESHOLD)
-      isNearBottom.value = near
-
-      if (near && !loadMoreFired) {
-        loadMoreFired = true
-        onLoadMore()
-      }
-    }
-
-    // Reset the guard when totalSize changes (new content loaded)
-    watch(totalSize, () => {
-      loadMoreFired = false
-      // Re-check immediately — user might still be near bottom after new content
-      checkScroll()
-    })
-
-    onMounted(() => {
-      window.addEventListener('scroll', checkScroll, { passive: true })
-    })
-
-    onUnmounted(() => {
-      window.removeEventListener('scroll', checkScroll)
-    })
-  }
 
   return {
     containerRef,

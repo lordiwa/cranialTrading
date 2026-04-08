@@ -644,6 +644,129 @@ const clearAllFilters = () => {
   resetAllChipFilters()
 }
 
+// ========== SERVER-SIDE PAGINATION WIRING ==========
+
+/** Build a filters object for queryCardIndex from current filter state */
+const buildPaginationFilters = () => {
+  // Map status filter to server format
+  let statusArr: string[] | undefined
+  if (statusFilter.value === 'owned') {
+    statusArr = ['collection', 'sale', 'trade']
+  } else if (statusFilter.value === 'available') {
+    statusArr = ['sale', 'trade']
+  } else if (statusFilter.value !== 'all') {
+    statusArr = [statusFilter.value]
+  }
+
+  // Map color display categories to color letters for server
+  const colorMap: Record<string, string> = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' }
+  const colorArr = selectedColors.value.size < colorOrder.length
+    ? [...selectedColors.value].map(c => colorMap[c]).filter(Boolean) as string[] // eslint-disable-line security/detect-object-injection
+    : undefined
+
+  // Map rarity display categories to server format
+  const rarityMap: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
+  const rarityArr = selectedRarities.value.size < rarityOrder.length
+    ? [...selectedRarities.value].map(r => rarityMap[r]).filter(Boolean) as string[] // eslint-disable-line security/detect-object-injection
+    : undefined
+
+  // Map type display categories to server format
+  const typeMap: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
+  const typeArr = selectedTypes.value.size < typeOrder.length
+    ? [...selectedTypes.value].map(t => typeMap[t]).filter(Boolean) as string[] // eslint-disable-line security/detect-object-injection
+    : undefined
+
+  // Map foil filter
+  const foilVal = advFoilFilter.value === 'foil' ? true : undefined
+
+  // Map condition — not currently tracked as chip filter; skip if not filtered
+  const conditionArr = undefined
+
+  // Map edition (advanced sets filter)
+  const editionArr = advSelectedSets.value.length > 0 ? advSelectedSets.value : undefined
+
+  return {
+    search: filterQuery.value.trim() || undefined,
+    status: statusArr,
+    edition: editionArr,
+    color: colorArr,
+    rarity: rarityArr,
+    type: typeArr,
+    foil: foilVal,
+    condition: conditionArr,
+    minPrice: advPriceMin.value,
+    maxPrice: advPriceMax.value,
+  }
+}
+
+/** Build a sort object for queryCardIndex from current sort state */
+const buildPaginationSort = (): { field: 'name' | 'price' | 'edition' | 'quantity' | 'dateAdded'; direction: 'asc' | 'desc' } => {
+  // Map client sort values to server field names
+  const fieldMap: Record<string, 'name' | 'price' | 'edition' | 'quantity' | 'dateAdded'> = {
+    name: 'name',
+    price: 'price',
+    recent: 'dateAdded',
+    edition: 'edition',
+    quantity: 'quantity',
+  }
+  return {
+    field: fieldMap[sortBy.value] ?? 'name',
+    direction: sortBy.value === 'name' ? 'asc' : 'desc',
+  }
+}
+
+// Debounced watcher: when any filter/sort changes, re-query the server
+let _paginationDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  [
+    filterQuery,
+    statusFilter,
+    sortBy,
+    selectedColors,
+    selectedManaValues,
+    selectedTypes,
+    selectedRarities,
+    advFoilFilter,
+    advSelectedSets,
+    advPriceMin,
+    advPriceMax,
+  ],
+  () => {
+    if (_paginationDebounceTimer) clearTimeout(_paginationDebounceTimer)
+    _paginationDebounceTimer = setTimeout(() => {
+      if (viewMode.value === 'collection') {
+        collectionStore.queryPage(buildPaginationFilters(), buildPaginationSort())
+      }
+    }, 300)
+  },
+  { deep: true }
+)
+
+// Clean up debounce timer on unmount
+onUnmounted(() => {
+  if (_paginationDebounceTimer) clearTimeout(_paginationDebounceTimer)
+})
+
+// Computed: use paginated cards for collection mode, filtered cards for deck/binder
+const collectionDisplayCards = computed(() => {
+  const paginated = collectionStore.paginatedCards
+  // If pagination has data, use it; otherwise fall back to filteredCards
+  if (paginated.length > 0 || collectionStore.paginationMeta.loading) {
+    return paginated
+  }
+  return filteredCards.value
+})
+
+// Card count display for paginated mode
+const paginatedCardCount = computed(() => {
+  const meta = collectionStore.paginationMeta
+  if (meta.total > 0) {
+    return { showing: collectionStore.paginatedCards.length, total: meta.total }
+  }
+  return { showing: filteredCards.value.length, total: filteredCards.value.length }
+})
+
 // Wishlist grouping — reuses the same filter state from the main composable
 const passesChipFilters = (card: Card): boolean => {
   if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !passesColorFilter(card, selectedColors.value, exactColorMode.value)) return false
@@ -3353,6 +3476,9 @@ onMounted(async () => {
       binderStore.loadBinders()
     ])
 
+    // Trigger initial server-side paginated query (fire-and-forget, no await)
+    collectionStore.queryPage(buildPaginationFilters(), buildPaginationSort())
+
     // Check for view mode query param (from search redirect)
     const fromParam = route.query.from as string
     if (fromParam === 'decks') {
@@ -4021,11 +4147,16 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== CARDS GRID: MODO COLECCIÓN ========== -->
-        <div v-if="viewMode === 'collection' && filteredCards.length > 0 && statusFilter !== 'wishlist'">
+        <div v-if="viewMode === 'collection' && (collectionDisplayCards.length > 0 || collectionStore.paginationMeta.loading) && statusFilter !== 'wishlist'">
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-body font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
             <span class="text-small text-silver-50">
-              ({{ filteredCards.length }})
+              <template v-if="paginatedCardCount.total > paginatedCardCount.showing">
+                ({{ t('collection.pagination.showingOf', { count: paginatedCardCount.showing, total: paginatedCardCount.total }) }})
+              </template>
+              <template v-else>
+                ({{ paginatedCardCount.showing }})
+              </template>
             </span>
           </div>
 
@@ -4038,11 +4169,13 @@ onUnmounted(() => {
                 <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
               </div>
               <CollectionGrid
-                  :cards="group.cards"
+                  :cards="group.type === 'all' ? collectionDisplayCards : group.cards"
                   :compact="viewType === 'texto'"
                   :deleting-card-ids="deletingCardIds"
                   :selection-mode="selectionMode"
                   :selected-card-ids="selectedCardIds"
+                  :on-load-more="group.type === 'all' ? collectionStore.loadNextPage : undefined"
+                  :loading-more="group.type === 'all' ? collectionStore.paginationMeta.loadingMore : false"
                   @card-click="handleCardClick"
                   @delete="handleDelete"
                   @toggle-select="toggleCardSelection"
@@ -4173,8 +4306,9 @@ onUnmounted(() => {
 
         <!-- Empty State: No filter results (cards exist but all hidden by filters) -->
         <div v-if="viewMode === 'collection' && !collectionStore.loading
+                    && !collectionStore.paginationMeta.loading
                     && collectionStore.cards.length > 0
-                    && filteredCards.length === 0 && wishlistCards.length === 0"
+                    && collectionDisplayCards.length === 0 && wishlistCards.length === 0"
              class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">{{ t('collection.empty.noFilterResults') }}</p>

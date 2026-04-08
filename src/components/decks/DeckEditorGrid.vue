@@ -221,9 +221,10 @@ const {
   containerRef: binderContainerRef,
   virtualRows: binderVirtualRows,
   totalSize: binderTotalSize,
+  virtualizer: binderVirtualizer,
 } = useVirtualGrid({
   items: binderFlatCards,
-  estimateRowHeight: 160,
+  estimateRowHeight: 180,
   overscan: 5,
   getColumns: getBinderColumns,
 })
@@ -457,6 +458,9 @@ const handleDeckContextMenuSelect = (itemId: string) => {
           <div
             v-for="vRow in binderVirtualRows"
             :key="vRow.index"
+            :data-index="vRow.index"
+            :ref="(el: any) => { if (el) binderVirtualizer.measureElement(el as HTMLElement) }"
+            class="pb-3"
             :style="{
               position: 'absolute',
               top: 0,

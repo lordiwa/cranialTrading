@@ -114,7 +114,7 @@ export class CollectionPage {
     return cards.count();
   }
 
-  async switchView(mode: 'stack' | 'visual' | 'texto') {
+  async switchView(mode: 'visual' | 'texto') {
     await this.viewTypeSelect.selectOption(mode);
   }
 

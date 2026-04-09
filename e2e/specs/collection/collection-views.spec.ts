@@ -14,13 +14,6 @@ test.describe('Collection View Modes', () => {
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test('stack groups cards by name', async ({ collectionPage }) => {
-    await collectionPage.switchView('stack');
-    await collectionPage.page.waitForTimeout(500);
-
-    await expect(collectionPage.statusFilters).toBeVisible();
-  });
-
   test('text view shows list with card data columns', async ({ collectionPage }) => {
     await collectionPage.switchView('texto');
     await collectionPage.page.waitForTimeout(500);

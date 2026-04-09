@@ -61,6 +61,7 @@ After all tasks in a slice pass review:
    - In **autonomous mode**: attempt auto-resolution for trivial conflicts (imports, adjacent lines). If complex: stop, switch to supervised, report
 4. Run a final `review-code` pass on the merged `develop` to catch integration issues
 5. Run `npm run test:unit` and `npx vite build` on merged result
+6. **Before pushing to develop:** run `npm run e2e` (or at minimum the E2E specs for changed views). Unit tests + build alone do NOT catch UI regressions.
 
 ### 5. Report
 

@@ -29,7 +29,7 @@ export default defineConfig({
     navigationTimeout: 15_000,
   },
   projects: [
-    // Setup project — logs in ONCE, saves storageState + IndexedDB dump
+    // Setup project — logs in ONCE, saves storageState (localStorage has Firebase auth tokens)
     {
       name: 'setup',
       testDir: './e2e',
@@ -43,20 +43,12 @@ export default defineConfig({
         storageState: 'e2e/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\/.+\.spec\.ts/, /i18n\/.+\.spec\.ts/],
+      testIgnore: [/auth\/.+\.spec\.ts/, /i18n\/.+\.spec\.ts/, /notifications\/.+\.spec\.ts/],
     },
-    // Auth tests — NO storageState (they test login/register flows)
+    // Tests that need clean state (no storageState) — they test login/register/locale/toast flows
     {
-      name: 'auth-tests',
-      testMatch: /auth\/.+\.spec\.ts/,
-      use: {
-        ...devices['Desktop Chrome'],
-      },
-    },
-    // i18n tests — NO storageState (they test default locale behavior)
-    {
-      name: 'i18n-tests',
-      testMatch: /i18n\/.+\.spec\.ts/,
+      name: 'no-auth-tests',
+      testMatch: [/auth\/.+\.spec\.ts/, /i18n\/.+\.spec\.ts/, /notifications\/.+\.spec\.ts/],
       use: {
         ...devices['Desktop Chrome'],
       },

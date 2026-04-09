@@ -1,5 +1,5 @@
 import { test as setup } from '@playwright/test'
-import { writeFileSync, mkdirSync, existsSync } from 'fs'
+import { mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import dotenv from 'dotenv'
 import path from 'path'
@@ -11,12 +11,12 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') })
 
 const AUTH_DIR = join(process.cwd(), 'e2e', '.auth')
 const STORAGE_STATE_FILE = join(AUTH_DIR, 'user.json')
-const IDB_DUMP_FILE = join(AUTH_DIR, 'firebase-idb.json')
 
 /**
  * Global auth setup — runs ONCE before all tests.
- * Logs in via form, saves Playwright storageState + Firebase IndexedDB dump.
- * Tests reuse these files, eliminating redundant logins and Firebase rate-limiting.
+ * Logs in via form, saves Playwright storageState (cookies + localStorage).
+ * With browserLocalPersistence, Firebase auth tokens are in localStorage,
+ * so storageState captures everything. No IndexedDB dump needed.
  */
 setup('authenticate', async ({ page }) => {
   const email = process.env.TEST_USER_A_EMAIL
@@ -41,14 +41,13 @@ setup('authenticate', async ({ page }) => {
   // Wait for successful redirect (not on /login anymore)
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 })
 
-  // Wait for Firebase to persist auth tokens to IndexedDB
+  // Wait for Firebase to persist auth tokens to localStorage
   await page.waitForTimeout(2_000)
 
   // Set locale to English and mark tour completed
   await page.evaluate(() => {
     localStorage.setItem('cranial_locale', 'en')
     localStorage.setItem('cranial_tour_completed', 'true')
-    // Set all user-specific tour keys
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key?.startsWith('cranial_tour_completed')) {
@@ -57,33 +56,6 @@ setup('authenticate', async ({ page }) => {
     }
   })
 
-  // Dump Firebase IndexedDB auth state
-  const idbEntries = await page.evaluate(() => {
-    return new Promise<any[]>((resolve) => {
-      const req = indexedDB.open('firebaseLocalStorageDb')
-      req.onsuccess = () => {
-        const db = req.result
-        try {
-          const tx = db.transaction('firebaseLocalStorage', 'readonly')
-          const store = tx.objectStore('firebaseLocalStorage')
-          const keys = store.getAllKeys()
-          const values = store.getAll()
-          tx.oncomplete = () => {
-            const entries = keys.result.map((key: any, i: number) => ({
-              key, value: values.result[i],
-            }))
-            db.close()
-            resolve(entries)
-          }
-        } catch { db.close(); resolve([]) }
-      }
-      req.onerror = () => resolve([])
-    })
-  })
-
-  // Save IndexedDB dump to disk
-  writeFileSync(IDB_DUMP_FILE, JSON.stringify(idbEntries))
-
-  // Save Playwright storageState (cookies + localStorage)
+  // Save Playwright storageState (cookies + localStorage — includes Firebase auth tokens)
   await page.context().storageState({ path: STORAGE_STATE_FILE })
 })

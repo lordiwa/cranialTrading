@@ -3466,9 +3466,37 @@ const resumeImport = async (savedState: ImportState) => {
   }
 }
 
+// ========== SLOW-LOAD TOAST ==========
+// If the initial collection load takes >3s, show an info toast
+let slowLoadTimer: ReturnType<typeof setTimeout> | null = null
+
+function startSlowLoadTimer() {
+  slowLoadTimer = setTimeout(() => {
+    toastStore.show(t('collection.pagination.slowLoad'), 'info')
+    slowLoadTimer = null
+  }, 3000)
+}
+
+function cancelSlowLoadTimer() {
+  if (slowLoadTimer !== null) {
+    clearTimeout(slowLoadTimer)
+    slowLoadTimer = null
+  }
+}
+
+// Watch loading state — cancel timer when loading finishes
+watch(() => collectionStore.loading, (isLoading) => {
+  if (!isLoading) {
+    cancelSlowLoadTimer()
+  }
+})
+
 // ========== LIFECYCLE ==========
 
 onMounted(async () => {
+  // Start slow-load timer before collection loads
+  startSlowLoadTimer()
+
   try {
     await Promise.all([
       collectionStore.loadCollection(),
@@ -3592,6 +3620,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  cancelSlowLoadTimer()
 })
 
 // Keyboard shortcut: "n" to open add card modal
@@ -4139,8 +4168,12 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Loading skeleton -->
+        <!-- Loading spinner + skeleton -->
         <div v-if="viewMode === 'collection' && collectionStore.loading && collectionStore.cards.length === 0">
+          <div class="flex flex-col items-center justify-center py-12 mb-6">
+            <div class="w-10 h-10 border-4 border-silver-20 border-t-neon rounded-full animate-spin mb-4" />
+            <p class="text-small text-silver-70">{{ t('collection.pagination.loading') }}</p>
+          </div>
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             <SkeletonCard v-for="n in 10" :key="n" />
           </div>

@@ -576,6 +576,10 @@
       "importError": "Error importing cards",
       "synced": "Cards synced for matches",
       "syncError": "Error syncing cards"
+    },
+    "pagination": {
+      "loading": "Loading collection...",
+      "slowLoad": "Large collection — this may take a moment"
     }
   },
 

@@ -576,6 +576,10 @@
       "importError": "Error al importar cartas",
       "synced": "Cartas sincronizadas para matches",
       "syncError": "Error sincronizando cartas"
+    },
+    "pagination": {
+      "loading": "Cargando colección...",
+      "slowLoad": "Colección grande — puede tardar un momento"
     }
   },
 

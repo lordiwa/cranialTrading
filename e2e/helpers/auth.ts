@@ -1,13 +1,11 @@
 import { type Page } from '@playwright/test';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const AUTH_CACHE_DIR = join(process.cwd(), 'e2e', '.auth');
-const AUTH_CACHE_FILE = join(AUTH_CACHE_DIR, 'cached-auth.json');
+const IDB_DUMP_FILE = join(process.cwd(), 'e2e', '.auth', 'firebase-idb.json');
 
 /**
  * Race a promise against a hard timeout to prevent hangs.
- * Used around browser-context async operations (IndexedDB) that have no built-in timeout.
  */
 function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Operation'): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -20,41 +18,59 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Operation'): P
 }
 
 /**
- * Cached Firebase auth state to avoid re-login per test.
- * Firebase rate-limits sequential signInWithEmailAndPassword calls (~20/min),
- * causing CI failures when 30+ tests each login independently.
- * After the first successful login we cache the IndexedDB + localStorage state
- * BOTH in-memory AND to a file on disk, so it survives across browser contexts.
+ * Load Firebase IndexedDB dump created by auth.setup.ts.
  */
-let cachedAuth: { indexedDB: any[]; localStorage: Record<string, string> } | null = null;
-
-/** Load cached auth from disk if available (survives across browser contexts) */
-function loadCachedAuthFromDisk(): typeof cachedAuth {
+function loadIdbDump(): any[] | null {
   try {
-    if (existsSync(AUTH_CACHE_FILE)) {
-      const data = JSON.parse(readFileSync(AUTH_CACHE_FILE, 'utf-8'));
-      // Check if cache is recent (< 30 min old)
-      if (data._savedAt && Date.now() - data._savedAt < 30 * 60 * 1000) {
-        return { indexedDB: data.indexedDB, localStorage: data.localStorage };
-      }
+    if (existsSync(IDB_DUMP_FILE)) {
+      return JSON.parse(readFileSync(IDB_DUMP_FILE, 'utf-8'));
     }
   } catch { /* ignore corrupt file */ }
   return null;
 }
 
-/** Save cached auth to disk for reuse across contexts */
-function saveCachedAuthToDisk(auth: NonNullable<typeof cachedAuth>) {
-  try {
-    if (!existsSync(AUTH_CACHE_DIR)) mkdirSync(AUTH_CACHE_DIR, { recursive: true });
-    writeFileSync(AUTH_CACHE_FILE, JSON.stringify({ ...auth, _savedAt: Date.now() }));
-  } catch { /* non-critical */ }
+/**
+ * Restore Firebase IndexedDB auth tokens into the page.
+ * Playwright's storageState handles cookies/localStorage, but Firebase
+ * stores auth in IndexedDB which storageState doesn't capture.
+ */
+async function restoreFirebaseIdb(page: Page, entries: any[]): Promise<void> {
+  await withTimeout(
+    page.evaluate(async (idbEntries) => {
+      return new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('firebaseLocalStorageDb', 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('firebaseLocalStorage')) {
+            db.createObjectStore('firebaseLocalStorage');
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('firebaseLocalStorage', 'readwrite');
+          const store = tx.objectStore('firebaseLocalStorage');
+          for (const entry of idbEntries) {
+            store.put(entry.value, entry.key);
+          }
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }, entries),
+    5_000,
+    'restoreFirebaseIdb',
+  );
 }
 
 /**
- * Ensure the page is authenticated. If we're on the login page,
- * perform a login then navigate to the target URL.
- * Firebase stores auth in indexedDB which isn't captured by
- * Playwright's storageState, so we login per-context.
+ * Ensure the page is authenticated.
+ *
+ * With the setup project (auth.setup.ts), Playwright already restores
+ * cookies + localStorage via storageState. This function handles:
+ * 1. Restoring Firebase IndexedDB tokens (not captured by storageState)
+ * 2. Navigating to the target URL
+ * 3. Falling back to form login ONLY if everything else fails
  */
 export async function ensureLoggedIn(page: Page, targetUrl?: string) {
   const email = process.env.TEST_USER_A_EMAIL;
@@ -66,177 +82,22 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
 
   const dest = targetUrl || '/collection';
 
-  // Try restoring cached auth state (avoids Firebase rate-limiting on CI)
-  // Check in-memory first, then disk
-  if (!cachedAuth || cachedAuth.indexedDB.length === 0) {
-    cachedAuth = loadCachedAuthFromDisk();
-  }
-  if (cachedAuth && cachedAuth.indexedDB.length > 0) {
-    const restored = await restoreCachedAuth(page, dest);
-    if (restored) return;
-    // If restore failed, fall through to form login
-  }
-
-  // Wait for Vue to bootstrap and either show login form or authenticated nav.
-  // page.goto resolves on initial HTML load, before Vue's client-side redirect.
-  await page.waitForLoadState('domcontentloaded');
-  const loginForm = page.locator('input[type="email"]');
-  const authenticatedNav = page.locator('[data-testid="nav-collection"], [data-tour="nav-collection"]');
-  await Promise.race([
-    loginForm.waitFor({ state: 'visible', timeout: 5_000 }),
-    authenticatedNav.waitFor({ state: 'visible', timeout: 5_000 }),
-  ]).catch(() => {
-    // Neither appeared — fall through to URL check
-  });
-
-  if (page.url().includes('/login') || await loginForm.isVisible().catch(() => false)) {
-    await page.locator('input[type="email"]').fill(email);
-    await page.locator('input[type="password"]').fill(password);
-    await page.locator('button[type="submit"]').click();
-
-    // Race: redirect away from /login vs error toast
-    await waitForLoginResult(page);
-
-    // Wait for authenticated UI to be ready instead of hardcoded timeout
-    await page.waitForSelector(
-      '[data-testid="nav-collection"], [data-tour="nav-collection"], nav, .nav',
-      { timeout: 10_000 },
-    ).catch(() => {
-      // Not critical — some pages may not have nav visible immediately
-    });
-
-    // Cache auth state for subsequent tests
-    await saveAuthState(page);
-
-    // Set locale and mark tour completed BEFORE any navigation.
-    await page.evaluate(() => {
-      localStorage.setItem('cranial_locale', 'en');
-    });
-    await markTourCompletedForCurrentUser(page);
-
-    // Force a full page navigation to the target URL.
-    // This re-initializes the Vue app, so initI18n() reads locale=en
-    // and WelcomeModal reads tour=completed.
-    await page.goto(dest);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Dismiss any overlay that still appears (shouldn't with tour key set)
-    await dismissTourOverlay(page);
-  } else {
-    // Not on login page — ensure locale is English anyway
-    const currentLocale = await page.evaluate(() => localStorage.getItem('cranial_locale'));
-    if (currentLocale !== 'en') {
-      await page.evaluate(() => {
-        localStorage.setItem('cranial_locale', 'en');
-      });
-      await markTourCompletedForCurrentUser(page);
-      await page.reload();
-      await page.waitForLoadState('domcontentloaded');
-    } else {
-      await markTourCompletedForCurrentUser(page);
-    }
-    await dismissTourOverlay(page);
-  }
-}
-
-/**
- * Save Firebase auth state (IndexedDB + localStorage) after successful login.
- */
-async function saveAuthState(page: Page) {
-  try {
-    const ls = await page.evaluate(() => {
-      const result: Record<string, string> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k) result[k] = localStorage.getItem(k) || '';
-      }
-      return result;
-    });
-
-    const idb = await withTimeout(
-      page.evaluate(() => {
-        return new Promise<any[]>((resolve) => {
-          const req = indexedDB.open('firebaseLocalStorageDb');
-          req.onsuccess = () => {
-            const db = req.result;
-            try {
-              const tx = db.transaction('firebaseLocalStorage', 'readonly');
-              const store = tx.objectStore('firebaseLocalStorage');
-              const keys = store.getAllKeys();
-              const values = store.getAll();
-              tx.oncomplete = () => {
-                const entries = keys.result.map((key: any, i: number) => ({
-                  key, value: values.result[i],
-                }));
-                db.close();
-                resolve(entries);
-              };
-            } catch { db.close(); resolve([]); }
-          };
-          req.onerror = () => resolve([]);
-        });
-      }),
-      5_000,
-      'saveAuthState IndexedDB read',
-    );
-
-    if (idb.length > 0) {
-      cachedAuth = { indexedDB: idb, localStorage: ls };
-      saveCachedAuthToDisk(cachedAuth);
-    }
-  } catch {
-    // Non-critical — next test will just login via form
-  }
-}
-
-/**
- * Restore cached Firebase auth state into a fresh page, bypassing the login form.
- * Returns true if auth was restored and the page is on the target URL.
- */
-async function restoreCachedAuth(page: Page, targetUrl: string): Promise<boolean> {
-  try {
-    // Navigate to the app origin first (needed for IndexedDB/localStorage access)
+  // Step 1: Restore Firebase IndexedDB from setup dump
+  const idbEntries = loadIdbDump();
+  if (idbEntries && idbEntries.length > 0) {
+    // Navigate to app origin first (needed for IndexedDB access)
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
 
-    // Restore localStorage
-    await page.evaluate((ls) => {
-      for (const [k, v] of Object.entries(ls)) localStorage.setItem(k, v);
-    }, cachedAuth!.localStorage);
-
-    // Restore IndexedDB (Firebase auth tokens) — with timeout to prevent hangs
-    await withTimeout(
-      page.evaluate(async (entries) => {
-        return new Promise<void>((resolve, reject) => {
-          const req = indexedDB.open('firebaseLocalStorageDb', 1);
-          req.onupgradeneeded = () => {
-            const db = req.result;
-            if (!db.objectStoreNames.contains('firebaseLocalStorage')) {
-              db.createObjectStore('firebaseLocalStorage');
-            }
-          };
-          req.onsuccess = () => {
-            const db = req.result;
-            const tx = db.transaction('firebaseLocalStorage', 'readwrite');
-            const store = tx.objectStore('firebaseLocalStorage');
-            for (const entry of entries) {
-              store.put(entry.value, entry.key);
-            }
-            tx.oncomplete = () => { db.close(); resolve(); };
-            tx.onerror = () => { db.close(); reject(tx.error); };
-          };
-          req.onerror = () => reject(req.error);
-        });
-      }, cachedAuth!.indexedDB),
-      5_000,
-      'restoreCachedAuth IndexedDB write',
-    );
+    await restoreFirebaseIdb(page, idbEntries).catch(() => {
+      // Non-critical — will fall back to form login
+    });
 
     // Navigate to target — Firebase should recognize auth from IndexedDB
-    await page.goto(targetUrl);
+    await page.goto(dest);
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait briefly for Vue router to settle
+    // Check if we're authenticated
     const loginForm = page.locator('input[type="email"]');
     const authenticatedNav = page.locator('[data-testid="nav-collection"], [data-tour="nav-collection"]');
     await Promise.race([
@@ -244,19 +105,44 @@ async function restoreCachedAuth(page: Page, targetUrl: string): Promise<boolean
       authenticatedNav.waitFor({ state: 'visible', timeout: 3_000 }),
     ]).catch(() => {});
 
-    // If we ended up on login, the cached token expired — invalidate cache
-    if (page.url().includes('/login') || await loginForm.isVisible().catch(() => false)) {
-      cachedAuth = null;
-      return false;
+    if (!page.url().includes('/login') && !(await loginForm.isVisible().catch(() => false))) {
+      // Authenticated via IndexedDB restore
+      await markTourCompletedForCurrentUser(page);
+      await dismissTourOverlay(page);
+      return;
     }
+  }
 
-    // Success — locale and tour should already be set from cached localStorage
+  // Step 2: Fallback — form login (should rarely happen with setup project)
+  await page.goto('/login');
+  await page.waitForLoadState('domcontentloaded');
+
+  const loginForm = page.locator('input[type="email"]');
+  await loginForm.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+
+  if (page.url().includes('/login') || await loginForm.isVisible().catch(() => false)) {
+    await page.locator('input[type="email"]').fill(email);
+    await page.locator('input[type="password"]').fill(password);
+    await page.locator('button[type="submit"]').click();
+
+    await waitForLoginResult(page);
+
+    await page.waitForSelector(
+      '[data-testid="nav-collection"], [data-tour="nav-collection"], nav, .nav',
+      { timeout: 10_000 },
+    ).catch(() => {});
+
+    await page.evaluate(() => {
+      localStorage.setItem('cranial_locale', 'en');
+    });
+    await markTourCompletedForCurrentUser(page);
+
+    await page.goto(dest);
+    await page.waitForLoadState('domcontentloaded');
+    await dismissTourOverlay(page);
+  } else {
     await markTourCompletedForCurrentUser(page);
     await dismissTourOverlay(page);
-    return true;
-  } catch {
-    cachedAuth = null;
-    return false;
   }
 }
 
@@ -298,8 +184,6 @@ export async function waitForLoginResult(page: Page) {
         ]);
 
         if (retryResult === 'redirected') {
-          // Save auth on successful retry so subsequent tests don't need to login
-          await saveAuthState(page);
           return;
         }
 

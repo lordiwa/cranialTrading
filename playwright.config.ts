@@ -29,16 +29,34 @@ export default defineConfig({
     navigationTimeout: 15_000,
   },
   projects: [
+    // Setup project — logs in ONCE, saves storageState + IndexedDB dump
+    {
+      name: 'setup',
+      testDir: './e2e',
+      testMatch: /auth\.setup\.ts/,
+    },
+    // Feature tests — reuse saved auth state, no redundant logins
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/user.json',
       },
-      testIgnore: /auth\/.+\.spec\.ts/,
+      dependencies: ['setup'],
+      testIgnore: [/auth\/.+\.spec\.ts/, /i18n\/.+\.spec\.ts/],
     },
+    // Auth tests — NO storageState (they test login/register flows)
     {
       name: 'auth-tests',
       testMatch: /auth\/.+\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+    // i18n tests — NO storageState (they test default locale behavior)
+    {
+      name: 'i18n-tests',
+      testMatch: /i18n\/.+\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
       },

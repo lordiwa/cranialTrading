@@ -26,12 +26,14 @@ test.describe('Match Calculation', () => {
     expect(matchCount > 0 || noMatches || tabVisible).toBeTruthy();
   });
 
-  test('no matches found shows guidance message', async ({ matchesPage }) => {
+  test('no matches found shows guidance message', async ({ matchesPage, page }) => {
     await matchesPage.switchTab('new');
+    // Wait for matches to load (either cards appear or empty state renders)
+    await page.waitForTimeout(3000);
     const matchCount = await matchesPage.getMatchCount();
 
     if (matchCount === 0) {
-      await expect(matchesPage.noMatchesMessage).toBeVisible();
+      await expect(matchesPage.noMatchesMessage).toBeVisible({ timeout: 10_000 });
     }
   });
 });

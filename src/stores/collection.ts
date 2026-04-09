@@ -689,6 +689,9 @@ export const useCollectionStore = defineStore('collection', () => {
                     })
             }
 
+            // Refresh paginated view so the new card appears in the grid
+            refreshCurrentPage().catch(() => {})
+
             return docRef.id
         } catch (error) {
             console.error('Error adding card:', error)
@@ -750,6 +753,9 @@ export const useCollectionStore = defineStore('collection', () => {
                         })
                 }
             }
+
+            // Refresh paginated view so the updated card reflects in the grid
+            refreshCurrentPage().catch(() => {})
 
             return true
         } catch (error) {
@@ -878,6 +884,9 @@ export const useCollectionStore = defineStore('collection', () => {
                 .catch((err: unknown) => {
                     console.error('[PublicSync] Error removing card:', err)
                 })
+
+            // Refresh paginated view so the deleted card disappears from the grid
+            refreshCurrentPage().catch(() => {})
 
             return true
         } catch (error) {
@@ -1298,9 +1307,15 @@ export const useCollectionStore = defineStore('collection', () => {
     let _lastQueryFilters: QueryCardIndexRequest['filters'] = _defaultFilters
     let _lastQuerySort: QueryCardIndexRequest['sort'] = _defaultSort
 
+    /** Generation counter: each queryPage call increments this.
+     *  When the response arrives, it's only applied if the generation hasn't changed,
+     *  preventing stale responses from overwriting newer results. */
+    let _queryGeneration = 0
+
     /**
      * Query a page of cards from the server-side card_index.
      * Replaces paginatedCards with the results.
+     * Uses a generation counter to discard stale responses from overlapping calls.
      */
     const queryPage = async (
         filters?: QueryCardIndexRequest['filters'],
@@ -1308,6 +1323,8 @@ export const useCollectionStore = defineStore('collection', () => {
         page = 0,
     ) => {
         if (!authStore.user) return
+
+        const generation = ++_queryGeneration
 
         _lastQueryFilters = filters ?? _defaultFilters
         _lastQuerySort = sort ?? _defaultSort
@@ -1324,6 +1341,9 @@ export const useCollectionStore = defineStore('collection', () => {
                 pageSize: paginationMeta.value.pageSize,
             })
 
+            // Discard stale response — a newer queryPage call was made while we were waiting
+            if (generation !== _queryGeneration) return
+
             // Map CF response records to Card objects via indexToCard
             paginatedCards.value = response.cards.map(rec => indexToCard(rec as unknown as IndexCard))
 
@@ -1334,7 +1354,10 @@ export const useCollectionStore = defineStore('collection', () => {
         } catch (error) {
             console.error('[queryPage] Error querying card index:', error)
         } finally {
-            paginationMeta.value.loading = false
+            // Only clear loading if this is still the latest generation
+            if (generation === _queryGeneration) {
+                paginationMeta.value.loading = false
+            }
         }
     }
 
@@ -1390,6 +1413,15 @@ export const useCollectionStore = defineStore('collection', () => {
         _lastQuerySort = _defaultSort
     }
 
+    /**
+     * Re-query the current page with the last-used filters and sort.
+     * Called after card mutations (add/edit/delete) so paginatedCards
+     * reflects the latest data without requiring a manual refresh.
+     */
+    const refreshCurrentPage = () => {
+        return queryPage(_lastQueryFilters, _lastQuerySort, paginationMeta.value.page)
+    }
+
     return {
         // State
         cards,
@@ -1435,6 +1467,7 @@ export const useCollectionStore = defineStore('collection', () => {
         queryPage,
         loadNextPage,
         resetPagination,
+        refreshCurrentPage,
 
         // Cleanup
         clear,

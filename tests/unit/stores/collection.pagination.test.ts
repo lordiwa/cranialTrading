@@ -446,4 +446,187 @@ describe('collection store: pagination', () => {
       })
     })
   })
+
+  describe('query abort: stale response discarding (Task 6.1)', () => {
+    it('discards stale response when a newer queryPage call was made', async () => {
+      const store = useCollectionStore()
+
+      // Create two controllable promises for queryCardIndex
+      let resolveFirst: (value: QueryCardIndexResponse) => void
+      let resolveSecond: (value: QueryCardIndexResponse) => void
+
+      const firstPromise = new Promise<QueryCardIndexResponse>((resolve) => {
+        resolveFirst = resolve
+      })
+      const secondPromise = new Promise<QueryCardIndexResponse>((resolve) => {
+        resolveSecond = resolve
+      })
+
+      // Set up first slow-resolving mock
+      mockQueryCardIndex.mockReturnValueOnce(firstPromise)
+
+      // Fire first query — it will await the dynamic import, then call queryCardIndex
+      const firstCall = store.queryPage({ search: 'old' }, undefined, 0)
+
+      // Yield to let the first call's dynamic import resolve and reach queryCardIndex
+      await new Promise(r => setTimeout(r, 0))
+
+      // Now set up second mock and fire second query (increments generation, making first stale)
+      mockQueryCardIndex.mockReturnValueOnce(secondPromise)
+      const secondCall = store.queryPage({ search: 'new' }, undefined, 0)
+
+      // Yield to let the second call's dynamic import resolve
+      await new Promise(r => setTimeout(r, 0))
+
+      // Resolve the SECOND call first (newer, should be applied)
+      resolveSecond!(makeCfResponse(
+        [makeIndexCardRecord({ i: 'new-card', n: 'New Result' })],
+        { total: 1 }
+      ))
+      await secondCall
+
+      expect(store.paginatedCards).toHaveLength(1)
+      expect(store.paginatedCards[0].id).toBe('new-card')
+
+      // Now resolve the FIRST call (stale, should be discarded)
+      resolveFirst!(makeCfResponse(
+        [makeIndexCardRecord({ i: 'old-card', n: 'Old Result' }), makeIndexCardRecord({ i: 'old-card-2', n: 'Old Result 2' })],
+        { total: 2 }
+      ))
+      await firstCall
+
+      // paginatedCards should still show the newer result, NOT the stale one
+      expect(store.paginatedCards).toHaveLength(1)
+      expect(store.paginatedCards[0].id).toBe('new-card')
+    })
+
+    it('applies response when no newer call was made (non-stale)', async () => {
+      const store = useCollectionStore()
+
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'only-card' })], { total: 1 })
+      )
+
+      await store.queryPage({ search: 'test' }, undefined, 0)
+
+      // Single call, response should be applied normally
+      expect(store.paginatedCards).toHaveLength(1)
+      expect(store.paginatedCards[0].id).toBe('only-card')
+    })
+
+    it('does not update paginationMeta for stale responses', async () => {
+      const store = useCollectionStore()
+
+      // Create two controllable promises for queryCardIndex
+      let resolveFirst: (value: QueryCardIndexResponse) => void
+      let resolveSecond: (value: QueryCardIndexResponse) => void
+
+      const firstPromise = new Promise<QueryCardIndexResponse>((resolve) => {
+        resolveFirst = resolve
+      })
+      const secondPromise = new Promise<QueryCardIndexResponse>((resolve) => {
+        resolveSecond = resolve
+      })
+
+      // Fire first call with slow-resolving mock
+      mockQueryCardIndex.mockReturnValueOnce(firstPromise)
+      const firstCall = store.queryPage({}, undefined, 0)
+      await new Promise(r => setTimeout(r, 0))
+
+      // Fire second call (makes first stale)
+      mockQueryCardIndex.mockReturnValueOnce(secondPromise)
+      const secondCall = store.queryPage({}, undefined, 0)
+      await new Promise(r => setTimeout(r, 0))
+
+      // Resolve second first
+      resolveSecond!(makeCfResponse([], { total: 5, page: 0, hasMore: true }))
+      await secondCall
+
+      expect(store.paginationMeta.total).toBe(5)
+      expect(store.paginationMeta.hasMore).toBe(true)
+
+      // Resolve stale first
+      resolveFirst!(makeCfResponse([], { total: 999, page: 0, hasMore: false }))
+      await firstCall
+
+      // Meta should still reflect the second (newer) call
+      expect(store.paginationMeta.total).toBe(5)
+      expect(store.paginationMeta.hasMore).toBe(true)
+    })
+  })
+
+  describe('refreshCurrentPage: mutation sync (Task 6.2)', () => {
+    it('re-queries with last filters, sort, and page', async () => {
+      const store = useCollectionStore()
+
+      // Initial query with specific filters and sort
+      const filters = { search: 'bolt', status: ['collection'] }
+      const sort = { field: 'price' as const, direction: 'desc' as const }
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'c1' })], { total: 10, page: 0, hasMore: true })
+      )
+      await store.queryPage(filters, sort, 0)
+
+      // Load next page to advance page counter
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'c2' })], { total: 10, page: 1, hasMore: true })
+      )
+      await store.loadNextPage()
+
+      // Clear mock history
+      mockQueryCardIndex.mockClear()
+
+      // Call refreshCurrentPage
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'c1-updated' })], { total: 10, page: 1, hasMore: true })
+      )
+      await store.refreshCurrentPage()
+
+      // Should have called queryCardIndex with the same filters, sort, and CURRENT page
+      expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
+      expect(mockQueryCardIndex).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters,
+          sort,
+          page: 1,
+        })
+      )
+    })
+
+    it('updates paginatedCards with fresh results', async () => {
+      const store = useCollectionStore()
+
+      // Initial query
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'c1', n: 'Old Name' })], { total: 1 })
+      )
+      await store.queryPage({}, undefined, 0)
+      expect(store.paginatedCards[0].name).toBe('Old Name')
+
+      // Refresh returns updated data
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'c1', n: 'Updated Name' })], { total: 1 })
+      )
+      await store.refreshCurrentPage()
+
+      expect(store.paginatedCards[0].name).toBe('Updated Name')
+    })
+
+    it('uses default filters/sort when no prior query was made', async () => {
+      const store = useCollectionStore()
+
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([], { total: 0 })
+      )
+      await store.refreshCurrentPage()
+
+      expect(mockQueryCardIndex).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: {},
+          sort: { field: 'name', direction: 'asc' },
+          page: 0,
+        })
+      )
+    })
+  })
 })

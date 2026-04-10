@@ -75,7 +75,7 @@ const completionPercent = computed(() => {
           <p class="text-h3 font-bold text-neon">{{ deck.stats.totalCards }}</p>
         </div>
         <div class="text-center">
-          <p class="text-tiny text-silver-70">{{ t('decks.card.stats.cost') }}</p>
+          <p class="text-tiny text-silver-70">{{ t('decks.card.stats.cost') }} <span class="text-[#4CAF50]">CK</span></p>
           <p class="text-h3 font-bold text-neon">${{ deck.stats.totalPrice.toFixed(0) }}</p>
         </div>
         <div class="text-center">

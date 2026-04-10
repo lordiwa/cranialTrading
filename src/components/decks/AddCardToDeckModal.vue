@@ -382,16 +382,16 @@ watch(() => props.show, (newVal) => {
                     <!-- Multi-source prices -->
                     <div class="mb-3 space-y-1">
                       <div class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-70">TCG:</span>
-                        <span class="text-body font-bold text-neon">
-                          ${{ selectedCard.prices?.usd ? Number.parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
-                        </span>
-                      </div>
-                      <div class="flex justify-between items-center">
                         <span class="text-tiny text-silver-70">CK:</span>
                         <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
                         <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
                         <span v-else class="text-small text-silver-50">-</span>
+                      </div>
+                      <div class="flex justify-between items-center">
+                        <span class="text-tiny text-silver-70">TCG:</span>
+                        <span class="text-body text-silver">
+                          ${{ selectedCard.prices?.usd ? Number.parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
+                        </span>
                       </div>
                       <div class="flex justify-between items-center">
                         <span class="text-tiny text-silver-70">BL:</span>

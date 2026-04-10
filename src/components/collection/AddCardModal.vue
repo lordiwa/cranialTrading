@@ -504,17 +504,17 @@ const handleClose = () => {
 
               <!-- Prices Section -->
               <div class="mt-3 space-y-1">
-                <!-- TCGPlayer Price -->
-                <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">TCG:</span>
-                  <span class="text-neon font-bold">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
-                </div>
-                <!-- Card Kingdom Price -->
+                <!-- Card Kingdom Price (primary) -->
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-[#EEEEEE]/70">CK:</span>
                   <span v-if="hasCardKingdomPrices" class="text-neon font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
                   <span v-else-if="loadingCKPrices" class="text-[#EEEEEE]/50">...</span>
                   <span v-else class="text-[#EEEEEE]/50">-</span>
+                </div>
+                <!-- TCGPlayer Price -->
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-[#EEEEEE]/70">TCG:</span>
+                  <span class="text-[#EEEEEE]/70">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
                 </div>
                 <!-- Buylist -->
                 <div class="flex justify-between items-center text-sm">

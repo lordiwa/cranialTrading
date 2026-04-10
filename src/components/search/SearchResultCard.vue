@@ -68,11 +68,11 @@ const getCardImage = (card: ScryfallCard): string => {
 
     <!-- Multi-source prices -->
     <div class="space-y-0.5 mt-1">
-      <p class="text-tiny font-bold text-neon">TCG: ${{ card.prices?.usd ?? 'N/A' }}</p>
       <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-neon">
         CK: {{ formatPrice(cardKingdomRetail) }}
       </p>
       <p v-else class="text-tiny font-bold text-silver-50">CK: -</p>
+      <p class="text-tiny text-silver">TCG: ${{ card.prices?.usd ?? 'N/A' }}</p>
       <p v-if="cardKingdomBuylist" class="text-tiny text-silver">
         BL: {{ formatPrice(cardKingdomBuylist) }}
       </p>

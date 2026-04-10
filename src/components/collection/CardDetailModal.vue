@@ -677,14 +677,14 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
             <!-- Multi-source prices -->
             <div class="mt-2 space-y-1">
               <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">TCG:</span>
-                <span class="text-body font-bold text-neon">${{ currentPrice.toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between items-center">
                 <span class="text-tiny text-silver-70">CK:</span>
                 <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
                 <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
                 <span v-else class="text-small text-silver-50">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-tiny text-silver-70">TCG:</span>
+                <span class="text-body text-silver">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-tiny text-silver-70">BL:</span>

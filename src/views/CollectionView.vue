@@ -3901,7 +3901,7 @@ onUnmounted(() => {
               <span class="text-silver-30">|</span>
               <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards ?? 0 }} cards</span>
               <span class="text-silver-30">|</span>
-              <span class="text-tiny text-silver-50">${{ (selectedBinder.stats?.totalPrice ?? 0).toFixed(2) }}</span>
+              <span class="text-tiny text-silver-50">CK: ${{ (selectedBinder.stats?.totalPrice ?? 0).toFixed(2) }}</span>
               <BaseButton size="small" variant="secondary" @click="handleExportBinder">
                 <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
                 <span class="sm:hidden">📋</span>
@@ -4239,6 +4239,7 @@ onUnmounted(() => {
               @add-to-wishlist="handleDeckGridAddToWishlist"
               @toggle-commander="handleDeckGridToggleCommander"
               @move-board="handleDeckGridMoveBoard"
+              @add-card="selectedScryfallCard = undefined; showAddCardModal = true"
           />
         </div>
 
@@ -4270,6 +4271,7 @@ onUnmounted(() => {
               @add-to-wishlist="handleDeckGridAddToWishlist"
               @toggle-commander="handleDeckGridToggleCommander"
               @move-board="handleDeckGridMoveBoard"
+              @add-card="selectedScryfallCard = undefined; showAddCardModal = true"
           />
         </div>
 
@@ -4327,6 +4329,7 @@ onUnmounted(() => {
               @set-status="handleBinderGridSetStatus"
               @toggle-foil="handleBinderGridToggleFoil"
               @toggle-public="handleBinderGridTogglePublic"
+              @add-card="selectedScryfallCard = undefined; showAddCardModal = true"
           />
         </div>
 

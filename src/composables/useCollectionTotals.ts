@@ -28,7 +28,7 @@ export function cancelPriceFetch(): void {
 // Shared card prices map (by card ID) — shared across all composable instances
 // shallowRef: Map mutations (.set/.delete) don't trigger reactivity automatically.
 // We call triggerRef() in batches to avoid re-computing totals on every single card price update.
-const sharedCardPrices = shallowRef<Map<string, CardPrices | null>>(new Map())
+export const sharedCardPrices = shallowRef<Map<string, CardPrices | null>>(new Map())
 
 export interface CollectionTotals {
   // TCGPlayer totals

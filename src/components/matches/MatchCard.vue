@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref, shallowRef } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import ChatModal from '../chat/ChatModal.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 import { useContactsStore } from '../../stores/contacts'
-import { type SimpleMatch } from '../../stores/matches'
+import { type MatchCard as MatchCardType, type SimpleMatch } from '../../stores/matches'
 import { useToastStore } from '../../stores/toast'
 import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
 import { getAvatarUrlForUser } from '../../utils/avatar'
+import { type CardPrices, formatPrice, getCardPrices } from '../../services/mtgjson'
 
 const props = withDefaults(defineProps<Props>(), {
   matchIndex: 0,
@@ -34,6 +35,34 @@ const contactSaving = ref(false)
 const contactsStore = useContactsStore()
 const toastStore = useToastStore()
 const messagesStore = useMessagesStore()
+
+// Live CK/TCG/BL prices for match cards
+const matchPrices = shallowRef<Map<string, CardPrices | null>>(new Map())
+
+const getCKRetail = (card: MatchCardType): number | null => {
+  return matchPrices.value.get(card.scryfallId)?.cardKingdom?.retail ?? null
+}
+
+const getCKBuylist = (card: MatchCardType): number | null => {
+  return matchPrices.value.get(card.scryfallId)?.cardKingdom?.buylist ?? null
+}
+
+onMounted(async () => {
+  const allCards = [...(props.match.myCards ?? []), ...(props.match.otherCards ?? [])]
+  const uniqueIds = [...new Set(allCards.map(c => c.scryfallId).filter(Boolean))]
+  const results = new Map<string, CardPrices | null>()
+
+  for (const scryfallId of uniqueIds) {
+    try {
+      const prices = await getCardPrices(scryfallId)
+      results.set(scryfallId, prices)
+    } catch {
+      results.set(scryfallId, null)
+    }
+  }
+
+  matchPrices.value = results
+})
 
 // TAB: NEW - Guardar match
 const handleSaveMatch = () => {
@@ -167,7 +196,8 @@ const handleSaveContact = async () => {
             <div v-for="card in match.myCards" :key="card.scryfallId" class="bg-silver-5 border border-silver-20 p-3 rounded">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
-              <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
+              <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ {{ getCKRetail(card) != null ? `CK ${formatPrice(getCKRetail(card))}` : `$${card.price?.toFixed(2) || '0.00'}` }}</p>
+              <p class="text-tiny text-silver-50">TCG: ${{ card.price?.toFixed(2) || '0.00' }}<template v-if="getCKBuylist(card) != null"> | BL: {{ formatPrice(getCKBuylist(card)) }}</template></p>
             </div>
           </div>
           <div v-else class="text-small text-silver-50 italic">
@@ -186,7 +216,8 @@ const handleSaveContact = async () => {
             <div v-for="card in match.otherCards" :key="card.scryfallId" class="bg-silver-5 border border-silver-20 p-3 rounded">
               <p class="text-body font-bold text-silver">{{ card.name }}</p>
               <p class="text-small text-silver-70">{{ card.edition }} | {{ card.condition }}</p>
-              <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ ${{ card.price?.toFixed(2) || '0.00' }}</p>
+              <p class="text-small text-neon font-bold mt-1">x{{ card.quantity }} @ {{ getCKRetail(card) != null ? `CK ${formatPrice(getCKRetail(card))}` : `$${card.price?.toFixed(2) || '0.00'}` }}</p>
+              <p class="text-tiny text-silver-50">TCG: ${{ card.price?.toFixed(2) || '0.00' }}<template v-if="getCKBuylist(card) != null"> | BL: {{ formatPrice(getCKBuylist(card)) }}</template></p>
             </div>
           </div>
           <div v-else class="text-small text-silver-50 italic">

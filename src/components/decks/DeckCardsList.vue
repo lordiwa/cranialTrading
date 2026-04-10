@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { sharedCardPrices } from '../../composables/useCollectionTotals'
+import { formatPrice } from '../../services/mtgjson'
 import type { DisplayDeckCard, HydratedWishlistCard } from '../../types/deck'
 import BaseBadge from '../ui/BaseBadge.vue'
 
@@ -59,6 +61,19 @@ const needCards = computed(() => {
       .filter(c => c.isWishlist && c.totalInCollection === 0)
       .reduce((sum, c) => sum + getQuantity(c), 0)
 })
+
+// Price lookup from shared collection prices
+const getCKRetail = (card: DisplayDeckCard): number | null => {
+  return sharedCardPrices.value.get(card.cardId)?.cardKingdom?.retail ?? null
+}
+
+const getCKBuylist = (card: DisplayDeckCard): number | null => {
+  return sharedCardPrices.value.get(card.cardId)?.cardKingdom?.buylist ?? null
+}
+
+const getDisplayPrice = (card: DisplayDeckCard): number => {
+  return getCKRetail(card) ?? card.price
+}
 </script>
 
 <template>
@@ -131,9 +146,10 @@ const needCards = computed(() => {
                 </div>
                 <p class="text-tiny text-silver-70">{{ card.edition }}</p>
               </div>
-              <div class="text-right">
-                <p class="text-tiny text-silver-50">${{ card.price.toFixed(2) }} {{ t('decks.cardsList.perUnit') }}</p>
-                <p class="font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">${{ (card.price * getQuantity(card)).toFixed(2) }}</p>
+              <div class="text-right space-y-0.5">
+                <p class="text-tiny font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">CK: {{ formatPrice(getDisplayPrice(card)) }} {{ t('decks.cardsList.perUnit') }}</p>
+                <p class="text-tiny text-silver-50">TCG: ${{ card.price.toFixed(2) }}<template v-if="getCKBuylist(card) != null"> | BL: {{ formatPrice(getCKBuylist(card)) }}</template></p>
+                <p class="font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">{{ formatPrice(getDisplayPrice(card) * getQuantity(card)) }}</p>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 text-tiny">
@@ -190,9 +206,10 @@ const needCards = computed(() => {
               </span>
             </div>
             <div class="col-span-2">
-              <p class="text-small text-silver">${{ card.price.toFixed(2) }} {{ t('decks.cardsList.perUnit') }}</p>
+              <p class="text-small font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">CK: {{ formatPrice(getDisplayPrice(card)) }} {{ t('decks.cardsList.perUnit') }}</p>
+              <p class="text-tiny text-silver-50">TCG: ${{ card.price.toFixed(2) }}<template v-if="getCKBuylist(card) != null"> | BL: {{ formatPrice(getCKBuylist(card)) }}</template></p>
               <p class="text-tiny font-bold" :class="card.isWishlist && card.totalInCollection > 0 ? 'text-blue-400' : card.isWishlist ? 'text-amber' : 'text-neon'">
-                ${{ (card.price * getQuantity(card)).toFixed(2) }}
+                {{ formatPrice(getDisplayPrice(card) * getQuantity(card)) }}
               </p>
             </div>
             <div class="col-span-1 flex gap-1">

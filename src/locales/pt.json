@@ -988,6 +988,8 @@
     "editorGrid": {
       "noImage": "Sem imagem",
       "tcg": "TCG:",
+      "ck": "CK:",
+      "bl": "BL:",
       "total": "Total:",
       "noCardsInCollection": "Você não tem esta carta na coleção",
       "proxyCard": "Você usa esta carta em outros decks (proxy)",

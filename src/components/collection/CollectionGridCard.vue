@@ -588,11 +588,12 @@ const handleContextMenuSelect = async (itemId: string) => {
 
     <!-- Row 6: Prices -->
     <div class="mt-1 space-y-0.5">
-      <!-- TCGPlayer Price -->
+      <!-- Card Kingdom Price (primary) -->
       <div class="flex items-center gap-1">
-        <p class="text-tiny font-bold text-neon">
-          TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
+        <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-neon">
+          CK: {{ formatPrice(cardKingdomRetail) }}
         </p>
+        <p v-else class="text-tiny text-silver-50">CK: -</p>
         <span
             v-if="priceChangeData"
             class="text-[14px] font-bold px-1 rounded"
@@ -601,11 +602,10 @@ const handleContextMenuSelect = async (itemId: string) => {
           {{ priceChangeData.isPositive ? '&#x25B2;' : '&#x25BC;' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
         </span>
       </div>
-      <!-- Card Kingdom Price -->
-      <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-neon">
-        CK: {{ formatPrice(cardKingdomRetail) }}
+      <!-- TCGPlayer Price -->
+      <p class="text-tiny text-silver">
+        TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
       </p>
-      <p v-else class="text-tiny text-silver-50">CK: -</p>
       <!-- CK Buylist -->
       <p v-if="cardKingdomBuylist" class="text-tiny text-silver">
         BL: {{ formatPrice(cardKingdomBuylist) }}

@@ -3,6 +3,8 @@ import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { useContextMenu } from '../../composables/useContextMenu'
 import { useCollectionStore } from '../../stores/collection'
+import { sharedCardPrices } from '../../composables/useCollectionTotals'
+import { formatPrice } from '../../services/mtgjson'
 import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder } from '../../composables/useCardFilter'
 import { useVirtualGrid } from '../../composables/useVirtualGrid'
 import ContextMenu from '../ui/ContextMenu.vue'
@@ -33,6 +35,7 @@ const emit = defineEmits<{
   setStatus: [card: DisplayDeckCard, status: string]
   toggleFoil: [card: DisplayDeckCard]
   togglePublic: [card: DisplayDeckCard]
+  addCard: []
 }>()
 
 const { t } = useI18n()
@@ -40,6 +43,16 @@ const { t } = useI18n()
 // Preview state
 const hoveredCard = ref<DisplayDeckCard | null>(null)
 const previewCard = computed(() => hoveredCard.value)
+
+// Price lookup from shared collection prices
+const previewPrices = computed(() => {
+  const card = previewCard.value
+  if (!card) return null
+  return sharedCardPrices.value.get(card.cardId) ?? null
+})
+
+const previewCKRetail = computed(() => previewPrices.value?.cardKingdom?.retail ?? null)
+const previewCKBuylist = computed(() => previewPrices.value?.cardKingdom?.buylist ?? null)
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Type guard
@@ -196,8 +209,13 @@ const groupedCards = computed(() => {
   return buildGroups(source, getCategory, getCategoryOrder())
 })
 
-// Virtual scroll for binder mode with no grouping (35k+ cards)
-const useBinderVirtualScroll = computed(() => props.binderMode && props.groupBy === 'none')
+// Virtual scroll for binder mode with no grouping — only for large binders (200+ cards)
+// Small binders render with the regular grid to avoid estimateRowHeight gaps
+const useBinderVirtualScroll = computed(() => {
+  if (!props.binderMode || props.groupBy !== 'none') return false
+  const group = groupedCards.value[0]
+  return (group?.cards.length ?? 0) > 200
+})
 
 const binderFlatCards = computed(() => {
   if (!useBinderVirtualScroll.value) return []
@@ -415,12 +433,20 @@ const handleDeckContextMenuSelect = (itemId: string) => {
 
           <div class="border-t border-silver-20 pt-2 mt-2 space-y-1">
             <div class="flex justify-between">
-              <span class="text-silver-70">{{ t('decks.editorGrid.tcg') }}</span>
-              <span class="text-neon font-bold">${{ previewCard.price?.toFixed(2) || 'N/A' }}</span>
+              <span class="text-silver-70">{{ t('decks.editorGrid.ck') }}</span>
+              <span class="text-neon font-bold">{{ previewCKRetail != null ? formatPrice(previewCKRetail) : `$${previewCard.price?.toFixed(2) || 'N/A'}` }}</span>
             </div>
             <div class="flex justify-between">
+              <span class="text-silver-70">{{ t('decks.editorGrid.tcg') }}</span>
+              <span class="text-silver">${{ previewCard.price?.toFixed(2) || 'N/A' }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-silver-70">{{ t('decks.editorGrid.bl') }}</span>
+              <span class="text-silver">{{ previewCKBuylist != null ? formatPrice(previewCKBuylist) : '-' }}</span>
+            </div>
+            <div class="flex justify-between border-t border-silver-20 pt-1 mt-1">
               <span class="text-silver-70">{{ t('decks.editorGrid.total') }}</span>
-              <span class="text-neon font-bold">${{ (previewCard.price * getQuantity(previewCard)).toFixed(2) }}</span>
+              <span class="text-neon font-bold">{{ formatPrice((previewCKRetail ?? previewCard.price ?? 0) * getQuantity(previewCard)) }}</span>
             </div>
           </div>
 
@@ -448,12 +474,33 @@ const handleDeckContextMenuSelect = (itemId: string) => {
     <!-- Right Panel: Cards Grid -->
     <div class="flex-1 space-y-4 md:space-y-6 min-w-0">
       <!-- Empty state -->
-      <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
+      <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center space-y-4">
         <p class="text-body text-silver-70">{{ t('decks.editorGrid.emptyBoard') }}</p>
+        <div
+          class="inline-block cursor-pointer group"
+          @click="emit('addCard')"
+        >
+          <div class="w-[100px] md:w-[130px] aspect-[3/4] border-2 border-dashed border-silver-30 hover:border-neon flex items-center justify-center transition-all duration-150 mx-auto">
+            <span class="text-h1 font-light text-silver-30 group-hover:text-neon transition-colors">+</span>
+          </div>
+        </div>
       </div>
 
       <!-- ===== Binder Virtual Scroll (groupBy=none, 35k+ cards) ===== -->
       <div v-else-if="useBinderVirtualScroll" ref="binderContainerRef">
+        <!-- Add card placeholder (top) -->
+        <div class="mb-3">
+          <div
+            class="cursor-pointer group inline-block"
+            @click="emit('addCard')"
+          >
+            <div
+              class="w-20 md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] border-2 border-dashed border-silver-30 hover:border-neon flex items-center justify-center transition-all duration-150"
+            >
+              <span class="text-h1 font-light text-silver-30 group-hover:text-neon transition-colors">+</span>
+            </div>
+          </div>
+        </div>
         <div :style="{ height: `${binderTotalSize}px`, width: '100%', position: 'relative' }">
           <div
             v-for="vRow in binderVirtualRows"
@@ -543,6 +590,19 @@ const handleDeckContextMenuSelect = (itemId: string) => {
               </div>
               <div class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1">
                 <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- Add card placeholder (outside grid to avoid layout gaps) -->
+          <div class="mt-2 md:mt-3">
+            <div
+              class="inline-block cursor-pointer group"
+              @click="emit('addCard')"
+            >
+              <div
+                class="w-20 md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] border-2 border-dashed border-silver-30 hover:border-neon flex items-center justify-center transition-all duration-150"
+              >
+                <span class="text-h1 font-light text-silver-30 group-hover:text-neon transition-colors">+</span>
               </div>
             </div>
           </div>

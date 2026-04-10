@@ -28,12 +28,19 @@ test.describe('Match Calculation', () => {
 
   test('no matches found shows guidance message', async ({ matchesPage, page }) => {
     await matchesPage.switchTab('new');
-    // Wait for matches to load (either cards appear or empty state renders)
-    await page.waitForTimeout(3000);
-    const matchCount = await matchesPage.getMatchCount();
 
-    if (matchCount === 0) {
-      await expect(matchesPage.noMatchesMessage).toBeVisible({ timeout: 10_000 });
+    // Wait for page to settle — either match cards load OR empty state renders
+    const matchCard = page.locator('[data-match-id]').first();
+    const emptyMessage = matchesPage.noMatchesMessage;
+
+    await Promise.race([
+      matchCard.waitFor({ state: 'visible', timeout: 15_000 }),
+      emptyMessage.waitFor({ state: 'visible', timeout: 15_000 }),
+    ]).catch(() => {});
+
+    // If no match cards visible, the empty state should be
+    if (!(await matchCard.isVisible().catch(() => false))) {
+      await expect(emptyMessage).toBeVisible();
     }
   });
 });

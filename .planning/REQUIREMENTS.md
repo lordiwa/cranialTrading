@@ -64,44 +64,44 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AXSS-01 | — | Pending |
-| AXSS-02 | — | Pending |
-| AXSS-03 | — | Pending |
-| AXSS-04 | — | Pending |
-| AXSS-05 | — | Pending |
-| AXSS-06 | — | Pending |
-| AXSS-07 | — | Pending |
-| AXSS-08 | — | Pending |
-| ARCH-01 | — | Pending |
-| ARCH-02 | — | Pending |
-| ARCH-03 | — | Pending |
-| ARCH-04 | — | Pending |
-| ARCH-05 | — | Pending |
-| ARCH-06 | — | Pending |
-| ARCH-07 | — | Pending |
-| ARCH-08 | — | Pending |
-| ARCH-09 | — | Pending |
-| ARCH-10 | — | Pending |
-| ARCH-11 | — | Pending |
-| ARCH-12 | — | Pending |
-| ARCH-13 | — | Pending |
-| NICE-01 | — | Pending |
-| NICE-02 | — | Pending |
-| NICE-03 | — | Pending |
-| NICE-04 | — | Pending |
-| NICE-05 | — | Pending |
-| NICE-06 | — | Pending |
-| NICE-07 | — | Pending |
-| NICE-08 | — | Pending |
-| NICE-09 | — | Pending |
-| NICE-10 | — | Pending |
-| NICE-11 | — | Pending |
+| AXSS-01 | Phase 1 | Pending |
+| AXSS-02 | Phase 1 | Pending |
+| AXSS-03 | Phase 1 | Pending |
+| AXSS-04 | Phase 1 | Pending |
+| AXSS-05 | Phase 1 | Pending |
+| AXSS-06 | Phase 1 | Pending |
+| AXSS-07 | Phase 2 | Pending |
+| AXSS-08 | Phase 1 | Pending |
+| ARCH-01 | Phase 2 | Pending |
+| ARCH-02 | Phase 3 | Pending |
+| ARCH-03 | Phase 1 | Pending |
+| ARCH-04 | Phase 2 | Pending |
+| ARCH-05 | Phase 3 | Pending |
+| ARCH-06 | Phase 3 | Pending |
+| ARCH-07 | Phase 2 | Pending |
+| ARCH-08 | Phase 1 | Pending |
+| ARCH-09 | Phase 1 | Pending |
+| ARCH-10 | Phase 4 | Pending |
+| ARCH-11 | Phase 1 | Pending |
+| ARCH-12 | Phase 1 | Pending |
+| ARCH-13 | Phase 2 | Pending |
+| NICE-01 | Phase 1 | Pending |
+| NICE-02 | Phase 1 | Pending |
+| NICE-03 | Phase 1 | Pending |
+| NICE-04 | Phase 1 | Pending |
+| NICE-05 | Phase 1 | Pending |
+| NICE-06 | Phase 1 | Pending |
+| NICE-07 | Phase 3 | Pending |
+| NICE-08 | Phase 3 | Pending |
+| NICE-09 | Phase 3 | Pending |
+| NICE-10 | Phase 3 | Pending |
+| NICE-11 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 32 total
-- Mapped to phases: 0
-- Unmapped: 32 (pending roadmap creation)
+- Mapped to phases: 32
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-13 after initial definition*
+*Last updated: 2026-04-13 after roadmap creation*

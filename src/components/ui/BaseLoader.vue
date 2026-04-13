@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from '../../composables/useI18n'
+
 interface Props {
   size?: 'small' | 'medium' | 'large';
 }
@@ -6,6 +8,8 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   size: 'medium',
 });
+
+const { t } = useI18n()
 
 const sizeClasses = {
   small: 'w-6 h-6',
@@ -15,8 +19,10 @@ const sizeClasses = {
 </script>
 
 <template>
-  <div class="flex items-center justify-center">
+  <div aria-live="polite" class="flex items-center justify-center">
     <div
+        role="status"
+        :aria-label="t('common.aria.loading')"
         :class="[
         'animate-spin rounded-full border-2 border-silver-20 border-t-neon',
         sizeClasses[size],

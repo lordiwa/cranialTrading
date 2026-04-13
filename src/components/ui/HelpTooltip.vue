@@ -46,6 +46,7 @@ const handleClick = () => {
       class="inline-flex items-center justify-center"
       @click.stop="handleClick"
       :title="title"
+      :aria-label="title"
   >
     <!-- Question mark icon -->
     <span

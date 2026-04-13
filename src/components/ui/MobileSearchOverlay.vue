@@ -102,6 +102,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             @click="close"
             class="p-1.5 text-silver-50 hover:text-silver transition-colors flex-shrink-0"
             type="button"
+            :aria-label="t('common.actions.back')"
           >
             <SvgIcon name="chevron-left" size="small" />
           </button>
@@ -125,6 +126,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               @click.stop="clearSearch"
               class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
               type="button"
+              :aria-label="t('common.aria.clearInput')"
             >
               ✕
             </button>

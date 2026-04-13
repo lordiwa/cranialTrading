@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '../../composables/useI18n'
 
 interface Props {
   modelValue: string | number;
@@ -21,6 +22,8 @@ const props = withDefaults(defineProps<Props>(), {
   id: undefined,
   clearable: false,
 });
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number];
@@ -63,6 +66,7 @@ const showClearButton = computed(() => {
         @click="handleClear"
         class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
         type="button"
+        :aria-label="t('common.aria.clearInput')"
     >
       ✕
     </button>

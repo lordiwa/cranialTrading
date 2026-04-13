@@ -452,6 +452,7 @@ const handleContextMenuSelect = async (itemId: string) => {
           class="flex items-center justify-center transition-all"
           :class="card.public ? 'text-neon' : 'text-silver-50'"
           :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
+          :aria-label="t('common.aria.toggleVisibility')"
       >
         <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="small" />
       </button>
@@ -467,6 +468,7 @@ const handleContextMenuSelect = async (itemId: string) => {
             :class="card.status === status
               ? getStatusColor(status)
               : 'text-silver-30 hover:text-silver-50'"
+            :aria-label="status"
         >
           <SvgIcon :name="getStatusIconName(status)" size="small" />
         </button>
@@ -531,6 +533,7 @@ const handleContextMenuSelect = async (itemId: string) => {
           @click.stop="toggleCardFace"
           class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
           :title="t('cards.grid.flipTitle')"
+          :aria-label="t('common.aria.flipCard')"
       >
         <SvgIcon name="flip" size="tiny" />
       </button>

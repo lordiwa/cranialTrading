@@ -4,6 +4,8 @@ import SvgIcon from './SvgIcon.vue'
 
 const confirmStore = useConfirmStore()
 
+const dialogTitleId = `confirm-modal-${Math.random().toString(36).slice(2, 9)}`
+
 const getConfirmButtonClass = () => {
   switch (confirmStore.options.confirmVariant) {
     case 'danger':
@@ -29,7 +31,12 @@ const getIconName = () => {
           class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 px-4"
           @click.self="confirmStore.cancel"
       >
-        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 transition-normal rounded-lg">
+        <div
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="dialogTitleId"
+          class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 transition-normal rounded-lg"
+        >
           <!-- Icon -->
           <div class="flex justify-center mb-4">
             <div
@@ -47,6 +54,7 @@ const getIconName = () => {
           <!-- Title -->
           <h2
               v-if="confirmStore.options.title"
+              :id="dialogTitleId"
               class="text-h3 font-bold text-silver text-center mb-3"
           >
             {{ confirmStore.options.title }}

@@ -6,6 +6,8 @@ import SvgIcon from './SvgIcon.vue'
 const promptStore = usePromptStore()
 const inputRef = ref<HTMLInputElement | null>(null)
 
+const dialogTitleId = `prompt-modal-${Math.random().toString(36).slice(2, 9)}`
+
 // Auto-focus input when modal opens
 watch(() => promptStore.isOpen, (open) => {
   if (open) {
@@ -31,7 +33,12 @@ const handleKeydown = (e: KeyboardEvent) => {
           v-show="promptStore.isOpen"
           class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 px-4"
       >
-        <div class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 transition-normal rounded-lg">
+        <div
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="dialogTitleId"
+          class="relative bg-primary border border-silver-50 shadow-strong max-w-md w-full p-6 transition-normal rounded-lg"
+        >
           <!-- Icon -->
           <div class="flex justify-center mb-4">
             <div class="p-3 border rounded border-neon bg-neon/10">
@@ -42,6 +49,7 @@ const handleKeydown = (e: KeyboardEvent) => {
           <!-- Title -->
           <h2
               v-if="promptStore.options.title"
+              :id="dialogTitleId"
               class="text-h3 font-bold text-silver text-center mb-3"
           >
             {{ promptStore.options.title }}
@@ -66,7 +74,7 @@ const handleKeydown = (e: KeyboardEvent) => {
                 v-model.number="promptStore.inputValue"
                 :min="promptStore.options.min"
                 :max="promptStore.options.max"
-                class="w-full bg-primary border border-silver-50 text-silver px-3 py-2 rounded text-center text-h3 font-bold focus:border-neon focus:outline-none"
+                class="w-full bg-primary border border-silver-50 text-silver px-3 py-2 rounded text-center text-h3 font-bold focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary focus:outline-none focus:border-neon"
                 @keydown="handleKeydown"
             />
           </div>

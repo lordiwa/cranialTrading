@@ -487,7 +487,7 @@ const handleClose = () => {
                   @click.stop="toggleCardFace"
                   class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#5AC168] p-2 hover:bg-[#5AC168]/20 transition-all rounded z-10"
                   :title="`Ver lado ${cardFaceIndex === 0 ? 2 : 1}`"
-                  aria-label="Ver otro lado de la carta"
+                  :aria-label="t('common.aria.flipCard')"
               >
                 <svg class="w-5 h-5 text-[#5AC168]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
@@ -651,7 +651,7 @@ const handleClose = () => {
         <button
             @click="showZoom = false"
             class="absolute top-4 right-4 text-silver hover:text-neon transition-colors p-2"
-            aria-label="Cerrar zoom"
+            :aria-label="t('common.aria.closeModal')"
         >
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>

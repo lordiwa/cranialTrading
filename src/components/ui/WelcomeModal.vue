@@ -11,6 +11,8 @@ const { t } = useI18n()
 const { isTourCompleted, startTour, skipTour } = useTour()
 const authStore = useAuthStore()
 
+const dialogTitleId = `welcome-modal-${Math.random().toString(36).slice(2, 9)}`
+
 const show = ref(false)
 
 onMounted(() => {
@@ -50,13 +52,18 @@ const handleSkip = async () => {
       <div class="absolute inset-0 bg-black/80" @click="handleSkip"></div>
 
       <!-- Modal -->
-      <div class="relative bg-primary border border-neon rounded px-8 py-10 max-w-md w-full mx-4 text-center">
+      <div
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="dialogTitleId"
+        class="relative bg-primary border border-neon rounded px-8 py-10 max-w-md w-full mx-4 text-center"
+      >
         <!-- Logo -->
         <svg class="w-16 h-16 text-neon mx-auto mb-6" viewBox="0 0 100 100" fill="currentColor">
           <use href="/icons.svg#cranial-logo" />
         </svg>
 
-        <h2 class="text-h2 font-bold text-neon mb-3">
+        <h2 :id="dialogTitleId" class="text-h2 font-bold text-neon mb-3">
           {{ t('tour.welcome.title') }}
         </h2>
 

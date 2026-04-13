@@ -75,6 +75,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
               ? 'bg-neon-10 border-neon text-neon'
               : 'border-silver-10 text-neon hover:border-silver-30'
           ]"
+          :aria-label="t('common.aria.toggleVisibility')"
       >
         <SvgIcon name="filter" size="small" />
       </button>

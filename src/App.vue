@@ -62,13 +62,22 @@ onMounted(() => {
 </script>
 
 <template>
+  <a
+    href="#main-content"
+    class="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-[9999] focus-visible:px-4 focus-visible:py-2 focus-visible:bg-neon focus-visible:text-primary focus-visible:font-bold focus-visible:rounded focus-visible:outline-none"
+  >
+    {{ t('common.actions.skipToContent') }}
+  </a>
+
   <div v-if="authStore.loading" class="min-h-screen flex items-center justify-center">
     <BaseLoader size="large" />
   </div>
 
   <div v-else class="min-h-screen flex flex-col">
     <div :class="['flex-1', authStore.user ? 'pb-12 md:pb-0' : '']">
-      <RouterView />
+      <main id="main-content">
+        <RouterView />
+      </main>
     </div>
     <AppFooter v-if="showFooter" />
   </div>

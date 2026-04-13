@@ -5,11 +5,15 @@ interface Props {
   name: string
   size?: 'tiny' | 'small' | 'medium' | 'large' | 'xl'
   class?: string
+  ariaHidden?: boolean
+  ariaLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'small',
   class: '',
+  ariaHidden: true,
+  ariaLabel: '',
 })
 
 // Sprite grid: 7 columns x 4 rows
@@ -86,6 +90,9 @@ const scale = computed(() => displaySize.value / CELL_SIZE)
   <span
     class="sprite-icon inline-block"
     :class="[props.class, `sprite-${props.size}`]"
+    :aria-hidden="props.ariaHidden ? 'true' : undefined"
+    :role="props.ariaLabel ? 'img' : undefined"
+    :aria-label="props.ariaLabel || undefined"
     :style="{
       width: `${displaySize}px`,
       height: `${displaySize}px`,

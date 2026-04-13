@@ -4,10 +4,12 @@ import { computed } from 'vue'
 interface Props {
   name: string
   size?: 'tiny' | 'small' | 'medium' | 'large' | 'xl' | '2xl' | '3xl' | '4xl'
+  ariaHidden?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  size: 'small'
+  size: 'small',
+  ariaHidden: true,
 })
 
 // Size mappings in pixels
@@ -36,6 +38,8 @@ const iconHref = computed(() => `/icons.svg#icon-${props.name}`)
     :height="displaySize"
     :viewBox="'0 0 100 100'"
     fill="currentColor"
+    :aria-hidden="props.ariaHidden ? 'true' : undefined"
+    focusable="false"
   >
     <use :href="iconHref" />
   </svg>

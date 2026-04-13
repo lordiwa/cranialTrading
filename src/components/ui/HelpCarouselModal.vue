@@ -5,6 +5,8 @@ import SvgIcon from './SvgIcon.vue'
 
 const helpStore = useHelpStore()
 
+const dialogTitleId = `help-modal-${Math.random().toString(36).slice(2, 9)}`
+
 // Close on escape key
 const handleKeydown = (e: KeyboardEvent) => {
   if (!helpStore.isOpen.value) return
@@ -53,18 +55,24 @@ watch(() => helpStore.isOpen.value, (isOpen) => {
         <div class="absolute inset-0 bg-black/80" />
 
         <!-- Modal Content -->
-        <div class="relative bg-primary border border-silver-30 rounded-md w-full max-w-md md:max-w-lg lg:max-w-xl shadow-strong">
+        <div
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="dialogTitleId"
+          class="relative bg-primary border border-silver-30 rounded-md w-full max-w-md md:max-w-lg lg:max-w-xl shadow-strong"
+        >
           <!-- Header -->
           <div class="flex items-center justify-between p-4 border-b border-silver-20">
             <div class="flex items-center gap-2">
               <span class="w-6 h-6 rounded-full bg-neon text-primary flex items-center justify-center text-small font-bold">
                 ?
               </span>
-              <h3 class="text-body font-bold text-silver">Ayuda</h3>
+              <h3 :id="dialogTitleId" class="text-body font-bold text-silver">Ayuda</h3>
             </div>
             <button
                 @click="helpStore.close()"
                 class="text-silver-50 hover:text-silver transition-colors p-1"
+                :aria-label="'Close modal'"
             >
               <SvgIcon name="x-mark" size="small" />
             </button>

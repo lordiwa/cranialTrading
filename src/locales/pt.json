@@ -24,7 +24,8 @@
       "clear": "LIMPAR",
       "searching": "BUSCANDO...",
       "advancedSearch": "Busca avançada",
-      "backToSearch": "Voltar para busca"
+      "backToSearch": "Voltar para busca",
+      "skipToContent": "Ir para o conteúdo principal"
     },
     "labels": {
       "quantity": "Quantidade",
@@ -121,6 +122,15 @@
       "resumeFailed": "Importação de \"{name}\" falhou. Limpando...",
       "fetchingDataProgress": "Obtendo dados: {current}/{total}...",
       "savingProgress": "Salvando cartas: {current}/{total}..."
+    },
+    "aria": {
+      "loading": "Carregando",
+      "closeModal": "Fechar modal",
+      "flipCard": "Virar carta",
+      "clearInput": "Limpar campo",
+      "toggleVisibility": "Mostrar/ocultar",
+      "nextSlide": "Próximo",
+      "prevSlide": "Anterior"
     }
   },
 

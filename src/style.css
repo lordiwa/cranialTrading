@@ -83,6 +83,20 @@
         @apply font-sans rounded;
     }
 
+    button,
+    [role="button"],
+    a,
+    input,
+    select,
+    textarea,
+    label[for] {
+        touch-action: manipulation;
+    }
+
+    h1, h2, h3 {
+        text-wrap: balance;
+    }
+
     ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -104,7 +118,8 @@
 @layer components {
     .btn-base {
         @apply font-bold cursor-pointer min-h-[44px] flex items-center justify-center border rounded uppercase;
-        transition: all 150ms ease-out;
+        transition: background-color, border-color, color, opacity 150ms ease-out;
+        touch-action: manipulation;
     }
 
     .btn-primary {
@@ -161,8 +176,8 @@
     }
 
     .input-base {
-        @apply w-full bg-primary border border-silver-10 px-3 py-2 h-[40px] text-small md:text-body text-silver placeholder:text-neon/40 focus:outline-none font-sans rounded;
-        transition: all 150ms ease-out;
+        @apply w-full bg-primary border border-silver-10 px-3 py-2 h-[40px] text-small md:text-body text-silver placeholder:text-neon/40 font-sans rounded;
+        transition: border-color, box-shadow 150ms ease-out;
     }
 
     .input-base:focus {
@@ -183,7 +198,7 @@
     }
 
     .card-base:hover {
-        transition: all 300ms ease-in-out;
+        transition: transform, box-shadow 300ms ease-in-out;
     }
 
     .badge-busco {
@@ -214,7 +229,8 @@
     .modal-content {
         @apply relative bg-primary border shadow-strong max-w-md w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto rounded-lg;
         border-color: rgba(238, 238, 238, 0.5);
-        transition: all 300ms ease-in-out;
+        transition: opacity, transform 300ms ease-in-out;
+        overscroll-behavior: contain;
     }
 }
 
@@ -228,15 +244,19 @@
     }
 
     .transition-fast {
-        transition: all 150ms ease-out;
+        transition: background-color, border-color, color, opacity, transform 150ms ease-out;
     }
 
     .transition-normal {
-        transition: all 300ms ease-in-out;
+        transition: background-color, border-color, color, opacity, transform 300ms ease-in-out;
     }
 
     .transition-slow {
-        transition: all 500ms ease-in-out;
+        transition: background-color, border-color, color, opacity, transform 500ms ease-in-out;
+    }
+
+    .tabular-nums {
+        font-variant-numeric: tabular-nums;
     }
 
     .no-spinner::-webkit-inner-spin-button,

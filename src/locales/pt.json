@@ -24,7 +24,8 @@
       "clear": "LIMPAR",
       "searching": "BUSCANDO...",
       "advancedSearch": "Busca avançada",
-      "backToSearch": "Voltar para busca"
+      "backToSearch": "Voltar para busca",
+      "skipToContent": "Ir para o conteúdo principal"
     },
     "labels": {
       "quantity": "Quantidade",

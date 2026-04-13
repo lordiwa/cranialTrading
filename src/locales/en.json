@@ -24,7 +24,8 @@
       "clear": "CLEAR",
       "searching": "SEARCHING...",
       "advancedSearch": "Advanced search",
-      "backToSearch": "Back to search"
+      "backToSearch": "Back to search",
+      "skipToContent": "Skip to main content"
     },
     "labels": {
       "quantity": "Quantity",

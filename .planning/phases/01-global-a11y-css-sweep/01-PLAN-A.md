@@ -9,6 +9,9 @@ files_modified:
   - index.html
   - src/App.vue
   - src/utils/formatDate.ts
+  - src/locales/en.json
+  - src/locales/es.json
+  - src/locales/pt.json
 autonomous: true
 requirements:
   - AXSS-01
@@ -208,7 +211,12 @@ The sr-only class from Tailwind hides it until focused; focus-visible:not-sr-onl
     </div>
 ```
 
-Note: The i18n key `common.actions.skipToContent` MUST be added in Task 3 below (in Plan B). This task only adds the template markup. The key will resolve once Plan B's i18n task runs. If running Plan A standalone before Plan B, temporarily use the English string directly.
+IMPORTANT: Before adding the template markup, add the `skipToContent` i18n key to all 3 locale files atomically (Anti-loop Rule 3):
+- en.json: `"common.actions.skipToContent": "Skip to main content"`
+- es.json: `"common.actions.skipToContent": "Saltar al contenido principal"`
+- pt.json: `"common.actions.skipToContent": "Ir para o conteúdo principal"`
+
+This makes Plan A self-contained — it doesn't depend on Plan B for this key. Plan B Task 1 also creates this key, but the executor should check if it already exists before adding (idempotent).
 
 Per D-07.
   </action>

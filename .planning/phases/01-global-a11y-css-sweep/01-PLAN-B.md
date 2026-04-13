@@ -346,12 +346,58 @@ const dialogTitleId = `help-modal-${Math.random().toString(36).slice(2, 9)}`
 On the inner modal content div (the `relative bg-primary border border-silver-30 rounded-md...` div), add the 3 dialog attributes.
 Identify the element that serves as the panel heading/title and add `:id="dialogTitleId"`.
 
-Per D-05, D-06.
+Also add `overscroll-behavior: contain` to each modal's scroll container div (the inner content div that has overflow). This covers ARCH-09 for standalone modals not using BaseModal's .modal-content class. Add as an inline Tailwind class: `[overscroll-behavior:contain]` or as a style attribute.
+
+Per D-05, D-06, D-12.
   </action>
   <verify>
     <automated>npx vite build 2>&1 | tail -5</automated>
   </verify>
   <done>Build passes. Each of the 4 modals has role="dialog" aria-modal="true" aria-labelledby on the inner content div. The referenced ID exists in each modal's title element. No TypeScript errors.</done>
+</task>
+
+<task type="auto">
+  <name>Task 5: Wire aria-label to icon-only buttons using i18n keys from Task 1</name>
+  <files>src/components/collection/CollectionGridCard.vue, src/components/ui/HelpCarouselModal.vue, src/components/ui/BaseInput.vue, src/components/ui/FloatingActionButton.vue, src/components/ui/HelpTooltip.vue, src/components/ui/CardFilterBar.vue, src/components/ui/MobileSearchOverlay.vue</files>
+  <action>
+Read each file first. For every icon-only button (a button containing only an SvgIcon/SpriteIcon/emoji with no visible text), add `:aria-label="t('common.aria.KEY')"` using the keys created in Task 1.
+
+**CollectionGridCard.vue:**
+- Toggle public/private button (eye icon) → `:aria-label="t('common.aria.toggleVisibility')"`
+- Status cycle buttons (status icons) → `:aria-label="statusLabel"` (use the existing status label string)
+- Flip card button (↔️) → `:aria-label="t('common.aria.flipCard')"`
+
+**HelpCarouselModal.vue:**
+- Close button (X icon) → `:aria-label="t('common.aria.closeModal')"`
+- Previous/Next buttons (if icon-only) → `:aria-label="t('common.aria.prevSlide')"` / `:aria-label="t('common.aria.nextSlide')"`
+- Dot navigation buttons → `:aria-label="'Slide ' + (index + 1)"`
+
+**BaseInput.vue:**
+- Clear button (✕) → `:aria-label="t('common.aria.clearInput')"`
+
+**FloatingActionButton.vue:**
+- Replace `:title="label"` with `:aria-label="label"` (keep title for tooltip)
+
+**HelpTooltip.vue:**
+- Replace `:title="title"` with `:aria-label="title"` on the trigger button
+
+**CardFilterBar.vue:**
+- Filter toggle button (filter icon) → `:aria-label="t('common.aria.toggleVisibility')"` or a more specific key
+- Bulk select toggle → `:aria-label` from its existing title
+
+**MobileSearchOverlay.vue:**
+- Back button (chevron icon) → `:aria-label="t('common.actions.back')"` or `:aria-label="t('common.aria.closeModal')"`
+
+Also fix hardcoded Spanish aria-labels in AddCardModal.vue and EditCardModal.vue:
+- Replace `aria-label="Cerrar zoom"` with `:aria-label="t('common.aria.closeModal')"`
+- Replace `aria-label="Ver otro lado de la carta"` with `:aria-label="t('common.aria.flipCard')"`
+
+Per D-04 (AXSS-04). Uses i18n keys created in Task 1.
+  </action>
+  <verify>
+    <automated>npx vite build 2>&1 | tail -5</automated>
+  </verify>
+  <done>Build passes. Every icon-only button in the listed files has an aria-label attribute. No hardcoded Spanish aria-labels remain in AddCardModal or EditCardModal.</done>
 </task>
 
 </tasks>

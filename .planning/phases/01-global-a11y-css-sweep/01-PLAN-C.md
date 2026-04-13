@@ -28,6 +28,8 @@ files_modified:
   - src/components/search/FilterPanel.vue
   - src/components/binders/CreateBinderModal.vue
   - src/components/preferences/ImportPreferencesModal.vue
+  - src/components/ui/BaseSelect.vue
+  - src/components/collection/ImportDeckModal.vue
 autonomous: true
 requirements:
   - AXSS-03
@@ -130,7 +132,9 @@ Output: 21 files updated with targeted 1-3 line changes each.
     src/components/decks/CreateDeckModal.vue,
     src/components/binders/CreateBinderModal.vue,
     src/components/preferences/ImportPreferencesModal.vue,
-    src/components/ui/PromptModal.vue
+    src/components/ui/PromptModal.vue,
+    src/components/ui/BaseSelect.vue,
+    src/components/collection/ImportDeckModal.vue
   </files>
   <action>
 Read each file before modifying it (Anti-loop Rule 1). For each instance of `focus:outline-none`, apply the replacement below. Do NOT blindly replace — read the context of each instance first.
@@ -177,9 +181,9 @@ For all other files (EditCardModal, CardDetailModal, AdvancedFilterModal, Filter
 Per D-01, D-02.
   </action>
   <verify>
-    <automated>npx vite build 2>&1 | tail -5</automated>
+    <automated>npx vite build 2>&1 | tail -5 && echo "--- Focus audit ---" && (grep -rn "focus:outline-none" src/ --include="*.vue" | grep -v "focus:border\|focus-visible:ring\|focus:ring" || echo "PASS: no bare outline-none found")</automated>
   </verify>
-  <done>Build passes. `grep -r "focus:outline-none" src/` finds only instances that also have a visible focus indicator (neon border) — no bare outline-none without a ring or border replacement.</done>
+  <done>Build passes. Grep audit confirms no bare focus:outline-none remains without a paired focus indicator (border or ring). BaseSelect.vue and ImportDeckModal.vue included in sweep.</done>
 </task>
 
 <task type="auto">

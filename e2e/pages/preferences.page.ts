@@ -27,7 +27,7 @@ export class PreferencesPage {
   constructor(page: Page) {
     this.page = page;
     this.statusFilters = page.locator('[data-tour="status-filters"]');
-    this.wantedFilter = this.statusFilters.getByRole('button', { name: /wanted|wishlist|deseado/i });
+    this.wantedFilter = this.statusFilters.locator('button').filter({ hasText: /wanted|wishlist|deseado/i });
     this.addCardButton = page.locator('[data-tour="add-card-btn"]');
     this.fabButton = page.locator('[data-tour="fab-add-card"]');
     this.importButton = page.getByRole('button', { name: /^import$/i }).first();

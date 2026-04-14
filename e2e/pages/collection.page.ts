@@ -83,7 +83,7 @@ export class CollectionPage {
   }
 
   async filterByStatus(status: string) {
-    await this.statusFilters.getByRole('button', { name: new RegExp(status, 'i') }).click();
+    await this.statusFilters.locator('button').filter({ hasText: new RegExp(status, 'i') }).click();
   }
 
   async openAddCardModal() {

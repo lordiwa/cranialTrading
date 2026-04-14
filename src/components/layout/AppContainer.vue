@@ -7,7 +7,7 @@ import WelcomeModal from '../ui/WelcomeModal.vue';
 <template>
   <div class="min-h-screen">
     <AppHeader />
-    <main class="container mx-auto px-4 md:px-lg py-6 md:py-8 pb-24 md:pb-8 max-w-[1200px] overflow-x-clip">
+    <main id="main-content" class="container mx-auto px-4 md:px-lg py-6 md:py-8 pb-24 md:pb-8 max-w-[1200px] overflow-x-clip">
       <slot />
     </main>
 

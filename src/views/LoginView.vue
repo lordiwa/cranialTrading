@@ -102,7 +102,7 @@ const comparisonRows = computed(() => [
 <template>
   <div class="min-h-screen flex flex-col">
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col lg:flex-row">
+    <main id="main-content" class="flex-1 flex flex-col lg:flex-row">
       <!-- Right Column: Login Form (appears first on mobile, sticky on desktop) -->
       <div class="w-full lg:w-[400px] xl:w-[440px] flex-shrink-0 order-first lg:order-last lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto border-b lg:border-b-0 lg:border-l border-silver-20 bg-primary">
         <div class="flex items-center justify-center px-6 py-8 lg:py-12 lg:px-8 lg:min-h-screen">

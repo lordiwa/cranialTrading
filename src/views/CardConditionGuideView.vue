@@ -45,7 +45,7 @@ useHead({
     </header>
 
     <!-- Content -->
-    <main class="max-w-4xl mx-auto px-6 py-12">
+    <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
       <h1 class="text-h1 font-bold text-silver mb-2">Guía de Estado de Cartas Magic: The Gathering</h1>
       <p class="text-body text-silver-70 mb-10">
         El estado (condición) de una carta es uno de los factores más importantes en el intercambio y venta de cartas Magic: The Gathering.

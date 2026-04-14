@@ -49,7 +49,7 @@ useHead({
     </header>
 
     <!-- Content -->
-    <main class="max-w-4xl mx-auto px-6 py-12">
+    <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
       <h1 class="text-h1 font-bold text-silver mb-8">Sobre Cranial Trading</h1>
 
       <!-- Mission Statement -->

@@ -30,7 +30,7 @@ useSeoMeta({
     </header>
 
     <!-- Content -->
-    <main class="max-w-4xl mx-auto px-6 py-12">
+    <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
       <h1 class="text-h1 font-bold text-silver mb-2">{{ t('legal.terms.title') }}</h1>
       <p class="text-small text-silver-50 mb-8">{{ t('legal.cookies.lastUpdated') }} {{ lastUpdated }}</p>
 

@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/auth'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
 import { useToastStore } from '../stores/toast'
 import { useI18n } from '../composables/useI18n'
+import { formatDate } from '../utils/formatDate'
 import { db } from '../services/firebase'
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore'
 import {
@@ -37,7 +38,7 @@ const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
 const priceMatching = usePriceMatchingStore()
 const toastStore = useToastStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // State
 const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted'>('new')
@@ -158,7 +159,7 @@ const formatLastSync = (date: Date): string => {
   if (diffMins < 1) return t('dashboard.justNow')
   if (diffMins < 60) return t('dashboard.minutesAgo', { mins: diffMins })
   if (diffHours < 24) return t('dashboard.hoursAgo', { hours: diffHours })
-  return date.toLocaleDateString()
+  return formatDate(date, locale.value)
 }
 
 // ✅ CARGAR EMAILS para matches guardados

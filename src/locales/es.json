@@ -4,7 +4,7 @@
       "save": "GUARDAR",
       "cancel": "CANCELAR",
       "delete": "ELIMINAR",
-      "deleting": "ELIMINANDO...",
+      "deleting": "ELIMINANDO…",
       "edit": "EDITAR",
       "add": "AGREGAR",
       "close": "CERRAR",
@@ -15,14 +15,14 @@
       "update": "ACTUALIZAR",
       "import": "IMPORTAR",
       "export": "EXPORTAR",
-      "loading": "CARGANDO...",
-      "saving": "GUARDANDO...",
-      "sending": "ENVIANDO...",
+      "loading": "CARGANDO…",
+      "saving": "GUARDANDO…",
+      "sending": "ENVIANDO…",
       "loadMore": "CARGAR MÁS",
       "retry": "REINTENTAR",
       "apply": "APLICAR",
       "clear": "LIMPIAR",
-      "searching": "BUSCANDO...",
+      "searching": "BUSCANDO…",
       "advancedSearch": "Búsqueda avanzada",
       "backToSearch": "Volver a buscar",
       "skipToContent": "Saltar al contenido principal"
@@ -92,36 +92,36 @@
       "loadError": "Error cargando datos"
     },
     "import": {
-      "importing": "Importando \"{name}\"...",
-      "creatingDeck": "Creando mazo \"{name}\"...",
-      "creatingBinder": "Creando carpeta \"{name}\"...",
+      "importing": "Importando \"{name}\"…",
+      "creatingDeck": "Creando mazo \"{name}\"…",
+      "creatingBinder": "Creando carpeta \"{name}\"…",
       "errorCreatingDeck": "Error al crear el mazo",
       "errorCreatingBinder": "Error al crear la carpeta",
-      "preparing": "Preparando {count} cartas...",
-      "fetchingData": "Obteniendo datos de {count} cartas...",
-      "processing": "Procesando cartas...",
-      "processingCount": "Procesando {count} cartas...",
-      "processingProgress": "Procesando {current}/{total}...",
-      "fetchingPrices": "Buscando precios adicionales...",
-      "saving": "Guardando {count} cartas...",
-      "allocatingToDeck": "Asignando cartas al mazo...",
-      "allocatingToDeckCount": "Asignando {count} cartas al mazo...",
-      "allocatingToBinder": "Asignando cartas a la carpeta...",
-      "allocatingToBinderCount": "Asignando {count} cartas a la carpeta...",
-      "allocatingProgress": "Asignando {current}/{total}...",
+      "preparing": "Preparando {count} cartas…",
+      "fetchingData": "Obteniendo datos de {count} cartas…",
+      "processing": "Procesando cartas…",
+      "processingCount": "Procesando {count} cartas…",
+      "processingProgress": "Procesando {current}/{total}…",
+      "fetchingPrices": "Buscando precios adicionales…",
+      "saving": "Guardando {count} cartas…",
+      "allocatingToDeck": "Asignando cartas al mazo…",
+      "allocatingToDeckCount": "Asignando {count} cartas al mazo…",
+      "allocatingToBinder": "Asignando cartas a la carpeta…",
+      "allocatingToBinderCount": "Asignando {count} cartas a la carpeta…",
+      "allocatingProgress": "Asignando {current}/{total}…",
       "deckComplete": "\"{name}\" importado con {count} cartas",
       "binderComplete": "\"{name}\" importada con {count} cartas",
       "errorDeck": "Error al importar el mazo",
       "errorBinder": "Error al importar la carpeta",
       "errorCsv": "Error al importar CSV",
       "deckCreated": "Mazo \"{name}\" creado",
-      "resuming": "Continuando \"{name}\"...",
+      "resuming": "Continuando \"{name}\"…",
       "resumeComplete": "\"{name}\" completado con {count} cartas",
       "resumeIncomplete": "Importación incompleta. El mazo puede estar vacío.",
       "resumeError": "Error al resumir importación",
-      "resumeFailed": "Importación de \"{name}\" falló. Limpiando...",
-      "fetchingDataProgress": "Obteniendo datos: {current}/{total}...",
-      "savingProgress": "Guardando cartas: {current}/{total}..."
+      "resumeFailed": "Importación de \"{name}\" falló. Limpiando…",
+      "fetchingDataProgress": "Obteniendo datos: {current}/{total}…",
+      "savingProgress": "Guardando cartas: {current}/{total}…"
     },
     "aria": {
       "loading": "Cargando",
@@ -141,7 +141,7 @@
       "emailPlaceholder": "tu@email.com",
       "passwordPlaceholder": "Contraseña",
       "submit": "INGRESAR",
-      "submitting": "INGRESANDO...",
+      "submitting": "INGRESANDO…",
       "forgotPassword": "¿Olvidaste tu contraseña?",
       "noAccount": "¿No tienes cuenta?",
       "register": "Registrarse",
@@ -158,7 +158,7 @@
       "usernameLabel": "Nombre de usuario",
       "locationLabel": "Ubicación (ej: Buenos Aires, Argentina)",
       "submit": "CREAR CUENTA",
-      "submitting": "CREANDO CUENTA...",
+      "submitting": "CREANDO CUENTA…",
       "hasAccount": "¿Ya tienes cuenta?",
       "login": "Iniciar sesión"
     },
@@ -167,7 +167,7 @@
       "message": "Te hemos enviado un email a",
       "instruction": "Haz click en el enlace para verificar tu cuenta. Si no lo ves, revisa spam.",
       "checkButton": "YA VERIFIQUÉ",
-      "checking": "VERIFICANDO...",
+      "checking": "VERIFICANDO…",
       "resend": "REENVIAR EMAIL"
     },
     "forgotPassword": {
@@ -175,7 +175,7 @@
       "instruction": "Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.",
       "emailPlaceholder": "tu@email.com",
       "submit": "ENVIAR ENLACE",
-      "submitting": "ENVIANDO...",
+      "submitting": "ENVIANDO…",
       "success": "Email enviado",
       "successMessage": "Revisa tu correo para el enlace de recuperación. Si no lo ves, revisa spam.",
       "backToLogin": "Volver al login",
@@ -187,7 +187,7 @@
       "confirmPasswordPlaceholder": "Confirmar contraseña",
       "passwordMismatch": "Las contraseñas no coinciden",
       "submit": "RESTABLECER",
-      "submitting": "RESTABLECIENDO...",
+      "submitting": "RESTABLECIENDO…",
       "invalidLink": "Enlace inválido",
       "invalidLinkMessage": "El enlace de recuperación es inválido o expiró.",
       "requestNewLink": "Solicitar nuevo enlace",
@@ -347,7 +347,7 @@
       "update": "ACTUALIZAR"
     },
     "search": {
-      "placeholder": "Buscar cartas...",
+      "placeholder": "Buscar cartas…",
       "tabs": {
         "collection": "Mi colección",
         "users": "Otros usuarios",
@@ -363,9 +363,9 @@
   "dashboard": {
     "title": "BUSCAR MATCHES",
     "matchesFound": "matches encontrados",
-    "calculating": "CALCULANDO...",
+    "calculating": "CALCULANDO…",
     "recalculate": "RECALCULAR",
-    "syncing": "SINCRONIZANDO...",
+    "syncing": "SINCRONIZANDO…",
     "sync": "SINCRONIZAR",
     "lastSync": "Última sincronización",
     "justNow": "ahora mismo",
@@ -374,7 +374,7 @@
     "deleteData": "BORRAR MIS DATOS",
     "searchOthers": {
       "title": "BUSCAR CARTAS DE OTROS USUARIOS",
-      "placeholder": "Nombre de la carta...",
+      "placeholder": "Nombre de la carta…",
       "search": "BUSCAR",
       "noImage": "Sin imagen",
       "noOwner": "Sin dueño",
@@ -386,17 +386,17 @@
     },
     "calculatingMatches": {
       "title": "CALCULANDO MATCHES",
-      "loading": "Cargando datos..."
+      "loading": "Cargando datos…"
     },
     "clearData": {
       "title": "Borrar todos los datos",
       "message": "¿Borrar TODAS tus cartas, preferencias, matches y decks? Esta acción no se puede deshacer.",
       "confirm": "BORRAR TODO",
-      "progress": "Borrando datos...",
-      "deleting": "Borrando {step}...",
+      "progress": "Borrando datos…",
+      "deleting": "Borrando {step}…",
       "complete": "Todos los datos borrados",
       "withErrors": "Borrado con {count} error(es)",
-      "resuming": "Continuando borrado de datos..."
+      "resuming": "Continuando borrado de datos…"
     },
     "interest": {
       "sent": "Interés enviado a @{username}",
@@ -410,7 +410,7 @@
       "addCardsOrPrefs": "Agrega cartas a tu colección o crea una preferencia para encontrar matches automáticamente.",
       "viewCollection": "VER MI COLECCIÓN",
       "noMatches": "No hay matches disponibles",
-      "usersInPlatform": "Hay {count} usuarios en la plataforma..."
+      "usersInPlatform": "Hay {count} usuarios en la plataforma…"
     },
     "blockedUsers": "BLOQUEADOS",
     "userUnblocked": "{username} desbloqueado",
@@ -420,7 +420,7 @@
       "noBlocked": "No hay usuarios bloqueados",
       "unblock": "DESBLOQUEAR",
       "block": "BLOQUEAR",
-      "usernamePlaceholder": "Escribe el usuario a bloquear...",
+      "usernamePlaceholder": "Escribe el usuario a bloquear…",
       "userNotFound": "Usuario no encontrado",
       "alreadyBlocked": "El usuario ya está bloqueado",
       "cannotBlockSelf": "No puedes bloquearte a ti mismo",
@@ -446,7 +446,7 @@
       "owned": "TENGO",
       "available": "DISPONIBLE",
       "wishlist": "NECESITO",
-      "searchPlaceholder": "Buscar por nombre...",
+      "searchPlaceholder": "Buscar por nombre…",
       "colorModeAny": "CUALQ",
       "colorModeExact": "EXACTO"
     },
@@ -473,7 +473,7 @@
     },
     "pagination": {
       "showingOf": "Mostrando {count} de {total}",
-      "loadingMore": "Cargando más..."
+      "loadingMore": "Cargando más…"
     },
     "empty": {
       "deckEmpty": "Deck vacío",
@@ -527,7 +527,7 @@
     "totals": {
       "title": "VALOR DE COLECCION",
       "update": "ACTUALIZAR",
-      "loading": "Cargando precios... {progress}%",
+      "loading": "Cargando precios… {progress}%",
       "priceSource": "Fuente",
       "cards": "Cartas",
       "unique": "Únicas",
@@ -562,7 +562,7 @@
       "publicSuccess": "{count} cartas actualizadas",
       "setPublic": "PÚBLICO",
       "setPrivate": "PRIVADO",
-      "processing": "Procesando...",
+      "processing": "Procesando…",
       "addLabel": "AÑADIR",
       "deck": "MAZO",
       "binder": "CARPETA",
@@ -588,7 +588,7 @@
       "syncError": "Error sincronizando cartas"
     },
     "pagination": {
-      "loading": "Cargando colección...",
+      "loading": "Cargando colección…",
       "slowLoad": "Colección grande — puede tardar un momento"
     }
   },
@@ -596,7 +596,7 @@
   "cards": {
     "addModal": {
       "title": "AGREGAR CARTA",
-      "searchPlaceholder": "Buscar nombre de carta...",
+      "searchPlaceholder": "Buscar nombre de carta…",
       "noResults": "No se encontraron cartas. Intenta otra búsqueda.",
       "editionLabel": "Edición / Print",
       "printsAvailable": "{count} prints disponibles",
@@ -617,15 +617,15 @@
       "priceCK": "CK: {price}",
       "priceBuylist": "BL: {price}",
       "submit": "AGREGAR",
-      "submitting": "GUARDANDO...",
+      "submitting": "GUARDANDO…",
       "success": "✓ {name} agregada",
       "splitCardSide": "Lado {current} de {total}"
     },
     "editModal": {
       "title": "EDITAR CARTA",
       "subtitle": "Modifica los detalles de tu carta",
-      "loadingPrices": "Cargando precios CK...",
-      "loadingPrints": "Cargando prints...",
+      "loadingPrices": "Cargando precios CK…",
+      "loadingPrints": "Cargando prints…",
       "allocations": {
         "title": "ASIGNADA EN MAZOS",
         "inDeck": "{qty} en {deckName}",
@@ -640,7 +640,7 @@
       "title": "CAMBIAR STATUS",
       "subtitle": "Gestiona el estado de esta carta",
       "prices": "Precios:",
-      "loadingCKPrices": "Cargando precios CK...",
+      "loadingCKPrices": "Cargando precios CK…",
       "currentStatus": "Status actual:",
       "newStatus": "Nuevo status",
       "statusOptions": {
@@ -696,7 +696,7 @@
       "quantityMin": "Cantidad debe ser al menos 1",
       "validationMinCopy": "Debes tener al menos 1 copia",
       "allocationWarning": "{excess} carta(s) asignadas a mazos pasarán a wishlist",
-      "loadingPrints": "Cargando prints...",
+      "loadingPrints": "Cargando prints…",
       "printsAvailable": "{count} prints disponibles",
       "editionPrintLabel": "Edición / Print",
       "updated": "Carta actualizada",
@@ -717,7 +717,7 @@
       "noImage": "No image",
       "noImg": "No img",
       "delete": "ELIMINAR",
-      "deleting": "ELIMINANDO...",
+      "deleting": "ELIMINANDO…",
       "visibleInProfile": "Carta visible en perfil",
       "hiddenFromProfile": "Carta oculta del perfil",
       "visibilityError": "Error al cambiar visibilidad",
@@ -756,7 +756,7 @@
       "editDeck": "EDITAR MAZO"
     },
     "filters": {
-      "searchPlaceholder": "Buscar por nombre o descripción...",
+      "searchPlaceholder": "Buscar por nombre o descripción…",
       "format": "Formato",
       "all": "TODOS"
     },
@@ -784,9 +784,9 @@
       "namePlaceholder": "Ej: RDW Modern",
       "formatLabel": "Formato",
       "descriptionLabel": "Descripción",
-      "descriptionPlaceholder": "Describe tu estrategia, meta, notas...",
+      "descriptionPlaceholder": "Describe tu estrategia, meta, notas…",
       "cardListLabel": "Lista de cartas (opcional)",
-      "cardListPlaceholder": "Pega tu lista aquí: 4 Lightning Bolt...",
+      "cardListPlaceholder": "Pega tu lista aquí: 4 Lightning Bolt…",
       "colorsLabel": "Colores",
       "preview": "{total} cartas detectadas",
       "previewDetail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
@@ -798,9 +798,9 @@
     "importModal": {
       "title": "IMPORTAR MAZO",
       "inputLabel": "Link de Moxfield o texto del mazo",
-      "inputPlaceholder": "https://moxfield.com/decks/... o 3 Arid Mesa...",
+      "inputPlaceholder": "https://moxfield.com/decks/… o 3 Arid Mesa…",
       "analyze": "ANALIZAR",
-      "analyzing": "ANALIZANDO...",
+      "analyzing": "ANALIZANDO…",
       "moxfieldDetected": {
         "title": "Link de Moxfield detectado",
         "instruction": "Moxfield no permite importar directamente. Sigue estos pasos:",
@@ -820,7 +820,7 @@
         "deckNamePlaceholder": "Dejar vacío para generar un nombre aleatorio",
         "formatLabel": "Formato",
         "commanderLabel": "Comandante",
-        "commanderPlaceholder": "Nombre del comandante...",
+        "commanderPlaceholder": "Nombre del comandante…",
         "commanderHint": "Escribe el nombre o selecciona de las cartas importadas",
         "makePublic": "Hacer todas estas cartas públicas",
         "statusLabel": "Estado de las cartas"
@@ -838,14 +838,14 @@
       "titleOwned": "EDITAR CARTA",
       "subtitleOwned": "Modificar esta carta actualizará tu colección",
       "subtitleWishlist": "Modifica los detalles de la carta en wishlist",
-      "loadingCKPrices": "Cargando precios CK...",
+      "loadingCKPrices": "Cargando precios CK…",
       "inYourCollection": "EN TU COLECCIÓN",
       "copiesTotal": "{qty} copias totales,",
       "available": "{qty} disponibles",
       "usedIn": "Usado en:",
       "editionPrint": "Edición / Print",
       "printsAvailable": "{count} prints disponibles",
-      "loadingPrints": "Cargando prints...",
+      "loadingPrints": "Cargando prints…",
       "quantityAssigned": "Cantidad asignada",
       "quantityDesired": "Cantidad deseada",
       "maxQty": "(máx: {max})",
@@ -860,7 +860,7 @@
       "title": "AGREGAR CARTA AL DECK",
       "subtitle": "Busca y selecciona una carta",
       "searchLabel": "Buscar Carta",
-      "searchPlaceholder": "Ej: Black Lotus, Ragavan, Counterspell...",
+      "searchPlaceholder": "Ej: Black Lotus, Ragavan, Counterspell…",
       "searchError": "Error en la búsqueda",
       "noResults": "No se encontraron resultados para \"{query}\"",
       "resultsCount": "{count} resultados - Click para agregar",
@@ -1056,7 +1056,7 @@
       "deletedWithCards": "Deck y {count} cartas eliminadas",
       "deletedWithCardWarning": "Deck eliminado. {deleted} cartas borradas, {failed} no se pudieron eliminar",
       "deleteError": "Error al eliminar deck",
-      "deletingDeck": "Eliminando deck...",
+      "deletingDeck": "Eliminando deck…",
       "noCardsInDeck": "No hay cartas en el deck",
       "cardsNowPublic": "{count} cartas ahora son públicas",
       "cardsNowPrivate": "{count} cartas ahora son privadas",
@@ -1223,7 +1223,7 @@
   "messages": {
     "title": "MENSAJES",
     "subtitle": "conversaciones activas",
-    "searchPlaceholder": "Buscar por usuario...",
+    "searchPlaceholder": "Buscar por usuario…",
     "empty": {
       "noResults": "No se encontraron conversaciones",
       "noMessages": "No tienes mensajes aún",
@@ -1233,7 +1233,7 @@
     "chat": {
       "title": "Chat con @{username}",
       "noMessages": "No hay mensajes aún. ¡Sé el primero en escribir!",
-      "inputPlaceholder": "Escribe un mensaje..."
+      "inputPlaceholder": "Escribe un mensaje…"
     },
     "errors": {
       "selfChat": "No puedes conversar contigo mismo",
@@ -1305,7 +1305,7 @@
       "button": "CAMBIAR",
       "placeholder": "Ciudad, País",
       "detect": "📍 Detectar automáticamente",
-      "detecting": "Detectando...",
+      "detecting": "Detectando…",
       "detected": "Ubicación detectada:",
       "notSet": "No configurada",
       "success": "Ubicación actualizada correctamente.",
@@ -1315,7 +1315,7 @@
     "changeAvatar": {
       "edit": "Cambiar",
       "upload": "📷 SUBIR IMAGEN",
-      "placeholder": "...o pega URL de imagen",
+      "placeholder": "…o pega URL de imagen",
       "hint": "Sube una imagen o pega una URL. Deja vacío y guarda para usar avatar generado.",
       "reset": "RESET",
       "custom": "Avatar personalizado",
@@ -1338,7 +1338,7 @@
         "title": "¿Eliminar todos tus datos?",
         "message": "Esta acción eliminará permanentemente todas tus cartas, mazos, matches guardados y contactos. Esta acción NO se puede deshacer.",
         "confirm": "SÍ, ELIMINAR TODO",
-        "progress": "Eliminando datos...",
+        "progress": "Eliminando datos…",
         "success": "Todos los datos han sido eliminados",
         "error": "Error al eliminar datos. Intenta de nuevo."
       },
@@ -1374,17 +1374,17 @@
     },
     "owned": "x{count} tengo",
     "filterPanel": {
-      "placeholder": "Buscar carta por nombre...",
+      "placeholder": "Buscar carta por nombre…",
       "searchButton": "BUSCAR",
       "moreFilters": "MÁS",
       "clear": "✕ LIMPIAR",
       "autoSearch": "Los filtros se aplicarán automáticamente en 0.5 segundos",
-      "filterSearchPlaceholder": "Buscar filtro... (ej: flying, trample, cascade)",
+      "filterSearchPlaceholder": "Buscar filtro… (ej: flying, trample, cascade)",
       "noFilterResults": "No se encontraron filtros para \"{query}\"",
       "onlyReleased": "Solo lanzadas",
-      "setSearchPlaceholder": "Buscar edición... (ej: Dominaria, MH3)",
+      "setSearchPlaceholder": "Buscar edición… (ej: Dominaria, MH3)",
       "noSetsFound": "No se encontraron ediciones",
-      "creatureTypeSearchPlaceholder": "Buscar tipo de criatura... (ej: Humano, Dragón)",
+      "creatureTypeSearchPlaceholder": "Buscar tipo de criatura… (ej: Humano, Dragón)",
       "noCreatureTypesFound": "No se encontraron tipos de criatura"
     },
     "modal": {
@@ -1442,7 +1442,7 @@
       "showingOf": "Mostrando {count} de los resultados más relevantes"
     },
     "bar": {
-      "placeholder": "Busca una carta (ej: Black Lotus, Counterspell...)",
+      "placeholder": "Busca una carta (ej: Black Lotus, Counterspell…)",
       "searchButton": "BUSCAR",
       "noCardsFound": "No se encontraron cartas con ese nombre",
       "searchError": "Error al buscar cartas",
@@ -1545,15 +1545,15 @@
     },
     "newModal": {
       "title": "NUEVA PREFERENCIA",
-      "searchPlaceholder": "Buscar carta...",
+      "searchPlaceholder": "Buscar carta…",
       "minCondition": "Condición mínima",
       "changeCard": "CAMBIAR CARTA"
     },
     "importModal": {
       "title": "IMPORTAR COMO WISHLIST",
       "inputLabel": "Link de Moxfield o texto del mazo",
-      "placeholder": "https://moxfield.com/decks/...\no\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n...",
-      "analyzing": "ANALIZANDO...",
+      "placeholder": "https://moxfield.com/decks/…\no\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n…",
+      "analyzing": "ANALIZANDO…",
       "analyze": "ANALIZAR",
       "moxfieldDetected": {
         "title": "Link de Moxfield detectado",
@@ -1776,7 +1776,7 @@
           "a": "Sí. Puedes: 1) Importar desde Moxfield pegando la URL del mazo, 2) Pegar listas en formato MTGO/Arena (ej: '4 Lightning Bolt' o '4x Lightning Bolt [M10]'), 3) Subir un archivo CSV (formato ManaBox compatible). El sistema reconoce cantidad, nombre y opcionalmente el set."
         },
         {
-          "q": "¿Qué significan las condiciones de carta (M, NM, LP...)?",
+          "q": "¿Qué significan las condiciones de carta (M, NM, LP…)?",
           "a": "M (Mint): Perfecta, sin usar. NM (Near Mint): Casi perfecta, mínimo desgaste. LP (Light Play): Pequeñas marcas visibles. MP (Moderate Play): Desgaste moderado, dobleces menores. HP (Heavy Play): Daño evidente pero jugable. PO (Poor): Mal estado significativo. Ejemplo: Una carta recién abierta es M/NM, una jugada en torneos sin fundas probablemente sea LP/MP."
         },
         {
@@ -1943,7 +1943,7 @@
       "formatLabel": "Formato",
       "categoryLabel": "Categoría"
     },
-    "search": "Buscar cartas...",
+    "search": "Buscar cartas…",
     "sort": {
       "label": "Ordenar por",
       "change": "% Cambio",

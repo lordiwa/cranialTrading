@@ -4,7 +4,7 @@
       "save": "SAVE",
       "cancel": "CANCEL",
       "delete": "DELETE",
-      "deleting": "DELETING...",
+      "deleting": "DELETING…",
       "edit": "EDIT",
       "add": "ADD",
       "close": "CLOSE",
@@ -15,14 +15,14 @@
       "update": "UPDATE",
       "import": "IMPORT",
       "export": "EXPORT",
-      "loading": "LOADING...",
-      "saving": "SAVING...",
-      "sending": "SENDING...",
+      "loading": "LOADING…",
+      "saving": "SAVING…",
+      "sending": "SENDING…",
       "loadMore": "LOAD MORE",
       "retry": "RETRY",
       "apply": "APPLY",
       "clear": "CLEAR",
-      "searching": "SEARCHING...",
+      "searching": "SEARCHING…",
       "advancedSearch": "Advanced search",
       "backToSearch": "Back to search",
       "skipToContent": "Skip to main content"
@@ -92,36 +92,36 @@
       "loadError": "Error loading data"
     },
     "import": {
-      "importing": "Importing \"{name}\"...",
-      "creatingDeck": "Creating deck \"{name}\"...",
-      "creatingBinder": "Creating binder \"{name}\"...",
+      "importing": "Importing \"{name}\"…",
+      "creatingDeck": "Creating deck \"{name}\"…",
+      "creatingBinder": "Creating binder \"{name}\"…",
       "errorCreatingDeck": "Error creating deck",
       "errorCreatingBinder": "Error creating binder",
-      "preparing": "Preparing {count} cards...",
-      "fetchingData": "Fetching data for {count} cards...",
-      "processing": "Processing cards...",
-      "processingCount": "Processing {count} cards...",
-      "processingProgress": "Processing {current}/{total}...",
-      "fetchingPrices": "Fetching additional prices...",
-      "saving": "Saving {count} cards...",
-      "allocatingToDeck": "Allocating cards to deck...",
-      "allocatingToDeckCount": "Allocating {count} cards to deck...",
-      "allocatingToBinder": "Allocating cards to binder...",
-      "allocatingToBinderCount": "Allocating {count} cards to binder...",
-      "allocatingProgress": "Allocating {current}/{total}...",
+      "preparing": "Preparing {count} cards…",
+      "fetchingData": "Fetching data for {count} cards…",
+      "processing": "Processing cards…",
+      "processingCount": "Processing {count} cards…",
+      "processingProgress": "Processing {current}/{total}…",
+      "fetchingPrices": "Fetching additional prices…",
+      "saving": "Saving {count} cards…",
+      "allocatingToDeck": "Allocating cards to deck…",
+      "allocatingToDeckCount": "Allocating {count} cards to deck…",
+      "allocatingToBinder": "Allocating cards to binder…",
+      "allocatingToBinderCount": "Allocating {count} cards to binder…",
+      "allocatingProgress": "Allocating {current}/{total}…",
       "deckComplete": "\"{name}\" imported with {count} cards",
       "binderComplete": "\"{name}\" imported with {count} cards",
       "errorDeck": "Error importing deck",
       "errorBinder": "Error importing binder",
       "errorCsv": "Error importing CSV",
       "deckCreated": "Deck \"{name}\" created",
-      "resuming": "Resuming \"{name}\"...",
+      "resuming": "Resuming \"{name}\"…",
       "resumeComplete": "\"{name}\" completed with {count} cards",
       "resumeIncomplete": "Import incomplete. Deck may be empty.",
       "resumeError": "Error resuming import",
-      "resumeFailed": "Import of \"{name}\" failed. Cleaning up...",
-      "fetchingDataProgress": "Fetching card data: {current}/{total}...",
-      "savingProgress": "Saving cards: {current}/{total}..."
+      "resumeFailed": "Import of \"{name}\" failed. Cleaning up…",
+      "fetchingDataProgress": "Fetching card data: {current}/{total}…",
+      "savingProgress": "Saving cards: {current}/{total}…"
     },
     "aria": {
       "loading": "Loading",
@@ -141,7 +141,7 @@
       "emailPlaceholder": "your@email.com",
       "passwordPlaceholder": "Password",
       "submit": "SIGN IN",
-      "submitting": "SIGNING IN...",
+      "submitting": "SIGNING IN…",
       "forgotPassword": "Forgot your password?",
       "noAccount": "Don't have an account?",
       "register": "Register",
@@ -158,7 +158,7 @@
       "usernameLabel": "Username",
       "locationLabel": "Location (e.g.: New York, USA)",
       "submit": "CREATE ACCOUNT",
-      "submitting": "CREATING ACCOUNT...",
+      "submitting": "CREATING ACCOUNT…",
       "hasAccount": "Already have an account?",
       "login": "Sign in"
     },
@@ -167,7 +167,7 @@
       "message": "We've sent an email to",
       "instruction": "Click the link to verify your account. If you don't see it, check spam.",
       "checkButton": "I VERIFIED",
-      "checking": "VERIFYING...",
+      "checking": "VERIFYING…",
       "resend": "RESEND EMAIL"
     },
     "forgotPassword": {
@@ -175,7 +175,7 @@
       "instruction": "Enter your email and we'll send you a link to reset your password.",
       "emailPlaceholder": "your@email.com",
       "submit": "SEND LINK",
-      "submitting": "SENDING...",
+      "submitting": "SENDING…",
       "success": "Email sent",
       "successMessage": "Check your email for the recovery link. If you don't see it, check spam.",
       "backToLogin": "Back to login",
@@ -187,7 +187,7 @@
       "confirmPasswordPlaceholder": "Confirm password",
       "passwordMismatch": "Passwords don't match",
       "submit": "RESET",
-      "submitting": "RESETTING...",
+      "submitting": "RESETTING…",
       "invalidLink": "Invalid link",
       "invalidLinkMessage": "The recovery link is invalid or expired.",
       "requestNewLink": "Request new link",
@@ -347,7 +347,7 @@
       "update": "UPDATE"
     },
     "search": {
-      "placeholder": "Search cards...",
+      "placeholder": "Search cards…",
       "tabs": {
         "collection": "My collection",
         "users": "Other users",
@@ -363,9 +363,9 @@
   "dashboard": {
     "title": "FIND MATCHES",
     "matchesFound": "matches found",
-    "calculating": "CALCULATING...",
+    "calculating": "CALCULATING…",
     "recalculate": "RECALCULATE",
-    "syncing": "SYNCING...",
+    "syncing": "SYNCING…",
     "sync": "SYNC",
     "lastSync": "Last sync",
     "justNow": "just now",
@@ -374,7 +374,7 @@
     "deleteData": "DELETE MY DATA",
     "searchOthers": {
       "title": "SEARCH OTHER USERS' CARDS",
-      "placeholder": "Card name...",
+      "placeholder": "Card name…",
       "search": "SEARCH",
       "noImage": "No image",
       "noOwner": "No owner",
@@ -386,17 +386,17 @@
     },
     "calculatingMatches": {
       "title": "CALCULATING MATCHES",
-      "loading": "Loading data..."
+      "loading": "Loading data…"
     },
     "clearData": {
       "title": "Delete all data",
       "message": "Delete ALL your cards, preferences, matches and decks? This action cannot be undone.",
       "confirm": "DELETE ALL",
-      "progress": "Deleting data...",
-      "deleting": "Deleting {step}...",
+      "progress": "Deleting data…",
+      "deleting": "Deleting {step}…",
       "complete": "All data deleted",
       "withErrors": "Deleted with {count} error(s)",
-      "resuming": "Resuming data deletion..."
+      "resuming": "Resuming data deletion…"
     },
     "interest": {
       "sent": "Interest sent to @{username}",
@@ -410,7 +410,7 @@
       "addCardsOrPrefs": "Add cards to your collection or create a preference to find matches automatically.",
       "viewCollection": "VIEW MY COLLECTION",
       "noMatches": "No matches available",
-      "usersInPlatform": "There are {count} users on the platform..."
+      "usersInPlatform": "There are {count} users on the platform…"
     },
     "blockedUsers": "BLOCKED",
     "userUnblocked": "{username} unblocked",
@@ -420,7 +420,7 @@
       "noBlocked": "No blocked users",
       "unblock": "UNBLOCK",
       "block": "BLOCK",
-      "usernamePlaceholder": "Type username to block...",
+      "usernamePlaceholder": "Type username to block…",
       "userNotFound": "User not found",
       "alreadyBlocked": "User is already blocked",
       "cannotBlockSelf": "You cannot block yourself",
@@ -446,7 +446,7 @@
       "owned": "OWNED",
       "available": "AVAILABLE",
       "wishlist": "WANTED",
-      "searchPlaceholder": "Search by name...",
+      "searchPlaceholder": "Search by name…",
       "colorModeAny": "ANY",
       "colorModeExact": "EXACT"
     },
@@ -473,7 +473,7 @@
     },
     "pagination": {
       "showingOf": "Showing {count} of {total}",
-      "loadingMore": "Loading more..."
+      "loadingMore": "Loading more…"
     },
     "empty": {
       "deckEmpty": "Empty deck",
@@ -527,7 +527,7 @@
     "totals": {
       "title": "COLLECTION VALUE",
       "update": "UPDATE",
-      "loading": "Loading prices... {progress}%",
+      "loading": "Loading prices… {progress}%",
       "priceSource": "Source",
       "cards": "Cards",
       "unique": "Unique",
@@ -562,7 +562,7 @@
       "publicSuccess": "{count} cards updated",
       "setPublic": "PUBLIC",
       "setPrivate": "PRIVATE",
-      "processing": "Processing...",
+      "processing": "Processing…",
       "addLabel": "ADD TO",
       "deck": "DECK",
       "binder": "BINDER",
@@ -588,7 +588,7 @@
       "syncError": "Error syncing cards"
     },
     "pagination": {
-      "loading": "Loading collection...",
+      "loading": "Loading collection…",
       "slowLoad": "Large collection — this may take a moment"
     }
   },
@@ -596,7 +596,7 @@
   "cards": {
     "addModal": {
       "title": "ADD CARD",
-      "searchPlaceholder": "Search card name...",
+      "searchPlaceholder": "Search card name…",
       "noResults": "No cards found. Try a different search.",
       "editionLabel": "Edition / Print",
       "printsAvailable": "{count} prints available",
@@ -617,15 +617,15 @@
       "priceCK": "CK: {price}",
       "priceBuylist": "BL: {price}",
       "submit": "ADD",
-      "submitting": "SAVING...",
+      "submitting": "SAVING…",
       "success": "✓ {name} added",
       "splitCardSide": "Side {current} of {total}"
     },
     "editModal": {
       "title": "EDIT CARD",
       "subtitle": "Modify your card details",
-      "loadingPrices": "Loading CK prices...",
-      "loadingPrints": "Loading prints...",
+      "loadingPrices": "Loading CK prices…",
+      "loadingPrints": "Loading prints…",
       "allocations": {
         "title": "ASSIGNED TO DECKS",
         "inDeck": "{qty} in {deckName}",
@@ -640,7 +640,7 @@
       "title": "CHANGE STATUS",
       "subtitle": "Manage this card's status",
       "prices": "Prices:",
-      "loadingCKPrices": "Loading CK prices...",
+      "loadingCKPrices": "Loading CK prices…",
       "currentStatus": "Current status:",
       "newStatus": "New status",
       "statusOptions": {
@@ -696,7 +696,7 @@
       "quantityMin": "Quantity must be at least 1",
       "validationMinCopy": "You must have at least 1 copy",
       "allocationWarning": "{excess} card(s) assigned to decks will move to wishlist",
-      "loadingPrints": "Loading prints...",
+      "loadingPrints": "Loading prints…",
       "printsAvailable": "{count} prints available",
       "editionPrintLabel": "Edition / Print",
       "updated": "Card updated",
@@ -717,7 +717,7 @@
       "noImage": "No image",
       "noImg": "No img",
       "delete": "DELETE",
-      "deleting": "DELETING...",
+      "deleting": "DELETING…",
       "visibleInProfile": "Card visible on profile",
       "hiddenFromProfile": "Card hidden from profile",
       "visibilityError": "Error changing visibility",
@@ -756,7 +756,7 @@
       "editDeck": "EDIT DECK"
     },
     "filters": {
-      "searchPlaceholder": "Search by name or description...",
+      "searchPlaceholder": "Search by name or description…",
       "format": "Format",
       "all": "ALL"
     },
@@ -784,9 +784,9 @@
       "namePlaceholder": "Ex: RDW Modern",
       "formatLabel": "Format",
       "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Describe your strategy, meta, notes...",
+      "descriptionPlaceholder": "Describe your strategy, meta, notes…",
       "cardListLabel": "Card list (optional)",
-      "cardListPlaceholder": "Paste your list here: 4 Lightning Bolt...",
+      "cardListPlaceholder": "Paste your list here: 4 Lightning Bolt…",
       "colorsLabel": "Colors",
       "preview": "{total} cards detected",
       "previewDetail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
@@ -798,9 +798,9 @@
     "importModal": {
       "title": "IMPORT DECK",
       "inputLabel": "Moxfield link or deck text",
-      "inputPlaceholder": "https://moxfield.com/decks/... or 3 Arid Mesa...",
+      "inputPlaceholder": "https://moxfield.com/decks/… or 3 Arid Mesa…",
       "analyze": "ANALYZE",
-      "analyzing": "ANALYZING...",
+      "analyzing": "ANALYZING…",
       "moxfieldDetected": {
         "title": "Moxfield link detected",
         "instruction": "Moxfield doesn't allow direct imports. Follow these steps:",
@@ -820,7 +820,7 @@
         "deckNamePlaceholder": "Leave empty to generate a random name",
         "formatLabel": "Format",
         "commanderLabel": "Commander",
-        "commanderPlaceholder": "Commander name...",
+        "commanderPlaceholder": "Commander name…",
         "commanderHint": "Type the name or select from imported cards",
         "makePublic": "Make all these cards public",
         "statusLabel": "Card status"
@@ -838,14 +838,14 @@
       "titleOwned": "EDIT CARD",
       "subtitleOwned": "Modifying this card will update your collection",
       "subtitleWishlist": "Modify the wishlist card details",
-      "loadingCKPrices": "Loading CK prices...",
+      "loadingCKPrices": "Loading CK prices…",
       "inYourCollection": "IN YOUR COLLECTION",
       "copiesTotal": "{qty} total copies,",
       "available": "{qty} available",
       "usedIn": "Used in:",
       "editionPrint": "Edition / Print",
       "printsAvailable": "{count} prints available",
-      "loadingPrints": "Loading prints...",
+      "loadingPrints": "Loading prints…",
       "quantityAssigned": "Quantity assigned",
       "quantityDesired": "Quantity desired",
       "maxQty": "(max: {max})",
@@ -860,7 +860,7 @@
       "title": "ADD CARD TO DECK",
       "subtitle": "Search and select a card",
       "searchLabel": "Search Card",
-      "searchPlaceholder": "Ex: Black Lotus, Ragavan, Counterspell...",
+      "searchPlaceholder": "Ex: Black Lotus, Ragavan, Counterspell…",
       "searchError": "Search error",
       "noResults": "No results found for \"{query}\"",
       "resultsCount": "{count} results - Click to add",
@@ -1056,7 +1056,7 @@
       "deletedWithCards": "Deck and {count} cards deleted",
       "deletedWithCardWarning": "Deck deleted. {deleted} cards removed, {failed} cards could not be deleted",
       "deleteError": "Error deleting deck",
-      "deletingDeck": "Deleting deck...",
+      "deletingDeck": "Deleting deck…",
       "noCardsInDeck": "No cards in the deck",
       "cardsNowPublic": "{count} cards are now public",
       "cardsNowPrivate": "{count} cards are now private",
@@ -1223,7 +1223,7 @@
   "messages": {
     "title": "MESSAGES",
     "subtitle": "active conversations",
-    "searchPlaceholder": "Search by user...",
+    "searchPlaceholder": "Search by user…",
     "empty": {
       "noResults": "No conversations found",
       "noMessages": "You have no messages yet",
@@ -1233,7 +1233,7 @@
     "chat": {
       "title": "Chat with @{username}",
       "noMessages": "No messages yet. Be the first to write!",
-      "inputPlaceholder": "Write a message..."
+      "inputPlaceholder": "Write a message…"
     },
     "errors": {
       "selfChat": "You cannot chat with yourself",
@@ -1305,7 +1305,7 @@
       "button": "CHANGE",
       "placeholder": "City, Country",
       "detect": "📍 Detect automatically",
-      "detecting": "Detecting...",
+      "detecting": "Detecting…",
       "detected": "Location detected:",
       "notSet": "Not set",
       "success": "Location updated successfully.",
@@ -1315,7 +1315,7 @@
     "changeAvatar": {
       "edit": "Change",
       "upload": "📷 UPLOAD IMAGE",
-      "placeholder": "...or paste image URL",
+      "placeholder": "…or paste image URL",
       "hint": "Upload an image or paste a URL. Leave empty and save to use generated avatar.",
       "reset": "RESET",
       "custom": "Custom avatar",
@@ -1338,7 +1338,7 @@
         "title": "Delete all your data?",
         "message": "This action will permanently delete all your cards, decks, saved matches and contacts. This action CANNOT be undone.",
         "confirm": "YES, DELETE ALL",
-        "progress": "Deleting data...",
+        "progress": "Deleting data…",
         "success": "All data has been deleted",
         "error": "Error deleting data. Try again."
       },
@@ -1374,17 +1374,17 @@
     },
     "owned": "x{count} owned",
     "filterPanel": {
-      "placeholder": "Search card by name...",
+      "placeholder": "Search card by name…",
       "searchButton": "SEARCH",
       "moreFilters": "MORE",
       "clear": "✕ CLEAR",
       "autoSearch": "Filters will be applied automatically in 0.5 seconds",
-      "filterSearchPlaceholder": "Search filter... (e.g., flying, trample, cascade)",
+      "filterSearchPlaceholder": "Search filter… (e.g., flying, trample, cascade)",
       "noFilterResults": "No filters found for \"{query}\"",
       "onlyReleased": "Only released",
-      "setSearchPlaceholder": "Search edition... (e.g., Dominaria, MH3)",
+      "setSearchPlaceholder": "Search edition… (e.g., Dominaria, MH3)",
       "noSetsFound": "No editions found",
-      "creatureTypeSearchPlaceholder": "Search creature type... (e.g., Human, Dragon)",
+      "creatureTypeSearchPlaceholder": "Search creature type… (e.g., Human, Dragon)",
       "noCreatureTypesFound": "No creature types found"
     },
     "modal": {
@@ -1442,7 +1442,7 @@
       "showingOf": "Showing {count} of the most relevant results"
     },
     "bar": {
-      "placeholder": "Search for a card (e.g., Black Lotus, Counterspell...)",
+      "placeholder": "Search for a card (e.g., Black Lotus, Counterspell…)",
       "searchButton": "SEARCH",
       "noCardsFound": "No cards found with that name",
       "searchError": "Error searching cards",
@@ -1545,15 +1545,15 @@
     },
     "newModal": {
       "title": "NEW PREFERENCE",
-      "searchPlaceholder": "Search card...",
+      "searchPlaceholder": "Search card…",
       "minCondition": "Minimum condition",
       "changeCard": "CHANGE CARD"
     },
     "importModal": {
       "title": "IMPORT AS WANTED",
       "inputLabel": "Moxfield link or deck text",
-      "placeholder": "https://moxfield.com/decks/...\nor\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n...",
-      "analyzing": "ANALYZING...",
+      "placeholder": "https://moxfield.com/decks/…\nor\n3 Arid Mesa (MH2) 244\n2 Artist's Talent (BLB) 124\n…",
+      "analyzing": "ANALYZING…",
       "analyze": "ANALYZE",
       "moxfieldDetected": {
         "title": "Moxfield link detected",
@@ -1776,7 +1776,7 @@
           "a": "Yes. You can: 1) Import from Moxfield by pasting the deck URL, 2) Paste lists in MTGO/Arena format (e.g., '4 Lightning Bolt' or '4x Lightning Bolt [M10]'), 3) Upload a CSV file (ManaBox compatible format). The system recognizes quantity, name and optionally the set."
         },
         {
-          "q": "What do card conditions (M, NM, LP...) mean?",
+          "q": "What do card conditions (M, NM, LP…) mean?",
           "a": "M (Mint): Perfect, unused. NM (Near Mint): Almost perfect, minimal wear. LP (Light Play): Small visible marks. MP (Moderate Play): Moderate wear, minor bends. HP (Heavy Play): Obvious damage but playable. PO (Poor): Significant poor condition. Example: A freshly opened card is M/NM, one played in tournaments without sleeves is probably LP/MP."
         },
         {
@@ -1943,7 +1943,7 @@
       "formatLabel": "Format",
       "categoryLabel": "Category"
     },
-    "search": "Search cards...",
+    "search": "Search cards…",
     "sort": {
       "label": "Sort by",
       "change": "% Change",

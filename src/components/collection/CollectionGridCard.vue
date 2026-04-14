@@ -382,6 +382,8 @@ const handleContextMenuSelect = async (itemId: string) => {
             :src="getCardImage(card)"
             :alt="card.name"
             loading="lazy"
+            width="244"
+            height="340"
             class="w-full h-full object-cover"
             @load="onImageLoad"
             @error="onImageError"
@@ -392,7 +394,7 @@ const handleContextMenuSelect = async (itemId: string) => {
       </template>
       <div v-else class="w-full h-full flex flex-col items-center justify-center bg-primary gap-2">
         <div class="w-8 h-8 border-2 border-silver-30 border-t-neon rounded-full animate-spin"></div>
-        <span class="text-[12px] text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
+        <span translate="no" class="text-[12px] text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
       </div>
 
       <!-- Qty Badge - BIGGER for compact -->
@@ -403,7 +405,7 @@ const handleContextMenuSelect = async (itemId: string) => {
 
     <!-- Minimal Card Info -->
     <div class="mt-1 min-h-[50px]">
-      <p class="text-[14px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
+      <p translate="no" class="text-[14px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
         {{ card.name }}
       </p>
       <p v-if="hasCardKingdomPrices" class="text-[14px] text-neon">{{ formatPrice(cardKingdomRetail) }} c/u</p>
@@ -514,6 +516,8 @@ const handleContextMenuSelect = async (itemId: string) => {
             :src="getCardImage(card)"
             :alt="card.name"
             loading="lazy"
+            width="244"
+            height="340"
             class="w-full h-full object-cover"
             @load="onImageLoad"
             @error="onImageError"
@@ -524,7 +528,7 @@ const handleContextMenuSelect = async (itemId: string) => {
       </template>
       <div v-else class="w-full h-full flex flex-col items-center justify-center bg-primary gap-2">
         <div class="w-8 h-8 border-2 border-silver-30 border-t-neon rounded-full animate-spin"></div>
-        <span class="text-tiny text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
+        <span translate="no" class="text-tiny text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
       </div>
 
       <!-- Toggle button for split cards (always visible if split) -->
@@ -576,7 +580,7 @@ const handleContextMenuSelect = async (itemId: string) => {
     </div>
 
     <!-- Row 4: Card Name (fixed 2-line height: 14px * 1.5 lh * 2 = 42px) -->
-    <p class="text-small font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors mt-1 h-[42px]">
+    <p translate="no" class="text-small font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors mt-1 h-[42px]">
       {{ card.name }}
     </p>
 

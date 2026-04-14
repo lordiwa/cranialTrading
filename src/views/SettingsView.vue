@@ -10,6 +10,7 @@ import { useMatchesStore } from '../stores/matches';
 import { useContactsStore } from '../stores/contacts';
 import { useI18n } from '../composables/useI18n';
 import { useTour } from '../composables/useTour';
+import { formatDate } from '../utils/formatDate';
 import { cancelPriceFetch } from '../composables/useCollectionTotals';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseInput from '../components/ui/BaseInput.vue';
@@ -25,8 +26,10 @@ const collectionStore = useCollectionStore();
 const decksStore = useDecksStore();
 const matchesStore = useMatchesStore();
 const contactsStore = useContactsStore();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { startTour, resetTour } = useTour();
+
+const formattedCreatedAt = computed(() => formatDate(authStore.user?.createdAt, locale.value));
 
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -825,7 +828,7 @@ const handleRestartTour = () => {
           <div>
             <p class="text-silver-70">{{ t('settings.sections.accountInfo.created') }}</p>
             <p class="text-silver font-bold">
-              {{ authStore.user?.createdAt.toLocaleDateString() }}
+              {{ formattedCreatedAt }}
             </p>
           </div>
         </div>

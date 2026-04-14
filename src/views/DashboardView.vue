@@ -18,6 +18,7 @@ import { addDoc, collection, deleteDoc, doc, type DocumentData, getDocs, limit, 
 import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
+import { formatDate } from '../utils/formatDate'
 import { db } from '../services/firebase'
 import {
   findCardsMatchingPreferences,
@@ -75,7 +76,7 @@ const priceMatching = usePriceMatchingStore()
 const decksStore = useDecksStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const loading = ref(false)
 const syncing = ref(false)
@@ -94,7 +95,7 @@ const formatLastSync = (date: Date): string => {
   if (diffMins < 1) return t('dashboard.justNow')
   if (diffMins < 60) return t('dashboard.minutesAgo', { mins: diffMins })
   if (diffHours < 24) return t('dashboard.hoursAgo', { hours: diffHours })
-  return date.toLocaleDateString()
+  return formatDate(date, locale.value)
 }
 
 // ========== CLEAR DATA PROGRESS STATE ==========

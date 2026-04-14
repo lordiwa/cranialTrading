@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { type Contact } from '../../types/contact'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
 import { getAvatarUrlForUser } from '../../utils/avatar'
+import { formatDate } from '../../utils/formatDate'
 
 const props = defineProps<{
   contact: Contact
@@ -15,7 +17,9 @@ const emit = defineEmits<{
 }>()
 
 const toastStore = useToastStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+const formattedSavedAt = computed(() => formatDate(new Date(props.contact.savedAt), locale.value))
 
 const copyEmail = async () => {
   try {
@@ -43,7 +47,7 @@ const copyEmail = async () => {
     </div>
 
     <p class="text-tiny text-silver-50 mb-md">
-      Guardado: {{ new Date(contact.savedAt).toLocaleDateString() }}
+      Guardado: {{ formattedSavedAt }}
     </p>
 
     <div class="flex gap-2">

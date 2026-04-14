@@ -17,7 +17,8 @@ import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } fro
 import { auth, db } from '../services/firebase';
 import { type User } from '../types/user';
 import { useToastStore } from './toast';
-import { t } from '../composables/useI18n';
+import { t, useI18n } from '../composables/useI18n';
+import { formatDate } from '../utils/formatDate';
 
 let authUnsubscribe: (() => void) | null = null;
 
@@ -405,7 +406,8 @@ export const useAuthStore = defineStore('auth', () => {
         // Check rate limit
         const { allowed, nextChangeDate } = canChangeUsername();
         if (!allowed && nextChangeDate) {
-            toastStore.show(t('settings.changeUsername.rateLimited', { date: nextChangeDate.toLocaleDateString() }), 'error');
+            const { locale } = useI18n();
+            toastStore.show(t('settings.changeUsername.rateLimited', { date: formatDate(nextChangeDate, locale.value) }), 'error');
             return { success: false };
         }
 

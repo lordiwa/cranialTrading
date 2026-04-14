@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { formatDate } from '../../utils/formatDate'
 import type { Deck } from '../../types/deck'
 import BaseBadge from '../ui/BaseBadge.vue'
 
@@ -13,7 +14,7 @@ const emit = defineEmits<{
   delete: [deckId: string]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const formatLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -96,7 +97,7 @@ const completionPercent = computed(() => {
 
       <!-- Date -->
       <p class="text-tiny text-silver-50 mb-4">
-        {{ t('decks.card.updated', { date: deck.updatedAt.toLocaleDateString() }) }}
+        {{ t('decks.card.updated', { date: formatDate(deck.updatedAt, locale) }) }}
       </p>
 
       <!-- Buttons -->

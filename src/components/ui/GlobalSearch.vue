@@ -170,10 +170,12 @@ defineExpose({
               :src="card.image"
               :alt="card.name"
               loading="lazy"
+              width="40"
+              height="56"
               class="w-10 h-14 object-cover rounded"
             />
             <div class="flex-1 min-w-0">
-              <p class="text-small font-bold text-silver truncate">{{ card.name }}</p>
+              <p translate="no" class="text-small font-bold text-silver truncate">{{ card.name }}</p>
               <p class="text-tiny text-silver-50">{{ card.edition }} · x{{ card.quantity }}</p>
             </div>
             <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
@@ -249,10 +251,12 @@ defineExpose({
               :src="card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small"
               :alt="card.name"
               loading="lazy"
+              width="40"
+              height="56"
               class="w-10 h-14 object-cover rounded"
             />
             <div class="flex-1 min-w-0">
-              <p class="text-small font-bold text-silver truncate">{{ card.name }}</p>
+              <p translate="no" class="text-small font-bold text-silver truncate">{{ card.name }}</p>
               <div class="flex items-center gap-2">
                 <ManaCost v-if="card.mana_cost" :cost="card.mana_cost" size="tiny" />
                 <span class="text-tiny text-silver-50">{{ card.set_name }}</span>

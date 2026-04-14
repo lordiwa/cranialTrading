@@ -202,6 +202,8 @@ defineExpose({
                   :src="getCardImage(card)"
                   :alt="card.name"
                   loading="lazy"
+                  width="146"
+                  height="204"
                   class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
               />
               <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
@@ -222,7 +224,7 @@ defineExpose({
 
             <!-- Card Info -->
             <div class="mt-2 space-y-1">
-              <p class="text-tiny font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors">
+              <p translate="no" class="text-tiny font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors">
                 {{ card.name }}
               </p>
               <ManaCost v-if="card.mana_cost" :cost="card.mana_cost" size="tiny" />

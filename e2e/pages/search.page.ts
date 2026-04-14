@@ -42,10 +42,11 @@ export class SearchPage {
     await this.searchInput.press('Escape');
     await this.page.waitForTimeout(300);
     await this.searchButton.click();
-    // Wait for results to render OR no-results message (up to 10s)
+    // Wait for results to render OR no-results message.
+    // Scryfall is ~3s locally but 10-15s on GitHub CI runners; 25s tolerates the slower path.
     await Promise.race([
-      this.resultCards.first().waitFor({ state: 'visible', timeout: 10_000 }),
-      this.noResultsMessage.waitFor({ state: 'visible', timeout: 10_000 }),
+      this.resultCards.first().waitFor({ state: 'visible', timeout: 25_000 }),
+      this.noResultsMessage.waitFor({ state: 'visible', timeout: 25_000 }),
     ]).catch(() => {});
   }
 

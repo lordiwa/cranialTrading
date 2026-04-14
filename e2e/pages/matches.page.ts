@@ -17,14 +17,14 @@ export class MatchesPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.calculateButton = page.getByRole('button', { name: /calculate|calcular|recalcul/i });
-    this.syncButton = page.getByRole('button', { name: /sync|sincronizar/i });
+    this.calculateButton = page.locator('button').filter({ hasText: /calculate|calcular|recalcul/i }).first();
+    this.syncButton = page.locator('button').filter({ hasText: /sync|sincronizar/i }).first();
 
     this.tabs = {
-      new: page.getByRole('button', { name: /new|nuev/i }).first(),
-      sent: page.getByRole('button', { name: /sent|enviad/i }),
-      saved: page.getByRole('button', { name: /saved|guardad/i }),
-      deleted: page.getByRole('button', { name: /deleted|eliminad/i }),
+      new: page.locator('button').filter({ hasText: /new|nuev/i }).first(),
+      sent: page.locator('button').filter({ hasText: /sent|enviad/i }).first(),
+      saved: page.locator('button').filter({ hasText: /saved|guardad/i }).first(),
+      deleted: page.locator('button').filter({ hasText: /deleted|eliminad/i }).first(),
     };
 
     this.matchCards = page.locator('[data-match-id]');

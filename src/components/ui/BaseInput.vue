@@ -23,11 +23,11 @@ const props = withDefaults(defineProps<Props>(), {
   clearable: false,
 });
 
-const { t } = useI18n()
-
 const emit = defineEmits<{
   'update:modelValue': [value: string | number];
 }>();
+
+const { t } = useI18n()
 
 const handleInput = (event: Event) => {
   const target = event.target as HTMLInputElement;

@@ -117,7 +117,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               v-model="searchQuery"
               type="text"
               :placeholder="t('header.search.placeholder')"
-              class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2.5 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded transition-all"
+              class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2.5 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded transition-all"
               @input="handleInput"
               @keydown="handleKeydown"
             />

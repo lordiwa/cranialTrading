@@ -130,7 +130,7 @@ const handleClose = () => {
             id="import-pref-input"
             v-model="inputText"
             :placeholder="t('preferences.importModal.placeholder')"
-            class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon font-sans"
+            class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary font-sans"
             rows="8"
             @input="preview = null"
         />

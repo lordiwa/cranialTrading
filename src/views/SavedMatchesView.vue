@@ -972,7 +972,7 @@ onUnmounted(() => {
               v-model="blockUsernameInput"
               type="text"
               :placeholder="t('dashboard.blockedUsersModal.usernamePlaceholder')"
-              class="flex-1 px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none"
+              class="flex-1 px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
               @keyup.enter="handleBlockByUsername"
               :disabled="blockingUser"
           />

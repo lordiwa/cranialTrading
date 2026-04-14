@@ -389,7 +389,7 @@ const handleClose = () => {
               v-model="searchQuery"
               type="text"
               :placeholder="t('cards.addModal.searchPlaceholder')"
-              class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+              class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
               @input="handleSearchInput"
               @keyup.enter="performSearch"
           />
@@ -465,7 +465,7 @@ const handleClose = () => {
               <button
                   v-if="currentCardImage"
                   @click="showZoom = true"
-                  class="relative group cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-neon rounded w-full"
+                  class="relative group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded w-full"
               >
                 <img
                     :src="currentCardImage"
@@ -531,7 +531,7 @@ const handleClose = () => {
                     id="print-select"
                     :value="selectedPrint?.id"
                     @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#5AC168] rounded"
+                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#5AC168] focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
                 >
                   <option
                       v-for="print in availablePrints"

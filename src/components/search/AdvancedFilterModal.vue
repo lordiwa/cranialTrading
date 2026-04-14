@@ -333,7 +333,7 @@ const handleReset = () => {
             v-model="filterSearchQuery"
             type="text"
             :placeholder="t('search.filterPanel.filterSearchPlaceholder')"
-            class="w-full bg-primary border-2 border-neon px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:outline-none"
+            class="w-full bg-primary border-2 border-neon px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         />
         <button
             v-if="filterSearchQuery.length > 0"
@@ -571,13 +571,13 @@ const handleReset = () => {
                 v-model.number="f.priceUSD.min"
                 @change="emitUpdate()"
                 type="number" placeholder="Min" step="0.01"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
+                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
             />
             <input
                 v-model.number="f.priceUSD.max"
                 @change="emitUpdate()"
                 type="number" placeholder="Max" step="0.01"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none"
+                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
             />
           </div>
         </div>
@@ -590,9 +590,9 @@ const handleReset = () => {
           </span>
           <div class="flex gap-2">
             <input v-model.number="f.power.min" @change="emitUpdate()" type="number" placeholder="Min"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none" />
+                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
             <input v-model.number="f.power.max" @change="emitUpdate()" type="number" placeholder="Max"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none" />
+                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
           </div>
         </div>
 
@@ -604,9 +604,9 @@ const handleReset = () => {
           </span>
           <div class="flex gap-2">
             <input v-model.number="f.toughness.min" @change="emitUpdate()" type="number" placeholder="Min"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none" />
+                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
             <input v-model.number="f.toughness.max" @change="emitUpdate()" type="number" placeholder="Max"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none" />
+                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
           </div>
         </div>
 
@@ -655,7 +655,7 @@ const handleReset = () => {
                 v-model="setSearchQuery"
                 type="text"
                 :placeholder="t('search.filterPanel.setSearchPlaceholder')"
-                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
             />
             <button v-if="setSearchQuery.length > 0" @click="setSearchQuery = ''"
                 class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20" type="button">
@@ -815,7 +815,7 @@ const handleReset = () => {
                 v-model="creatureTypeSearchQuery"
                 type="text"
                 :placeholder="t('search.filterPanel.creatureTypeSearchPlaceholder')"
-                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
             />
             <button v-if="creatureTypeSearchQuery.length > 0" @click="creatureTypeSearchQuery = ''"
                 class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20" type="button">

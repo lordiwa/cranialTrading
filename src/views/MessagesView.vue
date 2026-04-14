@@ -88,7 +88,7 @@ onMounted(async () => {
             v-model="filterQuery"
             type="text"
             :placeholder="t('messages.searchPlaceholder')"
-            class="w-full bg-primary border border-silver px-4 py-3 text-body text-silver placeholder:text-silver-50 focus:outline-none focus:border-2 focus:border-neon transition-fast rounded"
+            class="w-full bg-primary border border-silver px-4 py-3 text-body text-silver placeholder:text-silver-50 focus:outline-none focus:border-2 focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-fast rounded"
         />
       </div>
 

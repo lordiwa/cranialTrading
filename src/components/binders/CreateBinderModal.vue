@@ -78,7 +78,7 @@ watch(() => props.show, (show) => {
               id="create-binder-description"
               v-model="form.description"
               :placeholder="t('binders.create.descPlaceholder')"
-              class="w-full px-4 py-3 bg-primary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-small focus:outline-none focus:border-neon transition-150 resize-none h-20"
+              class="w-full px-4 py-3 bg-primary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150 resize-none h-20"
           />
         </div>
       </div>

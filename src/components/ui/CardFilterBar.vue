@@ -131,7 +131,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="sortBy"
             @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="recent">{{ t('collection.sort.recent') }}</option>
           <option value="name">{{ t('collection.sort.name') }}</option>
@@ -145,7 +145,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="groupBy"
             @change="emit('update:groupBy', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="none">{{ t('collection.group.none') }}</option>
           <option value="type">{{ t('collection.deckStats.type') }}</option>
@@ -160,7 +160,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="viewType"
             @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'visual' | 'texto')"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="visual">{{ t('collection.view.visual') }}</option>
           <option value="texto">{{ t('collection.view.texto') }}</option>

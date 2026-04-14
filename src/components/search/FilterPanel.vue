@@ -287,7 +287,7 @@ const getSetName = (code: string): string => code.toUpperCase()
               @keydown.enter="handleSearch"
               :placeholder="t('search.filterPanel.placeholder')"
               type="text"
-              class="w-full bg-primary border border-silver-30 px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none transition-fast rounded"
+              class="w-full bg-primary border border-silver-30 px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-fast rounded"
           />
           <button
               v-if="filters.name && filters.name.length > 0"

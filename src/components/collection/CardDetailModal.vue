@@ -642,7 +642,7 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           <button
               v-if="currentImage"
               @click="showZoom = true"
-              class="relative group cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-neon rounded"
+              class="relative group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
           >
             <img
                 :src="currentImage"
@@ -778,7 +778,7 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
             id="detail-print-select"
             :value="selectedPrint?.id"
             @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon transition-150 rounded"
+            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150 rounded"
         >
           <option
               v-for="print in availablePrints"

@@ -1228,7 +1228,7 @@ const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
                   v-model="searchQuery"
                   type="text"
                   :placeholder="t('dashboard.searchOthers.placeholder')"
-                  class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none rounded"
+                  class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
                   @input="handleSearchInput"
                   @keyup.enter="searchPublicCards"
               />
@@ -1413,7 +1413,7 @@ const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
               v-model="blockUsernameInput"
               type="text"
               :placeholder="t('dashboard.blockedUsersModal.usernamePlaceholder')"
-              class="flex-1 px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none"
+              class="flex-1 px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
               @keyup.enter="handleBlockByUsername"
               :disabled="blockingUser"
           />

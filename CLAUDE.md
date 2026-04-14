@@ -388,3 +388,74 @@ Agent(dev)  # Task 3 (depends on Task 1)
 - **ALWAYS** run `npx vite build` before considering work finished
 - If either fails, fix it before reporting to the user
 - Use `npx vite build` (NOT `npm run build` which includes lint with pre-existing errors)
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**Frontend Modernization**
+
+A comprehensive accessibility, code quality, and architecture modernization of Cranial Trading — an existing Vue 3 + TypeScript + Tailwind CSS Magic: The Gathering trading platform. The design system (black/neon/rust palette, custom typography) is already distinctive; this work targets structural issues surfaced by a combined Vercel Web Interface Guidelines + Vue Best Practices audit.
+
+**Core Value:** Every interactive element must be accessible to keyboard-only and screen reader users — accessibility fixes are the non-negotiable foundation that everything else builds on.
+
+### Constraints
+
+- **Tech stack**: Vue 3 + TypeScript + Tailwind CSS + Firebase — no framework changes
+- **TDD required**: Per CLAUDE.md, every logic change needs tests first (RED → GREEN → REFACTOR)
+- **Branch**: All work on `develop`, never commit to `main` directly
+- **Build**: Must pass `npx vite build` after every change (pre-existing lint warnings OK)
+- **Anti-loop rules**: Read before touching, trace all callers, identify parallel siblings, verify i18n keys exist
+- **No async onMounted**: Never use async onMounted with await — breaks anonymous user profile loading
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:STACK.md -->
+## Technology Stack
+
+Technology stack not yet documented. Will populate after codebase mapping or first phase.
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+| Skill | Description | Path |
+|-------|-------------|------|
+| deploy-dev | Run tests, bump version, commit, and push to develop branch for dev deployment | `.claude/skills/deploy-dev/SKILL.md` |
+| deploy-prod | Production deployment checklist — verify, merge develop to main, and push | `.claude/skills/deploy-prod/SKILL.md` |
+| frontend-design | Design thinking process and aesthetic guidelines for building visually distinctive frontend interfaces | `.claude/skills/frontend-design/SKILL.md` |
+| i18n-check | Verify all i18n keys exist in en.json, es.json, and pt.json locale files | `.claude/skills/i18n-check/SKILL.md` |
+| optimize-seo | Run an SEO audit via the seo agent, categorize findings, and generate an actionable implementation plan with optional fix execution | `.claude/skills/optimize-seo/SKILL.md` |
+| pr | Create a pull request with standard format from current branch to develop or main | `.claude/skills/pr/SKILL.md` |
+| tdd | Walk through the TDD workflow (red/green/refactor) for a given task | `.claude/skills/tdd/SKILL.md` |
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

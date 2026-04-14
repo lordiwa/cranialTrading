@@ -219,25 +219,34 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               :key="card.id"
               class="px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors border-b border-silver-20 last:border-0"
             >
-              <img
-                v-if="card.image"
-                :src="card.image"
-                :alt="card.cardName"
-                loading="lazy"
-                class="w-12 h-[67px] object-cover rounded cursor-pointer"
+              <button
+                type="button"
+                class="flex-1 min-w-0 flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-neon focus-visible:outline-none rounded"
                 @click="goToUserCard(card)"
-              />
-              <div class="flex-1 min-w-0 cursor-pointer" @click="goToUserCard(card)">
-                <p class="text-small font-bold text-silver truncate">{{ card.cardName }}</p>
-                <p class="text-tiny text-silver-50 flex items-center gap-1">
-                  <img
-                    :src="getAvatarUrlForUser(card.username ?? '', 14, card.avatarUrl)"
-                    :alt="`${card.username} avatar`"
-                    class="w-3.5 h-3.5 rounded-full"
-                  />
-                  @{{ card.username }} · {{ card.status }}
-                </p>
-              </div>
+              >
+                <img
+                  v-if="card.image"
+                  :src="card.image"
+                  :alt="card.cardName"
+                  width="48"
+                  height="67"
+                  loading="lazy"
+                  class="w-12 h-[67px] object-cover rounded flex-shrink-0"
+                />
+                <div class="min-w-0">
+                  <p class="text-small font-bold text-silver truncate" translate="no">{{ card.cardName }}</p>
+                  <p class="text-tiny text-silver-50 flex items-center gap-1">
+                    <img
+                      :src="getAvatarUrlForUser(card.username ?? '', 14, card.avatarUrl)"
+                      :alt="`${card.username} avatar`"
+                      width="14"
+                      height="14"
+                      class="w-3.5 h-3.5 rounded-full"
+                    />
+                    @{{ card.username }} · {{ card.status }}
+                  </p>
+                </div>
+              </button>
               <div class="flex flex-col items-end gap-1 flex-shrink-0">
                 <span class="text-small text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
                 <button

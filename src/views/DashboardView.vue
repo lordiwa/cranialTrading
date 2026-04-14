@@ -1237,14 +1237,15 @@ const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
                   v-if="showSuggestions && suggestions.length > 0"
                   class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-20 rounded"
               >
-                <div
+                <button
                     v-for="suggestion in suggestions"
                     :key="suggestion"
+                    type="button"
                     @mousedown.prevent="selectSuggestion(suggestion)"
-                    class="px-4 py-2 hover:bg-silver-10 cursor-pointer text-small text-silver border-b border-silver-30 transition-all"
+                    class="w-full px-4 py-2 hover:bg-silver-10 cursor-pointer text-small text-silver border-b border-silver-30 transition-all text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neon"
                 >
                   {{ suggestion }}
-                </div>
+                </button>
               </div>
             </div>
             <BaseButton size="small" @click="searchPublicCards" :disabled="searching || !searchQuery.trim()">

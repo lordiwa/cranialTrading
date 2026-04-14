@@ -375,7 +375,7 @@ const handleContextMenuSelect = async (itemId: string) => {
 
 <template>
   <!-- COMPACT MODE: For deck view -->
-  <div v-if="compact" ref="compactCardRef" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
+  <button v-if="compact" ref="compactCardRef" type="button" class="group cursor-pointer min-h-[180px] w-full text-left focus-visible:ring-2 focus-visible:ring-neon focus-visible:outline-none rounded" @click="emit('cardClick', card)">
     <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded">
       <template v-if="hasImage">
         <img
@@ -411,7 +411,7 @@ const handleContextMenuSelect = async (itemId: string) => {
       <p v-if="hasCardKingdomPrices" class="text-[14px] text-neon font-bold">{{ formatPrice((cardKingdomRetail ?? 0) * card.quantity) }}</p>
       <p v-else class="text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
     </div>
-  </div>
+  </button>
 
   <!-- FULL MODE: For collection view -->
   <div

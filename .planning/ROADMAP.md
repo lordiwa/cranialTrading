@@ -44,8 +44,8 @@ Plans:
   1. DashboardView.vue is under 400 lines and contains no direct Firestore imports
   2. Match expiry calculation logic is reachable via unit test without mounting the component
   3. SearchView getOwnedCount does not re-scan the collection array on every card render (O(1) lookup via computed Map)
-  4. MATCH_LIFETIME_DAYS is defined in exactly one place (matches.ts) and imported everywhere it is used
-**Plans**: TBD
+  4. MATCH_LIFETIME_DAYS is defined in exactly one place (src/utils/matchExpiry.ts — Firebase-free, unit-testable) and imported everywhere it is used, including src/stores/matches.ts
+**Plans**: 4 plans (A/B/C/D — see .planning/phases/02-dashboardview-decomposition/)
 **UI hint**: yes
 
 ### Phase 3: CollectionView Decomposition

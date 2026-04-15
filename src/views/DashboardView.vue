@@ -20,12 +20,11 @@ import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
 import { getMatchExpirationDate } from '../utils/matchExpiry'
+import { groupMatchesByUser } from '../utils/matchGrouping'
 import { db } from '../services/firebase'
 import {
   findCardsMatchingPreferences,
   findPreferencesMatchingCards,
-  type PublicCard,
-  type PublicPreference,
 } from '../services/publicCards'
 import { getCardSuggestions, type ScryfallCard, searchCards } from '../services/scryfall'
 import { notifyMatchUser } from '../services/cloudFunctions'
@@ -628,57 +627,6 @@ const clearAllData = async () => {
 // Export to avoid unused warning (can be called from dev tools)
 if (import.meta.env.DEV) {
   (globalThis as unknown as Record<string, unknown>).__clearAllData = clearAllData
-}
-
-/**
- * Groups matching cards and preferences by userId into a single Map.
- * Each entry contains that user's matched cards, preferences, and profile info.
- */
-const groupMatchesByUser = (
-  matchingCards: PublicCard[],
-  matchingPrefs: PublicPreference[]
-): Map<string, { cards: PublicCard[], prefs: PublicPreference[], username: string, location: string, email: string }> => {
-  const userMatches = new Map<string, {
-    cards: PublicCard[],
-    prefs: PublicPreference[],
-    username: string,
-    location: string,
-    email: string
-  }>()
-
-  for (const card of matchingCards) {
-    if (!userMatches.has(card.userId)) {
-      userMatches.set(card.userId, {
-        cards: [],
-        prefs: [],
-        username: card.username,
-        location: card.location ?? 'Unknown',
-        email: card.email ?? ''
-      })
-    }
-    const entry = userMatches.get(card.userId)
-    if (entry) {
-      entry.cards.push(card)
-    }
-  }
-
-  for (const pref of matchingPrefs) {
-    if (!userMatches.has(pref.userId)) {
-      userMatches.set(pref.userId, {
-        cards: [],
-        prefs: [],
-        username: pref.username,
-        location: pref.location ?? 'Unknown',
-        email: pref.email ?? ''
-      })
-    }
-    const entry = userMatches.get(pref.userId)
-    if (entry) {
-      entry.prefs.push(pref)
-    }
-  }
-
-  return userMatches
 }
 
 /**

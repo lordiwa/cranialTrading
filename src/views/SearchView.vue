@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCollectionStore } from '../stores/collection'
 import { useSearchStore } from '../stores/search'
 import { useI18n } from '../composables/useI18n'
 import type { ScryfallCard } from '../services/scryfall'
+import { buildOwnedCountMap } from '../utils/ownedCount'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -20,12 +21,12 @@ const { t } = useI18n()
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 const showAddCardModal = ref(false)
 
+const ownedCountByName = computed(() => buildOwnedCountMap(collectionStore.cards))
+
 const getOwnedCount = (scryfallCard: ScryfallCard): number => {
   const cardName = scryfallCard.name?.toLowerCase()
   if (!cardName) return 0
-  return collectionStore.cards
-    .filter(c => c.name.toLowerCase() === cardName)
-    .reduce((sum, c) => sum + c.quantity, 0)
+  return ownedCountByName.value.get(cardName) ?? 0
 }
 
 const handleCardSelected = (card: ScryfallCard) => {

@@ -262,6 +262,7 @@ Auto-dismiss after 4 seconds.
 - `CollectionView.vue` ↔ `CollectionGrid.vue`
 - `AddCardModal.vue` ↔ `EditCardModal.vue`
 - `CardGridSearch.vue` ↔ Scryfall service + AddCardModal
+- `SavedMatchesView.vue` ↔ `utils/matchGrouping`, `services/stats`, `stores/matches` (match-calculation pipeline — Plan 02-C wired SavedMatchesView to extracted infrastructure)
 
 ---
 
@@ -343,7 +344,7 @@ Agent(dev)  # Task 3 (depends on Task 1)
 
 - Before modifying ANY function, read the entire file and trace all callers/callees
 - If a function has a parallel "sibling" (e.g., `handleDeckGridRemove` / `handleBinderGridRemove`, or `*QuantityUpdate` for deck and binder), identify BOTH and apply the change to both
-- If a component is used in multiple views (e.g., BlockedUsersModal in SavedMatchesView AND DashboardView), change ALL usages
+- If a component is used in multiple views, change ALL usages. Note: blocked-users inline logic lives only in SavedMatchesView — DashboardView was deleted in Phase 02-C
 - **Never assume "there's only one"** — always search with Grep/Glob for parallel instances
 
 ### Rule 2: Do NOT "Improve" Code You Weren't Asked to Change
@@ -378,7 +379,7 @@ Agent(dev)  # Task 3 (depends on Task 1)
 - Apply the change to ALL points in the same step — never "I'll do the other one later"
 - **Parallelism checklist for this project:**
   - Deck handlers ↔ Binder handlers (always come in pairs)
-  - SavedMatchesView ↔ DashboardView (BlockedUsersModal)
+  - SavedMatchesView (blocked-users inline — consolidation tech debt noted in Phase 02-C SUMMARY)
   - en.json ↔ es.json ↔ pt.json (always all 3)
   - AddCardModal ↔ EditCardModal (shared behavior)
 

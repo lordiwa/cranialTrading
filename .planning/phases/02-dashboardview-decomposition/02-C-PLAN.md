@@ -7,11 +7,12 @@ depends_on:
   - A
   - B
 files_modified:
-  - src/composables/useBlockedUsers.ts
-  - src/composables/useClearUserData.ts
-  - src/composables/useDashboardPublicSearch.ts
-  - tests/unit/composables/useClearUserData.test.ts
+  - src/views/SavedMatchesView.vue
   - src/views/DashboardView.vue
+  - src/composables/useDashboardMatches.ts
+  - tests/unit/composables/useDashboardMatches.test.ts
+  - src/router/index.ts
+  - CLAUDE.md
 autonomous: true
 requirements:
   - ARCH-01
@@ -19,41 +20,53 @@ requirements:
 
 must_haves:
   truths:
-    - "useBlockedUsers composable exposes blockedUsers, loadingBlockedUsers, showBlockedUsersModal, blockUsernameInput, blockingUser refs and openBlockedUsersModal/loadBlockedUsers/unblockUser/handleBlockByUsername actions"
-    - "useClearUserData composable exposes clearDataProgress ref, clearAllData, executeClearData, resumeClearData actions and persists/restores state via localStorage key 'cranial_clear_data_progress'"
-    - "useDashboardPublicSearch composable exposes searchQuery, searchResults, searching, searchedOnce, sentInterestIds, suggestions, showSuggestions, scryfallResults, showScryfallFallback, searchContainer refs + searchPublicCards/addToWishlist/handleSearchInput/selectSuggestion/handleClickOutside/sendInterestFromSearch actions"
-    - "DashboardView.vue NO LONGER defines blocked-users state/handlers, clear-data state/handlers, public-search state/handlers, the inline duplicate sendInterestFromSearch, or debugPublicCollections"
-    - "DashboardView.vue NO LONGER imports addDoc/deleteDoc/getDocs/query/where/limit/doc directly from firebase/firestore"
-    - "DashboardView.vue's PublicCardSearchResult interface is removed (the type lives in src/services/publicCards.ts as of Plan B)"
-    - "useDashboardPublicSearch's sendInterestFromSearch delegates to useGlobalSearch.sendInterestFromSearch (no duplicated body)"
-    - "debugPublicCollections function and its globalThis.window exposure are deleted (verified dead code)"
+    - "SavedMatchesView imports groupMatchesByUser from ../utils/matchGrouping and deletes the inline copy at lines 406-444 (preserves Plan 02-A artifact)."
+    - "SavedMatchesView imports getTotalUserCount from ../services/stats and replaces the inline getDocs(collection(db, 'users')) + docs.length-1 block at lines 720-722 with await loadTotalUsers() or equivalent inline await getTotalUserCount() - 1 call."
+    - "SavedMatchesView calls matchesStore.loadDiscardedUserIds() instead of the inline loadDiscardedMatches at lines 201-220; the inline function is deleted. The local discardedMatchIds ref remains; its populator changes to: discardedMatchIds.value = await matchesStore.loadDiscardedUserIds() (preserves error-fallback semantics via the store method — empty Set on error)."
+    - "SavedMatchesView calls matchesStore.persistCalculatedMatches(foundMatches) instead of the inline saveMatchesToFirebase at lines 583-641; the inline function is deleted. Behavior preserved: the store method has the identical 4-step sequence with _notificationOf preservation and per-match try/catch around notifyMatchUser (verified identical in drift analysis)."
+    - "SavedMatchesView calls matchesStore.discardCalculatedMatch(match) instead of the inline discardMatchToFirestore at lines 222-252; the inline function is deleted. The caller (handleDiscardMatch, line ~650) then mutates discardedMatchIds.value.add(match.otherUserId) locally — preserves the existing behavior where the ref-mutation happened inside discardMatchToFirestore."
+    - "SavedMatchesView's inline calculateMatches at lines 446-579 is NOT migrated to the composable. It stays inline but now consumes the imported helpers (groupMatchesByUser, matchesStore.persistCalculatedMatches). The `as unknown as 'VENDO'` type-coercion cast at line 554 is preserved verbatim — known tech debt (SimpleMatch.type is 3-valued but the value here is 'BIDIRECTIONAL' | 'UNIDIRECTIONAL')."
+    - "handleDiscardMatch (line ~650) dual-path logic is preserved: if matchId matches a calculated match, use discardCalculatedMatch path; otherwise matchesStore.discardMatch(matchId, tab). This is SavedMatchesView-specific behavior not in the composable."
+    - "handleSaveMatch (line ~645) still calls matchesStore.saveMatch(match) then loadSavedMatchesWithEmails() — unchanged."
+    - "Blocked-users inline code in SavedMatchesView (BlockedUser interface line 59, blockedUsers ref line 66, loadBlockedUsers/unblockUser/handleBlockByUsername/openBlockedUsersModal + BaseModal template) stays UNCHANGED in this plan — out of scope; flagged as tech debt for future phase."
+    - "DashboardView.vue is DELETED (unrouted dead code per router/index.ts:43-45 /dashboard → /saved-matches redirect since commit 212488f on 2026-02-09)."
+    - "useDashboardMatches composable and its test file are DELETED (orphaned after this migration — no view consumes it). The Plan 02-B store methods (loadDiscardedUserIds, persistCalculatedMatches, discardCalculatedMatch) and services (stats.ts, publicCards.ts searchPublicCards) REMAIN because SavedMatchesView now consumes them."
+    - "The /dashboard redirect in router/index.ts:43-45 is PRESERVED (removing it would break any external bookmarks). DashboardView.vue file deletion is orthogonal to the route definition."
+    - "CLAUDE.md references to DashboardView (lines 346, 381) are updated to reflect deletion — SavedMatchesView is the sole match-calculation host."
   artifacts:
-    - path: "src/composables/useBlockedUsers.ts"
-      provides: "Blocked-users state + Firestore reads/writes (matches_eliminados load + unblock + block-by-username)"
-    - path: "src/composables/useClearUserData.ts"
-      provides: "Resumable clear-all-data state machine with localStorage persistence"
-    - path: "src/composables/useDashboardPublicSearch.ts"
-      provides: "Public cards search, Scryfall fallback, auto-suggest dropdown, send-interest delegation"
-    - path: "tests/unit/composables/useClearUserData.test.ts"
-      provides: "Tests for save/load/clear of clear-data state in localStorage + step progression logic"
+    - path: "src/views/SavedMatchesView.vue"
+      provides: "Live match-calculation view wired to matchesStore methods + utility helpers (no inline Firestore wrappers)"
+    - path: "src/views/DashboardView.vue"
+      provides: "DELETED — dead code since 2026-02-09"
+    - path: "src/composables/useDashboardMatches.ts"
+      provides: "DELETED — orphaned after migration"
+    - path: "tests/unit/composables/useDashboardMatches.test.ts"
+      provides: "DELETED — orphaned after composable deletion"
   key_links:
-    - from: "src/views/DashboardView.vue"
-      to: "src/composables/useBlockedUsers.ts + useClearUserData.ts + useDashboardPublicSearch.ts"
-      via: "destructured composable returns at top of <script setup>"
-    - from: "src/composables/useDashboardPublicSearch.ts sendInterestFromSearch"
-      to: "src/composables/useGlobalSearch.ts sendInterestFromSearch"
-      via: "delegate call — no duplicated logic"
-    - from: "src/composables/useDashboardPublicSearch.ts searchPublicCards"
-      to: "src/services/publicCards.ts searchPublicCards"
-      via: "import { searchPublicCards as searchPublicCardsService } from '../services/publicCards'"
+    - from: "src/views/SavedMatchesView.vue"
+      to: "src/utils/matchGrouping.ts groupMatchesByUser"
+      via: "import { groupMatchesByUser } from '../utils/matchGrouping'"
+    - from: "src/views/SavedMatchesView.vue"
+      to: "src/services/stats.ts getTotalUserCount"
+      via: "import { getTotalUserCount } from '../services/stats'"
+    - from: "src/views/SavedMatchesView.vue"
+      to: "src/stores/matches.ts loadDiscardedUserIds + persistCalculatedMatches + discardCalculatedMatch"
+      via: "matchesStore.loadDiscardedUserIds() / matchesStore.persistCalculatedMatches(found) / matchesStore.discardCalculatedMatch(m)"
+    - from: "router/index.ts /dashboard"
+      to: "/saved-matches"
+      via: "redirect preserved — no DashboardView.vue reference after deletion"
 ---
 
 <objective>
-Move the remaining three responsibilities out of DashboardView.vue into focused composables: blocked-users management (155 lines), the clear-all-data resumable state machine (~190 lines), and the public-cards search + Scryfall fallback + auto-suggest (~140 lines). Delete the duplicated `sendInterestFromSearch` and the dead `debugPublicCollections` console helper. After this plan, DashboardView's `<script setup>` is just imports + store wiring + composable destructures + thin handlers + the still-async onMounted (which Plan D fixes).
+Pivot Phase 02 to its real scope: migrate the LIVE view (SavedMatchesView.vue, ~1030 lines, mounted at `/saved-matches`) to consume the helpers, services, and store methods extracted by Plans 02-A and 02-B. Delete DashboardView.vue (unrouted dead code since 2026-02-09) and the now-orphaned `useDashboardMatches` composable.
 
-Purpose: Closes ARCH-01 and ARCH-04 fully. Removes the last inline Firestore call sites from DashboardView. Sets the stage for Plan D's < 400-line verification and the async-onMounted fix.
+**Purpose:** Phase 02's original premise — "decompose DashboardView.vue" — was misaimed. `/dashboard` redirects to `/saved-matches` (router/index.ts:43-45); DashboardView is never rendered. The match pipeline LIVES inline in SavedMatchesView. Plans 02-A (utils) and 02-B (composable + store methods + services) produced legitimately useful infrastructure — this plan puts that infrastructure to work on the live view and deletes the orphans.
 
-Output: 3 new composables, 1 new test file (useClearUserData state-persistence tests; the other two composables are integration-tested via the existing dashboard E2E + Plan D's new spec), large net-delete from DashboardView.vue.
+**Behavior preservation:** SavedMatchesView.vue's user-facing behavior MUST NOT change. Same tabs, same recalculate button, same save/discard handlers, same blocked-users modal. Only the implementation of three inline Firestore wrappers (`loadDiscardedMatches`, `saveMatchesToFirebase`, `discardMatchToFirestore`) and two pure helpers (`groupMatchesByUser`, inline user-count getDocs) is replaced by calls to the extracted infrastructure. The drift analysis confirmed the inline versions are logically identical to the extracted versions — migration is behavior-neutral.
+
+**Scope discipline:** SavedMatchesView's inline `calculateMatches` at lines 446-579 STAYS INLINE. Migrating it to `useDashboardMatches.calculateMatches` would require widening `MatchCard`'s `match: SimpleMatch` prop to accept `CalculatedMatch`, or widening `SimpleMatch.type` to 4-valued — both out of scope. Composable is therefore orphaned and deleted. Blocked-users inline code stays UNCHANGED — out of scope, flagged as tech debt.
+
+**Output:** SavedMatchesView trimmed by ~160 lines; 3 inline functions replaced by imports; 2 dead files (DashboardView.vue + useDashboardMatches.ts + composable test) removed; CLAUDE.md updated.
 </objective>
 
 <execution_context>
@@ -64,758 +77,186 @@ Output: 3 new composables, 1 new test file (useClearUserData state-persistence t
 <context>
 @.planning/PROJECT.md
 @.planning/ROADMAP.md
-@.planning/REQUIREMENTS.md
-@.planning/phases/02-dashboardview-decomposition/RESEARCH.md
-@.planning/phases/02-dashboardview-decomposition/02-A-PLAN.md
-@.planning/phases/02-dashboardview-decomposition/02-B-PLAN.md
+@.planning/phases/02-dashboardview-decomposition/02-A-SUMMARY.md
+@.planning/phases/02-dashboardview-decomposition/02-B-SUMMARY.md
 @CLAUDE.md
 
-<interfaces>
-<!-- ============================================================ -->
-<!-- DashboardView source ranges (verified against current code,  -->
-<!-- post-Plan-B which already removed match-related code).       -->
-<!-- ============================================================ -->
+<drift_analysis_evidence>
+The SavedMatchesView drift investigation (2026-04-15) confirmed line-by-line:
+- `saveMatchesToFirebase` (SavedMatchesView:583) IS logically identical to `matchesStore.persistCalculatedMatches` — same 4-step sequence, same `_notificationOf` filter (line 593), same per-match try/catch around `notifyMatchUser`.
+- `discardMatchToFirestore` (SavedMatchesView:222) IS logically identical to `matchesStore.discardCalculatedMatch` — same sequential two-step, same deletion predicate `data.id === match.id || data.otherUserId === match.otherUserId`. ONE drift: SavedMatchesView mutates `discardedMatchIds.value.add(match.otherUserId)` INSIDE the function (line 239); the store method does NOT. Caller must perform this mutation after the store call to preserve behavior.
+- `groupMatchesByUser` (SavedMatchesView:406) is ZERO drift from `src/utils/matchGrouping.ts`.
+- `loadDiscardedMatches` (SavedMatchesView:201-220) is ZERO drift from `matchesStore.loadDiscardedUserIds` (which the store method was explicitly a verbatim port of).
+- Inline user-count block at SavedMatchesView:720-722 is a verbatim inline of `getDocs(collection(db, 'users')).docs.length - 1` — `services/stats.ts:getTotalUserCount()` returns the unclamped count (we subtract 1 at call site).
+</drift_analysis_evidence>
 
-<!-- BLOCKED USERS (DashboardView.vue lines 278-432, ~155 lines):
-     interface BlockedUser { odifUserId, username, location?, blockedAt: Date, docIds: string[] }
-     refs: showBlockedUsersModal, blockedUsers, loadingBlockedUsers,
-           blockUsernameInput, blockingUser
-     actions:
-       openBlockedUsersModal()  → sets showBlockedUsersModal.value = true; calls loadBlockedUsers()
-       loadBlockedUsers()       → reads matches_eliminados, groups by otherUserId
-       unblockUser(user)        → confirms, deletes all docIds for that user, removes from local list
-       handleBlockByUsername()  → searches /users where('username','==',name), creates matches_eliminados doc
-     Firestore calls:
-       collection(db, 'users', uid, 'matches_eliminados') + getDocs (load)
-       deleteDoc(doc(db, ..., 'matches_eliminados', docId)) (unblock loop)
-       collection(db, 'users') + query(where('username','==',name)) + getDocs (lookup)
-       collection(db, 'users', uid, 'matches_eliminados') + addDoc (block)
--->
-
-<!-- CLEAR-DATA (DashboardView.vue lines 100-144 + 478-631, ~190 lines):
-     types:
-       type ClearDataStep = 'cards' | 'preferences' | 'matches_nuevos' |
-                            'matches_guardados' | 'matches_eliminados' |
-                            'contactos' | 'decks'
-       interface ClearDataState { status, completedSteps, currentStep, errors }
-       const ALL_CLEAR_STEPS: ClearDataStep[] = [...7 strings]
-       const CLEAR_DATA_STORAGE_KEY = 'cranial_clear_data_progress'
-     refs: clearDataProgress
-     actions:
-       saveClearDataState / loadClearDataState / clearClearDataState
-       deleteCollectionStep(stepName: ClearDataStep) → deletes ALL docs in user subcollection
-       executeClearData()  → orchestrates step-by-step deletion + state save after each
-       resumeClearData(savedState) → resumes from completedSteps
-       clearAllData()      → confirm modal, then executeClearData
-     Firestore calls:
-       collection(db, 'users', uid, '<stepName>') + getDocs + deleteDoc loop
-       Plus calls into decksStore.clear() for the 'decks' step
-     ALSO: dev-only `globalThis.__clearAllData = clearAllData` exposure → KEEP it but expose from the composable level (so window var still works in dev console).
--->
-
-<!-- PUBLIC SEARCH + SCRYFALL FALLBACK + AUTO-SUGGEST (DashboardView.vue lines 149-165 + 957-1077, ~140 lines):
-     refs:
-       searchQuery, searchResults, searching, searchedOnce, sentInterestIds,
-       suggestions, showSuggestions, suppressSuggestions, searchContainer,
-       suggestLoading, scryfallResults, showScryfallFallback
-     actions:
-       handleSearchInput()       → debounced getCardSuggestions(searchQuery), populates suggestions
-       selectSuggestion(s)       → sets searchQuery, runs searchPublicCards
-       handleClickOutside(e)     → closes dropdown when click is outside searchContainer
-       searchPublicCards()       → calls service, falls back to Scryfall on empty
-       addToWishlist(scryfallCard) → existing flow (uses collectionStore)
-     EVENT LISTENER: handleClickOutside is registered/unregistered by DashboardView's
-       onMounted/onUnmounted (lines 434-476). The composable should self-register
-       on mount and self-cleanup on unmount via tryOnMounted/tryOnScopeDispose
-       (or simple onMounted/onUnmounted) so DashboardView no longer manages it.
--->
-
-<!-- SEND INTEREST DUPLICATION (DashboardView.vue lines 1079-1158):
-     `sendInterestFromSearch` is ~80 lines duplicating
-     src/composables/useGlobalSearch.ts:180-259 almost verbatim.
-     DECISION: useDashboardPublicSearch should NOT re-implement this.
-     It should call useGlobalSearch().sendInterestFromSearch(card).
-     Note: useGlobalSearch's signature accepts a slightly different card
-     shape — check the type compatibility. If the inputs differ
-     materially, the composable must adapt by mapping
-     PublicCardSearchResult → useGlobalSearch's expected card shape
-     before delegating. Document the mapping in the implementation.
--->
-
-<!-- DEAD CODE (DashboardView.vue lines 248-276):
-     `debugPublicCollections` async function + globalThis.window exposure.
-     RESEARCH §Risk 7 confirms zero callers via grep. SAFE TO DELETE.
-     Per Anti-loop Rule 1, run `grep -rn "debugPublicCollections" src/`
-     before deleting and confirm only DashboardView.vue is the source.
-     Document the deletion in the SUMMARY.
--->
-
-<!-- AUTO-SUGGEST UNIFICATION DECISION (per user Plan-Phase decision #2):
-     Prefer extending useSearchSuggestions if feasible. Current state:
-       - useSearchSuggestions takes Ref<string>, returns localMatches
-         (collection cards) + scryfallSuggestions (string[]) + isLoading +
-         showDropdown + clearSuggestions
-       - DashboardView's auto-suggest uses ONLY scryfall (no collection mix)
-         and exposes `suggestions: string[]` (not the localMatches/scryfall
-         split)
-     IMPEDANCE MISMATCH: yes, materially different shape. Decision:
-     useDashboardPublicSearch implements a thin local debounce around
-     getCardSuggestions (preserving DashboardView's exact behavior) and
-     leaves a TODO comment pointing at a future
-     `useScryfallOnlySuggestions` extraction. Do NOT force-fit
-     useSearchSuggestions in this plan — the shape divergence would
-     require API changes to useSearchSuggestions which is out of scope.
-     Add the TODO comment with a link to RESEARCH §Open Questions #1.
--->
-
-<!-- useGlobalSearch.sendInterestFromSearch signature (verified at
-     src/composables/useGlobalSearch.ts:180-259) accepts a card-like
-     object and uses Plan-A's getMatchExpirationDate. Calling shape:
-     `await sendInterestFromSearch(card)` where card has scryfallId,
-     edition, cardName, userId, username, location, quantity, condition,
-     foil, price, status. PublicCardSearchResult has all these fields
-     with the same names — direct delegation is safe. -->
-</interfaces>
+<key_invariants>
+- SavedMatchesView is a Pinia-store-heavy view. The store methods on `useMatchesStore` live in `src/stores/matches.ts:566-742` (added by Plan 02-B). Their implementations have Amendment A-M protections already baked in.
+- `matches_nuevos`, `matches_guardados`, `matches_eliminados` Firestore paths are used by both DashboardView (dead) and SavedMatchesView (live). After this plan only SavedMatchesView + the store methods reference them.
+- The `/dashboard` redirect in router/index.ts:43 STAYS — removing it is risky (external bookmarks, Plan A's skip-nav, notFound fallback in UserProfileView line 485 `<RouterLink to="/dashboard">` rides the redirect). Only the DashboardView.vue file itself is deleted.
+- `UserProfileView.vue:485` has `<RouterLink to="/dashboard">` inside the not-found fallback. After deletion that link still works (redirects). Do NOT change this.
+- The `useGlobalSearch.ts` composable (Plan 02-A touched it) and `SearchView.vue` (consumes `buildOwnedCountMap`) reference `src/utils/` artifacts — those stay.
+</key_invariants>
 </context>
 
 <tasks>
 
-<task type="auto" tdd="true">
-  <name>Task 1: Create useClearUserData composable + tests for state persistence</name>
-  <files>src/composables/useClearUserData.ts, tests/unit/composables/useClearUserData.test.ts</files>
-  <behavior>
-    - saveClearDataState writes to localStorage under 'cranial_clear_data_progress' as JSON
-    - loadClearDataState returns parsed state from localStorage; null if absent or malformed JSON
-    - clearClearDataState removes the localStorage key and sets the in-memory ref to null
-    - The composable exposes a reactive `clearDataProgress` ref that mirrors localStorage after save/clear
-    - Calling saveClearDataState({status:'in_progress', completedSteps:['cards'], currentStep:'preferences', errors:0}) followed by loadClearDataState() → returns equal object
-    - loadClearDataState with bad JSON in localStorage returns null and does not throw
-    - clearClearDataState is idempotent (calling twice is fine)
-  </behavior>
-  <action>
-**Step 1 (RED) — write the test file first.** Run `npm run test:unit -- useClearUserData` and CONFIRM RED.
-
-`tests/unit/composables/useClearUserData.test.ts`:
-```typescript
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useClearUserData } from '@/composables/useClearUserData'
-
-// We don't want to actually trigger any Firestore-backed actions in this
-// unit test — only the localStorage state machine is under test.
-vi.mock('@/services/firebase', () => ({ db: {} }))
-vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(() => ({})),
-  getDocs: vi.fn().mockResolvedValue({ docs: [] }),
-  deleteDoc: vi.fn(),
-}))
-vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ user: { id: 'me-id' } }) }))
-vi.mock('@/stores/decks', () => ({ useDecksStore: () => ({ clear: vi.fn() }) }))
-vi.mock('@/stores/collection', () => ({ useCollectionStore: () => ({}) }))
-vi.mock('@/stores/preferences', () => ({ usePreferencesStore: () => ({}) }))
-vi.mock('@/stores/matches', () => ({ useMatchesStore: () => ({}) }))
-vi.mock('@/stores/toast', () => ({ useToastStore: () => ({ show: vi.fn() }) }))
-vi.mock('@/stores/confirm', () => ({ useConfirmStore: () => ({ show: vi.fn().mockResolvedValue(true) }) }))
-vi.mock('@/composables/useI18n', () => ({ useI18n: () => ({ t: (k: string) => k }) }))
-
-describe('useClearUserData — localStorage state machine', () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
-
-  it('saveClearDataState writes JSON to localStorage and updates clearDataProgress', () => {
-    const { saveClearDataState, clearDataProgress } = useClearUserData()
-    saveClearDataState({
-      status: 'in_progress',
-      completedSteps: ['cards'],
-      currentStep: 'preferences',
-      errors: 0,
-    })
-    const raw = localStorage.getItem('cranial_clear_data_progress')
-    expect(raw).not.toBeNull()
-    expect(JSON.parse(raw!).completedSteps).toEqual(['cards'])
-    expect(clearDataProgress.value?.currentStep).toBe('preferences')
-  })
-
-  it('loadClearDataState returns the previously-saved state', () => {
-    const { saveClearDataState, loadClearDataState } = useClearUserData()
-    saveClearDataState({
-      status: 'in_progress',
-      completedSteps: ['cards', 'preferences'],
-      currentStep: 'matches_nuevos',
-      errors: 1,
-    })
-    const loaded = loadClearDataState()
-    expect(loaded).toEqual({
-      status: 'in_progress',
-      completedSteps: ['cards', 'preferences'],
-      currentStep: 'matches_nuevos',
-      errors: 1,
-    })
-  })
-
-  it('loadClearDataState returns null when storage is empty', () => {
-    const { loadClearDataState } = useClearUserData()
-    expect(loadClearDataState()).toBeNull()
-  })
-
-  it('loadClearDataState returns null when storage has malformed JSON', () => {
-    localStorage.setItem('cranial_clear_data_progress', '{not-json')
-    const { loadClearDataState } = useClearUserData()
-    expect(loadClearDataState()).toBeNull()
-  })
-
-  it('clearClearDataState removes the key and sets clearDataProgress to null', () => {
-    const { saveClearDataState, clearClearDataState, clearDataProgress } = useClearUserData()
-    saveClearDataState({
-      status: 'complete',
-      completedSteps: ['cards'],
-      currentStep: null,
-      errors: 0,
-    })
-    clearClearDataState()
-    expect(localStorage.getItem('cranial_clear_data_progress')).toBeNull()
-    expect(clearDataProgress.value).toBeNull()
-  })
-
-  it('clearClearDataState is idempotent', () => {
-    const { clearClearDataState } = useClearUserData()
-    clearClearDataState()
-    clearClearDataState()
-    expect(localStorage.getItem('cranial_clear_data_progress')).toBeNull()
-  })
-})
-```
-
-Run tests, CONFIRM RED.
-
----
-
-**Step 2 (GREEN) — implement the composable**
-
-`src/composables/useClearUserData.ts`:
-```typescript
-import { ref } from 'vue'
-import { collection, deleteDoc, getDocs } from 'firebase/firestore'
-import { db } from '../services/firebase'
-import { useAuthStore } from '../stores/auth'
-import { useCollectionStore } from '../stores/collection'
-import { usePreferencesStore } from '../stores/preferences'
-import { useMatchesStore } from '../stores/matches'
-import { useDecksStore } from '../stores/decks'
-import { useToastStore } from '../stores/toast'
-import { useConfirmStore } from '../stores/confirm'
-import { useI18n } from './useI18n'
-
-export type ClearDataStep =
-  | 'cards' | 'preferences' | 'matches_nuevos'
-  | 'matches_guardados' | 'matches_eliminados' | 'contactos' | 'decks'
-
-export interface ClearDataState {
-  status: 'in_progress' | 'complete' | 'error'
-  completedSteps: ClearDataStep[]
-  currentStep: ClearDataStep | null
-  errors: number
-}
-
-const CLEAR_DATA_STORAGE_KEY = 'cranial_clear_data_progress'
-const ALL_CLEAR_STEPS: ClearDataStep[] = [
-  'cards', 'preferences', 'matches_nuevos',
-  'matches_guardados', 'matches_eliminados', 'contactos', 'decks',
-]
-
-export function useClearUserData() {
-  const authStore = useAuthStore()
-  const collectionStore = useCollectionStore()
-  const preferencesStore = usePreferencesStore()
-  const matchesStore = useMatchesStore()
-  const decksStore = useDecksStore()
-  const toastStore = useToastStore()
-  const confirmStore = useConfirmStore()
-  const { t } = useI18n()
-
-  const clearDataProgress = ref<ClearDataState | null>(null)
-
-  const saveClearDataState = (state: ClearDataState): void => {
-    try {
-      localStorage.setItem(CLEAR_DATA_STORAGE_KEY, JSON.stringify(state))
-      clearDataProgress.value = state
-    } catch (e) {
-      console.warn('[ClearData] Failed to save state:', e)
-    }
-  }
-
-  const loadClearDataState = (): ClearDataState | null => {
-    try {
-      const saved = localStorage.getItem(CLEAR_DATA_STORAGE_KEY)
-      if (!saved) return null
-      return JSON.parse(saved) as ClearDataState
-    } catch (e) {
-      console.warn('[ClearData] Failed to load state:', e)
-      return null
-    }
-  }
-
-  const clearClearDataState = (): void => {
-    try {
-      localStorage.removeItem(CLEAR_DATA_STORAGE_KEY)
-      clearDataProgress.value = null
-    } catch (e) {
-      console.warn('[ClearData] Failed to clear state:', e)
-    }
-  }
-
-  // PORT verbatim from src/views/DashboardView.vue lines 478-631:
-  //   - deleteCollectionStep
-  //   - executeClearData
-  //   - resumeClearData
-  //   - clearAllData (with confirmStore + toastStore strings preserved)
-  // All references to authStore.user / decksStore.clear() / collectionStore /
-  // preferencesStore / matchesStore stay the same — those imports are
-  // already in scope above. DO NOT modify the algorithm.
-  const deleteCollectionStep = async (_step: ClearDataStep): Promise<number> => {
-    // STUB — replace with verbatim port from DashboardView lines 478~520.
-    return 0
-  }
-  const executeClearData = async (): Promise<void> => {
-    // STUB — replace with verbatim port from DashboardView lines 521~595.
-  }
-  const resumeClearData = async (_savedState: ClearDataState): Promise<void> => {
-    // STUB — replace with verbatim port from DashboardView lines 596~615.
-  }
-  const clearAllData = async (): Promise<void> => {
-    // STUB — replace with verbatim port from DashboardView lines 616~625.
-  }
-
-  return {
-    clearDataProgress,
-    saveClearDataState,
-    loadClearDataState,
-    clearClearDataState,
-    deleteCollectionStep,
-    executeClearData,
-    resumeClearData,
-    clearAllData,
-    ALL_CLEAR_STEPS,
-  }
-}
-```
-
-IMPORTANT: the four action stubs MUST be replaced with verbatim ports from DashboardView (open the current DashboardView.vue, locate lines 478-631, copy each function body in). Anti-loop Rule 2 — do not "improve" the loops or error handling.
-
-After porting, run `npm run test:unit -- useClearUserData` — CONFIRM all PASS (GREEN).
-
-Optional dev-only globalThis exposure (preserves the prior `__clearAllData` console helper):
-```typescript
-if (import.meta.env.DEV && globalThis.window !== undefined) {
-  (globalThis as unknown as Record<string, unknown>).__clearAllData = clearAllData
-}
-```
-Place this at the bottom of the composable factory, after the actions are defined. Note: this fires every time the composable is instantiated; for a single-instance dashboard view this is fine. Document in SUMMARY that the helper is now scoped to `import.meta.env.DEV` (previously DashboardView wrapped it the same way).
-  </action>
-  <verify>
-    <automated>
-# Standard test gate first:
-npm run test:unit -- useClearUserData && npx vue-tsc --noEmit && npx vite build 2>&1 | tail -10
-
-# Strict-diff discipline (PORT-verbatim guard for 4 clear-data action bodies):
-# deleteCollectionStep, executeClearData, resumeClearData, clearAllData were
-# lifted from DashboardView.vue (lines ~478-631 per RESEARCH §DashboardView
-# Inventory). Their bodies must be byte-equivalent to the originals modulo
-# identifier renames — composable already has authStore/decksStore/collectionStore/
-# preferencesStore/matchesStore/toastStore/confirmStore/t in scope.
-# The gsd-executor commits the pre-port state first, so HEAD~1 has the original.
-#
-# Run for EACH of the 4 ported functions:
-git show HEAD~1:src/views/DashboardView.vue | sed -n '<DELETE_START>,<DELETE_END>p' > /tmp/port-before-delete.txt
-cat src/composables/useClearUserData.ts | sed -n '<NEW_DELETE_START>,<NEW_DELETE_END>p' > /tmp/port-after-delete.txt
-diff -u /tmp/port-before-delete.txt /tmp/port-after-delete.txt | head -60
-
-git show HEAD~1:src/views/DashboardView.vue | sed -n '<EXEC_START>,<EXEC_END>p' > /tmp/port-before-exec.txt
-cat src/composables/useClearUserData.ts | sed -n '<NEW_EXEC_START>,<NEW_EXEC_END>p' > /tmp/port-after-exec.txt
-diff -u /tmp/port-before-exec.txt /tmp/port-after-exec.txt | head -120
-
-git show HEAD~1:src/views/DashboardView.vue | sed -n '<RESUME_START>,<RESUME_END>p' > /tmp/port-before-resume.txt
-cat src/composables/useClearUserData.ts | sed -n '<NEW_RESUME_START>,<NEW_RESUME_END>p' > /tmp/port-after-resume.txt
-diff -u /tmp/port-before-resume.txt /tmp/port-after-resume.txt | head -60
-
-git show HEAD~1:src/views/DashboardView.vue | sed -n '<CLEAR_START>,<CLEAR_END>p' > /tmp/port-before-clear.txt
-cat src/composables/useClearUserData.ts | sed -n '<NEW_CLEAR_START>,<NEW_CLEAR_END>p' > /tmp/port-after-clear.txt
-diff -u /tmp/port-before-clear.txt /tmp/port-after-clear.txt | head -60
-
-# <*_START>/<*_END> placeholders: executor fills in actual line ranges after
-# locating each original (deleteCollectionStep ~478-520, executeClearData ~521-595,
-# resumeClearData ~596-615, clearAllData ~616-625) and the new ranges in
-# useClearUserData.ts.
-#
-# DO NOT skip this check. If diff shows wholesale rewrite (logic change,
-# dropped toast()/confirm()/localStorage()/saveClearDataState() call,
-# reordered loops, simplified error handling), REVERT and port again verbatim.
-# Acceptable diffs: identifier renames into the new composable scope only.
-    </automated>
-  </verify>
-  <done>useClearUserData.ts exists with the API listed in must_haves. The 6 state-machine tests pass. The 4 action functions are verbatim ports from DashboardView (verified by side-by-side read). Type-check + build pass. STRICT-DIFF DISCIPLINE: per-function diffs were run for deleteCollectionStep / executeClearData / resumeClearData / clearAllData against HEAD~1 DashboardView.vue (lines ~478-631); reviewer signed off that only identifier renames differ — no toast(), confirm(), localStorage(), or saveClearDataState() call from the originals was dropped, and no loop ordering was changed.</done>
-</task>
-
 <task type="auto">
-  <name>Task 2: Create useBlockedUsers + useDashboardPublicSearch composables</name>
-  <files>src/composables/useBlockedUsers.ts, src/composables/useDashboardPublicSearch.ts</files>
+  <name>Task 1: SavedMatchesView Slice A — swap pure helpers (groupMatchesByUser + getTotalUserCount)</name>
+  <files>src/views/SavedMatchesView.vue</files>
   <action>
-Anti-loop Rule 1: read DashboardView.vue lines 278-432 (blocked users) and lines 149-165 + 957-1158 (search + send-interest) in full first.
+Anti-loop Rule 1: read `src/views/SavedMatchesView.vue` in full (1030 lines) before editing. Confirm the exact line numbers below by grep — drift analysis was run on HEAD 2526daf; minor offsets possible.
 
----
+**Atomic edit list (save once at end):**
 
-**A. `src/composables/useBlockedUsers.ts`**
+1. **Add imports** at the top of `<script setup>` (grouped with existing `../utils/` and `../services/` imports, alphabetically sorted per lint rule):
+   ```typescript
+   import { getTotalUserCount } from '../services/stats'
+   import { groupMatchesByUser } from '../utils/matchGrouping'
+   ```
 
-```typescript
-import { ref } from 'vue'
-import { addDoc, collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore'
-import { db } from '../services/firebase'
-import { useAuthStore } from '../stores/auth'
-import { useToastStore } from '../stores/toast'
-import { useConfirmStore } from '../stores/confirm'
-import { useI18n } from './useI18n'
-import { getMatchExpirationDate } from '../utils/matchExpiry'
+2. **Delete the inline `groupMatchesByUser` function** (current lines ~406-444). The util export has an identical signature and return shape (verified by drift analysis).
 
-export interface BlockedUser {
-  odifUserId: string  // Note: original field name preserved (typo in source)
-  username: string
-  location?: string
-  blockedAt: Date
-  docIds: string[]
-}
+3. **Replace the inline user-count block** inside `onMounted` (current lines ~720-722):
+   ```typescript
+   // BEFORE:
+   const usersRef = collection(db, 'users')
+   const usersSnapshot = await getDocs(usersRef)
+   totalUsers.value = usersSnapshot.docs.length - 1 // Excluir al usuario actual
 
-export function useBlockedUsers() {
-  const authStore = useAuthStore()
-  const toastStore = useToastStore()
-  const confirmStore = useConfirmStore()
-  const { t } = useI18n()
+   // AFTER:
+   totalUsers.value = Math.max(0, (await getTotalUserCount()) - 1) // Excluir al usuario actual
+   ```
+   Note `Math.max(0, ...)` clamp — `getTotalUserCount` fails-closed to 0 (Plan B Amendment A); clamping avoids negative totalUsers.
 
-  const showBlockedUsersModal = ref(false)
-  const blockedUsers = ref<BlockedUser[]>([])
-  const loadingBlockedUsers = ref(false)
-  const blockUsernameInput = ref('')
-  const blockingUser = ref(false)
-
-  // PORT verbatim from src/views/DashboardView.vue lines 278-432:
-  //   - loadBlockedUsers      (lines ~296-340)
-  //   - openBlockedUsersModal (lines ~342-345)
-  //   - unblockUser           (lines ~347-380)
-  //   - handleBlockByUsername (lines ~385-432)
-  // Replace any inline `15 * 24 * 60 * 60 * 1000` math with
-  // getMatchExpirationDate() (Plan A canonical helper).
-  // Preserve all toast strings, confirm modal copy, and the BlockedUser
-  // shape exactly. Anti-loop Rule 2.
-
-  const loadBlockedUsers = async (): Promise<void> => { /* PORT */ }
-  const openBlockedUsersModal = async (): Promise<void> => {
-    showBlockedUsersModal.value = true
-    await loadBlockedUsers()
-  }
-  const unblockUser = async (_user: BlockedUser): Promise<void> => { /* PORT */ }
-  const handleBlockByUsername = async (): Promise<void> => { /* PORT */ }
-
-  return {
-    showBlockedUsersModal,
-    blockedUsers,
-    loadingBlockedUsers,
-    blockUsernameInput,
-    blockingUser,
-    openBlockedUsersModal,
-    loadBlockedUsers,
-    unblockUser,
-    handleBlockByUsername,
-  }
-}
-```
-
-After porting the 4 stubs, `grep -n "15 \* 24 \* 60 \* 60" src/composables/useBlockedUsers.ts` MUST return zero matches (Plan A's canonical helper is the only allowed expiry source).
-
-Anti-loop Rule 6: the original blocked-users template is also duplicated in `src/views/SavedMatchesView.vue`. RESEARCH §Risk 6 flags this as a stretch goal. We are NOT extracting `BlockedUsersModal.vue` as a component in this phase (per user Plan-Phase decision #3). Document this deferral in the SUMMARY.
-
----
-
-**B. `src/composables/useDashboardPublicSearch.ts`**
-
-```typescript
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { useCollectionStore } from '../stores/collection'
-import { useToastStore } from '../stores/toast'
-import { useI18n } from './useI18n'
-import { useGlobalSearch } from './useGlobalSearch'
-import {
-  searchPublicCards as searchPublicCardsService,
-  type PublicCardSearchResult,
-} from '../services/publicCards'
-import { getCardSuggestions, type ScryfallCard, searchCards } from '../services/scryfall'
-
-export function useDashboardPublicSearch() {
-  const authStore = useAuthStore()
-  const collectionStore = useCollectionStore()
-  const toastStore = useToastStore()
-  const { t } = useI18n()
-  const globalSearch = useGlobalSearch()
-
-  // Search state
-  const searchQuery = ref('')
-  const searchResults = ref<PublicCardSearchResult[]>([])
-  const searching = ref(false)
-  const searchedOnce = ref(false)
-  const sentInterestIds = ref<Set<string>>(new Set())
-
-  // Auto-suggest state
-  const suggestions = ref<string[]>([])
-  const showSuggestions = ref(false)
-  const suppressSuggestions = ref(false)
-  const searchContainer = ref<HTMLElement | null>(null)
-  const suggestLoading = ref(false)
-
-  // Scryfall fallback state
-  const scryfallResults = ref<ScryfallCard[]>([])
-  const showScryfallFallback = ref(false)
-
-  // Debounce handle for auto-suggest
-  let suggestDebounce: ReturnType<typeof setTimeout> | null = null
-
-  // PORT verbatim from src/views/DashboardView.vue:
-  //   - handleSearchInput      (lines ~959-985)  — debounced getCardSuggestions
-  //   - selectSuggestion       (lines ~987-995)
-  //   - handleClickOutside     (lines ~997-1010) — closes dropdown when click outside searchContainer
-  //   - searchPublicCards      (lines ~1015-1067) — calls service then Scryfall fallback
-  //   - addToWishlist          (lines ~1069-1077) — uses collectionStore
-  //
-  // For searchPublicCards: REPLACE the inline Firestore body
-  //   `const cardsRef = collection(db, 'public_cards'); const snap = ...`
-  // with a call to `searchPublicCardsService(searchQuery.value, authStore.user.id)`.
-  // The service was added in Plan B and matches the prior behavior verbatim.
-
-  const handleSearchInput = async (): Promise<void> => { /* PORT */ }
-  const selectSuggestion = async (_s: string): Promise<void> => { /* PORT */ }
-  const handleClickOutside = (_e: MouseEvent): void => { /* PORT */ }
-  const searchPublicCards = async (): Promise<void> => { /* PORT — uses searchPublicCardsService */ }
-  const addToWishlist = async (_card: ScryfallCard): Promise<void> => { /* PORT */ }
-
-  /**
-   * Send-interest delegation: the original DashboardView.sendInterestFromSearch
-   * (lines 1079-1158) duplicated useGlobalSearch.sendInterestFromSearch almost
-   * verbatim. We delegate to the existing composable.
-   *
-   * PublicCardSearchResult and useGlobalSearch's expected card shape
-   * share field names — direct pass-through is safe. If runtime testing
-   * reveals a shape mismatch, add an explicit mapping here and document
-   * in SUMMARY.
-   */
-  const sendInterestFromSearch = async (card: PublicCardSearchResult): Promise<void> => {
-    if (!authStore.user || sentInterestIds.value.has(card.id)) return
-    await globalSearch.sendInterestFromSearch(card as never)
-    sentInterestIds.value.add(card.id)
-  }
-
-  // Self-manage the document click listener (was DashboardView's responsibility before).
-  onMounted(() => {
-    document.addEventListener('click', handleClickOutside)
-  })
-  onUnmounted(() => {
-    document.removeEventListener('click', handleClickOutside)
-    if (suggestDebounce) clearTimeout(suggestDebounce)
-  })
-
-  return {
-    searchQuery,
-    searchResults,
-    searching,
-    searchedOnce,
-    sentInterestIds,
-    suggestions,
-    showSuggestions,
-    suppressSuggestions,
-    searchContainer,
-    suggestLoading,
-    scryfallResults,
-    showScryfallFallback,
-    handleSearchInput,
-    selectSuggestion,
-    handleClickOutside,
-    searchPublicCards,
-    addToWishlist,
-    sendInterestFromSearch,
-  }
-}
-```
-
-TODO comment to include verbatim near the auto-suggest section:
-```typescript
-// TODO(phase-04+): consider extracting a useScryfallOnlySuggestions
-// composable to share debounce logic with useSearchSuggestions. The
-// existing useSearchSuggestions mixes collection-local matches with
-// scryfall results, which is undesirable in the public-search context.
-// See .planning/phases/02-dashboardview-decomposition/RESEARCH.md
-// §Open Questions #1.
-```
-
-PORT IMPORTANT NOTES:
-- `selectSuggestion` likely sets `searchQuery.value = s; suppressSuggestions.value = true; suggestions.value = []; await searchPublicCards()`. Verify exact body.
-- `handleClickOutside` should check `searchContainer.value` is set and `!searchContainer.value.contains(e.target as Node)` before closing dropdown.
-- `searchPublicCards` MUST set `searching.value = true / false` and `searchedOnce.value = true` and clear/populate `scryfallResults` + `showScryfallFallback` based on whether the service returns results.
-- After porting, verify:
-  - `grep -n "from 'firebase/firestore'" src/composables/useDashboardPublicSearch.ts` returns ZERO (all firestore goes through the service).
-  - `grep -n "addDoc\|getDocs\|deleteDoc" src/composables/useDashboardPublicSearch.ts` returns ZERO.
-
-If the runtime delegation in `sendInterestFromSearch` fails type-check (the `as never` cast is intentional — useGlobalSearch's parameter type is internal and stricter), add a small mapping function:
-```typescript
-const toGlobalSearchCard = (c: PublicCardSearchResult) => ({
-  id: c.id, scryfallId: c.scryfallId ?? '', cardId: c.cardId,
-  cardName: c.cardName ?? '', edition: c.edition ?? '',
-  condition: c.condition ?? 'NM', foil: c.foil ?? false,
-  price: c.price ?? 0, quantity: c.quantity ?? 1,
-  image: c.image ?? '', status: c.status ?? 'sale',
-  username: c.username ?? '', userId: c.userId ?? '',
-  location: c.location ?? '',
-})
-// then: await globalSearch.sendInterestFromSearch(toGlobalSearchCard(card))
-```
-Document the chosen approach in the SUMMARY.
+4. **Remove the now-unused `collection` / `getDocs` imports** IF they're no longer referenced in SavedMatchesView (verify via grep — other Firestore calls may still use them; don't remove unused imports that ARE used). The `collection` import is likely still needed for blocked-users inline code.
   </action>
   <verify>
     <automated>
-# Standard test gate first:
 npm run test:unit && npx vue-tsc --noEmit && npx vite build 2>&1 | tail -10
 
-# Strict-diff discipline (PORT-verbatim guard for 4 blocked-users + 5 public-search action bodies).
-# Both composables were created by lifting bodies out of DashboardView.vue.
-# The gsd-executor commits the pre-port state first, so HEAD~1 has the original.
-#
-# BLOCKED USERS (4 functions, originals at DashboardView.vue lines ~278-432 per RESEARCH):
-for fn in loadBlockedUsers openBlockedUsersModal unblockUser handleBlockByUsername; do
-  echo "=== diff: $fn ==="
-  # Executor fills in <BLOCKED_${fn}_START>/<BLOCKED_${fn}_END> from HEAD~1 DashboardView.vue
-  # and <NEW_${fn}_START>/<NEW_${fn}_END> from src/composables/useBlockedUsers.ts.
-  # See line range hints: loadBlockedUsers ~296-340, openBlockedUsersModal ~342-345,
-  # unblockUser ~347-380, handleBlockByUsername ~385-432.
-done
-
-# PUBLIC SEARCH (5 functions, originals at DashboardView.vue lines ~959-1077 per RESEARCH):
-for fn in handleSearchInput selectSuggestion handleClickOutside searchPublicCards addToWishlist; do
-  echo "=== diff: $fn ==="
-  # Executor fills in <SEARCH_${fn}_START>/<SEARCH_${fn}_END> from HEAD~1 DashboardView.vue
-  # and <NEW_${fn}_START>/<NEW_${fn}_END> from src/composables/useDashboardPublicSearch.ts.
-  # NOTE: searchPublicCards's inline Firestore body IS expected to differ — it's
-  # replaced by a call to searchPublicCardsService(). Reviewer must confirm the
-  # SHAPE of the function (loading flags, searchedOnce flag, scryfall fallback
-  # branch, toast strings) is identical; only the firestore lookup is delegated.
-done
-
-# Concrete diff command template (executor instantiates per-function):
-# git show HEAD~1:src/views/DashboardView.vue | sed -n '<START>,<END>p' > /tmp/port-before-FN.txt
-# cat src/composables/use<Composable>.ts | sed -n '<NEW_START>,<NEW_END>p' > /tmp/port-after-FN.txt
-# diff -u /tmp/port-before-FN.txt /tmp/port-after-FN.txt | head -80
-#
-# DO NOT skip these checks. If any diff shows wholesale rewrite (dropped
-# toast()/confirm()/localStorage() call, removed loading flag, reordered
-# awaits, simplified error handling), REVERT and port again verbatim.
-# Acceptable diffs:
-#   - identifier renames (composable already has authStore/toastStore/etc. in scope)
-#   - searchPublicCards inline firestore body → searchPublicCardsService() call
-#   - sendInterestFromSearch body → globalSearch.sendInterestFromSearch() delegation
-#   - 15-day expiry math → getMatchExpirationDate() (Plan A canonical helper)
+# Post-edit greps:
+grep -n "const groupMatchesByUser" src/views/SavedMatchesView.vue  # must be 0 (inline deleted)
+grep -n "from '../utils/matchGrouping'" src/views/SavedMatchesView.vue  # must be 1 (import added)
+grep -n "from '../services/stats'" src/views/SavedMatchesView.vue  # must be 1
+grep -n "getDocs(usersRef)\|collection(db, 'users')" src/views/SavedMatchesView.vue  # must be 0 for the user-count use
     </automated>
   </verify>
-  <done>Both composables exist with the documented APIs. All inline Firestore calls are gone from useDashboardPublicSearch (delegates to publicCards service). useBlockedUsers preserves the four actions verbatim from DashboardView. No new MATCH_LIFETIME_DAYS or 15-day inline math introduced. Type-check + build pass. STRICT-DIFF DISCIPLINE: per-function diffs were run for the 4 blocked-users actions (loadBlockedUsers, openBlockedUsersModal, unblockUser, handleBlockByUsername) and the 5 public-search actions (handleSearchInput, selectSuggestion, handleClickOutside, searchPublicCards, addToWishlist) against HEAD~1 DashboardView.vue; reviewer signed off that only identifier renames differ (plus the documented searchPublicCards delegation to searchPublicCardsService and the sendInterestFromSearch delegation to useGlobalSearch); no toast(), confirm(), localStorage(), or store-call from the originals was dropped.</done>
+  <done>SavedMatchesView imports groupMatchesByUser + getTotalUserCount. Inline groupMatchesByUser deleted. User-count block replaced by service call. Type-check clean, build succeeds, tests pass (547+ unchanged).</done>
 </task>
 
 <task type="auto">
-  <name>Task 3: Wire all 3 composables into DashboardView, delete moved code, kill debugPublicCollections + duplicate sendInterestFromSearch</name>
-  <files>src/views/DashboardView.vue</files>
+  <name>Task 2: SavedMatchesView Slice B — swap Firestore wrappers (loadDiscardedUserIds, persistCalculatedMatches, discardCalculatedMatch)</name>
+  <files>src/views/SavedMatchesView.vue</files>
   <action>
-Anti-loop Rule 1: read DashboardView.vue in full (post-Plan-B state, ~1050 lines). Identify and confirm the 3 sections to delete (blocked users, clear data, public search) and the 2 dead-code targets (debugPublicCollections, duplicate sendInterestFromSearch).
+Anti-loop Rule 1: re-read SavedMatchesView.vue post-Task-1 to confirm line numbers.
 
----
+**Atomic edit list:**
 
-**Atomic edit list** (apply in order, save once):
-
-1. **Add the 3 composable imports** alongside other composable imports (top of `<script setup>`):
+1. **Replace `loadDiscardedMatches`** (current lines ~201-220). Delete the inline function. At its only call site in `onMounted` (current line ~705), replace:
    ```typescript
-   import { useBlockedUsers } from '../composables/useBlockedUsers'
-   import { useClearUserData } from '../composables/useClearUserData'
-   import { useDashboardPublicSearch } from '../composables/useDashboardPublicSearch'
+   await loadDiscardedMatches()
    ```
-
-2. **Add the 3 destructures** after the matchesStore wiring (after `useDashboardMatches()` from Plan B):
+   with:
    ```typescript
-   const {
-     showBlockedUsersModal, blockedUsers, loadingBlockedUsers,
-     blockUsernameInput, blockingUser,
-     openBlockedUsersModal, loadBlockedUsers, unblockUser, handleBlockByUsername,
-   } = useBlockedUsers()
-
-   const {
-     clearDataProgress, clearAllData, executeClearData, resumeClearData,
-     loadClearDataState, clearClearDataState,
-   } = useClearUserData()
-
-   const {
-     searchQuery, searchResults, searching, searchedOnce, sentInterestIds,
-     suggestions, showSuggestions, searchContainer,
-     scryfallResults, showScryfallFallback,
-     handleSearchInput, selectSuggestion,
-     searchPublicCards, addToWishlist, sendInterestFromSearch,
-   } = useDashboardPublicSearch()
+   discardedMatchIds.value = await matchesStore.loadDiscardedUserIds()
    ```
+   The `discardedMatchIds` local ref (line ~56) STAYS. The store method's internal try/catch returns an empty Set on Firestore error — matching the inline version's fallback behavior.
 
-3. **Delete the BlockedUser interface** (around lines 279-285) and ALL of:
-   - The 5 refs (lines ~287-291): `showBlockedUsersModal`, `blockedUsers`, `loadingBlockedUsers`, `blockUsernameInput`, `blockingUser`
-   - `loadBlockedUsers` function
-   - `openBlockedUsersModal` function (if defined inline)
-   - `unblockUser` function
-   - `handleBlockByUsername` function
+2. **Replace `saveMatchesToFirebase` call** inside `calculateMatches` (current line ~569):
+   ```typescript
+   // BEFORE:
+   await saveMatchesToFirebase(foundMatches)
 
-4. **Delete the ClearData section**:
-   - `type ClearDataStep` and `interface ClearDataState` (lines ~102-109)
-   - `const CLEAR_DATA_STORAGE_KEY` (line ~111)
-   - `const clearDataProgress = ref(...)` (line ~112)
-   - `const ALL_CLEAR_STEPS = [...]` (line ~114)
-   - `saveClearDataState`, `loadClearDataState`, `clearClearDataState` functions (lines ~116-144)
-   - `deleteCollectionStep`, `executeClearData`, `resumeClearData`, `clearAllData` (lines ~478-625)
-   - The `if (import.meta.env.DEV) (globalThis as ...)__clearAllData = clearAllData` block (the composable now owns it)
+   // AFTER:
+   await matchesStore.persistCalculatedMatches(foundMatches)
+   ```
+   Then **delete the inline `saveMatchesToFirebase` function** (current lines ~583-641). Behavior is identical (drift analysis verified the 4-step sequence + `_notificationOf` filter + per-match try/catch).
 
-5. **Delete the public-search section**:
-   - `const searchQuery / searchResults / searching / searchedOnce / sentInterestIds` (lines ~150-154)
-   - Auto-suggest refs `suggestions / showSuggestions / suppressSuggestions / searchContainer / suggestLoading` (lines ~157-161)
-   - `scryfallResults / showScryfallFallback` (lines ~164-165)
-   - The `interface PublicCardSearchResult` (lines ~52-68) — type now lives in src/services/publicCards.ts (added by Plan B)
-   - `handleSearchInput`, `selectSuggestion`, `handleClickOutside`, `searchPublicCards`, `addToWishlist` functions
-   - `sendInterestFromSearch` (lines ~1079-1158) — DELETE the duplicate; the composable owns it
+3. **Replace `discardMatchToFirestore` call** inside `handleDiscardMatch` (current line ~654):
+   ```typescript
+   // BEFORE:
+   await discardMatchToFirestore(calcMatch)
 
-6. **Delete `debugPublicCollections`** (lines ~248-271) AND the `globalThis.window !== undefined` exposure block (lines ~273-276). Confirm with `grep -rn "debugPublicCollections" src/` returning ZERO before saving (already verified in RESEARCH §Risk 7; re-confirm).
+   // AFTER:
+   await matchesStore.discardCalculatedMatch(calcMatch)
+   discardedMatchIds.value.add(calcMatch.otherUserId) // preserve mutation that was inline in the deleted function
+   ```
+   **The explicit `discardedMatchIds.value.add(...)` AT THE CALL SITE is load-bearing.** The inline function mutated this ref at line 239; the store method does not. Without this line, discarded users re-surface on recalculate.
+   Then **delete the inline `discardMatchToFirestore` function** (current lines ~222-252).
 
-7. **Delete `syncPublicData` if trivial** — RESEARCH says this is already a thin wrapper around `collectionStore.syncAllToPublic()`. If the template references `syncPublicData`, KEEP a 2-line inline version OR change the template to call `collectionStore.syncAllToPublic()` directly (the latter is preferred). Verify by grep before changing.
-
-8. **Update onMounted** — DO NOT touch the async-onMounted structure (Plan D's job). But the click-listener registration (line 435: `document.addEventListener('click', handleClickOutside)`) is now self-managed by useDashboardPublicSearch's onMounted. DELETE that line from DashboardView's onMounted. Likewise DELETE the corresponding `document.removeEventListener` in onUnmounted (lines ~474-476).
-   - The `loadDiscardedMatches` and `calculateMatches` calls inside onMounted now resolve to the composable destructure from Plan B — no change needed there.
-   - The `await initMatchData()` (Plan B added) still belongs in onMounted; don't remove.
-
-9. **Trim imports** — after all deletions, audit and remove:
-   - `addDoc, collection, deleteDoc, doc, type DocumentData, getDocs, limit, query, where` from `'firebase/firestore'` — ALL should now be unused inside DashboardView.vue. If `type DocumentData` was only used by the removed `PublicCardSearchResult` interface, also gone.
-   - `db` from `'../services/firebase'` — likely unused now.
-   - `getCardSuggestions, type ScryfallCard, searchCards` from `'../services/scryfall'` — moved to useDashboardPublicSearch.
-   - Run `npx vue-tsc --noEmit` — if it complains about an unused import, remove it. If it complains about a missing reference, the corresponding code wasn't deleted; re-check.
-
-10. **Verify the template still compiles** — DashboardView's template (lines 1161-1470) references all the destructured names. They're all still in scope. Composable refs survive destructure (Vue auto-unwraps in template), so no `.value` changes needed.
-
----
-
-**Atomic-commit checklist before saving:**
-- [ ] DashboardView.vue line count is now ~400-500 lines (from ~1050 post-Plan-B). Plan D will verify the < 400 final.
-- [ ] `grep -n "interface BlockedUser\|interface ClearDataState\|interface PublicCardSearchResult\|debugPublicCollections" src/views/DashboardView.vue` → ZERO matches.
-- [ ] `grep -n "from 'firebase/firestore'" src/views/DashboardView.vue` → ZERO matches.
-- [ ] `grep -n "import.*from '../services/firebase'\|from '../services/scryfall'" src/views/DashboardView.vue` → ZERO matches (db and scryfall both moved).
-- [ ] `grep -n "useBlockedUsers\|useClearUserData\|useDashboardPublicSearch" src/views/DashboardView.vue` → ONE match each (the destructure).
-- [ ] Type-check + tests + build pass.
+4. **Remove now-unused imports** if any (verify via grep — `addDoc`, `deleteDoc`, `doc`, `Timestamp`, `getMatchExpirationDate`, `notifyMatchUser` may be reducible; verify each is still used by remaining code before removing). Alphabetical-sort the import block per lint rule.
   </action>
   <verify>
-    <automated>npm run test:unit && npx vue-tsc --noEmit && npx vite build 2>&1 | tail -10</automated>
+    <automated>
+npm run test:unit && npx vue-tsc --noEmit && npx vite build 2>&1 | tail -10
+
+# Post-edit greps:
+grep -n "const loadDiscardedMatches\|const saveMatchesToFirebase\|const discardMatchToFirestore" src/views/SavedMatchesView.vue  # must be 0 defs
+grep -n "matchesStore.loadDiscardedUserIds\|matchesStore.persistCalculatedMatches\|matchesStore.discardCalculatedMatch" src/views/SavedMatchesView.vue  # must be 3+ call sites
+grep -n "discardedMatchIds.value.add(calcMatch.otherUserId)" src/views/SavedMatchesView.vue  # must be ≥1 (preserves the ref mutation)
+    </automated>
   </verify>
-  <done>DashboardView.vue is roughly 500 lines lighter; the 3 composables are wired via destructure; the 5 deleted code blocks are gone (verified by grep); zero firebase/firestore imports remain in DashboardView; type-check + tests + build pass. The template still renders the same UI (manual verification in dev deferred to Plan D's E2E spec).</done>
+  <done>SavedMatchesView no longer defines any of the 3 inline Firestore wrappers. All 3 call sites use matchesStore methods. The load-bearing `discardedMatchIds.value.add(calcMatch.otherUserId)` mutation is preserved at the call site. Tests + type-check + build all pass.</done>
+</task>
+
+<task type="auto">
+  <name>Task 3: Delete dead code — DashboardView.vue, useDashboardMatches composable + test, update CLAUDE.md</name>
+  <files>
+    src/views/DashboardView.vue,
+    src/composables/useDashboardMatches.ts,
+    tests/unit/composables/useDashboardMatches.test.ts,
+    CLAUDE.md
+  </files>
+  <action>
+Anti-loop Rule 1: grep-confirm zero imports before deletion.
+
+**Pre-deletion audit (executor MUST run these):**
+```bash
+grep -rn "DashboardView\b" src/ tests/ e2e/ 2>&1 | grep -v "// " | grep -v "/\*"  # should be empty or only historical docstrings
+grep -rn "useDashboardMatches" src/ tests/ e2e/ 2>&1 | grep -v "^src/composables/useDashboardMatches\|^tests/unit/composables/useDashboardMatches"
+grep -rn "from '../views/DashboardView'" src/ 2>&1  # must be empty
+```
+If any grep returns unexpected imports, STOP and ask user — there's a live consumer.
+
+**Deletions:**
+
+1. `rm src/views/DashboardView.vue` — dead code since 2026-02-09 (commit 212488f added /dashboard redirect).
+
+2. `rm src/composables/useDashboardMatches.ts` — orphaned after SavedMatchesView migration (no consumer).
+
+3. `rm tests/unit/composables/useDashboardMatches.test.ts` — orphan tests.
+
+4. **Do NOT touch `router/index.ts:43-45`** — the `/dashboard` → `/saved-matches` redirect STAYS (external bookmarks, UserProfileView:485 `<RouterLink to="/dashboard">` depends on it).
+
+5. **CLAUDE.md updates**:
+   - Line 346: change `"e.g., BlockedUsersModal in SavedMatchesView AND DashboardView"` to `"e.g., blocked-users inline logic exists in SavedMatchesView — DashboardView was deleted in Phase 02-C"`.
+   - Line 381: change `"SavedMatchesView ↔ DashboardView (BlockedUsersModal)"` to `"SavedMatchesView (blocked-users inline — consolidation tech debt noted in Phase 02-C SUMMARY)"`.
+   - Add a new entry under Files Often Modified Together (or an equivalent section): `"SavedMatchesView ↔ utils/matchGrouping, services/stats, stores/matches (match-calculation pipeline — Plan 02-C wired SavedMatchesView to extracted infrastructure)"`.
+
+**Reduced test count expected:**
+- Plan B added 13 tests (6 composable + 7 store). Deleting the composable file deletes 6 tests → 547 - 6 = 541.
+- Store tests for persistCalculatedMatches / discardCalculatedMatch / loadDiscardedUserIds STAY — they now cover the live code path SavedMatchesView uses.
+  </action>
+  <verify>
+    <automated>
+# Pre-deletion audit (MUST return empty/only docstrings):
+grep -rn "import.*DashboardView\|from.*DashboardView" src/ tests/ e2e/ 2>&1
+
+# Post-deletion:
+test ! -f src/views/DashboardView.vue && echo "DashboardView deleted" || echo "STILL EXISTS"
+test ! -f src/composables/useDashboardMatches.ts && echo "Composable deleted" || echo "STILL EXISTS"
+test ! -f tests/unit/composables/useDashboardMatches.test.ts && echo "Test deleted" || echo "STILL EXISTS"
+
+# CLAUDE.md grep:
+grep -n "DashboardView" CLAUDE.md  # all remaining occurrences must be historical / context only — no instructions referencing it as live
+
+# Standard gate:
+npm run test:unit && npx vue-tsc --noEmit && npx vite build 2>&1 | tail -10
+# Expected: 541 tests passing (6 fewer after composable test deletion), type-check clean, build succeeds.
+    </automated>
+  </verify>
+  <done>Three files deleted. CLAUDE.md updated to reflect new reality. No imports broken. Tests pass at new count. The /dashboard redirect still works (tested by visiting /dashboard in dev → lands on /saved-matches).</done>
 </task>
 
 </tasks>
@@ -825,58 +266,46 @@ Anti-loop Rule 1: read DashboardView.vue in full (post-Plan-B state, ~1050 lines
 
 | Boundary | Description |
 |----------|-------------|
-| User-supplied username (block-by-username input) → Firestore query | String passed into `where('username', '==', input)` query |
-| LocalStorage (cranial_clear_data_progress) → resumeClearData state | JSON state read on mount; controls which Firestore subcollections get deleted |
-| Document click event → handleClickOutside | DOM event used to close auto-suggest dropdown |
-| Public search results → sendInterestFromSearch payload | PublicCardSearchResult passed to useGlobalSearch.sendInterestFromSearch |
+| User auth (authStore.user) → SavedMatchesView match ops | SavedMatchesView gates the entire view on `if (!authStore.user) return` in onMounted (line 702). Match ops inherit this gate. |
+| matchesStore methods | Same gate (store methods early-return on missing auth). |
 
 ## STRIDE Threat Register
 
 | Threat ID | Category | Component | Disposition | Mitigation Plan |
 |-----------|----------|-----------|-------------|-----------------|
-| T-02C-01 | Tampering | localStorage-driven resumeClearData triggers Firestore deletes | accept | Existing behavior preserved; the user's own subcollections only (Firestore Rules enforce ownership). Worst case: a tampered localStorage causes the user to re-delete already-empty collections — idempotent |
-| T-02C-02 | Spoofing | block-by-username Firestore query | accept | Looks up by username then writes only to caller's matches_eliminados; no privilege escalation |
-| T-02C-03 | Information Disclosure | useBlockedUsers reads matches_eliminados (caller's subcollection) | accept | Firestore Rules already restrict access; same data read by the prior inline implementation |
-| T-02C-04 | Denial of Service | searchPublicCards full-collection scan | accept | Inherited from Plan B's service-level implementation; no new cost in this plan |
-| T-02C-05 | Tampering | sendInterestFromSearch shape passed to useGlobalSearch | mitigate | Explicit `toGlobalSearchCard` mapper (if needed) zero-pads optional fields with safe defaults; no untrusted code paths |
-| T-02C-06 | Repudiation | clearAllData state machine partial-failure | mitigate | State persisted to localStorage after each step; resumeClearData picks up where it left off — preserved behavior |
-| T-02C-07 | Information Disclosure | debugPublicCollections globalThis exposure | mitigate | Removed entirely (dead code). Closes a small dev-time information-leak surface |
+| T-02C-01 | Tampering | discardedMatchIds ref mutation moving from inline fn to call site | mitigate | Explicit `discardedMatchIds.value.add(calcMatch.otherUserId)` in handleDiscardMatch — unit-testable behavior preserved. Drift analysis + must_haves truth make this load-bearing. |
+| T-02C-02 | Denial of Service | getTotalUserCount fail-closed changes semantics (was: throws; now: returns 0 → totalUsers clamped to 0) | accept | Net improvement — previously an unhandled getDocs rejection would leave `loading.value = true` permanently. Now it's graceful. |
+| T-02C-03 | Information Disclosure | DashboardView.vue deletion exposes no data (file never rendered) | accept | N/A |
+| T-02C-04 | Repudiation | `/dashboard` redirect preserved — bookmark behavior stable | accept | Router unchanged. |
 </threat_model>
 
 <verification>
 After all three tasks complete:
 
-1. `npm run test:unit` — all tests pass (incl. useClearUserData)
-2. `npx vue-tsc --noEmit` — no type errors
+1. `npm run test:unit` — 541 tests passing (547 - 6 from composable test deletion; 0 new failures)
+2. `npx vue-tsc --noEmit` — 0 errors
 3. `npx vite build` — succeeds
-4. Composable extraction audit:
-   - `grep -n "useBlockedUsers\|useClearUserData\|useDashboardPublicSearch" src/views/DashboardView.vue` → 3 matches (the destructures)
-   - `grep -n "function loadBlockedUsers\|function executeClearData\|function searchPublicCards\|function debugPublicCollections" src/views/DashboardView.vue` → ZERO
-5. Firestore decoupling:
-   - `grep -n "from 'firebase/firestore'" src/views/DashboardView.vue` → ZERO
-   - `grep -n "addDoc\|getDocs\|deleteDoc" src/views/DashboardView.vue` → ZERO
-6. Dead-code deletion:
-   - `grep -rn "debugPublicCollections" src/` → ZERO
-7. Manual smoke (dev): login → dashboard → open blocked-users modal → modal renders, list loads → close modal → run public search → results appear → click suggestion → search refines → click "send interest" → toast appears
+4. **Migration audit greps:**
+   - `grep -n "const groupMatchesByUser\|const loadDiscardedMatches\|const saveMatchesToFirebase\|const discardMatchToFirestore" src/views/SavedMatchesView.vue` → 0 matches
+   - `grep -n "matchesStore.persistCalculatedMatches\|matchesStore.discardCalculatedMatch\|matchesStore.loadDiscardedUserIds" src/views/SavedMatchesView.vue` → 3+ call sites
+   - `grep -rn "DashboardView" src/ tests/ e2e/` — only historical docstrings, no imports
+5. **Line count:** SavedMatchesView is approximately -160 lines (~1030 → ~870).
+6. **Manual smoke on dev** (user or orchestrator):
+   - Login → /saved-matches → matches render with progress
+   - Recalculate → matches update, matches_nuevos cleaned, matches_nuevos docs with `_notificationOf` preserved (check Firestore console)
+   - Save a match → appears in the "Saved" tab
+   - Discard a match → removes from list, does NOT reappear after recalculate (tests `discardedMatchIds.value.add` at the call site)
+   - Visit /dashboard → redirects to /saved-matches (unchanged)
+7. **E2E suite:** existing `e2e/specs/matches/*` suite should pass unchanged. They already target `/saved-matches`.
 </verification>
 
 <success_criteria>
-- 3 new composables exist with the documented APIs
-- 1 new test file passes (useClearUserData state-machine tests, TDD evidence)
-- DashboardView.vue no longer contains: blocked-users state/functions, clear-data state/functions, public-search state/functions, debugPublicCollections, the duplicate sendInterestFromSearch
-- Zero `from 'firebase/firestore'` imports in DashboardView.vue
-- ARCH-01 (composable extraction) — CLOSED
-- ARCH-04 (Firestore behind services/stores) — CLOSED
-- Phase 02 success criterion #1 (no Firestore imports in DashboardView) — CLOSED (line-count check is Plan D)
-- `npm run test:unit && npx vue-tsc --noEmit && npx vite build` all pass
+- SavedMatchesView no longer defines groupMatchesByUser, loadDiscardedMatches, saveMatchesToFirebase, or discardMatchToFirestore inline.
+- SavedMatchesView imports from utils/matchGrouping, services/stats, stores/matches for these responsibilities.
+- The load-bearing `discardedMatchIds.value.add(calcMatch.otherUserId)` mutation is preserved at the call site after `matchesStore.discardCalculatedMatch`.
+- DashboardView.vue file deleted; `/dashboard` redirect in router still works.
+- useDashboardMatches composable + its test file deleted.
+- CLAUDE.md updated (no stale DashboardView references in parallel-sibling guidance).
+- All tests pass (541); type-check clean; build succeeds.
+- Manual smoke on dev confirms identical user-facing behavior.
 </success_criteria>
-
-<output>
-After completion, create `.planning/phases/02-dashboardview-decomposition/02-C-SUMMARY.md` using the template at `@$HOME/.claude/get-shit-done/templates/summary.md`. Include:
-- TDD evidence for useClearUserData
-- Decision and rationale for sendInterestFromSearch shape mapping (direct cast vs. explicit mapper)
-- DashboardView.vue line count before (post-Plan-B) and after this plan
-- Confirmation that BlockedUsersModal component extraction was deferred (per Plan-Phase decision #3)
-- Confirmation that debugPublicCollections was dead code (grep evidence)
-- Any new TODOs left behind (e.g. useScryfallOnlySuggestions follow-up)
-</output>

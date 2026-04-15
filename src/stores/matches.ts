@@ -652,7 +652,7 @@ export const useMatchesStore = defineStore('matches', () => {
      * Step 4: notifyMatchUser per match wrapped in per-match try/catch
      *         (non-blocking: one failed notification does not abort batch).
      */
-    const persistCalculatedMatches = async (matches: Array<{
+    const persistCalculatedMatches = async (matches: {
         id: string
         otherUserId: string
         otherUsername: string
@@ -667,7 +667,7 @@ export const useMatchesStore = defineStore('matches', () => {
         type: 'VENDO' | 'BUSCO' | 'BIDIRECTIONAL' | 'UNIDIRECTIONAL'
         createdAt: Date
         lifeExpiresAt: Date
-    }>): Promise<void> => {
+    }[]): Promise<void> => {
         if (!authStore.user) return;
 
         try {

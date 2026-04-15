@@ -44,12 +44,30 @@ setup('authenticate', async ({ page }) => {
   // Wait for Firebase to persist auth tokens to localStorage
   await page.waitForTimeout(2_000)
 
-  // Set locale to English and mark tour completed
+  // Set locale to English and mark tour completed.
+  // useTour.isTourCompleted() reads cranial_tour_completed_<uid> when authStore.user is set,
+  // so we must explicitly set the user-scoped key alongside the global one — the app never
+  // creates the user-scoped key unless the user actively clicks START TOUR or SKIP.
   await page.evaluate(() => {
     localStorage.setItem('cranial_locale', 'en')
     localStorage.setItem('cranial_tour_completed', 'true')
+
+    // Extract Firebase user UID from the firebase:authUser:* key and set the user-scoped flag.
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
+      if (key?.startsWith('firebase:authUser:')) {
+        const raw = localStorage.getItem(key)
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as { uid?: string }
+            if (parsed.uid) {
+              localStorage.setItem(`cranial_tour_completed_${parsed.uid}`, 'true')
+            }
+          } catch {
+            // ignore parse failures; global key still set above
+          }
+        }
+      }
       if (key?.startsWith('cranial_tour_completed')) {
         localStorage.setItem(key, 'true')
       }

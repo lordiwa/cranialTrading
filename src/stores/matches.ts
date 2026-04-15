@@ -12,6 +12,7 @@ import {
     writeBatch,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { notifyMatchUser } from '../services/cloudFunctions';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
@@ -571,6 +572,170 @@ export const useMatchesStore = defineStore('matches', () => {
         }
     };
 
+    /**
+     * Load the set of otherUserIds the current user has discarded.
+     * Used by useDashboardMatches to filter out previously-discarded matches.
+     * Preserves DashboardView.vue loadDiscardedMatches (lines 171-191) behavior
+     * verbatim: on getDocs error returns empty Set and logs via console.error.
+     */
+    const loadDiscardedUserIds = async (): Promise<Set<string>> => {
+        if (!authStore.user) return new Set();
+        try {
+            const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados');
+            const snapshot = await getDocs(discardedRef);
+            const ids = new Set<string>();
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                if (data.otherUserId) ids.add(data.otherUserId as string);
+            }
+            return ids;
+        } catch (err) {
+            console.error('Error loading discarded matches:', err);
+            return new Set();
+        }
+    };
+
+    /**
+     * Sequential two-step discard (preserves DashboardView:200-228 non-atomic
+     * behavior — NOT wrapped in writeBatch). Amendment D.
+     *
+     * Step 1: addDoc to matches_eliminados.
+     * Step 2: getDocs matches_nuevos + deleteDoc loop for any doc with same
+     *         match.id OR same otherUserId.
+     *
+     * If step 2 throws, step 1 is NOT rolled back — caller sees the error and
+     * must re-run to clean up orphans. Matches existing behavior verbatim.
+     */
+    const discardCalculatedMatch = async (match: {
+        id: string
+        otherUserId: string
+        otherUsername: string
+        otherLocation: string
+        myCards: unknown[]
+        otherCards: unknown[]
+    }): Promise<void> => {
+        if (!authStore.user) return;
+
+        const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados');
+        await addDoc(discardedRef, {
+            id: match.id,
+            otherUserId: match.otherUserId,
+            otherUsername: match.otherUsername,
+            otherLocation: match.otherLocation,
+            myCards: match.myCards ?? [],
+            otherCards: match.otherCards ?? [],
+            status: 'eliminado',
+            eliminatedAt: new Date(),
+            lifeExpiresAt: getMatchExpirationDate(),
+        });
+
+        const nuevosRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
+        const nuevosSnapshot = await getDocs(nuevosRef);
+        for (const docSnap of nuevosSnapshot.docs) {
+            const data = docSnap.data();
+            if (data.id === match.id || data.otherUserId === match.otherUserId) {
+                await deleteDoc(docSnap.ref);
+            }
+        }
+    };
+
+    /**
+     * Persist a freshly-calculated batch of matches into matches_nuevos.
+     * AMENDMENT C — 4-step behavior-preserving port of DashboardView.vue:799-863
+     * saveMatchesToFirebase. MUST skip deleting docs with truthy _notificationOf
+     * (populated by notifyMatchUser Cloud Function AND notifyOtherUser store
+     * method at line 513). Deleting these drops incoming cross-user notifications.
+     *
+     * Step 1: getDocs existing matches_nuevos.
+     * Step 2: deleteDoc every doc WITHOUT _notificationOf.
+     * Step 3: addDoc each new CalculatedMatch.
+     * Step 4: notifyMatchUser per match wrapped in per-match try/catch
+     *         (non-blocking: one failed notification does not abort batch).
+     */
+    const persistCalculatedMatches = async (matches: Array<{
+        id: string
+        otherUserId: string
+        otherUsername: string
+        otherLocation: string
+        otherEmail?: string
+        myCards: unknown[]
+        otherCards: unknown[]
+        myTotalValue: number
+        theirTotalValue: number
+        valueDifference: number
+        compatibility: number
+        type: 'VENDO' | 'BUSCO' | 'BIDIRECTIONAL' | 'UNIDIRECTIONAL'
+        createdAt: Date
+        lifeExpiresAt: Date
+    }>): Promise<void> => {
+        if (!authStore.user) return;
+
+        try {
+            const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
+
+            // Step 1+2: Only delete self-calculated matches, preserve notification docs
+            // from other users (notification docs have _notificationOf field set by
+            // the cloud function or notifyOtherUser store method).
+            const existingSnapshot = await getDocs(matchesRef);
+            for (const docSnap of existingSnapshot.docs) {
+                if (!(docSnap.data())._notificationOf) {
+                    await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id));
+                }
+            }
+
+            // Step 3: Now save the new ones and (step 4) notify the other user.
+            for (const match of matches) {
+                await addDoc(matchesRef, {
+                    id: match.id,
+                    otherUserId: match.otherUserId,
+                    otherUsername: match.otherUsername,
+                    otherLocation: match.otherLocation,
+                    otherEmail: match.otherEmail,
+                    myCards: match.myCards ?? [],
+                    otherCards: match.otherCards ?? [],
+                    myTotalValue: match.myTotalValue,
+                    theirTotalValue: match.theirTotalValue,
+                    valueDifference: match.valueDifference,
+                    compatibility: match.compatibility,
+                    type: match.type,
+                    status: 'nuevo',
+                    createdAt: match.createdAt,
+                    lifeExpiresAt: match.lifeExpiresAt,
+                });
+
+                // Step 4: Notify the other user via Cloud Function.
+                // This bypasses security rules to write to their matches_nuevos collection.
+                // Per-match try/catch keeps this non-blocking — one failed notification
+                // does not abort the batch.
+                try {
+                    await notifyMatchUser({
+                        targetUserId: match.otherUserId,
+                        matchId: match.id,
+                        fromUserId: authStore.user.id,
+                        fromUsername: authStore.user.username,
+                        fromLocation: authStore.user.location,
+                        fromAvatarUrl: authStore.user.avatarUrl,
+                        myCards: (match.myCards ?? []) as Record<string, unknown>[],
+                        otherCards: (match.otherCards ?? []) as Record<string, unknown>[],
+                        myTotalValue: match.myTotalValue,
+                        theirTotalValue: match.theirTotalValue,
+                        valueDifference: match.valueDifference,
+                        compatibility: match.compatibility,
+                        type: match.type as 'BIDIRECTIONAL' | 'UNIDIRECTIONAL',
+                    });
+                    console.info(`Notified ${match.otherUsername} about match`);
+                } catch (notifyErr) {
+                    // Log but don't fail the whole operation if notification fails
+                    console.warn(`Could not notify ${match.otherUsername}:`, notifyErr);
+                }
+            }
+
+            console.info(`${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`);
+        } catch (err) {
+            console.error('Error guardando matches:', err);
+        }
+    };
+
     return {
         newMatches,
         sentMatches,
@@ -585,5 +750,9 @@ export const useMatchesStore = defineStore('matches', () => {
         notifyOtherUser,
         getUnseenCount,
         isMatchSaved,
+        // Plan 02-B: match-calculation pipeline (Amendments C, D, G)
+        loadDiscardedUserIds,
+        discardCalculatedMatch,
+        persistCalculatedMatches,
     };
 });

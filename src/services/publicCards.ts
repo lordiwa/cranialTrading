@@ -13,6 +13,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  type DocumentData,
   getDocs,
   query,
   setDoc,
@@ -466,4 +467,62 @@ export async function getUserPublicPreferences(userId: string): Promise<PublicPr
   )
   const snapshot = await getDocs(q)
   return snapshot.docs.map(d => ({ ...d.data(), docId: d.id } as PublicPreference))
+}
+
+/**
+ * Shape of a public_cards search result — matches the inline interface
+ * formerly defined in src/views/DashboardView.vue.
+ *
+ * AMENDMENT B — `extends DocumentData` is REQUIRED so the consumer's
+ * `{ id: d.id, ...d.data() } as PublicCardSearchResult` cast compiles.
+ */
+export interface PublicCardSearchResult extends DocumentData {
+  id: string
+  cardName?: string
+  userId?: string
+  edition?: string
+  condition?: string
+  price?: number
+  image?: string
+  username?: string
+  avatarUrl?: string
+  status?: string
+  scryfallId?: string
+  cardId?: string
+  quantity?: number
+  foil?: boolean
+  location?: string
+}
+
+/**
+ * Search the denormalized public_cards collection for a card name.
+ * Excludes the caller's own cards. Currently does a full-collection
+ * scan + client-side substring match (matches DashboardView's prior
+ * behavior verbatim — to be optimized in a future phase if scale demands).
+ *
+ * AMENDMENT B — slice(0, 20) preserves DashboardView:975 cap.
+ *
+ * @param term Search term, case-insensitive substring match on cardName
+ * @param excludeUserId Caller's userId — results owned by this user are filtered out
+ */
+export const searchPublicCards = async (
+  term: string,
+  excludeUserId: string,
+): Promise<PublicCardSearchResult[]> => {
+  const trimmed = term.trim()
+  if (!trimmed) return []
+  const normalised = trimmed.toLowerCase()
+
+  const cardsRef = collection(db, 'public_cards')
+  const snapshot = await getDocs(cardsRef)
+
+  const results: PublicCardSearchResult[] = []
+  for (const docSnap of snapshot.docs) {
+    const data = { id: docSnap.id, ...docSnap.data() } as PublicCardSearchResult
+    if (data.userId === excludeUserId) continue
+    const name = (data.cardName ?? '').toLowerCase()
+    if (!name.includes(normalised)) continue
+    results.push(data)
+  }
+  return results.slice(0, 20) // Preserves DashboardView:975 cap
 }

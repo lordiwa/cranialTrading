@@ -16,7 +16,6 @@ import {
   findCardsMatchingPreferences,
   findPreferencesMatchingCards,
 } from '../services/publicCards'
-import { notifyMatchUser } from '../services/cloudFunctions'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseModal from '../components/ui/BaseModal.vue'
@@ -193,61 +192,6 @@ const loadSavedMatchesWithEmails = async () => {
     matchesWithEmails.value = matchesWithData
   } catch {
     // ignore
-  }
-}
-
-// ========== DISCARDED MATCHES ==========
-
-const loadDiscardedMatches = async () => {
-  if (!authStore.user) return
-
-  try {
-    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
-    const snapshot = await getDocs(discardedRef)
-
-    const ids = new Set<string>()
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data() as Record<string, unknown>
-      if (data.otherUserId) {
-        ids.add(data.otherUserId as string)
-      }
-    }
-    discardedMatchIds.value = ids
-  } catch (err) {
-    console.error('Error loading discarded matches:', err)
-    discardedMatchIds.value = new Set()
-  }
-}
-
-const discardMatchToFirestore = async (match: SimpleMatch) => {
-  if (!authStore.user) return
-
-  try {
-    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
-    await addDoc(discardedRef, {
-      id: match.id,
-      otherUserId: match.otherUserId,
-      otherUsername: match.otherUsername,
-      otherLocation: match.otherLocation,
-      myCards: match.myCards ?? [],
-      otherCards: match.otherCards ?? [],
-      status: 'eliminado',
-      eliminatedAt: new Date(),
-      lifeExpiresAt: getMatchExpirationDate(),
-    })
-
-    discardedMatchIds.value.add(match.otherUserId)
-
-    const nuevosRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
-    const nuevosSnapshot = await getDocs(nuevosRef)
-    for (const docSnap of nuevosSnapshot.docs) {
-      const data = docSnap.data() as Record<string, unknown>
-      if (data.id === match.id || data.otherUserId === match.otherUserId) {
-        await deleteDoc(docSnap.ref)
-      }
-    }
-  } catch (err) {
-    console.error('Error discarding match:', err)
   }
 }
 
@@ -525,8 +469,28 @@ const calculateMatches = async () => {
     calculatedMatches.value = foundMatches.filter(m => !discardedMatchIds.value.has(m.otherUserId))
 
     // Persistir matches en Firestore
+    // SimpleMatch has optional otherLocation/otherEmail but persistCalculatedMatches
+    // requires strings — coerce via defaults at the call boundary (preserves behavior:
+    // foundMatches always has non-empty otherLocation/otherEmail from data.location/data.email).
     if (foundMatches.length > 0) {
-      await saveMatchesToFirebase(foundMatches)
+      await matchesStore.persistCalculatedMatches(
+        foundMatches.map(m => ({
+          id: m.id,
+          otherUserId: m.otherUserId,
+          otherUsername: m.otherUsername,
+          otherLocation: m.otherLocation ?? '',
+          otherEmail: m.otherEmail ?? '',
+          myCards: m.myCards ?? [],
+          otherCards: m.otherCards ?? [],
+          myTotalValue: m.myTotalValue ?? 0,
+          theirTotalValue: m.theirTotalValue ?? 0,
+          valueDifference: m.valueDifference ?? 0,
+          compatibility: m.compatibility ?? 0,
+          type: m.type,
+          createdAt: m.createdAt,
+          lifeExpiresAt: m.lifeExpiresAt ?? getMatchExpirationDate(),
+        }))
+      )
     }
 
     // Reload matches from Firestore to sync store state with what was just written
@@ -537,66 +501,6 @@ const calculateMatches = async () => {
     loading.value = false
     progressCurrent.value = 0
     progressTotal.value = 0
-  }
-}
-
-const saveMatchesToFirebase = async (matches: SimpleMatch[]) => {
-  if (!authStore.user) return
-
-  try {
-    const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
-
-    // Only delete self-calculated matches, preserve notification docs from other users
-    // (notification docs have _notificationOf field set by the cloud function)
-    const existingSnapshot = await getDocs(matchesRef)
-    for (const docSnap of existingSnapshot.docs) {
-      if (!(docSnap.data() as Record<string, unknown>)._notificationOf) {
-        await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
-      }
-    }
-
-    // Guardar los nuevos y notificar
-    for (const match of matches) {
-      await addDoc(matchesRef, {
-        id: match.id,
-        otherUserId: match.otherUserId,
-        otherUsername: match.otherUsername,
-        otherLocation: match.otherLocation,
-        otherEmail: match.otherEmail,
-        myCards: match.myCards ?? [],
-        otherCards: match.otherCards ?? [],
-        myTotalValue: match.myTotalValue,
-        theirTotalValue: match.theirTotalValue,
-        valueDifference: match.valueDifference,
-        compatibility: match.compatibility,
-        type: match.type,
-        status: 'nuevo',
-        createdAt: match.createdAt,
-        lifeExpiresAt: match.lifeExpiresAt,
-      })
-
-      try {
-        await notifyMatchUser({
-          targetUserId: match.otherUserId,
-          matchId: match.id,
-          fromUserId: authStore.user.id,
-          fromUsername: authStore.user.username,
-          fromLocation: authStore.user.location,
-          fromAvatarUrl: authStore.user.avatarUrl,
-          myCards: (match.myCards ?? []) as unknown as Record<string, unknown>[],
-          otherCards: (match.otherCards ?? []) as unknown as Record<string, unknown>[],
-          myTotalValue: match.myTotalValue,
-          theirTotalValue: match.theirTotalValue,
-          valueDifference: match.valueDifference,
-          compatibility: match.compatibility ?? 0,
-          type: match.type as 'BIDIRECTIONAL' | 'UNIDIRECTIONAL',
-        })
-      } catch (notifyErr) {
-        console.warn(`Could not notify ${match.otherUsername}:`, notifyErr)
-      }
-    }
-  } catch (err) {
-    console.error('Error guardando matches:', err)
   }
 }
 
@@ -611,7 +515,16 @@ const handleDiscardMatch = async (matchId: string) => {
   // Check if this is a calculated match (from the engine)
   const calcMatch: SimpleMatch | undefined = calculatedMatches.value.find(m => m.id === matchId)
   if (calcMatch) {
-    await discardMatchToFirestore(calcMatch)
+    // SimpleMatch.otherLocation is optional; store requires string — coerce at boundary.
+    await matchesStore.discardCalculatedMatch({
+      id: calcMatch.id,
+      otherUserId: calcMatch.otherUserId,
+      otherUsername: calcMatch.otherUsername,
+      otherLocation: calcMatch.otherLocation ?? '',
+      myCards: calcMatch.myCards ?? [],
+      otherCards: calcMatch.otherCards ?? [],
+    })
+    discardedMatchIds.value.add(calcMatch.otherUserId) // preserve mutation that was inline in the deleted function
     calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
     toastStore.show(t('matches.messages.deleted'), 'info')
     return
@@ -662,7 +575,7 @@ onMounted(async () => {
   if (!authStore.user) return
 
   // Load discarded matches from Firestore
-  await loadDiscardedMatches()
+  discardedMatchIds.value = await matchesStore.loadDiscardedUserIds()
 
   loading.value = true
   try {

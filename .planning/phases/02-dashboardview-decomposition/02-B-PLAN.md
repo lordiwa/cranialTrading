@@ -21,13 +21,26 @@ requirements:
 must_haves:
   truths:
     - "useMatchesStore exposes loadDiscardedUserIds(): Promise<Set<string>>, persistCalculatedMatches(matches: CalculatedMatch[]): Promise<void>, and discardCalculatedMatch(match: CalculatedMatch): Promise<void>"
-    - "discardCalculatedMatch atomically writes to matches_eliminados AND removes any matching docs from matches_nuevos in the same call (preserves DashboardView lines 193-228 behavior)"
-    - "persistCalculatedMatches writes to matches_nuevos AND triggers notifyMatchUser cloud-function call (preserves DashboardView saveMatchesToFirebase behavior)"
+    - "discardCalculatedMatch performs the same sequential two-step write as DashboardView:200-228 (addDoc to matches_eliminados, then getDocs + deleteDoc loop on matching matches_nuevos docs). NOT wrapped in writeBatch — preserves non-atomic behavior verbatim."
+    - "persistCalculatedMatches MUST skip deleting any matches_nuevos doc whose _notificationOf field is truthy. Two writers populate this field: (1) the notifyMatchUser Cloud Function (functions/index.js:148) and (2) matchesStore.notifyOtherUser (stores/matches.ts:513). Deleting these docs silently drops incoming cross-user notifications."
+    - "persistCalculatedMatches is a 4-step sequence: (a) getDocs existing matches_nuevos for authStore.user.id, (b) deleteDoc every doc WITHOUT _notificationOf, (c) addDoc each new CalculatedMatch, (d) call notifyMatchUser Cloud Function per new match, wrapped in per-match try/catch that console.warns and continues (non-blocking — one failed notification does not fail the batch)."
+    - "handleDiscardMatch signature is (matchId: string): Promise<void> — NOT (match: CalculatedMatch). MatchCard @discard emits a string id. Handler body: calculatedMatches.value.find(m => m.id === matchId); if missing, early return; otherwise await matchesStore.discardCalculatedMatch(match), then discardedMatchIds.value.add(match.otherUserId), then calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId), then toastStore.show(t('matches.messages.deleted'), 'info'). NO confirm modal."
+    - "handleSaveMatch delegates to the EXISTING matchesStore.saveMatch(match: SimpleMatch) method at stores/matches.ts:395 — does NOT introduce a new addMatch / persistSingleMatch method. The SimpleMatch payload is constructed with the 13-field shape at DashboardView:868-890 including the lossy type coercion (see next truth)."
+    - "handleSaveMatch preserves the lossy type coercion 'type: match.type === VENDO ? VENDO : BUSCO' (DashboardView:872). SimpleMatch.type is 3-valued (VENDO|BUSCO|BIDIRECTIONAL) but this coercion funnels BOTH BIDIRECTIONAL and UNIDIRECTIONAL to BUSCO — existing known behavior. Do NOT 'fix' in Plan B; record as tech debt in SUMMARY."
+    - "useDashboardMatches imports SimpleMatch AND MatchCard (aliased as MatchCardType) from '../stores/matches' for handleSaveMatch payload typing."
+    - "discardedMatchIds is a Ref<Set<string>> keyed by otherUserId (not by match.id). Semantics: discarding one match blocks the user entirely — preserves DashboardView:147+774+214 behavior."
+    - "loadDiscardedUserIds has NO date/expiry filter. Loads every otherUserId ever discarded in matches_eliminados into a Set. On getDocs error, resets discardedMatchIds.value to new Set() and console.errors — preserves DashboardView:171-191 behavior verbatim."
+    - "useDashboardMatches exposes discardedMatchIds + calculateMatches so Plan C's useBlockedUsers can receive them as parameters from the single useDashboardMatches() instance in DashboardView. DO NOT invoke useDashboardMatches() twice — composable-scoped refs would desync."
+    - "initMatchData is split into two exported functions: loadDiscardedUserIds() and loadTotalUsers(). DashboardView onMounted keeps the exact ordering from DashboardView:447-468 — await loadDiscardedUserIds() BEFORE the loading.value = true try-block; await loadTotalUsers() INSIDE the try-block."
+    - "searchPublicCards service caps results via .slice(0, 20) INSIDE the service (preserves DashboardView:975 cap). Scryfall fallback stays in the VIEW (Plan C owns the wrapper). Service is Scryfall-free."
+    - "PublicCardSearchResult in services/publicCards.ts extends DocumentData (import from firebase/firestore)."
+    - "getTotalUserCount returns 0 on any Firestore failure (fail-closed, two-level fallback: getCountFromServer → getDocs → 0). Consumer clamps Math.max(0, result - 1) for self-exclusion."
+    - "Plan B does NOT fix the async onMounted anti-pattern (4 awaits at DashboardView:448, 453, 460, 467 violate MEMORY.md CRITICAL). The await chain is preserved verbatim — only function NAMES change. Plan D owns AXSS-07."
     - "src/services/publicCards.ts exports searchPublicCards(term, excludeUserId): Promise<PublicCardSearchResult[]>"
     - "src/services/stats.ts exports getTotalUserCount(): Promise<number> (uses getCountFromServer if firebase >= 9.12 else falls back to getDocs(collection))"
-    - "useDashboardMatches composable owns calculatedMatches, loading, progressCurrent, progressTotal, totalUsers refs and exposes calculateMatches(), recalculateMatches(), handleSaveMatch(), handleDiscardMatch(), initMatchData(), discardedMatchIds (read-only)"
+    - "useDashboardMatches composable owns calculatedMatches, loading, progressCurrent, progressTotal, totalUsers refs and exposes calculateMatches(), recalculateMatches(), handleSaveMatch(), handleDiscardMatch(), loadDiscardedUserIds(), loadTotalUsers(), discardedMatchIds"
     - "DashboardView.vue NO LONGER defines calculateMatches, saveMatchesToFirebase, loadDiscardedMatches, discardMatchToFirestore, handleSaveMatch, handleDiscardMatch, recalculateMatches, totalUsers ref, calculatedMatches ref, progressCurrent ref, progressTotal ref"
-    - "DashboardView.vue NO LONGER imports findCardsMatchingPreferences, findPreferencesMatchingCards, notifyMatchUser, PublicCard, PublicPreference (those are consumed inside the composable / store now)"
+    - "DashboardView.vue NO LONGER imports findCardsMatchingPreferences, findPreferencesMatchingCards, notifyMatchUser, PublicCard, PublicPreference (those are consumed inside the composable / store now). unblockUser and handleBlockByUsername in DashboardView remain UNCHANGED — they read discardedMatchIds + calculateMatches from the destructured composable; they move to Plan C's useBlockedUsers which receives those as parameters."
     - "DashboardView.vue still imports CalculatedMatch type — re-exported from useDashboardMatches"
   artifacts:
     - path: "src/composables/useDashboardMatches.ts"
@@ -45,16 +58,25 @@ must_haves:
   key_links:
     - from: "src/views/DashboardView.vue"
       to: "src/composables/useDashboardMatches.ts"
-      via: "const { calculatedMatches, loading, totalUsers, progressCurrent, progressTotal, calculateMatches, recalculateMatches, handleSaveMatch, handleDiscardMatch, initMatchData } = useDashboardMatches()"
+      via: "const { calculatedMatches, loading, totalUsers, progressCurrent, progressTotal, discardedMatchIds, calculateMatches, recalculateMatches, handleSaveMatch, handleDiscardMatch, loadDiscardedUserIds, loadTotalUsers } = useDashboardMatches()"
     - from: "src/composables/useDashboardMatches.ts"
-      to: "src/stores/matches.ts loadDiscardedUserIds + persistCalculatedMatches + discardCalculatedMatch"
-      via: "matchesStore.loadDiscardedUserIds() / matchesStore.persistCalculatedMatches(found) / matchesStore.discardCalculatedMatch(m)"
+      to: "src/stores/matches.ts loadDiscardedUserIds + persistCalculatedMatches + discardCalculatedMatch + saveMatch (EXISTING)"
+      via: "matchesStore.loadDiscardedUserIds() / matchesStore.persistCalculatedMatches(found) / matchesStore.discardCalculatedMatch(m) / matchesStore.saveMatch(simpleMatch)"
     - from: "src/composables/useDashboardMatches.ts"
       to: "src/services/publicCards.ts findCardsMatchingPreferences + findPreferencesMatchingCards"
       via: "direct imports — DashboardView no longer touches publicCards"
     - from: "src/services/stats.ts getTotalUserCount"
       to: "Firestore /users collection count"
-      via: "getCountFromServer(collection(db, 'users')) — fallback to getDocs(...).docs.length if SDK feature unavailable"
+      via: "getCountFromServer(collection(db, 'users')) — fallback to getDocs(...).docs.length if SDK feature unavailable; returns 0 on all failures"
+    - from: "src/composables/useDashboardMatches.ts"
+      to: "src/composables/useBlockedUsers.ts (Plan C)"
+      via: "discardedMatchIds + calculateMatches passed as parameters — NEVER via a second useDashboardMatches() call (would desync the Set)"
+    - from: "src/stores/matches.ts persistCalculatedMatches"
+      to: "src/services/cloudFunctions.ts notifyMatchUser"
+      via: "per-match invocation inside per-match try/catch — console.warn on failure, continue to next match (non-blocking)"
+    - from: "src/stores/matches.ts persistCalculatedMatches"
+      to: "matches_nuevos docs with _notificationOf field"
+      via: "MUST skip deleteDoc when _notificationOf is truthy (preserves cross-user notifications from notifyMatchUser CF AND notifyOtherUser store method at stores/matches.ts:513)"
 ---
 
 <objective>
@@ -163,6 +185,203 @@ interface CalculatedMatch {
 </context>
 
 <tasks>
+
+<!-- ============================================================ -->
+<!-- REMEDIATION AMENDMENTS (2026-04-15) — READ FIRST              -->
+<!-- These amendments SUPERSEDE the inline stubs below wherever   -->
+<!-- they conflict. Every amendment was derived from 3 rounds of  -->
+<!-- investigation against the live develop branch. Violations    -->
+<!-- will cause silent data loss, UX regressions, or TS errors.   -->
+<!-- ============================================================ -->
+
+<remediation_amendments>
+
+**AMENDMENT A — `getTotalUserCount` must fail-closed:** The stub in Task 1.A shows a try/catch around `getCountFromServer` only. The fallback `getDocs` path ALSO throws on Firestore Rules rejection. Wrap BOTH in a nested try/catch that returns `0` on any failure. Consumer clamps `Math.max(0, result - 1)` for self-exclusion.
+
+```typescript
+export const getTotalUserCount = async (): Promise<number> => {
+  const usersRef = collection(db, 'users')
+  try {
+    const snapshot = await getCountFromServer(usersRef)
+    return snapshot.data().count
+  } catch {
+    try {
+      const docsSnap = await getDocs(usersRef)
+      return docsSnap.docs.length
+    } catch {
+      return 0 // Fail-closed; caller clamps Math.max(0, n - 1)
+    }
+  }
+}
+```
+
+**AMENDMENT B — `PublicCardSearchResult` extends DocumentData + service applies `.slice(0, 20)`:** The stub at Task 1.B defines the interface WITHOUT `extends DocumentData`; the consumer's `{ id: d.id, ...d.data() } as PublicCardSearchResult` cast requires it. The stub also does NOT slice — the current inline behavior at `DashboardView.vue:975` caps at 20. Both must be added:
+
+```typescript
+import type { DocumentData } from 'firebase/firestore'
+// ...
+export interface PublicCardSearchResult extends DocumentData {
+  id: string
+  cardName?: string
+  userId?: string
+  edition?: string
+  condition?: string
+  price?: number
+  image?: string
+  username?: string
+  avatarUrl?: string
+  status?: string
+  scryfallId?: string
+  cardId?: string
+  quantity?: number
+  foil?: boolean
+  location?: string
+}
+
+export const searchPublicCards = async (term: string, excludeUserId: string): Promise<PublicCardSearchResult[]> => {
+  // ... existing body from Task 1.B stub ...
+  return results.slice(0, 20) // Preserves DashboardView:975 cap
+}
+```
+
+**AMENDMENT C — `persistCalculatedMatches` MUST preserve the `_notificationOf` filter and follow exact 4-step sequence:** The stub in Task 1.C instructs a "verbatim port" but the executor MUST NOT collapse the filter. Two writers set `_notificationOf`: the `notifyMatchUser` Cloud Function (`functions/index.js:148`) AND `matchesStore.notifyOtherUser` (`src/stores/matches.ts:513`). Delete-all-then-write = silent loss of incoming cross-user notifications.
+
+Required 4-step body (port verbatim from DashboardView saveMatchesToFirebase):
+
+```typescript
+const persistCalculatedMatches = async (matches: CalculatedMatch[]): Promise<void> => {
+  if (!authStore.user || matches.length === 0) return
+  const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
+
+  // Step 1+2: getDocs, delete-only-non-notification-docs (preserves _notificationOf)
+  const existingSnapshot = await getDocs(matchesRef)
+  for (const docSnap of existingSnapshot.docs) {
+    if (!(docSnap.data())._notificationOf) {
+      await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
+    }
+  }
+
+  // Step 3: addDoc each new match (port field shape from DashboardView inline write)
+  for (const m of matches) {
+    await addDoc(matchesRef, { /* same fields as DashboardView's inline write */ })
+  }
+
+  // Step 4: notifyMatchUser per match, per-match try/catch, non-blocking (one failure does NOT abort batch)
+  for (const m of matches) {
+    try {
+      await notifyMatchUser({ /* per contract at services/cloudFunctions.ts */ })
+    } catch (err) {
+      console.warn('notifyMatchUser failed for match', m.id, err)
+    }
+  }
+}
+```
+
+**AMENDMENT D — `discardCalculatedMatch` is sequential two-step, NOT atomic:** The stub's docstring calls it "Atomic discard" — rename to "Sequential two-step discard (preserves DashboardView:200-228 non-atomic behavior — NOT wrapped in writeBatch)." Implementation stays as already written in the stub (addDoc + getDocs + deleteDoc loop). The test must assert non-atomic behavior is preserved (see Amendment H).
+
+**AMENDMENT E — `handleDiscardMatch` signature is `(matchId: string)` and has NO confirm modal:** The Task 2 composable stub declares `(match: CalculatedMatch)` and says "Confirms via confirmStore" — BOTH ARE WRONG. MatchCard's `@discard` event emits a string id. There is no confirm modal today. Replace the stub entirely with:
+
+```typescript
+const handleDiscardMatch = async (matchId: string): Promise<void> => {
+  const match = calculatedMatches.value.find(m => m.id === matchId)
+  if (!match) return
+  await matchesStore.discardCalculatedMatch(match)
+  discardedMatchIds.value.add(match.otherUserId) // blocks user from reappearing in next recalc
+  calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
+  toastStore.show(t('matches.messages.deleted'), 'info')
+}
+```
+
+Do NOT import `useConfirmStore` in the composable — it's not used.
+
+**AMENDMENT F — `handleSaveMatch` delegates to EXISTING `matchesStore.saveMatch` with lossy coercion preserved:** The Task 2 composable stub leaves `handleSaveMatch` empty. DO NOT introduce a new store method. Use the existing `saveMatch(match: SimpleMatch)` at `stores/matches.ts:395`. The 13-field payload includes a LOSSY type coercion that MUST be preserved:
+
+```typescript
+import { type MatchCard as MatchCardType, type SimpleMatch, useMatchesStore } from '../stores/matches'
+
+const handleSaveMatch = async (match: CalculatedMatch): Promise<void> => {
+  const matchToSave: SimpleMatch = {
+    id: match.id,
+    // PRESERVED LOSSY COERCION from DashboardView:872 —
+    // BIDIRECTIONAL + UNIDIRECTIONAL both become BUSCO (existing tech debt).
+    // DO NOT FIX in Plan B; log to SUMMARY as known issue.
+    type: (match.type === 'VENDO' ? 'VENDO' : 'BUSCO'),
+    otherUserId: match.otherUserId,
+    otherUsername: match.otherUsername,
+    otherLocation: match.otherLocation,
+    myCards: (match.myCards ?? []) as MatchCardType[],
+    otherCards: (match.otherCards ?? []) as MatchCardType[],
+    myTotalValue: match.myTotalValue,
+    theirTotalValue: match.theirTotalValue,
+    valueDifference: match.valueDifference,
+    compatibility: match.compatibility,
+    createdAt: match.createdAt,
+    status: 'nuevo' as const,
+  }
+  await matchesStore.saveMatch(matchToSave)
+  toastStore.show(t('matches.messages.saved'), 'success')
+}
+```
+
+**AMENDMENT G — `initMatchData` is split into `loadDiscardedUserIds` + `loadTotalUsers`:** The Task 2 composable stub bundles both — this shifts `loadTotalUsers` OUTSIDE DashboardView's `loading.value = true` spinner block. Split them so DashboardView preserves the exact ordering from `DashboardView.vue:447-468`:
+
+```typescript
+const loadDiscardedUserIds = async (): Promise<void> => {
+  discardedMatchIds.value = await matchesStore.loadDiscardedUserIds()
+}
+
+const loadTotalUsers = async (): Promise<void> => {
+  totalUsers.value = Math.max(0, (await getTotalUserCount()) - 1)
+}
+```
+
+Replace `initMatchData` in the composable's return object with BOTH `loadDiscardedUserIds` and `loadTotalUsers`. DashboardView calls them in the correct order (see Amendment J).
+
+**AMENDMENT H — Additional test cases for `matches.persistCalculated.test.ts`:** Add these 4 cases to the existing 3 test cases in the stub:
+
+1. **`_notificationOf` preservation** — mock `getDocs` to return 3 docs, one with `_notificationOf: 'abc'`. Assert `deleteDoc` called exactly twice (on the 2 without `_notificationOf`).
+2. **4-step call order** — use spies on `getDocs`, `deleteDoc`, `addDoc`, `notifyMatchUser`. Assert order: getDocs → deleteDoc(s) → addDoc(s) → notifyMatchUser(s).
+3. **`notifyMatchUser` failure is non-blocking** — mock one notifyMatchUser call to throw. Assert `console.warn` fires, other matches still get `addDoc`'d, other `notifyMatchUser` calls still fire.
+4. **Non-atomic discard** — mock `addDoc` to succeed, first `deleteDoc` to throw. Assert the error propagates to caller AND no rollback is attempted.
+
+**AMENDMENT I — `discardedMatchIds` is keyed by `otherUserId` + composable state-sharing contract:** The Ref<Set<string>> at the composable top stores user IDs (not match IDs) — discarding one match blocks all future matches with that user (preserves current semantics). Plan C's `useBlockedUsers` must receive `discardedMatchIds` + `calculateMatches` as PARAMETERS from the single `useDashboardMatches()` instance in DashboardView. DO NOT call `useDashboardMatches()` a second time in any other composable — Vue returns fresh refs per call, which would desync the Set.
+
+**AMENDMENT J — DashboardView onMounted preserves 4-await chain with split helpers:** Task 3 step 7 told the executor to use `initMatchData`. Instead, use the split helpers to preserve DashboardView:447-468 ordering exactly:
+
+```typescript
+onMounted(async () => {
+  document.addEventListener('click', handleClickOutside)
+  if (!authStore.user) return
+
+  // ... existing clear-data logic ...
+
+  await loadDiscardedUserIds() // BEFORE loading spinner (matches line 448)
+
+  loading.value = true
+  try {
+    await Promise.all([
+      collectionStore.loadCollection(),
+      preferencesStore.loadPreferences(),
+    ])
+    await loadTotalUsers() // INSIDE spinner (matches line 460 ordering)
+    if (collectionStore.cards.length > 0 || preferencesStore.preferences.length > 0) {
+      await calculateMatches()
+    }
+  } finally {
+    loading.value = false
+  }
+})
+```
+
+Plan B does NOT fix the async-onMounted anti-pattern (4 awaits remain). Plan D owns AXSS-07.
+
+**AMENDMENT K — `unblockUser` and `handleBlockByUsername` stay in DashboardView for this plan:** Both functions mutate `discardedMatchIds.value` and `await calculateMatches()`. After Task 3's destructure, they read both from the composable-scoped refs. Leave their bodies UNCHANGED in Task 3. Plan C will move them to `useBlockedUsers`.
+
+**AMENDMENT L — No E2E coverage on `/dashboard`:** All existing matches E2E specs target `/saved-matches`. Plan D adds `/dashboard` specs. For Plan B the only automated safety net is the unit tests above. Manual smoke on dev is required before production merge — note this explicitly in SUMMARY.
+
+**AMENDMENT M — Remove `useConfirmStore` import and `CardCondition/CardStatus` imports if unused:** The composable stub imports `useConfirmStore` — remove per Amendment E. The `CardCondition, CardStatus` imports stay if referenced inside the preserved `buildMatchFromUserGroup` function (verify before removing).
+
+</remediation_amendments>
 
 <task type="auto">
   <name>Task 1: Extend matches.ts store with 3 new methods + create stats.ts service + extend publicCards.ts service</name>
@@ -642,8 +861,10 @@ import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useMatchesStore } from '../stores/matches'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
-import { useConfirmStore } from '../stores/confirm'
+// useConfirmStore NOT imported — Amendment E removed the confirm modal from handleDiscardMatch
 import { useToastStore } from '../stores/toast'
+// Amendment F: SimpleMatch + MatchCard type imports for handleSaveMatch payload
+import { type MatchCard as MatchCardType, type SimpleMatch } from '../stores/matches'
 import { useI18n } from './useI18n'
 import {
   findCardsMatchingPreferences,
@@ -759,7 +980,7 @@ export function useDashboardMatches() {
   const preferencesStore = usePreferencesStore()
   const matchesStore = useMatchesStore()
   const priceMatching = usePriceMatchingStore()
-  const confirmStore = useConfirmStore()
+  // NOTE: useConfirmStore REMOVED per Amendment E — handleDiscardMatch has no confirm modal
   const toastStore = useToastStore()
   const { t } = useI18n()
 
@@ -770,10 +991,7 @@ export function useDashboardMatches() {
   const totalUsers = ref(0)
   const discardedMatchIds = ref<Set<string>>(new Set())
 
-  /** Load discarded user IDs (called by initMatchData / on demand). */
-  const loadDiscardedMatches = async (): Promise<void> => {
-    discardedMatchIds.value = await matchesStore.loadDiscardedUserIds()
-  }
+  // `loadDiscardedMatches` REMOVED — replaced by Amendment G's `loadDiscardedUserIds` below (same body, canonical name).
 
   /**
    * Calculate matches by pulling the caller's collection + preferences
@@ -843,25 +1061,45 @@ export function useDashboardMatches() {
     await calculateMatches()
   }
 
-  /** Save handler — defers to existing matchesStore.saveMatch. */
+  /** Save handler — see Amendment F for the authoritative 13-field SimpleMatch payload with preserved lossy type coercion. */
   const handleSaveMatch = async (match: CalculatedMatch): Promise<void> => {
-    // PORT verbatim from DashboardView.vue handleSaveMatch (current ~line 916-935).
-    // Reads the original closure, calls matchesStore.saveMatch, shows toast.
-    // Do not "improve" — Anti-loop Rule 2.
+    // IMPLEMENT per Amendment F (verbatim):
+    //   const matchToSave: SimpleMatch = {
+    //     id, type: (match.type === 'VENDO' ? 'VENDO' : 'BUSCO'), otherUserId,
+    //     otherUsername, otherLocation,
+    //     myCards: (match.myCards ?? []) as MatchCardType[],
+    //     otherCards: (match.otherCards ?? []) as MatchCardType[],
+    //     myTotalValue, theirTotalValue, valueDifference, compatibility,
+    //     createdAt, status: 'nuevo' as const,
+    //   }
+    //   await matchesStore.saveMatch(matchToSave) // EXISTING method at stores/matches.ts:395 — do NOT create addMatch
+    //   toastStore.show(t('matches.messages.saved'), 'success')
+    // Preserve the lossy VENDO/BUSCO coercion exactly — see Amendment F rationale.
   }
 
-  /** Discard handler — confirms then delegates to store.discardCalculatedMatch. */
-  const handleDiscardMatch = async (match: CalculatedMatch): Promise<void> => {
-    // PORT verbatim from DashboardView.vue handleDiscardMatch (current ~line 937-957).
-    // Confirms via confirmStore, calls matchesStore.discardCalculatedMatch,
-    // updates calculatedMatches.value to filter out the discarded match,
-    // updates discardedMatchIds.value to add otherUserId, shows toast.
+  /** Discard handler — see Amendment E for the authoritative implementation. Signature is (matchId: string), NO confirm modal. */
+  const handleDiscardMatch = async (matchId: string): Promise<void> => {
+    // IMPLEMENT per Amendment E (verbatim):
+    //   const match = calculatedMatches.value.find(m => m.id === matchId)
+    //   if (!match) return
+    //   await matchesStore.discardCalculatedMatch(match)
+    //   discardedMatchIds.value.add(match.otherUserId)
+    //   calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
+    //   toastStore.show(t('matches.messages.deleted'), 'info')
+    // DO NOT add a confirm modal (current DashboardView.vue:892-902 has none).
   }
 
-  /** Load discarded + total user count (called from DashboardView onMounted). */
-  const initMatchData = async (): Promise<void> => {
-    await loadDiscardedMatches()
-    totalUsers.value = await getTotalUserCount() - 1 // exclude self, matches prior behavior
+  // Amendment G: initMatchData SPLIT into loadDiscardedUserIds + loadTotalUsers so
+  // DashboardView preserves the exact spinner ordering from DashboardView.vue:447-468.
+
+  /** Load the Set of discarded user IDs. Call BEFORE the loading spinner block. */
+  const loadDiscardedUserIds = async (): Promise<void> => {
+    discardedMatchIds.value = await matchesStore.loadDiscardedUserIds()
+  }
+
+  /** Load the total user count. Call INSIDE the loading spinner block. */
+  const loadTotalUsers = async (): Promise<void> => {
+    totalUsers.value = Math.max(0, (await getTotalUserCount()) - 1) // clamp — getTotalUserCount fails-closed to 0
   }
 
   return {
@@ -871,12 +1109,12 @@ export function useDashboardMatches() {
     progressTotal,
     totalUsers,
     discardedMatchIds,
-    loadDiscardedMatches,
     calculateMatches,
     recalculateMatches,
     handleSaveMatch,
     handleDiscardMatch,
-    initMatchData,
+    loadDiscardedUserIds, // Amendment G (replaces initMatchData)
+    loadTotalUsers,       // Amendment G (replaces initMatchData)
   }
 }
 ```
@@ -971,7 +1209,8 @@ Anti-loop Rule 1: read DashboardView.vue in full first. Note the 6 remaining sec
      recalculateMatches,
      handleSaveMatch,
      handleDiscardMatch,
-     initMatchData,
+     loadDiscardedUserIds, // Amendment G — replaces initMatchData
+     loadTotalUsers,       // Amendment G — replaces initMatchData
    } = useDashboardMatches()
    ```
 
@@ -984,11 +1223,13 @@ Anti-loop Rule 1: read DashboardView.vue in full first. Note the 6 remaining sec
    - `handleDiscardMatch` (lines ~937-955)
    - `recalculateMatches` (lines ~955-957) — verify exact line range first
 
-7. **Update onMounted** (Plan B only touches the 2 references that reference moved code):
-   - Replace `await loadDiscardedMatches()` with `await initMatchData()` — wait, `initMatchData` is async so it must stay awaited inside the (still-async) onMounted. Plan D will fix the async-onMounted itself.
-   - Replace the `getDocs(usersRef)` block (lines ~459-461) with: `// totalUsers loaded by initMatchData()` comment AND remove the `usersRef`/`usersSnapshot`/`totalUsers.value = ...` lines (initMatchData populates totalUsers).
+7. **Update onMounted per Amendment J** (split helpers preserve DashboardView:447-468 spinner ordering exactly):
+   - Replace `await loadDiscardedMatches()` (line ~448) with `await loadDiscardedUserIds()` — stays BEFORE the `loading.value = true` try-block.
+   - Replace the inline `const usersRef = collection(db, 'users'); const usersSnapshot = await getDocs(usersRef); totalUsers.value = usersSnapshot.docs.length - 1` (lines ~459-461) with `await loadTotalUsers()` — INSIDE the try-block, same position.
    - The `await calculateMatches()` call at line ~470 still works — calculateMatches is now from the destructure.
    - Keep the `loading.value = true` / `finally { loading.value = false }` wrappers — they reference the composable's `loading` ref via the destructure; reactivity preserved (refs survive destructure).
+   - **DO NOT fix the async onMounted anti-pattern here.** The 4-await chain is preserved verbatim — only function NAMES change. Plan D owns AXSS-07 (`MEMORY.md` CRITICAL flag).
+   - **Leave `unblockUser` and `handleBlockByUsername` UNCHANGED per Amendment K.** They read `discardedMatchIds` + `calculateMatches` from the composable destructure; Plan C will move them.
 
 8. **Verify template** (DashboardView lines 1161-1470) still compiles. The template references `loading`, `calculatedMatches`, `progressCurrent`, `progressTotal`, `totalUsers`, `handleSaveMatch`, `handleDiscardMatch`, `recalculateMatches` — all still in scope via destructure. NO template changes needed.
 

@@ -11,8 +11,7 @@ import { getAvatarUrlForUser } from '../utils/avatar'
 import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
-import { type MatchCard as MatchCardType, type SimpleMatch, useMatchesStore } from '../stores/matches'
-import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
+import { type SimpleMatch } from '../stores/matches'
 import { useDecksStore } from '../stores/decks'
 import { addDoc, collection, deleteDoc, doc, type DocumentData, getDocs, limit, query, where } from 'firebase/firestore'
 import { useToastStore } from '../stores/toast'
@@ -20,33 +19,10 @@ import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
 import { getMatchExpirationDate } from '../utils/matchExpiry'
-import { groupMatchesByUser } from '../utils/matchGrouping'
 import { db } from '../services/firebase'
-import {
-  findCardsMatchingPreferences,
-  findPreferencesMatchingCards,
-} from '../services/publicCards'
 import { getCardSuggestions, type ScryfallCard, searchCards } from '../services/scryfall'
-import { notifyMatchUser } from '../services/cloudFunctions'
-import { type CardCondition, type CardStatus } from '../types/card'
-
-/** Calculated match shape produced by the dashboard matching logic */
-interface CalculatedMatch {
-  id: string
-  otherUserId: string
-  otherUsername: string
-  otherLocation: string
-  otherEmail: string
-  myCards: unknown[]
-  otherCards: unknown[]
-  myTotalValue: number
-  theirTotalValue: number
-  valueDifference: number
-  compatibility: number
-  type: 'VENDO' | 'BUSCO' | 'BIDIRECTIONAL' | 'UNIDIRECTIONAL'
-  createdAt: Date
-  lifeExpiresAt: Date
-}
+// Plan 02-B: match-calculation pipeline moved to composable
+import { type CalculatedMatch, useDashboardMatches } from '../composables/useDashboardMatches'
 
 /** Shape of a public_cards search result from Firestore */
 interface PublicCardSearchResult extends DocumentData {
@@ -71,19 +47,30 @@ const router = useRouter()
 const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
-const matchesStore = useMatchesStore()
-const priceMatching = usePriceMatchingStore()
 const decksStore = useDecksStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
 const { t, locale } = useI18n()
 
-const loading = ref(false)
+// Plan 02-B: match-calculation state + actions from composable.
+// `loading`, `calculatedMatches`, `progressCurrent`, `progressTotal`,
+// `totalUsers`, `discardedMatchIds` are now composable-scoped refs.
+const {
+  calculatedMatches,
+  loading,
+  progressCurrent,
+  progressTotal,
+  totalUsers,
+  discardedMatchIds,
+  calculateMatches,
+  recalculateMatches,
+  handleSaveMatch,
+  handleDiscardMatch,
+  loadDiscardedUserIds, // Amendment G — replaces inline loadDiscardedMatches
+  loadTotalUsers,       // Amendment G — replaces inline getDocs(users)
+} = useDashboardMatches()
+
 const syncing = ref(false)
-const calculatedMatches = ref<CalculatedMatch[]>([])
-const progressCurrent = ref(0)
-const progressTotal = ref(0)
-const totalUsers = ref(0)
 
 // Format last sync time
 const formatLastSync = (date: Date): string => {
@@ -143,8 +130,7 @@ const clearClearDataState = () => {
   }
 }
 
-// Discarded matches (persisted in Firestore matches_eliminados)
-const discardedMatchIds = ref<Set<string>>(new Set())
+// Discarded matches ref is now owned by useDashboardMatches composable (destructured above).
 
 // Card search
 const searchQuery = ref('')
@@ -164,68 +150,9 @@ const suggestLoading = ref(false)
 const scryfallResults = ref<ScryfallCard[]>([])
 const showScryfallFallback = ref(false)
 
-/**
- * Load discarded match IDs from Firestore matches_eliminados
- * This ensures discarded matches don't reappear after refresh
- */
-const loadDiscardedMatches = async () => {
-  if (!authStore.user) return
-
-  try {
-    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
-    const snapshot = await getDocs(discardedRef)
-
-    const ids = new Set<string>()
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data()
-      // Track by otherUserId to prevent matches with same user from reappearing
-      if (data.otherUserId) {
-        ids.add(data.otherUserId as string)
-      }
-    }
-    discardedMatchIds.value = ids
-  } catch (err) {
-    console.error('Error loading discarded matches:', err)
-    discardedMatchIds.value = new Set()
-  }
-}
-
-/**
- * Discard a match by moving it to matches_eliminados in Firestore
- */
-const discardMatchToFirestore = async (match: CalculatedMatch) => {
-  if (!authStore.user) return
-
-  try {
-    const discardedRef = collection(db, 'users', authStore.user.id, 'matches_eliminados')
-    await addDoc(discardedRef, {
-      id: match.id,
-      otherUserId: match.otherUserId,
-      otherUsername: match.otherUsername,
-      otherLocation: match.otherLocation,
-      myCards: match.myCards ?? [],
-      otherCards: match.otherCards ?? [],
-      status: 'eliminado',
-      eliminatedAt: new Date(),
-      lifeExpiresAt: getMatchExpirationDate(),
-    })
-
-    // Track by otherUserId to prevent future matches with same user
-    discardedMatchIds.value.add(match.otherUserId)
-
-    // Also remove from matches_nuevos if it exists there
-    const nuevosRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
-    const nuevosSnapshot = await getDocs(nuevosRef)
-    for (const docSnap of nuevosSnapshot.docs) {
-      const data = docSnap.data()
-      if (data.id === match.id || data.otherUserId === match.otherUserId) {
-        await deleteDoc(docSnap.ref)
-      }
-    }
-  } catch (err) {
-    console.error('Error discarding match:', err)
-  }
-}
+// Plan 02-B: loadDiscardedMatches + discardMatchToFirestore moved to useMatchesStore as
+// loadDiscardedUserIds() + discardCalculatedMatch(). Pipeline orchestration lives in
+// useDashboardMatches composable.
 
 /**
  * Sincronizar datos a colecciones públicas para matches optimizados
@@ -444,8 +371,8 @@ onMounted(async () => {
     clearClearDataState()
   }
 
-  // Load discarded matches from Firestore
-  await loadDiscardedMatches()
+  // Load discarded matches from Firestore (Amendment J — BEFORE spinner block)
+  await loadDiscardedUserIds()
 
   loading.value = true
   try {
@@ -455,10 +382,8 @@ onMounted(async () => {
       preferencesStore.loadPreferences(),
     ])
 
-    // Contar usuarios totales
-    const usersRef = collection(db, 'users')
-    const usersSnapshot = await getDocs(usersRef)
-    totalUsers.value = usersSnapshot.docs.length - 1 // Excluir al usuario actual
+    // Contar usuarios totales (Amendment J — INSIDE spinner block, same position)
+    await loadTotalUsers()
 
     // ✅ CORREGIDO: Calcular matches si tiene CARTAS O PREFERENCIAS
     // Antes: Solo si tenía preferencias
@@ -629,281 +554,9 @@ if (import.meta.env.DEV) {
   (globalThis as unknown as Record<string, unknown>).__clearAllData = clearAllData
 }
 
-/**
- * OPTIMIZED: Calcular matches usando colecciones públicas indexadas
- * En vez de O(n) usuarios, hace queries directas por scryfallId
- */
-const calculateMatches = async () => {
-  if (!authStore.user) return
-
-  loading.value = true
-  progressCurrent.value = 0
-  progressTotal.value = 0
-  calculatedMatches.value = []
-
-  try {
-    const myCards = collectionStore.cards
-    // Usar cartas con status 'wishlist' como lista de búsqueda (en lugar de preferencias)
-    const myWishlist = myCards.filter(c => c.status === 'wishlist')
-    // Convert wishlist cards to Preference format for matching functions
-    const myPreferences = myWishlist.map(c => ({
-      id: c.id,
-      name: c.name,
-      cardName: c.name,
-      scryfallId: c.scryfallId,
-      maxPrice: c.price || 0,
-      minCondition: c.condition,
-      type: 'BUSCO' as const,
-      quantity: c.quantity || 1,
-      condition: c.condition,
-      edition: c.edition,
-      image: c.image,
-      createdAt: c.createdAt ?? new Date(),
-    }))
-    const foundMatches: CalculatedMatch[] = []
-
-    console.info('Iniciando calculo de matches (optimizado)...')
-    console.info(`Mis cartas: ${myCards.length}, Mi wishlist: ${myWishlist.length}`)
-
-    // PASO 1: Buscar cartas que coincidan con mi wishlist (lo que BUSCO)
-    progressTotal.value = 2
-    progressCurrent.value = 1
-
-    // Debug: mostrar qué nombres estamos buscando
-    const myWishlistNames = myWishlist.map(c => c.name).filter(Boolean)
-    console.info('Buscando cartas por nombre:', myWishlistNames)
-
-    const matchingCards = await findCardsMatchingPreferences(myWishlist, authStore.user.id)
-    console.info(`Encontradas ${matchingCards.length} cartas que busco`)
-
-    // PASO 2: Buscar preferencias que coincidan con mis cartas (VENDO)
-    progressCurrent.value = 2
-
-    // Debug: mostrar qué nombres tengo para vender
-    const myTradeable = myCards.filter(c => c.status === 'trade' || c.status === 'sale')
-    const myCardNames = myTradeable.map(c => c.name).filter(Boolean)
-    console.info(`Mis cartas para vender (${myTradeable.length}):`, myCardNames)
-
-    const matchingPrefs = await findPreferencesMatchingCards(myCards, authStore.user.id)
-    console.info(`Encontradas ${matchingPrefs.length} personas buscando mis cartas`)
-
-    // Agrupar por usuario
-    const userMatches = groupMatchesByUser(matchingCards, matchingPrefs)
-
-    // Crear matches por usuario
-    progressTotal.value = userMatches.size + 2
-    let userIndex = 0
-
-    for (const [otherUserId, data] of userMatches) {
-      progressCurrent.value = userIndex + 3
-      userIndex++
-
-      // Convertir PublicCards a formato esperado por priceMatching
-      const theirCards = data.cards.map(c => ({
-        id: c.cardId,
-        name: c.cardName,
-        scryfallId: c.scryfallId,
-        price: c.price,
-        edition: c.edition,
-        condition: c.condition as CardCondition,
-        foil: c.foil,
-        quantity: c.quantity,
-        image: c.image,
-        status: c.status as CardStatus,
-        updatedAt: c.updatedAt?.toDate() ?? new Date(),
-        createdAt: c.updatedAt?.toDate() ?? new Date(),
-      }))
-
-      const theirPreferences = data.prefs.map(p => ({
-        id: p.prefId,
-        name: p.cardName,
-        cardName: p.cardName,
-        scryfallId: p.scryfallId,
-        maxPrice: p.maxPrice,
-        minCondition: p.minCondition,
-        // Fill required fields for type compatibility
-        type: 'BUSCO' as const,
-        quantity: 1,
-        condition: 'NM' as const,
-        edition: '',
-        image: '',
-        createdAt: p.updatedAt?.toDate() ?? new Date(),
-      }))
-
-      // INTENTAR MATCH BIDIRECCIONAL PRIMERO
-      let matchCalc = priceMatching.calculateBidirectionalMatch(
-          myCards,
-          myPreferences,
-          theirCards,
-          theirPreferences
-      )
-
-      // SI NO HAY BIDIRECCIONAL, INTENTAR UNIDIRECCIONAL
-      matchCalc ??= priceMatching.calculateUnidirectionalMatch(
-          myCards,
-          myPreferences,
-          theirCards,
-          theirPreferences
-      )
-
-      if (matchCalc?.isValid) {
-        const match = {
-          id: `${authStore.user.id}_${otherUserId}_${Date.now()}`,
-          otherUserId,
-          otherUsername: data.username,
-          otherLocation: data.location,
-          otherEmail: data.email,
-          myCards: matchCalc.myCardsInfo ?? [],
-          otherCards: matchCalc.theirCardsInfo ?? [],
-          myTotalValue: matchCalc.myTotalValue,
-          theirTotalValue: matchCalc.theirTotalValue,
-          valueDifference: matchCalc.valueDifference,
-          compatibility: matchCalc.compatibility,
-          type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' as const : 'UNIDIRECTIONAL' as const,
-          createdAt: new Date(),
-          lifeExpiresAt: getMatchExpirationDate(),
-        }
-
-        foundMatches.push(match)
-        console.info(`Match con ${data.username}: ${matchCalc.compatibility}%`)
-      }
-    }
-
-    // Ordenar por compatibilidad descendente y filtrar discardados (por otherUserId)
-    foundMatches.sort((a, b) => b.compatibility - a.compatibility)
-    calculatedMatches.value = foundMatches.filter(m => !discardedMatchIds.value.has(m.otherUserId))
-
-    // Persistir matches en Firestore
-    if (foundMatches.length > 0) {
-      await saveMatchesToFirebase(foundMatches)
-    }
-
-    // Reload matches from Firestore to sync store state with what was just written
-    await matchesStore.loadAllMatches()
-
-    console.info(`Total de matches: ${foundMatches.length} (de ${userMatches.size} usuarios potenciales)`)
-  } catch (error) {
-    console.error('Error calculando matches:', error)
-  } finally {
-    loading.value = false
-    progressCurrent.value = 0
-    progressTotal.value = 0
-  }
-}
-
-/**
- * CAMBIO 3: Guardar matches en Firestore
- * Limpia los matches_nuevos existentes antes de guardar los nuevos
- * Also notifies the other user via Cloud Function (Bug #2 fix)
- */
-const saveMatchesToFirebase = async (matches: CalculatedMatch[]) => {
-  if (!authStore.user) return
-
-  try {
-    const matchesRef = collection(db, 'users', authStore.user.id, 'matches_nuevos')
-
-    // Only delete self-calculated matches, preserve notification docs from other users
-    // (notification docs have _notificationOf field set by the cloud function)
-    const existingSnapshot = await getDocs(matchesRef)
-    for (const docSnap of existingSnapshot.docs) {
-      if (!(docSnap.data())._notificationOf) {
-        await deleteDoc(doc(db, 'users', authStore.user.id, 'matches_nuevos', docSnap.id))
-      }
-    }
-
-    // Ahora guardar los nuevos y notificar al otro usuario
-    for (const match of matches) {
-      await addDoc(matchesRef, {
-        id: match.id,
-        otherUserId: match.otherUserId,
-        otherUsername: match.otherUsername,
-        otherLocation: match.otherLocation,
-        otherEmail: match.otherEmail,
-        myCards: match.myCards ?? [],
-        otherCards: match.otherCards ?? [],
-        myTotalValue: match.myTotalValue,
-        theirTotalValue: match.theirTotalValue,
-        valueDifference: match.valueDifference,
-        compatibility: match.compatibility,
-        type: match.type,
-        status: 'nuevo',
-        createdAt: match.createdAt,
-        lifeExpiresAt: match.lifeExpiresAt,
-      })
-
-      // Notify the other user via Cloud Function
-      // This bypasses security rules to write to their matches_nuevos collection
-      try {
-        await notifyMatchUser({
-          targetUserId: match.otherUserId,
-          matchId: match.id,
-          fromUserId: authStore.user.id,
-          fromUsername: authStore.user.username,
-          fromLocation: authStore.user.location,
-          fromAvatarUrl: authStore.user.avatarUrl,
-          myCards: (match.myCards ?? []) as Record<string, unknown>[],
-          otherCards: (match.otherCards ?? []) as Record<string, unknown>[],
-          myTotalValue: match.myTotalValue,
-          theirTotalValue: match.theirTotalValue,
-          valueDifference: match.valueDifference,
-          compatibility: match.compatibility,
-          type: match.type as 'BIDIRECTIONAL' | 'UNIDIRECTIONAL',
-        })
-        console.info(`Notified ${match.otherUsername} about match`)
-      } catch (notifyErr) {
-        // Log but don't fail the whole operation if notification fails
-        console.warn(`Could not notify ${match.otherUsername}:`, notifyErr)
-      }
-    }
-
-    console.info(`${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`)
-  } catch (err) {
-    console.error('Error guardando matches:', err)
-  }
-}
-
-/**
- * CAMBIO 3: Integrar con matches.ts store
- */
-const handleSaveMatch = async (match: CalculatedMatch) => {
-  // Convertir match a formato SimpleMatch del store
-  const matchToSave: SimpleMatch = {
-    id: match.id,
-    type: (match.type === 'VENDO' ? 'VENDO' : 'BUSCO'),
-    otherUserId: match.otherUserId,
-    otherUsername: match.otherUsername,
-    otherLocation: match.otherLocation,
-    myCards: (match.myCards ?? []) as MatchCardType[],
-    otherCards: (match.otherCards ?? []) as MatchCardType[],
-    myTotalValue: match.myTotalValue,
-    theirTotalValue: match.theirTotalValue,
-    valueDifference: match.valueDifference,
-    compatibility: match.compatibility,
-    createdAt: match.createdAt,
-    status: 'nuevo' as const,
-  }
-
-  await matchesStore.saveMatch(matchToSave)
-
-  // Remover del dashboard
-  calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== match.id)
-}
-
-const handleDiscardMatch = async (matchId: string) => {
-  // Find the match by ID
-  const match = calculatedMatches.value.find(m => m.id === matchId)
-  if (!match) return
-
-  // Save to Firestore matches_eliminados for persistence
-  await discardMatchToFirestore(match)
-  // Remove from UI
-  calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
-  toastStore.show(t('matches.messages.deleted'), 'info')
-}
-
-const recalculateMatches = async () => {
-  await calculateMatches()
-}
+// Plan 02-B: calculateMatches, saveMatchesToFirebase, handleSaveMatch,
+// handleDiscardMatch, recalculateMatches moved to useDashboardMatches
+// composable (destructured above). This view now only wires in markup.
 
 // Handle search input for auto-suggest
 const handleSearchInput = async () => {

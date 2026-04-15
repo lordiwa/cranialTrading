@@ -15,6 +15,7 @@ import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
+import { getMatchExpirationDate } from '../utils/matchExpiry';
 
 export interface MatchCard {
     scryfallId: string;
@@ -103,14 +104,6 @@ interface SharedMatchData extends FirestoreMatchData {
     cardType?: string;
 }
 
-const MATCH_LIFETIME_DAYS = 15;
-
-const getExpirationDate = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + MATCH_LIFETIME_DAYS);
-    return date;
-};
-
 /**
  * Factory: Create a clean, serializable match payload
  * Extracts only the fields we need from ANY match source
@@ -191,15 +184,6 @@ export const useMatchesStore = defineStore('matches', () => {
     };
 
     /**
-     * Helper to calculate expiration date (createdAt + 15 days)
-     */
-    const calculateExpirationDate = (createdAt: Date): Date => {
-        const date = new Date(createdAt);
-        date.setDate(date.getDate() + MATCH_LIFETIME_DAYS);
-        return date;
-    };
-
-    /**
      * Convert Firestore document data to a clean SimpleMatch object
      */
     const parseFirestoreMatch = (docId: string, rawData: Record<string, unknown>): SimpleMatch => {
@@ -209,7 +193,7 @@ export const useMatchesStore = defineStore('matches', () => {
         // If lifeExpiresAt is missing or invalid, calculate from createdAt + 15 days
         let lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
         if (!lifeExpiresAt || Number.isNaN(lifeExpiresAt.getTime())) {
-            lifeExpiresAt = calculateExpirationDate(createdAt);
+            lifeExpiresAt = getMatchExpirationDate(createdAt);
         }
 
         return {
@@ -244,7 +228,7 @@ export const useMatchesStore = defineStore('matches', () => {
     const parseSharedMatch = (docId: string, rawData: Record<string, unknown>, currentUserId: string): SimpleMatch => {
         const data = rawData as unknown as SharedMatchData;
         const createdAt = toDate(data.createdAt);
-        const lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : calculateExpirationDate(createdAt);
+        const lifeExpiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : getMatchExpirationDate(createdAt);
 
         const isSender = data.senderId === currentUserId;
         const card: MatchCard = data.card ?? { scryfallId: '', name: '', edition: '', quantity: 0, condition: 'NM', foil: false, price: 0, image: '', status: 'collection' };
@@ -361,7 +345,7 @@ export const useMatchesStore = defineStore('matches', () => {
         const expiresAt = data.lifeExpiresAt ? toDate(data.lifeExpiresAt) : null;
         if (expiresAt && !Number.isNaN(expiresAt.getTime())) return expiresAt;
         const createdAt = toDate(data.createdAt);
-        const fallback = calculateExpirationDate(createdAt);
+        const fallback = getMatchExpirationDate(createdAt);
         return Number.isNaN(fallback.getTime()) ? null : fallback;
     };
 
@@ -416,7 +400,7 @@ export const useMatchesStore = defineStore('matches', () => {
             const payload = createCleanMatchPayload(match, {
                 status: 'activo',
                 savedAt: new Date(),
-                lifeExpiresAt: getExpirationDate(),
+                lifeExpiresAt: getMatchExpirationDate(),
             });
 
             const docRef = await addDoc(matchesRef, payload);
@@ -469,7 +453,7 @@ export const useMatchesStore = defineStore('matches', () => {
             const payload = createCleanMatchPayload(match, {
                 status: 'eliminado',
                 eliminatedAt: new Date(),
-                lifeExpiresAt: getExpirationDate(),
+                lifeExpiresAt: getMatchExpirationDate(),
             });
 
             // Add to eliminados
@@ -525,7 +509,7 @@ export const useMatchesStore = defineStore('matches', () => {
                     otherAvatarUrl: authStore.user.avatarUrl ?? null,
                     status: 'nuevo',
                     createdAt: new Date(),
-                    lifeExpiresAt: getExpirationDate(),
+                    lifeExpiresAt: getMatchExpirationDate(),
                     _notificationOf: match.id,
                 });
 

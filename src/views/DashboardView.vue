@@ -19,6 +19,7 @@ import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
+import { getMatchExpirationDate } from '../utils/matchExpiry'
 import { db } from '../services/firebase'
 import {
   findCardsMatchingPreferences,
@@ -207,7 +208,7 @@ const discardMatchToFirestore = async (match: CalculatedMatch) => {
       otherCards: match.otherCards ?? [],
       status: 'eliminado',
       eliminatedAt: new Date(),
-      lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      lifeExpiresAt: getMatchExpirationDate(),
     })
 
     // Track by otherUserId to prevent future matches with same user
@@ -414,7 +415,7 @@ const handleBlockByUsername = async () => {
       otherLocation: (userData.location as string) ?? '',
       status: 'eliminado',
       eliminatedAt: new Date(),
-      lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      lifeExpiresAt: getMatchExpirationDate(),
     })
 
     discardedMatchIds.value.add(userId)
@@ -812,7 +813,7 @@ const calculateMatches = async () => {
           compatibility: matchCalc.compatibility,
           type: matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' as const : 'UNIDIRECTIONAL' as const,
           createdAt: new Date(),
-          lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          lifeExpiresAt: getMatchExpirationDate(),
         }
 
         foundMatches.push(match)
@@ -1107,13 +1108,6 @@ const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
       return
     }
 
-    const MATCH_LIFETIME_DAYS = 15
-    const getExpirationDate = () => {
-      const date = new Date()
-      date.setDate(date.getDate() + MATCH_LIFETIME_DAYS)
-      return date
-    }
-
     const cardData = {
       id: card.cardId ?? card.id,
       scryfallId,
@@ -1144,7 +1138,7 @@ const sendInterestFromSearch = async (card: PublicCardSearchResult) => {
       senderStatus: 'interested',
       receiverStatus: 'new',
       createdAt: new Date(),
-      lifeExpiresAt: getExpirationDate(),
+      lifeExpiresAt: getMatchExpirationDate(),
     }
 
     await addDoc(sharedMatchesRef, sharedMatchPayload)

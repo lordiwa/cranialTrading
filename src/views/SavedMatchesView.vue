@@ -27,6 +27,7 @@ import MatchCard from '../components/matches/MatchCard.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
+import { getMatchExpirationDate } from '../utils/matchExpiry'
 import type { CardCondition, CardStatus } from '../types/card'
 
 const route = useRoute()
@@ -232,7 +233,7 @@ const discardMatchToFirestore = async (match: SimpleMatch) => {
       otherCards: match.otherCards ?? [],
       status: 'eliminado',
       eliminatedAt: new Date(),
-      lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      lifeExpiresAt: getMatchExpirationDate(),
     })
 
     discardedMatchIds.value.add(match.otherUserId)
@@ -382,7 +383,7 @@ const handleBlockByUsername = async () => {
       otherLocation: (userData.location as string) ?? '',
       status: 'eliminado',
       eliminatedAt: new Date(),
-      lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      lifeExpiresAt: getMatchExpirationDate(),
     })
 
     discardedMatchIds.value.add(foundUserId)
@@ -552,7 +553,7 @@ const calculateMatches = async () => {
           compatibility: matchCalc.compatibility,
           type: (matchCalc.matchType === 'bidirectional' ? 'BIDIRECTIONAL' : 'UNIDIRECTIONAL') as unknown as 'VENDO',
           createdAt: new Date(),
-          lifeExpiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          lifeExpiresAt: getMatchExpirationDate(),
         }
 
         foundMatches.push(match)

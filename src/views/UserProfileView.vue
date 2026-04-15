@@ -23,6 +23,7 @@ import ChatModal from '../components/chat/ChatModal.vue';
 import ExchangeCartDrawer from '../components/cart/ExchangeCartDrawer.vue';
 import type { Card } from '../types/card';
 import { getAvatarUrlForUser } from '../utils/avatar';
+import { getMatchExpirationDate } from '../utils/matchExpiry';
 
 const route = useRoute();
 const router = useRouter();
@@ -342,13 +343,6 @@ const handleInterest = async (card: Card) => {
       return;
     }
 
-    const MATCH_LIFETIME_DAYS = 15;
-    const getExpirationDate = () => {
-      const date = new Date();
-      date.setDate(date.getDate() + MATCH_LIFETIME_DAYS);
-      return date;
-    };
-
     const cardPrice = typeof card.price === 'number' ? card.price : 0;
     const cardData = {
       id: card.id || card.scryfallId,
@@ -387,7 +381,7 @@ const handleInterest = async (card: Card) => {
       receiverStatus: 'new', // new -> seen -> responded
       // Timestamps
       createdAt: new Date(),
-      lifeExpiresAt: getExpirationDate(),
+      lifeExpiresAt: getMatchExpirationDate(),
     };
 
     // Save to shared collection

@@ -8,6 +8,7 @@ import { type ScryfallCard, searchCards } from '../services/scryfall'
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import type { Card } from '../types/card'
+import { getMatchExpirationDate } from '../utils/matchExpiry'
 
 export interface PublicCardResult {
   id: string
@@ -206,13 +207,6 @@ export function useGlobalSearch() {
         return
       }
 
-      const MATCH_LIFETIME_DAYS = 15
-      const getExpirationDate = () => {
-        const date = new Date()
-        date.setDate(date.getDate() + MATCH_LIFETIME_DAYS)
-        return date
-      }
-
       const cardData = {
         id: card.cardId ?? card.id,
         scryfallId,
@@ -243,7 +237,7 @@ export function useGlobalSearch() {
         senderStatus: 'interested',
         receiverStatus: 'new',
         createdAt: new Date(),
-        lifeExpiresAt: getExpirationDate(),
+        lifeExpiresAt: getMatchExpirationDate(),
       }
 
       await addDoc(sharedMatchesRef, sharedMatchPayload)

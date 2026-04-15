@@ -15,8 +15,6 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, query, wher
 import {
   findCardsMatchingPreferences,
   findPreferencesMatchingCards,
-  type PublicCard,
-  type PublicPreference,
 } from '../services/publicCards'
 import { notifyMatchUser } from '../services/cloudFunctions'
 import AppContainer from '../components/layout/AppContainer.vue'
@@ -28,6 +26,8 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
 import { getMatchExpirationDate } from '../utils/matchExpiry'
+import { groupMatchesByUser } from '../utils/matchGrouping'
+import { getTotalUserCount } from '../services/stats'
 import type { CardCondition, CardStatus } from '../types/card'
 
 const route = useRoute()
@@ -403,46 +403,6 @@ const handleBlockByUsername = async () => {
 
 // ========== CALCULATE MATCHES ==========
 
-const groupMatchesByUser = (matchingCards: PublicCard[], matchingPrefs: PublicPreference[]) => {
-  const userMatches = new Map<string, {
-    cards: PublicCard[],
-    prefs: PublicPreference[],
-    username: string,
-    location: string,
-    email: string
-  }>()
-
-  for (const card of matchingCards) {
-    if (!userMatches.has(card.userId)) {
-      userMatches.set(card.userId, {
-        cards: [],
-        prefs: [],
-        username: card.username,
-        location: card.location ?? 'Unknown',
-        email: card.email ?? ''
-      })
-    }
-    const existing = userMatches.get(card.userId)
-    if (existing) existing.cards.push(card)
-  }
-
-  for (const pref of matchingPrefs) {
-    if (!userMatches.has(pref.userId)) {
-      userMatches.set(pref.userId, {
-        cards: [],
-        prefs: [],
-        username: pref.username,
-        location: pref.location ?? 'Unknown',
-        email: pref.email ?? ''
-      })
-    }
-    const existing = userMatches.get(pref.userId)
-    if (existing) existing.prefs.push(pref)
-  }
-
-  return userMatches
-}
-
 const calculateMatches = async () => {
   if (!authStore.user) return
 
@@ -717,9 +677,7 @@ onMounted(async () => {
     await loadSavedMatchesWithEmails()
 
     // Contar usuarios totales
-    const usersRef = collection(db, 'users')
-    const usersSnapshot = await getDocs(usersRef)
-    totalUsers.value = usersSnapshot.docs.length - 1
+    totalUsers.value = Math.max(0, (await getTotalUserCount()) - 1) // Excluir al usuario actual
 
     // Calcular matches si tiene cartas o preferencias
     if (collectionStore.cards.length > 0 || preferencesStore.preferences.length > 0) {

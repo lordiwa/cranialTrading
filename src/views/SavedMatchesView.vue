@@ -571,7 +571,7 @@ watch(() => route.query.match, (matchId) => {
 })
 
 // ✅ CARGAR DATOS AL MONTAR
-onMounted(async () => {
+const initView = async () => {
   if (!authStore.user) return
 
   // Load discarded matches from Firestore
@@ -599,14 +599,17 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
 
-  // Handle initial match query param
-  const matchId = route.query.match
-  if (matchId && typeof matchId === 'string') {
-    activeTab.value = 'new'
-    await scrollToMatch(matchId)
-    void router.replace({ query: { ...route.query, match: undefined } })
-  }
+onMounted(() => {
+  void initView().then(() => {
+    const matchId = route.query.match
+    if (matchId && typeof matchId === 'string') {
+      activeTab.value = 'new'
+      void scrollToMatch(matchId)
+      void router.replace({ query: { ...route.query, match: undefined } })
+    }
+  })
 })
 
 onUnmounted(() => {

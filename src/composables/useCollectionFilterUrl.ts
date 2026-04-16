@@ -8,7 +8,7 @@
  * isHydrating guard prevents ping-pong between state watchers and route-query watchers.
  */
 
-import { ref, watch, type Ref } from 'vue'
+import { type Ref, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 // Known valid status values (threat model T-03B-01: validate URL params)

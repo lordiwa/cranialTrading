@@ -156,7 +156,7 @@ function indexToCard(ic: IndexCard): Card {
         price: ic.p,
         cmc: ic.cm,
         colors: ic.co,
-        rarity: RARITY_MAP[ic.r] || ic.r, // eslint-disable-line security/detect-object-injection
+        rarity: RARITY_MAP[ic.r] || ic.r,  
         type_line: ic.t,
         foil: ic.f,
         condition: ic.cn as CardCondition,
@@ -235,7 +235,7 @@ export const useCollectionStore = defineStore('collection', () => {
         const statusCounts: Record<string, number> = {}
         let totalValue = 0
         for (const card of cardList) {
-            statusCounts[card.status] = (statusCounts[card.status] || 0) + 1 // eslint-disable-line security/detect-object-injection
+            statusCounts[card.status] = (statusCounts[card.status] || 0) + 1  
             totalValue += (card.price || 0) * card.quantity
         }
         return {

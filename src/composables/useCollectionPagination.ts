@@ -7,7 +7,7 @@
  * Exposes triggerQuery() for immediate initial mount call.
  */
 
-import { watch, onScopeDispose, type Ref } from 'vue'
+import { onScopeDispose, type Ref, watch } from 'vue'
 import { buildPaginationFilters, buildPaginationSort, type PaginationFilterParams } from '../utils/collectionFilters'
 
 export interface PaginationFilterState {

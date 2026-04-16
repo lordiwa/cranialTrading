@@ -19,14 +19,13 @@ import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import type { CreateBinderInput } from '../types/binder'
-import { type Card, type CardCondition, type CardStatus } from '../types/card'
-import type { CreateDeckInput, DeckCardAllocation, DeckFormat, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
+import { type Card, type CardStatus } from '../types/card'
+import type { CreateDeckInput, DeckCardAllocation, DisplayDeckCard, HydratedDeckCard, HydratedWishlistCard } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { type ScryfallCard, searchCards } from '../services/scryfallCache'
-import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
-import { buildCollectionCardFromScryfall, buildRawCsvCard, buildRawMoxfieldCard, parseTextImportLine, type ExtractedScryfallData, type ImportCardData, type MoxfieldImportCard } from '../utils/importHelpers'
+import { buildManaboxCsv, buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
@@ -2150,7 +2149,7 @@ onMounted(async () => {
       // Clean up completed delete
       clearDeleteDeckState()
     }
-  } catch (err) {
+  } catch (_err) {
     toastStore.show(t('common.messages.loadError'), 'error')
   }
 })
@@ -3027,7 +3026,6 @@ onUnmounted(() => {
         @import-direct="handleImportBinderDirect"
         @import-csv="handleImportBinderCsv"
     />
-
 </AppContainer>
 
   <!-- Floating Action Button (mobile) — teleported for z-index above panels -->

@@ -8,6 +8,8 @@
  */
 
 import { ref, type Ref } from 'vue'
+import type { ToastType } from '../stores/toast'
+import type { ConfirmOptions } from '../stores/confirm'
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
 
 // ============================================================
@@ -44,12 +46,12 @@ export interface UseDeckDeletionOptions {
     batchDeleteCards: (cardIds: string[], onProgress?: (percent: number) => void) => Promise<{ deleted: number; failed: number }>
   }
   toastStore: {
-    show: (message: string, type: string) => void
+    show: (message: string, type?: ToastType, persistent?: boolean) => number
   }
   confirmStore: {
-    show: (opts: Record<string, unknown>) => Promise<boolean>
+    show: (opts: ConfirmOptions) => Promise<boolean>
   }
-  t: (key: string, params?: Record<string, unknown>) => string
+  t: (key: string, params?: Record<string, string | number>) => string
   deckFilter: Ref<string>
   selectedDeck?: Ref<{ id: string; name: string; allocations?: { cardId: string }[] } | null>
   isDeletingDeck?: Ref<boolean>
@@ -256,8 +258,8 @@ export function useDeckDeletion(opts: UseDeckDeletionOptions) {
     // Capture references BEFORE any async operation
     const deckId = deck.id
     const deckName = deck.name
-    const cardIds = deck.allocations?.length > 0
-      ? [...new Set(deck.allocations.map(a => a.cardId))]
+    const cardIds = (deck.allocations?.length ?? 0) > 0
+      ? [...new Set((deck.allocations ?? []).map(a => a.cardId))]
       : []
 
     // First confirmation: delete the deck

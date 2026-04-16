@@ -9,17 +9,20 @@
 
 import { ref, type Ref } from 'vue'
 import type { CardCondition, CardStatus } from '../types/card'
-import type { DeckFormat } from '../types/deck'
+import type { CreateDeckInput, DeckFormat } from '../types/deck'
+import type { CreateBinderInput } from '../types/binder'
+import type { ToastType } from '../stores/toast'
+import type { ConfirmOptions } from '../stores/confirm'
 import { type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
 import {
   buildCollectionCardFromScryfall,
   buildRawCsvCard,
   buildRawMoxfieldCard,
-  parseTextImportLine,
   type ExtractedScryfallData,
   type ImportCardData,
   type MoxfieldImportCard,
+  parseTextImportLine,
 } from '../utils/importHelpers'
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
 
@@ -45,7 +48,7 @@ export interface ImportState {
   status: 'fetching' | 'processing' | 'saving' | 'allocating' | 'complete' | 'error'
   totalCards: number
   currentCard: number
-  cards: Array<Record<string, unknown>>
+  cards: Record<string, unknown>[]
   cardMeta: { quantity: number; isInSideboard: boolean }[]
   createdCardIds: string[]
   allocatedCount: number
@@ -57,26 +60,25 @@ export interface UseCollectionImportOptions {
     confirmImport: (cards: ImportCardData[], triggerRefresh?: boolean, onProgress?: (current: number, total: number) => void) => Promise<string[]>
     refreshCards: () => void
     enrichCardsWithMissingMetadata: () => Promise<void>
-    queryPage?: (...args: unknown[]) => unknown
   }
   decksStore: {
-    createDeck: (input: { name: string; format: string; description: string; colors: string[]; commander: string }) => Promise<string | undefined>
+    createDeck: (input: CreateDeckInput) => Promise<string | null>
     loadDecks: () => Promise<void>
     bulkAllocateCardsToDeck: (deckId: string, items: { cardId: string; quantity: number; isInSideboard: boolean }[], onProgress?: (current: number, total: number) => void) => Promise<{ allocated: number }>
   }
   binderStore: {
-    createBinder: (input: { name: string; description: string }) => Promise<string | undefined>
+    createBinder: (input: CreateBinderInput) => Promise<string | null>
     loadBinders: () => Promise<void>
     bulkAllocateCardsToBinder: (binderId: string, items: { cardId: string; quantity: number }[]) => Promise<number>
   }
   toastStore: {
-    show: (message: string, type: string) => void
+    show: (message: string, type?: ToastType, persistent?: boolean) => number
     showProgress: (message: string, progress: number) => { update: (progress: number, message?: string) => void; complete: (message?: string) => void; error: (message?: string) => void }
   }
   confirmStore: {
-    show: (opts: Record<string, unknown>) => Promise<boolean>
+    show: (opts: ConfirmOptions) => Promise<boolean>
   }
-  t: (key: string, params?: Record<string, unknown>) => string
+  t: (key: string, params?: Record<string, string | number>) => string
   deckFilter: Ref<string>
   binderFilter: Ref<string>
   statusFilter: Ref<string>
@@ -98,7 +100,6 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
     t,
     deckFilter,
     binderFilter,
-    statusFilter,
     viewMode,
     showImportDeckModal,
     showImportBinderModal,
@@ -265,7 +266,7 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         if (!printWithPrice) return null
         return extractScryfallCardData(printWithPrice)
       }
-    } catch (e) {
+    } catch (_e) {
       console.warn(`No se pudo obtener datos de Scryfall para: ${cardName}`)
     }
     return null
@@ -318,14 +319,8 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       await collectionStore.confirmImport(collectionCardsToAdd)
 
       if (deckId) {
-        const bulkItems = collectionCardsToAdd
-          .map(cardData => {
-            // Cannot do exact match here without card store — upstream handles this
-            return null as null
-          })
-          .filter((item): item is NonNullable<typeof item> => item !== null)
-
-        await decksStore.bulkAllocateCardsToDeck(deckId, bulkItems)
+        // Upstream handles card-to-deck allocation via exact match; no items mapped here
+        await decksStore.bulkAllocateCardsToDeck(deckId, [])
       }
     }
 
@@ -900,7 +895,7 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       } else if (savedState.status === 'saving' && savedState.cards.length > 0) {
         progressToast.update(55, t('common.import.saving', { count: savedState.cards.length }))
 
-        const createdCardIds = await collectionStore.confirmImport(savedState.cards as ImportCardData[], true, (current, total) => {
+        const createdCardIds = await collectionStore.confirmImport(savedState.cards as unknown as ImportCardData[], true, (current, total) => {
           const pct = 55 + Math.round((current / total) * 5)
           progressToast.update(pct, t('common.import.savingProgress', { current, total }))
         })

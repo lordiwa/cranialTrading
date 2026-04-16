@@ -60,10 +60,10 @@ Plans:
   5. Changing a filter or sort in CollectionView updates the browser URL, and refreshing the page restores the same filtered view
 **Plans**: 5 plans
 Plans:
-- [ ] 03-A-PLAN.md — Pure helper foundation: extract collectionFilters.ts + importHelpers.ts, fix NICE-07/08/09
-- [ ] 03-B-PLAN.md — State machine composables: useCollectionImport, useDeckDeletion, useCollectionFilterUrl, useCollectionPagination (NICE-10)
+- [x] 03-A-PLAN.md — Pure helper foundation: extract collectionFilters.ts + importHelpers.ts, fix NICE-07/08/09
+- [x] 03-B-PLAN.md — State machine composables: useCollectionImport, useDeckDeletion, useCollectionFilterUrl, useCollectionPagination (NICE-10)
 - [ ] 03-C-PLAN.md — Route split: create DeckView.vue + BinderView.vue, update router, eliminate viewMode
-- [ ] 03-D-PLAN.md — CollectionGridCard split: routing shell + Compact + Full variants, wire useSwipe (ARCH-05, ARCH-06)
+- [x] 03-D-PLAN.md — CollectionGridCard split: routing shell + Compact + Full variants, wire useSwipe (ARCH-05, ARCH-06)
 - [ ] 03-E-PLAN.md — Closeout: dead code audit, line count verification, version bump, user verification
 **UI hint**: yes
 

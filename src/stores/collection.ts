@@ -227,7 +227,24 @@ export const useCollectionStore = defineStore('collection', () => {
     const cardsById = new Map<string, Card>()
     const loading = ref(false)
     const importing = ref(false)
-    const collectionSummary = ref<{ totalCards: number; totalValue: number; statusCounts: Record<string, number>; loadedCards: number } | null>(null)
+    // NICE-09: computed from cards so it auto-derives without manual sync
+    // D-11 note: loadFromIndex and loadFromFullCards no longer need to set this manually
+    const collectionSummary = computed(() => {
+        const cardList = cards.value
+        if (cardList.length === 0) return null
+        const statusCounts: Record<string, number> = {}
+        let totalValue = 0
+        for (const card of cardList) {
+            statusCounts[card.status] = (statusCounts[card.status] || 0) + 1 // eslint-disable-line security/detect-object-injection
+            totalValue += (card.price || 0) * card.quantity
+        }
+        return {
+            totalCards: cardList.length,
+            totalValue,
+            statusCounts,
+            loadedCards: cardList.length,
+        }
+    })
     const lastSyncAt = ref<Date | null>(null)
 
     // Card index state — compact index for fast load, kept in sync with cards
@@ -319,20 +336,7 @@ export const useCollectionStore = defineStore('collection', () => {
             cardIndexRaw.value = allIndex
             cards.value = allIndex.map(indexToCard)
             rebuildCardIndex()
-
-            // Compute summary from index
-            const statusCounts: Record<string, number> = {}
-            let totalValue = 0
-            for (const ic of allIndex) {
-                statusCounts[ic.st] = (statusCounts[ic.st] || 0) + 1 // eslint-disable-line security/detect-object-injection
-                totalValue += ic.p * ic.q
-            }
-            collectionSummary.value = {
-                totalCards: allIndex.length,
-                totalValue,
-                statusCounts,
-                loadedCards: allIndex.length,
-            }
+            // collectionSummary auto-derives from cards via computed (NICE-09)
 
             // Auto-rebuild stale index in background
             if (indexVersion < EXPECTED_INDEX_VERSION) {
@@ -365,14 +369,8 @@ export const useCollectionStore = defineStore('collection', () => {
             const chunk = await loadCollectionChunk(cursor, isFirstChunk, true)
             isFirstChunk = false
 
-            if (chunk.summary) {
-                collectionSummary.value = {
-                    totalCards: chunk.summary.totalCards,
-                    totalValue: 0,
-                    statusCounts: chunk.summary.statusCounts,
-                    loadedCards: 0,
-                }
-            }
+            // chunk.summary previously set collectionSummary manually (with totalValue=0, loadedCards=0)
+            // Now collectionSummary auto-derives from cards via computed (NICE-09)
 
             for (const card of chunk.cards) {
                 all.push({

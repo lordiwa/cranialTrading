@@ -57,6 +57,8 @@ export function useCollectionTotals(cards: () => Card[]) {
   const progress = ref(0)
   const totalCards = ref(0)
   const processedCards = ref(0)
+  // NICE-08: call useCollectionStore() at composable setup, not inside async callbacks
+  const collectionStore = useCollectionStore()
 
   // Use shared prices map
   const cardPrices = sharedCardPrices
@@ -95,7 +97,6 @@ export function useCollectionTotals(cards: () => Card[]) {
         }
 
         // Update card in collection store only if it still exists
-        const collectionStore = useCollectionStore()
         if (collectionStore.getCardById(card.id)) {
           const ok = await collectionStore.updateCard(card.id, {
             scryfallId,
@@ -183,7 +184,6 @@ export function useCollectionTotals(cards: () => Card[]) {
     progress.value = 0
 
     // O(1) lookup instead of O(N) .find() per card
-    const collectionStore = useCollectionStore()
     const cardIdSet = new Set(cardList.map(c => c.id))
 
     // Preload set mappings in parallel batches (turns ~300 sequential downloads into ~60 parallel batches)

@@ -39,7 +39,7 @@ const emit = defineEmits<{
   toggleSelect: [cardId: string]
 }>()
 
-const cardsRef = computed(() => props.cards)
+const cardsRef = toRef(props, 'cards')
 
 const { containerRef, virtualRows, totalSize, virtualizer } = useVirtualGrid({
   items: cardsRef,

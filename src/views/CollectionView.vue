@@ -33,6 +33,8 @@ import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
+import { buildPaginationFilters as _buildPaginationFilters, buildPaginationSort as _buildPaginationSort } from '../utils/collectionFilters'
+import { buildCollectionCardFromScryfall, buildRawCsvCard, buildRawMoxfieldCard, parseTextImportLine, type ExtractedScryfallData, type ImportCardData, type MoxfieldImportCard } from '../utils/importHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
@@ -78,45 +80,7 @@ const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
 const deckFilter = ref<string>('all')
 const viewType = ref<'visual' | 'texto'>('visual')
 
-// Moxfield import card shape (from moxfieldToCardList)
-interface MoxfieldImportCard {
-  quantity: number
-  name: string
-  setCode: string
-  collectorNumber: string
-  scryfallId: string
-  isInSideboard: boolean
-  isCommander: boolean
-}
-
-// Shape of a collection card being built for import (before it gets an id)
-interface ImportCardData {
-  scryfallId: string
-  name: string
-  edition: string
-  quantity: number
-  condition: CardCondition
-  foil: boolean
-  price: number
-  image: string
-  status: CardStatus
-  public: boolean
-  isInSideboard?: boolean
-  setCode?: string
-  language?: string
-  cmc?: number
-  type_line?: string
-  colors?: string[]
-  rarity?: string
-  power?: string
-  toughness?: string
-  oracle_text?: string
-  keywords?: string[]
-  legalities?: Record<string, string>
-  full_art?: boolean
-  produced_mana?: string[]
-  updatedAt: Date
-}
+// MoxfieldImportCard, ImportCardData, ExtractedScryfallData interfaces moved to src/utils/importHelpers.ts (Plan 03-A)
 
 
 // Vista principal: Colección, Mazos o Carpetas
@@ -645,75 +609,24 @@ const clearAllFilters = () => {
 }
 
 // ========== SERVER-SIDE PAGINATION WIRING ==========
+// buildPaginationFilters and buildPaginationSort extracted to src/utils/collectionFilters.ts (Plan 03-A)
 
 /** Build a filters object for queryCardIndex from current filter state */
-const buildPaginationFilters = () => {
-  // Map status filter to server format
-  let statusArr: string[] | undefined
-  if (statusFilter.value === 'owned') {
-    statusArr = ['collection', 'sale', 'trade']
-  } else if (statusFilter.value === 'available') {
-    statusArr = ['sale', 'trade']
-  } else if (statusFilter.value !== 'all') {
-    statusArr = [statusFilter.value]
-  }
-
-  // Map color display categories to color letters for server
-  const colorMap: Record<string, string> = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' }
-  const colorArr = selectedColors.value.size < colorOrder.length
-    ? [...selectedColors.value].map(c => colorMap[c]).filter(Boolean) as string[] // eslint-disable-line security/detect-object-injection
-    : undefined
-
-  // Map rarity display categories to server format
-  const rarityMap: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
-  const rarityArr = selectedRarities.value.size < rarityOrder.length
-    ? [...selectedRarities.value].map(r => rarityMap[r]).filter(Boolean) as string[] // eslint-disable-line security/detect-object-injection
-    : undefined
-
-  // Map type display categories to server format
-  const typeMap: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
-  const typeArr = selectedTypes.value.size < typeOrder.length
-    ? [...selectedTypes.value].map(t => typeMap[t]).filter(Boolean) as string[] // eslint-disable-line security/detect-object-injection
-    : undefined
-
-  // Map foil filter
-  const foilVal = advFoilFilter.value === 'foil' ? true : undefined
-
-  // Map condition — not currently tracked as chip filter; skip if not filtered
-  const conditionArr = undefined
-
-  // Map edition (advanced sets filter)
-  const editionArr = advSelectedSets.value.length > 0 ? advSelectedSets.value : undefined
-
-  return {
-    search: filterQuery.value.trim() || undefined,
-    status: statusArr,
-    edition: editionArr,
-    color: colorArr,
-    rarity: rarityArr,
-    type: typeArr,
-    foil: foilVal,
-    condition: conditionArr,
-    minPrice: advPriceMin.value,
-    maxPrice: advPriceMax.value,
-  }
-}
+const buildPaginationFilters = () => _buildPaginationFilters({
+  statusFilter: statusFilter.value,
+  selectedColors: selectedColors.value,
+  selectedTypes: selectedTypes.value,
+  selectedRarities: selectedRarities.value,
+  selectedManaValues: selectedManaValues.value,
+  filterQuery: filterQuery.value,
+  advFoilFilter: advFoilFilter.value,
+  advSelectedSets: advSelectedSets.value,
+  advPriceMin: advPriceMin.value,
+  advPriceMax: advPriceMax.value,
+})
 
 /** Build a sort object for queryCardIndex from current sort state */
-const buildPaginationSort = (): { field: 'name' | 'price' | 'edition' | 'quantity' | 'dateAdded'; direction: 'asc' | 'desc' } => {
-  // Map client sort values to server field names
-  const fieldMap: Record<string, 'name' | 'price' | 'edition' | 'quantity' | 'dateAdded'> = {
-    name: 'name',
-    price: 'price',
-    recent: 'dateAdded',
-    edition: 'edition',
-    quantity: 'quantity',
-  }
-  return {
-    field: fieldMap[sortBy.value] ?? 'name',
-    direction: sortBy.value === 'name' ? 'asc' : 'desc',
-  }
-}
+const buildPaginationSort = () => _buildPaginationSort(sortBy.value)
 
 // Debounced watcher: when any filter/sort changes, re-query the server
 let _paginationDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -1793,25 +1706,7 @@ const extractScryfallImage = (card: ScryfallCard | null | undefined): string => 
   return card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal ?? ''
 }
 
-/** Extracted card data from Scryfall for building collection cards */
-interface ExtractedScryfallData {
-  scryfallId: string
-  image: string
-  price: number
-  edition: string
-  setCode: string
-  cmc: number | undefined
-  type_line: string
-  colors: string[]
-  rarity: string
-  power: string | undefined
-  toughness: string | undefined
-  oracle_text: string | undefined
-  keywords: string[]
-  legalities: Record<string, string> | undefined
-  full_art: boolean
-  produced_mana: string[] | undefined
-}
+// ExtractedScryfallData interface moved to src/utils/importHelpers.ts (Plan 03-A)
 
 /** Extract all relevant card data fields from a Scryfall result */
 const extractScryfallCardData = (card: ScryfallCard): ExtractedScryfallData => {
@@ -1860,64 +1755,7 @@ const executeBinderDeletion = async (binderId: string, cardIds: string[], delete
   }
 }
 
-/** Parse a single text line into card data for import (shared by deck and binder text import) */
-const parseTextImportLine = (trimmed: string): { quantity: number; cardName: string; setCode: string | null; isFoil: boolean } | null => {
-  // eslint-disable-next-line security/detect-unsafe-regex
-  const match = /^(\d+)x?\s+(.+?)(?:\s+\((\w+)\))?(?:\s+[\w-]+)?(?:\s+\*f\*?)?$/i.exec(trimmed)
-  const matchQty = match?.[1]
-  const matchName = match?.[2]
-  if (!match || !matchQty || !matchName) return null
-
-  return {
-    quantity: Number.parseInt(matchQty, 10),
-    cardName: cleanCardName(matchName.trim()),
-    setCode: match[3] ?? null,
-    isFoil: /\*[fF]\*?\s*$/.test(trimmed),
-  }
-}
-
-/** Build a collection card object from text import line data + Scryfall results */
-const buildCollectionCardFromScryfall = (opts: {
-  cardName: string,
-  quantity: number,
-  condition: CardCondition,
-  isFoil: boolean,
-  setCode: string | null,
-  scryfallData: ExtractedScryfallData | null | undefined,
-  status: CardStatus | undefined,
-  makePublic: boolean,
-  isInSideboard: boolean,
-}): ImportCardData => {
-  const { cardName, quantity, condition, isFoil, setCode, scryfallData, status, makePublic, isInSideboard } = opts
-  const cardData: ImportCardData = {
-    scryfallId: scryfallData?.scryfallId ?? '',
-    name: cardName,
-    edition: scryfallData?.edition ?? setCode ?? 'Unknown',
-    quantity,
-    condition,
-    foil: isFoil,
-    price: scryfallData?.price ?? 0,
-    image: scryfallData?.image ?? '',
-    status: status ?? 'collection',
-    public: makePublic,
-    isInSideboard,
-    cmc: scryfallData?.cmc,
-    type_line: scryfallData?.type_line,
-    colors: scryfallData?.colors ?? [],
-    rarity: scryfallData?.rarity,
-    power: scryfallData?.power,
-    toughness: scryfallData?.toughness,
-    oracle_text: scryfallData?.oracle_text,
-    keywords: scryfallData?.keywords ?? [],
-    legalities: scryfallData?.legalities,
-    full_art: scryfallData?.full_art ?? false,
-    updatedAt: new Date(),
-  }
-  if (scryfallData?.setCode ?? setCode) {
-    cardData.setCode = scryfallData?.setCode ?? setCode ?? undefined
-  }
-  return cardData
-}
+// parseTextImportLine and buildCollectionCardFromScryfall moved to src/utils/importHelpers.ts (Plan 03-A)
 
 // @ts-expect-error — unused after progressive import refactor, kept for reference
 const _processImportCard = (
@@ -2039,60 +1877,7 @@ const _enrichCardsWithFallbackSearch = async (collectionCardsToAdd: ImportCardDa
   }
 }
 
-/** Build a minimal card from Moxfield import data (no Scryfall fetch needed) */
-const buildRawMoxfieldCard = (
-  card: MoxfieldImportCard,
-  condition: CardCondition,
-  status: CardStatus | undefined,
-  makePublic: boolean,
-): ImportCardData => {
-  let cardName = card.name
-  const isFoil = /\*[fF]\*?\s*$/.test(cardName)
-  if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
-
-  // User-specific fields + convenience copies (name, edition, image)
-  // Scryfall metadata (colors, keywords, etc.) lives in scryfall_cache
-  return {
-    scryfallId: card.scryfallId ?? '',
-    name: cardName,
-    edition: card.setCode?.toUpperCase() ?? 'Unknown',
-    setCode: card.setCode?.toUpperCase(),
-    quantity: card.quantity,
-    condition,
-    foil: isFoil,
-    price: 0,
-    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
-    status: status ?? 'collection',
-    public: makePublic,
-    updatedAt: new Date(),
-  }
-}
-
-/** Build a minimal card from CSV import data (no Scryfall fetch needed) */
-const buildRawCsvCard = (
-  card: ParsedCsvCard,
-  status: CardStatus | undefined,
-  makePublic: boolean,
-): ImportCardData => {
-  // User-specific fields + convenience copies (name, edition, image)
-  // Scryfall metadata (colors, keywords, etc.) lives in scryfall_cache
-  const cardData: ImportCardData = {
-    scryfallId: card.scryfallId ?? '',
-    name: card.name,
-    edition: card.setCode?.toUpperCase() ?? 'Unknown',
-    quantity: card.quantity,
-    condition: card.condition,
-    foil: card.foil,
-    price: card.price ?? 0,
-    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
-    status: status ?? 'collection',
-    public: makePublic,
-    updatedAt: new Date(),
-  }
-  if (card.setCode) cardData.setCode = card.setCode.toUpperCase()
-  if (card.language) cardData.language = card.language
-  return cardData
-}
+// buildRawMoxfieldCard and buildRawCsvCard moved to src/utils/importHelpers.ts (Plan 03-A)
 
 // @ts-expect-error — unused after progressive import refactor
 const _buildCsvCollectionCard = (

@@ -26,7 +26,6 @@ import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, cleanCardName, downloadAsFile, type ParsedCsvCard } from '../utils/cardHelpers'
-import { buildPaginationFilters as _buildPaginationFilters, buildPaginationSort as _buildPaginationSort } from '../utils/collectionFilters'
 import { buildCollectionCardFromScryfall, buildRawCsvCard, buildRawMoxfieldCard, parseTextImportLine, type ExtractedScryfallData, type ImportCardData, type MoxfieldImportCard } from '../utils/importHelpers'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
@@ -37,6 +36,8 @@ import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCat
 import { cancelPriceFetch, useCollectionTotals } from '../composables/useCollectionTotals'
 import { useCollectionImport } from '../composables/useCollectionImport'
 import { useDeckDeletion } from '../composables/useDeckDeletion'
+import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
+import { useCollectionPagination } from '../composables/useCollectionPagination'
 
 const route = useRoute()
 const router = useRouter()
@@ -421,6 +422,39 @@ const {
   resetAdvancedFilters,
 } = useCardFilter(statusFilteredCards)
 
+// ========== URL FILTER SYNC (Plan 03-B, NICE-10) ==========
+// Bidirectional: hydrates filter state from URL on mount, updates URL on state change.
+useCollectionFilterUrl({
+  filterQuery,
+  statusFilter,
+  sortBy,
+  selectedColors,
+  selectedTypes,
+  selectedRarities,
+  selectedManaValues,
+  advFoilFilter,
+})
+
+// ========== PAGINATION COMPOSABLE (Plan 03-B, ARCH-02) ==========
+// Replaces inline debounced watcher. triggerQuery() used in onMounted for initial load.
+const { triggerQuery: triggerPaginationQuery } = useCollectionPagination({
+  filterState: {
+    filterQuery,
+    statusFilter,
+    sortBy,
+    selectedColors,
+    selectedManaValues,
+    selectedTypes,
+    selectedRarities,
+    advFoilFilter,
+    advSelectedSets,
+    advPriceMin,
+    advPriceMax,
+  },
+  collectionStore,
+  viewMode,
+})
+
 // Bridge: individual refs <-> AdvancedFilters for the shared modal
 // Modal uses Scryfall-style values (w, u, creature, common), collection uses display categories (White, Blue, Creatures, Common)
 const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' }
@@ -520,59 +554,6 @@ const clearAllFilters = () => {
   filterQuery.value = ''
   resetAllChipFilters()
 }
-
-// ========== SERVER-SIDE PAGINATION WIRING ==========
-// buildPaginationFilters and buildPaginationSort extracted to src/utils/collectionFilters.ts (Plan 03-A)
-
-/** Build a filters object for queryCardIndex from current filter state */
-const buildPaginationFilters = () => _buildPaginationFilters({
-  statusFilter: statusFilter.value,
-  selectedColors: selectedColors.value,
-  selectedTypes: selectedTypes.value,
-  selectedRarities: selectedRarities.value,
-  selectedManaValues: selectedManaValues.value,
-  filterQuery: filterQuery.value,
-  advFoilFilter: advFoilFilter.value,
-  advSelectedSets: advSelectedSets.value,
-  advPriceMin: advPriceMin.value,
-  advPriceMax: advPriceMax.value,
-})
-
-/** Build a sort object for queryCardIndex from current sort state */
-const buildPaginationSort = () => _buildPaginationSort(sortBy.value)
-
-// Debounced watcher: when any filter/sort changes, re-query the server
-let _paginationDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-watch(
-  [
-    filterQuery,
-    statusFilter,
-    sortBy,
-    selectedColors,
-    selectedManaValues,
-    selectedTypes,
-    selectedRarities,
-    advFoilFilter,
-    advSelectedSets,
-    advPriceMin,
-    advPriceMax,
-  ],
-  () => {
-    if (_paginationDebounceTimer) clearTimeout(_paginationDebounceTimer)
-    _paginationDebounceTimer = setTimeout(() => {
-      if (viewMode.value === 'collection') {
-        collectionStore.queryPage(buildPaginationFilters(), buildPaginationSort())
-      }
-    }, 300)
-  },
-  { deep: true }
-)
-
-// Clean up debounce timer on unmount
-onUnmounted(() => {
-  if (_paginationDebounceTimer) clearTimeout(_paginationDebounceTimer)
-})
 
 // Computed: use paginated cards for collection mode, filtered cards for deck/binder
 const collectionDisplayCards = computed(() => {
@@ -2123,7 +2104,7 @@ onMounted(async () => {
     ])
 
     // Trigger initial server-side paginated query (fire-and-forget, no await)
-    collectionStore.queryPage(buildPaginationFilters(), buildPaginationSort())
+    triggerPaginationQuery()
 
     // Check for view mode query param (from search redirect)
     const fromParam = route.query.from as string

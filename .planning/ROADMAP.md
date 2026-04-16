@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Global A11y & CSS Sweep** - Accessibility fixes and systemic CSS/HTML corrections across all files
 - [ ] **Phase 2: DashboardView Decomposition** - Decompose the 1158-line DashboardView mega-component into composables + fix its rule violations
-- [ ] **Phase 3: CollectionView Decomposition** - Decompose the 1050-line CollectionView mega-component and split CollectionGridCard
+- [ ] **Phase 3: CollectionView Decomposition** - Split the 4579-line CollectionView into 3 route-level views + composables, split CollectionGridCard, wire useSwipe, add URL-synced filters
 - [ ] **Phase 4: GlobalSearch & Navigation Polish** - ARIA combobox on GlobalSearch and anchor-based navigation
 
 ## Phase Details
@@ -49,15 +49,22 @@ Plans:
 **UI hint**: yes
 
 ### Phase 3: CollectionView Decomposition
-**Goal**: CollectionView delegates its import state machine, delete-deck state machine, filter mapping, deck display cards, and pagination params to composables; CollectionGridCard is split into compact and full variants; swipe logic uses the existing composable
+**Goal**: CollectionView.vue (4579 lines) is split into 3 route-level views (CollectionView, DeckView, BinderView) each under 600 lines, with import/delete state machines and filter/pagination logic extracted into composables; CollectionGridCard is split into compact and full variants with useSwipe; filter state syncs bidirectionally with the URL
 **Depends on**: Phase 2
 **Requirements**: ARCH-02, ARCH-05, ARCH-06, NICE-07, NICE-08, NICE-09, NICE-10
 **Success Criteria** (what must be TRUE):
-  1. CollectionView.vue is under 400 lines with no duplicated state machine logic inline
-  2. CollectionGridCard renders via a routing shell that delegates to CollectionGridCardCompact or CollectionGridCardFull — no duplicated swipe handlers
-  3. Swiping a collection card uses useSwipe.ts with no inline touch event listeners remaining in CollectionGridCard
-  4. Changing a filter or sort in CollectionView updates the browser URL, and refreshing the page restores the same filtered view
-**Plans**: TBD
+  1. CollectionView.vue is under 600 lines with no duplicated state machine logic inline
+  2. DeckView.vue and BinderView.vue exist as first-class route-level views at /decks/:id? and /binders/:id?
+  3. CollectionGridCard renders via a routing shell that delegates to CollectionGridCardCompact or CollectionGridCardFull — no duplicated swipe handlers
+  4. Swiping a collection card uses useSwipe.ts with no inline touch event listeners remaining in CollectionGridCard
+  5. Changing a filter or sort in CollectionView updates the browser URL, and refreshing the page restores the same filtered view
+**Plans**: 5 plans
+Plans:
+- [ ] 03-A-PLAN.md — Pure helper foundation: extract collectionFilters.ts + importHelpers.ts, fix NICE-07/08/09
+- [ ] 03-B-PLAN.md — State machine composables: useCollectionImport, useDeckDeletion, useCollectionFilterUrl, useCollectionPagination (NICE-10)
+- [ ] 03-C-PLAN.md — Route split: create DeckView.vue + BinderView.vue, update router, eliminate viewMode
+- [ ] 03-D-PLAN.md — CollectionGridCard split: routing shell + Compact + Full variants, wire useSwipe (ARCH-05, ARCH-06)
+- [ ] 03-E-PLAN.md — Closeout: dead code audit, line count verification, version bump, user verification
 **UI hint**: yes
 
 ### Phase 4: GlobalSearch & Navigation Polish
@@ -80,5 +87,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Global A11y & CSS Sweep | 0/3 | Not started | - |
 | 2. DashboardView Decomposition | 0/TBD | Not started | - |
-| 3. CollectionView Decomposition | 0/TBD | Not started | - |
+| 3. CollectionView Decomposition | 0/5 | Planning complete | - |
 | 4. GlobalSearch & Navigation Polish | 0/TBD | Not started | - |

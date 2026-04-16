@@ -2164,6 +2164,14 @@
         "title": "Minha Colecao",
         "description": "Gerencie sua colecao de cartas Magic: The Gathering."
       },
+      "decks": {
+        "title": "Meus Decks",
+        "description": "Edite, aloque cartas e gerencie seus decks de Magic: The Gathering."
+      },
+      "binders": {
+        "title": "Minhas Pastas",
+        "description": "Gerencie suas pastas de Magic: The Gathering para venda e troca."
+      },
       "search": {
         "title": "Buscar Cartas",
         "description": "Busque cartas Magic: The Gathering no banco de dados do Scryfall."

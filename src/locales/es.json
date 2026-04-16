@@ -2164,6 +2164,14 @@
         "title": "Mi Coleccion",
         "description": "Gestiona tu coleccion de cartas Magic: The Gathering."
       },
+      "decks": {
+        "title": "Mis Mazos",
+        "description": "Edita, asigna cartas y gestiona tus mazos de Magic: The Gathering."
+      },
+      "binders": {
+        "title": "Mis Carpetas",
+        "description": "Gestiona tus carpetas de Magic: The Gathering para venta e intercambio."
+      },
       "search": {
         "title": "Buscar Cartas",
         "description": "Busca cartas Magic: The Gathering en la base de datos de Scryfall."

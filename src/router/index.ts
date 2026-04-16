@@ -79,22 +79,26 @@ const router = createRouter({
             component: () => import('../views/SettingsView.vue'),
             meta: { requiresAuth: true, title: 'seo.pages.settings.title', description: 'seo.pages.settings.description', robots: 'noindex, nofollow' },
         },
-        // Deck routes - redirect to collection (decks are now managed via collection tabs)
-        {
-            path: '/decks',
-            redirect: '/collection',
-        },
+        // Legacy deck redirects (must come before /decks/:id? to take priority)
         {
             path: '/decks/new',
-            redirect: '/collection',
-        },
-        {
-            path: '/decks/:deckId',
-            redirect: to => ({ path: '/collection', query: { deck: to.params.deckId } }),
+            redirect: '/decks',
         },
         {
             path: '/decks/:deckId/edit',
-            redirect: to => ({ path: '/collection', query: { deck: to.params.deckId } }),
+            redirect: to => ({ path: `/decks/${String(to.params.deckId)}` }),
+        },
+        {
+            path: '/decks/:id?',
+            name: 'decks',
+            component: () => import('../views/DeckView.vue'),
+            meta: { requiresAuth: true, title: 'seo.pages.decks.title', description: 'seo.pages.decks.description', robots: 'noindex, nofollow' },
+        },
+        {
+            path: '/binders/:id?',
+            name: 'binders',
+            component: () => import('../views/BinderView.vue'),
+            meta: { requiresAuth: true, title: 'seo.pages.binders.title', description: 'seo.pages.binders.description', robots: 'noindex, nofollow' },
         },
         {
             path: '/@:username',

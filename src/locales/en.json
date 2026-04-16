@@ -2164,6 +2164,14 @@
         "title": "My Collection",
         "description": "Manage your Magic: The Gathering card collection."
       },
+      "decks": {
+        "title": "My Decks",
+        "description": "Edit, allocate, and track your Magic: The Gathering decks."
+      },
+      "binders": {
+        "title": "My Binders",
+        "description": "Manage your Magic: The Gathering binders for trade and sale."
+      },
       "search": {
         "title": "Search Cards",
         "description": "Search Magic: The Gathering cards from the Scryfall database."

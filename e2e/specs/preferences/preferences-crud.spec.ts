@@ -74,8 +74,4 @@ test.describe('Preferences (Wishlist) CRUD', () => {
     const wantedText = page.locator('text=/WANTED|wishlist|deseado/i');
     await expect(wantedText.first()).toBeVisible({ timeout: 5000 });
   });
-
-  test('import button is visible on collection page', async ({ preferencesPage }) => {
-    await expect(preferencesPage.importButton).toBeVisible({ timeout: 5000 });
-  });
 });

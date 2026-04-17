@@ -13,6 +13,7 @@ import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
+import DeckStatsFooter from '../components/decks/DeckStatsFooter.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
@@ -1370,106 +1371,21 @@ onUnmounted(() => {
   </Teleport>
 
   <!-- ========== DECK STATS FOOTER ========== -->
-  <Teleport to="body">
-    <div v-if="selectedDeck"
-         class="fixed md:!bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
-      <div class="container mx-auto max-w-[1200px]">
-        <!-- Desktop -->
-        <div class="hidden md:flex items-center gap-4 text-tiny px-4 py-2">
-          <div class="flex items-center gap-1 border-r border-silver-30 pr-4">
-            <span class="text-silver-50">{{ t('collection.totals.priceSource') }}:</span>
-            <button
-                v-for="src in (['tcg', 'ck', 'buylist'] as DeckPriceSource[])"
-                :key="src"
-                @click="deckPriceSource = src"
-                :class="[
-                  'px-2 py-0.5 font-bold rounded transition-colors uppercase',
-                  deckPriceSource === src
-                    ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
-                    : 'text-silver-50 hover:text-silver hover:bg-silver-5'
-                ]"
-            >
-              {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'Buylist' }}
-            </button>
-          </div>
-          <span class="text-silver-50">{{ t('collection.deckStats.have') }} <span class="font-bold text-neon text-small">{{ deckOwnedCount }}</span></span>
-          <span class="text-silver-30">|</span>
-          <span class="text-silver-50">{{ t('collection.deckStats.need') }} <span class="font-bold text-yellow-400 text-small">{{ deckWishlistCount }}</span></span>
-          <span class="text-silver-30">|</span>
-          <span class="text-silver-50">{{ t('collection.deckStats.total') }} <span class="font-bold text-small"><span class="text-neon">{{ deckOwnedCount }}</span><span class="text-silver-30">/</span>{{ deckOwnedCount + deckWishlistCount }}</span></span>
-          <span class="text-silver-30">|</span>
-          <span class="text-silver-50">{{ t('collection.deckStats.valueHave') }} <span class="font-bold" :class="deckSourceColor">${{ deckOwnedCostBySource.toFixed(2) }}</span></span>
-          <span class="text-silver-30">|</span>
-          <span class="text-silver-50">{{ t('collection.deckStats.valueNeed') }} <span class="font-bold text-yellow-400">${{ deckWishlistCostBySource.toFixed(2) }}</span></span>
-          <span class="text-silver-30">|</span>
-          <span class="text-silver-50">{{ t('collection.deckStats.valueTotal') }} <span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span></span>
-          <div v-if="selectedDeckStats" class="flex items-center gap-2 flex-1 ml-2">
-            <div class="flex-1 h-2 bg-primary rounded overflow-hidden border border-silver-30/30">
-              <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage ?? 0}%` }"></div>
-            </div>
-            <span class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage ?? 0).toFixed(0) }}%</span>
-          </div>
-        </div>
-        <!-- Mobile -->
-        <div class="md:hidden">
-          <button
-            @click="deckStatsExpanded = !deckStatsExpanded"
-            class="w-full flex items-center justify-between px-4 py-1"
-          >
-            <div class="flex items-center gap-1.5 text-[11px]">
-              <span class="font-bold uppercase" :class="deckSourceColor">{{ deckActiveSourceLabel }}</span>
-              <span class="text-silver-30">|</span>
-              <span class="text-neon font-bold">{{ deckOwnedCount }}</span><span class="text-silver-50 text-[11px]">/{{ deckOwnedCount + deckWishlistCount }}</span>
-              <span class="text-silver-30">|</span>
-              <span class="text-silver-50">${{ deckTotalCostBySource.toFixed(2) }}</span>
-              <span v-if="selectedDeckStats" class="font-bold text-neon">{{ (selectedDeckStats.completionPercentage ?? 0).toFixed(0) }}%</span>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                 class="text-silver-50 transition-transform duration-200" :class="deckStatsExpanded ? 'rotate-180' : ''">
-              <polyline points="18 15 12 9 6 15"/>
-            </svg>
-          </button>
-
-          <div v-if="deckStatsExpanded" class="px-4 pb-1.5 space-y-1.5">
-            <div class="flex items-center gap-2">
-              <div class="flex items-center gap-1">
-                <button
-                    v-for="src in (['tcg', 'ck', 'buylist'] as DeckPriceSource[])"
-                    :key="src"
-                    @click.stop="deckPriceSource = src"
-                    :class="[
-                      'px-1.5 py-0.5 text-[11px] font-bold rounded transition-colors uppercase',
-                      deckPriceSource === src
-                        ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
-                        : 'text-silver-50'
-                    ]"
-                >
-                  {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
-                </button>
-              </div>
-              <span class="text-silver-30">|</span>
-              <span class="text-[11px]"><span class="text-silver-50">Have </span><span class="text-neon font-bold">{{ deckOwnedCount }}</span></span>
-              <span class="text-silver-30">|</span>
-              <span class="text-[11px]"><span class="text-silver-50">Need </span><span class="text-yellow-400 font-bold">{{ deckWishlistCount }}</span></span>
-            </div>
-            <div class="flex items-center gap-2 text-[11px]">
-              <span><span class="text-silver-50">Have </span><span class="font-bold" :class="deckSourceColor">${{ deckOwnedCostBySource.toFixed(2) }}</span></span>
-              <span class="text-silver-30">|</span>
-              <span><span class="text-silver-50">Need </span><span class="font-bold text-yellow-400">${{ deckWishlistCostBySource.toFixed(2) }}</span></span>
-              <span class="text-silver-30">|</span>
-              <span><span class="text-silver-50">Total </span><span class="font-bold" :class="deckSourceColor">${{ deckTotalCostBySource.toFixed(2) }}</span></span>
-            </div>
-            <div v-if="selectedDeckStats" class="flex items-center gap-2">
-              <div class="flex-1 h-1.5 bg-primary rounded overflow-hidden border border-silver-30/30">
-                <div class="h-full bg-neon transition-all" :style="{ width: `${selectedDeckStats.completionPercentage ?? 0}%` }"></div>
-              </div>
-              <span class="text-[11px] font-bold text-neon">{{ (selectedDeckStats.completionPercentage ?? 0).toFixed(0) }}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <DeckStatsFooter
+      v-if="selectedDeck"
+      :owned-count="deckOwnedCount"
+      :wishlist-count="deckWishlistCount"
+      :owned-cost="deckOwnedCostBySource"
+      :wishlist-cost="deckWishlistCostBySource"
+      :total-cost="deckTotalCostBySource"
+      :price-source="deckPriceSource"
+      :source-color="deckSourceColor"
+      :source-label="deckActiveSourceLabel"
+      :expanded="deckStatsExpanded"
+      :completion-percentage="selectedDeckStats?.completionPercentage ?? null"
+      @update:expanded="deckStatsExpanded = $event"
+      @change-source="deckPriceSource = $event"
+  />
 </template>
 
 <style scoped>

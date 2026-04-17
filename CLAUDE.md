@@ -192,6 +192,17 @@ src/
 - Feature-based component organization
 - Firebase SDK v9 modular imports
 
+### Three-View Architecture (Phase 03)
+**CollectionView (`/collection`), DeckView (`/decks/:id?`), BinderView (`/binders/:id?`) are separate route-level views — no shared `viewMode` state.** Each view mounts its own feature set:
+
+- `CollectionView.vue` — card grid, status filters, wishlist, bulk operations, URL-synced filters (`useCollectionFilterUrl`), server-side pagination (`useCollectionPagination`)
+- `DeckView.vue` — deck editor (`DeckEditorGrid`), allocations, import/delete flows (`useCollectionImport` + `useDeckDeletion`), CSV/clipboard export, mainboard/sideboard separation, deck stats footer
+- `BinderView.vue` — binder editor (`DeckEditorGrid` in `binder-mode`), allocations, import flow (`useCollectionImport`), CSV/clipboard export, public/for-sale toggles
+
+Tab navigation between the three views uses `<RouterLink>` — never internal state toggles. Legacy `/collection?deck=X` / `?binder=X` / `?from=decks` query params are still redirected in `CollectionView.initView()` for backward compatibility.
+
+`CollectionGridCard.vue` is a routing shell that delegates to `CollectionGridCardCompact.vue` (grid thumbnail) or `CollectionGridCardFull.vue` (list row with swipe). Swipe interactions use the `useSwipe` composable — no inline `@touchstart` / `@touchmove` / `@touchend` handlers.
+
 ## Core Data Types
 
 - **Card:** scryfallId, name, edition, quantity, condition (M/NM/LP/MP/HP/PO), foil, price, status (collection|sale|trade|wishlist)
@@ -260,9 +271,15 @@ Auto-dismiss after 4 seconds.
 
 ## Files Often Modified Together
 - `CollectionView.vue` ↔ `CollectionGrid.vue`
+- `DeckView.vue` ↔ `DeckEditorGrid.vue` ↔ `stores/decks.ts` (deck editor + allocations)
+- `BinderView.vue` ↔ `DeckEditorGrid.vue` (binder-mode) ↔ `stores/binders.ts` (binder editor)
+- `DeckView.vue` ↔ `BinderView.vue` ↔ `composables/useCollectionImport.ts` (shared import flow)
+- `CollectionGridCard.vue` ↔ `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (shell + variants — swipe lives in Full via `useSwipe`)
+- `CollectionView.vue` ↔ `composables/useCollectionFilterUrl.ts` ↔ `composables/useCollectionPagination.ts` (URL-synced filters + server pagination)
 - `AddCardModal.vue` ↔ `EditCardModal.vue`
 - `CardGridSearch.vue` ↔ Scryfall service + AddCardModal
 - `SavedMatchesView.vue` ↔ `utils/matchGrouping`, `services/stats`, `stores/matches` (match-calculation pipeline — Plan 02-C wired SavedMatchesView to extracted infrastructure)
+- `src/locales/en.json` ↔ `src/locales/es.json` ↔ `src/locales/pt.json` (always update all 3 together)
 
 ---
 
@@ -378,10 +395,11 @@ Agent(dev)  # Task 3 (depends on Task 1)
 - Identify ALL parallel points BEFORE starting to code (list them in the plan)
 - Apply the change to ALL points in the same step — never "I'll do the other one later"
 - **Parallelism checklist for this project:**
-  - Deck handlers ↔ Binder handlers (always come in pairs)
+  - Deck handlers ↔ Binder handlers (always come in pairs — now live in `DeckView.vue` / `BinderView.vue` post-Phase 03)
   - SavedMatchesView (blocked-users inline — consolidation tech debt noted in Phase 02-C SUMMARY)
   - en.json ↔ es.json ↔ pt.json (always all 3)
   - AddCardModal ↔ EditCardModal (shared behavior)
+  - `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (same Card prop shape, different presentation — swipe only in Full)
 
 ### Rule 7: Build + Tests = Definition of "Done"
 

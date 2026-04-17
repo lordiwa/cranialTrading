@@ -68,10 +68,10 @@ export class DecksPage {
   }
 
   async goto() {
-    await this.page.goto('/collection');
-    await ensureLoggedIn(this.page, '/collection');
+    // Phase 03: DeckView is now a standalone /decks route (previously internal view mode)
+    await this.page.goto('/decks');
+    await ensureLoggedIn(this.page, '/decks');
     await this.page.waitForLoadState('domcontentloaded');
-    await this.deckTab.click();
     await this.page.waitForTimeout(500);
   }
 

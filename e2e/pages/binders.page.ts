@@ -32,10 +32,10 @@ export class BindersPage {
   }
 
   async goto() {
-    await this.page.goto('/collection');
-    await ensureLoggedIn(this.page, '/collection');
+    // Phase 03: BinderView is now a standalone /binders route (previously internal view mode)
+    await this.page.goto('/binders');
+    await ensureLoggedIn(this.page, '/binders');
     await this.page.waitForLoadState('domcontentloaded');
-    await this.binderTab.click();
     await this.page.waitForTimeout(500);
   }
 

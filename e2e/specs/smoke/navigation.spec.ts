@@ -35,18 +35,19 @@ test.describe('Navigation Smoke Tests', () => {
   });
 
   test('tab switching renders correct content', async ({ page }) => {
-    await page.goto(ROUTES.collection);
-    await page.waitForLoadState('domcontentloaded');
+    // Phase 03: tabs are now RouterLinks (separate views), not internal state toggles.
+    // Use ensureLoggedIn to guarantee auth + mounted CollectionView before asserting.
+    await ensureLoggedIn(page, ROUTES.collection);
 
-    // Collection tab should be active by default
+    // Collection tab should be active by default — status filters are in CollectionView
     const collectionContent = page.locator('[data-tour="status-filters"]');
-    await expect(collectionContent).toBeVisible();
+    await expect(collectionContent).toBeVisible({ timeout: 15_000 });
 
-    // Switch to decks tab
+    // Switch to decks tab (now navigates to /decks route)
     const deckTab = page.locator('[data-tour="deck-tab"]');
     if (await deckTab.isVisible()) {
       await deckTab.click();
-      await page.waitForTimeout(500);
+      await expect(page).toHaveURL(/\/decks/, { timeout: 5_000 });
     }
   });
 });

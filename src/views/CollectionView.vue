@@ -7,6 +7,7 @@ import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import AppContainer from '../components/layout/AppContainer.vue'
 import AddCardModal from '../components/collection/AddCardModal.vue'
+import BulkSelectionActionBar from '../components/collection/BulkSelectionActionBar.vue'
 import CardDetailModal from '../components/collection/CardDetailModal.vue'
 import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import CollectionGrid from '../components/collection/CollectionGrid.vue'
@@ -517,14 +518,11 @@ const handleBulkPublicToggle = async (isPublic: boolean) => {
 }
 
 // ---- Bulk allocate to deck/binder ----
-const showBulkDeckPicker = ref(false)
-const showBulkBinderPicker = ref(false)
 const pendingBulkAllocateDeck = ref(false)
 const pendingBulkAllocateBinder = ref(false)
 
 const handleBulkAllocateToDeck = async (deckId: string) => {
   if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
-  showBulkDeckPicker.value = false
   bulkActionLoading.value = true
   try {
     const items = [...selectedCardIds.value].map(cardId => ({
@@ -580,7 +578,6 @@ const performBulkBinderAllocate = async (binderId: string) => {
 
 const handleBulkAllocateToBinder = async (binderId: string) => {
   if (selectedCardIds.value.size === 0 || bulkActionLoading.value) return
-  showBulkBinderPicker.value = false
   bulkActionLoading.value = true
   try {
     await performBulkBinderAllocate(binderId)
@@ -590,13 +587,11 @@ const handleBulkAllocateToBinder = async (binderId: string) => {
 }
 
 const handleBulkCreateDeck = () => {
-  showBulkDeckPicker.value = false
   showCreateDeckModal.value = true
   pendingBulkAllocateDeck.value = true
 }
 
 const handleBulkCreateBinder = () => {
-  showBulkBinderPicker.value = false
   showCreateBinderModal.value = true
   pendingBulkAllocateBinder.value = true
 }
@@ -1022,167 +1017,24 @@ onUnmounted(() => {
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->
-        <div v-if="selectionMode" class="bg-silver-5 border border-silver-10 p-3 mb-4 rounded space-y-3 relative">
-          <div v-if="bulkActionLoading" class="absolute inset-0 bg-primary/70 rounded flex flex-col items-center justify-center z-10 gap-2">
-            <span class="text-small font-bold text-neon animate-pulse">
-              {{ bulkActionProgress > 0 ? `${bulkActionProgress}%` : t('collection.bulkEdit.processing') }}
-            </span>
-            <div v-if="bulkActionProgress > 0" class="w-3/4 h-1 bg-silver-10 rounded overflow-hidden">
-              <div class="h-full bg-neon transition-all duration-300" :style="{ width: `${bulkActionProgress}%` }"></div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-              <span class="text-small font-bold text-silver">
-                {{ t('collection.bulkDelete.selected', { count: selectedCardIds.size }) }}
-              </span>
-              <button
-                  @click="selectAllFiltered"
-                  :disabled="bulkActionLoading"
-                  class="text-tiny text-neon hover:text-neon/80 underline transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                {{ t('collection.bulkDelete.selectAll') }}
-              </button>
-              <button
-                  v-if="selectedCardIds.size > 0"
-                  @click="clearSelection"
-                  :disabled="bulkActionLoading"
-                  class="text-tiny text-silver-50 hover:text-silver underline transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                {{ t('collection.bulkDelete.clearSelection') }}
-              </button>
-            </div>
-            <BaseButton size="small" variant="secondary" :disabled="bulkActionLoading" @click="toggleSelectionMode">
-              {{ t('common.actions.cancel') }}
-            </BaseButton>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.statusLabel') }}</span>
-            <button
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkStatusChange('collection')"
-                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
-            >
-              <SvgIcon name="check" size="tiny" />
-              {{ t('common.status.collection').toUpperCase() }}
-            </button>
-            <button
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkStatusChange('trade')"
-                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-blue-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-blue-400"
-            >
-              <SvgIcon name="flip" size="tiny" />
-              {{ t('common.status.trade').toUpperCase() }}
-            </button>
-            <button
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkStatusChange('sale')"
-                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-yellow-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-yellow-400"
-            >
-              <SvgIcon name="money" size="tiny" />
-              {{ t('common.status.sale').toUpperCase() }}
-            </button>
-            <button
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkStatusChange('wishlist')"
-                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-red-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-red-400"
-            >
-              <SvgIcon name="star" size="tiny" />
-              {{ t('common.status.wishlist').toUpperCase() }}
-            </button>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.visibilityLabel') }}</span>
-            <button
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkPublicToggle(true)"
-                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
-            >
-              <SvgIcon name="eye-open" size="tiny" />
-              {{ t('collection.bulkEdit.setPublic') }}
-            </button>
-            <button
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkPublicToggle(false)"
-                class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-silver-50/50 disabled:opacity-30 disabled:cursor-not-allowed text-silver-50"
-            >
-              <SvgIcon name="eye-closed" size="tiny" />
-              {{ t('collection.bulkEdit.setPrivate') }}
-            </button>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.addLabel') }}</span>
-
-            <div class="relative">
-              <button
-                  :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                  @click="showBulkDeckPicker = !showBulkDeckPicker; showBulkBinderPicker = false"
-                  class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
-              >
-                <SvgIcon name="box" size="tiny" />
-                {{ t('collection.bulkEdit.deck') }} ▾
-              </button>
-              <div v-if="showBulkDeckPicker" class="absolute top-full left-0 mt-1 z-20 bg-primary border border-silver-10 rounded shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
-                <button
-                    v-for="deck in decksList"
-                    :key="deck.id"
-                    @click="handleBulkAllocateToDeck(deck.id)"
-                    class="w-full text-left px-3 py-2 text-tiny text-silver hover:bg-silver-5 transition-colors"
-                >
-                  {{ deck.name }}
-                </button>
-                <button
-                    @click="handleBulkCreateDeck"
-                    class="w-full text-left px-3 py-2 text-tiny text-neon hover:bg-silver-5 transition-colors border-t border-silver-10"
-                >
-                  {{ t('collection.bulkEdit.newDeck') }}
-                </button>
-              </div>
-            </div>
-
-            <div class="relative">
-              <button
-                  :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                  @click="showBulkBinderPicker = !showBulkBinderPicker; showBulkDeckPicker = false"
-                  class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
-              >
-                <SvgIcon name="collection" size="tiny" />
-                {{ t('collection.bulkEdit.binder') }} ▾
-              </button>
-              <div v-if="showBulkBinderPicker" class="absolute top-full left-0 mt-1 z-20 bg-primary border border-silver-10 rounded shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
-                <button
-                    v-for="binder in bindersList"
-                    :key="binder.id"
-                    @click="handleBulkAllocateToBinder(binder.id)"
-                    class="w-full text-left px-3 py-2 text-tiny text-silver hover:bg-silver-5 transition-colors"
-                >
-                  {{ binder.name }}
-                </button>
-                <button
-                    @click="handleBulkCreateBinder"
-                    class="w-full text-left px-3 py-2 text-tiny text-neon hover:bg-silver-5 transition-colors border-t border-silver-10"
-                >
-                  {{ t('collection.bulkEdit.newBinder') }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <BaseButton
-                size="small"
-                variant="danger"
-                :disabled="selectedCardIds.size === 0 || bulkActionLoading"
-                @click="handleBulkDelete"
-            >
-              {{ t('collection.bulkDelete.deleteSelected', { count: selectedCardIds.size }) }}
-            </BaseButton>
-          </div>
-        </div>
+        <BulkSelectionActionBar
+            v-if="selectionMode"
+            :selected-count="selectedCardIds.size"
+            :bulk-action-loading="bulkActionLoading"
+            :bulk-action-progress="bulkActionProgress"
+            :decks="decksList"
+            :binders="bindersList"
+            @toggle-selection-mode="toggleSelectionMode"
+            @select-all="selectAllFiltered"
+            @clear-selection="clearSelection"
+            @change-status="handleBulkStatusChange"
+            @toggle-public="handleBulkPublicToggle"
+            @allocate-to-deck="handleBulkAllocateToDeck"
+            @allocate-to-binder="handleBulkAllocateToBinder"
+            @create-deck="handleBulkCreateDeck"
+            @create-binder="handleBulkCreateBinder"
+            @delete="handleBulkDelete"
+        />
 
         <!-- Loading spinner + skeleton -->
         <div v-if="collectionStore.loading && collectionStore.cards.length === 0">

@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.22.0
+milestone: v1.23.0
 milestone_name: milestone
-status: Executing Phase 03
-stopped_at: Phase 03 context gathered
-last_updated: "2026-04-16T03:55:31.862Z"
-last_activity: 2026-04-16 -- Phase 03 execution started
+status: Phase 03 complete — cleaning up tech debt
+stopped_at: Phase 03 shipped to dev, verified by user
+last_updated: "2026-04-17T02:00:00.000Z"
+last_activity: 2026-04-17 -- Phase 03 complete, extracting remaining components to hit D-06 line targets
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 7
-  percent: 58
+  completed_plans: 12
+  percent: 75
 ---
 
 # Project State
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** Every interactive element must be accessible to keyboard-only and screen reader users
-**Current focus:** Phase 03 — collectionview-decomposition
+**Current focus:** Phase 03 cleanup → Phase 04 planning
 
 ## Current Position
 
-Phase: 03 (collectionview-decomposition) — EXECUTING
-Plan: 1 of 5
-Plans delivered: A (CSS foundation), B (shared UI ARIA), C (per-component sweep)
-Shipped: v1.23.0 on cranial-trading-dev.web.app, verified by user
-Last activity: 2026-04-16 -- Phase 03 execution started
+Phase: 03 (collectionview-decomposition) — COMPLETE
+Plans delivered: A (pure helpers), B (composables), C (route split), D (GridCard split), E (closeout)
+Shipped: v1.23.0 on cranial-trading-dev.web.app, verified by user 2026-04-17
+Next: tech-debt cleanup (BulkSelectionActionBar + DeckStatsFooter + useDeckDisplayCards extractions) → Phase 04 (GlobalSearch ARIA combobox)
+Last activity: 2026-04-17 -- Phase 03 complete, starting cleanup
 
-Progress: [██▌░░░░░░░] 25%
+Progress: [███████▌░░] 75%
 
 ## Performance Metrics
 

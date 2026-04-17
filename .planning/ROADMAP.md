@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Global A11y & CSS Sweep** - Accessibility fixes and systemic CSS/HTML corrections across all files
 - [ ] **Phase 2: DashboardView Decomposition** - Decompose the 1158-line DashboardView mega-component into composables + fix its rule violations
-- [ ] **Phase 3: CollectionView Decomposition** - Split the 4579-line CollectionView into 3 route-level views + composables, split CollectionGridCard, wire useSwipe, add URL-synced filters
+- [x] **Phase 3: CollectionView Decomposition** - Split the 4579-line CollectionView into 3 route-level views + composables, split CollectionGridCard, wire useSwipe, add URL-synced filters
 - [ ] **Phase 4: GlobalSearch & Navigation Polish** - ARIA combobox on GlobalSearch and anchor-based navigation
 
 ## Phase Details
@@ -62,9 +62,9 @@ Plans:
 Plans:
 - [x] 03-A-PLAN.md — Pure helper foundation: extract collectionFilters.ts + importHelpers.ts, fix NICE-07/08/09
 - [x] 03-B-PLAN.md — State machine composables: useCollectionImport, useDeckDeletion, useCollectionFilterUrl, useCollectionPagination (NICE-10)
-- [ ] 03-C-PLAN.md — Route split: create DeckView.vue + BinderView.vue, update router, eliminate viewMode
+- [x] 03-C-PLAN.md — Route split: create DeckView.vue + BinderView.vue, update router, eliminate viewMode
 - [x] 03-D-PLAN.md — CollectionGridCard split: routing shell + Compact + Full variants, wire useSwipe (ARCH-05, ARCH-06)
-- [ ] 03-E-PLAN.md — Closeout: dead code audit, line count verification, version bump, user verification
+- [x] 03-E-PLAN.md — Closeout: dead code audit, line count verification, version bump, user verification
 **UI hint**: yes
 
 ### Phase 4: GlobalSearch & Navigation Polish
@@ -87,5 +87,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Global A11y & CSS Sweep | 0/3 | Not started | - |
 | 2. DashboardView Decomposition | 0/TBD | Not started | - |
-| 3. CollectionView Decomposition | 0/5 | Planning complete | - |
+| 3. CollectionView Decomposition | 5/5 | Complete | 2026-04-17 |
 | 4. GlobalSearch & Navigation Polish | 0/TBD | Not started | - |

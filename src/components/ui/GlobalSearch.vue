@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import { getAvatarUrlForUser } from '../../utils/avatar'
@@ -33,6 +33,10 @@ const {
   isExpanded,
   moveHighlight,
   selectHighlighted,
+  // Plan 04-03: route resolvers for RouterLink :to= binding
+  resolveCollectionRoute,
+  resolveUserRoute,
+  resolveScryfallRoute,
 } = useGlobalSearch()
 
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -142,12 +146,13 @@ defineExpose({
     </div>
     <!-- Advanced search link -->
     <div class="flex justify-end mt-1">
-      <button
-          @click="isOpen = false; router.push('/search')"
+      <RouterLink
+          :to="'/search'"
+          @click="isOpen = false"
           class="text-tiny text-silver-50 hover:text-neon transition-colors"
       >
         {{ t('common.actions.advancedSearch') }} →
-      </button>
+      </RouterLink>
     </div>
 
     <!-- Results Dropdown — shown when isExpanded (matches popup render condition exactly) -->
@@ -204,13 +209,14 @@ defineExpose({
           <div v-if="collectionResults.length === 0" class="p-4 text-center text-small text-silver-50">
             {{ t('header.search.noResults') }}
           </div>
-          <button
+          <RouterLink
             v-for="(card, index) in collectionResults"
             :key="card.id"
             :id="`option-collection-${index}`"
             role="option"
             :aria-selected="activeDescendantId === `option-collection-${index}` ? 'true' : 'false'"
-            @click="goToCollection(card)"
+            :to="resolveCollectionRoute(card)"
+            @click="isOpen = false; searchQuery = ''"
             class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
           >
             <img
@@ -227,7 +233,7 @@ defineExpose({
               <p class="text-tiny text-silver-50">{{ card.edition }} · x{{ card.quantity }}</p>
             </div>
             <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
-          </button>
+          </RouterLink>
         </div>
 
         <!-- Users Results -->
@@ -243,10 +249,10 @@ defineExpose({
             :aria-selected="activeDescendantId === `option-users-${index}` ? 'true' : 'false'"
             class="px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors border-b border-silver-20 last:border-0"
           >
-            <button
-              type="button"
+            <RouterLink
+              :to="resolveUserRoute(card)"
+              @click="isOpen = false; searchQuery = ''"
               class="flex-1 min-w-0 flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-neon focus-visible:outline-none rounded"
-              @click="goToUserCard(card)"
             >
               <img
                 v-if="card.image"
@@ -270,7 +276,7 @@ defineExpose({
                   @{{ card.username }} · {{ card.status }}
                 </p>
               </div>
-            </button>
+            </RouterLink>
             <div class="flex flex-col items-end gap-1 flex-shrink-0">
               <span class="text-tiny text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
               <button
@@ -291,13 +297,14 @@ defineExpose({
           <div v-if="scryfallResults.length === 0" class="p-4 text-center text-small text-silver-50">
             {{ t('header.search.noResults') }}
           </div>
-          <button
+          <RouterLink
             v-for="(card, index) in scryfallResults"
             :key="card.id"
             :id="`option-scryfall-${index}`"
             role="option"
             :aria-selected="activeDescendantId === `option-scryfall-${index}` ? 'true' : 'false'"
-            @click="goToScryfall(card)"
+            :to="resolveScryfallRoute(card)"
+            @click="isOpen = false; searchQuery = ''"
             class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
           >
             <img
@@ -317,7 +324,7 @@ defineExpose({
               </div>
             </div>
             <span class="text-tiny text-neon">+ {{ t('header.search.addToCollection') }}</span>
-          </button>
+          </RouterLink>
         </div>
       </div>
     </div>

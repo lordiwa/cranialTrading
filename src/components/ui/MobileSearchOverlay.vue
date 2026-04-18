@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import { getAvatarUrlForUser } from '../../utils/avatar'
@@ -15,7 +15,6 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const router = useRouter()
 const { t } = useI18n()
 
 const {
@@ -28,9 +27,6 @@ const {
   handleInput,
   clearSearch,
   totalResults,
-  goToCollection: _goToCollection,
-  goToUserCard: _goToUserCard,
-  goToScryfall: _goToScryfall,
   sentInterestIds,
   sendingInterest,
   sendInterestFromSearch,
@@ -40,6 +36,10 @@ const {
   isExpanded,
   moveHighlight,
   selectHighlighted,
+  // Plan 04-03: route resolvers for RouterLink :to= binding (parallel with GlobalSearch — Rule 6)
+  resolveCollectionRoute,
+  resolveUserRoute,
+  resolveScryfallRoute,
 } = useGlobalSearch()
 
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -76,34 +76,17 @@ const handleInputKeydown = (e: KeyboardEvent) => {
     case 'ArrowUp':   e.preventDefault(); moveHighlight('up'); break
     case 'Home':      e.preventDefault(); moveHighlight('home'); break
     case 'End':       e.preventDefault(); moveHighlight('end'); break
-    case 'Enter':     e.preventDefault(); selectHighlighted(); break
+    case 'Enter':
+      e.preventDefault()
+      selectHighlighted()
+      emit('close')   // ensure mobile overlay closes after Enter-selection
+      break
   }
 }
 
 const close = () => {
   clearSearch()
   emit('close')
-}
-
-// Navigation wrappers that also close the overlay
-const goToCollection = (card: Parameters<typeof _goToCollection>[0]) => {
-  _goToCollection(card)
-  emit('close')
-}
-
-const goToUserCard = (card: Parameters<typeof _goToUserCard>[0]) => {
-  _goToUserCard(card)
-  emit('close')
-}
-
-const goToScryfall = (card: Parameters<typeof _goToScryfall>[0]) => {
-  _goToScryfall(card)
-  emit('close')
-}
-
-const goToAdvancedSearch = () => {
-  close()
-  void router.push('/search')
 }
 
 // Global escape key listener
@@ -229,13 +212,14 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             <div v-if="collectionResults.length === 0 && searchQuery.length >= 2" class="p-6 text-center text-small text-silver-50">
               {{ t('header.search.noResults') }}
             </div>
-            <button
+            <RouterLink
               v-for="(card, index) in collectionResults"
               :key="card.id"
               :id="`option-collection-${index}`"
               role="option"
               :aria-selected="activeDescendantId === `option-collection-${index}` ? 'true' : 'false'"
-              @click="goToCollection(card)"
+              :to="resolveCollectionRoute(card)"
+              @click="emit('close')"
               class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
             >
               <img
@@ -252,7 +236,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
                 <p class="text-tiny text-silver-50">{{ card.edition }} · x{{ card.quantity }}</p>
               </div>
               <span class="text-small text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
-            </button>
+            </RouterLink>
           </div>
 
           <!-- Users Results listbox -->
@@ -273,10 +257,10 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               :aria-selected="activeDescendantId === `option-users-${index}` ? 'true' : 'false'"
               class="px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors border-b border-silver-20 last:border-0"
             >
-              <button
-                type="button"
+              <RouterLink
+                :to="resolveUserRoute(card)"
+                @click="emit('close')"
                 class="flex-1 min-w-0 flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-neon focus-visible:outline-none rounded"
-                @click="goToUserCard(card)"
               >
                 <img
                   v-if="card.image"
@@ -300,7 +284,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
                     @{{ card.username }} · {{ card.status }}
                   </p>
                 </div>
-              </button>
+              </RouterLink>
               <div class="flex flex-col items-end gap-1 flex-shrink-0">
                 <span class="text-small text-neon font-bold">${{ card.price?.toFixed(2) ?? 'N/A' }}</span>
                 <button
@@ -326,13 +310,14 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             <div v-if="scryfallResults.length === 0 && searchQuery.length >= 2" class="p-6 text-center text-small text-silver-50">
               {{ t('header.search.noResults') }}
             </div>
-            <button
+            <RouterLink
               v-for="(card, index) in scryfallResults"
               :key="card.id"
               :id="`option-scryfall-${index}`"
               role="option"
               :aria-selected="activeDescendantId === `option-scryfall-${index}` ? 'true' : 'false'"
-              @click="goToScryfall(card)"
+              :to="resolveScryfallRoute(card)"
+              @click="emit('close')"
               class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
             >
               <img
@@ -352,18 +337,19 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
                 </div>
               </div>
               <span class="text-small text-neon font-bold whitespace-nowrap">+ {{ t('header.search.addToCollection') }}</span>
-            </button>
+            </RouterLink>
           </div>
         </div>
 
         <!-- Advanced Search link at bottom -->
         <div class="border-t border-silver-20 px-4 py-3 flex-shrink-0">
-          <button
-            @click="goToAdvancedSearch"
-            class="w-full text-center text-small text-silver-50 hover:text-neon transition-colors"
+          <RouterLink
+            :to="'/search'"
+            @click="emit('close')"
+            class="w-full block text-center text-small text-silver-50 hover:text-neon transition-colors"
           >
             {{ t('header.search.advancedSearch') }} →
-          </button>
+          </RouterLink>
         </div>
       </div>
     </Transition>

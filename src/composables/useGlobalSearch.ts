@@ -64,7 +64,7 @@ export function useGlobalSearch() {
   )
 
   // ── Helper: which results array is currently active ───────────────────────────
-  const getActiveResults = (): Array<Card | PublicCardResult | ScryfallCard> => {
+  const getActiveResults = (): (Card | PublicCardResult | ScryfallCard)[] => {
     if (activeTab.value === 'collection') return collectionResults.value
     if (activeTab.value === 'users') return usersResults.value
     return scryfallResults.value

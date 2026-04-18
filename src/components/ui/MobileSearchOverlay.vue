@@ -55,17 +55,10 @@ watch(() => props.open, (isOpen) => {
   }
 })
 
-// Document-level Escape handler (global close — unchanged)
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
-    close()
-  }
-}
-
 // Input-scoped keyboard nav handler (NEW — arrow/home/end/enter + IME guard)
 const handleInputKeydown = (e: KeyboardEvent) => {
   // IME composition safety (CJK input — Q6)
-  if (e.isComposing || e.keyCode === 229) return
+  if (e.isComposing) return
   if (e.key === 'Escape') {
     close()
     return

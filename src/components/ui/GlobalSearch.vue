@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import { getAvatarUrlForUser } from '../../utils/avatar'
 import SvgIcon from './SvgIcon.vue'
 import ManaCost from './ManaCost.vue'
 
-const router = useRouter()
 const { t } = useI18n()
 
 const {
@@ -20,10 +19,6 @@ const {
   scryfallResults,
   handleInput,
   clearSearch,
-  totalResults,
-  goToCollection,
-  goToUserCard,
-  goToScryfall,
   sentInterestIds,
   sendingInterest,
   sendInterestFromSearch,
@@ -59,7 +54,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 // Input-scoped keyboard nav handler (NEW — arrow/home/end/enter + IME guard)
 const handleInputKeydown = (e: KeyboardEvent) => {
   // IME composition safety (CJK input — Q6)
-  if (e.isComposing || e.keyCode === 229) return
+  if (e.isComposing) return
   if (e.key === 'Escape') {
     isOpen.value = false
     inputRef.value?.blur()

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.22.0
 milestone_name: milestone
-status: Phase 03 complete — cleaning up tech debt
+status: Ready to execute
 stopped_at: Phase 4 context gathered
-last_updated: "2026-04-18T00:39:38.029Z"
-last_activity: 2026-04-17 -- Phase 03 complete, starting cleanup
+last_updated: "2026-04-18T01:35:25.296Z"
+last_activity: 2026-04-18 -- Phase 04 planning complete
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 12
+  total_plans: 15
   completed_plans: 12
-  percent: 100
+  percent: 80
 ---
 
 # Project State
@@ -29,7 +29,7 @@ Phase: 03 (collectionview-decomposition) — COMPLETE
 Plans delivered: A (pure helpers), B (composables), C (route split), D (GridCard split), E (closeout)
 Shipped: v1.23.0 on cranial-trading-dev.web.app, verified by user 2026-04-17
 Next: tech-debt cleanup (BulkSelectionActionBar + DeckStatsFooter + useDeckDisplayCards extractions) → Phase 04 (GlobalSearch ARIA combobox)
-Last activity: 2026-04-17 -- Phase 03 complete, starting cleanup
+Last activity: 2026-04-18 -- Phase 04 planning complete
 
 Progress: [███████▌░░] 75%
 

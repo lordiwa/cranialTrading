@@ -75,7 +75,11 @@ Plans:
   1. A screen reader announces the GlobalSearch as a combobox with its expanded/collapsed state and the number of available suggestions
   2. Keyboard users can navigate GlobalSearch suggestions with arrow keys and select with Enter without a mouse
   3. Navigation actions (e.g. "Go to deck", "View profile") open in a new tab when Cmd+clicked or middle-clicked
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 04-01-PLAN.md — Composable expansion + unit tests (TDD): keyboard nav state, live-region debounce, route resolvers (ARCH-10)
+- [ ] 04-02-PLAN.md — ARIA combobox template wiring in GlobalSearch.vue + MobileSearchOverlay.vue (parallel siblings) (ARCH-10)
+- [ ] 04-03-PLAN.md — RouterLink conversions across 8 files + i18n keys in en/es/pt (NICE-11, closes ARCH-10 i18n)
 **UI hint**: yes
 
 ## Progress
@@ -88,4 +92,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Global A11y & CSS Sweep | 0/3 | Not started | - |
 | 2. DashboardView Decomposition | 0/TBD | Not started | - |
 | 3. CollectionView Decomposition | 5/5 | Complete | 2026-04-17 |
-| 4. GlobalSearch & Navigation Polish | 0/TBD | Not started | - |
+| 4. GlobalSearch & Navigation Polish | 0/3 | Not started | - |

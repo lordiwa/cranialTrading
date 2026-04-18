@@ -8,7 +8,7 @@
 
 Make the `GlobalSearch` component a fully accessible ARIA combobox (screen-reader announceable + arrow-key navigable) and convert user-triggered navigation actions across the app from `<button @click="router.push(...)">` to `<RouterLink>` so Cmd+click / middle-click open destinations in a new tab.
 
-**Key insight:** `GlobalSearch.vue` and `MobileSearchOverlay.vue` both consume `useGlobalSearch` — keyboard-nav state and live-region state move into the composable so the ARIA template changes stay thin and parallel (Anti-loop Rule 6). RouterLink is already used 185× in the codebase, so the navigation-conversion is a mechanical sweep of ~22 sites, not a new pattern.
+**Key insight:** `GlobalSearch.vue` and `MobileSearchOverlay.vue` both consume `useGlobalSearch` — keyboard-nav state and live-region state move into the composable so the ARIA template changes stay thin and parallel (Anti-loop Rule 6). RouterLink is already used 185× in the codebase, so the navigation-conversion is a mechanical sweep of ~15 template sites (per D-07 revised scope; the other originally-listed sites turned out to be imperative post-`await` redirects that stay as `router.push`), not a new pattern.
 
 </domain>
 
@@ -24,17 +24,20 @@ Make the `GlobalSearch` component a fully accessible ARIA combobox (screen-reade
 - **D-06 (Claude's Discretion):** `role="combobox"` + `aria-expanded` + `aria-controls` + `aria-haspopup="listbox"` on the input wrapper. `role="listbox"` on the active-tab results container. `role="option"` + unique `id` on each result row. `aria-selected="true"` on the highlighted option.
 
 ### NICE-11 Navigation Scope
-- **D-07 (USER LOCKED):** Convert to `<RouterLink>` in these 4 categories (~22 sites total):
-  1. **GlobalSearch result handlers (3 sites)** — `composables/useGlobalSearch.ts` `goToCollection` / `goToUserCard` / `goToScryfall` (lines 162 / 168 / 174). These are called by both `GlobalSearch.vue` and `MobileSearchOverlay.vue`.
-  2. **Deck & binder cards in list views (8 sites)** — `CollectionView.vue:627/629/659`, `DecksView.vue:331/335/388/487/552`. Clicking a deck/binder card opens its editor.
-  3. **Match notifications + text anchors (8 sites)** — `MatchNotificationsDropdown.vue:96/102`, `GlobalSearch.vue:107` (advanced search link), `AddCardModal.vue:424`, `SearchView.vue:38`, `CollectionView.vue:693`, `BinderView.vue:155`, `DeckView.vue:283`.
-  4. **AppHeader menu items + UserPopover (2 sites)** — `AppHeader.vue:46` (FAQ), `UserPopover.vue:221` (Login).
+- **D-07 (USER LOCKED — scope narrowed by 04-RESEARCH.md Q8):** Convert to `<RouterLink>` in these 4 categories. Research verified each call site; **actual template-level conversions: ~15**, not 22. Sites that turn out to be imperative post-`await` redirects (e.g., `handleCreateDeck` after `await decksStore.createDeck()`) stay as `router.push` per D-08 — user intent is unchanged, original count was imprecise.
+  1. **GlobalSearch result handlers (3 sites)** — `composables/useGlobalSearch.ts` `goToCollection` / `goToUserCard` / `goToScryfall` (lines 162 / 168 / 174). Split pattern: template click → RouterLink; Enter-key path (`selectHighlighted`) stays `router.push`.
+  2. **Deck & binder cards in list views** — Classification per RESEARCH Q8:
+     - `CollectionView.vue:627/629/659` → imperative (post-await), **stay as `router.push`**
+     - `DecksView.vue:331/388/487/552` → imperative (post-create/import), **stay as `router.push`**
+     - `DecksView.vue:335` → user-click but emits from `<DeckCard>` child component (button inside DeckCard). **Planner must read `DeckCard.vue` first** to classify definitively.
+  3. **Match notifications + text anchors** — `MatchNotificationsDropdown.vue:96/102` (convert with `@click="closeDropdown()"` side effect), `GlobalSearch.vue:107` (advanced search link, convert with `@click="isOpen = false"`), `AddCardModal.vue:424` (convert with `@click="handleClose()"`), `CollectionView.vue:693` (convert), `BinderView.vue:155` (convert), `DeckView.vue:283` (convert). **`SearchView.vue:38`** is a `<BaseButton>` not inline markup → **stay as `router.push`** (button component can't be a link without BaseButton API changes).
+  4. **AppHeader menu items + UserPopover** — `AppHeader.vue:46` (FAQ) → convert. `UserPopover.vue:221` → imperative (post-`await logout()`), **stay as `router.push`**.
 - **D-08 (USER LOCKED):** Imperative redirects stay as `router.push` — these are NOT user-triggered navigation:
   - Post-auth redirects: `LoginView.vue:50/67`, `RegisterView.vue:59/65`, `ResetPasswordView.vue:40`, `UserProfileView.vue:429/434` (`buildLoginUrl` / `buildRegisterUrl`).
   - Post-action redirects: `SettingsView.vue:339/400`, `WelcomeModal.vue:28/40`, `SearchView.vue:38` if it's the "go to collection" post-search handler.
   - Side-effect navigation bundled with other work: `AppHeader.vue:57` (`restartTour` — closes menus, navigates, starts tour).
   - Modal-open intents: `AppHeader.vue:167/169` (open AddCardModal).
-- **D-09 (USER LOCKED):** Rendering: `<RouterLink :to="...">` with `@click.prevent="handler"` for side effects (close dropdown, clear search query). `RouterLink` natively honors Cmd+click / middle-click by ignoring its own navigation in those cases and deferring to browser default — the `@click.prevent` handler correspondingly skips on modifier clicks (Vue Router's built-in behavior — no manual `event.metaKey` checks needed).
+- **D-09 (USER LOCKED — corrected by 04-RESEARCH.md Q3):** Rendering: `<RouterLink :to="..." @click="handler">` for side effects (close dropdown, clear search query). **Do NOT use `.prevent`** — verified from Vue Router source (`RouterLink.ts` `guardEvent`): `.prevent` sets `e.defaultPrevented = true` before `guardEvent` runs, which causes `guardEvent` to skip `router.push` entirely. Normal left-clicks would stop navigating. Correct flow: on normal click → side effect runs, then RouterLink navigates. On Cmd+click / middle-click → side effect runs, RouterLink's `guardEvent` sees `metaKey` / `button !== 0` and defers to browser (new tab). No manual `event.metaKey` checks needed. User intent (side effect + native modifier-click behavior) is preserved — only the mechanism corrected.
 - **D-10 (USER LOCKED):** `ME INTERESA` button inside user results stays as a sibling `<button>` **outside** the surrounding `<RouterLink>`. Never nest interactive elements inside `<a>`. Current flex layout already places it as a sibling — just confirm no accidental nesting during the conversion.
 - **D-11 (USER LOCKED):** Scryfall result click → `/collection?addCard=<name>` wrapped in `<RouterLink>` so Cmd+click opens the add-card flow in a new tab. The `addCard` query param already triggers the add-card modal on `/collection` mount.
 
@@ -50,11 +53,13 @@ Make the `GlobalSearch` component a fully accessible ARIA combobox (screen-reade
 - **D-18 (USER LOCKED):** Autofocus timing on mobile overlay (`setTimeout(() => inputRef.value?.focus(), 100)` after `nextTick`) stays as-is. The 100ms is an iOS focus-after-transition workaround — not ARCH-10 scope.
 
 ### i18n Keys (all three locales required — CLAUDE.md)
-- **D-19 (Claude's Discretion):** New i18n keys to add to `en.json`, `es.json`, `pt.json`:
+- **D-19 (Claude's Discretion — corrected by 04-RESEARCH.md Q4):** New i18n keys to add to `en.json`, `es.json`, `pt.json`. **No pluralization engine:** this project uses a custom `useI18n.ts` (not vue-i18n) with `{placeholder}` interpolation only — no `tc()`, no `|` parsing, no ICU `{count, plural, ...}` support. The existing `itemCount` key with `|` is dormant. Use **two separate keys + ternary at call site**:
   - `header.search.clearAriaLabel` — "Clear search" / "Limpiar búsqueda" / "Limpar busca"
   - `header.search.searching` — "Searching…" / "Buscando…" / "Buscando…"
-  - `header.search.resultsCount` — with pluralization: `{count, plural, one {# result} other {# results}} in {tabName}` (or equivalent pt/es plural forms per vue-i18n pluralization syntax already in use).
+  - `header.search.resultsCount` — plural form: `{count} results in {tabName}` / `{count} resultados en {tabName}` / `{count} resultados em {tabName}`
+  - `header.search.resultsCountSingular` — singular form: `{count} result in {tabName}` / `{count} resultado en {tabName}` / `{count} resultado em {tabName}`
   - `header.search.tabNames.collection` / `.users` / `.scryfall` — lowercase accessible names ("collection" / "colección" / "coleção", etc.) — separate from the visible `header.search.tabs.*` keys, which are shouted ALL-CAPS.
+  - Call pattern: `const key = count === 1 ? 'header.search.resultsCountSingular' : 'header.search.resultsCount'; t(key, { count, tabName: t(...) })`.
 
 ### Composable Changes (Claude's Discretion)
 - **D-20:** `useGlobalSearch` grows these fields:
@@ -62,7 +67,7 @@ Make the `GlobalSearch` component a fully accessible ARIA combobox (screen-reade
   - `moveHighlight(direction: 'up' | 'down' | 'home' | 'end'): void` — handles wrap logic.
   - `selectHighlighted(): void` — invokes the correct `goTo*` handler for the current tab's highlighted item.
   - `ariaLiveMessage: Ref<string>` — debounced message for the live region (updated when results load, tab switches, or loading state changes).
-- **D-21:** `goToCollection`, `goToUserCard`, `goToScryfall` return their route descriptor object (e.g., `{ path, query }`) via new helpers (`resolveCollectionRoute`, `resolveUserRoute`, `resolveScryfallRoute`) so templates can bind `:to="resolve...(card)"` on RouterLink. The existing navigate-via-side-effect handlers stay for `Enter` key + `@click.prevent` usage, and simply call `router.push(resolve...(card))` internally.
+- **D-21 (corrected reference to D-09):** `goToCollection`, `goToUserCard`, `goToScryfall` return their route descriptor object (e.g., `{ path, query }`) via new helpers (`resolveCollectionRoute`, `resolveUserRoute`, `resolveScryfallRoute`) so templates can bind `:to="resolve...(card)"` on RouterLink. The existing navigate-via-side-effect handlers stay for the `Enter`-key path (invoked by `selectHighlighted()`) and call `router.push(resolve...(card))` internally. Template click path uses `<RouterLink :to @click="sideEffect">` (no `.prevent`, per D-09 correction).
 
 </decisions>
 

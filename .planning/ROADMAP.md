@@ -77,7 +77,7 @@ Plans:
   3. Navigation actions (e.g. "Go to deck", "View profile") open in a new tab when Cmd+clicked or middle-clicked
 **Plans**: 3 plans
 Plans:
-- [ ] 04-01-PLAN.md — Composable expansion + unit tests (TDD): keyboard nav state, live-region debounce, route resolvers (ARCH-10)
+- [x] 04-01-PLAN.md — Composable expansion + unit tests (TDD): keyboard nav state, live-region debounce, route resolvers (ARCH-10)
 - [ ] 04-02-PLAN.md — ARIA combobox template wiring in GlobalSearch.vue + MobileSearchOverlay.vue (parallel siblings) (ARCH-10)
 - [ ] 04-03-PLAN.md — RouterLink conversions across 8 files + i18n keys in en/es/pt (NICE-11, closes ARCH-10 i18n)
 **UI hint**: yes

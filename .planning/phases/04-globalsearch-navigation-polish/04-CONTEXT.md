@@ -125,7 +125,7 @@ Make the `GlobalSearch` component a fully accessible ARIA combobox (screen-reade
 ### Established Patterns
 - Debounce via `setTimeout` + `ReturnType<typeof setTimeout>` — same pattern as `useGlobalSearch.handleInput` (line 50, 300ms debounce). Match that for the live region's 500ms debounce.
 - Composable fan-out: `useGlobalSearch` is imported by both `GlobalSearch.vue` and `MobileSearchOverlay.vue` — any state added there propagates automatically. Only the templates diverge.
-- `@click.prevent="handler"` + `<RouterLink :to>` — standard Vue Router pattern for side-effects-before-navigate.
+- `@click="handler"` (NO `.prevent`) + `<RouterLink :to>` — standard Vue Router 4 pattern for side-effects-before-navigate. Per D-09 correction / 04-RESEARCH.md Q3: `.prevent` sets `defaultPrevented=true`, which makes RouterLink's `guardEvent` skip `router.push` and break normal-click navigation. RouterLink handles its own `preventDefault` internally — never add `.prevent` on RouterLink.
 
 ### Integration Points
 - `GlobalSearch.vue` is mounted in `AppHeader.vue:221` (desktop-only, `hidden md:block`). `MobileSearchOverlay.vue` is mounted separately for mobile.

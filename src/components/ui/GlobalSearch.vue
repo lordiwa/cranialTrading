@@ -27,6 +27,12 @@ const {
   sentInterestIds,
   sendingInterest,
   sendInterestFromSearch,
+  // Plan 04-02: ARIA combobox wiring
+  activeDescendantId,
+  ariaLiveMessage,
+  isExpanded,
+  moveHighlight,
+  selectHighlighted,
 } = useGlobalSearch()
 
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -38,10 +44,30 @@ const handleClickOutside = (e: MouseEvent) => {
   }
 }
 
+// Document-level handler: Escape only (handles global shortcut + click-outside Escape)
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     isOpen.value = false
     inputRef.value?.blur()
+  }
+}
+
+// Input-scoped keyboard nav handler (NEW — arrow/home/end/enter + IME guard)
+const handleInputKeydown = (e: KeyboardEvent) => {
+  // IME composition safety (CJK input — Q6)
+  if (e.isComposing || e.keyCode === 229) return
+  if (e.key === 'Escape') {
+    isOpen.value = false
+    inputRef.value?.blur()
+    return
+  }
+  if (!isExpanded.value) return
+  switch (e.key) {
+    case 'ArrowDown': e.preventDefault(); moveHighlight('down'); break
+    case 'ArrowUp':   e.preventDefault(); moveHighlight('up'); break
+    case 'Home':      e.preventDefault(); moveHighlight('home'); break
+    case 'End':       e.preventDefault(); moveHighlight('end'); break
+    case 'Enter':     e.preventDefault(); selectHighlighted(); break
   }
 }
 
@@ -67,7 +93,10 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="containerRef" class="relative">
+  <div ref="containerRef" class="relative" :aria-busy="loading ? 'true' : 'false'">
+    <!-- sr-only live region for screen reader announcements (D-12, D-15) -->
+    <span aria-live="polite" aria-atomic="true" class="sr-only">{{ ariaLiveMessage }}</span>
+
     <!-- Search Input -->
     <div class="relative">
       <SvgIcon
@@ -79,10 +108,18 @@ defineExpose({
         ref="inputRef"
         v-model="searchQuery"
         type="text"
+        role="combobox"
+        :aria-expanded="isExpanded ? 'true' : 'false'"
+        :aria-controls="isExpanded ? `search-listbox-${activeTab}` : undefined"
+        aria-haspopup="listbox"
+        aria-autocomplete="list"
+        :aria-activedescendant="activeDescendantId ?? undefined"
+        :aria-label="t('header.search.placeholder')"
         :placeholder="t('header.search.placeholder')"
         class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded transition-all"
         @input="handleInput"
         @focus="searchQuery.length >= 2 && (isOpen = true)"
+        @keydown="handleInputKeydown"
       />
       <!-- Clear button (shows when there's text) -->
       <button
@@ -90,12 +127,14 @@ defineExpose({
         @click.stop="handleClearSearch"
         class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
         type="button"
+        :aria-label="t('header.search.clearAriaLabel')"
       >
         ✕
       </button>
-      <!-- Keyboard hint (shows when no text) -->
+      <!-- Keyboard hint (shows when no text) — aria-hidden: decorative shortcut hint -->
       <span
         v-else
+        aria-hidden="true"
         class="absolute right-3 top-1/2 -translate-y-1/2 text-tiny text-silver-50 hidden lg:inline pointer-events-none"
       >
         /
@@ -111,12 +150,12 @@ defineExpose({
       </button>
     </div>
 
-    <!-- Results Dropdown -->
+    <!-- Results Dropdown — shown when isExpanded (matches popup render condition exactly) -->
     <div
-      v-if="isOpen && (loading || totalResults > 0)"
+      v-if="isExpanded"
       class="absolute top-full right-0 mt-2 w-[420px] bg-primary border border-silver-30 rounded shadow-lg max-h-[70vh] overflow-hidden z-50"
     >
-      <!-- Tabs -->
+      <!-- Tabs — plain buttons, NOT role="tab" (combobox owns the widget; no tablist conflict) -->
       <div class="flex border-b border-silver-20">
         <button
           @click="activeTab = 'collection'"
@@ -152,16 +191,25 @@ defineExpose({
         <span class="text-small text-silver-50">{{ t('common.actions.loading') }}...</span>
       </div>
 
-      <!-- Results -->
-      <div v-else class="max-h-80 overflow-y-auto">
+      <!-- Results listbox -->
+      <div
+        v-else
+        :id="`search-listbox-${activeTab}`"
+        role="listbox"
+        :aria-label="t(`header.search.tabNames.${activeTab}`)"
+        class="max-h-80 overflow-y-auto"
+      >
         <!-- Collection Results -->
         <div v-if="activeTab === 'collection'">
           <div v-if="collectionResults.length === 0" class="p-4 text-center text-small text-silver-50">
             {{ t('header.search.noResults') }}
           </div>
           <button
-            v-for="card in collectionResults"
+            v-for="(card, index) in collectionResults"
             :key="card.id"
+            :id="`option-collection-${index}`"
+            role="option"
+            :aria-selected="activeDescendantId === `option-collection-${index}` ? 'true' : 'false'"
             @click="goToCollection(card)"
             class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
           >
@@ -188,8 +236,11 @@ defineExpose({
             {{ t('header.search.noResults') }}
           </div>
           <div
-            v-for="card in usersResults"
+            v-for="(card, index) in usersResults"
             :key="card.id"
+            :id="`option-users-${index}`"
+            role="option"
+            :aria-selected="activeDescendantId === `option-users-${index}` ? 'true' : 'false'"
             class="px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors border-b border-silver-20 last:border-0"
           >
             <button
@@ -241,8 +292,11 @@ defineExpose({
             {{ t('header.search.noResults') }}
           </div>
           <button
-            v-for="card in scryfallResults"
+            v-for="(card, index) in scryfallResults"
             :key="card.id"
+            :id="`option-scryfall-${index}`"
+            role="option"
+            :aria-selected="activeDescendantId === `option-scryfall-${index}` ? 'true' : 'false'"
             @click="goToScryfall(card)"
             class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
           >

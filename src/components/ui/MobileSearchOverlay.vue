@@ -34,11 +34,17 @@ const {
   sentInterestIds,
   sendingInterest,
   sendInterestFromSearch,
+  // Plan 04-02: ARIA combobox wiring (parallel with GlobalSearch — Rule 6)
+  activeDescendantId,
+  ariaLiveMessage,
+  isExpanded,
+  moveHighlight,
+  selectHighlighted,
 } = useGlobalSearch()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 
-// Auto-focus input when overlay opens (setTimeout for iOS compatibility)
+// Auto-focus input when overlay opens (setTimeout for iOS compatibility — D-18 unchanged)
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
     void nextTick(() => {
@@ -49,9 +55,28 @@ watch(() => props.open, (isOpen) => {
   }
 })
 
+// Document-level Escape handler (global close — unchanged)
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     close()
+  }
+}
+
+// Input-scoped keyboard nav handler (NEW — arrow/home/end/enter + IME guard)
+const handleInputKeydown = (e: KeyboardEvent) => {
+  // IME composition safety (CJK input — Q6)
+  if (e.isComposing || e.keyCode === 229) return
+  if (e.key === 'Escape') {
+    close()
+    return
+  }
+  if (!isExpanded.value) return
+  switch (e.key) {
+    case 'ArrowDown': e.preventDefault(); moveHighlight('down'); break
+    case 'ArrowUp':   e.preventDefault(); moveHighlight('up'); break
+    case 'Home':      e.preventDefault(); moveHighlight('home'); break
+    case 'End':       e.preventDefault(); moveHighlight('end'); break
+    case 'Enter':     e.preventDefault(); selectHighlighted(); break
   }
 }
 
@@ -95,7 +120,11 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
       <div
         v-if="open"
         class="fixed inset-0 z-[60] bg-primary flex flex-col"
+        :aria-busy="loading ? 'true' : 'false'"
       >
+        <!-- sr-only live region for screen reader announcements (D-12, D-15 — parallel with GlobalSearch) -->
+        <span aria-live="polite" aria-atomic="true" class="sr-only">{{ ariaLiveMessage }}</span>
+
         <!-- Top bar -->
         <div class="flex items-center gap-2 px-3 py-2 border-b border-silver-20 flex-shrink-0">
           <button
@@ -116,17 +145,24 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               ref="inputRef"
               v-model="searchQuery"
               type="text"
+              role="combobox"
+              :aria-expanded="isExpanded ? 'true' : 'false'"
+              :aria-controls="isExpanded ? `search-listbox-${activeTab}` : undefined"
+              aria-haspopup="listbox"
+              aria-autocomplete="list"
+              :aria-activedescendant="activeDescendantId ?? undefined"
+              :aria-label="t('header.search.placeholder')"
               :placeholder="t('header.search.placeholder')"
               class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2.5 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded transition-all"
               @input="handleInput"
-              @keydown="handleKeydown"
+              @keydown="handleInputKeydown"
             />
             <button
               v-if="searchQuery.length > 0"
               @click.stop="clearSearch"
               class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
               type="button"
-              :aria-label="t('common.aria.clearInput')"
+              :aria-label="t('header.search.clearAriaLabel')"
             >
               ✕
             </button>
@@ -140,7 +176,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
           </button>
         </div>
 
-        <!-- Tabs -->
+        <!-- Tabs — plain buttons, NOT role="tab" (combobox owns the widget; no tablist conflict) -->
         <div v-if="loading || totalResults > 0" class="flex border-b border-silver-20 flex-shrink-0">
           <button
             @click="activeTab = 'collection'"
@@ -183,14 +219,22 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             <p class="text-small text-silver-50">{{ t('header.search.noResults') }}</p>
           </div>
 
-          <!-- Collection Results -->
-          <div v-else-if="activeTab === 'collection'">
+          <!-- Collection Results listbox -->
+          <div
+            v-else-if="activeTab === 'collection'"
+            :id="`search-listbox-${activeTab}`"
+            role="listbox"
+            :aria-label="t(`header.search.tabNames.${activeTab}`)"
+          >
             <div v-if="collectionResults.length === 0 && searchQuery.length >= 2" class="p-6 text-center text-small text-silver-50">
               {{ t('header.search.noResults') }}
             </div>
             <button
-              v-for="card in collectionResults"
+              v-for="(card, index) in collectionResults"
               :key="card.id"
+              :id="`option-collection-${index}`"
+              role="option"
+              :aria-selected="activeDescendantId === `option-collection-${index}` ? 'true' : 'false'"
               @click="goToCollection(card)"
               class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
             >
@@ -211,14 +255,22 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             </button>
           </div>
 
-          <!-- Users Results -->
-          <div v-else-if="activeTab === 'users'">
+          <!-- Users Results listbox -->
+          <div
+            v-else-if="activeTab === 'users'"
+            :id="`search-listbox-${activeTab}`"
+            role="listbox"
+            :aria-label="t(`header.search.tabNames.${activeTab}`)"
+          >
             <div v-if="usersResults.length === 0 && searchQuery.length >= 2" class="p-6 text-center text-small text-silver-50">
               {{ t('header.search.noResults') }}
             </div>
             <div
-              v-for="card in usersResults"
+              v-for="(card, index) in usersResults"
               :key="card.id"
+              :id="`option-users-${index}`"
+              role="option"
+              :aria-selected="activeDescendantId === `option-users-${index}` ? 'true' : 'false'"
               class="px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors border-b border-silver-20 last:border-0"
             >
               <button
@@ -264,14 +316,22 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             </div>
           </div>
 
-          <!-- Scryfall Results -->
-          <div v-else-if="activeTab === 'scryfall'">
+          <!-- Scryfall Results listbox -->
+          <div
+            v-else-if="activeTab === 'scryfall'"
+            :id="`search-listbox-${activeTab}`"
+            role="listbox"
+            :aria-label="t(`header.search.tabNames.${activeTab}`)"
+          >
             <div v-if="scryfallResults.length === 0 && searchQuery.length >= 2" class="p-6 text-center text-small text-silver-50">
               {{ t('header.search.noResults') }}
             </div>
             <button
-              v-for="card in scryfallResults"
+              v-for="(card, index) in scryfallResults"
               :key="card.id"
+              :id="`option-scryfall-${index}`"
+              role="option"
+              :aria-selected="activeDescendantId === `option-scryfall-${index}` ? 'true' : 'false'"
               @click="goToScryfall(card)"
               class="w-full px-4 py-3 flex items-center gap-3 hover:bg-silver-10 active:bg-silver-10 transition-colors text-left border-b border-silver-20 last:border-0"
             >

@@ -356,7 +356,16 @@
       "noResults": "Sin resultados",
       "addToCollection": "Agregar",
       "cancel": "Cancelar",
-      "advancedSearch": "Búsqueda avanzada"
+      "advancedSearch": "Búsqueda avanzada",
+      "clearAriaLabel": "Limpiar búsqueda",
+      "searching": "Buscando…",
+      "resultsCount": "{count} resultados en {tabName}",
+      "resultsCountSingular": "{count} resultado en {tabName}",
+      "tabNames": {
+        "collection": "colección",
+        "users": "usuarios",
+        "scryfall": "Scryfall"
+      }
     }
   },
 

@@ -9,7 +9,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useDecksStore } from '../../stores/decks'
 import { useBindersStore } from '../../stores/binders'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { getCardSuggestions, type ScryfallCard, searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
@@ -26,7 +26,6 @@ const props = defineProps<Props>()
 const emit = defineEmits(['close', 'added'])
 
 const { t } = useI18n()
-const router = useRouter()
 
 // Search state (when no card pre-selected)
 const searchQuery = ref('')
@@ -420,12 +419,13 @@ const handleClose = () => {
           >
             {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
           </BaseButton>
-          <button
-              @click="handleClose(); router.push('/search')"
+          <RouterLink
+              :to="'/search'"
+              @click="handleClose()"
               class="text-tiny text-silver-50 hover:text-neon transition-colors whitespace-nowrap"
           >
             {{ t('common.actions.advancedSearch') }} →
-          </button>
+          </RouterLink>
         </div>
 
         <!-- Search Results Grid -->

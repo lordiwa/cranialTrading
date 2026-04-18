@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, toRef } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useSearchSuggestions } from '../../composables/useSearchSuggestions'
 import type { Card } from '../../types/card'
@@ -32,7 +33,6 @@ const emit = defineEmits<{
   'change-view-type': [value: 'visual' | 'texto']
   'select-local-card': [card: Card]
   'select-scryfall-card': [cardName: string]
-  'open-advanced-search': []
   'open-filters': []
 }>()
 
@@ -116,11 +116,11 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         </div>
 
         <!-- Advanced search link (collection mode only) -->
-        <button v-if="viewMode === 'collection'" @click="emit('open-advanced-search'); clearSuggestions(); dropdownDismissed = true"
+        <RouterLink v-if="viewMode === 'collection'" :to="'/search'" @click="clearSuggestions(); dropdownDismissed = true"
           class="w-full px-3 py-2 text-small text-neon hover:bg-neon-10 border-t border-silver-30 flex items-center gap-1">
           <SvgIcon name="search" size="tiny" />
           {{ t('collection.suggestions.advancedSearch') }} →
-        </button>
+        </RouterLink>
         </div>
       </div>
     </div>

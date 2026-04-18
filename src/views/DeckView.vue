@@ -279,10 +279,6 @@ const handleScryfallSuggestionSelect = async (cardName: string) => {
   }
 }
 
-const handleOpenAdvancedSearch = () => {
-  void router.push({ path: '/search' })
-}
-
 const handleAddCardModalClose = () => {
   showAddCardModal.value = false
   selectedScryfallCard.value = undefined
@@ -979,7 +975,6 @@ onUnmounted(() => {
             :active-filter-count="0"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
-            @open-advanced-search="handleOpenAdvancedSearch"
         />
 
         <!-- ========== MAINBOARD GRID ========== -->

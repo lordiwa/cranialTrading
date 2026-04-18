@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useCollectionStore } from '../../stores/collection'
 import { useMatchesStore } from '../../stores/matches'
@@ -38,12 +38,6 @@ const toggleHelpMenu = () => {
 
 const closeHelpMenu = () => {
   showHelpMenu.value = false
-}
-
-const goToFaq = () => {
-  closeHelpMenu()
-  closeMobileMenu()
-  void router.push('/faq')
 }
 
 const restartTour = async () => {
@@ -259,13 +253,14 @@ onUnmounted(() => {
                     v-if="showHelpMenu"
                     class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-md shadow-lg z-50 overflow-hidden"
                 >
-                  <button
-                      @click="goToFaq"
+                  <RouterLink
+                      :to="'/faq'"
+                      @click="closeHelpMenu(); closeMobileMenu()"
                       class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
                   >
                     <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
                     {{ t('help.menu.faq') }}
-                  </button>
+                  </RouterLink>
                   <button
                       v-if="isAuthenticated"
                       @click="restartTour"
@@ -339,13 +334,14 @@ onUnmounted(() => {
                   v-if="showHelpMenu"
                   class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-md shadow-lg z-50 overflow-hidden"
               >
-                <button
-                    @click="goToFaq"
+                <RouterLink
+                    :to="'/faq'"
+                    @click="closeHelpMenu(); closeMobileMenu()"
                     class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
                 >
                   <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
                   {{ t('help.menu.faq') }}
-                </button>
+                </RouterLink>
                 <!-- Legal links -->
                 <div class="border-t border-silver-20 px-4 py-2 flex flex-col gap-1">
                   <router-link to="/terms" @click="closeHelpMenu" class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast">

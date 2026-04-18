@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { type SimpleMatch, useMatchesStore } from '../../stores/matches'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
@@ -9,7 +9,6 @@ defineProps<{
   active: boolean
 }>()
 
-const router = useRouter()
 const matchesStore = useMatchesStore()
 const { t } = useI18n()
 
@@ -91,16 +90,6 @@ const timeAgo = (date: Date | string | number): string => {
   return t('matches.notifications.daysAgo', { n: diffDays })
 }
 
-const goToMatches = () => {
-  closeDropdown()
-  void router.push('/saved-matches')
-}
-
-const goToMatch = (match: SimpleMatch) => {
-  closeDropdown()
-  const matchId = match.docId ?? match.id
-  void router.push({ path: '/saved-matches', query: { match: matchId } })
-}
 </script>
 
 <template>
@@ -150,10 +139,11 @@ const goToMatch = (match: SimpleMatch) => {
 
         <!-- Alert list -->
         <div v-if="recentAlerts.length > 0" class="max-h-[320px] overflow-y-auto">
-          <button
+          <RouterLink
               v-for="match in recentAlerts"
               :key="match.docId || match.id"
-              @click="goToMatch(match)"
+              :to="{ path: '/saved-matches', query: { match: match.docId ?? match.id } }"
+              @click="closeDropdown()"
               class="w-full px-4 py-3 flex items-start gap-3 hover:bg-silver-5 transition-fast text-left border-b border-silver-10 last:border-b-0"
           >
             <!-- Avatar -->
@@ -188,7 +178,7 @@ const goToMatch = (match: SimpleMatch) => {
             >
               {{ match.type === 'VENDO' ? t('matches.notifications.sell') : t('matches.notifications.buy') }}
             </span>
-          </button>
+          </RouterLink>
         </div>
 
         <!-- Empty state -->
@@ -198,12 +188,13 @@ const goToMatch = (match: SimpleMatch) => {
         </div>
 
         <!-- Footer link -->
-        <button
-            @click="goToMatches"
-            class="w-full px-4 py-3 text-center text-tiny font-bold text-neon hover:bg-neon-10 transition-fast border-t border-silver-20 rounded-b-md"
+        <RouterLink
+            :to="'/saved-matches'"
+            @click="closeDropdown()"
+            class="w-full px-4 py-3 text-center text-tiny font-bold text-neon hover:bg-neon-10 transition-fast border-t border-silver-20 rounded-b-md block"
         >
           {{ t('matches.notifications.goToMatches') }}
-        </button>
+        </RouterLink>
       </div>
     </Transition>
   </div>

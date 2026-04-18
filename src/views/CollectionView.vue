@@ -688,11 +688,6 @@ const handleScryfallSuggestionSelect = async (cardName: string) => {
   }
 }
 
-// Click on "Advanced search" → navigate to /search
-const handleOpenAdvancedSearch = () => {
-  void router.push({ path: '/search' })
-}
-
 // Cerrar modal de agregar carta y limpiar URL
 const handleAddCardModalClose = () => {
   showAddCardModal.value = false
@@ -999,7 +994,6 @@ onUnmounted(() => {
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
-            @open-advanced-search="handleOpenAdvancedSearch"
             @open-filters="showLocalFilters = true"
         />
 

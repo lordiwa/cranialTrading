@@ -490,12 +490,10 @@ export const useCollectionStore = defineStore('collection', () => {
     const persistEnrichmentBatches = async (updates: { card: Card; data: Partial<Card> }[], userId: string) => {
         const BATCH_SIZE = 400
 
-        // Scryfall metadata fields that belong in the cache (not user docs).
-        // SCRUM-27: cmc/type_line/colors/rarity/power/toughness/full_art/produced_mana
-        // also go to user doc so local consumers (mana curve, filter, cardToIndex)
-        // read them without needing a scryfall_cache merge on load.
-        const CACHE_ONLY_FIELDS = new Set<string>([
-            'oracle_text', 'keywords', 'legalities',
+        // Scryfall metadata fields that belong in the cache (not user docs)
+        const CACHE_ONLY_FIELDS = new Set([
+            'type_line', 'colors', 'rarity', 'oracle_text', 'keywords',
+            'legalities', 'power', 'toughness', 'cmc', 'full_art', 'produced_mana',
         ])
 
         for (let i = 0; i < updates.length; i += BATCH_SIZE) {
@@ -554,14 +552,7 @@ export const useCollectionStore = defineStore('collection', () => {
     const enrichCardsWithMissingMetadata = async () => {
         if (!authStore.user?.id) return
 
-        // SCRUM-27: also enrich cards with missing cmc. Task 2 populated type_line
-        // at build time (via batchFetchScryfallMap), which bypassed the original
-        // type_line guard for cards that DID batch-hit. Cards that missed the batch
-        // had no type_line AND no cmc — but we cannot rely on type_line alone as
-        // the sentinel anymore. cmc === undefined is the canonical "needs enrichment".
-        const cardsToEnrich = cards.value.filter(c =>
-            c.scryfallId && (c.cmc === undefined || !c.type_line || c.produced_mana === undefined)
-        )
+        const cardsToEnrich = cards.value.filter(c => c.scryfallId && (!c.type_line || c.produced_mana === undefined))
         if (cardsToEnrich.length === 0) return
 
         console.info(`[Enrichment] ${cardsToEnrich.length} cards missing metadata, fetching from Scryfall...`)
@@ -589,14 +580,6 @@ export const useCollectionStore = defineStore('collection', () => {
 
         if (updates.length === 0) return
         cards.value = newCards
-
-        // SCRUM-27: re-sync card_index so cardToIndex captures cmc/type_line/colors
-        // after enrichment. Without this, mana curve and mana filter on legacy
-        // collections stay broken until a full page reload triggers another enrich cycle.
-        for (const { card } of updates) {
-            syncIndexLocal(card, 'update')
-        }
-        persistIndexToFirestore()
 
         await persistEnrichmentBatches(updates, authStore.user.id)
         console.info(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)
@@ -1159,12 +1142,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 onProgress?.(Math.min(i + CHUNK_SIZE, cardsToSave.length), cardsToSave.length)
             }
 
-            // SCRUM-27: collect new cards then reassign cards.value to trigger
-            // reactivity (shallowRef.push does NOT notify computeds/watchers).
-            // Also syncIndexLocal + persistIndexToFirestore so the local blob
-            // captures cmc/type_line/colors from the ImportCardData (otherwise
-            // cardToIndex reads stale local state and blob ends up with cm=0).
-            const newCards: Card[] = []
+            // Push in-place so getCardById works for deck allocation
+            // shallowRef does NOT detect push — zero reactive cascade
             for (let k = 0; k < createdIds.length; k++) {
                 // eslint-disable-next-line security/detect-object-injection
                 const cardId = createdIds[k]
@@ -1172,21 +1151,19 @@ export const useCollectionStore = defineStore('collection', () => {
                 const card = cardsToSave[k]
                 if (cardId && card) {
                     const newCard = { ...card, id: cardId, updatedAt: new Date(), createdAt: new Date() } as Card
-                    newCards.push(newCard)
+                    cards.value.push(newCard)
                     cardsById.set(cardId, newCard)
-                    syncIndexLocal(newCard, 'add')
                 }
             }
-            if (newCards.length > 0) {
-                cards.value = [...cards.value, ...newCards]  // reactive trigger
-                persistIndexToFirestore()
-            }
 
-            // SCRUM-27: server-side buildCardIndex removed here — it read user docs
-            // whose cmc/type_line/colors are filtered out by bulkImportCards'
-            // USER_CARD_FIELDS set, and overwrote the local blob with cm=0.
-            // The syncIndexLocal + persistIndexToFirestore loop above already
-            // updates the blob with the full ImportCardData (including cmc).
+            // Rebuild index after bulk import (more efficient than individual syncs)
+            import('../services/cloudFunctions').then(({ buildCardIndex }) => {
+                buildCardIndex().then(result => {
+                    console.info(`[Import] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
+                }).catch((err: unknown) => {
+                    console.warn('[Import] Index rebuild failed:', err)
+                })
+            }).catch(() => {})
 
             if (!silent) {
                 toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')

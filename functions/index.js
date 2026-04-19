@@ -431,14 +431,9 @@ exports.refreshMarketData = onRequest({ cors: true, maxInstances: 1, timeoutSeco
 // Server-side batch writes bypass the browser SDK's write stream limit
 // ============================================================
 // Fields that belong to the user doc (not the cache)
-// SCRUM-27: cmc/type_line/colors/rarity/power/toughness/full_art/produced_mana
-// also go to user doc so buildCardIndex picks them up on rebuild and local
-// consumers (mana curve, filter, cardToIndex) read them without cache merge.
 const USER_CARD_FIELDS = new Set([
   'scryfallId', 'quantity', 'condition', 'foil', 'status', 'public',
   'price', 'language', 'name', 'edition', 'setCode', 'image', 'deckName',
-  'cmc', 'type_line', 'colors', 'rarity', 'power', 'toughness',
-  'full_art', 'produced_mana',
 ]);
 
 exports.bulkImportCards = onCall(

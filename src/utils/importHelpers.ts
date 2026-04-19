@@ -135,107 +135,57 @@ export const buildCollectionCardFromScryfall = (opts: {
   return cardData
 }
 
-/**
- * Apply ExtractedScryfallData metadata to an ImportCardData in-place.
- * Shared between buildRawMoxfieldCard and buildRawCsvCard (anti-loop Rule 6).
- *
- * SCRUM-27: cmc=0 is a real value (Mox Pearl, Black Lotus, Mishra's Bauble) —
- * use direct assignment, NEVER `?? undefined` or `|| undefined` (the latter nukes 0).
- */
-const applyScryfallMetadata = (target: ImportCardData, data: ExtractedScryfallData): void => {
-  // cmc=0 is a real value (e.g. Mox Pearl) — do not coerce
-  target.cmc = data.cmc
-  if (data.type_line) target.type_line = data.type_line
-  target.colors = data.colors
-  if (data.rarity) target.rarity = data.rarity
-  if (data.power !== undefined) target.power = data.power
-  if (data.toughness !== undefined) target.toughness = data.toughness
-  if (data.oracle_text !== undefined) target.oracle_text = data.oracle_text
-  target.keywords = data.keywords
-  if (data.legalities !== undefined) target.legalities = data.legalities
-  target.full_art = data.full_art
-  // produced_mana: undefined is how enrichCardsWithMissingMetadata detects "missing",
-  // so only copy when defined — do NOT default to []
-  if (data.produced_mana !== undefined) {
-    target.produced_mana = data.produced_mana
-  }
-}
-
-/** Build a minimal card from Moxfield import data.
- *  When scryfallData is provided (SCRUM-27), metadata is populated at build time
- *  so cardToIndex / mana curve see correct cmc/type_line without waiting for background enrichment. */
+/** Build a minimal card from Moxfield import data (no Scryfall fetch needed) */
 export const buildRawMoxfieldCard = (
   card: MoxfieldImportCard,
   condition: CardCondition,
   status: CardStatus | undefined,
   makePublic: boolean,
-  scryfallData?: ExtractedScryfallData | null,
 ): ImportCardData => {
   let cardName = card.name
   const isFoil = /\*[fF]\*?\s*$/.test(cardName)
   if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
 
-  const fallbackImage = card.scryfallId
-    ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg`
-    : ''
-
-  const cardData: ImportCardData = {
-    scryfallId: scryfallData?.scryfallId || card.scryfallId || '',
+  // User-specific fields + convenience copies (name, edition, image)
+  // Scryfall metadata (colors, keywords, etc.) lives in scryfall_cache
+  return {
+    scryfallId: card.scryfallId ?? '',
     name: cardName,
-    edition: (scryfallData?.edition) || card.setCode?.toUpperCase() || 'Unknown',
-    setCode: scryfallData?.setCode || card.setCode?.toUpperCase(),
+    edition: card.setCode?.toUpperCase() ?? 'Unknown',
+    setCode: card.setCode?.toUpperCase(),
     quantity: card.quantity,
     condition,
     foil: isFoil,
-    price: (scryfallData && scryfallData.price > 0) ? scryfallData.price : 0,
-    image: (scryfallData?.image) || fallbackImage,
+    price: 0,
+    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
     status: status ?? 'collection',
     public: makePublic,
     updatedAt: new Date(),
   }
-
-  if (scryfallData) {
-    applyScryfallMetadata(cardData, scryfallData)
-  }
-
-  return cardData
 }
 
-/** Build a minimal card from CSV import data.
- *  When scryfallData is provided (SCRUM-27), metadata is populated at build time. */
+/** Build a minimal card from CSV import data (no Scryfall fetch needed) */
 export const buildRawCsvCard = (
   card: ParsedCsvCard,
   status: CardStatus | undefined,
   makePublic: boolean,
-  scryfallData?: ExtractedScryfallData | null,
 ): ImportCardData => {
-  const fallbackImage = card.scryfallId
-    ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg`
-    : ''
-
+  // User-specific fields + convenience copies (name, edition, image)
+  // Scryfall metadata (colors, keywords, etc.) lives in scryfall_cache
   const cardData: ImportCardData = {
-    scryfallId: scryfallData?.scryfallId || card.scryfallId || '',
+    scryfallId: card.scryfallId ?? '',
     name: card.name,
-    edition: (scryfallData?.edition) || card.setCode?.toUpperCase() || 'Unknown',
+    edition: card.setCode?.toUpperCase() ?? 'Unknown',
     quantity: card.quantity,
     condition: card.condition,
     foil: card.foil,
-    price: (scryfallData && scryfallData.price > 0) ? scryfallData.price : (card.price ?? 0),
-    image: (scryfallData?.image) || fallbackImage,
+    price: card.price ?? 0,
+    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
     status: status ?? 'collection',
     public: makePublic,
     updatedAt: new Date(),
   }
-  if (scryfallData?.setCode) {
-    cardData.setCode = scryfallData.setCode
-  } else if (card.setCode) {
-    cardData.setCode = card.setCode.toUpperCase()
-  }
+  if (card.setCode) cardData.setCode = card.setCode.toUpperCase()
   if (card.language) cardData.language = card.language
-
-  if (scryfallData) {
-    applyScryfallMetadata(cardData, scryfallData)
-  }
-
   return cardData
 }

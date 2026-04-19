@@ -34,9 +34,6 @@ interface ImportedCardData {
   setCode?: string;
   deckName?: string;
   language?: string;
-  cmc?: number;
-  type_line?: string;
-  colors?: string[];
 }
 
 interface MoxfieldCard {
@@ -100,9 +97,6 @@ const extractCardData = (card: ScryfallCard) => {
     price: card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0,
     edition: card.set_name,
     setCode: card.set.toUpperCase(),
-    cmc: card.cmc,
-    type_line: card.type_line,
-    colors: card.colors ?? [],
   }
 }
 
@@ -196,9 +190,6 @@ const parseLinesIntoCards = async (
       public: makePublic,
       isInSideboard: inSideboard,
     }
-    if (scryfallData?.cmc !== undefined) cardData.cmc = scryfallData.cmc
-    if (scryfallData?.type_line) cardData.type_line = scryfallData.type_line
-    if (scryfallData?.colors) cardData.colors = scryfallData.colors
 
     const finalSetCode = scryfallData?.setCode ?? setCode
     if (finalSetCode) {
@@ -305,9 +296,6 @@ const buildCsvCardData = (card: ParsedCsvCard, scryfallDataMap: Map<string, Scry
     public: makePublic,
     isInSideboard: false,
   }
-  if (sc?.cmc !== undefined) cardData.cmc = sc.cmc
-  if (sc?.type_line) cardData.type_line = sc.type_line
-  if (sc?.colors) cardData.colors = sc.colors
   if (card.setCode) {
     cardData.setCode = card.setCode.toUpperCase()
   }
@@ -477,11 +465,8 @@ const handleImportDirect = async (
       status: 'collection',
       deckName: finalDeckName,
       public: makePublic ?? false,
-      colors,
       isInSideboard: false,
     }
-    if (cmc !== undefined) collectionCardData.cmc = cmc
-    if (type_line) collectionCardData.type_line = type_line
 
     // Only add setCode if we have a valid one (Firebase rejects undefined)
     if (finalEdition && finalEdition !== 'Unknown') {

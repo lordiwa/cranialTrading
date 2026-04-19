@@ -81,12 +81,23 @@ function stripCacheMetadata(data: Record<string, unknown>): ScryfallCard {
   return card as unknown as ScryfallCard
 }
 
+/**
+ * Ensure the returned ScryfallCard has an `id` field. Some docs written by
+ * bulkImportCards via `_cacheFields` only store partial payloads without the `id`
+ * key (the id is in the doc path, not duplicated inside). Without this fallback,
+ * downstream consumers using the card to key a Map get `undefined` collisions.
+ */
+function ensureIdFromDoc(card: ScryfallCard, docId: string): ScryfallCard {
+  if (!(card as { id?: string }).id) (card as { id?: string }).id = docId
+  return card
+}
+
 async function l2Get(id: string): Promise<{ card: ScryfallCard; metaFresh: boolean } | null> {
   const snap = await getDoc(doc(db, COLLECTION, id))
   if (!snap.exists()) return null
 
   const data = snap.data() as ScryfallCard & CacheMetadata
-  const card = stripCacheMetadata(data as unknown as Record<string, unknown>)
+  const card = ensureIdFromDoc(stripCacheMetadata(data as unknown as Record<string, unknown>), snap.id)
   return {
     card,
     metaFresh: isMetadataFresh(data),
@@ -177,7 +188,7 @@ export async function getCardsByIds(
           returnedIds.add(snap.id)
           const data = snap.data() as ScryfallCard & CacheMetadata
           if (isMetadataFresh(data)) {
-            const card = stripCacheMetadata(data as unknown as Record<string, unknown>)
+            const card = ensureIdFromDoc(stripCacheMetadata(data as unknown as Record<string, unknown>), snap.id)
             l1Set(card)
             results.push(card)
             chunkHits++

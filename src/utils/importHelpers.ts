@@ -50,11 +50,18 @@ export interface ImportCardData {
   full_art?: boolean
   produced_mana?: string[]
   updatedAt: Date
+  /**
+   * Opaque bundle of Scryfall metadata forwarded to `functions/index.js:bulkImportCards`
+   * (extracted there and written to `scryfall_cache` with admin rights).
+   * The server strips this before writing the user doc, so it stays out of USER_CARD_FIELDS.
+   */
+  _cacheFields?: Record<string, unknown>
 }
 
 /** Extracted card data from Scryfall for building collection cards */
 export interface ExtractedScryfallData {
   scryfallId: string
+  name: string
   image: string
   price: number
   edition: string
@@ -135,6 +142,36 @@ export const buildCollectionCardFromScryfall = (opts: {
   return cardData
 }
 
+/**
+ * Build the `_cacheFields` bundle from ExtractedScryfallData.
+ * These fields are shipped to `bulkImportCards` (see functions/index.js:496) and
+ * written to scryfall_cache with admin rights — bypassing the Firestore rules
+ * that block client-side writes to that collection.
+ *
+ * Only includes non-empty fields to avoid overwriting good cache data with blanks.
+ */
+export const buildCacheFieldsFromScryfall = (sc: ExtractedScryfallData): Record<string, unknown> => {
+  const fields: Record<string, unknown> = {}
+  // id + name let the L2 cache reader (scryfallCache.ts) rebuild a usable
+  // ScryfallCard object with the canonical id and matchable name — without
+  // these the returned `sc.id` is undefined and `Map.set(undefined, x)`
+  // collapses every card into a single key.
+  if (sc.scryfallId) fields.id = sc.scryfallId
+  if (sc.name) fields.name = sc.name
+  if (sc.cmc !== undefined) fields.cmc = sc.cmc
+  if (sc.type_line) fields.type_line = sc.type_line
+  if (sc.colors.length > 0) fields.colors = sc.colors
+  if (sc.rarity) fields.rarity = sc.rarity
+  if (sc.power !== undefined) fields.power = sc.power
+  if (sc.toughness !== undefined) fields.toughness = sc.toughness
+  if (sc.oracle_text !== undefined) fields.oracle_text = sc.oracle_text
+  if (sc.keywords.length > 0) fields.keywords = sc.keywords
+  if (sc.legalities !== undefined) fields.legalities = sc.legalities
+  if (sc.full_art) fields.full_art = sc.full_art
+  if (sc.produced_mana !== undefined) fields.produced_mana = sc.produced_mana
+  return fields
+}
+
 /** Build a minimal card from Moxfield import data (no Scryfall fetch needed) */
 export const buildRawMoxfieldCard = (
   card: MoxfieldImportCard,
@@ -162,6 +199,49 @@ export const buildRawMoxfieldCard = (
     public: makePublic,
     updatedAt: new Date(),
   }
+}
+
+/**
+ * Build an ImportCardData from a Moxfield card + optional Scryfall match.
+ *
+ * When Scryfall data is present:
+ * - Uses buildCollectionCardFromScryfall to produce a full-metadata payload
+ *   (cmc, type_line, colors, etc. go into convenience copies on the user doc).
+ * - Attaches `_cacheFields` so bulkImportCards can populate scryfall_cache with
+ *   admin rights (bypassing the Firestore rules that block client writes).
+ *
+ * When Scryfall data is missing (ID not in Scryfall / rate-limit / offline):
+ * - Falls back to buildRawMoxfieldCard — exact legacy behavior, no regression.
+ */
+export const buildMoxfieldCardWithScryfall = (
+  card: MoxfieldImportCard,
+  scryfallData: ExtractedScryfallData | null | undefined,
+  condition: CardCondition,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+): ImportCardData => {
+  if (!scryfallData) {
+    return buildRawMoxfieldCard(card, condition, status, makePublic)
+  }
+
+  let cardName = card.name
+  const isFoil = /\*[fF]\*?\s*$/.test(cardName)
+  if (isFoil) cardName = cardName.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+
+  const built = buildCollectionCardFromScryfall({
+    cardName,
+    quantity: card.quantity,
+    condition,
+    isFoil,
+    setCode: card.setCode ?? null,
+    scryfallData,
+    status,
+    makePublic,
+    isInSideboard: card.isInSideboard ?? false,
+  })
+
+  built._cacheFields = buildCacheFieldsFromScryfall(scryfallData)
+  return built
 }
 
 /** Build a minimal card from CSV import data (no Scryfall fetch needed) */

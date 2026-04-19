@@ -13,12 +13,12 @@ import type { CreateDeckInput, DeckFormat } from '../types/deck'
 import type { CreateBinderInput } from '../types/binder'
 import type { ToastType } from '../stores/toast'
 import type { ConfirmOptions } from '../stores/confirm'
-import { type ScryfallCard, searchCards } from '../services/scryfallCache'
+import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
 import {
   buildCollectionCardFromScryfall,
+  buildMoxfieldCardWithScryfall,
   buildRawCsvCard,
-  buildRawMoxfieldCard,
   type ExtractedScryfallData,
   type ImportCardData,
   type MoxfieldImportCard,
@@ -179,6 +179,7 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
   const extractScryfallCardData = (card: ScryfallCard): ExtractedScryfallData => {
     return {
       scryfallId: card.id,
+      name: card.name,
       image: extractScryfallImage(card),
       price: card.prices?.usd ? Number.parseFloat(card.prices.usd) : 0,
       edition: card.set_name,
@@ -393,7 +394,67 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       // Cancel price fetch to free write stream
       cancelPriceFetch()
 
-      // PASO 2: Build raw cards (no Scryfall fetch — enrichment in background)
+      // PASO 1.5: Batch-fetch Scryfall metadata upfront. The /cards/collection
+      // endpoint accepts identifiers mixed as `{id}` and `{name}`. We send an `id`
+      // for every Moxfield card that has a scryfall_id, and a `name` for the rest
+      // (Moxfield occasionally omits scryfall_id for very new sets). Scryfall also
+      // canonicalizes variant prints to master ids, so the response id may not equal
+      // the requested id — we index by BOTH returned `sc.id` and `sc.name` and fall
+      // back to name lookup at build time.
+      // Writes to scryfall_cache go through `_cacheFields` → bulkImportCards admin
+      // path (see functions/index.js:496) — client cannot write scryfall_cache
+      // directly because Firestore rules block it.
+      progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
+      const cleanCardName = (raw: string): string =>
+        raw.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+
+      const identifiers: ({ id: string } | { name: string })[] = []
+      const seenIds = new Set<string>()
+      const seenNames = new Set<string>()
+      for (const c of cards) {
+        if (c.scryfallId) {
+          if (!seenIds.has(c.scryfallId)) {
+            seenIds.add(c.scryfallId)
+            identifiers.push({ id: c.scryfallId })
+          }
+        } else if (c.name) {
+          const key = cleanCardName(c.name)
+          const lowerKey = key.toLowerCase()
+          if (!seenNames.has(lowerKey)) {
+            seenNames.add(lowerKey)
+            identifiers.push({ name: key })
+          }
+        }
+      }
+
+      const scryfallByName = new Map<string, ExtractedScryfallData>()
+      const scryfallById = new Map<string, ExtractedScryfallData>()
+      if (identifiers.length > 0) {
+        try {
+          const scryfallCards = await getCardsByIds(identifiers)
+          for (const sc of scryfallCards) {
+            const data = extractScryfallCardData(sc)
+            scryfallById.set(sc.id, data)
+            if (sc.name) scryfallByName.set(sc.name.toLowerCase(), data)
+          }
+        } catch (err) {
+          console.warn('[Import] Upfront Scryfall batch failed, falling back to raw:', err)
+        }
+      }
+
+      const lookupScryfall = (card: MoxfieldImportCard): ExtractedScryfallData | null => {
+        if (card.scryfallId) {
+          const byId = scryfallById.get(card.scryfallId)
+          if (byId) return byId
+        }
+        if (card.name) {
+          const byName = scryfallByName.get(cleanCardName(card.name).toLowerCase())
+          if (byName) return byName
+        }
+        return null
+      }
+
+      // PASO 2: Build cards with Scryfall metadata when available, raw otherwise
       progressToast.update(15, t('common.import.processing'))
       saveImportState({ ...initialState, status: 'processing' })
 
@@ -404,7 +465,8 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false))
+        const scryfallData = lookupScryfall(card)
+        collectionCardsToAdd.push(buildMoxfieldCardWithScryfall(card, scryfallData, condition, status, makePublic ?? false))
         cardMeta.push({
           quantity: card.quantity,
           isInSideboard: card.isInSideboard ?? false
@@ -659,6 +721,58 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
 
       cancelPriceFetch()
 
+      // PASO 1.5: Batch-fetch Scryfall metadata upfront (same pattern + id/name dual
+      // mapping as handleImportDirect — see comment there for why we need name fallback).
+      progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
+      const cleanCardName = (raw: string): string =>
+        raw.replace(/\s*\*[fF]\*?\s*$/, '').trim()
+
+      const identifiers: ({ id: string } | { name: string })[] = []
+      const seenIds = new Set<string>()
+      const seenNames = new Set<string>()
+      for (const c of cards) {
+        if (c.scryfallId) {
+          if (!seenIds.has(c.scryfallId)) {
+            seenIds.add(c.scryfallId)
+            identifiers.push({ id: c.scryfallId })
+          }
+        } else if (c.name) {
+          const key = cleanCardName(c.name)
+          const lowerKey = key.toLowerCase()
+          if (!seenNames.has(lowerKey)) {
+            seenNames.add(lowerKey)
+            identifiers.push({ name: key })
+          }
+        }
+      }
+
+      const scryfallByName = new Map<string, ExtractedScryfallData>()
+      const scryfallById = new Map<string, ExtractedScryfallData>()
+      if (identifiers.length > 0) {
+        try {
+          const scryfallCards = await getCardsByIds(identifiers)
+          for (const sc of scryfallCards) {
+            const data = extractScryfallCardData(sc)
+            scryfallById.set(sc.id, data)
+            if (sc.name) scryfallByName.set(sc.name.toLowerCase(), data)
+          }
+        } catch (err) {
+          console.warn('[Import] Upfront Scryfall batch failed (binder), falling back to raw:', err)
+        }
+      }
+
+      const lookupScryfall = (card: MoxfieldImportCard): ExtractedScryfallData | null => {
+        if (card.scryfallId) {
+          const byId = scryfallById.get(card.scryfallId)
+          if (byId) return byId
+        }
+        if (card.name) {
+          const byName = scryfallByName.get(cleanCardName(card.name).toLowerCase())
+          if (byName) return byName
+        }
+        return null
+      }
+
       progressToast.update(15, t('common.import.processing'))
       const collectionCardsToAdd: ImportCardData[] = []
 
@@ -666,7 +780,8 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false))
+        const scryfallData = lookupScryfall(card)
+        collectionCardsToAdd.push(buildMoxfieldCardWithScryfall(card, scryfallData, condition, status, makePublic ?? false))
 
         if (i % 100 === 0) {
           const processPercent = 15 + Math.round((i / cards.length) * 25)

@@ -430,10 +430,16 @@ exports.refreshMarketData = onRequest({ cors: true, maxInstances: 1, timeoutSeco
 // BULK IMPORT CARDS
 // Server-side batch writes bypass the browser SDK's write stream limit
 // ============================================================
-// Fields that belong to the user doc (not the cache)
+// Fields persisted on the user doc. Scryfall metadata (cmc, type_line, etc.) is
+// ALSO written here — same as pre-07f5d08 behavior — so buildCardIndex and any
+// client-side reader (mana curve, filters, card grid) can access the fields
+// without joining scryfall_cache. The cache still receives these via
+// `_cacheFields` below for cross-user sharing.
 const USER_CARD_FIELDS = new Set([
   'scryfallId', 'quantity', 'condition', 'foil', 'status', 'public',
   'price', 'language', 'name', 'edition', 'setCode', 'image', 'deckName',
+  'cmc', 'type_line', 'colors', 'rarity', 'power', 'toughness',
+  'full_art', 'produced_mana', 'keywords', 'legalities', 'oracle_text',
 ]);
 
 exports.bulkImportCards = onCall(
@@ -1100,9 +1106,15 @@ exports.buildCardIndex = onCall(
       if (snapshot.docs.length < READ_CHUNK) break;
     }
 
-    // Phase 2: Batch-read scryfall_cache to detect dual-faced cards accurately
+    // Phase 2: Batch-read scryfall_cache for two purposes:
+    //   1. Detect dual-faced cards accurately (dualFacedIds)
+    //   2. Merge Scryfall metadata (cmc/type_line/colors/etc) into the index —
+    //      USER_CARD_FIELDS strips those from user docs, so the cache is the
+    //      authoritative source. Without this merge, reloads show cmc=0 for every
+    //      imported card even though bulkImportCards just wrote the cache.
     const uniqueScryfallIds = [...new Set(allRawCards.map(c => c.data.scryfallId).filter(Boolean))];
     const dualFacedIds = new Set();
+    const scryfallCacheMap = new Map(); // scryfallId → cache doc data
 
     // db.getAll supports up to ~10k refs per call; batch if needed
     const CACHE_BATCH = 5000;
@@ -1114,6 +1126,7 @@ exports.buildCardIndex = onCall(
       for (const cDoc of cacheDocs) {
         if (!cDoc.exists) continue;
         const cData = cDoc.data();
+        scryfallCacheMap.set(cDoc.id, cData);
         if (cData.card_faces && cData.card_faces.length > 1) {
           const facesWithImages = cData.card_faces.filter(f => f.image_uris);
           if (facesWithImages.length > 1) {
@@ -1123,11 +1136,27 @@ exports.buildCardIndex = onCall(
       }
     }
 
-    logger.info(`[buildCardIndex] Found ${dualFacedIds.size} dual-faced cards out of ${uniqueScryfallIds.length} unique scryfallIds`);
+    logger.info(`[buildCardIndex] Found ${dualFacedIds.size} dual-faced cards out of ${uniqueScryfallIds.length} unique scryfallIds (cache hits: ${scryfallCacheMap.size})`);
 
-    // Phase 3: Build index cards with accurate df flag
+    // Phase 3: Build index cards with accurate df flag and cache-merged metadata
     const allIndexCards = allRawCards.map(({ id, data }) => {
-      const ic = toIndexCard(id, data);
+      const cache = data.scryfallId ? scryfallCacheMap.get(data.scryfallId) : null;
+      const merged = cache
+        ? {
+            ...data,
+            cmc: data.cmc ?? cache.cmc,
+            type_line: data.type_line || cache.type_line,
+            colors: (data.colors && data.colors.length > 0) ? data.colors : cache.colors,
+            rarity: data.rarity || cache.rarity,
+            power: data.power || cache.power,
+            toughness: data.toughness || cache.toughness,
+            full_art: data.full_art ?? cache.full_art,
+            produced_mana: (data.produced_mana && data.produced_mana.length > 0) ? data.produced_mana : cache.produced_mana,
+            keywords: (data.keywords && data.keywords.length > 0) ? data.keywords : cache.keywords,
+            legalities: data.legalities || cache.legalities,
+          }
+        : data;
+      const ic = toIndexCard(id, merged);
       // Override df with accurate scryfall_cache detection
       ic.df = dualFacedIds.has(data.scryfallId);
       return ic;

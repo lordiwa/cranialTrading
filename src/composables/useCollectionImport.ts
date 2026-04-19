@@ -13,7 +13,7 @@ import type { CreateDeckInput, DeckFormat } from '../types/deck'
 import type { CreateBinderInput } from '../types/binder'
 import type { ToastType } from '../stores/toast'
 import type { ConfirmOptions } from '../stores/confirm'
-import { type ScryfallCard, searchCards } from '../services/scryfallCache'
+import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
 import {
   buildCollectionCardFromScryfall,
@@ -195,6 +195,34 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       full_art: card.full_art ?? false,
       produced_mana: card.produced_mana,
     }
+  }
+
+  /**
+   * Batch-fetch Scryfall metadata for import items (SCRUM-27).
+   * Dedups by scryfallId, wraps getCardsByIds in try/catch so a Scryfall outage
+   * degrades gracefully (builders fall back to raw behavior).
+   */
+  const batchFetchScryfallMap = async (
+    items: { scryfallId?: string }[],
+  ): Promise<Map<string, ExtractedScryfallData>> => {
+    const identifiers = [
+      ...new Map(
+        items
+          .filter((c): c is { scryfallId: string } => !!c.scryfallId)
+          .map(c => [c.scryfallId, { id: c.scryfallId }]),
+      ).values(),
+    ]
+    const map = new Map<string, ExtractedScryfallData>()
+    if (identifiers.length === 0) return map
+    try {
+      const scryfallCards = await getCardsByIds(identifiers)
+      for (const sc of scryfallCards) {
+        map.set(sc.id, extractScryfallCardData(sc))
+      }
+    } catch (e) {
+      console.warn('[Import] Batch Scryfall fetch failed; proceeding without metadata', e)
+    }
+    return map
   }
 
   const _applySearchResultToCard = (cardData: ImportCardData, results: ScryfallCard[]) => {
@@ -393,9 +421,13 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       // Cancel price fetch to free write stream
       cancelPriceFetch()
 
-      // PASO 2: Build raw cards (no Scryfall fetch — enrichment in background)
+      // PASO 2: Build raw cards + batch-fetch Scryfall metadata (SCRUM-27)
       progressToast.update(15, t('common.import.processing'))
       saveImportState({ ...initialState, status: 'processing' })
+
+      // Batch-fetch Scryfall data up front so builders populate cmc/type_line/colors
+      // at card-creation time (fixes mana curve / cardToIndex on fresh imports).
+      const scryfallMap = await batchFetchScryfallMap(cards)
 
       const collectionCardsToAdd: ImportCardData[] = []
       const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
@@ -404,7 +436,8 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false))
+        const scryfallData = card.scryfallId ? scryfallMap.get(card.scryfallId) : undefined
+        collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false, scryfallData))
         cardMeta.push({
           quantity: card.quantity,
           isInSideboard: card.isInSideboard ?? false
@@ -530,6 +563,10 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       cancelPriceFetch()
 
       progressToast.update(15, t('common.import.processing'))
+
+      // Batch-fetch Scryfall data up front (SCRUM-27) so builders populate cmc/type_line/colors.
+      const scryfallMap = await batchFetchScryfallMap(cards)
+
       const collectionCardsToAdd: ImportCardData[] = []
       const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
 
@@ -537,7 +574,8 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false))
+        const scryfallData = card.scryfallId ? scryfallMap.get(card.scryfallId) : undefined
+        collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false, scryfallData))
         cardMeta.push({ quantity: card.quantity, isInSideboard: false })
 
         if (i % 100 === 0) {
@@ -660,13 +698,18 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       cancelPriceFetch()
 
       progressToast.update(15, t('common.import.processing'))
+
+      // Batch-fetch Scryfall data up front (SCRUM-27).
+      const scryfallMap = await batchFetchScryfallMap(cards)
+
       const collectionCardsToAdd: ImportCardData[] = []
 
       for (let i = 0; i < cards.length; i++) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false))
+        const scryfallData = card.scryfallId ? scryfallMap.get(card.scryfallId) : undefined
+        collectionCardsToAdd.push(buildRawMoxfieldCard(card, condition, status, makePublic ?? false, scryfallData))
 
         if (i % 100 === 0) {
           const processPercent = 15 + Math.round((i / cards.length) * 25)
@@ -751,13 +794,18 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       cancelPriceFetch()
 
       progressToast.update(15, t('common.import.processing'))
+
+      // Batch-fetch Scryfall data up front (SCRUM-27).
+      const scryfallMap = await batchFetchScryfallMap(cards)
+
       const collectionCardsToAdd: ImportCardData[] = []
 
       for (let i = 0; i < cards.length; i++) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false))
+        const scryfallData = card.scryfallId ? scryfallMap.get(card.scryfallId) : undefined
+        collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false, scryfallData))
 
         if (i % 100 === 0) {
           const pct = 15 + Math.round((i / cards.length) * 25)

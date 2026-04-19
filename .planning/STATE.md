@@ -29,7 +29,7 @@ Phase: 04
 Plans delivered: A (pure helpers), B (composables), C (route split), D (GridCard split), E (closeout)
 Shipped: v1.23.0 on cranial-trading-dev.web.app, verified by user 2026-04-17
 Next: tech-debt cleanup (BulkSelectionActionBar + DeckStatsFooter + useDeckDisplayCards extractions) → Phase 04 (GlobalSearch ARIA combobox)
-Last activity: 2026-04-18 - Completed quick task 260418-pzu: Mana curve per deck with hypergeometric play probability (SCRUM-10)
+Last activity: 2026-04-18 - Completed quick task 260418-rzv: Fix CMC/type_line loss on Moxfield URL + CSV import flows (SCRUM-27)
 
 Progress: [███████▌░░] 75%
 
@@ -77,9 +77,10 @@ None from Phase 01. Ready to plan Phase 02.
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260418-pzu | Mana curve per deck with hypergeometric play probability (SCRUM-10) | 2026-04-18 | 92cbce1 | [260418-pzu-mana-curve-per-deck-with-hypergeometric-](./quick/260418-pzu-mana-curve-per-deck-with-hypergeometric-/) |
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260418-pzu | Mana curve per deck with hypergeometric play probability (SCRUM-10) | 2026-04-18 | 92cbce1 | | [260418-pzu-mana-curve-per-deck-with-hypergeometric-](./quick/260418-pzu-mana-curve-per-deck-with-hypergeometric-/) |
+| 260418-rzv | Fix CMC/type_line loss on Moxfield URL + CSV import flows (SCRUM-27) | 2026-04-18 | e4467fe | Needs Review | [260418-rzv-fix-cmc-type-line-loss-on-moxfield-url-c](./quick/260418-rzv-fix-cmc-type-line-loss-on-moxfield-url-c/) |
 
 ### Phase 01 Lessons (feed into Phase 02 planning)
 

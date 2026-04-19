@@ -786,6 +786,18 @@
       "edit": "EDITAR",
       "delete": "EXCLUIR"
     },
+    "manaCurve": {
+      "title": "Curva de Mana",
+      "cards": "cartas",
+      "onPlay": "Na mão inicial",
+      "onDraw": "Com compra",
+      "landsLabel": "Terrenos",
+      "tappedWarning": "{count} terrenos ETB tapped detectados",
+      "tappedWarningHelp": "Elas contam na probabilidade, mas atrasam turnos.",
+      "noLands": "Nenhum terreno detectado neste deck.",
+      "detecting": "Detectando terrenos com ETB tapped…",
+      "probabilityLabel": "P(≥{k} terrenos no turno {k})"
+    },
     "createModal": {
       "title": "CRIAR NOVO DECK",
       "subtitle": "Defina os detalhes básicos do seu deck",

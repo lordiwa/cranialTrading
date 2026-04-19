@@ -786,6 +786,18 @@
       "edit": "EDITAR",
       "delete": "BORRAR"
     },
+    "manaCurve": {
+      "title": "Curva de Maná",
+      "cards": "cartas",
+      "onPlay": "Jugando",
+      "onDraw": "Robando",
+      "landsLabel": "Tierras",
+      "tappedWarning": "{count} tierras ETB tapped detectadas",
+      "tappedWarningHelp": "Cuentan en la probabilidad, pero retrasan turnos.",
+      "noLands": "No hay tierras en este mazo.",
+      "detecting": "Detectando tierras con ETB tapped…",
+      "probabilityLabel": "P(≥{k} tierras al turno {k})"
+    },
     "createModal": {
       "title": "CREAR NUEVO MAZO",
       "subtitle": "Define los detalles básicos de tu mazo",

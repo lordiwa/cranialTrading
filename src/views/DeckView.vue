@@ -13,6 +13,7 @@ import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
+import DeckManaCurve from '../components/decks/DeckManaCurve.vue'
 import DeckStatsFooter from '../components/decks/DeckStatsFooter.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
@@ -160,6 +161,12 @@ const {
   collectionCards,
   filterQuery,
 })
+
+// Deck size for the mana curve (mainboard owned + wishlist — sideboard EXCLUDED).
+// Matches the plan's locked decision: sideboard never contributes to curve/probability.
+const manaCurveDeckSize = computed(
+    () => mainboardOwnedCount.value + mainboardWishlistCount.value
+)
 
 // ¿Todas las cartas del deck son públicas?
 const isDeckPublic = computed(() => {
@@ -1043,6 +1050,14 @@ onUnmounted(() => {
             <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.deckNoCards') }}</p>
           </div>
         </div>
+
+        <!-- ========== MANA CURVE ========== -->
+        <!-- Inline (NOT teleported) — scrolls with AppContainer body, sits above the fixed DeckStatsFooter. -->
+        <DeckManaCurve
+            v-if="selectedDeck && mainboardDisplayCards.length > 0"
+            :cards="mainboardDisplayCards"
+            :deck-size="manaCurveDeckSize"
+        />
       </div>
     </div>
 

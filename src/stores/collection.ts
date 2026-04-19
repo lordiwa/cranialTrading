@@ -490,10 +490,12 @@ export const useCollectionStore = defineStore('collection', () => {
     const persistEnrichmentBatches = async (updates: { card: Card; data: Partial<Card> }[], userId: string) => {
         const BATCH_SIZE = 400
 
-        // Scryfall metadata fields that belong in the cache (not user docs)
-        const CACHE_ONLY_FIELDS = new Set([
-            'type_line', 'colors', 'rarity', 'oracle_text', 'keywords',
-            'legalities', 'power', 'toughness', 'cmc', 'full_art', 'produced_mana',
+        // Scryfall metadata fields that belong in the cache (not user docs).
+        // SCRUM-27: cmc/type_line/colors/rarity/power/toughness/full_art/produced_mana
+        // also go to user doc so local consumers (mana curve, filter, cardToIndex)
+        // read them without needing a scryfall_cache merge on load.
+        const CACHE_ONLY_FIELDS = new Set<string>([
+            'oracle_text', 'keywords', 'legalities',
         ])
 
         for (let i = 0; i < updates.length; i += BATCH_SIZE) {
@@ -580,6 +582,14 @@ export const useCollectionStore = defineStore('collection', () => {
 
         if (updates.length === 0) return
         cards.value = newCards
+
+        // SCRUM-27: re-sync card_index so cardToIndex captures cmc/type_line/colors
+        // after enrichment. Without this, mana curve and mana filter on legacy
+        // collections stay broken until a full page reload triggers another enrich cycle.
+        for (const { card } of updates) {
+            syncIndexLocal(card, 'update')
+        }
+        persistIndexToFirestore()
 
         await persistEnrichmentBatches(updates, authStore.user.id)
         console.info(`[Enrichment] Updated ${updates.length} cards with Scryfall metadata`)

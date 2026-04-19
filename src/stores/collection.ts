@@ -554,7 +554,14 @@ export const useCollectionStore = defineStore('collection', () => {
     const enrichCardsWithMissingMetadata = async () => {
         if (!authStore.user?.id) return
 
-        const cardsToEnrich = cards.value.filter(c => c.scryfallId && (!c.type_line || c.produced_mana === undefined))
+        // SCRUM-27: also enrich cards with missing cmc. Task 2 populated type_line
+        // at build time (via batchFetchScryfallMap), which bypassed the original
+        // type_line guard for cards that DID batch-hit. Cards that missed the batch
+        // had no type_line AND no cmc — but we cannot rely on type_line alone as
+        // the sentinel anymore. cmc === undefined is the canonical "needs enrichment".
+        const cardsToEnrich = cards.value.filter(c =>
+            c.scryfallId && (c.cmc === undefined || !c.type_line || c.produced_mana === undefined)
+        )
         if (cardsToEnrich.length === 0) return
 
         console.info(`[Enrichment] ${cardsToEnrich.length} cards missing metadata, fetching from Scryfall...`)

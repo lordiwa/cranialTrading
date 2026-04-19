@@ -1161,6 +1161,11 @@ export const useCollectionStore = defineStore('collection', () => {
 
             // Push in-place so getCardById works for deck allocation
             // shallowRef does NOT detect push — zero reactive cascade
+            // SCRUM-27: also syncIndexLocal + persistIndexToFirestore so the local
+            // index (and its Firestore blob) captures cmc/type_line/colors from the
+            // ImportCardData. Without this, the server-side buildCardIndex rebuild
+            // (triggered below) reads user docs whose cmc was filtered out by
+            // bulkImportCards' USER_CARD_FIELDS set — and pisa the blob with cm=0.
             for (let k = 0; k < createdIds.length; k++) {
                 // eslint-disable-next-line security/detect-object-injection
                 const cardId = createdIds[k]
@@ -1170,17 +1175,16 @@ export const useCollectionStore = defineStore('collection', () => {
                     const newCard = { ...card, id: cardId, updatedAt: new Date(), createdAt: new Date() } as Card
                     cards.value.push(newCard)
                     cardsById.set(cardId, newCard)
+                    syncIndexLocal(newCard, 'add')
                 }
             }
+            persistIndexToFirestore()
 
-            // Rebuild index after bulk import (more efficient than individual syncs)
-            import('../services/cloudFunctions').then(({ buildCardIndex }) => {
-                buildCardIndex().then(result => {
-                    console.info(`[Import] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
-                }).catch((err: unknown) => {
-                    console.warn('[Import] Index rebuild failed:', err)
-                })
-            }).catch(() => {})
+            // SCRUM-27: server-side buildCardIndex removed here — it read user docs
+            // whose cmc/type_line/colors are filtered out by bulkImportCards'
+            // USER_CARD_FIELDS set, and overwrote the local blob with cm=0.
+            // The syncIndexLocal + persistIndexToFirestore loop above already
+            // updates the blob with the full ImportCardData (including cmc).
 
             if (!silent) {
                 toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')

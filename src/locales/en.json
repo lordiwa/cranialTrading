@@ -786,6 +786,18 @@
       "edit": "EDIT",
       "delete": "DELETE"
     },
+    "manaCurve": {
+      "title": "Mana Curve",
+      "cards": "cards",
+      "onPlay": "On play",
+      "onDraw": "On draw",
+      "landsLabel": "Lands",
+      "tappedWarning": "{count} ETB-tapped lands detected",
+      "tappedWarningHelp": "They count in the probability, but they slow turns.",
+      "noLands": "No lands detected in this deck.",
+      "detecting": "Detecting tapped lands…",
+      "probabilityLabel": "P(≥{k} lands by turn {k})"
+    },
     "createModal": {
       "title": "CREATE NEW DECK",
       "subtitle": "Define your deck's basic details",

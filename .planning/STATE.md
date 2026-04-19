@@ -29,7 +29,7 @@ Phase: 04
 Plans delivered: A (pure helpers), B (composables), C (route split), D (GridCard split), E (closeout)
 Shipped: v1.23.0 on cranial-trading-dev.web.app, verified by user 2026-04-17
 Next: tech-debt cleanup (BulkSelectionActionBar + DeckStatsFooter + useDeckDisplayCards extractions) → Phase 04 (GlobalSearch ARIA combobox)
-Last activity: 2026-04-18
+Last activity: 2026-04-18 - Completed quick task 260418-pzu: Mana curve per deck with hypergeometric play probability (SCRUM-10)
 
 Progress: [███████▌░░] 75%
 
@@ -74,6 +74,12 @@ None from Phase 01. Ready to plan Phase 02.
 - ARCH-03 (transition:all sweep) — RESOLVED in Phase 01 Plan A
 - Phase 2 and 3 each touch a 1000+ line file — plan as multiple focused plans, not a single large plan (reminder still applies)
 - E2E flake risk on CI runners from slow Scryfall: mitigated by 25s search timeout in page object; monitor going forward
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260418-pzu | Mana curve per deck with hypergeometric play probability (SCRUM-10) | 2026-04-18 | 92cbce1 | [260418-pzu-mana-curve-per-deck-with-hypergeometric-](./quick/260418-pzu-mana-curve-per-deck-with-hypergeometric-/) |
 
 ### Phase 01 Lessons (feed into Phase 02 planning)
 

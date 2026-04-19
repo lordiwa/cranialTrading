@@ -387,6 +387,37 @@ describe('activeTab watcher (extended)', () => {
   })
 })
 
+// ─── describe: searchScryfall edition parity (SCRUM-13) ──────────────────────
+
+describe('searchScryfall edition parity (SCRUM-13)', () => {
+  it('passes a query that excludes previews (matches /search default onlyReleased)', async () => {
+    const { searchCards } = await import('@/services/scryfall')
+    const mock = vi.mocked(searchCards)
+    mock.mockClear()
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'lightning bolt'
+    await gs.performSearch()
+
+    expect(mock).toHaveBeenCalledTimes(1)
+    const queryArg = mock.mock.calls[0]?.[0]
+    expect(queryArg).toContain('-is:preview')
+  })
+
+  it('wraps the card name in quotes (matches /search buildQuery)', async () => {
+    const { searchCards } = await import('@/services/scryfall')
+    const mock = vi.mocked(searchCards)
+    mock.mockClear()
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'lightning bolt'
+    await gs.performSearch()
+
+    const queryArg = mock.mock.calls[0]?.[0] ?? ''
+    expect(queryArg).toContain('"lightning bolt"')
+  })
+})
+
 // ─── describe: performSearch loading announcement ─────────────────────────────
 
 describe('performSearch loading announcement', () => {

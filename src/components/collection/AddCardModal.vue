@@ -59,7 +59,7 @@ watch(() => props.scryfallCard, async (card: ScryfallCard | undefined) => {
     try {
       // Cargar prints y mazos en paralelo
       const [results] = await Promise.all([
-        searchCards(`!"${card.name}"`),
+        searchCards(`!"${card.name}" -is:preview`),
         decksStore.loadDecks()
       ])
       availablePrints.value = results
@@ -325,7 +325,7 @@ const performSearch = async () => {
   suppressSuggestions.value = true
   showSuggestions.value = false
   try {
-    const results = await searchCards(`!"${query}"`)
+    const results = await searchCards(`!"${query}" -is:preview`)
     searchResults.value = results.slice(0, 12)
   } catch {
     searchResults.value = []

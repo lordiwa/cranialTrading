@@ -181,7 +181,10 @@ export function useGlobalSearch() {
 
   const searchScryfall = async (q: string) => {
     try {
-      const results = await searchCards(q)
+      // SCRUM-13: match /search advanced default (onlyReleased + quoted name).
+      // buildQuery in stores/search.ts wraps filters.name in quotes and appends
+      // `-is:preview` when onlyReleased=true (its default). Mirror that here.
+      const results = await searchCards(`"${q}" -is:preview`)
       scryfallResults.value = results.slice(0, 8)
     } catch {
       scryfallResults.value = []

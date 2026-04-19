@@ -264,7 +264,10 @@ export function useCardFilter<T extends FilterableCard>(
   }
 
   // --- Chip filter check ---
-  const passesChipFilters = (card: T): boolean => {
+  // Signature uses FilterableCard (not T) so callers like DeckView/BinderView
+  // can apply chip filtering to a different card type (DisplayDeckCard) than
+  // what was passed to useCardFilter.
+  const passesChipFilters = (card: FilterableCard): boolean => {
     // Color filter: lands with produced_mana match if ANY produced color is selected
     if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length) {
       if (!passesColorFilter(card, selectedColors.value, exactColorMode.value)) return false
@@ -279,25 +282,27 @@ export function useCardFilter<T extends FilterableCard>(
   }
 
   // --- Advanced filter helpers ---
-  const passesPrice = (card: T): boolean => {
+  // Signatures use FilterableCard (not T) so callers can apply the same
+  // logic to other card types (e.g., DisplayDeckCard) without re-implementing.
+  const passesPrice = (card: FilterableCard): boolean => {
     if (advPriceMin.value !== undefined && (card.price === undefined || card.price < advPriceMin.value)) return false
     if (advPriceMax.value !== undefined && (card.price === undefined || card.price > advPriceMax.value)) return false
     return true
   }
 
-  const passesFoil = (card: T): boolean => {
+  const passesFoil = (card: FilterableCard): boolean => {
     if (advFoilFilter.value === 'foil' && !card.foil) return false
     if (advFoilFilter.value === 'nonfoil' && card.foil) return false
     return true
   }
 
-  const passesSets = (card: T): boolean => {
+  const passesSets = (card: FilterableCard): boolean => {
     if (advSelectedSets.value.length === 0) return true
     const cardSet = card.setCode?.toLowerCase() ?? ''
     return advSelectedSets.value.some(s => s.toLowerCase() === cardSet)
   }
 
-  const passesKeywords = (card: T): boolean => {
+  const passesKeywords = (card: FilterableCard): boolean => {
     if (advSelectedKeywords.value.length === 0) return true
     const oracleText = card.oracle_text?.toLowerCase() ?? ''
     const cardKeywords = card.keywords?.map(k => k.toLowerCase()) ?? []
@@ -308,20 +313,20 @@ export function useCardFilter<T extends FilterableCard>(
     })
   }
 
-  const passesFormats = (card: T): boolean => {
+  const passesFormats = (card: FilterableCard): boolean => {
     if (advSelectedFormats.value.length === 0) return true
     if (!card.legalities) return false
     // eslint-disable-next-line security/detect-object-injection
     return advSelectedFormats.value.every(fmt => card.legalities?.[fmt] === 'legal')
   }
 
-  const passesCreatureTypes = (card: T): boolean => {
+  const passesCreatureTypes = (card: FilterableCard): boolean => {
     if (advSelectedCreatureTypes.value.length === 0) return true
     const subtypes = extractCreatureSubtypes(card.type_line ?? '')
     return advSelectedCreatureTypes.value.some(ct => subtypes.includes(ct.toLowerCase()))
   }
 
-  const passesFullArt = (card: T): boolean => {
+  const passesFullArt = (card: FilterableCard): boolean => {
     return !advFullArtOnly.value || !!card.full_art
   }
 
@@ -335,7 +340,7 @@ export function useCardFilter<T extends FilterableCard>(
   }
 
   // --- Advanced filter check ---
-  const passesAdvancedFilters = (card: T): boolean => {
+  const passesAdvancedFilters = (card: FilterableCard): boolean => {
     return passesPrice(card)
       && passesFoil(card)
       && passesSets(card)
@@ -594,6 +599,12 @@ export function useCardFilter<T extends FilterableCard>(
 
     // Advanced reset
     resetAdvancedFilters,
+
+    // Predicates (exposed so callers — e.g., DeckView/BinderView — can apply
+    // the same chip + advanced filter logic to a different card source than
+    // the one passed into useCardFilter, without re-implementing the rules).
+    passesChipFilters,
+    passesAdvancedFilters,
 
     // Translation
     translateCategory: translate,

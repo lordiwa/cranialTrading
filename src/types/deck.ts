@@ -40,6 +40,7 @@ export interface HydratedDeckCard {
     scryfallId: string
     name: string
     edition: string
+    setCode?: string          // Set code (for advanced filter "Sets")
     condition: CardCondition
     foil: boolean
     language?: string
@@ -49,6 +50,13 @@ export interface HydratedDeckCard {
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
     produced_mana?: string[]  // Colors of mana produced (for lands)
+    rarity?: string           // For chip rarity filter
+    power?: string            // For advanced power range filter
+    toughness?: string        // For advanced toughness range filter
+    oracle_text?: string      // For advanced keyword filter
+    keywords?: string[]       // For advanced keyword filter
+    legalities?: Record<string, string> // For advanced format filter
+    full_art?: boolean        // For advanced full-art filter
 
     // From DeckCardAllocation
     allocatedQuantity: number
@@ -68,6 +76,7 @@ export interface HydratedWishlistCard {
     scryfallId: string
     name: string
     edition: string
+    setCode?: string          // For advanced filter "Sets"
     condition: CardCondition
     foil: boolean
     language?: string
@@ -77,6 +86,13 @@ export interface HydratedWishlistCard {
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
     produced_mana?: string[]  // Colors of mana produced (for lands)
+    rarity?: string           // For chip rarity filter
+    power?: string            // For advanced power range filter
+    toughness?: string        // For advanced toughness range filter
+    oracle_text?: string      // For advanced keyword filter
+    keywords?: string[]       // For advanced keyword filter
+    legalities?: Record<string, string> // For advanced format filter
+    full_art?: boolean        // For advanced full-art filter
     requestedQuantity: number
     allocatedQuantity: number // Same as requestedQuantity (for unified access)
     isInSideboard: boolean

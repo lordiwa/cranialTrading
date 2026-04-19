@@ -20,6 +20,7 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
+import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import { type Card, type CardStatus } from '../types/card'
 import type { CreateDeckInput, DisplayDeckCard } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
@@ -27,7 +28,7 @@ import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
 import { type ScryfallCard, searchCards } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
-import { useCardFilter } from '../composables/useCardFilter'
+import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { useCollectionTotals } from '../composables/useCollectionTotals'
 import { useCollectionImport } from '../composables/useCollectionImport'
 import { useDeckDeletion } from '../composables/useDeckDeletion'
@@ -130,7 +131,9 @@ const deckWishlistCards = computed(() => {
 })
 
 // ========== CARD FILTER COMPOSABLE (deck cards) ==========
-// Deck view uses useCardFilter for text search / sort; chip filters are forwarded to DeckEditorGrid
+// Deck view uses useCardFilter for text search / sort + chip + advanced filter
+// state. Chip filters are forwarded to DeckEditorGrid; advanced filters are
+// applied at this level via passesAdvancedFilters before passing cards down.
 const {
   filterQuery,
   sortBy,
@@ -140,7 +143,108 @@ const {
   selectedManaValues,
   selectedTypes,
   selectedRarities,
+  // Advanced filter state
+  advPriceMin,
+  advPriceMax,
+  advFoilFilter,
+  advSelectedSets,
+  advSelectedKeywords,
+  advSelectedFormats,
+  advSelectedCreatureTypes,
+  advFullArtOnly,
+  advPowerMin,
+  advPowerMax,
+  advToughnessMin,
+  advToughnessMax,
+  advancedFilterCount,
+  collectionSets,
+  collectionCreatureTypes,
+  resetAdvancedFilters,
+  passesAdvancedFilters,
 } = useCardFilter(collectionCards)
+
+// ========== LOCAL FILTERS MODAL (full bridge — same UX as /search and CollectionView) ==========
+const showLocalFilters = ref(false)
+
+const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' }
+const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' }
+const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
+const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' }
+const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
+const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' }
+
+/* eslint-disable security/detect-object-injection */
+const localAdvancedFilters = computed<AdvancedFilters>(() => ({
+  colors: selectedColors.value.size < colorOrder.length
+    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
+    : [],
+  types: selectedTypes.value.size < typeOrder.length
+    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
+    : [],
+  manaValue: selectedManaValues.value.size < manaOrder.length
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
+    : { min: undefined, max: undefined, values: undefined },
+  rarity: selectedRarities.value.size < rarityOrder.length
+    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
+    : [],
+  sets: advSelectedSets.value,
+  power: { min: advPowerMin.value, max: advPowerMax.value },
+  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
+  formatLegal: advSelectedFormats.value,
+  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
+  keywords: advSelectedKeywords.value,
+  creatureTypes: advSelectedCreatureTypes.value,
+  isFoil: advFoilFilter.value === 'foil',
+  isFullArt: advFullArtOnly.value,
+}))
+/* eslint-enable security/detect-object-injection */
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
+const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
+  advSelectedSets.value = [...updated.sets]
+  advSelectedKeywords.value = [...updated.keywords]
+  advSelectedFormats.value = [...updated.formatLegal]
+  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])]
+  advPriceMin.value = updated.priceUSD.min
+  advPriceMax.value = updated.priceUSD.max
+  advPowerMin.value = updated.power.min
+  advPowerMax.value = updated.power.max
+  advToughnessMin.value = updated.toughness.min
+  advToughnessMax.value = updated.toughness.max
+  advFoilFilter.value = updated.isFoil ? 'foil' : 'any'
+  advFullArtOnly.value = updated.isFullArt
+  if (updated.manaValue.values?.length) {
+    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v))
+    selectedManaValues.value = new Set(mapped)
+  } else {
+    selectedManaValues.value = new Set(manaOrder)
+  }
+  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v)
+  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder)
+  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v)
+  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder)
+  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v)
+  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder)
+}
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (selectedColors.value.size < colorOrder.length) count++
+  if (selectedManaValues.value.size < manaOrder.length) count++
+  if (selectedTypes.value.size < typeOrder.length) count++
+  if (selectedRarities.value.size < rarityOrder.length) count++
+  count += advancedFilterCount.value
+  return count
+})
+
+const resetAllFilters = () => {
+  selectedColors.value = new Set(colorOrder)
+  selectedManaValues.value = new Set(manaOrder)
+  selectedTypes.value = new Set(typeOrder)
+  selectedRarities.value = new Set(rarityOrder)
+  resetAdvancedFilters()
+}
 
 // ========== DECK DISPLAY CARDS (hydration + filtering + counts + commander) ==========
 const {
@@ -161,6 +265,16 @@ const {
   collectionCards,
   filterQuery,
 })
+
+// Apply advanced filters (sets, price, power, toughness, format, keywords,
+// creature types, foil, full-art) on top of the text-filtered display cards.
+// Chip filters (colors/mana/types/rarity) are still applied inside DeckEditorGrid.
+const displayedMainboardCards = computed(() =>
+  filteredMainboardDisplayCards.value.filter(passesAdvancedFilters)
+)
+const displayedSideboardCards = computed(() =>
+  filteredSideboardDisplayCards.value.filter(passesAdvancedFilters)
+)
 
 // Deck size for the mana curve (mainboard owned + wishlist — sideboard EXCLUDED).
 // Matches the plan's locked decision: sideboard never contributes to curve/probability.
@@ -979,19 +1093,33 @@ onUnmounted(() => {
             view-mode="decks"
             :show-bulk-select="false"
             :show-view-type="false"
-            :active-filter-count="0"
+            :active-filter-count="activeFilterCount"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
+            @open-filters="showLocalFilters = true"
+        />
+
+        <AdvancedFilterModal
+            :show="showLocalFilters"
+            :filters="localAdvancedFilters"
+            mode="local"
+            :local-sets="collectionSets"
+            :local-creature-types="collectionCreatureTypes"
+            :exact-color-mode="exactColorMode"
+            @close="showLocalFilters = false"
+            @update:filters="handleLocalFiltersUpdate"
+            @update:exact-color-mode="exactColorMode = $event"
+            @reset="resetAllFilters"
         />
 
         <!-- ========== MAINBOARD GRID ========== -->
-        <div v-if="selectedDeck && filteredMainboardDisplayCards.length > 0" class="mb-6">
+        <div v-if="selectedDeck && displayedMainboardCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-neon">
             <h3 class="text-body font-bold text-neon">{{ t('collection.sections.mainboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ mainboardOwnedCount + mainboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid
-              :cards="filteredMainboardDisplayCards"
+              :cards="displayedMainboardCards"
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
@@ -1012,18 +1140,18 @@ onUnmounted(() => {
         </div>
 
         <!-- Sideboard separator -->
-        <div v-if="selectedDeck && !isCommanderFormat && filteredSideboardDisplayCards.length > 0" class="my-8">
+        <div v-if="selectedDeck && !isCommanderFormat && displayedSideboardCards.length > 0" class="my-8">
           <div class="border-t-2 border-dashed border-blue-400/50"></div>
         </div>
 
         <!-- ========== SIDEBOARD GRID ========== -->
-        <div v-if="selectedDeck && !isCommanderFormat && filteredSideboardDisplayCards.length > 0" class="mb-6">
+        <div v-if="selectedDeck && !isCommanderFormat && displayedSideboardCards.length > 0" class="mb-6">
           <div class="flex items-center gap-2 mb-3 pb-2 border-b border-blue-400/30">
             <h3 class="text-small font-bold text-blue-400">{{ t('collection.sections.sideboard') }}</h3>
             <span class="text-tiny text-silver-50">({{ sideboardOwnedCount + sideboardWishlistCount }} cartas)</span>
           </div>
           <DeckEditorGrid
-              :cards="filteredSideboardDisplayCards"
+              :cards="displayedSideboardCards"
               :deck-id="selectedDeck.id"
               :commander-names="commanderNames"
               :group-by="deckGroupBy"
@@ -1044,7 +1172,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Empty deck state -->
-        <div v-if="selectedDeck && filteredMainboardDisplayCards.length === 0 && filteredSideboardDisplayCards.length === 0" class="flex justify-center items-center h-64">
+        <div v-if="selectedDeck && displayedMainboardCards.length === 0 && displayedSideboardCards.length === 0" class="flex justify-center items-center h-64">
           <div class="text-center">
             <p class="text-small text-silver-70">{{ t('collection.empty.deckEmpty') }}</p>
             <p class="text-tiny text-silver-70 mt-1">{{ t('collection.empty.deckNoCards') }}</p>

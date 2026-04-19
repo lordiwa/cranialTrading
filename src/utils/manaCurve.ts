@@ -102,6 +102,13 @@ export interface BuildManaCurveOptions {
     deckSize: number
     landCount: number
     handSize?: number // default 7 — opening hand
+    /**
+     * When true, cards whose type_line is a pure Land (no `//` split indicator) are
+     * excluded from the per-bucket counts. MDFCs like `Valakut Awakening // Valakut
+     * Stoneforge` still show up because their back face is a castable spell.
+     * The hypergeom math (landCount, deckSize) is not affected by this flag.
+     */
+    excludePureLandsFromBuckets?: boolean
 }
 
 function isLandTypeLine(typeLine: string | undefined): boolean {
@@ -109,12 +116,18 @@ function isLandTypeLine(typeLine: string | undefined): boolean {
     return /\bland\b/i.test(typeLine)
 }
 
+/** A pure land is a land with no other face (no `//` split indicator in type_line). */
+function isPureLand(typeLine: string | undefined): boolean {
+    if (!isLandTypeLine(typeLine)) return false
+    return !(typeLine ?? '').includes('//')
+}
+
 export function buildManaCurve(
     cards: ManaCurveCardInput[],
     opts: BuildManaCurveOptions
 ): ManaCurveResult {
     const handSize = opts.handSize ?? 7
-    const { deckSize, landCount } = opts
+    const { deckSize, landCount, excludePureLandsFromBuckets } = opts
 
     // Aggregate counts per CMC bucket + compute total + max CMC
     const countsByCmc = new Map<number, number>()
@@ -122,6 +135,7 @@ export function buildManaCurve(
     let maxCmc = 0
 
     for (const card of cards) {
+        if (excludePureLandsFromBuckets && isPureLand(card.type_line)) continue
         const cmc = Number.isFinite(card.cmc) && card.cmc !== undefined ? Math.max(0, Math.floor(card.cmc)) : 0
         const qty = card.allocatedQuantity ?? 0
         if (qty <= 0) continue

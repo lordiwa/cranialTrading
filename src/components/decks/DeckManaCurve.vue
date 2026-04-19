@@ -37,6 +37,7 @@ const curve = computed(() =>
   buildManaCurve(curveInput.value, {
     deckSize: props.deckSize,
     landCount: landCount.value,
+    excludePureLandsFromBuckets: true,
   })
 )
 

@@ -180,4 +180,50 @@ describe('buildManaCurve', () => {
     // 0..7 inclusive = 8 buckets
     expect(result.buckets).toHaveLength(8)
   })
+
+  describe('excludePureLandsFromBuckets option', () => {
+    it('excludes pure lands from bucket 0 but keeps them in landCount', () => {
+      const cards = [
+        { cmc: 0, type_line: 'Basic Land — Forest', allocatedQuantity: 24 },
+        { cmc: 2, type_line: 'Creature — Elf', allocatedQuantity: 4 },
+      ]
+      const result = buildManaCurve(cards, { deckSize: 60, landCount: 24, excludePureLandsFromBuckets: true })
+      const bucket0 = result.buckets.find(b => b.cmc === 0)
+      expect(bucket0?.count).toBe(0)
+      expect(result.landCount).toBe(24)
+      expect(result.totalCards).toBe(4)
+    })
+
+    it('keeps MDFC spell/land cards (type_line contains "//") in the buckets', () => {
+      // e.g. Valakut Awakening // Valakut Stoneforge — front is Sorcery (cmc 3), back is Land
+      const cards = [
+        { cmc: 3, type_line: 'Sorcery // Land', allocatedQuantity: 2 },
+        { cmc: 0, type_line: 'Basic Land — Mountain', allocatedQuantity: 20 },
+      ]
+      const result = buildManaCurve(cards, { deckSize: 60, landCount: 22, excludePureLandsFromBuckets: true })
+      const bucket3 = result.buckets.find(b => b.cmc === 3)
+      expect(bucket3?.count).toBe(2)
+      const bucket0 = result.buckets.find(b => b.cmc === 0)
+      expect(bucket0?.count).toBe(0)
+    })
+
+    it('leaves cmc-0 non-land cards (e.g. Black Lotus) in bucket 0 when flag is on', () => {
+      const cards = [
+        { cmc: 0, type_line: 'Artifact', allocatedQuantity: 1 },
+        { cmc: 0, type_line: 'Basic Land — Island', allocatedQuantity: 10 },
+      ]
+      const result = buildManaCurve(cards, { deckSize: 60, landCount: 10, excludePureLandsFromBuckets: true })
+      const bucket0 = result.buckets.find(b => b.cmc === 0)
+      expect(bucket0?.count).toBe(1)
+    })
+
+    it('defaults to including lands in buckets when flag is omitted', () => {
+      const cards = [
+        { cmc: 0, type_line: 'Basic Land — Forest', allocatedQuantity: 24 },
+      ]
+      const result = buildManaCurve(cards, { deckSize: 60, landCount: 24 })
+      const bucket0 = result.buckets.find(b => b.cmc === 0)
+      expect(bucket0?.count).toBe(24)
+    })
+  })
 })

@@ -1159,13 +1159,12 @@ export const useCollectionStore = defineStore('collection', () => {
                 onProgress?.(Math.min(i + CHUNK_SIZE, cardsToSave.length), cardsToSave.length)
             }
 
-            // Push in-place so getCardById works for deck allocation
-            // shallowRef does NOT detect push — zero reactive cascade
-            // SCRUM-27: also syncIndexLocal + persistIndexToFirestore so the local
-            // index (and its Firestore blob) captures cmc/type_line/colors from the
-            // ImportCardData. Without this, the server-side buildCardIndex rebuild
-            // (triggered below) reads user docs whose cmc was filtered out by
-            // bulkImportCards' USER_CARD_FIELDS set — and pisa the blob with cm=0.
+            // SCRUM-27: collect new cards then reassign cards.value to trigger
+            // reactivity (shallowRef.push does NOT notify computeds/watchers).
+            // Also syncIndexLocal + persistIndexToFirestore so the local blob
+            // captures cmc/type_line/colors from the ImportCardData (otherwise
+            // cardToIndex reads stale local state and blob ends up with cm=0).
+            const newCards: Card[] = []
             for (let k = 0; k < createdIds.length; k++) {
                 // eslint-disable-next-line security/detect-object-injection
                 const cardId = createdIds[k]
@@ -1173,12 +1172,15 @@ export const useCollectionStore = defineStore('collection', () => {
                 const card = cardsToSave[k]
                 if (cardId && card) {
                     const newCard = { ...card, id: cardId, updatedAt: new Date(), createdAt: new Date() } as Card
-                    cards.value.push(newCard)
+                    newCards.push(newCard)
                     cardsById.set(cardId, newCard)
                     syncIndexLocal(newCard, 'add')
                 }
             }
-            persistIndexToFirestore()
+            if (newCards.length > 0) {
+                cards.value = [...cards.value, ...newCards]  // reactive trigger
+                persistIndexToFirestore()
+            }
 
             // SCRUM-27: server-side buildCardIndex removed here — it read user docs
             // whose cmc/type_line/colors are filtered out by bulkImportCards'

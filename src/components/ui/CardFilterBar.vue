@@ -18,11 +18,13 @@ const props = withDefaults(defineProps<{
   viewType?: 'visual' | 'texto'
   activeFilterCount?: number
   showSuggestions?: boolean
+  showDiscoverButton?: boolean
 }>(), {
   viewMode: 'collection',
   activeFilterCount: 0,
   showSuggestions: true,
   viewType: undefined,
+  showDiscoverButton: false,
 })
 
 const emit = defineEmits<{
@@ -34,6 +36,7 @@ const emit = defineEmits<{
   'select-local-card': [card: Card]
   'select-scryfall-card': [cardName: string]
   'open-filters': []
+  'request-discovery': []
 }>()
 
 const { t } = useI18n()
@@ -78,6 +81,17 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
           :aria-label="t('common.aria.toggleVisibility')"
       >
         <SvgIcon name="filter" size="small" />
+      </button>
+
+      <!-- Discover button (shown inline when any filter is active) -->
+      <button
+          v-if="showDiscoverButton && activeFilterCount > 0"
+          @click="emit('request-discovery')"
+          class="flex-shrink-0 h-[40px] px-3 flex items-center justify-center rounded border border-neon text-neon text-tiny font-bold hover:bg-neon hover:text-primary transition-colors"
+          :title="t('discovery.bar.discoverButton')"
+          data-testid="discover-button"
+      >
+        {{ t('discovery.bar.discoverButtonShort') }}
       </button>
 
       <div ref="wrapperRef" class="relative flex-1">

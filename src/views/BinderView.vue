@@ -16,12 +16,14 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
+import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
+import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import type { CreateBinderInput } from '../types/binder'
 import { type Card, type CardStatus } from '../types/card'
 import type { DisplayDeckCard } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
-import { type ScryfallCard, searchCards } from '../services/scryfallCache'
+import { type ScryfallCard } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
 import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
@@ -46,6 +48,10 @@ const showImportBinderModal = ref(false)
 
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
+
+// Discovery panel state (SCRUM-34)
+const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
+const discoveryTrigger = ref(0)
 
 // statusFilter + deckFilter unused in binder view but required by composable contracts
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
@@ -243,17 +249,36 @@ const quickAllocateCardToBinder = async (card: Card) => {
   }
 }
 
-const handleScryfallSuggestionSelect = async (cardName: string) => {
+const handleScryfallSuggestionSelect = (cardName: string) => {
   filterQuery.value = ''
-  try {
-    const results = await searchCards(`!"${cardName}"`)
-    if (results.length > 0) {
-      selectedScryfallCard.value = results[0]
-      showAddCardModal.value = true
-    }
-  } catch (err) {
-    console.error('Error searching card:', err)
-  }
+  discoveryVersionTrigger.value = { name: cardName, key: Date.now() }
+}
+
+const handleRequestDiscovery = () => {
+  discoveryTrigger.value = Date.now()
+}
+
+// Discovery panel add-card orchestration (SCRUM-34)
+const discoveryAdd = useDiscoveryAddCard('binders', {
+  collectionStore: {
+    addCard: collectionStore.addCard,
+    cards: computed(() => collectionStore.cards),
+  },
+  decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },
+  bindersStore: {
+    allocateCardToBinder: binderStore.allocateCardToBinder,
+    binders: computed(() => binderStore.binders),
+  },
+  toastStore: { show: (m, k) => toastStore.show(m, k ?? 'info') },
+  t,
+  selectedDeckId: computed(() => undefined),
+  selectedBinderId: computed(() => (binderFilter.value !== 'all' ? binderFilter.value : undefined)),
+})
+
+const handleDiscoveryAddBinder = (print: ScryfallCard) => { void discoveryAdd.addToBinder(print) }
+const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
+  selectedScryfallCard.value = print
+  showAddCardModal.value = true
 }
 
 const handleAddCardModalClose = () => {
@@ -785,9 +810,11 @@ onUnmounted(() => {
             :show-bulk-select="false"
             :show-view-type="false"
             :active-filter-count="activeFilterCount"
+            :show-discover-button="true"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
             @open-filters="showLocalFilters = true"
+            @request-discovery="handleRequestDiscovery"
         />
 
         <AdvancedFilterModal
@@ -801,6 +828,19 @@ onUnmounted(() => {
             @update:filters="handleLocalFiltersUpdate"
             @update:exact-color-mode="exactColorMode = $event"
             @reset="resetAllFilters"
+        />
+
+        <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
+        <DiscoveryPanel
+            scope="binders"
+            :selected-binder-id="binderFilter !== 'all' ? binderFilter : undefined"
+            :filters="localAdvancedFilters"
+            :collection-cards="collectionStore.cards"
+            :version-trigger="discoveryVersionTrigger"
+            :discover-trigger="discoveryTrigger"
+            @add-to-binder="handleDiscoveryAddBinder"
+            @open-add-modal="handleDiscoveryOpenAddModal"
+            @request-close="discoveryVersionTrigger = null"
         />
 
         <!-- ========== BINDER GRID ========== -->

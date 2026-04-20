@@ -22,12 +22,14 @@ import type { CreateDeckInput } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { type ScryfallCard, searchCards } from '../services/scryfallCache'
+import { type ScryfallCard } from '../services/scryfallCache'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
+import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
+import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
 import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
@@ -61,6 +63,10 @@ const totalsPanelExpanded = ref(false)
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
+
+// Discovery panel state (SCRUM-34)
+const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
+const discoveryTrigger = ref(0)
 
 // Filtros de COLECCIÓN
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
@@ -674,18 +680,39 @@ const handleLocalCardSelect = (card: Card) => {
   showCardDetailModal.value = true
 }
 
-// Click on Scryfall suggestion → search card and open AddCardModal
-const handleScryfallSuggestionSelect = async (cardName: string) => {
+// Click on Scryfall suggestion → open Discovery Panel in VERSION mode (SCRUM-34)
+const handleScryfallSuggestionSelect = (cardName: string) => {
   filterQuery.value = ''
-  try {
-    const results = await searchCards(`!"${cardName}"`)
-    if (results.length > 0) {
-      selectedScryfallCard.value = results[0]
-      showAddCardModal.value = true
-    }
-  } catch (err) {
-    console.error('Error searching card:', err)
-  }
+  discoveryVersionTrigger.value = { name: cardName, key: Date.now() }
+}
+
+const handleRequestDiscovery = () => {
+  discoveryTrigger.value = Date.now()
+}
+
+// Discovery panel add-card orchestration (SCRUM-34)
+const discoveryAdd = useDiscoveryAddCard('collection', {
+  collectionStore: {
+    addCard: collectionStore.addCard,
+    cards: computed(() => collectionStore.cards),
+  },
+  decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },
+  bindersStore: {
+    allocateCardToBinder: binderStore.allocateCardToBinder,
+    binders: computed(() => binderStore.binders),
+  },
+  toastStore: { show: (m, k) => toastStore.show(m, k ?? 'info') },
+  t,
+  selectedDeckId: computed(() => undefined),
+  selectedBinderId: computed(() => undefined),
+})
+
+const handleDiscoveryAddCollection = (print: ScryfallCard, status: CardStatus) => {
+  void discoveryAdd.addToCollection(print, status)
+}
+const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
+  selectedScryfallCard.value = print
+  showAddCardModal.value = true
 }
 
 // Cerrar modal de agregar carta y limpiar URL
@@ -990,11 +1017,13 @@ onUnmounted(() => {
             :show-view-type="true"
             :view-type="viewType"
             :active-filter-count="activeChipFilterCount"
+            :show-discover-button="true"
             @toggle-bulk-select="toggleSelectionMode"
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
             @open-filters="showLocalFilters = true"
+            @request-discovery="handleRequestDiscovery"
         />
 
         <AdvancedFilterModal
@@ -1008,6 +1037,19 @@ onUnmounted(() => {
             @update:filters="handleLocalFiltersUpdate"
             @update:exact-color-mode="exactColorMode = $event"
             @reset="resetAllChipFilters"
+        />
+
+        <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
+        <DiscoveryPanel
+            scope="collection"
+            :filters="localAdvancedFilters"
+            :collection-cards="collectionStore.cards"
+            :version-trigger="discoveryVersionTrigger"
+            :discover-trigger="discoveryTrigger"
+            :default-collection-status="statusFilter === 'all' || statusFilter === 'owned' || statusFilter === 'available' ? 'collection' : statusFilter"
+            @add-to-collection="handleDiscoveryAddCollection"
+            @open-add-modal="handleDiscoveryOpenAddModal"
+            @request-close="discoveryVersionTrigger = null"
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->

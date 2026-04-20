@@ -21,6 +21,8 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
+import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
+import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import { type Card, type CardStatus } from '../types/card'
 import type { CreateDeckInput, DisplayDeckCard } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
@@ -56,6 +58,10 @@ const showImportDeckModal = ref(false)
 
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
+
+// Discovery panel state (SCRUM-34)
+const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
+const discoveryTrigger = ref(0)
 
 // statusFilter and binderFilter are unused in this view but the composable contracts
 // require Refs — use local constants so URL sync / import still compiles cleanly.
@@ -387,17 +393,37 @@ const quickAllocateCardToDeck = async (card: Card) => {
   }
 }
 
-const handleScryfallSuggestionSelect = async (cardName: string) => {
+const handleScryfallSuggestionSelect = (cardName: string) => {
   filterQuery.value = ''
-  try {
-    const results = await searchCards(`!"${cardName}"`)
-    if (results.length > 0) {
-      selectedScryfallCard.value = results[0]
-      showAddCardModal.value = true
-    }
-  } catch (err) {
-    console.error('Error searching card:', err)
-  }
+  discoveryVersionTrigger.value = { name: cardName, key: Date.now() }
+}
+
+const handleRequestDiscovery = () => {
+  discoveryTrigger.value = Date.now()
+}
+
+// Discovery panel add-card orchestration
+const discoveryAdd = useDiscoveryAddCard('decks', {
+  collectionStore: {
+    addCard: collectionStore.addCard,
+    cards: computed(() => collectionStore.cards),
+  },
+  decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },
+  bindersStore: {
+    allocateCardToBinder: binderStore.allocateCardToBinder,
+    binders: computed(() => binderStore.binders),
+  },
+  toastStore: { show: (m, k) => toastStore.show(m, k ?? 'info') },
+  t,
+  selectedDeckId: computed(() => (deckFilter.value !== 'all' ? deckFilter.value : undefined)),
+  selectedBinderId: computed(() => undefined),
+})
+
+const handleDiscoveryAddMainboard = (print: ScryfallCard) => { void discoveryAdd.addToMainboard(print) }
+const handleDiscoveryAddSideboard = (print: ScryfallCard) => { void discoveryAdd.addToSideboard(print) }
+const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
+  selectedScryfallCard.value = print
+  showAddCardModal.value = true
 }
 
 const handleAddCardModalClose = () => {
@@ -1094,9 +1120,11 @@ onUnmounted(() => {
             :show-bulk-select="false"
             :show-view-type="false"
             :active-filter-count="activeFilterCount"
+            :show-discover-button="true"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
             @open-filters="showLocalFilters = true"
+            @request-discovery="handleRequestDiscovery"
         />
 
         <AdvancedFilterModal
@@ -1110,6 +1138,20 @@ onUnmounted(() => {
             @update:filters="handleLocalFiltersUpdate"
             @update:exact-color-mode="exactColorMode = $event"
             @reset="resetAllFilters"
+        />
+
+        <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
+        <DiscoveryPanel
+            scope="decks"
+            :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
+            :filters="localAdvancedFilters"
+            :collection-cards="collectionStore.cards"
+            :version-trigger="discoveryVersionTrigger"
+            :discover-trigger="discoveryTrigger"
+            @add-to-mainboard="handleDiscoveryAddMainboard"
+            @add-to-sideboard="handleDiscoveryAddSideboard"
+            @open-add-modal="handleDiscoveryOpenAddModal"
+            @request-close="discoveryVersionTrigger = null"
         />
 
         <!-- ========== MAINBOARD GRID ========== -->

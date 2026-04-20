@@ -20,6 +20,8 @@ interface Props {
   scryfallCard?: ScryfallCard
   selectedDeckId?: string
   selectedBinderId?: string
+  defaultStatus?: CardStatus
+  defaultFoil?: boolean
 }
 
 const props = defineProps<Props>()
@@ -119,10 +121,17 @@ const form = reactive<{
 }>({
   quantity: 1,
   condition: 'NM',
-  foil: false,
-  status: 'collection',
+  foil: props.defaultFoil ?? false,
+  status: props.defaultStatus ?? 'collection',
   deckName: '',
   public: true,
+})
+
+watch(() => props.show, (isOpen) => {
+  if (isOpen) {
+    if (props.defaultStatus !== undefined) form.status = props.defaultStatus
+    if (props.defaultFoil !== undefined) form.foil = props.defaultFoil
+  }
 })
 
 // ✅ NUEVO: Estado para controlar qué lado mostrar en split cards
@@ -357,8 +366,8 @@ onUnmounted(() => {
 const handleClose = () => {
   form.quantity = 1
   form.condition = 'NM'
-  form.foil = false
-  form.status = 'collection'
+  form.foil = props.defaultFoil ?? false
+  form.status = props.defaultStatus ?? 'collection'
   form.deckName = ''
   form.public = true
   cardFaceIndex.value = 0

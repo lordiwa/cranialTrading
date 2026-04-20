@@ -1,0 +1,145 @@
+import type { Ref } from 'vue'
+import type { Card, CardStatus } from '@/types/card'
+import type { ScryfallCard } from '@/services/scryfall'
+
+type DiscoveryScope = 'decks' | 'binders' | 'collection'
+
+interface DiscoveryAddDeps {
+  collectionStore: {
+    addCard: (data: Omit<Card, 'id' | 'updatedAt'>) => Promise<string | null>
+    cards: Ref<Card[]>
+  }
+  decksStore: {
+    allocateCardToDeck: (
+      deckId: string,
+      cardId: string,
+      quantity: number,
+      isInSideboard: boolean,
+    ) => Promise<{ allocated: number; wishlisted: number }>
+  }
+  bindersStore: {
+    allocateCardToBinder: (binderId: string, cardId: string, quantity: number) => Promise<number>
+    binders: Ref<{ id: string; forSale?: boolean }[]>
+  }
+  toastStore: { show: (msg: string, kind?: 'success' | 'error' | 'info') => void }
+  t: (key: string, params?: Record<string, string | number>) => string
+  selectedDeckId: Ref<string | undefined>
+  selectedBinderId: Ref<string | undefined>
+}
+
+interface AddResult {
+  ok: boolean
+}
+
+function scryfallToCardData(print: ScryfallCard, status: CardStatus): Omit<Card, 'id' | 'updatedAt'> {
+  const priceStr = print.prices?.usd
+  const price = priceStr ? Number.parseFloat(priceStr) || 0 : 0
+
+  const image = print.image_uris?.small ?? print.image_uris?.normal ?? ''
+
+  const data: Omit<Card, 'id' | 'updatedAt'> = {
+    scryfallId: print.id,
+    name: print.name,
+    edition: print.set_name,
+    quantity: 1,
+    condition: 'NM',
+    foil: false,
+    price,
+    image,
+    status,
+  }
+  if (print.set !== undefined) data.setCode = print.set
+  if (print.cmc !== undefined) data.cmc = print.cmc
+  if (print.type_line !== undefined) data.type_line = print.type_line
+  if (print.colors !== undefined) data.colors = print.colors
+  if (print.rarity !== undefined) data.rarity = print.rarity
+  if (print.power !== undefined) data.power = print.power
+  if (print.toughness !== undefined) data.toughness = print.toughness
+  if (print.oracle_text !== undefined) data.oracle_text = print.oracle_text
+  if (print.keywords !== undefined) data.keywords = print.keywords
+  if (print.legalities !== undefined) data.legalities = print.legalities
+  if (print.full_art !== undefined) data.full_art = print.full_art
+  if (print.produced_mana !== undefined) data.produced_mana = print.produced_mana
+  return data
+}
+
+function findExistingCard(cards: Card[], scryfallId: string, status: CardStatus): Card | undefined {
+  return cards.find(c =>
+    c.scryfallId === scryfallId &&
+    c.condition === 'NM' &&
+    !c.foil &&
+    c.status === status,
+  )
+}
+
+export function useDiscoveryAddCard(scope: DiscoveryScope, deps: DiscoveryAddDeps) {
+  const ensureCollectionCard = async (print: ScryfallCard, status: CardStatus): Promise<string | null> => {
+    const existing = findExistingCard(deps.collectionStore.cards.value, print.id, status)
+    if (existing) return existing.id
+    return deps.collectionStore.addCard(scryfallToCardData(print, status))
+  }
+
+  const addToMainboard = async (print: ScryfallCard): Promise<AddResult> => {
+    if (scope !== 'decks' || !deps.selectedDeckId.value) {
+      deps.toastStore.show(deps.t('discovery.messages.noActiveTarget'), 'info')
+      return { ok: false }
+    }
+    const cardId = await ensureCollectionCard(print, 'collection')
+    if (!cardId) return { ok: false }
+    const result = await deps.decksStore.allocateCardToDeck(deps.selectedDeckId.value, cardId, 1, false)
+    if (result.allocated === 0 && result.wishlisted === 0) {
+      deps.toastStore.show(deps.t('discovery.messages.addError'), 'error')
+      return { ok: false }
+    }
+    deps.toastStore.show(deps.t('discovery.messages.addedToMainboard', { name: print.name }), 'success')
+    return { ok: true }
+  }
+
+  const addToSideboard = async (print: ScryfallCard): Promise<AddResult> => {
+    if (scope !== 'decks' || !deps.selectedDeckId.value) {
+      deps.toastStore.show(deps.t('discovery.messages.noActiveTarget'), 'info')
+      return { ok: false }
+    }
+    const cardId = await ensureCollectionCard(print, 'collection')
+    if (!cardId) return { ok: false }
+    const result = await deps.decksStore.allocateCardToDeck(deps.selectedDeckId.value, cardId, 1, true)
+    if (result.allocated === 0 && result.wishlisted === 0) {
+      deps.toastStore.show(deps.t('discovery.messages.addError'), 'error')
+      return { ok: false }
+    }
+    deps.toastStore.show(deps.t('discovery.messages.addedToSideboard', { name: print.name }), 'success')
+    return { ok: true }
+  }
+
+  const addToBinder = async (print: ScryfallCard): Promise<AddResult> => {
+    if (scope !== 'binders' || !deps.selectedBinderId.value) {
+      deps.toastStore.show(deps.t('discovery.messages.noActiveTarget'), 'info')
+      return { ok: false }
+    }
+    const binder = deps.bindersStore.binders.value.find(b => b.id === deps.selectedBinderId.value)
+    const status: CardStatus = binder?.forSale ? 'sale' : 'collection'
+    const cardId = await ensureCollectionCard(print, status)
+    if (!cardId) return { ok: false }
+    const allocated = await deps.bindersStore.allocateCardToBinder(deps.selectedBinderId.value, cardId, 1)
+    if (allocated === 0) {
+      deps.toastStore.show(deps.t('discovery.messages.addError'), 'error')
+      return { ok: false }
+    }
+    deps.toastStore.show(deps.t('discovery.messages.addedToBinder', { name: print.name }), 'success')
+    return { ok: true }
+  }
+
+  const addToCollection = async (print: ScryfallCard, status: CardStatus): Promise<AddResult> => {
+    const cardId = await ensureCollectionCard(print, status)
+    if (!cardId) return { ok: false }
+    deps.toastStore.show(deps.t('discovery.messages.addedToCollection', { name: print.name }), 'success')
+    return { ok: true }
+  }
+
+  return {
+    addToMainboard,
+    addToSideboard,
+    addToBinder,
+    addToCollection,
+  }
+}

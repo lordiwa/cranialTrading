@@ -1388,6 +1388,49 @@
     }
   },
 
+  "discovery": {
+    "panel": {
+      "titleVersions": "VERSIONS",
+      "titleDiscover": "DISCOVER",
+      "subtitleVersions": "Pick the printing of {name}",
+      "subtitleDiscover": "Cards matching your filters",
+      "close": "Close",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "loadMore": "LOAD MORE",
+      "showingOf": "Showing {showing} of {total}",
+      "showingApprox": "Showing {showing} (page {page})",
+      "noResults": "No prints found",
+      "noFiltersResults": "No cards found with these filters",
+      "loading": "Loading…",
+      "error": "Error loading cards",
+      "owned": "x{count} owned",
+      "inMainboard": "IN MB ×{count}",
+      "inSideboard": "IN SB ×{count}",
+      "inBinder": "IN BINDER ×{count}"
+    },
+    "card": {
+      "addMainboard": "+ MB",
+      "addSideboard": "+ SB",
+      "addBinder": "+ ADD",
+      "addCollection": "+ ADD",
+      "moreOptions": "More options",
+      "statusLabel": "Status"
+    },
+    "bar": {
+      "discoverButton": "DISCOVER MORE",
+      "discoverButtonShort": "DISCOVER"
+    },
+    "messages": {
+      "addedToMainboard": "{name} added to mainboard",
+      "addedToSideboard": "{name} added to sideboard",
+      "addedToBinder": "{name} added to binder",
+      "addedToCollection": "{name} added to collection",
+      "addError": "Error adding card",
+      "noActiveTarget": "Select a deck or binder first"
+    }
+  },
+
   "search": {
     "view": {
       "title": "ADVANCED SEARCH",

@@ -1388,6 +1388,49 @@
     }
   },
 
+  "discovery": {
+    "panel": {
+      "titleVersions": "VERSIONES",
+      "titleDiscover": "DESCUBRIR",
+      "subtitleVersions": "Elige la impresión de {name}",
+      "subtitleDiscover": "Cartas que cumplen tus filtros",
+      "close": "Cerrar",
+      "collapse": "Plegar",
+      "expand": "Expandir",
+      "loadMore": "VER MÁS",
+      "showingOf": "Mostrando {showing} de {total}",
+      "showingApprox": "Mostrando {showing} (página {page})",
+      "noResults": "Sin impresiones",
+      "noFiltersResults": "No hay cartas con estos filtros",
+      "loading": "Cargando…",
+      "error": "Error cargando cartas",
+      "owned": "x{count} en colección",
+      "inMainboard": "EN MB ×{count}",
+      "inSideboard": "EN SB ×{count}",
+      "inBinder": "EN CARPETA ×{count}"
+    },
+    "card": {
+      "addMainboard": "+ MB",
+      "addSideboard": "+ SB",
+      "addBinder": "+ AGREGAR",
+      "addCollection": "+ AGREGAR",
+      "moreOptions": "Más opciones",
+      "statusLabel": "Estado"
+    },
+    "bar": {
+      "discoverButton": "DESCUBRIR MÁS",
+      "discoverButtonShort": "DESCUBRIR"
+    },
+    "messages": {
+      "addedToMainboard": "{name} agregada al mainboard",
+      "addedToSideboard": "{name} agregada al sideboard",
+      "addedToBinder": "{name} agregada a la carpeta",
+      "addedToCollection": "{name} agregada a la colección",
+      "addError": "Error agregando carta",
+      "noActiveTarget": "Selecciona un deck o carpeta primero"
+    }
+  },
+
   "search": {
     "view": {
       "title": "BÚSQUEDA AVANZADA",

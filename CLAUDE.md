@@ -454,6 +454,7 @@ Architecture not yet mapped. Follow existing patterns found in the codebase.
 | deploy-prod | Production deployment checklist — verify, merge develop to main, and push | `.claude/skills/deploy-prod/SKILL.md` |
 | frontend-design | Design thinking process and aesthetic guidelines for building visually distinctive frontend interfaces | `.claude/skills/frontend-design/SKILL.md` |
 | i18n-check | Verify all i18n keys exist in en.json, es.json, and pt.json locale files | `.claude/skills/i18n-check/SKILL.md` |
+| jira-pm | Manage Cranial Trading Jira tickets via Atlassian MCP — audit backlog, create/edit issues, import test plans, organize Epics, apply label conventions | `.claude/skills/jira-pm/SKILL.md` |
 | optimize-seo | Run an SEO audit via the seo agent, categorize findings, and generate an actionable implementation plan with optional fix execution | `.claude/skills/optimize-seo/SKILL.md` |
 | pr | Create a pull request with standard format from current branch to develop or main | `.claude/skills/pr/SKILL.md` |
 | tdd | Walk through the TDD workflow (red/green/refactor) for a given task | `.claude/skills/tdd/SKILL.md` |

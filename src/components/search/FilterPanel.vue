@@ -430,10 +430,10 @@ const getSetName = (code: string): string => code.toUpperCase()
           </button>
         </div>
 
-        <span class="text-silver-30">|</span>
+        <span v-if="!hideNameInput" class="text-silver-30">|</span>
 
-        <!-- Only Released checkbox -->
-        <label class="flex items-center gap-1 cursor-pointer">
+        <!-- Only Released checkbox (hidden when embedded to keep UI lean) -->
+        <label v-if="!hideNameInput" class="flex items-center gap-1 cursor-pointer">
           <input v-model="filters.onlyReleased" type="checkbox" class="w-4 h-4 accent-neon" />
           <span class="text-tiny text-silver-70">{{ t('search.filterPanel.onlyReleased') }}</span>
           <HelpTooltip :text="t('help.tooltips.search.onlyReleased')" :title="t('help.titles.onlyReleased')" />

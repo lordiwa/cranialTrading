@@ -6,6 +6,7 @@ import type { ScryfallCard } from '../../services/scryfall'
 import { useI18n } from '../../composables/useI18n'
 import { useDiscoveryPanel } from '../../composables/useDiscoveryPanel'
 import DiscoveryCard from './DiscoveryCard.vue'
+import FilterPanel from '../search/FilterPanel.vue'
 
 interface DisplayDeckCardLike {
   scryfallId?: string
@@ -17,18 +18,15 @@ const props = withDefaults(defineProps<{
   scope: 'decks' | 'binders' | 'collection'
   selectedDeckId?: string
   selectedBinderId?: string
-  filters: FilterOptions
+  searchQuery?: string
   collectionCards?: { scryfallId: string; quantity: number; status?: string }[]
   deckCards?: DisplayDeckCardLike[]
   binderCards?: DisplayDeckCardLike[]
-  autoDiscoveryThreshold?: number
   versionTrigger?: { name: string; key: number } | null
-  discoverTrigger?: number
   defaultCollectionStatus?: CardStatus
 }>(), {
-  autoDiscoveryThreshold: 12,
   versionTrigger: null,
-  discoverTrigger: 0,
+  searchQuery: '',
   collectionCards: () => [],
   deckCards: () => [],
   binderCards: () => [],
@@ -38,7 +36,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'card-added': [print: ScryfallCard, destination: string]
   'open-add-modal': [print: ScryfallCard]
-  'request-close': []
   'add-to-mainboard': [print: ScryfallCard]
   'add-to-sideboard': [print: ScryfallCard]
   'add-to-binder': [print: ScryfallCard]
@@ -52,12 +49,9 @@ const panel = useDiscoveryPanel(props.scope)
 const hasActiveDeck = computed(() => !!props.selectedDeckId)
 const hasActiveBinder = computed(() => !!props.selectedBinderId)
 
-const isOpen = computed(() => panel.mode.value !== 'idle')
-
 const title = computed(() => {
   if (panel.mode.value === 'version') return t('discovery.panel.titleVersions')
-  if (panel.mode.value === 'discovery') return t('discovery.panel.titleDiscover')
-  return ''
+  return t('discovery.panel.titleDiscover')
 })
 
 const subtitle = computed(() => {
@@ -68,27 +62,19 @@ const subtitle = computed(() => {
   return ''
 })
 
-// Watchers for external triggers
+// Version mode trigger — when a Scryfall suggestion is picked in CardFilterBar
 watch(() => props.versionTrigger, (trigger) => {
   if (trigger?.name) void panel.openVersionMode(trigger.name)
 }, { deep: true, immediate: true })
 
-watch(() => props.discoverTrigger, (v, prev) => {
-  if (v && v !== prev) void panel.openDiscoveryMode(props.filters)
-})
+// Embedded FilterPanel drives discovery via @search event
+const onDiscoverySearch = (filters: FilterOptions): void => {
+  void panel.openDiscoveryMode(filters)
+}
 
-// Auto-discovery when filters change + fewer local matches than threshold
-watch(() => props.filters, (f) => {
-  const localMatchCount = estimateLocalMatches()
-  panel.onFiltersChanged(f, localMatchCount, props.autoDiscoveryThreshold)
-}, { deep: true })
-
-function estimateLocalMatches(): number {
-  // Best-effort: if the caller can't filter locally, it passes a large collection.
-  // We don't have access to passesAdvancedFilters here, so the threshold is based
-  // on raw collection size. Discovery will still fire if fewer than threshold
-  // items exist in collection after *caller-side* filtering.
-  return props.collectionCards.length
+const onDiscoveryClear = (): void => {
+  // Clear results without hiding the panel (panel stays in 'discovery' mode).
+  void panel.openDiscoveryMode({})
 }
 
 const ownedCountMap = computed<Record<string, number>>(() => {
@@ -131,11 +117,6 @@ function inBinderCount(scryfallId: string): number {
   return n
 }
 
-const onClose = (): void => {
-  panel.close()
-  emit('request-close')
-}
-
 const onToggleCollapsed = (): void => { panel.toggleCollapsed(); }
 const onLoadMore = (): void => { void panel.loadMore() }
 
@@ -155,7 +136,6 @@ defineExpose({
 
 <template>
   <section
-    v-if="isOpen"
     class="discovery-panel border-2 border-neon/40 bg-secondary/40 rounded mb-3"
     :aria-label="title"
     data-testid="discovery-panel"
@@ -180,23 +160,26 @@ defineExpose({
         >
 {{ panel.collapsed.value ? '▾' : '▴' }}
 </button>
-        <button
-          type="button"
-          class="text-silver/70 hover:text-rust text-small px-1.5"
-          :aria-label="t('discovery.panel.close')"
-          @click="onClose"
-          data-testid="close"
-        >
-✕
-</button>
       </div>
     </header>
 
     <div
       v-if="!panel.collapsed.value"
-      class="overflow-y-auto max-h-[280px] md:max-h-[280px] p-2"
+      class="overflow-y-auto max-h-[480px] p-2"
       data-testid="body"
     >
+      <!-- Embedded FilterPanel — only in discovery mode (hidden while viewing a specific card's prints) -->
+      <FilterPanel
+        v-if="panel.mode.value !== 'version'"
+        :auto-search="false"
+        :sync-with-router="false"
+        :hide-name-input="true"
+        :external-name="searchQuery"
+        @search="onDiscoverySearch"
+        @clear="onDiscoveryClear"
+        class="mb-2"
+      />
+
       <div v-if="panel.loading.value && panel.results.value.length === 0" class="text-silver/70 text-small py-4 text-center" data-testid="loading">
         {{ t('discovery.panel.loading') }}
       </div>

@@ -472,7 +472,9 @@
       "texto": "Texto"
     },
     "group": {
-      "none": "Nenhum"
+      "none": "Nenhum",
+      "name": "Nome",
+      "prints": "{n} prints"
     },
     "sections": {
       "myCards": "CARTAS QUE TENHO",

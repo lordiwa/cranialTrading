@@ -34,22 +34,32 @@ vi.mock('../../../src/components/discovery/DiscoveryCard.vue', () => ({
   },
 }))
 
+// Stub the embedded FilterPanel — we only care about DiscoveryPanel's contract here
+vi.mock('../../../src/components/search/FilterPanel.vue', () => ({
+  default: {
+    name: 'FilterPanel',
+    template: '<div data-testid="filter-panel-stub"></div>',
+    props: ['autoSearch', 'syncWithRouter', 'hideNameInput', 'externalName'],
+    emits: ['search', 'clear'],
+  },
+}))
+
 describe('DiscoveryPanel', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
   })
 
-  it('does not render when mode is idle', () => {
+  it('renders panel even when there are no filters', () => {
     const wrapper = mount(DiscoveryPanel, {
-      props: { scope: 'decks', filters: {} },
+      props: { scope: 'decks' },
     })
-    expect(wrapper.find('[data-testid="discovery-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="discovery-panel"]').exists()).toBe(true)
   })
 
   it('opens in version mode when versionTrigger fires and renders results', async () => {
     const wrapper = mount(DiscoveryPanel, {
-      props: { scope: 'decks', filters: {}, versionTrigger: null },
+      props: { scope: 'decks', versionTrigger: null },
     })
 
     await wrapper.setProps({ versionTrigger: { name: 'Lightning Bolt', key: 1 } })
@@ -61,22 +71,18 @@ describe('DiscoveryPanel', () => {
     expect(wrapper.findAll('[data-testid="dcard"]').length).toBe(2)
   })
 
-  it('emits request-close and closes when ✕ clicked', async () => {
+  it('has no close (×) button — panel cannot be closed, only collapsed', async () => {
     const wrapper = mount(DiscoveryPanel, {
-      props: { scope: 'decks', filters: {}, versionTrigger: { name: 'Bolt', key: 1 } },
+      props: { scope: 'decks', versionTrigger: { name: 'Bolt', key: 1 } },
     })
     await new Promise(r => setTimeout(r, 0))
     await nextTick()
-
-    await wrapper.find('[data-testid="close"]').trigger('click')
-    expect(wrapper.emitted('request-close')).toBeTruthy()
-    await nextTick()
-    expect(wrapper.find('[data-testid="discovery-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="close"]').exists()).toBe(false)
   })
 
   it('collapses body when toggle clicked', async () => {
     const wrapper = mount(DiscoveryPanel, {
-      props: { scope: 'decks', filters: {}, versionTrigger: { name: 'Bolt', key: 1 } },
+      props: { scope: 'decks', versionTrigger: { name: 'Bolt', key: 1 } },
     })
     await new Promise(r => setTimeout(r, 0))
     await nextTick()
@@ -92,7 +98,6 @@ describe('DiscoveryPanel', () => {
       props: {
         scope: 'decks',
         selectedDeckId: 'deck-1',
-        filters: {},
         versionTrigger: { name: 'Bolt', key: 1 },
       },
     })
@@ -111,7 +116,7 @@ describe('DiscoveryPanel', () => {
 
   it('renders counter badge when results > 0', async () => {
     const wrapper = mount(DiscoveryPanel, {
-      props: { scope: 'decks', filters: {}, versionTrigger: { name: 'Bolt', key: 1 } },
+      props: { scope: 'decks', versionTrigger: { name: 'Bolt', key: 1 } },
     })
     await new Promise(r => setTimeout(r, 0))
     await nextTick()

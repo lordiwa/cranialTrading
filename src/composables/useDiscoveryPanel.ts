@@ -32,7 +32,7 @@ export function useDiscoveryPanel(_scope: DiscoveryScope, deps: DiscoveryPanelDe
   const pageSize = deps.pageSize ?? 175
   const maxPages = deps.maxPages ?? 3
 
-  const mode = ref<DiscoveryMode>('idle')
+  const mode = ref<DiscoveryMode>('discovery')
   const results = ref<ScryfallCard[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -94,12 +94,12 @@ export function useDiscoveryPanel(_scope: DiscoveryScope, deps: DiscoveryPanelDe
 
   const openDiscoveryMode = async (filters: FilterOptions): Promise<void> => {
     const query = buildQuery(filters)
-    if (!query.trim()) return
     const myRequest = ++requestId
     mode.value = 'discovery'
     versionCardName.value = null
     currentFilters = filters
     reset()
+    if (!query.trim()) return
     loading.value = true
     try {
       const res = await searchAdvancedFn(query, { unique: 'prints', order: 'released', dir: 'desc', page: 1 })

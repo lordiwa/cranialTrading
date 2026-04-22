@@ -27,7 +27,6 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
-import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
 import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
@@ -55,7 +54,9 @@ const showCreateDeckModal = ref(false)
 const showCreateBinderModal = ref(false)
 const createDeckModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
 const createBinderModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
-const showLocalFilters = ref(false)
+// Search text that drives ONLY the DiscoveryPanel (Scryfall search),
+// deliberately decoupled from the local grid so typing doesn't shrink the collection view.
+const discoverQuery = ref('')
 
 // Totals panel expanded state (for FAB positioning)
 const totalsPanelExpanded = ref(false)
@@ -66,7 +67,6 @@ const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 
 // Discovery panel state (SCRUM-34)
 const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
-const discoveryTrigger = ref(0)
 
 // Filtros de COLECCIÓN
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
@@ -180,23 +180,11 @@ const {
   filteredCards,
   groupedCards: groupedFilteredCards,
   translateCategory,
-  // Advanced filters
+  // Advanced filter state still consumed by useCollectionPagination's filterState
   advPriceMin,
   advPriceMax,
   advFoilFilter,
   advSelectedSets,
-  advSelectedKeywords,
-  advSelectedFormats,
-  advSelectedCreatureTypes,
-  advFullArtOnly,
-  advPowerMin,
-  advPowerMax,
-  advToughnessMin,
-  advToughnessMax,
-  advancedFilterCount,
-  collectionSets,
-  collectionCreatureTypes,
-  resetAdvancedFilters,
 } = useCardFilter(statusFilteredCards)
 
 // ========== URL FILTER SYNC (Plan 03-B, NICE-10) ==========
@@ -229,91 +217,9 @@ const { triggerQuery: triggerPaginationQuery } = useCollectionPagination({
   collectionStore,
 })
 
-// Bridge: individual refs <-> AdvancedFilters for the shared modal
-const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' }
-const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' }
-const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
-const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' }
-const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
-const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' }
-
-/* eslint-disable security/detect-object-injection */
-const localAdvancedFilters = computed<AdvancedFilters>(() => ({
-  colors: selectedColors.value.size < colorOrder.length
-    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
-    : [],
-  types: selectedTypes.value.size < typeOrder.length
-    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
-    : [],
-  manaValue: selectedManaValues.value.size < manaOrder.length
-    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
-    : { min: undefined, max: undefined, values: undefined },
-  rarity: selectedRarities.value.size < rarityOrder.length
-    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
-    : [],
-  sets: advSelectedSets.value,
-  power: { min: advPowerMin.value, max: advPowerMax.value },
-  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
-  formatLegal: advSelectedFormats.value,
-  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
-  keywords: advSelectedKeywords.value,
-  creatureTypes: advSelectedCreatureTypes.value,
-  isFoil: advFoilFilter.value === 'foil',
-  isFullArt: advFullArtOnly.value,
-}))
-/* eslint-enable security/detect-object-injection */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
-const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
-  advSelectedSets.value = [...updated.sets]
-  advSelectedKeywords.value = [...updated.keywords]
-  advSelectedFormats.value = [...updated.formatLegal]
-  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])]
-  advPriceMin.value = updated.priceUSD.min
-  advPriceMax.value = updated.priceUSD.max
-  advPowerMin.value = updated.power.min
-  advPowerMax.value = updated.power.max
-  advToughnessMin.value = updated.toughness.min
-  advToughnessMax.value = updated.toughness.max
-  advFoilFilter.value = updated.isFoil ? 'foil' : 'any'
-  advFullArtOnly.value = updated.isFullArt
-  if (updated.manaValue.values?.length) {
-    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v))
-    selectedManaValues.value = new Set(mapped)
-  } else {
-    selectedManaValues.value = new Set(manaOrder)
-  }
-  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v)
-  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder)
-  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v)
-  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder)
-  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v)
-  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder)
-}
-/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
-
-// Active chip filter count for badge
-const activeChipFilterCount = computed(() => {
-  let count = 0
-  if (selectedColors.value.size < colorOrder.length) count++
-  if (selectedManaValues.value.size < manaOrder.length) count++
-  if (selectedTypes.value.size < typeOrder.length) count++
-  if (selectedRarities.value.size < rarityOrder.length) count++
-  count += advancedFilterCount.value
-  return count
-})
-
-const resetAllChipFilters = () => {
-  selectedColors.value = new Set(colorOrder)
-  selectedManaValues.value = new Set(manaOrder)
-  selectedTypes.value = new Set(typeOrder)
-  selectedRarities.value = new Set(rarityOrder)
-  resetAdvancedFilters()
-}
-
 const clearAllFilters = () => {
+  discoverQuery.value = ''
   filterQuery.value = ''
-  resetAllChipFilters()
 }
 
 // Paginated cards for collection view
@@ -351,6 +257,7 @@ const getCardCategory = (card: Card): string => {
     case 'mana': return getCardManaCategory(card)
     case 'color': return getCardColorCategory(card)
     case 'type': return getCardTypeCategory(card)
+    case 'name': return card.name ?? 'Unknown'
     default: return 'all'
   }
 }
@@ -390,10 +297,11 @@ const groupedWishlistCards = computed(() => {
       sortedGroups.push({ type: category, cards: group })
     }
   }
-  for (const category in groups) {
+  const remaining = Object.keys(groups).filter(c => !order.includes(c)).sort((a, b) => a.localeCompare(b))
+  for (const category of remaining) {
     // eslint-disable-next-line security/detect-object-injection
     const group = groups[category]
-    if (!order.includes(category) && group && group.length > 0) {
+    if (group && group.length > 0) {
       sortedGroups.push({ type: category, cards: group })
     }
   }
@@ -673,21 +581,14 @@ const handleCreateBinder = async (data: CreateBinderInput) => {
 
 // ========== METHODS ==========
 
-// Click on local card suggestion
+// Click on local card suggestion → feed its name to the search input so Discovery searches it
 const handleLocalCardSelect = (card: Card) => {
-  filterQuery.value = ''
-  selectedCard.value = card
-  showCardDetailModal.value = true
+  discoverQuery.value = card.name
 }
 
-// Click on Scryfall suggestion → open Discovery Panel in VERSION mode (SCRUM-34)
+// Click on Scryfall suggestion → place text in the search input so the DiscoveryPanel picks it up
 const handleScryfallSuggestionSelect = (cardName: string) => {
-  filterQuery.value = ''
-  discoveryVersionTrigger.value = { name: cardName, key: Date.now() }
-}
-
-const handleRequestDiscovery = () => {
-  discoveryTrigger.value = Date.now()
+  discoverQuery.value = cardName
 }
 
 // Discovery panel add-card orchestration (SCRUM-34)
@@ -1008,7 +909,7 @@ onUnmounted(() => {
 
         <!-- ========== SEARCH + SORT + VIEW ========== -->
         <CardFilterBar
-            v-model:filter-query="filterQuery"
+            v-model:filter-query="discoverQuery"
             v-model:sort-by="sortBy"
             v-model:group-by="collectionGroupBy"
             view-mode="collection"
@@ -1016,40 +917,21 @@ onUnmounted(() => {
             :selection-mode="selectionMode"
             :show-view-type="true"
             :view-type="viewType"
-            :active-filter-count="activeChipFilterCount"
-            :show-discover-button="true"
             @toggle-bulk-select="toggleSelectionMode"
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
-            @open-filters="showLocalFilters = true"
-            @request-discovery="handleRequestDiscovery"
-        />
-
-        <AdvancedFilterModal
-            :show="showLocalFilters"
-            :filters="localAdvancedFilters"
-            mode="local"
-            :local-sets="collectionSets"
-            :local-creature-types="collectionCreatureTypes"
-            :exact-color-mode="exactColorMode"
-            @close="showLocalFilters = false"
-            @update:filters="handleLocalFiltersUpdate"
-            @update:exact-color-mode="exactColorMode = $event"
-            @reset="resetAllChipFilters"
         />
 
         <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
         <DiscoveryPanel
             scope="collection"
-            :filters="localAdvancedFilters"
+            :search-query="discoverQuery"
             :collection-cards="collectionStore.cards"
             :version-trigger="discoveryVersionTrigger"
-            :discover-trigger="discoveryTrigger"
             :default-collection-status="statusFilter === 'all' || statusFilter === 'owned' || statusFilter === 'available' ? 'collection' : statusFilter"
             @add-to-collection="handleDiscoveryAddCollection"
             @open-add-modal="handleDiscoveryOpenAddModal"
-            @request-close="discoveryVersionTrigger = null"
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->
@@ -1100,7 +982,10 @@ onUnmounted(() => {
           <div v-for="group in groupedFilteredCards" :key="group.type" class="mb-6">
             <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-silver-20">
               <h4 class="text-tiny font-bold text-neon uppercase">{{ translateCategory(group.type) }}</h4>
-              <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+              <span v-if="collectionGroupBy === 'name'" class="text-tiny text-silver-50">
+                ({{ t('collection.group.prints', { n: group.cards.length }) }})
+              </span>
+              <span v-else class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
             </div>
             <CollectionGrid
                 :cards="group.type === 'all' ? collectionDisplayCards : group.cards"
@@ -1127,7 +1012,10 @@ onUnmounted(() => {
           <div v-for="group in groupedWishlistCards" :key="group.type" class="mb-6">
             <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-400/30">
               <h4 class="text-tiny font-bold text-yellow-400 uppercase">{{ translateCategory(group.type) }}</h4>
-              <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
+              <span v-if="collectionGroupBy === 'name'" class="text-tiny text-silver-50">
+                ({{ t('collection.group.prints', { n: group.cards.length }) }})
+              </span>
+              <span v-else class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
             </div>
             <CollectionGrid
                 :cards="group.cards"

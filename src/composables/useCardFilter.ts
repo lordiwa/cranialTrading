@@ -55,6 +55,10 @@ export const getCardTypeCategory = (card: FilterableCard): string => {
   return 'Other'
 }
 
+export const getCardNameCategory = (card: FilterableCard): string => {
+  return card.name ?? 'Unknown'
+}
+
 export const getCardManaCategory = (card: FilterableCard): string => {
   const typeLine = card.type_line?.toLowerCase() ?? ''
   if (typeLine.includes('land')) return 'Lands'
@@ -194,7 +198,7 @@ export function useCardFilter<T extends FilterableCard>(
   })
 
   const sortBy = ref<'recent' | 'name' | 'price'>('recent')
-  const groupBy = ref<'none' | 'type' | 'mana' | 'color'>('none')
+  const groupBy = ref<'none' | 'type' | 'mana' | 'color' | 'name'>('none')
 
   const selectedColors = ref<Set<string>>(new Set(colorOrder))
   const exactColorMode = ref(false)
@@ -486,6 +490,7 @@ export function useCardFilter<T extends FilterableCard>(
       case 'mana': return getCardManaCategory(card)
       case 'color': return getCardColorCategory(card)
       case 'type': return getCardTypeCategory(card)
+      case 'name': return getCardNameCategory(card)
       default: return 'all'
     }
   }
@@ -536,11 +541,13 @@ export function useCardFilter<T extends FilterableCard>(
         sortedGroups.push({ type: category, cards: group })
       }
     }
-    // Any categories not in the predefined order
-    for (const category in groups) {
+    // Any categories not in the predefined order (sorted alphabetically so
+    // open-ended groupings like 'name' have a deterministic display order).
+    const remaining = Object.keys(groups).filter(c => !order.includes(c)).sort((a, b) => a.localeCompare(b))
+    for (const category of remaining) {
       // eslint-disable-next-line security/detect-object-injection
       const group = groups[category]
-      if (!order.includes(category) && group && group.length > 0) {
+      if (group && group.length > 0) {
         sortedGroups.push({ type: category, cards: group })
       }
     }

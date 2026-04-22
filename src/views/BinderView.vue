@@ -15,7 +15,6 @@ import BaseButton from '../components/ui/BaseButton.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
-import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
 import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import type { CreateBinderInput } from '../types/binder'
@@ -25,7 +24,7 @@ import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { type ScryfallCard } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
-import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
+import { useCardFilter } from '../composables/useCardFilter'
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
 import { useCollectionImport } from '../composables/useCollectionImport'
 
@@ -51,7 +50,6 @@ const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 
 // Discovery panel state (SCRUM-34)
 const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
-const discoveryTrigger = ref(0)
 
 // statusFilter + deckFilter unused in binder view but required by composable contracts
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
@@ -100,7 +98,6 @@ const {
 
 // ========== CARD FILTER COMPOSABLE ==========
 const {
-  filterQuery,
   sortBy,
   groupBy: deckGroupBy,
   selectedColors,
@@ -108,119 +105,15 @@ const {
   selectedManaValues,
   selectedTypes,
   selectedRarities,
-  // Advanced filter state
-  advPriceMin,
-  advPriceMax,
-  advFoilFilter,
-  advSelectedSets,
-  advSelectedKeywords,
-  advSelectedFormats,
-  advSelectedCreatureTypes,
-  advFullArtOnly,
-  advPowerMin,
-  advPowerMax,
-  advToughnessMin,
-  advToughnessMax,
-  advancedFilterCount,
-  collectionSets,
-  collectionCreatureTypes,
-  resetAdvancedFilters,
   passesAdvancedFilters,
 } = useCardFilter(collectionCards)
 
-// ========== LOCAL FILTERS MODAL (full bridge — same UX as /search and CollectionView) ==========
-const showLocalFilters = ref(false)
+// Search text bound to CardFilterBar + DiscoveryPanel only; decoupled from the binder grid.
+const discoverQuery = ref('')
 
-const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' }
-const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' }
-const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
-const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' }
-const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
-const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' }
-
-/* eslint-disable security/detect-object-injection */
-const localAdvancedFilters = computed<AdvancedFilters>(() => ({
-  colors: selectedColors.value.size < colorOrder.length
-    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
-    : [],
-  types: selectedTypes.value.size < typeOrder.length
-    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
-    : [],
-  manaValue: selectedManaValues.value.size < manaOrder.length
-    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
-    : { min: undefined, max: undefined, values: undefined },
-  rarity: selectedRarities.value.size < rarityOrder.length
-    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
-    : [],
-  sets: advSelectedSets.value,
-  power: { min: advPowerMin.value, max: advPowerMax.value },
-  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
-  formatLegal: advSelectedFormats.value,
-  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
-  keywords: advSelectedKeywords.value,
-  creatureTypes: advSelectedCreatureTypes.value,
-  isFoil: advFoilFilter.value === 'foil',
-  isFullArt: advFullArtOnly.value,
-}))
-/* eslint-enable security/detect-object-injection */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
-const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
-  advSelectedSets.value = [...updated.sets]
-  advSelectedKeywords.value = [...updated.keywords]
-  advSelectedFormats.value = [...updated.formatLegal]
-  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])]
-  advPriceMin.value = updated.priceUSD.min
-  advPriceMax.value = updated.priceUSD.max
-  advPowerMin.value = updated.power.min
-  advPowerMax.value = updated.power.max
-  advToughnessMin.value = updated.toughness.min
-  advToughnessMax.value = updated.toughness.max
-  advFoilFilter.value = updated.isFoil ? 'foil' : 'any'
-  advFullArtOnly.value = updated.isFullArt
-  if (updated.manaValue.values?.length) {
-    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v))
-    selectedManaValues.value = new Set(mapped)
-  } else {
-    selectedManaValues.value = new Set(manaOrder)
-  }
-  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v)
-  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder)
-  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v)
-  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder)
-  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v)
-  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder)
-}
-/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
-
-const activeFilterCount = computed(() => {
-  let count = 0
-  if (selectedColors.value.size < colorOrder.length) count++
-  if (selectedManaValues.value.size < manaOrder.length) count++
-  if (selectedTypes.value.size < typeOrder.length) count++
-  if (selectedRarities.value.size < rarityOrder.length) count++
-  count += advancedFilterCount.value
-  return count
-})
-
-const resetAllFilters = () => {
-  selectedColors.value = new Set(colorOrder)
-  selectedManaValues.value = new Set(manaOrder)
-  selectedTypes.value = new Set(typeOrder)
-  selectedRarities.value = new Set(rarityOrder)
-  resetAdvancedFilters()
-}
-
-// Text-search filtered + advanced-filter applied
+// Advanced-filter predicate still runs (chip state stays neutral since the filter button was removed).
 const filteredBinderDisplayCards = computed(() => {
-  let result = binderDisplayCards.value
-  if (filterQuery.value.trim()) {
-    const q = filterQuery.value.toLowerCase()
-    result = result.filter(c =>
-      c.name.toLowerCase().includes(q) || c.edition.toLowerCase().includes(q)
-    )
-  }
-  return result.filter(passesAdvancedFilters)
+  return binderDisplayCards.value.filter(passesAdvancedFilters)
 })
 
 const fabBottomStyle = computed(() => {
@@ -231,31 +124,11 @@ const fabBottomStyle = computed(() => {
 // ========== METHODS ==========
 
 const handleLocalCardSelect = (card: Card) => {
-  if (binderFilter.value !== 'all') {
-    filterQuery.value = ''
-    void quickAllocateCardToBinder(card)
-  } else {
-    filterQuery.value = ''
-    selectedCard.value = card
-    showCardDetailModal.value = true
-  }
-}
-
-const quickAllocateCardToBinder = async (card: Card) => {
-  if (binderFilter.value === 'all') return
-  const allocated = await binderStore.allocateCardToBinder(binderFilter.value, card.id, 1)
-  if (allocated > 0) {
-    toastStore.show(t('binders.cardAdded'), 'success')
-  }
+  discoverQuery.value = card.name
 }
 
 const handleScryfallSuggestionSelect = (cardName: string) => {
-  filterQuery.value = ''
-  discoveryVersionTrigger.value = { name: cardName, key: Date.now() }
-}
-
-const handleRequestDiscovery = () => {
-  discoveryTrigger.value = Date.now()
+  discoverQuery.value = cardName
 }
 
 // Discovery panel add-card orchestration (SCRUM-34)
@@ -803,44 +676,25 @@ onUnmounted(() => {
 
         <!-- ========== SEARCH ========== -->
         <CardFilterBar
-            v-model:filter-query="filterQuery"
+            v-model:filter-query="discoverQuery"
             v-model:sort-by="sortBy"
             v-model:group-by="deckGroupBy"
             view-mode="binders"
             :show-bulk-select="false"
             :show-view-type="false"
-            :active-filter-count="activeFilterCount"
-            :show-discover-button="true"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
-            @open-filters="showLocalFilters = true"
-            @request-discovery="handleRequestDiscovery"
-        />
-
-        <AdvancedFilterModal
-            :show="showLocalFilters"
-            :filters="localAdvancedFilters"
-            mode="local"
-            :local-sets="collectionSets"
-            :local-creature-types="collectionCreatureTypes"
-            :exact-color-mode="exactColorMode"
-            @close="showLocalFilters = false"
-            @update:filters="handleLocalFiltersUpdate"
-            @update:exact-color-mode="exactColorMode = $event"
-            @reset="resetAllFilters"
         />
 
         <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
         <DiscoveryPanel
             scope="binders"
             :selected-binder-id="binderFilter !== 'all' ? binderFilter : undefined"
-            :filters="localAdvancedFilters"
+            :search-query="discoverQuery"
             :collection-cards="collectionStore.cards"
             :version-trigger="discoveryVersionTrigger"
-            :discover-trigger="discoveryTrigger"
             @add-to-binder="handleDiscoveryAddBinder"
             @open-add-modal="handleDiscoveryOpenAddModal"
-            @request-close="discoveryVersionTrigger = null"
         />
 
         <!-- ========== BINDER GRID ========== -->

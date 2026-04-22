@@ -16,7 +16,7 @@ const props = defineProps<{
   deckId: string
   commanderNames?: string[]
   binderMode?: boolean
-  groupBy?: 'none' | 'type' | 'mana' | 'color'
+  groupBy?: 'none' | 'type' | 'mana' | 'color' | 'name'
   sortBy?: 'recent' | 'name' | 'price'
   selectedColors?: Set<string>
   exactColorMode?: boolean
@@ -103,6 +103,7 @@ const getCategory = (card: DisplayDeckCard): string => {
   switch (props.groupBy) {
     case 'mana': return getManaCategory(card)
     case 'color': return getColorCategory(card)
+    case 'name': return card.name ?? 'Unknown'
     default: return getTypeCategory(card)
   }
 }
@@ -112,6 +113,7 @@ const getCategoryOrder = (): string[] => {
   switch (props.groupBy) {
     case 'mana': return deckManaOrder
     case 'color': return deckColorOrder
+    case 'name': return []
     default: return deckTypeOrder
   }
 }

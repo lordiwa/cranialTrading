@@ -11,6 +11,23 @@ import SvgIcon from '../ui/SvgIcon.vue'
 import ManaIcon from '../ui/ManaIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 
+const props = withDefaults(defineProps<{
+  autoSearch?: boolean
+  syncWithRouter?: boolean
+  hideNameInput?: boolean
+  externalName?: string
+}>(), {
+  autoSearch: true,
+  syncWithRouter: true,
+  hideNameInput: false,
+  externalName: undefined,
+})
+
+const emit = defineEmits<{
+  'search': [filters: FilterOptions]
+  'clear': []
+}>()
+
 const route = useRoute()
 const { t } = useI18n()
 const searchStore = useSearchStore()
@@ -156,14 +173,34 @@ const handleClickOutside = (e: MouseEvent) => {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  // If URL has ?q= param, populate the name filter and search
-  const q = route.query.q
-  if (q && typeof q === 'string' && q.trim()) {
-    filters.name = q.trim()
+  if (props.syncWithRouter) {
+    // If URL has ?q= param, populate the name filter and search
+    const q = route.query.q
+    if (q && typeof q === 'string' && q.trim()) {
+      filters.name = q.trim()
+      void handleSearch()
+    }
+  }
+  if (props.externalName?.trim()) {
+    filters.name = props.externalName.trim()
     void handleSearch()
   }
 })
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
+
+// Sync externalName → filters.name (debounced by the auto-search watcher downstream)
+watch(() => props.externalName, (val) => {
+  const next = (val ?? '').trim()
+  if (next === (filters.name ?? '').trim()) return
+  filters.name = next
+  // Use the debounce-aware flow: any non-empty name triggers a search through handleSearch,
+  // and an empty name clears it.
+  if (next) {
+    void handleSearch()
+  } else if (!props.autoSearch) {
+    emit('clear')
+  }
+})
 
 // Opciones predefinidas
 const colorOptions = [
@@ -218,14 +255,22 @@ const toggleRarity = (rarity: string) => {
 const handleSearch = async () => {
   suppressSuggestions.value = true
   showSuggestions.value = false
-  await searchStore.search(filters)
+  if (props.autoSearch) {
+    await searchStore.search(filters)
+  } else {
+    emit('search', { ...filters })
+  }
 }
 
 const handleClear = () => {
   filters.name = ''
   handleAdvancedReset()
   filters.onlyReleased = true
-  searchStore.clearSearch()
+  if (props.autoSearch) {
+    searchStore.clearSearch()
+  } else {
+    emit('clear')
+  }
 }
 
 // Contar filtros activos
@@ -278,8 +323,8 @@ const getSetName = (code: string): string => code.toUpperCase()
   <div class="space-y-4">
     <!-- ========== BARRA DE BÚSQUEDA HORIZONTAL ========== -->
     <div class="bg-primary border border-silver-30 p-4 rounded-md">
-      <!-- Fila 1: Input + Botón Buscar -->
-      <div class="flex gap-3 mb-4">
+      <!-- Fila 1: Input + Botón Buscar (oculto en modo embebido si hideNameInput) -->
+      <div v-if="!hideNameInput" class="flex gap-3 mb-4">
         <div ref="nameInputContainer" class="relative flex-1">
           <input
               :value="filters.name"

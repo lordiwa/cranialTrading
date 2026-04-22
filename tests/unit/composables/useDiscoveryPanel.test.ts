@@ -38,9 +38,9 @@ describe('useDiscoveryPanel', () => {
   })
 
   describe('initial state', () => {
-    it('starts in idle mode with no results', () => {
+    it('starts in discovery mode with no results', () => {
       const panel = useDiscoveryPanel('decks', makeDeps())
-      expect(panel.mode.value).toBe('idle')
+      expect(panel.mode.value).toBe('discovery')
       expect(panel.results.value).toEqual([])
       expect(panel.loading.value).toBe(false)
       expect(panel.page.value).toBe(1)
@@ -116,14 +116,15 @@ describe('useDiscoveryPanel', () => {
       expect(panel.hasMore.value).toBe(false)
     })
 
-    it('does nothing when filters produce empty query string', async () => {
+    it('skips the fetch when filters produce empty query string but keeps discovery mode', async () => {
       const deps = makeDeps()
       const panel = useDiscoveryPanel('decks', deps)
 
       await panel.openDiscoveryMode({})
 
       expect(deps.searchAdvanced).not.toHaveBeenCalled()
-      expect(panel.mode.value).toBe('idle')
+      expect(panel.mode.value).toBe('discovery')
+      expect(panel.results.value).toEqual([])
     })
   })
 
@@ -218,7 +219,7 @@ describe('useDiscoveryPanel', () => {
       await vi.runAllTimersAsync()
 
       expect(deps.searchAdvanced).not.toHaveBeenCalled()
-      expect(panel.mode.value).toBe('idle')
+      expect(panel.mode.value).toBe('discovery')
     })
 
     it('triggers discovery after debounce when localMatchCount < threshold', async () => {
@@ -278,7 +279,7 @@ describe('useDiscoveryPanel', () => {
 
       await panelA.openVersionMode('Bolt')
       expect(panelA.mode.value).toBe('version')
-      expect(panelB.mode.value).toBe('idle')
+      expect(panelB.mode.value).toBe('discovery')
     })
   })
 })

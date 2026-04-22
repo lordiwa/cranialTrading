@@ -285,3 +285,60 @@ describe('filterQuery debounce', () => {
     scope.stop()
   })
 })
+
+describe("groupedCards with groupBy='name'", () => {
+  it('groups cards with the same name into a single group regardless of edition', () => {
+    const cards = ref([
+      makeFilterableCard({ name: 'Lightning Bolt', edition: 'Limited Edition Alpha', setCode: 'LEA' }),
+      makeFilterableCard({ name: 'Lightning Bolt', edition: 'Magic 2011', setCode: 'M11' }),
+      makeFilterableCard({ name: 'Counterspell', edition: 'Modern Horizons 2', setCode: 'MH2' }),
+    ])
+
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(cards))!
+    result.groupBy.value = 'name'
+
+    const groups = result.groupedCards.value
+    expect(groups).toHaveLength(2)
+
+    const bolt = groups.find(g => g.type === 'Lightning Bolt')
+    expect(bolt).toBeDefined()
+    expect(bolt!.cards).toHaveLength(2)
+
+    const counter = groups.find(g => g.type === 'Counterspell')
+    expect(counter).toBeDefined()
+    expect(counter!.cards).toHaveLength(1)
+    scope.stop()
+  })
+
+  it('orders name groups alphabetically', () => {
+    const cards = ref([
+      makeFilterableCard({ name: 'Lightning Bolt', edition: 'M11' }),
+      makeFilterableCard({ name: 'Ancestral Recall', edition: 'LEA' }),
+      makeFilterableCard({ name: 'Counterspell', edition: 'MH2' }),
+    ])
+
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(cards))!
+    result.groupBy.value = 'name'
+
+    const names = result.groupedCards.value.map(g => g.type)
+    expect(names).toEqual(['Ancestral Recall', 'Counterspell', 'Lightning Bolt'])
+    scope.stop()
+  })
+
+  it('returns a single all-group when groupBy is none', () => {
+    const cards = ref([
+      makeFilterableCard({ name: 'Lightning Bolt' }),
+      makeFilterableCard({ name: 'Lightning Bolt' }),
+    ])
+
+    const scope = effectScope()
+    const result = scope.run(() => useCardFilter(cards))!
+    // Default is 'none'
+    expect(result.groupedCards.value).toHaveLength(1)
+    expect(result.groupedCards.value[0].type).toBe('all')
+    expect(result.groupedCards.value[0].cards).toHaveLength(2)
+    scope.stop()
+  })
+})

@@ -16,15 +16,11 @@ const props = withDefaults(defineProps<{
   selectionMode?: boolean
   showViewType?: boolean
   viewType?: 'visual' | 'texto'
-  activeFilterCount?: number
   showSuggestions?: boolean
-  showDiscoverButton?: boolean
 }>(), {
   viewMode: 'collection',
-  activeFilterCount: 0,
   showSuggestions: true,
   viewType: undefined,
-  showDiscoverButton: false,
 })
 
 const emit = defineEmits<{
@@ -35,8 +31,6 @@ const emit = defineEmits<{
   'change-view-type': [value: 'visual' | 'texto']
   'select-local-card': [card: Card]
   'select-scryfall-card': [cardName: string]
-  'open-filters': []
-  'request-discovery': []
 }>()
 
 const { t } = useI18n()
@@ -69,31 +63,6 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 <template>
   <div class="mb-6 space-y-3">
     <div class="flex items-center gap-2">
-      <!-- Advanced filters button (before search) -->
-      <button
-          @click="emit('open-filters')"
-          :class="[
-            'flex-shrink-0 h-[40px] w-[40px] flex items-center justify-center rounded border transition-colors',
-            activeFilterCount > 0
-              ? 'bg-neon-10 border-neon text-neon'
-              : 'border-silver-10 text-neon hover:border-silver-30'
-          ]"
-          :aria-label="t('common.aria.toggleVisibility')"
-      >
-        <SvgIcon name="filter" size="small" />
-      </button>
-
-      <!-- Discover button (shown inline when any filter is active) -->
-      <button
-          v-if="showDiscoverButton && activeFilterCount > 0"
-          @click="emit('request-discovery')"
-          class="flex-shrink-0 h-[40px] px-3 flex items-center justify-center rounded border border-neon text-neon text-tiny font-bold hover:bg-neon hover:text-primary transition-colors"
-          :title="t('discovery.bar.discoverButton')"
-          data-testid="discover-button"
-      >
-        {{ t('discovery.bar.discoverButtonShort') }}
-      </button>
-
       <div ref="wrapperRef" class="relative flex-1">
         <BaseInput
             :model-value="filterQuery"
@@ -162,6 +131,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
             class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="none">{{ t('collection.group.none') }}</option>
+          <option value="name">{{ t('collection.group.name') }}</option>
           <option value="type">{{ t('collection.deckStats.type') }}</option>
           <option value="mana">{{ t('collection.deckStats.mana') }}</option>
           <option value="color">{{ t('collection.deckStats.color') }}</option>

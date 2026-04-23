@@ -153,7 +153,7 @@ defineExpose({
       <div class="flex items-center gap-1 shrink-0">
         <button
           type="button"
-          class="text-silver/70 hover:text-neon text-small px-1.5"
+          class="text-silver/70 hover:text-neon text-small min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 px-1.5 flex items-center justify-center"
           :aria-label="panel.collapsed.value ? t('discovery.panel.expand') : t('discovery.panel.collapse')"
           @click="onToggleCollapsed"
           data-testid="toggle-collapse"
@@ -165,7 +165,7 @@ defineExpose({
 
     <div
       v-if="!panel.collapsed.value"
-      class="overflow-y-auto max-h-[480px] p-2"
+      class="overflow-y-auto max-h-[70vh] md:max-h-[480px] p-2"
       data-testid="body"
     >
       <!-- Embedded FilterPanel — only in discovery mode (hidden while viewing a specific card's prints) -->
@@ -193,7 +193,7 @@ defineExpose({
       </div>
 
       <div v-else>
-        <div class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
           <DiscoveryCard
             v-for="print in panel.results.value"
             :key="print.id"

@@ -122,21 +122,21 @@ const onMore = (): void => { emit('open-add-modal', props.print); }
         >{{ t('discovery.panel.owned', { count: ownedCount }) }}</span>
       </div>
 
-      <div class="absolute bottom-1 right-1 pointer-events-none text-tiny text-silver/70" v-if="setCode || collectorNumber">
+      <div class="absolute bottom-1 right-1 pointer-events-none text-tiny text-silver/70 hidden sm:block" v-if="setCode || collectorNumber">
         <span class="bg-primary/70 px-1 rounded">{{ setCode }} {{ collectorNumber ? `#${collectorNumber}` : '' }}</span>
       </div>
 
-      <div class="absolute bottom-1 left-1 pointer-events-none" v-if="isWishlistedSomewhere">
+      <div class="absolute bottom-1 left-1 pointer-events-none hidden sm:block" v-if="isWishlistedSomewhere">
         <span class="text-neon text-sm" data-testid="badge-wishlist" aria-label="wishlist">★</span>
       </div>
     </button>
 
-    <div class="flex items-center justify-between gap-1 p-1 bg-primary/60">
-      <div class="flex items-center gap-1 flex-1 min-w-0">
+    <div class="flex items-stretch sm:items-center justify-between gap-1 p-1 bg-primary/60">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-1 flex-1 min-w-0">
         <template v-if="scope === 'decks'">
           <button
             type="button"
-            class="text-tiny font-bold px-1.5 py-0.5 rounded bg-neon/20 text-neon border border-neon/40 hover:bg-neon hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition"
+            class="text-tiny font-bold rounded bg-neon/20 text-neon border border-neon/40 hover:bg-neon hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition w-full sm:w-auto px-3 py-2 sm:px-1.5 sm:py-0.5 min-h-[44px] sm:min-h-0"
             :disabled="disabled || !hasActiveDeck"
             @click="onAddMb"
             data-testid="btn-mb"
@@ -145,7 +145,7 @@ const onMore = (): void => { emit('open-add-modal', props.print); }
 </button>
           <button
             type="button"
-            class="text-tiny font-bold px-1.5 py-0.5 rounded bg-neon/10 text-silver border border-neon/30 hover:bg-neon/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            class="text-tiny font-bold rounded bg-neon/10 text-silver border border-neon/30 hover:bg-neon/30 disabled:opacity-40 disabled:cursor-not-allowed transition w-full sm:w-auto px-3 py-2 sm:px-1.5 sm:py-0.5 min-h-[44px] sm:min-h-0"
             :disabled="disabled || !hasActiveDeck"
             @click="onAddSb"
             data-testid="btn-sb"
@@ -157,7 +157,7 @@ const onMore = (): void => { emit('open-add-modal', props.print); }
         <template v-else-if="scope === 'binders'">
           <button
             type="button"
-            class="text-tiny font-bold px-1.5 py-0.5 rounded bg-neon/20 text-neon border border-neon/40 hover:bg-neon hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition w-full"
+            class="text-tiny font-bold rounded bg-neon/20 text-neon border border-neon/40 hover:bg-neon hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition w-full px-3 py-2 sm:px-1.5 sm:py-0.5 min-h-[44px] sm:min-h-0"
             :disabled="disabled || !hasActiveBinder"
             @click="onAddBinder"
             data-testid="btn-binder"
@@ -175,7 +175,7 @@ const onMore = (): void => { emit('open-add-modal', props.print); }
           />
           <button
             type="button"
-            class="text-tiny font-bold px-1.5 py-0.5 rounded bg-neon/20 text-neon border border-neon/40 hover:bg-neon hover:text-primary disabled:opacity-40 transition"
+            class="text-tiny font-bold rounded bg-neon/20 text-neon border border-neon/40 hover:bg-neon hover:text-primary disabled:opacity-40 transition w-full sm:w-auto px-3 py-2 sm:px-1.5 sm:py-0.5 min-h-[44px] sm:min-h-0"
             :disabled="disabled"
             @click="onAddCollection"
             data-testid="btn-collection"
@@ -187,7 +187,7 @@ const onMore = (): void => { emit('open-add-modal', props.print); }
 
       <button
         type="button"
-        class="text-silver/70 hover:text-neon transition shrink-0 text-lg leading-none px-1"
+        class="text-silver/70 hover:text-neon transition shrink-0 text-lg leading-none flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:px-1"
         :aria-label="t('discovery.card.moreOptions')"
         @click="onMore"
         data-testid="btn-more"

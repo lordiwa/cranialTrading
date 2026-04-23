@@ -600,7 +600,8 @@
     },
     "pagination": {
       "loading": "Loading collection…",
-      "slowLoad": "Large collection — this may take a moment"
+      "slowLoad": "Large collection — this may take a moment",
+      "showingOf": "showing {count} of {total}"
     }
   },
 
@@ -1410,6 +1411,11 @@
       "inMainboard": "IN MB ×{count}",
       "inSideboard": "IN SB ×{count}",
       "inBinder": "IN BINDER ×{count}"
+    },
+    "mobile": {
+      "openSheetDiscover": "Discover",
+      "openSheetFilter": "Filter",
+      "closeSheet": "Close discovery"
     },
     "card": {
       "addMainboard": "+ MB",

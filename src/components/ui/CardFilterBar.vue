@@ -17,10 +17,18 @@ const props = withDefaults(defineProps<{
   showViewType?: boolean
   viewType?: 'visual' | 'texto'
   showSuggestions?: boolean
+  showMobileDiscover?: boolean
+  mobileDiscoverActive?: boolean
+  showAdvancedFilters?: boolean
+  activeFilterCount?: number
 }>(), {
   viewMode: 'collection',
   showSuggestions: true,
   viewType: undefined,
+  showMobileDiscover: false,
+  mobileDiscoverActive: false,
+  showAdvancedFilters: false,
+  activeFilterCount: 0,
 })
 
 const emit = defineEmits<{
@@ -31,6 +39,8 @@ const emit = defineEmits<{
   'change-view-type': [value: 'visual' | 'texto']
   'select-local-card': [card: Card]
   'select-scryfall-card': [cardName: string]
+  'open-discovery-sheet': []
+  'open-filters': []
 }>()
 
 const { t } = useI18n()
@@ -106,6 +116,41 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         </RouterLink>
         </div>
       </div>
+      <button
+          v-if="showAdvancedFilters"
+          type="button"
+          class="flex items-center gap-1 px-3 min-h-[44px] md:min-h-0 md:py-1 rounded border text-tiny font-bold transition-150"
+          :class="activeFilterCount > 0
+            ? 'bg-neon text-primary border-neon'
+            : 'bg-primary text-silver border-silver-30 hover:border-neon hover:text-neon'"
+          :aria-label="t('discovery.mobile.openSheetFilter')"
+          aria-haspopup="dialog"
+          data-testid="cardfilterbar-open-filters"
+          @click="emit('open-filters')"
+      >
+        <SvgIcon name="filter" size="tiny" />
+        <span>{{ t('discovery.mobile.openSheetFilter') }}</span>
+        <span
+            v-if="activeFilterCount > 0"
+            class="ml-1 px-1.5 rounded-full bg-primary text-neon text-tiny font-bold"
+        >{{ activeFilterCount }}</span>
+      </button>
+      <button
+          v-if="showMobileDiscover"
+          type="button"
+          class="md:hidden flex items-center gap-1 px-3 min-h-[44px] rounded border text-tiny font-bold transition-150"
+          :class="mobileDiscoverActive
+            ? 'bg-neon text-primary border-neon'
+            : 'bg-primary text-neon border-neon hover:bg-neon hover:text-primary'"
+          :aria-label="t('discovery.mobile.openSheetDiscover')"
+          aria-haspopup="dialog"
+          :aria-expanded="mobileDiscoverActive"
+          data-testid="cardfilterbar-open-discovery-sheet"
+          @click="emit('open-discovery-sheet')"
+      >
+        <SvgIcon name="search" size="tiny" />
+        <span>{{ t('discovery.mobile.openSheetDiscover') }}</span>
+      </button>
     </div>
 
     <div class="flex flex-wrap items-center gap-3">

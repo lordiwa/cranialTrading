@@ -19,6 +19,7 @@ import BaseButton from '../components/ui/BaseButton.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
+import BottomSheet from '../components/ui/BottomSheet.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
 import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
@@ -60,6 +61,9 @@ const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 
 // Discovery panel state (SCRUM-34)
 const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
+
+// Mobile discovery bottom sheet (mobile <md)
+const showDiscoverySheet = ref(false)
 
 // statusFilter and binderFilter are unused in this view but the composable contracts
 // require Refs — use local constants so URL sync / import still compiles cleanly.
@@ -865,7 +869,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div :class="['mt-6', selectedDeck ? 'pb-20' : '']">
+    <div :class="['mt-6', selectedDeck ? 'pb-24 sm:pb-20' : '']">
       <div>
         <!-- ========== MAIN TABS ========== -->
         <div class="mb-6">
@@ -898,7 +902,7 @@ onUnmounted(() => {
                 v-for="deck in decksList"
                 :key="deck.id"
                 @click="deckFilter = deck.id"
-                class="relative overflow-hidden px-4 py-2 text-small font-bold whitespace-nowrap transition-150 border-2"
+                class="relative overflow-hidden px-4 py-3 min-h-[44px] md:min-h-0 md:py-2 text-small font-bold whitespace-nowrap transition-150 border-2"
                 :class="[
                   deckFilter === deck.id
                     ? isDeckImporting(deck.id)
@@ -998,21 +1002,46 @@ onUnmounted(() => {
             view-mode="decks"
             :show-bulk-select="false"
             :show-view-type="false"
+            :show-mobile-discover="true"
+            :mobile-discover-active="showDiscoverySheet"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
+            @open-discovery-sheet="showDiscoverySheet = true"
         />
 
-        <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
-        <DiscoveryPanel
-            scope="decks"
-            :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
-            :search-query="discoverQuery"
-            :collection-cards="collectionStore.cards"
-            :version-trigger="discoveryVersionTrigger"
-            @add-to-mainboard="handleDiscoveryAddMainboard"
-            @add-to-sideboard="handleDiscoveryAddSideboard"
-            @open-add-modal="handleDiscoveryOpenAddModal"
-        />
+        <!-- ========== DISCOVERY PANEL (SCRUM-34) — desktop inline ========== -->
+        <div class="hidden md:block">
+          <DiscoveryPanel
+              scope="decks"
+              :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
+              :search-query="discoverQuery"
+              :collection-cards="collectionStore.cards"
+              :version-trigger="discoveryVersionTrigger"
+              @add-to-mainboard="handleDiscoveryAddMainboard"
+              @add-to-sideboard="handleDiscoveryAddSideboard"
+              @open-add-modal="handleDiscoveryOpenAddModal"
+          />
+        </div>
+
+        <!-- ========== DISCOVERY BOTTOM SHEET — mobile only ========== -->
+        <BottomSheet
+            :show="showDiscoverySheet"
+            :title="t('discovery.panel.titleDiscover')"
+            class="md:hidden"
+            @close="showDiscoverySheet = false"
+        >
+          <DiscoveryPanel
+              v-if="showDiscoverySheet"
+              scope="decks"
+              :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
+              :search-query="discoverQuery"
+              :collection-cards="collectionStore.cards"
+              :version-trigger="discoveryVersionTrigger"
+              @add-to-mainboard="handleDiscoveryAddMainboard"
+              @add-to-sideboard="handleDiscoveryAddSideboard"
+              @open-add-modal="handleDiscoveryOpenAddModal"
+          />
+        </BottomSheet>
 
         <!-- ========== MAINBOARD GRID ========== -->
         <div v-if="selectedDeck && displayedMainboardCards.length > 0" class="mb-6">

@@ -27,8 +27,7 @@ import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
-import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
-import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
+import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
 import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
@@ -65,12 +64,13 @@ const totalsPanelExpanded = ref(false)
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
 
-// Discovery panel state (SCRUM-34)
-const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
 
 // Filtros de COLECCIÓN
 const statusFilter = ref<'all' | 'owned' | 'available' | CardStatus>('all')
 const viewType = ref<'visual' | 'texto'>('visual')
+
+// Advanced filters modal (filters local collection cards only)
+const showAdvancedFiltersModal = ref(false)
 
 // ========== COMPUTED ==========
 
@@ -185,7 +185,101 @@ const {
   advPriceMax,
   advFoilFilter,
   advSelectedSets,
+  advSelectedKeywords,
+  advSelectedFormats,
+  advSelectedCreatureTypes,
+  advFullArtOnly,
+  advPowerMin,
+  advPowerMax,
+  advToughnessMin,
+  advToughnessMax,
+  advancedFilterCount,
+  collectionSets,
+  collectionCreatureTypes,
+  resetAdvancedFilters,
 } = useCardFilter(statusFilteredCards)
+
+// ========== ADVANCED FILTER MODAL — bridge useCardFilter refs <-> AdvancedFilters shape (mode='local') ==========
+const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' }
+const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' }
+const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' }
+const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' }
+const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' }
+const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' }
+
+const localAdvancedFilters = computed<AdvancedFilters>(() => ({
+  colors: selectedColors.value.size < colorOrder.length
+    // eslint-disable-next-line security/detect-object-injection
+    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
+    : [],
+  types: selectedTypes.value.size < typeOrder.length
+    // eslint-disable-next-line security/detect-object-injection
+    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
+    : [],
+  manaValue: selectedManaValues.value.size < manaOrder.length
+    ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
+    : { min: undefined, max: undefined, values: undefined },
+  rarity: selectedRarities.value.size < rarityOrder.length
+    // eslint-disable-next-line security/detect-object-injection
+    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
+    : [],
+  sets: advSelectedSets.value,
+  power: { min: advPowerMin.value, max: advPowerMax.value },
+  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
+  formatLegal: advSelectedFormats.value,
+  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
+  keywords: advSelectedKeywords.value,
+  creatureTypes: advSelectedCreatureTypes.value,
+  isFoil: advFoilFilter.value === 'foil',
+  isFullArt: advFullArtOnly.value,
+}))
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
+const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
+  advSelectedSets.value = [...updated.sets]
+  advSelectedKeywords.value = [...updated.keywords]
+  advSelectedFormats.value = [...updated.formatLegal]
+  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])]
+  advPriceMin.value = updated.priceUSD.min
+  advPriceMax.value = updated.priceUSD.max
+  advPowerMin.value = updated.power.min
+  advPowerMax.value = updated.power.max
+  advToughnessMin.value = updated.toughness.min
+  advToughnessMax.value = updated.toughness.max
+  advFoilFilter.value = updated.isFoil ? 'foil' : 'any'
+  advFullArtOnly.value = updated.isFullArt
+  if (updated.manaValue.values?.length) {
+    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v))
+    selectedManaValues.value = new Set(mapped)
+  } else {
+    selectedManaValues.value = new Set(manaOrder)
+  }
+  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v)
+  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder)
+  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v)
+  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder)
+  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v)
+  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder)
+}
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
+
+const activeAdvancedFilterCount = computed(() => {
+  let count = 0
+  if (selectedColors.value.size < colorOrder.length) count++
+  if (selectedManaValues.value.size < manaOrder.length) count++
+  if (selectedTypes.value.size < typeOrder.length) count++
+  if (selectedRarities.value.size < rarityOrder.length) count++
+  count += advancedFilterCount.value
+  return count
+})
+
+const resetAllAdvancedFilters = () => {
+  selectedColors.value = new Set(colorOrder)
+  selectedManaValues.value = new Set(manaOrder)
+  selectedTypes.value = new Set(typeOrder)
+  selectedRarities.value = new Set(rarityOrder)
+  resetAdvancedFilters()
+}
 
 // ========== URL FILTER SYNC (Plan 03-B, NICE-10) ==========
 useCollectionFilterUrl({
@@ -222,8 +316,23 @@ const clearAllFilters = () => {
   filterQuery.value = ''
 }
 
+// True when an advanced filter is active that buildPaginationFilters does NOT support
+// (mana value, creature types, keywords, formats, full art, power, toughness).
+// In those cases we must filter client-side via filteredCards instead of trusting paginatedCards.
+const usesUnsupportedServerFilter = computed(() => {
+  if (selectedManaValues.value.size < manaOrder.length) return true
+  if (advSelectedCreatureTypes.value.length > 0) return true
+  if (advSelectedKeywords.value.length > 0) return true
+  if (advSelectedFormats.value.length > 0) return true
+  if (advFullArtOnly.value) return true
+  if (advPowerMin.value !== undefined || advPowerMax.value !== undefined) return true
+  if (advToughnessMin.value !== undefined || advToughnessMax.value !== undefined) return true
+  return false
+})
+
 // Paginated cards for collection view
 const collectionDisplayCards = computed(() => {
+  if (usesUnsupportedServerFilter.value) return filteredCards.value
   const paginated = collectionStore.paginatedCards
   if (paginated.length > 0 || collectionStore.paginationMeta.loading) {
     return paginated
@@ -233,6 +342,9 @@ const collectionDisplayCards = computed(() => {
 
 // Card count display
 const paginatedCardCount = computed(() => {
+  if (usesUnsupportedServerFilter.value) {
+    return { showing: filteredCards.value.length, total: filteredCards.value.length }
+  }
   const meta = collectionStore.paginationMeta
   if (meta.total > 0) {
     return { showing: collectionStore.paginatedCards.length, total: meta.total }
@@ -591,31 +703,6 @@ const handleScryfallSuggestionSelect = (cardName: string) => {
   discoverQuery.value = cardName
 }
 
-// Discovery panel add-card orchestration (SCRUM-34)
-const discoveryAdd = useDiscoveryAddCard('collection', {
-  collectionStore: {
-    addCard: collectionStore.addCard,
-    cards: computed(() => collectionStore.cards),
-  },
-  decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },
-  bindersStore: {
-    allocateCardToBinder: binderStore.allocateCardToBinder,
-    binders: computed(() => binderStore.binders),
-  },
-  toastStore: { show: (m, k) => toastStore.show(m, k ?? 'info') },
-  t,
-  selectedDeckId: computed(() => undefined),
-  selectedBinderId: computed(() => undefined),
-})
-
-const handleDiscoveryAddCollection = (print: ScryfallCard, status: CardStatus) => {
-  void discoveryAdd.addToCollection(print, status)
-}
-const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
-  selectedScryfallCard.value = print
-  showAddCardModal.value = true
-}
-
 // Cerrar modal de agregar carta y limpiar URL
 const handleAddCardModalClose = () => {
   showAddCardModal.value = false
@@ -836,7 +923,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ========== CONTENIDO PRINCIPAL ========== -->
-    <div class="mt-6 pb-20">
+    <div class="mt-6 pb-24 sm:pb-20">
       <div>
         <!-- ========== MAIN TABS: COLECCIÓN / MAZOS / BINDERS ========== -->
         <div class="mb-6">
@@ -880,7 +967,7 @@ onUnmounted(() => {
             <button
                 @click="statusFilter = status as typeof statusFilter"
                 :class="[
-                  'px-3 py-1 text-tiny font-bold whitespace-nowrap transition-150 rounded',
+                  'px-3 py-2 md:py-1 min-h-[44px] md:min-h-0 text-small md:text-tiny font-bold whitespace-nowrap transition-150 rounded',
                   statusFilter === status
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
@@ -917,21 +1004,27 @@ onUnmounted(() => {
             :selection-mode="selectionMode"
             :show-view-type="true"
             :view-type="viewType"
+            :show-advanced-filters="true"
+            :active-filter-count="activeAdvancedFilterCount"
             @toggle-bulk-select="toggleSelectionMode"
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
+            @open-filters="showAdvancedFiltersModal = true"
         />
 
-        <!-- ========== DISCOVERY PANEL (SCRUM-34) ========== -->
-        <DiscoveryPanel
-            scope="collection"
-            :search-query="discoverQuery"
-            :collection-cards="collectionStore.cards"
-            :version-trigger="discoveryVersionTrigger"
-            :default-collection-status="statusFilter === 'all' || statusFilter === 'owned' || statusFilter === 'available' ? 'collection' : statusFilter"
-            @add-to-collection="handleDiscoveryAddCollection"
-            @open-add-modal="handleDiscoveryOpenAddModal"
+        <!-- ========== ADVANCED FILTERS MODAL — filters local collection cards only ========== -->
+        <AdvancedFilterModal
+            :show="showAdvancedFiltersModal"
+            :filters="localAdvancedFilters"
+            mode="local"
+            :local-sets="collectionSets"
+            :local-creature-types="collectionCreatureTypes"
+            :exact-color-mode="exactColorMode"
+            @close="showAdvancedFiltersModal = false"
+            @update:filters="handleLocalFiltersUpdate"
+            @update:exact-color-mode="exactColorMode = $event"
+            @reset="resetAllAdvancedFilters"
         />
 
         <!-- ========== BULK SELECTION ACTION BAR ========== -->

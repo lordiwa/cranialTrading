@@ -627,14 +627,14 @@ const handleDeckContextMenuSelect = (itemId: string) => {
               </div>
             </div>
           </div>
-          <!-- Add card placeholder (outside grid to avoid layout gaps) -->
-          <div class="mt-2 md:mt-3">
+          <!-- Add card placeholder (hidden on mobile — FAB covers; visible md+ where there is no FAB) -->
+          <div class="hidden md:block md:mt-3">
             <div
               class="inline-block cursor-pointer group"
               @click="emit('addCard')"
             >
               <div
-                class="w-20 md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] border-2 border-dashed border-silver-30 hover:border-neon flex items-center justify-center transition-all duration-150"
+                class="md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] border-2 border-dashed border-silver-30 hover:border-neon flex items-center justify-center transition-all duration-150"
               >
                 <span class="text-h1 font-light text-silver-30 group-hover:text-neon transition-colors">+</span>
               </div>

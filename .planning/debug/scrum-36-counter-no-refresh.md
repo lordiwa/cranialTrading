@@ -1,21 +1,37 @@
 ---
-status: awaiting_human_verify
+status: investigating
 trigger: "En el editor de decks, al agregar copias adicionales de una carta ya presente vía AddCardModal, el badge `xN` del grid no refresca hasta recargar la vista o tocar +/-. Bug regression. Jira ticket: SCRUM-36."
 created: 2026-04-26T00:00:00Z
-updated: 2026-04-26T17:30:00Z
+updated: 2026-04-27T00:00:00Z
 ---
 
 ## Current Focus
 <!-- OVERWRITE on each update - reflects NOW -->
 
-hypothesis: ALL CONFIRMED AND FIXED. Multi-part commit on top of 69240ce delivers:
-  Part 2: Silent auto-grow replaced with debounced modal (DiscoveryAddConfirmModal, 600ms).
-  Part 3: Wishlist+collection merged in useDeckDisplayCards — one pile per (scryfallId,edition), no amber/opacity.
-  Part 4: Visual stack in DeckEditorGrid — up to 4 offset layers for qty>1 (SCRUM-37 closed).
+hypothesis: PART 9 — Inverse case (wishlist→collection). Rafael reports badge stuck at x1
+  after changing 5-wishlist → 8-collection. Exact x1 cause not yet confirmed by evidence;
+  need diagnostic console output. Two candidate hypotheses:
+  H-A: dangling W1 allocation stays in deck after W1 deleted; C1 alloc created correctly
+    → badge should show x5 or x6 (not x1). H-A doesn't explain x1.
+  H-B: processDeckAllocations creates the NEW C1 allocation BUT the deck reactivity snapshot
+    (decks.value = [...decks.value]) happens AFTER both allocateCardToDeck and deleteCard,
+    causing Vue to see the old deck state where only 1 collection copy was allocated.
+  H-C: Rafael had C1(qty=1, collection, alloc=1) + W1(qty=5, wishlist, alloc=5). The modal
+    deckAllocations = {D1:6}. buildOriginalAllocations captures {D1: {qty:1}} (only C1).
+    processDeckAllocations: origAlloc={qty:1} vs newAlloc={qty:6} → deallocateAll([C1]) +
+    allocateCardToDeck(C1, 6). But deleteCard(W1) already ran and W1 is gone from cards.value.
+    The dangling {W1, qty:5} alloc remains in deck. Display: C1 alloc=6 visible; W1 alloc
+    skipped. Badge x6. Still not x1.
+  H-D: The call to allocateCardToDeck to add C1 is blocked because C1.id is not found via
+    getCardById — timing race where C1 was just created but getCardById lookup misses it.
+    toAllocate=0, no alloc created. Deck only has old W1 alloc (dangling) → x0 shown, but
+    maybe display shows another card with qty=1 from legacy path.
 
-test: 888/888 unit tests pass. `npx vite build` clean. v1.27.0 bumped.
-expecting: Rafael to verify on local dev: MB click→ modal→ confirm → badge shows correctly; wishlist cards not visually distinct; stacked cards render correctly.
-next_action: Await Rafael local confirmation. Do not push until confirmed.
+test: add [SCRUM-36 diag3] console.log in CardDetailModal.handleSave capturing:
+  savedRelatedCards, savedDistribution, savedDeckAllocations, then after processStatusEntries:
+  updatedCardIds; then after processDeckAllocations: current deck.allocations for affected deck.
+expecting: Console output will show exact state and confirm/refute each hypothesis.
+next_action: Add diagnostic logging to CardDetailModal.handleSave → ask Rafael to repro → diagnose from output.
 
 ## Symptoms
 <!-- Written during gathering, then IMMUTABLE -->
@@ -126,6 +142,53 @@ started: Likely regression from Phase 03 route split (CollectionView → DeckVie
   found: updateAllocation is used by handleDeckGridQuantityUpdate which accidentally works due to the collectionStore.updateCard cascade. But updateAllocation itself is also broken for any caller that does NOT trigger a collection update. This is a secondary bug but not the one reported in SCRUM-36.
   implication: The fix to allocateCardToDeck also exposes that updateAllocation should eventually get the same treatment, but that is separate scope.
 
+- timestamp: 2026-04-26T19:00:00Z
+  checked: CardDetailModal.handleSave full execution path (lines 546-598), collectionStore.loadCollection (lines 282-310), loadFromIndex (lines 316-358).
+  found: |
+    Step-by-step trace for Rafael's scenario (3 owned → move 2 to wishlist):
+    1. reduceAllocationsForCard(C1, newQty=1) calls ensureCollectionWishlistCard → creates W1
+       in Firestore and in cards.value optimistically. Deck alloc split: {C1:1, W1:2}.
+    2. processStatusEntries: upsertStatusCard('collection',1,C1) → updates C1.quantity=1.
+       upsertStatusCard('wishlist',2,undefined) → savedRelatedCards has no wishlist card
+       (snapshot pre-W1) → calls addCard → creates duplicate W2 in Firestore + cards.value.
+       (Secondary issue: duplicate wishlist card. Not the display bug.)
+    3. processDeckAllocations: origAlloc=3, newAlloc=3 (user didn't change deck count) → no-op.
+    4. collectionStore.loadCollection() is called as background refresh (line ~588).
+       loadFromIndex reads card_index from Firestore. The Cloud Function that rebuilds the
+       index has NOT run yet — index still has only C1 (qty=3, collection) from before the save.
+       cards.value is overwritten with this stale index: W1 and W2 are wiped.
+    5. useDeckDisplayCards now: alloc {C1,1} → owned entry allocatedQty=1. Alloc {W1,2} →
+       cardMap.get('W1') = undefined (wiped) → skipped. deckAllocWishlistCards finds nothing.
+       Merge produces nothing. Badge shows x1.
+  implication: The loadCollection() call is the sole cause of the display regression in Rafael's
+    scenario. Removing it is safe because every individual store operation (addCard, updateCard,
+    deleteCard, ensureCollectionWishlistCard) already applies optimistic updates to cards.value.
+
+- timestamp: 2026-04-27T00:00:00Z
+  checked: CardDetailModal.handleSave full trace for wishlist→collection case (Part 9).
+    Initial state assumed: W1(scryfallId=X, edition=Y, status=wishlist, qty=5) allocated
+    to deck D1 qty=5. No collection card for (X,Y). User changes wishlist:5→0, collection:0→8.
+  found: |
+    1. reduceAllocationsForCard NOT called (newOwnedQty=8 >= savedTotalAllocated=5).
+    2. processStatusEntries runs:
+       - 'collection': targetQty=8, existingCard=undefined → addCard → C1 created
+       - 'wishlist': targetQty=0, existingCard=W1 → deleteCard(W1) → W1 removed from cards.value
+    3. buildOriginalAllocations([W1]) → skips W1 (wishlist) → returns empty Map.
+    4. processDeckAllocations(C1, [W1], {D1:{qty:5}}, allDecks, {}):
+       - nonWishlistCards = [] (W1 is wishlist)
+       - syncOneDeckAllocation(D1, C1, [], {qty:5}, undefined) → allocateCardToDeck(D1,C1,5,false)
+       - allocateCardToDeck: card=C1(qty=8), totalAllocated(C1)=0, toAllocate=5, toWishlist=0
+       - upsertAllocation → deck.allocations = [{W1,5}, {C1,5}]
+       - W1 alloc NEVER removed (nonWishlistCards empty, deallocateFromAll skipped)
+    5. Display after save: W1 alloc skipped (deleted from cards.value), C1 alloc→qty=5.
+       Badge should show x5 (not x1). Static analysis CANNOT reproduce "x1".
+  implication: |
+    Cannot determine exact path to "x1" without console output. Three questions remain:
+    Q1: Did Rafael have a pre-existing C1 (qty=1, collection) before the save?
+    Q2: Did the deck allocation counter in the modal show the combined total (W1+C1) or just one?
+    Q3: Did allocateCardToDeck actually run — or was C1 not found via getCardById at that moment?
+    Need [SCRUM-36 diag3] console output to confirm.
+
 ## Resolution
 <!-- OVERWRITE as understanding evolves -->
 
@@ -172,7 +235,14 @@ fix: |
 
   Tests: 888/888 pass. Build clean.
 
-verification: awaiting Rafael local confirmation (v1.27.0, not yet pushed)
+  Part 8 fix (v1.27.1):
+    - Removed collectionStore.loadCollection() background call from CardDetailModal.handleSave.
+      Individual ops already apply optimistic updates; loadCollection() was racing the Cloud
+      Function index and wiping freshly-created wishlist cards from cards.value.
+    - Added regression test in useDeckDisplayCards.test.ts: "merge survives after wishlist
+      card is created by reduceAllocationsForCard (no stale-index wipe)".
+
+verification: awaiting Rafael local confirmation (v1.27.1, not yet pushed)
 files_changed:
   - src/composables/useDiscoveryAddCard.ts
   - src/composables/useDeckDisplayCards.ts
@@ -184,5 +254,6 @@ files_changed:
   - src/locales/pt.json
   - tests/unit/composables/useDiscoveryAddCard.test.ts
   - tests/unit/composables/useDeckDisplayCards.test.ts
+  - src/components/collection/CardDetailModal.vue
   - package.json
   - package-lock.json

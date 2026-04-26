@@ -564,27 +564,32 @@ const handleDeckContextMenuSelect = (itemId: string) => {
             {{ translateCategoryLabel(group.type) }} ({{ getTypeCount(group.type) }})
           </h3>
 
-          <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">
+          <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap items-start gap-1.5 md:gap-2">
             <div
               v-for="card in group.cards"
               :key="card.scryfallId + card.edition"
-              class="relative cursor-pointer group"
+              class="relative cursor-pointer group w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px]"
               :class="{ 'opacity-75': isProxy(card) }"
+              :style="{
+                aspectRatio: !props.binderMode && getQuantity(card) > 1
+                  ? `3 / ${4 + 0.6 * (getQuantity(card) - 1)}`
+                  : '3 / 4'
+              }"
               @mouseenter="handleMouseEnter(card)"
               @mouseleave="handleMouseLeave"
               @click="handleCardClick(card)"
               @contextmenu.prevent="handleContextMenu($event, card)"
             >
-              <!-- Visual stack: render up to 4 offset layers for qty > 1 (SCRUM-37) -->
+              <!-- Visual stack: lower layers (deeper offset) on top in z-order, first card at the back (SCRUM-37) -->
               <template v-if="!props.binderMode && getQuantity(card) > 1">
                 <div
-                  v-for="layerIdx in Math.min(getQuantity(card) - 1, 3)"
+                  v-for="layerIdx in getQuantity(card) - 1"
                   :key="layerIdx"
-                  class="absolute w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden"
+                  class="absolute top-0 left-0 w-full aspect-[3/4] bg-secondary border-2 overflow-hidden"
                   :class="isCommander(card) ? 'border-purple-400' : isProxy(card) ? 'border-blue-400' : 'border-silver-20'"
                   :style="{
-                    transform: `translate(${layerIdx * 2}px, ${layerIdx * -2}px)`,
-                    zIndex: layerIdx,
+                    transform: `translateY(${layerIdx * 15}%)`,
+                    zIndex: layerIdx + 1,
                   }"
                 >
                   <img
@@ -592,18 +597,18 @@ const handleDeckContextMenuSelect = (itemId: string) => {
                     :src="getCardImageSmall(card)"
                     :alt="card.name"
                     loading="lazy"
-                    class="w-full h-full object-cover opacity-60"
+                    class="w-full h-full object-cover"
                   />
                 </div>
               </template>
-              <!-- Top (front) layer -->
+              <!-- First (top, deepest in z-order) layer -->
               <div
-                class="relative w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+                class="absolute top-0 left-0 w-full aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
                 :class="[
                   isProxy(card) ? 'border-blue-400' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
                   'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
                 ]"
-                :style="{ zIndex: Math.min(getQuantity(card) - 1, 3) + 1 }"
+                :style="{ zIndex: 1 }"
               >
                 <img
                   v-if="getCardImageSmall(card)"
@@ -613,9 +618,10 @@ const handleDeckContextMenuSelect = (itemId: string) => {
                   class="w-full h-full object-cover"
                 />
               </div>
+              <!-- Quantity badge — anchored to wrapper bottom (over the lowest visible layer), kept above all layers -->
               <div
                 class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1"
-                :style="{ zIndex: Math.min(getQuantity(card) - 1, 3) + 2 }"
+                :style="{ zIndex: getQuantity(card) + 10 }"
               >
                 <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
               </div>

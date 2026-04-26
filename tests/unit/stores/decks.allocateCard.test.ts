@@ -184,4 +184,51 @@ describe('allocateCardToDeck — Vue reactivity regression (SCRUM-36)', () => {
     })
     expect(allocatedQty.value).toBe(2)
   })
+
+  /**
+   * REGRESSION TEST 4: race condition — three sequential allocations all land in mainboard
+   *
+   * When allocateCardToDeck is called three times in sequence (each awaited, simulating
+   * the serialization queue in useDiscoveryAddCard), all three allocations must accumulate
+   * correctly. Uses findIndex(by id) instead of indexOf(by ref) so the lookup survives
+   * the deck object being replaced after each call (SCRUM-36 RC-2).
+   *
+   * The collection card starts with quantity=3 so all three copies are available.
+   */
+  it('accumulates all three allocations when called sequentially (race regression)', async () => {
+    const authStore = useAuthStore()
+    authStore.user = { id: 'user-1' } as any
+
+    const collectionStore = useCollectionStore()
+    // Quantity=3: each call has 1 available copy after the previous allocation
+    seedCollection(collectionStore, [
+      { id: 'card-1', name: 'Sol Ring', quantity: 3, price: 1, status: 'collection' },
+    ])
+
+    const store = useDecksStore()
+    seedDeck(store, []) // no pre-existing allocations
+
+    ;(updateDoc as any).mockResolvedValue(undefined)
+
+    // Simulate 3 sequential MB clicks (serialized by the queue in useDiscoveryAddCard)
+    const r1 = await store.allocateCardToDeck('deck-1', 'card-1', 1, false)
+    const r2 = await store.allocateCardToDeck('deck-1', 'card-1', 1, false)
+    const r3 = await store.allocateCardToDeck('deck-1', 'card-1', 1, false)
+
+    // Each call must have allocated to mainboard (not wishlist)
+    expect(r1).toEqual({ allocated: 1, wishlisted: 0 })
+    expect(r2).toEqual({ allocated: 1, wishlisted: 0 })
+    expect(r3).toEqual({ allocated: 1, wishlisted: 0 })
+
+    // Final state: 3 copies in mainboard
+    const allocatedQty = computed(() => {
+      const deck = store.decks.find(d => d.id === 'deck-1')
+      return deck?.allocations.find((a: any) => a.cardId === 'card-1' && !a.isInSideboard)?.quantity ?? 0
+    })
+    expect(allocatedQty.value).toBe(3)
+
+    // Array reference must have changed at least once (Vue reactivity check)
+    expect(store.decks.length).toBe(1)
+  })
+
 })

@@ -675,7 +675,9 @@ export const useDecksStore = defineStore('decks', () => {
             // that read decks.value (e.g. DeckView.selectedDeck) are invalidated.
             // Without this, in-place mutation of alloc.quantity is invisible to Vue.
             // Same pattern used in moveCardBoard and addExtraAllocation.
-            const idx = decks.value.indexOf(deck)
+            // Use findIndex(by id) — not indexOf(ref) — so concurrent calls that
+            // already replaced the array slot don't miss the update (SCRUM-36 RC-2).
+            const idx = decks.value.findIndex(d => d.id === deckId)
             if (idx !== -1) {
                 decks.value[idx] = snapshotDeck(deck)
                 decks.value = [...decks.value]

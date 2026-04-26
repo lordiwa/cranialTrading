@@ -187,6 +187,23 @@ const displayedSideboardCards = computed(() =>
   filteredSideboardDisplayCards.value.filter(passesAdvancedFilters)
 )
 
+// DiscoveryPanel :deck-cards — combined mainboard + sideboard in the shape
+// DiscoveryPanel expects ({ scryfallId, quantity, isInSideboard }).
+// Uses unfiltered display cards so the badge reflects the full deck allocation,
+// not just what passes the current search filter (SCRUM-36 RC-3).
+const discoveryDeckCards = computed(() => [
+  ...mainboardDisplayCards.value.map(c => ({
+    scryfallId: c.scryfallId,
+    quantity: c.allocatedQuantity,
+    isInSideboard: false as const,
+  })),
+  ...sideboardDisplayCards.value.map(c => ({
+    scryfallId: c.scryfallId,
+    quantity: c.allocatedQuantity,
+    isInSideboard: true as const,
+  })),
+])
+
 // Deck size for the mana curve (mainboard owned + wishlist — sideboard EXCLUDED).
 // Matches the plan's locked decision: sideboard never contributes to curve/probability.
 const manaCurveDeckSize = computed(
@@ -289,6 +306,7 @@ const handleScryfallSuggestionSelect = (cardName: string) => {
 const discoveryAdd = useDiscoveryAddCard('decks', {
   collectionStore: {
     addCard: collectionStore.addCard,
+    updateCard: collectionStore.updateCard,
     cards: computed(() => collectionStore.cards),
   },
   decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },
@@ -1016,6 +1034,7 @@ onUnmounted(() => {
               :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
               :search-query="discoverQuery"
               :collection-cards="collectionStore.cards"
+              :deck-cards="discoveryDeckCards"
               :version-trigger="discoveryVersionTrigger"
               @add-to-mainboard="handleDiscoveryAddMainboard"
               @add-to-sideboard="handleDiscoveryAddSideboard"
@@ -1036,6 +1055,7 @@ onUnmounted(() => {
               :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
               :search-query="discoverQuery"
               :collection-cards="collectionStore.cards"
+              :deck-cards="discoveryDeckCards"
               :version-trigger="discoveryVersionTrigger"
               @add-to-mainboard="handleDiscoveryAddMainboard"
               @add-to-sideboard="handleDiscoveryAddSideboard"

@@ -26,6 +26,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
   return {
     collectionStore: {
       addCard: vi.fn().mockResolvedValue('card-new-1'),
+      updateCard: vi.fn().mockResolvedValue(true),
       cards: ref([]),
       ...(overrides.collectionStore as object ?? {}),
     },
@@ -99,10 +100,12 @@ describe('useDiscoveryAddCard', () => {
       expect(deps.decksStore.allocateCardToDeck).not.toHaveBeenCalled()
     })
 
-    it('reuses existing collection card when same print+condition+foil+collection-status exists', async () => {
+    it('reuses existing collection card and auto-increments quantity (SCRUM-36 RC-1)', async () => {
+      const updateCard = vi.fn().mockResolvedValue(true)
       const deps = makeDeps({
         collectionStore: {
           addCard: vi.fn().mockResolvedValue('card-new'),
+          updateCard,
           cards: ref([
             { id: 'card-existing', scryfallId: 'scry-1', condition: 'NM', foil: false, status: 'collection', quantity: 2 },
           ]),
@@ -114,6 +117,8 @@ describe('useDiscoveryAddCard', () => {
 
       // Should NOT call addCard — reuse existing card
       expect(deps.collectionStore.addCard).not.toHaveBeenCalled()
+      // Must increment quantity so the next allocation has a copy available
+      expect(updateCard).toHaveBeenCalledWith('card-existing', { quantity: 3 })
       expect(deps.decksStore.allocateCardToDeck).toHaveBeenCalledWith(
         'deck-1', 'card-existing', 1, false
       )

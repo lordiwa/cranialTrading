@@ -139,6 +139,7 @@ const handleScryfallSuggestionSelect = (cardName: string) => {
 const discoveryAdd = useDiscoveryAddCard('binders', {
   collectionStore: {
     addCard: collectionStore.addCard,
+    updateCard: collectionStore.updateCard,
     cards: computed(() => collectionStore.cards),
   },
   decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },

@@ -567,20 +567,43 @@ const handleDeckContextMenuSelect = (itemId: string) => {
           <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">
             <div
               v-for="card in group.cards"
-              :key="card.scryfallId + (isWishlistCard(card) ? '-wish' : '')"
+              :key="card.scryfallId + card.edition"
               class="relative cursor-pointer group"
-              :class="{ 'opacity-75': isProxy(card), 'opacity-60': card.isWishlist && !isProxy(card) }"
+              :class="{ 'opacity-75': isProxy(card) }"
               @mouseenter="handleMouseEnter(card)"
               @mouseleave="handleMouseLeave"
               @click="handleCardClick(card)"
               @contextmenu.prevent="handleContextMenu($event, card)"
             >
+              <!-- Visual stack: render up to 4 offset layers for qty > 1 (SCRUM-37) -->
+              <template v-if="!props.binderMode && getQuantity(card) > 1">
+                <div
+                  v-for="layerIdx in Math.min(getQuantity(card) - 1, 3)"
+                  :key="layerIdx"
+                  class="absolute w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden"
+                  :class="isCommander(card) ? 'border-purple-400' : isProxy(card) ? 'border-blue-400' : 'border-silver-20'"
+                  :style="{
+                    transform: `translate(${layerIdx * 2}px, ${layerIdx * -2}px)`,
+                    zIndex: layerIdx,
+                  }"
+                >
+                  <img
+                    v-if="getCardImageSmall(card)"
+                    :src="getCardImageSmall(card)"
+                    :alt="card.name"
+                    loading="lazy"
+                    class="w-full h-full object-cover opacity-60"
+                  />
+                </div>
+              </template>
+              <!-- Top (front) layer -->
               <div
-                class="w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
+                class="relative w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4] bg-secondary border-2 overflow-hidden transition-all duration-150"
                 :class="[
-                  isProxy(card) ? 'border-blue-400' : card.isWishlist ? 'border-amber' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
+                  isProxy(card) ? 'border-blue-400' : isCommander(card) ? 'border-purple-400' : 'border-transparent',
                   'md:group-hover:border-neon md:group-hover:scale-105 md:group-hover:z-10'
                 ]"
+                :style="{ zIndex: Math.min(getQuantity(card) - 1, 3) + 1 }"
               >
                 <img
                   v-if="getCardImageSmall(card)"
@@ -590,7 +613,10 @@ const handleDeckContextMenuSelect = (itemId: string) => {
                   class="w-full h-full object-cover"
                 />
               </div>
-              <div class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1">
+              <div
+                class="absolute bottom-0.5 left-0.5 md:bottom-1 md:left-1 bg-primary/90 border border-neon px-1 md:px-2 py-0.5 md:py-1"
+                :style="{ zIndex: Math.min(getQuantity(card) - 1, 3) + 2 }"
+              >
                 <span class="text-tiny md:text-small font-bold text-neon">x{{ getQuantity(card) }}</span>
               </div>
             </div>

@@ -193,6 +193,112 @@ describe('useDiscoveryAddCard', () => {
     })
   })
 
+  describe('addToMainboardConfirmed (scope: decks) — modal-confirmed path (SCRUM-36)', () => {
+    it('creates a new collection card with user-chosen condition/foil/qty, then allocates all N copies', async () => {
+      const deps = makeDeps()
+      const { addToMainboardConfirmed } = useDiscoveryAddCard('decks', deps)
+
+      const result = await addToMainboardConfirmed(makePrint(), {
+        quantity: 3,
+        condition: 'LP',
+        foil: true,
+        isInSideboard: false,
+      })
+
+      expect(result.ok).toBe(true)
+      // Must create card with LP/foil/qty=3 (not default NM/false/1)
+      expect(deps.collectionStore.addCard).toHaveBeenCalledWith(expect.objectContaining({
+        scryfallId: 'scry-1',
+        condition: 'LP',
+        foil: true,
+        quantity: 3,
+        status: 'collection',
+      }))
+      // Allocate all 3 copies in one call
+      expect(deps.decksStore.allocateCardToDeck).toHaveBeenCalledWith(
+        'deck-1', 'card-new-1', 3, false
+      )
+    })
+
+    it('finds existing card matching (scryfallId, condition, foil) and grows quantity', async () => {
+      const updateCard = vi.fn().mockResolvedValue(true)
+      const deps = makeDeps({
+        collectionStore: {
+          addCard: vi.fn().mockResolvedValue('card-new'),
+          updateCard,
+          cards: ref([
+            { id: 'card-lp', scryfallId: 'scry-1', condition: 'LP', foil: true, status: 'collection', quantity: 1 },
+          ]),
+        },
+      })
+      const { addToMainboardConfirmed } = useDiscoveryAddCard('decks', deps)
+
+      await addToMainboardConfirmed(makePrint(), {
+        quantity: 2,
+        condition: 'LP',
+        foil: true,
+        isInSideboard: false,
+      })
+
+      // Must NOT call addCard — reuse the existing LP/foil card
+      expect(deps.collectionStore.addCard).not.toHaveBeenCalled()
+      // Grow quantity by the confirmed amount (1 existing + 2 new = 3)
+      expect(updateCard).toHaveBeenCalledWith('card-lp', { quantity: 3 })
+      expect(deps.decksStore.allocateCardToDeck).toHaveBeenCalledWith(
+        'deck-1', 'card-lp', 2, false
+      )
+    })
+
+    it('allocates to sideboard when isInSideboard=true', async () => {
+      const deps = makeDeps()
+      const { addToMainboardConfirmed } = useDiscoveryAddCard('decks', deps)
+
+      await addToMainboardConfirmed(makePrint(), {
+        quantity: 1,
+        condition: 'NM',
+        foil: false,
+        isInSideboard: true,
+      })
+
+      expect(deps.decksStore.allocateCardToDeck).toHaveBeenCalledWith(
+        'deck-1', 'card-new-1', 1, true
+      )
+    })
+
+    it('returns ok:false when no selectedDeckId', async () => {
+      const deps = makeDeps()
+      deps.selectedDeckId.value = undefined
+      const { addToMainboardConfirmed } = useDiscoveryAddCard('decks', deps)
+
+      const result = await addToMainboardConfirmed(makePrint(), {
+        quantity: 1, condition: 'NM', foil: false, isInSideboard: false,
+      })
+
+      expect(result.ok).toBe(false)
+      expect(deps.collectionStore.addCard).not.toHaveBeenCalled()
+    })
+
+    it('debounce intent: 3 rapid clicks → one modal → one confirmed call allocates qty=3', async () => {
+      // Simulates the end-state of the debounce: after 3 click accumulations,
+      // the modal opens with count=3.  The view calls addToMainboardConfirmed once
+      // with quantity=3.  Verify allocateCardToDeck is called with qty=3, not 3x qty=1.
+      const deps = makeDeps()
+      deps.collectionStore.addCard = vi.fn().mockResolvedValue('card-1')
+      const { addToMainboardConfirmed } = useDiscoveryAddCard('decks', deps)
+
+      await addToMainboardConfirmed(makePrint(), {
+        quantity: 3,
+        condition: 'NM',
+        foil: false,
+        isInSideboard: false,
+      })
+
+      expect(deps.collectionStore.addCard).toHaveBeenCalledTimes(1)
+      expect(deps.decksStore.allocateCardToDeck).toHaveBeenCalledTimes(1)
+      expect(deps.decksStore.allocateCardToDeck).toHaveBeenCalledWith('deck-1', 'card-1', 3, false)
+    })
+  })
+
   describe('addToCollection (scope: collection)', () => {
     it('adds with given status, no allocation', async () => {
       const deps = makeDeps()

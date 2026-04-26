@@ -1435,7 +1435,8 @@
       "addedToBinder": "{name} added to binder",
       "addedToCollection": "{name} added to collection",
       "addError": "Error adding card",
-      "noActiveTarget": "Select a deck or binder first"
+      "noActiveTarget": "Select a deck or binder first",
+      "addCancelled": "Add cancelled"
     }
   },
 

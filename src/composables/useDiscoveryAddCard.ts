@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { Card, CardStatus } from '@/types/card'
+import type { Card, CardCondition, CardStatus } from '@/types/card'
 import type { ScryfallCard } from '@/services/scryfall'
 
 type DiscoveryScope = 'decks' | 'binders' | 'collection'
@@ -26,6 +26,13 @@ interface DiscoveryAddDeps {
   t: (key: string, params?: Record<string, string | number>) => string
   selectedDeckId: Ref<string | undefined>
   selectedBinderId: Ref<string | undefined>
+}
+
+export interface ConfirmedAddOptions {
+  quantity: number
+  condition: CardCondition
+  foil: boolean
+  isInSideboard: boolean
 }
 
 interface AddResult {
@@ -69,6 +76,21 @@ function findExistingCard(cards: Card[], scryfallId: string, status: CardStatus)
     c.scryfallId === scryfallId &&
     c.condition === 'NM' &&
     !c.foil &&
+    c.status === status,
+  )
+}
+
+function findExistingCardByCondition(
+  cards: Card[],
+  scryfallId: string,
+  condition: CardCondition,
+  foil: boolean,
+  status: CardStatus,
+): Card | undefined {
+  return cards.find(c =>
+    c.scryfallId === scryfallId &&
+    c.condition === condition &&
+    c.foil === foil &&
     c.status === status,
   )
 }
@@ -161,10 +183,79 @@ export function useDiscoveryAddCard(scope: DiscoveryScope, deps: DiscoveryAddDep
     return { ok: true }
   }
 
+  /**
+   * Modal-confirmed add to deck board (mainboard or sideboard).
+   *
+   * Called by DeckView after the user confirms quantity/condition/foil in
+   * DiscoveryAddConfirmModal.  Finds or creates the collection card with the
+   * exact condition+foil the user chose, then allocates the confirmed quantity
+   * to the deck in a single atomic call.  Uses the serialisation queue so it
+   * never races with other pending operations (SCRUM-36 RC-2).
+   */
+  const addToMainboardConfirmed = (
+    print: ScryfallCard,
+    opts: ConfirmedAddOptions,
+  ): Promise<AddResult> =>
+    enqueue(async () => {
+      if (scope !== 'decks' || !deps.selectedDeckId.value) {
+        deps.toastStore.show(deps.t('discovery.messages.noActiveTarget'), 'info')
+        return { ok: false }
+      }
+
+      // Find an existing collection card that exactly matches condition + foil.
+      // If none exists, create one with the full Scryfall metadata.
+      const existing = findExistingCardByCondition(
+        deps.collectionStore.cards.value,
+        print.id,
+        opts.condition,
+        opts.foil,
+        'collection',
+      )
+
+      let cardId: string | null
+      if (existing) {
+        // Grow the collection quantity so the allocation has enough copies.
+        await deps.collectionStore.updateCard(existing.id, {
+          quantity: existing.quantity + opts.quantity,
+        })
+        cardId = existing.id
+      } else {
+        // Create a new collection card with user-chosen condition / foil / qty.
+        const data = scryfallToCardData(print, 'collection')
+        cardId = await deps.collectionStore.addCard({
+          ...data,
+          quantity: opts.quantity,
+          condition: opts.condition,
+          foil: opts.foil,
+        })
+      }
+
+      if (!cardId) return { ok: false }
+
+      const result = await deps.decksStore.allocateCardToDeck(
+        deps.selectedDeckId.value,
+        cardId,
+        opts.quantity,
+        opts.isInSideboard,
+      )
+
+      if (result.allocated === 0 && result.wishlisted === 0) {
+        deps.toastStore.show(deps.t('discovery.messages.addError'), 'error')
+        return { ok: false }
+      }
+
+      const msgKey = opts.isInSideboard
+        ? 'discovery.messages.addedToSideboard'
+        : 'discovery.messages.addedToMainboard'
+      deps.toastStore.show(deps.t(msgKey, { name: print.name }), 'success')
+      return { ok: true }
+    })
+
   return {
     addToMainboard,
     addToSideboard,
     addToBinder,
     addToCollection,
+    addToMainboardConfirmed,
   }
 }

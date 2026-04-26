@@ -22,7 +22,8 @@ import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import BottomSheet from '../components/ui/BottomSheet.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
-import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
+import DiscoveryAddConfirmModal, { type DiscoveryAddConfirmResult } from '../components/discovery/DiscoveryAddConfirmModal.vue'
+import { type ConfirmedAddOptions, useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import { type Card, type CardStatus } from '../types/card'
 import type { CreateDeckInput, DisplayDeckCard } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
@@ -64,6 +65,22 @@ const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
 
 // Mobile discovery bottom sheet (mobile <md)
 const showDiscoverySheet = ref(false)
+
+// ── Discovery add-confirm modal (debounced MB/SB click flow) ──────────────
+// Rapid clicks accumulate in a pending map (keyed by cardId+board).
+// After 600ms of silence the modal fires once asking condition/foil/qty.
+interface PendingDiscoveryClick {
+  count: number
+  timer: ReturnType<typeof setTimeout>
+  print: ScryfallCard
+  isInSideboard: boolean
+}
+const pendingDiscoveryClicks = new Map<string, PendingDiscoveryClick>()
+const showDiscoveryConfirmModal = ref(false)
+const discoveryConfirmPrint = ref<ScryfallCard | null>(null)
+const discoveryConfirmCount = ref(1)
+const discoveryConfirmIsInSideboard = ref(false)
+const isDiscoveryModalOpen = ref(false)
 
 // statusFilter and binderFilter are unused in this view but the composable contracts
 // require Refs — use local constants so URL sync / import still compiles cleanly.
@@ -320,8 +337,67 @@ const discoveryAdd = useDiscoveryAddCard('decks', {
   selectedBinderId: computed(() => undefined),
 })
 
-const handleDiscoveryAddMainboard = (print: ScryfallCard) => { void discoveryAdd.addToMainboard(print) }
-const handleDiscoveryAddSideboard = (print: ScryfallCard) => { void discoveryAdd.addToSideboard(print) }
+// ── Debounced Discovery add — accumulate clicks, open modal once ─────────
+const DISCOVERY_DEBOUNCE_MS = 600
+
+const openDiscoveryConfirmModal = (print: ScryfallCard, count: number, isInSideboard: boolean) => {
+  discoveryConfirmPrint.value = print
+  discoveryConfirmCount.value = count
+  discoveryConfirmIsInSideboard.value = isInSideboard
+  isDiscoveryModalOpen.value = true
+  showDiscoveryConfirmModal.value = true
+}
+
+const queueDiscoveryClick = (print: ScryfallCard, isInSideboard: boolean) => {
+  // Ignore clicks while modal is open (Anti-Loop: simpler than queuing)
+  if (isDiscoveryModalOpen.value) return
+
+  const key = `${print.id}|${isInSideboard ? 'sb' : 'mb'}`
+  const existing = pendingDiscoveryClicks.get(key)
+  if (existing) {
+    clearTimeout(existing.timer)
+    existing.count += 1
+    existing.timer = setTimeout(() => {
+      pendingDiscoveryClicks.delete(key)
+      openDiscoveryConfirmModal(print, existing.count, isInSideboard)
+    }, DISCOVERY_DEBOUNCE_MS)
+  } else {
+    const entry: PendingDiscoveryClick = {
+      count: 1,
+      print,
+      isInSideboard,
+      timer: setTimeout(() => {
+        pendingDiscoveryClicks.delete(key)
+        openDiscoveryConfirmModal(print, entry.count, isInSideboard)
+      }, DISCOVERY_DEBOUNCE_MS),
+    }
+    pendingDiscoveryClicks.set(key, entry)
+  }
+}
+
+const handleDiscoveryConfirmModalResult = (result: DiscoveryAddConfirmResult) => {
+  showDiscoveryConfirmModal.value = false
+  isDiscoveryModalOpen.value = false
+  if (!discoveryConfirmPrint.value) return
+  const opts: ConfirmedAddOptions = {
+    quantity: result.quantity,
+    condition: result.condition,
+    foil: result.foil,
+    isInSideboard: discoveryConfirmIsInSideboard.value,
+  }
+  void discoveryAdd.addToMainboardConfirmed(discoveryConfirmPrint.value, opts)
+  discoveryConfirmPrint.value = null
+}
+
+const handleDiscoveryConfirmModalCancel = () => {
+  showDiscoveryConfirmModal.value = false
+  isDiscoveryModalOpen.value = false
+  discoveryConfirmPrint.value = null
+  toastStore.show(t('discovery.messages.addCancelled'), 'info')
+}
+
+const handleDiscoveryAddMainboard = (print: ScryfallCard) => { queueDiscoveryClick(print, false) }
+const handleDiscoveryAddSideboard = (print: ScryfallCard) => { queueDiscoveryClick(print, true) }
 const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
   selectedScryfallCard.value = print
   showAddCardModal.value = true
@@ -863,6 +939,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   globalThis.removeEventListener('keydown', handleKeyboardShortcut)
+  // Clear any pending discovery debounce timers to avoid zombie writes
+  for (const entry of pendingDiscoveryClicks.values()) {
+    clearTimeout(entry.timer)
+  }
+  pendingDiscoveryClicks.clear()
 })
 </script>
 
@@ -1148,6 +1229,19 @@ onUnmounted(() => {
         :selected-deck-id="deckFilter !== 'all' ? deckFilter : undefined"
         @close="handleAddCardModalClose"
         @added="handleAddCardModalClose"
+    />
+
+    <!-- Discovery add-confirm modal: fires after debounce on MB/SB click (SCRUM-36) -->
+    <DiscoveryAddConfirmModal
+        v-if="discoveryConfirmPrint"
+        :show="showDiscoveryConfirmModal"
+        :card-name="discoveryConfirmPrint.name"
+        :deck-name="selectedDeck?.name ?? ''"
+        :pending-count="discoveryConfirmCount"
+        :is-in-sideboard="discoveryConfirmIsInSideboard"
+        @confirm="handleDiscoveryConfirmModalResult"
+        @cancel="handleDiscoveryConfirmModalCancel"
+        @close="handleDiscoveryConfirmModalCancel"
     />
 
     <CardDetailModal

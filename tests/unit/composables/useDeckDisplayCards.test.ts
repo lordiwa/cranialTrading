@@ -165,7 +165,7 @@ describe('useDeckDisplayCards', () => {
       expect(sideboardOwnedCount.value).toBe(2)
     })
 
-    it('includes legacy wishlist entries from deck.wishlist', () => {
+    it('includes legacy wishlist entries from deck.wishlist (no amber: isWishlist=false after SCRUM-36 merge)', () => {
       const deck = makeDeck({
         wishlist: [makeWishlistItem({ name: 'Force of Will', quantity: 3, isInSideboard: false })],
       })
@@ -179,10 +179,14 @@ describe('useDeckDisplayCards', () => {
       expect(deckMainboardWishlist.value).toHaveLength(1)
       expect(deckMainboardWishlist.value[0].name).toBe('Force of Will')
       expect(mainboardWishlistCount.value).toBe(3)
-      expect(mainboardDisplayCards.value.some(c => c.isWishlist && c.name === 'Force of Will')).toBe(true)
+      // After SCRUM-36 merge: wishlist-only entries render as isWishlist=false (no amber styling)
+      const entry = mainboardDisplayCards.value.find(c => c.name === 'Force of Will')
+      expect(entry).toBeDefined()
+      expect(entry!.isWishlist).toBe(false)
+      expect(entry!.allocatedQuantity).toBe(3)
     })
 
-    it('handles wishlist allocations (card.status === "wishlist")', () => {
+    it('handles wishlist allocations (card.status === "wishlist") — isWishlist=false after merge', () => {
       const wishCard = makeCard({ id: 'w1', name: 'Mana Crypt', status: 'wishlist', quantity: 1 })
       const deck = makeDeck({
         allocations: [makeAlloc({ cardId: 'w1', quantity: 1, isInSideboard: false })],
@@ -196,7 +200,82 @@ describe('useDeckDisplayCards', () => {
 
       expect(deckAllocWishlistCards.value).toHaveLength(1)
       expect(mainboardWishlistCount.value).toBe(1)
-      expect(mainboardDisplayCards.value.some(c => c.isWishlist && c.name === 'Mana Crypt')).toBe(true)
+      // After SCRUM-36: wishlist-only entry rendered without amber border
+      const entry = mainboardDisplayCards.value.find(c => c.name === 'Mana Crypt')
+      expect(entry).toBeDefined()
+      expect(entry!.isWishlist).toBe(false)
+    })
+  })
+
+  describe('wishlist merge (SCRUM-36)', () => {
+    it('merges wishlist-alloc quantity into owned entry with matching (scryfallId, edition)', () => {
+      // owned: 2 copies allocated, wishlist: 1 copy allocated → badge shows 3
+      const ownedCard = makeCard({ id: 'c1', scryfallId: 'sf1', edition: 'M21', quantity: 2, status: 'collection' })
+      const wishCard = makeCard({ id: 'w1', scryfallId: 'sf1', edition: 'M21', quantity: 1, status: 'wishlist' })
+      const deck = makeDeck({
+        allocations: [
+          makeAlloc({ cardId: 'c1', quantity: 2, isInSideboard: false }),
+          makeAlloc({ cardId: 'w1', quantity: 1, isInSideboard: false }),
+        ],
+      })
+      const selectedDeck = computed(() => deck)
+      const collectionCards = computed(() => [ownedCard, wishCard])
+      const filterQuery = ref('')
+
+      const { mainboardDisplayCards, mainboardOwnedCount, mainboardWishlistCount } =
+        useDeckDisplayCards({ selectedDeck, collectionCards, filterQuery })
+
+      // One merged entry (not two separate)
+      expect(mainboardDisplayCards.value).toHaveLength(1)
+      // Badge quantity = owned + wishlist
+      expect(mainboardDisplayCards.value[0]!.allocatedQuantity).toBe(3)
+      // No amber styling: isWishlist=false on the merged entry
+      expect(mainboardDisplayCards.value[0]!.isWishlist).toBe(false)
+      // Counts: owned=2, wishlist=1 (independent of merged display)
+      expect(mainboardOwnedCount.value).toBe(2)
+      expect(mainboardWishlistCount.value).toBe(1)
+    })
+
+    it('keeps separate piles for different editions (same scryfallId but different edition)', () => {
+      const cardA = makeCard({ id: 'cA', scryfallId: 'sf1', edition: 'Alpha', quantity: 2, status: 'collection' })
+      const cardB = makeCard({ id: 'cB', scryfallId: 'sf1', edition: 'Beta', quantity: 1, status: 'collection' })
+      const deck = makeDeck({
+        allocations: [
+          makeAlloc({ cardId: 'cA', quantity: 2, isInSideboard: false }),
+          makeAlloc({ cardId: 'cB', quantity: 1, isInSideboard: false }),
+        ],
+      })
+      const selectedDeck = computed(() => deck)
+      const collectionCards = computed(() => [cardA, cardB])
+      const filterQuery = ref('')
+
+      const { mainboardDisplayCards } = useDeckDisplayCards({ selectedDeck, collectionCards, filterQuery })
+
+      // Two separate piles (different editions = different prints)
+      expect(mainboardDisplayCards.value).toHaveLength(2)
+      const alphaEntry = mainboardDisplayCards.value.find(c => c.edition === 'Alpha')
+      const betaEntry = mainboardDisplayCards.value.find(c => c.edition === 'Beta')
+      expect(alphaEntry?.allocatedQuantity).toBe(2)
+      expect(betaEntry?.allocatedQuantity).toBe(1)
+    })
+
+    it('mainboardOwnedCount is not inflated by merged wishlist quantities', () => {
+      const ownedCard = makeCard({ id: 'c1', scryfallId: 'sf1', edition: 'M21', quantity: 2, status: 'collection' })
+      const wishCard = makeCard({ id: 'w1', scryfallId: 'sf1', edition: 'M21', quantity: 1, status: 'wishlist' })
+      const deck = makeDeck({
+        allocations: [
+          makeAlloc({ cardId: 'c1', quantity: 2, isInSideboard: false }),
+          makeAlloc({ cardId: 'w1', quantity: 1, isInSideboard: false }),
+        ],
+      })
+      const selectedDeck = computed(() => deck)
+      const collectionCards = computed(() => [ownedCard, wishCard])
+      const filterQuery = ref('')
+
+      const { mainboardOwnedCount } = useDeckDisplayCards({ selectedDeck, collectionCards, filterQuery })
+
+      // Must be 2 (owned only), not 3 (badge total)
+      expect(mainboardOwnedCount.value).toBe(2)
     })
   })
 

@@ -1435,7 +1435,8 @@
       "addedToBinder": "{name} agregada a la carpeta",
       "addedToCollection": "{name} agregada a la colección",
       "addError": "Error agregando carta",
-      "noActiveTarget": "Selecciona un deck o carpeta primero"
+      "noActiveTarget": "Selecciona un deck o carpeta primero",
+      "addCancelled": "Agregar cancelado"
     }
   },
 

@@ -584,8 +584,13 @@ const handleSave = async () => {
       await processDeckAllocations(primaryCardId, savedRelatedCards, { ...deckAllocations.value }, [...allDecks.value], originalAllocations)
     }
 
-    // Refresh collection in background — individual operations above already applied optimistic updates
-    collectionStore.loadCollection().catch((e: unknown) => { console.warn('Background collection refresh failed:', e) })
+    // NOTE: do NOT call collectionStore.loadCollection() here.
+    // Each individual op (addCard, updateCard, deleteCard, ensureCollectionWishlistCard)
+    // already applies optimistic updates to cards.value in-place.
+    // loadCollection() reads from the Firestore card_index which is rebuilt by a Cloud
+    // Function — it lags behind and would wipe freshly-created wishlist cards from
+    // cards.value, turning deck allocation references into dangling pointers and causing
+    // the xN badge to drop back to the owned-only count. (SCRUM-36 Part 8)
     toastStore.show(t('cards.detailModal.updated'), 'success')
     emit('saved')
     emit('close')

@@ -277,6 +277,45 @@ describe('useDeckDisplayCards', () => {
       // Must be 2 (owned only), not 3 (badge total)
       expect(mainboardOwnedCount.value).toBe(2)
     })
+
+    it('badge shows 3 after CardDetailModal moves 2 owned copies to wishlist (SCRUM-36 Part 8 regression)', () => {
+      // Reproduces Rafael's scenario:
+      //   - Started with 3 owned (C1, qty=3, collection), all 3 allocated to deck.
+      //   - User opens CardDetailModal, moves 2 copies to wishlist (collection:1, wishlist:2).
+      //   - handleSave calls reduceAllocationsForCard → creates W1 (wishlist, qty=2) optimistically
+      //     and splits deck alloc to {C1:1, W1:2}.
+      //   - handleSave updates C1.quantity=1.
+      //   - BUG (fixed): loadCollection() was then called and wiped W1 from cards.value,
+      //     making the deck alloc {W1:2} a dangling ref → badge dropped to x1.
+      //   - FIX: loadCollection() removed. State after save = C1(qty=1) + W1(qty=2) in cards.value.
+      //   This test pins that correct post-save state and verifies badge = 3.
+      const ownedCard = makeCard({ id: 'C1', scryfallId: 'sf-bolt', edition: 'M21', quantity: 1, status: 'collection' })
+      const wishCard = makeCard({ id: 'W1', scryfallId: 'sf-bolt', edition: 'M21', quantity: 2, status: 'wishlist' })
+      const deck = makeDeck({
+        allocations: [
+          makeAlloc({ cardId: 'C1', quantity: 1, isInSideboard: false }),
+          makeAlloc({ cardId: 'W1', quantity: 2, isInSideboard: false }),
+        ],
+      })
+      // collectionCards contains both C1 and W1 (as they would be after optimistic updates,
+      // WITHOUT a stale loadCollection() overwrite)
+      const selectedDeck = computed(() => deck)
+      const collectionCards = computed(() => [ownedCard, wishCard])
+      const filterQuery = ref('')
+
+      const { mainboardDisplayCards, mainboardOwnedCount, mainboardWishlistCount } =
+        useDeckDisplayCards({ selectedDeck, collectionCards, filterQuery })
+
+      // One merged pile (not two separate entries)
+      expect(mainboardDisplayCards.value).toHaveLength(1)
+      // Badge = owned(1) + wishlist(2) = 3
+      expect(mainboardDisplayCards.value[0]!.allocatedQuantity).toBe(3)
+      // No amber border on the merged entry
+      expect(mainboardDisplayCards.value[0]!.isWishlist).toBe(false)
+      // Owned count = 1 (only C1), wishlist count = 2 (only W1)
+      expect(mainboardOwnedCount.value).toBe(1)
+      expect(mainboardWishlistCount.value).toBe(2)
+    })
   })
 
   describe('deckOwnedCards', () => {

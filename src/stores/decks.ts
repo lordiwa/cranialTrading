@@ -671,6 +671,16 @@ export const useDecksStore = defineStore('decks', () => {
                 currentDeck.value = snapshotDeck(deck)
             }
 
+            // Replace the deck object AND the array so Vue computed properties
+            // that read decks.value (e.g. DeckView.selectedDeck) are invalidated.
+            // Without this, in-place mutation of alloc.quantity is invisible to Vue.
+            // Same pattern used in moveCardBoard and addExtraAllocation.
+            const idx = decks.value.indexOf(deck)
+            if (idx !== -1) {
+                decks.value[idx] = snapshotDeck(deck)
+                decks.value = [...decks.value]
+            }
+
             if (toWishlist > 0) {
                 toastStore.show(t('decks.messages.allocated', { fromCollection: toAllocate, toWishlist }), 'info')
             }

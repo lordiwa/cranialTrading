@@ -361,6 +361,20 @@ export const useBindersStore = defineStore('binders', () => {
                 updatedAt: Timestamp.now(),
             })
 
+            // Replace the binder object AND the array so Vue computed properties
+            // that read binders.value (e.g. BinderView.selectedBinder) are invalidated.
+            // Without this, in-place mutation of alloc.quantity is invisible to Vue.
+            // Mirrors the same fix applied to allocateCardToDeck in decks.ts.
+            const idx = binders.value.indexOf(binder)
+            if (idx !== -1) {
+                binders.value[idx] = {
+                    ...binder,
+                    allocations: binder.allocations ? binder.allocations.map(a => ({ ...a })) : [],
+                    stats: { ...binder.stats },
+                }
+                binders.value = [...binders.value]
+            }
+
             return toAllocate
         } catch (error) {
             console.error('Error allocating card to binder:', error)

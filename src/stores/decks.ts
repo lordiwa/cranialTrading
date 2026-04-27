@@ -921,6 +921,16 @@ export const useDecksStore = defineStore('decks', () => {
                 currentDeck.value = snapshotDeck(deck)
             }
 
+            // Replace deck object + array reference so deckAllocationTotalIndex computed
+            // re-evaluates immediately. Without this, a subsequent allocateCardToDeck reads
+            // stale getTotalAllocatedForCard and computes available=0, dropping cards.
+            // (SCRUM-36 Bug D)
+            const idx = decks.value.findIndex(d => d.id === deckId)
+            if (idx !== -1) {
+                decks.value[idx] = snapshotDeck(deck)
+                decks.value = [...decks.value]
+            }
+
             return true
         } catch (error) {
             console.error('Error deallocating card:', error)
@@ -1104,12 +1114,14 @@ export const useDecksStore = defineStore('decks', () => {
         if (!wishCardId) return
 
         const updatePromises: Promise<void>[] = []
+        const touchedDeckIds: string[] = []
 
         for (const deck of decks.value) {
             if (excessToRemove <= 0) break
             const converted = adjustDeckAllocation(deck, card.id, wishCardId, excessToRemove, collectionStore)
             if (converted <= 0) continue
             excessToRemove -= converted
+            touchedDeckIds.push(deck.id)
 
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
             updatePromises.push(
@@ -1125,6 +1137,18 @@ export const useDecksStore = defineStore('decks', () => {
         if (failures.length > 0) {
             console.error(`Error reducing allocations for ${failures.length} deck(s):`, failures)
             toastStore.show(t('decks.messages.allocateError'), 'error')
+        }
+
+        // Replace deck objects + array reference for Vue reactivity. (SCRUM-36)
+        if (touchedDeckIds.length > 0) {
+            for (const deckId of touchedDeckIds) {
+                const idx = decks.value.findIndex(d => d.id === deckId)
+                const target = idx !== -1 ? decks.value[idx] : undefined
+                if (target) {
+                    decks.value[idx] = snapshotDeck(target)
+                }
+            }
+            decks.value = [...decks.value]
         }
     }
 
@@ -1204,6 +1228,17 @@ export const useDecksStore = defineStore('decks', () => {
         if (failures.length > 0) {
             console.error(`Error converting allocations for ${failures.length} deck(s):`, failures)
             toastStore.show(t('decks.messages.allocateError'), 'error')
+        }
+
+        // Replace deck objects + array reference for Vue reactivity. (SCRUM-36)
+        if (decksWithAllocs.length > 0) {
+            for (const { deck } of decksWithAllocs) {
+                const idx = decks.value.findIndex(d => d.id === deck.id)
+                if (idx !== -1) {
+                    decks.value[idx] = snapshotDeck(deck)
+                }
+            }
+            decks.value = [...decks.value]
         }
     }
 

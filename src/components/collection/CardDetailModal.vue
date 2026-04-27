@@ -475,7 +475,18 @@ const processStatusEntries = async (
   for (const status of statuses) {
     // eslint-disable-next-line security/detect-object-injection
     const targetQty = savedDistribution[status]
-    const existingCard = savedRelatedCards.find(c => c.status === status)
+    // Bug A fix: search live state first (collectionStore.cards). Reason: reduceAllocationsForCard
+    // may have created a wishlist card BEFORE this loop runs. That card lives in cards.value
+    // but NOT in savedRelatedCards (snapshot pre-reduce). Without live lookup, the loop falls
+    // to addCard (no dedup) and produces W1+W2 with the same identity. (SCRUM-36)
+    const liveExistingCard = collectionStore.cards.find(c =>
+      c.status === status &&
+      c.scryfallId === cardData.scryfallId &&
+      c.edition === cardData.edition &&
+      c.condition === cardData.condition &&
+      c.foil === cardData.foil
+    )
+    const existingCard = liveExistingCard ?? savedRelatedCards.find(c => c.status === status)
     const cardId = await upsertStatusCard(status, targetQty, existingCard, cardData)
     if (cardId) updatedCardIds.push(cardId)
   }
@@ -570,18 +581,76 @@ const handleSave = async () => {
       isPublic: isPublic.value,
     }
 
+    // ===== STEP 0: consolidar duplicates con misma identidad (SCRUM-36 Bug C) =====
+    // Cards acumuladas por bugs previos: misma scryfallId+edition+condition+foil+status.
+    // Migrar sus deck allocations a savedCard y borrar los duplicados, para que el flujo
+    // siguiente opere sobre un solo registro consolidado.
+    const duplicates = collectionStore.cards.filter(c =>
+      c.id !== savedCard.id &&
+      c.status === savedCard.status &&
+      c.scryfallId === savedCard.scryfallId &&
+      c.edition === savedCard.edition &&
+      c.condition === savedCard.condition &&
+      c.foil === savedCard.foil
+    )
+    for (const dup of duplicates) {
+      for (const alloc of getAllocationsForCard(dup.id)) {
+        await decksStore.deallocateCard(alloc.deckId, dup.id, alloc.isInSideboard)
+        await decksStore.allocateCardToDeck(alloc.deckId, savedCard.id, alloc.quantity, alloc.isInSideboard)
+      }
+      await collectionStore.deleteCard(dup.id)
+    }
+
     const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
-    if (newOwnedQty < savedTotalAllocated) {
+
+    // Snapshot allocations of savedCard ANTES de cualquier mutación adicional (necesario para
+    // wishlist deck-allocation sync porque processDeckAllocations filtra wishlist).
+    const origAllocsBySavedCardDeck = new Map<string, { quantity: number; isInSideboard: boolean }>()
+    if (savedCard.status === 'wishlist') {
+      for (const alloc of getAllocationsForCard(savedCard.id)) {
+        origAllocsBySavedCardDeck.set(alloc.deckId, { quantity: alloc.quantity, isInSideboard: alloc.isInSideboard })
+      }
+    }
+
+    // ===== STEP 1: reduce (solo path owned) =====
+    // Para wishlist: NO llamar reduceAllocationsForCard. Vacía las allocations porque
+    // cardId === wishCardId hace que adjustDeckAllocation entre en estado degenerado.
+    if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
       await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
     }
 
+    // ===== STEP 2: processStatusEntries (siempre corre, para todos los buckets) =====
     const statuses: CardStatus[] = ['collection', 'sale', 'trade', 'wishlist']
     const updatedCardIds = await processStatusEntries(statuses, savedDistribution, savedRelatedCards, cardData)
 
-    const primaryCardId = updatedCardIds[0]
-    if (primaryCardId) {
-      const originalAllocations = buildOriginalAllocations(savedRelatedCards)
-      await processDeckAllocations(primaryCardId, savedRelatedCards, { ...deckAllocations.value }, [...allDecks.value], originalAllocations)
+    // ===== STEP 3: sync deck allocations =====
+    if (savedCard.status === 'wishlist') {
+      // Wishlist: processDeckAllocations filtra wishlist cards. Sync manual de las
+      // allocations de savedCard contra el estado del modal.
+      const stillExists = collectionStore.cards.find(c => c.id === savedCard.id)
+      if (stillExists) {
+        for (const deck of allDecks.value) {
+          const newAlloc = deckAllocations.value[deck.id]
+          const newQty = newAlloc?.quantity ?? 0
+          const orig = origAllocsBySavedCardDeck.get(deck.id)
+          const origQty = orig?.quantity ?? 0
+          const sideboardChanged = !!orig && !!newAlloc && orig.isInSideboard !== newAlloc.isInSideboard
+          if (newQty === origQty && !sideboardChanged) continue
+          if (orig && origQty > 0) {
+            await decksStore.deallocateCard(deck.id, savedCard.id, orig.isInSideboard)
+          }
+          if (newAlloc && newQty > 0) {
+            await decksStore.allocateCardToDeck(deck.id, savedCard.id, newQty, newAlloc.isInSideboard)
+          }
+        }
+      }
+    } else {
+      // Owned: flujo existing con processDeckAllocations.
+      const primaryCardId = updatedCardIds[0]
+      if (primaryCardId) {
+        const originalAllocations = buildOriginalAllocations(savedRelatedCards)
+        await processDeckAllocations(primaryCardId, savedRelatedCards, { ...deckAllocations.value }, [...allDecks.value], originalAllocations)
+      }
     }
 
     // NOTE: do NOT call collectionStore.loadCollection() here.

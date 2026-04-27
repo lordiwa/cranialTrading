@@ -702,6 +702,8 @@
         "sideboard": "SB",
         "mainboard": "MB"
       },
+      "slotMb": "MB",
+      "slotSb": "SB",
       "totalAssigned": "Total asignadas: {qty}",
       "noImage": "No image",
       "allocatedIn": "ASIGNADA EN MAZOS",

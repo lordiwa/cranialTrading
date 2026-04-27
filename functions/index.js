@@ -994,7 +994,8 @@ exports.migrateUserCards = onCall(
 // ============================================================
 
 const INDEX_CHUNK_SIZE = 2000;
-const INDEX_VERSION = 2; // Bump when index format changes — client auto-rebuilds stale indexes
+const INDEX_VERSION = 3; // Bump when index format changes — client auto-rebuilds stale indexes
+// v3 (2026-04-27): added `e` (edition / set_name) — fixes SCRUM-35 duplicate bug where stale `sc` uppercase clobbered set_name canon
 
 /**
  * Extract compact index fields from a full card document.
@@ -1035,6 +1036,7 @@ function toIndexCard(id, data) {
     t: data.type_line || '',
     f: !!data.foil,
     sc: data.setCode || '',
+    e: data.edition || '',
     pw: data.power || '',
     to: data.toughness || '',
     fa: !!data.full_art,
@@ -1075,7 +1077,7 @@ exports.buildCardIndex = onCall(
     // Only select fields needed for the index (reduces memory ~80%)
     const INDEX_FIELDS = [
       'scryfallId', 'name', 'status', 'quantity', 'price', 'cmc',
-      'colors', 'rarity', 'type_line', 'foil', 'setCode', 'power',
+      'colors', 'rarity', 'type_line', 'foil', 'setCode', 'edition', 'power',
       'toughness', 'full_art', 'produced_mana', 'keywords', 'legalities',
       'createdAt', 'condition', 'public', 'image',
     ];

@@ -9,6 +9,8 @@ import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePri
 import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
+import { type CardIdentity, computeStatusOperations } from '../../utils/cardSaveDiff'
+import { buildOriginalSlots, computeDeckSlotOps, type DeckSlot } from '../../utils/deckSlotDiff'
 import BaseButton from '../ui/BaseButton.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -59,8 +61,10 @@ const statusDistribution = ref<Record<CardStatus, number>>({
 // Related cards (same scryfallId + edition, different status)
 const relatedCards = ref<Card[]>([])
 
-// Deck allocations: deckId -> { quantity, isInSideboard }
-const deckAllocations = ref<Record<string, { quantity: number; isInSideboard: boolean }>>({})
+// SCRUM-35 D2: Deck allocations matrix per deck — { mb, sb }. Each slot represents the
+// TOTAL qty (owned + wishlist) assigned to that board location. allocateCardToDeck splits
+// owned vs wishlist automatically based on availability, so the modal only edits totals.
+const deckAllocations = ref<Record<string, DeckSlot>>({})
 
 // Card Kingdom prices
 const {
@@ -264,9 +268,9 @@ const currentPrice = computed(() => {
 // All available decks
 const allDecks = computed(() => decksStore.decks)
 
-// Total allocated from deckAllocations state
+// Total allocated from deckAllocations state (mb + sb across all decks)
 const totalAllocated = computed(() => {
-  return Object.values(deckAllocations.value).reduce((sum, a) => sum + a.quantity, 0)
+  return Object.values(deckAllocations.value).reduce((sum, slot) => sum + slot.mb + slot.sb, 0)
 })
 
 // Available quantity for deck assignment (owned cards minus allocated)
@@ -311,10 +315,15 @@ const initializeForm = async () => {
   // Get fresh card data from store (props.card might be stale reference)
   const freshCard = collectionStore.cards.find(c => c.id === props.card?.id) ?? props.card
 
-  // Find all related cards (same scryfallId + edition) from store
+  // SCRUM-35 D: identidad relajada por (scryfallId, condition, foil). scryfallId ya
+  // identifica el print de forma única en MTG real. Filtrar por edition aquí escondía
+  // duplicados legacy con edition mismatched ("ECL" vs "Lorwyn Eclipsed") creados por
+  // bug previo, que aparecían como "missing" en el modal y se re-creaban al guardar.
+  // Phase B1 (NM vs LP isolation) sigue intacta porque condition/foil siguen estrictos.
   relatedCards.value = collectionStore.cards.filter(c =>
     c.scryfallId === freshCard.scryfallId &&
-    c.edition === freshCard.edition
+    c.condition === freshCard.condition &&
+    c.foil === freshCard.foil
   )
 
   // Initialize status distribution from related cards
@@ -334,16 +343,18 @@ const initializeForm = async () => {
   foil.value = freshCard.foil
   isPublic.value = freshCard.public ?? false
 
-  // Load deck allocations for all related cards
+  // SCRUM-35 D2: load deck allocations as { mb, sb } slots per deck. Sums across ALL
+  // related cards (owned rows + wishlist rows) since they share the same physical card
+  // identity. The previous flat { quantity, isInSideboard } shape collapsed mb+sb into
+  // a single bucket and lost half the allocation data on save.
   deckAllocations.value = {}
   for (const card of relatedCards.value) {
     const allocations = getAllocationsForCard(card.id)
     for (const alloc of allocations) {
-      const existingAlloc = deckAllocations.value[alloc.deckId]
-      deckAllocations.value[alloc.deckId] = {
-        quantity: (existingAlloc?.quantity ?? 0) + alloc.quantity,
-        isInSideboard: alloc.isInSideboard ?? false
-      }
+      const cur = deckAllocations.value[alloc.deckId] ?? { mb: 0, sb: 0 }
+      if (alloc.isInSideboard) cur.sb += alloc.quantity
+      else cur.mb += alloc.quantity
+      deckAllocations.value[alloc.deckId] = cur
     }
   }
 
@@ -385,172 +396,94 @@ const adjustQuantity = (status: CardStatus, delta: number) => {
 
 // ========== DECK ALLOCATION METHODS ==========
 
-// Get allocation for a specific deck
-const getDeckAllocation = (deckId: string) => {
+// SCRUM-35 D2: per-slot getters/mutators. Each deck has independent mb and sb counters.
+type Board = 'mb' | 'sb'
+
+const getSlotQty = (deckId: string, board: Board): number => {
   // eslint-disable-next-line security/detect-object-injection
-  return deckAllocations.value[deckId]?.quantity ?? 0
+  return deckAllocations.value[deckId]?.[board] ?? 0
 }
 
-// Check if deck allocation is in sideboard
-const isInSideboard = (deckId: string) => {
+const adjustSlot = (deckId: string, board: Board, delta: number) => {
   // eslint-disable-next-line security/detect-object-injection
-  return deckAllocations.value[deckId]?.isInSideboard ?? false
-}
-
-// Increment deck allocation (no limit - excess goes to deck wishlist)
-const incrementDeckAllocation = (deckId: string) => {
-  const current = getDeckAllocation(deckId)
+  const cur = deckAllocations.value[deckId] ?? { mb: 0, sb: 0 }
   // eslint-disable-next-line security/detect-object-injection
-  const existing = deckAllocations.value[deckId]
-  // eslint-disable-next-line security/detect-object-injection
-  deckAllocations.value[deckId] = {
-    quantity: current + 1,
-    isInSideboard: existing?.isInSideboard ?? false
-  }
-}
-
-// Decrement deck allocation
-const decrementDeckAllocation = (deckId: string) => {
-  const current = getDeckAllocation(deckId)
-  if (current <= 0) return
-
-  if (current === 1) {
+  const next = Math.max(0, cur[board] + delta)
+  const updated = { ...cur, [board]: next }
+  if (updated.mb === 0 && updated.sb === 0) {
     // eslint-disable-next-line security/detect-object-injection
     delete deckAllocations.value[deckId]
   } else {
     // eslint-disable-next-line security/detect-object-injection
-    const existing = deckAllocations.value[deckId]
-    // eslint-disable-next-line security/detect-object-injection
-    deckAllocations.value[deckId] = {
-      quantity: current - 1,
-      isInSideboard: existing?.isInSideboard ?? false
-    }
+    deckAllocations.value[deckId] = updated
   }
 }
 
-// Toggle sideboard for a deck
-const toggleSideboard = (deckId: string) => {
+const getDeckTotal = (deckId: string): number => {
   // eslint-disable-next-line security/detect-object-injection
-  const alloc = deckAllocations.value[deckId]
-  if (alloc) {
-    alloc.isInSideboard = !alloc.isInSideboard
-  }
+  const slot = deckAllocations.value[deckId]
+  return slot ? slot.mb + slot.sb : 0
 }
 
-// Handle a single status: update/create/delete, return card ID if non-wishlist
-const upsertStatusCard = async (
-  status: CardStatus,
-  targetQty: number,
-  existingCard: Card | undefined,
+// SCRUM-35 fix: aplica ops calculadas por computeStatusOperations (util pura).
+// Cada op opera sobre la fila exacta (scryfallId, edition, condition, foil, status).
+// Devuelve mapping status → cardId para que el sync de allocations sepa cuál usar.
+const applyStatusOperations = async (
+  ops: ReturnType<typeof computeStatusOperations>,
   cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
-): Promise<string | null> => {
-  if (targetQty <= 0) {
-    if (existingCard) await collectionStore.deleteCard(existingCard.id)
-    return null
-  }
-  if (existingCard) {
-    await collectionStore.updateCard(existingCard.id, {
-      quantity: targetQty, condition: cardData.condition, foil: cardData.foil,
-      scryfallId: cardData.scryfallId, edition: cardData.edition, setCode: cardData.setCode,
-      image: cardData.image, price: cardData.price, public: cardData.isPublic,
-    })
-    return status === 'wishlist' ? null : existingCard.id
-  }
-  const newCardId = await collectionStore.addCard({
-    scryfallId: cardData.scryfallId, name: cardData.name, edition: cardData.edition,
-    setCode: cardData.setCode, quantity: targetQty, condition: cardData.condition,
-    foil: cardData.foil, price: cardData.price, image: cardData.image, status, public: cardData.isPublic,
-  })
-  return (status !== 'wishlist' && newCardId) ? newCardId : null
-}
-
-// Process all status entries, return non-wishlist card IDs
-const processStatusEntries = async (
-  statuses: CardStatus[],
-  savedDistribution: Record<CardStatus, number>,
-  savedRelatedCards: Card[],
-  cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
-): Promise<string[]> => {
-  const updatedCardIds: string[] = []
-  for (const status of statuses) {
+): Promise<Record<CardStatus, string | null>> => {
+  const idsByStatus: Record<CardStatus, string | null> = { collection: null, sale: null, trade: null, wishlist: null }
+  // SCRUM-35 D: snapshot canonical id por status — ignora edition (identidad relajada)
+  // para que survive cards con edition stale legacy. Prefiere la fila con edition
+  // canónica si existe; si todas son stale, agarra la primera (que será actualizada
+  // por la op de update con cardData.edition canónica → self-heal).
+  for (const status of ['collection', 'sale', 'trade', 'wishlist'] as CardStatus[]) {
     // eslint-disable-next-line security/detect-object-injection
-    const targetQty = savedDistribution[status]
-    // Bug A fix: search live state first (collectionStore.cards). Reason: reduceAllocationsForCard
-    // may have created a wishlist card BEFORE this loop runs. That card lives in cards.value
-    // but NOT in savedRelatedCards (snapshot pre-reduce). Without live lookup, the loop falls
-    // to addCard (no dedup) and produces W1+W2 with the same identity. (SCRUM-36)
-    const liveExistingCard = collectionStore.cards.find(c =>
+    const matches = collectionStore.cards.filter(c =>
       c.status === status &&
       c.scryfallId === cardData.scryfallId &&
-      c.edition === cardData.edition &&
       c.condition === cardData.condition &&
       c.foil === cardData.foil
     )
-    const existingCard = liveExistingCard ?? savedRelatedCards.find(c => c.status === status)
-    const cardId = await upsertStatusCard(status, targetQty, existingCard, cardData)
-    if (cardId) updatedCardIds.push(cardId)
+    const canonical = matches.find(c => c.edition === cardData.edition) ?? matches[0]
+    // eslint-disable-next-line security/detect-object-injection
+    if (canonical) idsByStatus[status] = canonical.id
   }
-  return updatedCardIds
-}
-
-// Build original deck allocations from related non-wishlist cards
-const buildOriginalAllocations = (savedRelatedCards: Card[]): Map<string, { quantity: number; isInSideboard: boolean }> => {
-  const map = new Map<string, { quantity: number; isInSideboard: boolean }>()
-  for (const card of savedRelatedCards) {
-    if (card.status === 'wishlist') continue
-    for (const alloc of getAllocationsForCard(card.id)) {
-      map.set(alloc.deckId, { quantity: alloc.quantity, isInSideboard: alloc.isInSideboard })
+  for (const op of ops) {
+    if (op.type === 'delete' && op.cardId) {
+      await collectionStore.deleteCard(op.cardId)
+      // eslint-disable-next-line security/detect-object-injection
+      idsByStatus[op.status] = null
+    } else if (op.type === 'update' && op.cardId) {
+      await collectionStore.updateCard(op.cardId, {
+        quantity: op.quantity, condition: cardData.condition, foil: cardData.foil,
+        scryfallId: cardData.scryfallId, edition: cardData.edition, setCode: cardData.setCode,
+        image: cardData.image, price: cardData.price, public: cardData.isPublic,
+      })
+      // eslint-disable-next-line security/detect-object-injection
+      idsByStatus[op.status] = op.cardId
+    } else if (op.type === 'create') {
+      const newId = await collectionStore.addCard({
+        scryfallId: cardData.scryfallId, name: cardData.name, edition: cardData.edition,
+        setCode: cardData.setCode, quantity: op.quantity, condition: cardData.condition,
+        foil: cardData.foil, price: cardData.price, image: cardData.image, status: op.status, public: cardData.isPublic,
+      })
+      // eslint-disable-next-line security/detect-object-injection
+      if (newId) idsByStatus[op.status] = newId
     }
   }
-  return map
+  return idsByStatus
 }
 
-// Deallocate a card from a deck for all non-wishlist related cards
-const deallocateFromAll = async (deckId: string, nonWishlistCards: Card[], isInSideboard: boolean) => {
-  for (const card of nonWishlistCards) {
-    await decksStore.deallocateCard(deckId, card.id, isInSideboard)
+// SCRUM-35 D2: snapshot allocations grouped by (deckId × board) across ALL related
+// cards (owned + wishlist). The previous version filtered out wishlist rows and
+// collapsed mb/sb into a single bucket, losing data on save.
+const buildOriginalSlotsForRelated = (savedRelatedCards: Card[]): Map<string, DeckSlot> => {
+  const allocsByCardId = new Map<string, readonly { deckId: string; quantity: number; isInSideboard: boolean }[]>()
+  for (const card of savedRelatedCards) {
+    allocsByCardId.set(card.id, getAllocationsForCard(card.id))
   }
-}
-
-// Sync one deck's allocation: add/update/remove
-const syncOneDeckAllocation = async (
-  deckId: string,
-  primaryCardId: string,
-  nonWishlistCards: Card[],
-  newAlloc: { quantity: number; isInSideboard: boolean } | undefined,
-  origAlloc: { quantity: number; isInSideboard: boolean } | undefined,
-) => {
-  const hasNew = !!newAlloc && newAlloc.quantity > 0
-  if (!hasNew && !origAlloc) return
-
-  if (!hasNew && origAlloc) {
-    await deallocateFromAll(deckId, nonWishlistCards, origAlloc.isInSideboard)
-    return
-  }
-
-  if (!origAlloc && newAlloc) {
-    await decksStore.allocateCardToDeck(deckId, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
-    return
-  }
-
-  if (newAlloc && origAlloc && (origAlloc.quantity !== newAlloc.quantity || origAlloc.isInSideboard !== newAlloc.isInSideboard)) {
-    await deallocateFromAll(deckId, nonWishlistCards, origAlloc.isInSideboard)
-    await decksStore.allocateCardToDeck(deckId, primaryCardId, newAlloc.quantity, newAlloc.isInSideboard)
-  }
-}
-
-// Process deck allocations: add/update/remove based on changes
-const processDeckAllocations = async (
-  primaryCardId: string,
-  savedRelatedCards: Card[],
-  savedDeckAllocations: Record<string, { quantity: number; isInSideboard: boolean }>,
-  savedAllDecks: typeof allDecks.value,
-  originalAllocations: Map<string, { quantity: number; isInSideboard: boolean }>,
-) => {
-  const nonWishlistCards = savedRelatedCards.filter(c => c.status !== 'wishlist')
-  for (const deck of savedAllDecks) {
-    await syncOneDeckAllocation(deck.id, primaryCardId, nonWishlistCards, savedDeckAllocations[deck.id], originalAllocations.get(deck.id))
-  }
+  return buildOriginalSlots(savedRelatedCards.map(c => c.id), allocsByCardId)
 }
 
 // Save changes
@@ -581,75 +514,60 @@ const handleSave = async () => {
       isPublic: isPublic.value,
     }
 
-    // ===== STEP 0: consolidar duplicates con misma identidad (SCRUM-36 Bug C) =====
-    // Cards acumuladas por bugs previos: misma scryfallId+edition+condition+foil+status.
-    // Migrar sus deck allocations a savedCard y borrar los duplicados, para que el flujo
-    // siguiente opere sobre un solo registro consolidado.
-    const duplicates = collectionStore.cards.filter(c =>
-      c.id !== savedCard.id &&
-      c.status === savedCard.status &&
-      c.scryfallId === savedCard.scryfallId &&
-      c.edition === savedCard.edition &&
-      c.condition === savedCard.condition &&
-      c.foil === savedCard.foil
-    )
-    for (const dup of duplicates) {
-      for (const alloc of getAllocationsForCard(dup.id)) {
-        await decksStore.deallocateCard(alloc.deckId, dup.id, alloc.isInSideboard)
-        await decksStore.allocateCardToDeck(alloc.deckId, savedCard.id, alloc.quantity, alloc.isInSideboard)
-      }
-      await collectionStore.deleteCard(dup.id)
+    // SCRUM-35: identidad estricta. Diff calculado por util pura (cardSaveDiff.ts).
+    // Identidad = (scryfallId, edition, condition, foil) — del print/condition NUEVOS si
+    // el usuario cambio en el modal, no del savedCard original.
+    const identity: CardIdentity = {
+      scryfallId: cardData.scryfallId,
+      edition: cardData.edition,
+      condition: cardData.condition,
+      foil: cardData.foil,
     }
 
     const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
 
-    // Snapshot allocations of savedCard ANTES de cualquier mutación adicional (necesario para
-    // wishlist deck-allocation sync porque processDeckAllocations filtra wishlist).
-    const origAllocsBySavedCardDeck = new Map<string, { quantity: number; isInSideboard: boolean }>()
-    if (savedCard.status === 'wishlist') {
-      for (const alloc of getAllocationsForCard(savedCard.id)) {
-        origAllocsBySavedCardDeck.set(alloc.deckId, { quantity: alloc.quantity, isInSideboard: alloc.isInSideboard })
-      }
-    }
+    // SCRUM-35 D2: snapshot per-deck (mb, sb) totals BEFORE any mutation. We sum
+    // across ALL related cards (owned + wishlist) since they share identity. This is
+    // the original truth that the diff compares against.
+    const originalSlots = buildOriginalSlotsForRelated(savedRelatedCards)
 
-    // ===== STEP 1: reduce (solo path owned) =====
-    // Para wishlist: NO llamar reduceAllocationsForCard. Vacía las allocations porque
-    // cardId === wishCardId hace que adjustDeckAllocation entre en estado degenerado.
+    // STEP 1: reduce deck allocations if owned drops below allocated (owned path only).
     if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
       await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
     }
 
-    // ===== STEP 2: processStatusEntries (siempre corre, para todos los buckets) =====
-    const statuses: CardStatus[] = ['collection', 'sale', 'trade', 'wishlist']
-    const updatedCardIds = await processStatusEntries(statuses, savedDistribution, savedRelatedCards, cardData)
+    // STEP 2: apply status diff. Strict identity per (scryfallId, edition, condition, foil)
+    // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
+    const ops = computeStatusOperations(savedDistribution, identity, collectionStore.cards)
+    const idsByStatus = await applyStatusOperations(ops, cardData)
 
-    // ===== STEP 3: sync deck allocations =====
-    if (savedCard.status === 'wishlist') {
-      // Wishlist: processDeckAllocations filtra wishlist cards. Sync manual de las
-      // allocations de savedCard contra el estado del modal.
-      const stillExists = collectionStore.cards.find(c => c.id === savedCard.id)
-      if (stillExists) {
-        for (const deck of allDecks.value) {
-          const newAlloc = deckAllocations.value[deck.id]
-          const newQty = newAlloc?.quantity ?? 0
-          const orig = origAllocsBySavedCardDeck.get(deck.id)
-          const origQty = orig?.quantity ?? 0
-          const sideboardChanged = !!orig && !!newAlloc && orig.isInSideboard !== newAlloc.isInSideboard
-          if (newQty === origQty && !sideboardChanged) continue
-          if (orig && origQty > 0) {
-            await decksStore.deallocateCard(deck.id, savedCard.id, orig.isInSideboard)
-          }
-          if (newAlloc && newQty > 0) {
-            await decksStore.allocateCardToDeck(deck.id, savedCard.id, newQty, newAlloc.isInSideboard)
-          }
-        }
-      }
-    } else {
-      // Owned: flujo existing con processDeckAllocations.
-      const primaryCardId = updatedCardIds[0]
-      if (primaryCardId) {
-        const originalAllocations = buildOriginalAllocations(savedRelatedCards)
-        await processDeckAllocations(primaryCardId, savedRelatedCards, { ...deckAllocations.value }, [...allDecks.value], originalAllocations)
+    // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
+    // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as
+    // the destination — allocateCardToDeck splits owned/wishlist via card.quantity).
+    // We deallocate ALL related cardIds for any board that changed so legacy rows
+    // (post-Fase D dupes still mid-flight, wishlist rows from prior bugs) get cleaned.
+    const ownedCardId =
+      idsByStatus.collection ??
+      idsByStatus.sale ??
+      idsByStatus.trade ??
+      idsByStatus.wishlist ??
+      null
+    const relatedCardIdsAfterStep2 = Array.from(new Set([
+      ...savedRelatedCards.map(c => c.id),
+      ...Object.values(idsByStatus).filter((v): v is string => !!v),
+    ]))
+    const slotOps = computeDeckSlotOps({
+      decks: allDecks.value.map(d => ({ deckId: d.id })),
+      originalSlots,
+      targetSlots: deckAllocations.value,
+      relatedCardIds: relatedCardIdsAfterStep2,
+      ownedCardId,
+    })
+    for (const op of slotOps) {
+      if (op.type === 'deallocate') {
+        await decksStore.deallocateCard(op.deckId, op.cardId, op.isInSideboard)
+      } else {
+        await decksStore.allocateCardToDeck(op.deckId, op.cardId, op.quantity, op.isInSideboard)
       }
     }
 
@@ -1042,8 +960,8 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           <div
               v-for="deck in allDecks"
               :key="deck.id"
-              class="flex items-center justify-between p-2 border transition-150"
-              :class="getDeckAllocation(deck.id) > 0 ? 'border-neon bg-neon-5' : 'border-silver-20'"
+              class="flex items-center justify-between p-2 border transition-150 gap-2"
+              :class="getDeckTotal(deck.id) > 0 ? 'border-neon bg-neon-5' : 'border-silver-20'"
           >
             <!-- Deck info -->
             <div class="flex-1 min-w-0 pr-2">
@@ -1051,36 +969,51 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
               <p class="text-tiny text-silver-50">{{ deck.format.toUpperCase() }}</p>
             </div>
 
-            <!-- Quantity controls -->
-            <div class="flex items-center gap-1">
-              <button
-                @click="decrementDeckAllocation(deck.id)"
-                :disabled="getDeckAllocation(deck.id) === 0"
-                class="w-7 h-7 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30"
-              >
+            <!-- MB / SB slot controls -->
+            <div class="flex items-center gap-3">
+              <div class="flex flex-col items-center">
+                <span class="text-tiny text-silver-50 font-bold mb-0.5">{{ t('cards.detailModal.slotMb') }}</span>
+                <div class="flex items-center gap-1">
+                  <button
+                    @click="adjustSlot(deck.id, 'mb', -1)"
+                    :disabled="getSlotQty(deck.id, 'mb') === 0"
+                    class="w-6 h-6 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 text-tiny"
+                  >
 -
 </button>
-
-              <span class="w-6 text-center text-small font-bold" :class="getDeckAllocation(deck.id) > 0 ? 'text-neon' : 'text-silver-50'">
-                {{ getDeckAllocation(deck.id) }}
-              </span>
-
-              <button
-                @click="incrementDeckAllocation(deck.id)"
-                class="w-7 h-7 flex items-center justify-center bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
-              >
+                  <span class="w-5 text-center text-small font-bold" :class="getSlotQty(deck.id, 'mb') > 0 ? 'text-neon' : 'text-silver-50'">
+                    {{ getSlotQty(deck.id, 'mb') }}
+                  </span>
+                  <button
+                    @click="adjustSlot(deck.id, 'mb', 1)"
+                    class="w-6 h-6 flex items-center justify-center bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded text-tiny"
+                  >
 +
 </button>
+                </div>
+              </div>
 
-              <!-- Sideboard toggle -->
-              <button
-                v-if="getDeckAllocation(deck.id) > 0"
-                @click="toggleSideboard(deck.id)"
-                class="ml-1 px-2 py-1 text-tiny border transition-150"
-                :class="isInSideboard(deck.id) ? 'border-amber text-amber' : 'border-silver-30 text-silver-50 hover:border-silver'"
-              >
-                {{ isInSideboard(deck.id) ? t('cards.detailModal.sideboardToggle.sideboard') : t('cards.detailModal.sideboardToggle.mainboard') }}
-              </button>
+              <div class="flex flex-col items-center">
+                <span class="text-tiny text-silver-50 font-bold mb-0.5">{{ t('cards.detailModal.slotSb') }}</span>
+                <div class="flex items-center gap-1">
+                  <button
+                    @click="adjustSlot(deck.id, 'sb', -1)"
+                    :disabled="getSlotQty(deck.id, 'sb') === 0"
+                    class="w-6 h-6 flex items-center justify-center border border-silver-30 text-silver hover:border-amber hover:text-amber transition-150 disabled:opacity-30 text-tiny"
+                  >
+-
+</button>
+                  <span class="w-5 text-center text-small font-bold" :class="getSlotQty(deck.id, 'sb') > 0 ? 'text-amber' : 'text-silver-50'">
+                    {{ getSlotQty(deck.id, 'sb') }}
+                  </span>
+                  <button
+                    @click="adjustSlot(deck.id, 'sb', 1)"
+                    class="w-6 h-6 flex items-center justify-center bg-amber text-primary font-bold border border-amber hover:brightness-110 transition-150 rounded text-tiny"
+                  >
++
+</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -702,6 +702,8 @@
         "sideboard": "SB",
         "mainboard": "MB"
       },
+      "slotMb": "MB",
+      "slotSb": "SB",
       "totalAssigned": "Total assigned: {qty}",
       "noImage": "No image",
       "allocatedIn": "ASSIGNED TO DECKS",

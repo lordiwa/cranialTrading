@@ -122,7 +122,8 @@ export interface IndexCard {
     r: string      // rarity (first char)
     t: string      // type_line
     f: boolean     // foil
-    sc: string     // setCode
+    sc: string     // setCode (e.g., "ECL")
+    e?: string     // edition (set_name humano-legible, e.g., "Lorwyn Eclipsed"). Optional for backward compat with pre-v3 indexes.
     pw: string     // power
     to: string     // toughness
     fa: boolean    // full_art
@@ -149,7 +150,7 @@ function indexToCard(ic: IndexCard): Card {
         id: ic.i,
         scryfallId: ic.s,
         name: ic.n,
-        edition: ic.sc?.toUpperCase() || '',
+        edition: ic.e || ic.sc?.toUpperCase() || '',
         setCode: ic.sc,
         status: ic.st as CardStatus,
         quantity: ic.q,
@@ -203,6 +204,7 @@ function cardToIndex(card: Card): IndexCard {
         t: card.type_line || '',
         f: card.foil,
         sc: card.setCode || '',
+        e: card.edition || '',
         pw: card.power || '',
         to: card.toughness || '',
         fa: card.full_art || false,
@@ -310,7 +312,7 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /** Expected index version — bump in Cloud Function when format changes */
-    const EXPECTED_INDEX_VERSION = 2
+    const EXPECTED_INDEX_VERSION = 3
 
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {

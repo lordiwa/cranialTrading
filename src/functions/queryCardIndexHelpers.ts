@@ -11,6 +11,7 @@
  *   st = status        q  = quantity      p  = price
  *   cm = cmc           co = colors[]      r  = rarity (first char: c/u/r/m)
  *   t  = type_line     f  = foil          sc = setCode
+ *   e  = edition (set_name, optional pre-v3)
  *   pw = power         to = toughness     fa = full_art
  *   pm = produced_mana kw = keywords      lg = legalities (legal format names)
  *   ca = createdAt(ms) cn = condition     pb = public
@@ -30,6 +31,7 @@ export interface IndexCard {
   t: string
   f: boolean
   sc: string
+  e?: string
   pw: string
   to: string
   fa: boolean

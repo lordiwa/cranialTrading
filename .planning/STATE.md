@@ -4,8 +4,8 @@ milestone: v1.22.0
 milestone_name: milestone
 status: Milestone complete
 stopped_at: Phase 4 context gathered
-last_updated: "2026-04-18T17:34:50.855Z"
-last_activity: 2026-04-18
+last_updated: "2026-04-27T23:35:00.000Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 4
   completed_phases: 4
@@ -29,7 +29,7 @@ Phase: 04
 Plans delivered: A (pure helpers), B (composables), C (route split), D (GridCard split), E (closeout)
 Shipped: v1.23.0 on cranial-trading-dev.web.app, verified by user 2026-04-17
 Next: tech-debt cleanup (BulkSelectionActionBar + DeckStatsFooter + useDeckDisplayCards extractions) → Phase 04 (GlobalSearch ARIA combobox)
-Last activity: 2026-04-18 - Completed quick task 260418-pzu: Mana curve per deck with hypergeometric play probability (SCRUM-10)
+Last activity: 2026-04-27 - Completed quick task 260427-pnm: SCRUM-41 FAB visible en desktop, ocultar placeholder + en grid (v1.28.1)
 
 Progress: [███████▌░░] 75%
 
@@ -80,6 +80,7 @@ None from Phase 01. Ready to plan Phase 02.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260418-pzu | Mana curve per deck with hypergeometric play probability (SCRUM-10) | 2026-04-18 | 92cbce1 | [260418-pzu-mana-curve-per-deck-with-hypergeometric-](./quick/260418-pzu-mana-curve-per-deck-with-hypergeometric-/) |
+| 260427-pnm | SCRUM-41 FAB visible en desktop, ocultar placeholder + en grid (v1.28.1) | 2026-04-27 | _pending_ | [260427-pnm-scrum-41-fab-visible-en-desktop-ocultar-](./quick/260427-pnm-scrum-41-fab-visible-en-desktop-ocultar-/) |
 
 ### Phase 01 Lessons (feed into Phase 02 planning)
 

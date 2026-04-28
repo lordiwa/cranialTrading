@@ -490,8 +490,8 @@ const handleDeckContextMenuSelect = (itemId: string) => {
 
       <!-- ===== Binder Virtual Scroll (groupBy=none, 35k+ cards) ===== -->
       <div v-else-if="useBinderVirtualScroll" ref="binderContainerRef">
-        <!-- Add card placeholder (top) -->
-        <div class="mb-3">
+        <!-- Add card placeholder (top) — hidden everywhere; FAB covers all viewports (SCRUM-41) -->
+        <div class="hidden">
           <div
             class="cursor-pointer group inline-block"
             @click="emit('addCard')"
@@ -627,8 +627,8 @@ const handleDeckContextMenuSelect = (itemId: string) => {
               </div>
             </div>
           </div>
-          <!-- Add card placeholder (hidden on mobile — FAB covers; visible md+ where there is no FAB) -->
-          <div class="hidden md:block md:mt-3">
+          <!-- Add card placeholder — hidden everywhere; FAB covers all viewports (SCRUM-41) -->
+          <div class="hidden">
             <div
               class="inline-block cursor-pointer group"
               @click="emit('addCard')"

@@ -47,6 +47,7 @@ export interface HydratedDeckCard {
     price: number
     image: string
     cmc?: number              // Mana value for grouping
+    mana_cost?: string        // Mana cost string e.g. "{W}{W}{U}" — hydrated on-demand for color analysis
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
     produced_mana?: string[]  // Colors of mana produced (for lands)
@@ -83,6 +84,7 @@ export interface HydratedWishlistCard {
     price: number
     image: string
     cmc?: number              // Mana value for grouping
+    mana_cost?: string        // Mana cost string e.g. "{W}{W}{U}" — hydrated on-demand for color analysis
     type_line?: string        // Card type for grouping
     colors?: string[]         // Card colors for grouping (W, U, B, R, G)
     produced_mana?: string[]  // Colors of mana produced (for lands)

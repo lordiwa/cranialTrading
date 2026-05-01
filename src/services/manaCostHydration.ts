@@ -57,10 +57,20 @@ export async function hydrateManaCosts(
             const identifiers = unknownIds.map(id => ({ id }))
             const cards: ScryfallCard[] = await getCardsByIds(identifiers)
 
-            // Build a quick id -> mana_cost map (Scryfall may return cards out of order)
+            // Build a quick id -> mana_cost map (Scryfall may return cards out of order).
+            // For MDFCs (modal_dfc / transform / etc.), top-level `mana_cost` is empty;
+            // the actual front-face cost lives in `card_faces[0].mana_cost`.
             const byId = new Map<string, string>()
             for (const card of cards) {
-                if (card?.id) byId.set(card.id, card.mana_cost ?? '')
+                if (!card?.id) continue
+                const topLevel = card.mana_cost ?? ''
+                if (topLevel) {
+                    byId.set(card.id, topLevel)
+                    continue
+                }
+                const faces = (card as ScryfallCard & { card_faces?: { mana_cost?: string }[] }).card_faces
+                const frontFaceCost = faces?.[0]?.mana_cost ?? ''
+                byId.set(card.id, frontFaceCost)
             }
 
             // Seed cache for every unknownId — even if Scryfall didn't return it

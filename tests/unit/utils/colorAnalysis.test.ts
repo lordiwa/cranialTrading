@@ -133,6 +133,35 @@ describe('calculateColorAnalysis', () => {
         expect(out.U).toEqual({ demand: 8, sources: 20 })
     })
 
+    it('counts spell+land MDFC demand AND sources (Shatterskull Smashing)', () => {
+        const out = calculateColorAnalysis([
+            makeCard({
+                name: 'Shatterskull Smashing',
+                type_line: 'Sorcery // Land',
+                mana_cost: '{X}{R}{R}',
+                produced_mana: ['R'],
+                allocatedQuantity: 4,
+            }),
+        ])
+        // Front-face cost contributes demand (R x 2 per copy = 8)
+        expect(out.R.demand).toBe(8)
+        // Back-face land contributes sources (R x 1 per copy = 4)
+        expect(out.R.sources).toBe(4)
+    })
+
+    it('excludes pure-land MDFC from demand (Pathway: Land // Land)', () => {
+        const out = calculateColorAnalysis([
+            makeCard({
+                name: 'Branchloft Pathway',
+                type_line: 'Land // Land',
+                produced_mana: ['G'],
+                allocatedQuantity: 4,
+            }),
+        ])
+        expect(out.G.demand).toBe(0)
+        expect(out.G.sources).toBe(4)
+    })
+
     it('sums hybrid card demand to BOTH colors per ticket', () => {
         const out = calculateColorAnalysis([
             makeCard({

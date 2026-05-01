@@ -11,6 +11,7 @@
  */
 
 import type { HydratedDeckCard } from '@/types/deck'
+import { type DeckSize, karstenSourcesNeeded } from './karstenThresholds'
 
 export interface ColorBreakdown {
     W: number
@@ -139,10 +140,27 @@ const EMPTY_ANALYSIS = (): ColorAnalysis => ({
     G: { demand: 0, sources: 0 },
 })
 
-const isLand = (typeLine?: string): boolean =>
-    !!typeLine && /\bLand\b/i.test(typeLine)
+/**
+ * "Pure land" = a card that should NOT contribute demand. For single-faced cards
+ * this is just any card whose type line includes "Land". For MDFCs (Modal
+ * Double-Faced Cards), only EXCLUDE if both sides are lands (e.g. Pathways).
+ * Spell+land MDFCs like Shatterskull Smashing must contribute their front-face
+ * cost as demand AND their back-face land production as sources.
+ */
+const isPureLand = (typeLine?: string): boolean => {
+    if (!typeLine) return false
+    if (!typeLine.includes('//')) {
+        return /\bLand\b/i.test(typeLine)
+    }
+    const sides = typeLine.split('//')
+    return sides.every(side => /\bLand\b/i.test(side))
+}
 
 /**
+ * @deprecated Use `calculateKarstenAnalysis` instead. This function sums absolute
+ * mana symbols across the deck which over-reports demand (lands re-tap each turn,
+ * so 49 absolute U pips vs 23 lands is a false-negative).
+ *
  * Aggregate per-color demand (mana symbols in non-land card costs) and sources
  * (produced_mana of lands) across a hydrated card list, multiplied by each
  * card's `allocatedQuantity`.
@@ -158,7 +176,7 @@ export function calculateColorAnalysis(cards: HydratedDeckCard[]): ColorAnalysis
         const qty = card.allocatedQuantity || 0
         if (qty <= 0) continue
 
-        const cardIsLand = isLand(card.type_line)
+        const cardIsLand = isPureLand(card.type_line)
 
         // Sources: any card with produced_mana (typically lands) contributes.
         if (card.produced_mana && card.produced_mana.length > 0) {
@@ -179,6 +197,155 @@ export function calculateColorAnalysis(cards: HydratedDeckCard[]): ColorAnalysis
             out.R.demand += breakdown.R * qty
             out.G.demand += breakdown.G * qty
         }
+    }
+
+    return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Karsten-based per-spell analysis (industry-standard playability check)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const COLOR_KEYS_TUPLE = ['W', 'U', 'B', 'R', 'G'] as const
+type Color = typeof COLOR_KEYS_TUPLE[number]
+
+export type ColorChannelStatus = 'ok' | 'tight' | 'critical' | 'noLands' | 'noDemand'
+
+export interface SpellPlayabilityCheck {
+    card: HydratedDeckCard
+    cmc: number
+    pips: number          // pips of the analyzed color in this spell's cost
+    required: number      // Karsten threshold
+    available: number     // sources of this color in the deck
+    status: 'ok' | 'tight' | 'critical'
+    deficit: number       // max(0, required - available)
+}
+
+export interface ColorChannelKarsten {
+    sources: number
+    maxRequired: number
+    maxRequiredCard?: HydratedDeckCard
+    spellChecks: SpellPlayabilityCheck[]
+    status: ColorChannelStatus
+    failingCount: number
+    totalCount: number
+}
+
+export interface KarstenColorAnalysis {
+    W: ColorChannelKarsten
+    U: ColorChannelKarsten
+    B: ColorChannelKarsten
+    R: ColorChannelKarsten
+    G: ColorChannelKarsten
+}
+
+const TIGHT_RATIO = 0.85
+
+const emptyChannel = (): ColorChannelKarsten => ({
+    sources: 0,
+    maxRequired: 0,
+    maxRequiredCard: undefined,
+    spellChecks: [],
+    status: 'noDemand',
+    failingCount: 0,
+    totalCount: 0,
+})
+
+const emptyKarstenAnalysis = (): KarstenColorAnalysis => ({
+    W: emptyChannel(),
+    U: emptyChannel(),
+    B: emptyChannel(),
+    R: emptyChannel(),
+    G: emptyChannel(),
+})
+
+function spellStatus(available: number, required: number): 'ok' | 'tight' | 'critical' {
+    if (available >= required) return 'ok'
+    if (available >= required * TIGHT_RATIO) return 'tight'
+    return 'critical'
+}
+
+function channelStatus(available: number, maxRequired: number, hasDemand: boolean): ColorChannelStatus {
+    if (!hasDemand) return 'noDemand'
+    if (available === 0) return 'noLands'
+    return spellStatus(available, maxRequired)
+}
+
+/**
+ * Per-spell Karsten playability analysis. For each non-land card, looks up the
+ * Karsten threshold for its (cmc, pips-of-this-color) and compares against the
+ * total `produced_mana` sources in the deck. Reports per-color status based on
+ * the most demanding spell.
+ *
+ * Cards without `mana_cost` (not yet hydrated, or genuinely costless) are
+ * silently skipped — the panel will repopulate reactively as hydration completes.
+ *
+ * Lands and pure-land MDFCs (Pathway-style: Land // Land) are excluded from
+ * demand. Spell+land MDFCs (Sorcery // Land) contribute their front-face cost.
+ */
+export function calculateKarstenAnalysis(
+    cards: HydratedDeckCard[],
+    deckSize: DeckSize
+): KarstenColorAnalysis {
+    const out = emptyKarstenAnalysis()
+
+    // Pass 1: count sources per color.
+    for (const card of cards) {
+        const qty = card.allocatedQuantity || 0
+        if (qty <= 0) continue
+        if (!card.produced_mana || card.produced_mana.length === 0) continue
+        for (const c of card.produced_mana) {
+            if (COLOR_KEYS_TUPLE.includes(c as Color)) {
+                out[c as Color].sources += qty
+            }
+        }
+    }
+
+    // Pass 2: for each non-land card with mana_cost, generate a SpellPlayabilityCheck
+    // for every color that has pips in the cost.
+    for (const card of cards) {
+        const qty = card.allocatedQuantity || 0
+        if (qty <= 0) continue
+        if (isPureLand(card.type_line)) continue
+        if (!card.mana_cost) continue
+
+        const breakdown = parseManaCost(card.mana_cost)
+        const cmc = card.cmc ?? 0
+
+        for (const color of COLOR_KEYS_TUPLE) {
+            const pips = breakdown[color]
+            if (pips <= 0) continue
+
+            const channel = out[color]
+            const required = karstenSourcesNeeded(cmc, pips, deckSize)
+            const available = channel.sources
+            const status = spellStatus(available, required)
+
+            const check: SpellPlayabilityCheck = {
+                card,
+                cmc,
+                pips,
+                required,
+                available,
+                status,
+                deficit: Math.max(0, required - available),
+            }
+
+            channel.spellChecks.push(check)
+            channel.totalCount++
+            if (status !== 'ok') channel.failingCount++
+            if (required > channel.maxRequired) {
+                channel.maxRequired = required
+                channel.maxRequiredCard = card
+            }
+        }
+    }
+
+    // Pass 3: compute channel-level status from accumulated data.
+    for (const color of COLOR_KEYS_TUPLE) {
+        const channel = out[color]
+        const hasDemand = channel.totalCount > 0
+        channel.status = channelStatus(channel.sources, channel.maxRequired, hasDemand)
     }
 
     return out

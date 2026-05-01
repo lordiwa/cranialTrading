@@ -803,6 +803,27 @@
       "detecting": "Detectando tierras con ETB tapped…",
       "probabilityLabel": "P(≥{k} tierras al turno {k})"
     },
+    "colorAnalysis": {
+      "title": "Análisis de Colores",
+      "subtitle": "Fuentes vs requisitos Karsten (mainboard)",
+      "sources": "Fuentes",
+      "requires": "requiere",
+      "worstSpell": "peor",
+      "playabilityStat": "{ok}/{total} cumplen",
+      "expandSpells": "Ver spells",
+      "collapseSpells": "Ocultar",
+      "noColors": "Este mazo no tiene costos de color en el mainboard.",
+      "loading": "Calculando colores…",
+      "statusOk": "OK",
+      "statusLow": "Justo",
+      "statusCritical": "Insuficiente",
+      "noLands": "Sin tierras",
+      "karstenLabel": "Karsten",
+      "spellHeader": "Carta",
+      "cmcHeader": "CMC",
+      "pipsHeader": "Símbolos",
+      "requiredHeader": "Req."
+    },
     "createModal": {
       "title": "CREAR NUEVO MAZO",
       "subtitle": "Define los detalles básicos de tu mazo",

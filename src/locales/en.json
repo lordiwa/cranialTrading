@@ -803,6 +803,27 @@
       "detecting": "Detecting tapped lands…",
       "probabilityLabel": "P(≥{k} lands by turn {k})"
     },
+    "colorAnalysis": {
+      "title": "Color Analysis",
+      "subtitle": "Sources vs Karsten requirements (mainboard)",
+      "sources": "Sources",
+      "requires": "requires",
+      "worstSpell": "worst",
+      "playabilityStat": "{ok}/{total} pass",
+      "expandSpells": "View spells",
+      "collapseSpells": "Hide",
+      "noColors": "This deck has no colored mana costs in the mainboard.",
+      "loading": "Calculating colors…",
+      "statusOk": "OK",
+      "statusLow": "Tight",
+      "statusCritical": "Insufficient",
+      "noLands": "No lands",
+      "karstenLabel": "Karsten",
+      "spellHeader": "Card",
+      "cmcHeader": "CMC",
+      "pipsHeader": "Symbols",
+      "requiredHeader": "Req."
+    },
     "createModal": {
       "title": "CREATE NEW DECK",
       "subtitle": "Define your deck's basic details",

@@ -803,6 +803,27 @@
       "detecting": "Detectando terrenos com ETB tapped…",
       "probabilityLabel": "P(≥{k} terrenos no turno {k})"
     },
+    "colorAnalysis": {
+      "title": "Análise de Cores",
+      "subtitle": "Fontes vs requisitos Karsten (mainboard)",
+      "sources": "Fontes",
+      "requires": "requer",
+      "worstSpell": "pior",
+      "playabilityStat": "{ok}/{total} cumprem",
+      "expandSpells": "Ver spells",
+      "collapseSpells": "Ocultar",
+      "noColors": "Este deck não tem custos coloridos no mainboard.",
+      "loading": "Calculando cores…",
+      "statusOk": "OK",
+      "statusLow": "Apertado",
+      "statusCritical": "Insuficiente",
+      "noLands": "Sem terrenos",
+      "karstenLabel": "Karsten",
+      "spellHeader": "Carta",
+      "cmcHeader": "CMC",
+      "pipsHeader": "Símbolos",
+      "requiredHeader": "Req."
+    },
     "createModal": {
       "title": "CRIAR NOVO DECK",
       "subtitle": "Defina os detalhes básicos do seu deck",

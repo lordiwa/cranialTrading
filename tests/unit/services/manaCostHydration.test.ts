@@ -83,6 +83,22 @@ describe('hydrateManaCosts', () => {
         expect(result.get('plains-id')).toBe('')
     })
 
+    it('falls back to card_faces[0].mana_cost for MDFCs (top-level mana_cost is empty)', async () => {
+        mockGetCardsByIds.mockResolvedValueOnce([
+            {
+                id: 'shatterskull-id',
+                name: 'Shatterskull Smashing',
+                mana_cost: '',
+                card_faces: [
+                    { mana_cost: '{X}{R}{R}' },
+                    { mana_cost: '' },
+                ],
+            } as unknown as ScryfallCard,
+        ])
+        const result = await hydrateManaCosts(['shatterskull-id'])
+        expect(result.get('shatterskull-id')).toBe('{X}{R}{R}')
+    })
+
     it('mixes cached hits with newly-fetched unknowns', async () => {
         mockGetCardsByIds.mockResolvedValueOnce([
             { id: 'bolt-id', name: 'Lightning Bolt', mana_cost: '{R}' } as ScryfallCard,

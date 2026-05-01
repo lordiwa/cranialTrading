@@ -12,6 +12,7 @@ import CardDetailModal from '../components/collection/CardDetailModal.vue'
 import ManageDecksModal from '../components/collection/ManageDecksModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
+import DeckColorAnalysis from '../components/decks/DeckColorAnalysis.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
 import DeckManaCurve from '../components/decks/DeckManaCurve.vue'
 import DeckStatsFooter from '../components/decks/DeckStatsFooter.vue'
@@ -1217,6 +1218,15 @@ onUnmounted(() => {
             v-if="selectedDeck && mainboardDisplayCards.length > 0"
             :cards="mainboardDisplayCards"
             :deck-size="manaCurveDeckSize"
+        />
+
+        <!-- ========== COLOR ANALYSIS (SCRUM-42 Phase 2 / SCRUM-45) ========== -->
+        <!-- Karsten-based playability per spell. Mainboard ONLY — Karsten thresholds
+             assume a fixed 60- or 99-card deck; mixing sideboard breaks the math. -->
+        <DeckColorAnalysis
+            v-if="selectedDeck && mainboardDisplayCards.length > 0"
+            :cards="mainboardDisplayCards"
+            :deck-format="selectedDeck.format"
         />
       </div>
     </div>

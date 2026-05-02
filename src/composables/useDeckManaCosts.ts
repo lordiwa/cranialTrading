@@ -20,12 +20,18 @@ export interface UseDeckManaCostsResult {
     manaCostsMap: Ref<Map<string, string>>
     /** Same cards as input, but with `mana_cost` populated where available */
     cardsWithManaCost: ComputedRef<HydratedDeckCard[]>
+    /** True while the FIRST hydration call is in flight (false thereafter, even on
+     *  subsequent fetches for newly-added cards). Lets the UI distinguish "loading"
+     *  from "no demand". */
+    isFirstLoading: Ref<boolean>
 }
 
 export function useDeckManaCosts(
     cards: ComputedRef<HydratedDeckCard[]>
 ): UseDeckManaCostsResult {
     const manaCostsMap = ref<Map<string, string>>(new Map())
+    const isFirstLoading = ref<boolean>(true)
+    let hasResolvedOnce = false
 
     // Watch the unique scryfallIds present in the input. Any new ID triggers a
     // single hydration fetch (cached upstream).
@@ -38,15 +44,31 @@ export function useDeckManaCosts(
             return Array.from(ids).sort().join('|')
         },
         async (signature) => {
-            if (!signature) return
+            if (!signature) {
+                if (!hasResolvedOnce) {
+                    isFirstLoading.value = false
+                    hasResolvedOnce = true
+                }
+                return
+            }
             const ids = signature.split('|').filter(Boolean)
-            if (ids.length === 0) return
+            if (ids.length === 0) {
+                if (!hasResolvedOnce) {
+                    isFirstLoading.value = false
+                    hasResolvedOnce = true
+                }
+                return
+            }
             const fresh = await hydrateManaCosts(ids)
             // Merge into existing map (do not lose previously-cached entries
             // for cards that just left the deck).
             const next = new Map(manaCostsMap.value)
             for (const [k, v] of fresh) next.set(k, v)
             manaCostsMap.value = next
+            if (!hasResolvedOnce) {
+                isFirstLoading.value = false
+                hasResolvedOnce = true
+            }
         },
         { immediate: true }
     )
@@ -61,5 +83,5 @@ export function useDeckManaCosts(
         })
     })
 
-    return { manaCostsMap, cardsWithManaCost }
+    return { manaCostsMap, cardsWithManaCost, isFirstLoading }
 }

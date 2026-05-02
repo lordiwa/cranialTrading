@@ -101,7 +101,7 @@ watch(
 
 function probabilityClass(p: number): string {
   if (p >= 0.9) return 'text-neon'
-  if (p >= 0.7) return 'text-yellow-400'
+  if (p >= 0.7) return 'text-warning'
   return 'text-rust'
 }
 
@@ -185,7 +185,7 @@ function barHeight(count: number): string {
     </div>
     <div
         v-else-if="tappedInfo && tappedInfo.tappedCount > 0"
-        class="mt-3 p-2 border border-yellow-400/40 text-yellow-400"
+        class="mt-3 p-2 border border-warning/40 text-warning"
     >
       <div class="text-small font-bold">
         {{ t('decks.manaCurve.tappedWarning', { count: tappedInfo.tappedCount }) }}

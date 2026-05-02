@@ -36,6 +36,14 @@ export default {
                     10: 'rgba(139, 46, 31, 0.1)',
                     5: 'rgba(139, 46, 31, 0.05)',
                 },
+                // Warning - tight / caution states (between OK and critical)
+                warning: {
+                    DEFAULT: '#FACC15', // matches Tailwind yellow-400 for backwards compat
+                    40: 'rgba(250, 204, 21, 0.4)',
+                    15: 'rgba(250, 204, 21, 0.15)',
+                    10: 'rgba(250, 204, 21, 0.1)',
+                    5: 'rgba(250, 204, 21, 0.05)',
+                },
             },
             fontFamily: {
                 sans: ['Open Sans', 'sans-serif'],

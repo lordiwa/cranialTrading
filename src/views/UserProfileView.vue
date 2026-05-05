@@ -554,6 +554,7 @@ onMounted(() => {
             v-model:filter-query="filterQuery"
             v-model:sort-by="sortBy"
             v-model:group-by="groupBy"
+            :show-advanced-filters="true"
             :active-filter-count="activeChipFilterCount"
             :show-suggestions="false"
             @open-filters="showFilters = true"

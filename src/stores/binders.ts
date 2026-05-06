@@ -32,6 +32,14 @@ const removeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
     ) as T
 }
 
+// Deep-copy a Binder so that array assignment always triggers reactivity for
+// consumers that read the array reference (mirrors snapshotDeck in decks.ts).
+const snapshotBinder = (binder: Binder): Binder => ({
+    ...binder,
+    allocations: binder.allocations ? binder.allocations.map(a => ({ ...a })) : [],
+    stats: { ...binder.stats },
+})
+
 /** Serialize allocations array to JSON string for Firestore (avoids 40k index entry limit on maps) */
 export const serializeAllocations = (allocations: BinderAllocation[]): string =>
     JSON.stringify(Object.fromEntries(allocations.map(a => [a.cardId, a.quantity])))
@@ -367,11 +375,7 @@ export const useBindersStore = defineStore('binders', () => {
             // Mirrors the same fix applied to allocateCardToDeck in decks.ts.
             const idx = binders.value.indexOf(binder)
             if (idx !== -1) {
-                binders.value[idx] = {
-                    ...binder,
-                    allocations: binder.allocations ? binder.allocations.map(a => ({ ...a })) : [],
-                    stats: { ...binder.stats },
-                }
+                binders.value[idx] = snapshotBinder(binder)
                 binders.value = [...binders.value]
             }
 
@@ -442,6 +446,14 @@ export const useBindersStore = defineStore('binders', () => {
                 updatedAt: Timestamp.now(),
             })
 
+            // SCRUM-40: replace binder slot + array reference so consumers that read
+            // binders.value identity (BinderView.selectedBinder) are invalidated.
+            const idx = binders.value.indexOf(binder)
+            if (idx !== -1) {
+                binders.value[idx] = snapshotBinder(binder)
+                binders.value = [...binders.value]
+            }
+
             return totalAllocated
         } catch (error) {
             console.error('Error bulk allocating cards to binder:', error)
@@ -476,6 +488,13 @@ export const useBindersStore = defineStore('binders', () => {
                     stats: binder.stats,
                     updatedAt: Timestamp.now(),
                 })
+
+                // SCRUM-40: replace binder slot + array reference.
+                const idx = binders.value.indexOf(binder)
+                if (idx !== -1) {
+                    binders.value[idx] = snapshotBinder(binder)
+                    binders.value = [...binders.value]
+                }
             }
             return removed
         } catch (error) {
@@ -504,6 +523,13 @@ export const useBindersStore = defineStore('binders', () => {
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
             })
+
+            // SCRUM-40: replace binder slot + array reference.
+            const idx = binders.value.indexOf(binder)
+            if (idx !== -1) {
+                binders.value[idx] = snapshotBinder(binder)
+                binders.value = [...binders.value]
+            }
 
             return true
         } catch (error) {
@@ -558,6 +584,14 @@ export const useBindersStore = defineStore('binders', () => {
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
             })
+
+            // SCRUM-40: replace binder slot + array reference so the in-place
+            // alloc.quantity mutation is visible to consumers reading binders.value.
+            const idx = binders.value.indexOf(binder)
+            if (idx !== -1) {
+                binders.value[idx] = snapshotBinder(binder)
+                binders.value = [...binders.value]
+            }
 
             return true
         } catch (error) {

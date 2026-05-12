@@ -118,6 +118,9 @@ const form = reactive<{
   foil: boolean
   status: CardStatus
   deckName: string
+  // SCRUM-34: explicit mainboard/sideboard selector when a deck is chosen.
+  // Previously the modal silently allocated to mainboard, which surprised QA.
+  isInSideboard: boolean
   public: boolean
 }>({
   quantity: 1,
@@ -125,6 +128,7 @@ const form = reactive<{
   foil: props.defaultFoil ?? false,
   status: props.defaultStatus ?? 'collection',
   deckName: '',
+  isInSideboard: false,
   public: true,
 })
 
@@ -267,13 +271,13 @@ const handleAddCard = async () => {
       })
     }
 
-    // Si se seleccionó un deck, asignar la carta al deck
+    // Si se seleccionó un deck, asignar la carta al deck (SCRUM-34: respect MB/SB choice)
     if (cardId && form.deckName) {
       await decksStore.allocateCardToDeck(
         form.deckName,  // deckId
         cardId,
         form.quantity,
-        false  // isInSideboard
+        form.isInSideboard
       )
     }
 
@@ -387,6 +391,7 @@ const handleClose = () => {
   form.foil = props.defaultFoil ?? false
   form.status = props.defaultStatus ?? 'collection'
   form.deckName = ''
+  form.isInSideboard = false
   form.public = true
   cardFaceIndex.value = 0
   showZoom.value = false
@@ -645,6 +650,33 @@ const handleClose = () => {
                   :options="deckOptions"
                   class="mt-1"
               />
+            </div>
+
+            <!-- Board (MB/SB) — SCRUM-34: only when a deck is selected -->
+            <div v-if="form.deckName">
+              <span class="text-sm text-[#EEEEEE] block mb-1">{{ t('cards.addModal.boardLabel') }}</span>
+              <div class="flex gap-3" role="radiogroup" :aria-label="t('cards.addModal.boardLabel')">
+                <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
+                  <input
+                      type="radio"
+                      name="board"
+                      :value="false"
+                      v-model="form.isInSideboard"
+                      class="w-4 h-4 cursor-pointer"
+                  />
+                  <span class="text-sm text-silver">{{ t('cards.addModal.boardMainboard') }}</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer hover:text-amber transition-colors">
+                  <input
+                      type="radio"
+                      name="board"
+                      :value="true"
+                      v-model="form.isInSideboard"
+                      class="w-4 h-4 cursor-pointer"
+                  />
+                  <span class="text-sm text-silver">{{ t('cards.addModal.boardSideboard') }}</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>

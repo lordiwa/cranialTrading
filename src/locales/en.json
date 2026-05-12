@@ -746,7 +746,11 @@
       "private": "PRIVATE",
       "deleteTitle": "Delete card",
       "statusChanged": "Status changed to {status}",
-      "statusError": "Error changing status"
+      "statusError": "Error changing status",
+      "togglePublicAria": "Toggle public visibility for card {name}",
+      "setStatusAria": "Mark card {name} as {status}",
+      "flipAria": "Flip card {name}",
+      "cardActivateAria": "Open details for card {name}, {status}, quantity {qty}"
     },
     "contextMenu": {
       "plusOne": "+1 Quantity",

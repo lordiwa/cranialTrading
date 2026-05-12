@@ -132,6 +132,25 @@ const togglePublic = async () => {
   }
 }
 
+// SCRUM-26: shared activation handler — same logic for click and keyboard.
+// Card image div is role=button + tabindex=0 so SR users can land on it via Tab
+// (instead of skipping straight to the ELIMINAR button below) and activate with Enter/Space.
+const handleCardActivate = () => {
+  if (props.selectionMode) {
+    emit('toggleSelect', props.card.id)
+    return
+  }
+  if (props.isBeingDeleted || isSwiping.value) return
+  emit('cardClick', props.card)
+}
+
+const handleCardKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    handleCardActivate()
+  }
+}
+
 const { getTotalAllocated, getAvailableQuantity, getAllocationsForCard } = useCardAllocation()
 
 // Card Kingdom prices
@@ -385,6 +404,8 @@ const handleContextMenuSelect = async (itemId: string) => {
           class="flex items-center justify-center transition-all"
           :class="card.public ? 'text-neon' : 'text-silver-50'"
           :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
+          :aria-label="t('cards.grid.togglePublicAria', { name: card.name })"
+          :aria-pressed="card.public"
       >
         <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="small" />
       </button>
@@ -400,6 +421,8 @@ const handleContextMenuSelect = async (itemId: string) => {
             :class="card.status === status
               ? getStatusColor(status)
               : 'text-silver-30 hover:text-silver-50'"
+            :aria-label="t('cards.grid.setStatusAria', { name: card.name, status })"
+            :aria-pressed="card.status === status"
         >
           <SvgIcon :name="getStatusIconName(status)" size="small" />
         </button>
@@ -414,7 +437,7 @@ const handleContextMenuSelect = async (itemId: string) => {
 
     <!-- Row 2: Card Image -->
     <div
-        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all"
+        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
         :class="[
           selectionMode && isSelected ? 'border-neon border-2' : '',
           !selectionMode && isBeingDeleted ? 'border-rust animate-pulse' : '',
@@ -422,7 +445,12 @@ const handleContextMenuSelect = async (itemId: string) => {
           selectionMode && !isSelected ? 'border-silver-30' : '',
         ]"
         :style="swipeStyle"
-        @click="selectionMode ? emit('toggleSelect', card.id) : (!isBeingDeleted && !isSwiping && emit('cardClick', card))"
+        :tabindex="isBeingDeleted ? -1 : 0"
+        role="button"
+        :aria-label="t('cards.grid.cardActivateAria', { name: card.name, status: card.status, qty: card.quantity })"
+        :aria-pressed="selectionMode ? isSelected : undefined"
+        @click="handleCardActivate"
+        @keydown="handleCardKeydown"
     >
       <!-- Selection checkbox overlay -->
       <div
@@ -464,6 +492,7 @@ const handleContextMenuSelect = async (itemId: string) => {
           @click.stop="toggleCardFace"
           class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
           :title="t('cards.grid.flipTitle')"
+          :aria-label="t('cards.grid.flipAria', { name: card.name })"
       >
         <SvgIcon name="flip" size="tiny" />
       </button>

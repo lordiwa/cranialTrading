@@ -746,7 +746,11 @@
       "private": "PRIVADO",
       "deleteTitle": "Excluir carta",
       "statusChanged": "Status mudado para {status}",
-      "statusError": "Erro ao mudar status"
+      "statusError": "Erro ao mudar status",
+      "togglePublicAria": "Alternar visibilidade pública da carta {name}",
+      "setStatusAria": "Marcar a carta {name} como {status}",
+      "flipAria": "Virar a carta {name}",
+      "cardActivateAria": "Abrir detalhes da carta {name}, {status}, quantidade {qty}"
     },
     "contextMenu": {
       "plusOne": "+1 Quantidade",

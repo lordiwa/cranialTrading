@@ -696,6 +696,7 @@
       "conditionLabel": "Condición",
       "foilLabel": "Foil",
       "assignToDecks": "ASIGNAR A MAZOS",
+      "assignToBinders": "ASIGNAR A CARPETAS",
       "available": "{qty} disponible(s)",
       "deckFormat": "{format}",
       "sideboardToggle": {

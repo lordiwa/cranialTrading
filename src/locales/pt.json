@@ -696,6 +696,7 @@
       "conditionLabel": "Condição",
       "foilLabel": "Foil",
       "assignToDecks": "ATRIBUIR A DECKS",
+      "assignToBinders": "ATRIBUIR A FICHÁRIOS",
       "available": "{qty} disponível(is)",
       "deckFormat": "{format}",
       "sideboardToggle": {

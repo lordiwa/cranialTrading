@@ -164,7 +164,8 @@ export function buildManaCurve(
     }
 }
 
-// isLandTypeLine is exposed indirectly via the curve builder; callers who need to
-// detect lands themselves (e.g. DeckManaCurve.vue) can use the same /\bland\b/i
-// regex directly — we deliberately keep it inline there to avoid a micro-util.
-export { isLandTypeLine }
+// isLandTypeLine matches any type_line containing "Land" (including MDFC backs
+// like "Sorcery // Land"). isPureLand requires the card to be single-faced —
+// callers that need to count only TRUE lands and exclude spell+land MDFCs (e.g.
+// DeckManaCurve land counter, per SCRUM-31) must use isPureLand.
+export { isLandTypeLine, isPureLand }

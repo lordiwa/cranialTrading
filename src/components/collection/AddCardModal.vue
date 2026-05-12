@@ -13,6 +13,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { getCardSuggestions, type ScryfallCard, searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { findCardWithSamePrint } from '../../utils/cardIdentity'
 import type { CardCondition, CardStatus } from '../../types/card'
 
 interface Props {
@@ -225,29 +226,46 @@ const handleAddCard = async () => {
 
     const imageToSave = currentCardImage.value ?? ''
 
-    const cardId = await collectionStore.addCard({
+    // SCRUM-35 bug #1: if user already has the SAME print (scryfallId+edition+condition+foil+status),
+    // increment that row's quantity instead of creating a duplicate. Without this, repeated AddCardModal
+    // adds left dupes that the deck grid rendered as separate xN entries instead of a single x(N+1).
+    const existing = findCardWithSamePrint(collectionStore.cards, {
       scryfallId: selectedPrint.value.id,
-      name: cardName,
       edition: selectedPrint.value.set_name,
-      setCode: selectedPrint.value.set,
-      quantity: form.quantity,
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: cardKingdomRetail.value ?? Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
-      image: imageToSave,
-      public: form.public,
-      cmc: selectedPrint.value.cmc,
-      type_line: selectedPrint.value.type_line,
-      colors: selectedPrint.value.colors ?? [],
-      rarity: selectedPrint.value.rarity,
-      power: selectedPrint.value.power,
-      toughness: selectedPrint.value.toughness,
-      oracle_text: selectedPrint.value.oracle_text,
-      keywords: selectedPrint.value.keywords ?? [],
-      legalities: selectedPrint.value.legalities,
-      full_art: selectedPrint.value.full_art ?? false,
     })
+
+    let cardId: string | null
+    if (existing) {
+      const ok = await collectionStore.updateCard(existing.id, { quantity: existing.quantity + form.quantity })
+      cardId = ok ? existing.id : null
+    } else {
+      cardId = await collectionStore.addCard({
+        scryfallId: selectedPrint.value.id,
+        name: cardName,
+        edition: selectedPrint.value.set_name,
+        setCode: selectedPrint.value.set,
+        quantity: form.quantity,
+        condition: form.condition,
+        foil: form.foil,
+        status: form.status,
+        price: cardKingdomRetail.value ?? Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
+        image: imageToSave,
+        public: form.public,
+        cmc: selectedPrint.value.cmc,
+        type_line: selectedPrint.value.type_line,
+        colors: selectedPrint.value.colors ?? [],
+        rarity: selectedPrint.value.rarity,
+        power: selectedPrint.value.power,
+        toughness: selectedPrint.value.toughness,
+        oracle_text: selectedPrint.value.oracle_text,
+        keywords: selectedPrint.value.keywords ?? [],
+        legalities: selectedPrint.value.legalities,
+        full_art: selectedPrint.value.full_art ?? false,
+      })
+    }
 
     // Si se seleccionó un deck, asignar la carta al deck
     if (cardId && form.deckName) {

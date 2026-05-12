@@ -14,8 +14,6 @@ import CollectionGrid from '../components/collection/CollectionGrid.vue'
 import CollectionTotalsPanel from '../components/collection/CollectionTotalsPanel.vue'
 import CreateBinderModal from '../components/binders/CreateBinderModal.vue'
 import CreateDeckModal from '../components/decks/CreateDeckModal.vue'
-import DiscoveryPanel from '../components/discovery/DiscoveryPanel.vue'
-import BottomSheet from '../components/ui/BottomSheet.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import type { CreateBinderInput } from '../types/binder'
@@ -24,7 +22,6 @@ import type { CreateDeckInput } from '../types/deck'
 import { useBindersStore } from '../stores/binders'
 import { useDecksStore } from '../stores/decks'
 import { useCardAllocation } from '../composables/useCardAllocation'
-import { useDiscoveryAddCard } from '../composables/useDiscoveryAddCard'
 import { type ScryfallCard } from '../services/scryfallCache'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
@@ -56,21 +53,17 @@ const showCreateDeckModal = ref(false)
 const showCreateBinderModal = ref(false)
 const createDeckModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
 const createBinderModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
-// Search text that drives ONLY the DiscoveryPanel (Scryfall search),
-// deliberately decoupled from the local grid so typing doesn't shrink the collection view.
-const discoverQuery = ref('')
-
-// SCRUM-34: DiscoveryPanel state (mirrors DeckView/BinderView). Inline on desktop,
-// BottomSheet on mobile via Discover button in CardFilterBar.
-const showDiscoverySheet = ref(false)
-const discoveryVersionTrigger = ref<{ name: string; key: number } | null>(null)
-
 // Totals panel expanded state (for FAB positioning)
 const totalsPanelExpanded = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
+
+// SCRUM-66: when a user picks a Scryfall suggestion from the CardFilterBar dropdown,
+// we open AddCardModal pre-filled with that name so they can choose a printing without
+// retyping. AddCardModal auto-runs the printings query on open.
+const pendingAddCardName = ref<string | undefined>(undefined)
 
 
 // Filtros de COLECCIÓN
@@ -320,7 +313,6 @@ const { triggerQuery: triggerPaginationQuery } = useCollectionPagination({
 })
 
 const clearAllFilters = () => {
-  discoverQuery.value = ''
   filterQuery.value = ''
 }
 
@@ -701,40 +693,16 @@ const handleCreateBinder = async (data: CreateBinderInput) => {
 
 // ========== METHODS ==========
 
-// Click on local card suggestion → feed its name to the search input so Discovery searches it
+// SCRUM-66: clicking a local card from the dropdown narrows the grid to that exact name.
+// The user already has it — they want to find it in the grid, not open a discovery panel.
 const handleLocalCardSelect = (card: Card) => {
-  discoverQuery.value = card.name
+  filterQuery.value = card.name
 }
 
-// Click on Scryfall suggestion → place text in the search input so the DiscoveryPanel picks it up
+// SCRUM-66: clicking a Scryfall suggestion opens AddCardModal pre-filled with that name.
+// The modal auto-runs the printings query so the user can pick a version and add it.
 const handleScryfallSuggestionSelect = (cardName: string) => {
-  discoverQuery.value = cardName
-}
-
-// SCRUM-34: Discovery panel add-card orchestration for collection scope.
-const discoveryAdd = useDiscoveryAddCard('collection', {
-  collectionStore: {
-    addCard: collectionStore.addCard,
-    updateCard: collectionStore.updateCard,
-    cards: computed(() => collectionStore.cards),
-  },
-  decksStore: { allocateCardToDeck: decksStore.allocateCardToDeck },
-  bindersStore: {
-    allocateCardToBinder: binderStore.allocateCardToBinder,
-    binders: computed(() => binderStore.binders),
-  },
-  toastStore: { show: (m, k) => toastStore.show(m, k ?? 'info') },
-  t,
-  selectedDeckId: computed(() => undefined),
-  selectedBinderId: computed(() => undefined),
-})
-
-const handleDiscoveryAddCollection = (print: ScryfallCard, status: CardStatus) => {
-  void discoveryAdd.addToCollection(print, status)
-}
-
-const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
-  selectedScryfallCard.value = print
+  pendingAddCardName.value = cardName
   showAddCardModal.value = true
 }
 
@@ -742,6 +710,7 @@ const handleDiscoveryOpenAddModal = (print: ScryfallCard) => {
 const handleAddCardModalClose = () => {
   showAddCardModal.value = false
   selectedScryfallCard.value = undefined
+  pendingAddCardName.value = undefined
   if (route.query.addCard) {
     void router.replace({ path: '/collection', query: { ...route.query, addCard: undefined } })
   }
@@ -1030,8 +999,10 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== SEARCH + SORT + VIEW ========== -->
+        <!-- SCRUM-66: filter-query is bound to filterQuery (grid filter). Discovery panel
+             removed from /collection — adding new cards goes through the + button + AddCardModal. -->
         <CardFilterBar
-            v-model:filter-query="discoverQuery"
+            v-model:filter-query="filterQuery"
             v-model:sort-by="sortBy"
             v-model:group-by="collectionGroupBy"
             view-mode="collection"
@@ -1041,45 +1012,12 @@ onUnmounted(() => {
             :view-type="viewType"
             :show-advanced-filters="true"
             :active-filter-count="activeAdvancedFilterCount"
-            :show-mobile-discover="true"
-            :mobile-discover-active="showDiscoverySheet"
             @toggle-bulk-select="toggleSelectionMode"
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
             @open-filters="showAdvancedFiltersModal = true"
-            @open-discovery-sheet="showDiscoverySheet = true"
         />
-
-        <!-- ========== DISCOVERY PANEL (SCRUM-34) — desktop inline ========== -->
-        <div class="hidden md:block">
-          <DiscoveryPanel
-              scope="collection"
-              :search-query="discoverQuery"
-              :collection-cards="collectionStore.cards"
-              :version-trigger="discoveryVersionTrigger"
-              @add-to-collection="handleDiscoveryAddCollection"
-              @open-add-modal="handleDiscoveryOpenAddModal"
-          />
-        </div>
-
-        <!-- ========== DISCOVERY BOTTOM SHEET — mobile only ========== -->
-        <BottomSheet
-            :show="showDiscoverySheet"
-            :title="t('discovery.panel.titleDiscover')"
-            class="md:hidden"
-            @close="showDiscoverySheet = false"
-        >
-          <DiscoveryPanel
-              v-if="showDiscoverySheet"
-              scope="collection"
-              :search-query="discoverQuery"
-              :collection-cards="collectionStore.cards"
-              :version-trigger="discoveryVersionTrigger"
-              @add-to-collection="handleDiscoveryAddCollection"
-              @open-add-modal="handleDiscoveryOpenAddModal"
-          />
-        </BottomSheet>
 
         <!-- ========== ADVANCED FILTERS MODAL — filters local collection cards only ========== -->
         <AdvancedFilterModal
@@ -1221,6 +1159,7 @@ onUnmounted(() => {
     <AddCardModal
         :show="showAddCardModal"
         :scryfall-card="selectedScryfallCard"
+        :initial-search-query="pendingAddCardName"
         @close="handleAddCardModalClose"
         @added="handleAddCardModalClose"
     />

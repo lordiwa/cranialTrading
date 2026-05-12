@@ -23,6 +23,7 @@ interface Props {
   selectedBinderId?: string
   defaultStatus?: CardStatus
   defaultFoil?: boolean
+  initialSearchQuery?: string
 }
 
 const props = defineProps<Props>()
@@ -370,6 +371,18 @@ const selectSearchResult = (card: ScryfallCard) => {
   searchResults.value = []
   searchQuery.value = ''
 }
+
+// SCRUM-66: when opened from the CollectionView searcher dropdown with a chosen card
+// name, pre-fill the search input and auto-run the printings query so the user lands
+// directly on the print picker instead of an empty modal.
+watch(() => props.show, async (isOpen) => {
+  if (!isOpen) return
+  if (props.scryfallCard) return
+  const initial = props.initialSearchQuery?.trim()
+  if (!initial) return
+  searchQuery.value = initial
+  await performSearch()
+})
 
 const handleClickOutside = (e: MouseEvent) => {
   if (searchContainer.value && !searchContainer.value.contains(e.target as Node)) {

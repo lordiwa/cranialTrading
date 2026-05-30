@@ -65,10 +65,9 @@ const gridClass = computed(() =>
           :class="compact ? 'pb-3' : 'pb-4'"
           :style="{
             position: 'absolute',
-            top: 0,
+            top: `${vRow.start}px`,
             left: 0,
             width: '100%',
-            transform: `translateY(${vRow.start}px)`,
           }"
       >
         <div :class="gridClass">

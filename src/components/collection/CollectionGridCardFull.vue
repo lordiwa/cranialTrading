@@ -288,16 +288,6 @@ const getStatusColor = (status: string) => {
   return colors[status as keyof typeof colors] || 'text-silver-70'
 }
 
-const getStatusIconName = (status: string) => {
-  const icons = {
-    collection: 'check',
-    sale: 'money',
-    trade: 'flip',
-    wishlist: 'star',
-  }
-  return icons[status as keyof typeof icons] || 'check'
-}
-
 // Price mover badge
 const priceChangeData = computed(() => {
   if (!marketStore.movers) return null
@@ -394,48 +384,10 @@ const handleContextMenuSelect = async (itemId: string) => {
       </div>
     </div>
 
-    <!-- Row 1: Status Bar (full width) -->
-    <div class="flex items-center justify-between bg-primary/80 border border-silver-20 rounded px-2 py-1">
-      <!-- Public/Eye toggle -->
-      <button
-          v-if="!readonly && !isBeingDeleted"
-          @click.stop="togglePublic"
-          :disabled="togglingPublic"
-          class="flex items-center justify-center transition-all"
-          :class="card.public ? 'text-neon' : 'text-silver-50'"
-          :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
-          :aria-label="t('cards.grid.togglePublicAria', { name: card.name })"
-          :aria-pressed="card.public"
-      >
-        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="small" />
-      </button>
-      <SvgIcon v-else :name="card.public ? 'eye-open' : 'eye-closed'" size="small" class="text-silver-30" />
-
-      <div class="w-px h-4 bg-silver-20"></div>
-
-      <template v-for="status in STATUS_ORDER" :key="status">
-        <button
-            v-if="!readonly && !isBeingDeleted"
-            @click.stop="setStatus(status)"
-            class="flex items-center transition-all"
-            :class="card.status === status
-              ? getStatusColor(status)
-              : 'text-silver-30 hover:text-silver-50'"
-            :aria-label="t('cards.grid.setStatusAria', { name: card.name, status })"
-            :aria-pressed="card.status === status"
-        >
-          <SvgIcon :name="getStatusIconName(status)" size="small" />
-        </button>
-        <SvgIcon
-            v-else
-            :name="getStatusIconName(status)"
-            size="small"
-            :class="card.status === status ? getStatusColor(status) : 'text-silver-30'"
-        />
-      </template>
-    </div>
-
-    <!-- Row 2: Card Image -->
+    <!-- Row 1: Card Image -->
+    <!-- Status-toggle bar removed: ~5 <svg><use> icons per card across ~10 virtualized
+         cards corrupted low-end Mali GPUs (cranialBugColl / Tecno Spark 30C, Mali-G52).
+         Status changes + public toggle remain available via the context menu and swipe-right. -->
     <div
         class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
         :class="[

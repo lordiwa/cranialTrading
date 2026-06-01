@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import type { DisplayDeckCard } from '../../types/deck'
-import { buildManaCurve } from '../../utils/manaCurve'
+import { buildManaCurve, isPureLand } from '../../utils/manaCurve'
 import { detectEtbTappedLands } from '../../services/manaCurveLands'
 
 interface Props {
@@ -17,8 +17,10 @@ const { t } = useI18n()
 // Curve math
 // --------------------------------------------------------------------------
 
-const LAND_RX = /\bland\b/i
-
+// SCRUM-31: MDFCs with a Land back face (e.g. "Sorcery // Land") used to be
+// counted as pure lands here, inflating the land count and misleading the
+// player about their mana base. Use isPureLand (single-faced lands only) to
+// match the TC criterion that MDFCs are spells first.
 const curveInput = computed(() =>
   props.cards.map((c) => ({
     cmc: c.cmc ?? 0,
@@ -29,7 +31,7 @@ const curveInput = computed(() =>
 
 const landCount = computed(() =>
   curveInput.value
-    .filter((c) => LAND_RX.test(c.type_line))
+    .filter((c) => isPureLand(c.type_line))
     .reduce((sum, c) => sum + (c.allocatedQuantity ?? 0), 0)
 )
 
@@ -55,9 +57,12 @@ const hasAnyCards = computed(() => curve.value.totalCards > 0)
 // Tapped-land detection (async, cached)
 // --------------------------------------------------------------------------
 
+// SCRUM-31: only pure lands need ETB-tapped detection; MDFC backs are never
+// played first turn as lands without conscious choice, so excluding them keeps
+// the tapped banner aligned with the (now pure-only) land counter above.
 const landScryfallIds = computed(() =>
   props.cards
-    .filter((c) => LAND_RX.test(c.type_line ?? ''))
+    .filter((c) => isPureLand(c.type_line ?? ''))
     .map((c) => c.scryfallId)
     .filter(Boolean)
 )

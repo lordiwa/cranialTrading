@@ -53,16 +53,17 @@ const showCreateDeckModal = ref(false)
 const showCreateBinderModal = ref(false)
 const createDeckModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
 const createBinderModalRef = ref<{ setLoading: (v: boolean) => void } | null>(null)
-// Search text that drives ONLY the DiscoveryPanel (Scryfall search),
-// deliberately decoupled from the local grid so typing doesn't shrink the collection view.
-const discoverQuery = ref('')
-
 // Totals panel expanded state (for FAB positioning)
 const totalsPanelExpanded = ref(false)
 
 // Selección de cartas
 const selectedCard = ref<Card | null>(null)
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
+
+// SCRUM-66: when a user picks a Scryfall suggestion from the CardFilterBar dropdown,
+// we open AddCardModal pre-filled with that name so they can choose a printing without
+// retyping. AddCardModal auto-runs the printings query on open.
+const pendingAddCardName = ref<string | undefined>(undefined)
 
 
 // Filtros de COLECCIÓN
@@ -312,7 +313,6 @@ const { triggerQuery: triggerPaginationQuery } = useCollectionPagination({
 })
 
 const clearAllFilters = () => {
-  discoverQuery.value = ''
   filterQuery.value = ''
 }
 
@@ -693,20 +693,24 @@ const handleCreateBinder = async (data: CreateBinderInput) => {
 
 // ========== METHODS ==========
 
-// Click on local card suggestion → feed its name to the search input so Discovery searches it
+// SCRUM-66: clicking a local card from the dropdown narrows the grid to that exact name.
+// The user already has it — they want to find it in the grid, not open a discovery panel.
 const handleLocalCardSelect = (card: Card) => {
-  discoverQuery.value = card.name
+  filterQuery.value = card.name
 }
 
-// Click on Scryfall suggestion → place text in the search input so the DiscoveryPanel picks it up
+// SCRUM-66: clicking a Scryfall suggestion opens AddCardModal pre-filled with that name.
+// The modal auto-runs the printings query so the user can pick a version and add it.
 const handleScryfallSuggestionSelect = (cardName: string) => {
-  discoverQuery.value = cardName
+  pendingAddCardName.value = cardName
+  showAddCardModal.value = true
 }
 
 // Cerrar modal de agregar carta y limpiar URL
 const handleAddCardModalClose = () => {
   showAddCardModal.value = false
   selectedScryfallCard.value = undefined
+  pendingAddCardName.value = undefined
   if (route.query.addCard) {
     void router.replace({ path: '/collection', query: { ...route.query, addCard: undefined } })
   }
@@ -995,8 +999,10 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== SEARCH + SORT + VIEW ========== -->
+        <!-- SCRUM-66: filter-query is bound to filterQuery (grid filter). Discovery panel
+             removed from /collection — adding new cards goes through the + button + AddCardModal. -->
         <CardFilterBar
-            v-model:filter-query="discoverQuery"
+            v-model:filter-query="filterQuery"
             v-model:sort-by="sortBy"
             v-model:group-by="collectionGroupBy"
             view-mode="collection"
@@ -1153,6 +1159,7 @@ onUnmounted(() => {
     <AddCardModal
         :show="showAddCardModal"
         :scryfall-card="selectedScryfallCard"
+        :initial-search-query="pendingAddCardName"
         @close="handleAddCardModalClose"
         @added="handleAddCardModalClose"
     />

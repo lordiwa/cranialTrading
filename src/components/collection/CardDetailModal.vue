@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useBindersStore } from '../../stores/binders'
 import { useCollectionStore } from '../../stores/collection'
 import { useDecksStore } from '../../stores/decks'
 import { useToastStore } from '../../stores/toast'
@@ -9,6 +10,7 @@ import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePri
 import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
+import { buildOriginalBinderSlots, computeBinderSlotOps } from '../../utils/binderSlotDiff'
 import { type CardIdentity, computeStatusOperations } from '../../utils/cardSaveDiff'
 import { buildOriginalSlots, computeDeckSlotOps, type DeckSlot } from '../../utils/deckSlotDiff'
 import BaseButton from '../ui/BaseButton.vue'
@@ -29,6 +31,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const bindersStore = useBindersStore()
 const collectionStore = useCollectionStore()
 const decksStore = useDecksStore()
 const toastStore = useToastStore()
@@ -65,6 +68,11 @@ const relatedCards = ref<Card[]>([])
 // TOTAL qty (owned + wishlist) assigned to that board location. allocateCardToDeck splits
 // owned vs wishlist automatically based on availability, so the modal only edits totals.
 const deckAllocations = ref<Record<string, DeckSlot>>({})
+
+// SCRUM-40 (QA gap): per-binder totals. Binders have no mb/sb, just one quantity per binder.
+// Mirrors deckAllocations shape but flat. Save flow: STEP 3.5 diffs vs original and applies
+// allocate/deallocate ops via bindersStore.
+const binderAllocations = ref<Record<string, number>>({})
 
 // Card Kingdom prices
 const {
@@ -268,9 +276,14 @@ const currentPrice = computed(() => {
 // All available decks
 const allDecks = computed(() => decksStore.decks)
 
-// Total allocated from deckAllocations state (mb + sb across all decks)
+// All available binders (SCRUM-40)
+const allBinders = computed(() => bindersStore.binders)
+
+// Total allocated from deckAllocations state (mb + sb across all decks) + binder allocations
 const totalAllocated = computed(() => {
-  return Object.values(deckAllocations.value).reduce((sum, slot) => sum + slot.mb + slot.sb, 0)
+  const deckTotal = Object.values(deckAllocations.value).reduce((sum, slot) => sum + slot.mb + slot.sb, 0)
+  const binderTotal = Object.values(binderAllocations.value).reduce((sum, qty) => sum + qty, 0)
+  return deckTotal + binderTotal
 })
 
 // Available quantity for deck assignment (owned cards minus allocated)
@@ -347,14 +360,23 @@ const initializeForm = async () => {
   // related cards (owned rows + wishlist rows) since they share the same physical card
   // identity. The previous flat { quantity, isInSideboard } shape collapsed mb+sb into
   // a single bucket and lost half the allocation data on save.
+  // SCRUM-40 (QA gap): useCardAllocation merges deck+binder allocations into one map keyed
+  // by the SAME deckId field (binders also use it). Split them up front using bindersStore
+  // ids to avoid binder allocs ending up in deckAllocations[binderId] (orphaned, never saved).
   deckAllocations.value = {}
+  binderAllocations.value = {}
+  const binderIds = new Set(bindersStore.binders.map(b => b.id))
   for (const card of relatedCards.value) {
     const allocations = getAllocationsForCard(card.id)
     for (const alloc of allocations) {
-      const cur = deckAllocations.value[alloc.deckId] ?? { mb: 0, sb: 0 }
-      if (alloc.isInSideboard) cur.sb += alloc.quantity
-      else cur.mb += alloc.quantity
-      deckAllocations.value[alloc.deckId] = cur
+      if (binderIds.has(alloc.deckId)) {
+        binderAllocations.value[alloc.deckId] = (binderAllocations.value[alloc.deckId] ?? 0) + alloc.quantity
+      } else {
+        const cur = deckAllocations.value[alloc.deckId] ?? { mb: 0, sb: 0 }
+        if (alloc.isInSideboard) cur.sb += alloc.quantity
+        else cur.mb += alloc.quantity
+        deckAllocations.value[alloc.deckId] = cur
+      }
     }
   }
 
@@ -425,6 +447,25 @@ const getDeckTotal = (deckId: string): number => {
   return slot ? slot.mb + slot.sb : 0
 }
 
+// SCRUM-40 (QA gap): per-binder getter/mutator. Each binder has 1 quantity slot.
+const getBinderQty = (binderId: string): number => {
+  // eslint-disable-next-line security/detect-object-injection
+  return binderAllocations.value[binderId] ?? 0
+}
+
+const adjustBinder = (binderId: string, delta: number) => {
+  // eslint-disable-next-line security/detect-object-injection
+  const cur = binderAllocations.value[binderId] ?? 0
+  const next = Math.max(0, cur + delta)
+  if (next === 0) {
+    // eslint-disable-next-line security/detect-object-injection
+    delete binderAllocations.value[binderId]
+  } else {
+    // eslint-disable-next-line security/detect-object-injection
+    binderAllocations.value[binderId] = next
+  }
+}
+
 // SCRUM-35 fix: aplica ops calculadas por computeStatusOperations (util pura).
 // Cada op opera sobre la fila exacta (scryfallId, edition, condition, foil, status).
 // Devuelve mapping status → cardId para que el sync de allocations sepa cuál usar.
@@ -478,12 +519,28 @@ const applyStatusOperations = async (
 // SCRUM-35 D2: snapshot allocations grouped by (deckId × board) across ALL related
 // cards (owned + wishlist). The previous version filtered out wishlist rows and
 // collapsed mb/sb into a single bucket, losing data on save.
+// SCRUM-40 (QA gap): excludes binder ids — those go via buildOriginalBinderSlotsForRelated.
 const buildOriginalSlotsForRelated = (savedRelatedCards: Card[]): Map<string, DeckSlot> => {
+  const binderIds = new Set(bindersStore.binders.map(b => b.id))
   const allocsByCardId = new Map<string, readonly { deckId: string; quantity: number; isInSideboard: boolean }[]>()
   for (const card of savedRelatedCards) {
-    allocsByCardId.set(card.id, getAllocationsForCard(card.id))
+    const onlyDecks = getAllocationsForCard(card.id).filter(a => !binderIds.has(a.deckId))
+    allocsByCardId.set(card.id, onlyDecks)
   }
   return buildOriginalSlots(savedRelatedCards.map(c => c.id), allocsByCardId)
+}
+
+// SCRUM-40 (QA gap): snapshot binder allocations per binder across ALL related cards.
+const buildOriginalBinderSlotsForRelated = (savedRelatedCards: Card[]): Map<string, number> => {
+  const binderIds = new Set(bindersStore.binders.map(b => b.id))
+  const allocsByCardId = new Map<string, { binderId: string; quantity: number }[]>()
+  for (const card of savedRelatedCards) {
+    const onlyBinders = getAllocationsForCard(card.id)
+      .filter(a => binderIds.has(a.deckId))
+      .map(a => ({ binderId: a.deckId, quantity: a.quantity }))
+    allocsByCardId.set(card.id, onlyBinders)
+  }
+  return buildOriginalBinderSlots(savedRelatedCards.map(c => c.id), allocsByCardId)
 }
 
 // Save changes
@@ -531,6 +588,9 @@ const handleSave = async () => {
     // the original truth that the diff compares against.
     const originalSlots = buildOriginalSlotsForRelated(savedRelatedCards)
 
+    // SCRUM-40 (QA gap): snapshot per-binder totals BEFORE mutation, same shape as deck slots.
+    const originalBinderSlots = buildOriginalBinderSlotsForRelated(savedRelatedCards)
+
     // STEP 1: reduce deck allocations if owned drops below allocated (owned path only).
     if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
       await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
@@ -571,6 +631,26 @@ const handleSave = async () => {
       }
     }
 
+    // SCRUM-40 (QA gap): STEP 3.5 — diff per-binder totals and dispatch ops via bindersStore.
+    // Same pattern as deck slots: deallocate ALL related cardIds for a binder when total
+    // changed, then re-allocate target qty against ownedCardId. Binders cap at available
+    // collection qty internally — STEP 2 already updated collection above, so the cap reflects
+    // the new owned total.
+    const binderSlotOps = computeBinderSlotOps({
+      binders: allBinders.value.map(b => ({ binderId: b.id })),
+      originalSlots: originalBinderSlots,
+      targetSlots: binderAllocations.value,
+      relatedCardIds: relatedCardIdsAfterStep2,
+      ownedCardId,
+    })
+    for (const op of binderSlotOps) {
+      if (op.type === 'deallocate') {
+        await bindersStore.deallocateCard(op.binderId, op.cardId)
+      } else {
+        await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
+      }
+    }
+
     // NOTE: do NOT call collectionStore.loadCollection() here.
     // Each individual op (addCard, updateCard, deleteCard, ensureCollectionWishlistCard)
     // already applies optimistic updates to cards.value in-place.
@@ -594,6 +674,7 @@ const handleClose = () => {
   selectedPrint.value = null
   relatedCards.value = []
   deckAllocations.value = {}
+  binderAllocations.value = {}
   showZoom.value = false
   cardFaceIndex.value = 0
   showPriceChart.value = false
@@ -1021,6 +1102,48 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
         <p v-if="totalAllocated > 0" class="text-tiny text-silver-50 mt-2 pt-2 border-t border-silver-20">
           {{ t('cards.detailModal.totalAssigned', { qty: totalAllocated }) }}
         </p>
+      </div>
+
+      <!-- Binder Allocations (SCRUM-40) -->
+      <div v-if="allBinders.length > 0" class="bg-secondary border border-silver-30 p-4 rounded">
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-small font-bold text-silver">{{ t('cards.detailModal.assignToBinders') }}</p>
+          <p class="text-tiny" :class="availableForAllocation > 0 ? 'text-neon' : 'text-silver-50'">
+            {{ t('cards.detailModal.available', { qty: availableForAllocation }) }}
+          </p>
+        </div>
+
+        <div class="space-y-2 max-h-[200px] overflow-y-auto">
+          <div
+              v-for="binder in allBinders"
+              :key="binder.id"
+              class="flex items-center justify-between p-2 border transition-150 gap-2"
+              :class="getBinderQty(binder.id) > 0 ? 'border-neon bg-neon-5' : 'border-silver-20'"
+          >
+            <div class="flex-1 min-w-0 pr-2">
+              <p class="text-small font-bold text-silver truncate">{{ binder.name }}</p>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button
+                @click="adjustBinder(binder.id, -1)"
+                :disabled="getBinderQty(binder.id) === 0"
+                class="w-6 h-6 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 text-tiny"
+              >
+-
+              </button>
+              <span class="w-5 text-center text-small font-bold" :class="getBinderQty(binder.id) > 0 ? 'text-neon' : 'text-silver-50'">
+                {{ getBinderQty(binder.id) }}
+              </span>
+              <button
+                @click="adjustBinder(binder.id, 1)"
+                class="w-6 h-6 flex items-center justify-center bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded text-tiny"
+              >
++
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Actions -->

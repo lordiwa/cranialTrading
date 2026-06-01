@@ -13,6 +13,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { getCardSuggestions, type ScryfallCard, searchCards } from '../../services/scryfall'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { findCardWithSamePrint } from '../../utils/cardIdentity'
 import type { CardCondition, CardStatus } from '../../types/card'
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
   selectedBinderId?: string
   defaultStatus?: CardStatus
   defaultFoil?: boolean
+  initialSearchQuery?: string
 }
 
 const props = defineProps<Props>()
@@ -117,6 +119,9 @@ const form = reactive<{
   foil: boolean
   status: CardStatus
   deckName: string
+  // SCRUM-34: explicit mainboard/sideboard selector when a deck is chosen.
+  // Previously the modal silently allocated to mainboard, which surprised QA.
+  isInSideboard: boolean
   public: boolean
 }>({
   quantity: 1,
@@ -124,6 +129,7 @@ const form = reactive<{
   foil: props.defaultFoil ?? false,
   status: props.defaultStatus ?? 'collection',
   deckName: '',
+  isInSideboard: false,
   public: true,
 })
 
@@ -225,37 +231,54 @@ const handleAddCard = async () => {
 
     const imageToSave = currentCardImage.value ?? ''
 
-    const cardId = await collectionStore.addCard({
+    // SCRUM-35 bug #1: if user already has the SAME print (scryfallId+edition+condition+foil+status),
+    // increment that row's quantity instead of creating a duplicate. Without this, repeated AddCardModal
+    // adds left dupes that the deck grid rendered as separate xN entries instead of a single x(N+1).
+    const existing = findCardWithSamePrint(collectionStore.cards, {
       scryfallId: selectedPrint.value.id,
-      name: cardName,
       edition: selectedPrint.value.set_name,
-      setCode: selectedPrint.value.set,
-      quantity: form.quantity,
       condition: form.condition,
       foil: form.foil,
       status: form.status,
-      price: cardKingdomRetail.value ?? Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
-      image: imageToSave,
-      public: form.public,
-      cmc: selectedPrint.value.cmc,
-      type_line: selectedPrint.value.type_line,
-      colors: selectedPrint.value.colors ?? [],
-      rarity: selectedPrint.value.rarity,
-      power: selectedPrint.value.power,
-      toughness: selectedPrint.value.toughness,
-      oracle_text: selectedPrint.value.oracle_text,
-      keywords: selectedPrint.value.keywords ?? [],
-      legalities: selectedPrint.value.legalities,
-      full_art: selectedPrint.value.full_art ?? false,
     })
 
-    // Si se seleccionó un deck, asignar la carta al deck
+    let cardId: string | null
+    if (existing) {
+      const ok = await collectionStore.updateCard(existing.id, { quantity: existing.quantity + form.quantity })
+      cardId = ok ? existing.id : null
+    } else {
+      cardId = await collectionStore.addCard({
+        scryfallId: selectedPrint.value.id,
+        name: cardName,
+        edition: selectedPrint.value.set_name,
+        setCode: selectedPrint.value.set,
+        quantity: form.quantity,
+        condition: form.condition,
+        foil: form.foil,
+        status: form.status,
+        price: cardKingdomRetail.value ?? Number.parseFloat(selectedPrint.value.prices?.usd ?? '0'),
+        image: imageToSave,
+        public: form.public,
+        cmc: selectedPrint.value.cmc,
+        type_line: selectedPrint.value.type_line,
+        colors: selectedPrint.value.colors ?? [],
+        rarity: selectedPrint.value.rarity,
+        power: selectedPrint.value.power,
+        toughness: selectedPrint.value.toughness,
+        oracle_text: selectedPrint.value.oracle_text,
+        keywords: selectedPrint.value.keywords ?? [],
+        legalities: selectedPrint.value.legalities,
+        full_art: selectedPrint.value.full_art ?? false,
+      })
+    }
+
+    // Si se seleccionó un deck, asignar la carta al deck (SCRUM-34: respect MB/SB choice)
     if (cardId && form.deckName) {
       await decksStore.allocateCardToDeck(
         form.deckName,  // deckId
         cardId,
         form.quantity,
-        false  // isInSideboard
+        form.isInSideboard
       )
     }
 
@@ -349,6 +372,18 @@ const selectSearchResult = (card: ScryfallCard) => {
   searchQuery.value = ''
 }
 
+// SCRUM-66: when opened from the CollectionView searcher dropdown with a chosen card
+// name, pre-fill the search input and auto-run the printings query so the user lands
+// directly on the print picker instead of an empty modal.
+watch(() => props.show, async (isOpen) => {
+  if (!isOpen) return
+  if (props.scryfallCard) return
+  const initial = props.initialSearchQuery?.trim()
+  if (!initial) return
+  searchQuery.value = initial
+  await performSearch()
+})
+
 const handleClickOutside = (e: MouseEvent) => {
   if (searchContainer.value && !searchContainer.value.contains(e.target as Node)) {
     showSuggestions.value = false
@@ -369,6 +404,7 @@ const handleClose = () => {
   form.foil = props.defaultFoil ?? false
   form.status = props.defaultStatus ?? 'collection'
   form.deckName = ''
+  form.isInSideboard = false
   form.public = true
   cardFaceIndex.value = 0
   showZoom.value = false
@@ -627,6 +663,33 @@ const handleClose = () => {
                   :options="deckOptions"
                   class="mt-1"
               />
+            </div>
+
+            <!-- Board (MB/SB) — SCRUM-34: only when a deck is selected -->
+            <div v-if="form.deckName">
+              <span class="text-sm text-[#EEEEEE] block mb-1">{{ t('cards.addModal.boardLabel') }}</span>
+              <div class="flex gap-3" role="radiogroup" :aria-label="t('cards.addModal.boardLabel')">
+                <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
+                  <input
+                      type="radio"
+                      name="board"
+                      :value="false"
+                      v-model="form.isInSideboard"
+                      class="w-4 h-4 cursor-pointer"
+                  />
+                  <span class="text-sm text-silver">{{ t('cards.addModal.boardMainboard') }}</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer hover:text-amber transition-colors">
+                  <input
+                      type="radio"
+                      name="board"
+                      :value="true"
+                      v-model="form.isInSideboard"
+                      class="w-4 h-4 cursor-pointer"
+                  />
+                  <span class="text-sm text-silver">{{ t('cards.addModal.boardSideboard') }}</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>

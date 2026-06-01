@@ -132,6 +132,25 @@ const togglePublic = async () => {
   }
 }
 
+// SCRUM-26: shared activation handler — same logic for click and keyboard.
+// Card image div is role=button + tabindex=0 so SR users can land on it via Tab
+// (instead of skipping straight to the ELIMINAR button below) and activate with Enter/Space.
+const handleCardActivate = () => {
+  if (props.selectionMode) {
+    emit('toggleSelect', props.card.id)
+    return
+  }
+  if (props.isBeingDeleted || isSwiping.value) return
+  emit('cardClick', props.card)
+}
+
+const handleCardKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    handleCardActivate()
+  }
+}
+
 const { getTotalAllocated, getAvailableQuantity, getAllocationsForCard } = useCardAllocation()
 
 // Card Kingdom prices
@@ -269,16 +288,6 @@ const getStatusColor = (status: string) => {
   return colors[status as keyof typeof colors] || 'text-silver-70'
 }
 
-const getStatusIconName = (status: string) => {
-  const icons = {
-    collection: 'check',
-    sale: 'money',
-    trade: 'flip',
-    wishlist: 'star',
-  }
-  return icons[status as keyof typeof icons] || 'check'
-}
-
 // Price mover badge
 const priceChangeData = computed(() => {
   if (!marketStore.movers) return null
@@ -375,46 +384,12 @@ const handleContextMenuSelect = async (itemId: string) => {
       </div>
     </div>
 
-    <!-- Row 1: Status Bar (full width) -->
-    <div class="flex items-center justify-between bg-primary/80 border border-silver-20 rounded px-2 py-1">
-      <!-- Public/Eye toggle -->
-      <button
-          v-if="!readonly && !isBeingDeleted"
-          @click.stop="togglePublic"
-          :disabled="togglingPublic"
-          class="flex items-center justify-center transition-all"
-          :class="card.public ? 'text-neon' : 'text-silver-50'"
-          :title="card.public ? t('cards.grid.visibleTitle') : t('cards.grid.hiddenTitle')"
-      >
-        <SvgIcon :name="card.public ? 'eye-open' : 'eye-closed'" size="small" />
-      </button>
-      <SvgIcon v-else :name="card.public ? 'eye-open' : 'eye-closed'" size="small" class="text-silver-30" />
-
-      <div class="w-px h-4 bg-silver-20"></div>
-
-      <template v-for="status in STATUS_ORDER" :key="status">
-        <button
-            v-if="!readonly && !isBeingDeleted"
-            @click.stop="setStatus(status)"
-            class="flex items-center transition-all"
-            :class="card.status === status
-              ? getStatusColor(status)
-              : 'text-silver-30 hover:text-silver-50'"
-        >
-          <SvgIcon :name="getStatusIconName(status)" size="small" />
-        </button>
-        <SvgIcon
-            v-else
-            :name="getStatusIconName(status)"
-            size="small"
-            :class="card.status === status ? getStatusColor(status) : 'text-silver-30'"
-        />
-      </template>
-    </div>
-
-    <!-- Row 2: Card Image -->
+    <!-- Row 1: Card Image -->
+    <!-- Status-toggle bar removed: ~5 <svg><use> icons per card across ~10 virtualized
+         cards corrupted low-end Mali GPUs (cranialBugColl / Tecno Spark 30C, Mali-G52).
+         Status changes + public toggle remain available via the context menu and swipe-right. -->
     <div
-        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all"
+        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
         :class="[
           selectionMode && isSelected ? 'border-neon border-2' : '',
           !selectionMode && isBeingDeleted ? 'border-rust animate-pulse' : '',
@@ -422,7 +397,12 @@ const handleContextMenuSelect = async (itemId: string) => {
           selectionMode && !isSelected ? 'border-silver-30' : '',
         ]"
         :style="swipeStyle"
-        @click="selectionMode ? emit('toggleSelect', card.id) : (!isBeingDeleted && !isSwiping && emit('cardClick', card))"
+        :tabindex="isBeingDeleted ? -1 : 0"
+        role="button"
+        :aria-label="t('cards.grid.cardActivateAria', { name: card.name, status: card.status, qty: card.quantity })"
+        :aria-pressed="selectionMode ? isSelected : undefined"
+        @click="handleCardActivate"
+        @keydown="handleCardKeydown"
     >
       <!-- Selection checkbox overlay -->
       <div
@@ -464,6 +444,7 @@ const handleContextMenuSelect = async (itemId: string) => {
           @click.stop="toggleCardFace"
           class="absolute top-2 left-2 bg-primary/95 border border-neon px-2 py-1 hover:bg-neon/20 transition-all flex items-center justify-center z-10 rounded"
           :title="t('cards.grid.flipTitle')"
+          :aria-label="t('cards.grid.flipAria', { name: card.name })"
       >
         <SvgIcon name="flip" size="tiny" />
       </button>

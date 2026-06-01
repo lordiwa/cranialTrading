@@ -625,6 +625,9 @@
       "publishLabel": "Publish on my profile",
       "publishHint": "Visible at /@{username}",
       "assignDeck": "Assign to Deck",
+      "boardLabel": "Board",
+      "boardMainboard": "Mainboard",
+      "boardSideboard": "Sideboard",
       "priceTCG": "TCG: ${price}",
       "priceCK": "CK: {price}",
       "priceBuylist": "BL: {price}",
@@ -696,6 +699,7 @@
       "conditionLabel": "Condition",
       "foilLabel": "Foil",
       "assignToDecks": "ASSIGN TO DECKS",
+      "assignToBinders": "ASSIGN TO BINDERS",
       "available": "{qty} available",
       "deckFormat": "{format}",
       "sideboardToggle": {
@@ -745,7 +749,11 @@
       "private": "PRIVATE",
       "deleteTitle": "Delete card",
       "statusChanged": "Status changed to {status}",
-      "statusError": "Error changing status"
+      "statusError": "Error changing status",
+      "togglePublicAria": "Toggle public visibility for card {name}",
+      "setStatusAria": "Mark card {name} as {status}",
+      "flipAria": "Flip card {name}",
+      "cardActivateAria": "Open details for card {name}, {status}, quantity {qty}"
     },
     "contextMenu": {
       "plusOne": "+1 Quantity",

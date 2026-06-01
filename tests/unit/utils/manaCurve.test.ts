@@ -1,4 +1,4 @@
-import { buildManaCurve, hypergeomAtLeast } from '../../../src/utils/manaCurve'
+import { buildManaCurve, hypergeomAtLeast, isLandTypeLine, isPureLand } from '../../../src/utils/manaCurve'
 
 // ============================================================================
 // hypergeomAtLeast — P(X >= k) in a hypergeometric(N, L, n) draw
@@ -225,5 +225,58 @@ describe('buildManaCurve', () => {
       const bucket0 = result.buckets.find(b => b.cmc === 0)
       expect(bucket0?.count).toBe(24)
     })
+  })
+})
+
+// ============================================================================
+// SCRUM-31 — isLandTypeLine vs isPureLand exposure
+// ============================================================================
+
+describe('isLandTypeLine', () => {
+  it('matches any type_line containing "Land" — including MDFC backs', () => {
+    expect(isLandTypeLine('Basic Land — Forest')).toBe(true)
+    expect(isLandTypeLine('Sorcery // Land')).toBe(true)
+    expect(isLandTypeLine('Land // Land')).toBe(true)
+    expect(isLandTypeLine('Land — Desert')).toBe(true)
+  })
+
+  it('returns false for non-land cards', () => {
+    expect(isLandTypeLine('Sorcery')).toBe(false)
+    expect(isLandTypeLine('Creature — Elf')).toBe(false)
+    expect(isLandTypeLine('Instant')).toBe(false)
+    expect(isLandTypeLine(undefined)).toBe(false)
+  })
+
+  it('case-insensitive', () => {
+    expect(isLandTypeLine('basic land')).toBe(true)
+    expect(isLandTypeLine('LAND')).toBe(true)
+  })
+})
+
+describe('isPureLand (SCRUM-31 — MDFC land counter)', () => {
+  it('returns true for single-faced lands', () => {
+    expect(isPureLand('Basic Land — Forest')).toBe(true)
+    expect(isPureLand('Land — Desert')).toBe(true)
+    expect(isPureLand('Legendary Land — Cave')).toBe(true)
+  })
+
+  it('returns false for MDFC spell // land (Sorcery // Land)', () => {
+    // e.g. Valakut Awakening // Valakut Stoneforge, Bridgeworks Battle // Tanglespan Bridgeworks
+    // QA bug: land counter previously counted these as pure lands.
+    expect(isPureLand('Sorcery // Land')).toBe(false)
+    expect(isPureLand('Instant // Land')).toBe(false)
+    expect(isPureLand('Creature — Spirit // Land')).toBe(false)
+  })
+
+  it('returns false for MDFC land // land (Pathway-style)', () => {
+    // Game-rules-wise these ARE always lands but per shared util convention any
+    // `//` indicates a split type_line and should NOT be treated as "pure".
+    expect(isPureLand('Land // Land')).toBe(false)
+  })
+
+  it('returns false for non-land cards', () => {
+    expect(isPureLand('Sorcery')).toBe(false)
+    expect(isPureLand('Creature — Elf')).toBe(false)
+    expect(isPureLand(undefined)).toBe(false)
   })
 })

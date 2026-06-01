@@ -512,10 +512,9 @@ const handleDeckContextMenuSelect = (itemId: string) => {
             class="pb-3"
             :style="{
               position: 'absolute',
-              top: 0,
+              top: `${vRow.start}px`,
               left: 0,
               width: '100%',
-              transform: `translateY(${vRow.start}px)`,
             }"
           >
             <div class="grid grid-cols-3 sm:grid-cols-4 md:flex md:flex-wrap gap-1.5 md:gap-2">

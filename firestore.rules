@@ -91,6 +91,15 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth.uid == userId;
       }
+
+      // SCRUM-70: solicitudes de compra (carrito enviado por un visitante)
+      // Crear: cualquiera (visitantes anónimos sin auth) puede enviar un carrito,
+      //        pero debe llegar con status 'pending' (guardia mínima de forma).
+      // Leer/gestionar: solo el dueño del perfil.
+      match /buyRequests/{requestId} {
+        allow create: if request.resource.data.status == 'pending';
+        allow read, update, delete: if request.auth.uid == userId;
+      }
     }
 
     // ========== COLECCIONES PÚBLICAS PARA MATCHES OPTIMIZADOS ==========

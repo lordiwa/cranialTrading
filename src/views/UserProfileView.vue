@@ -8,6 +8,7 @@ import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
 import { useExchangeCartStore } from '../stores/exchangeCart';
+import { useBuyRequestsStore } from '../stores/buyRequests';
 import { useI18n } from '../composables/useI18n';
 import { buildLoginUrl, buildRegisterUrl } from '../composables/useReturnUrl';
 import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter';
@@ -31,6 +32,7 @@ const toastStore = useToastStore();
 const authStore = useAuthStore();
 const confirmStore = useConfirmStore();
 const cartStore = useExchangeCartStore();
+const buyRequestsStore = useBuyRequestsStore();
 const { t } = useI18n();
 
 // State refs
@@ -424,6 +426,22 @@ const handleShareCart = async () => {
   else toastStore.show(t('cart.shareError'), 'error');
 };
 
+// SCRUM-70.1: el visitante envía su carrito al dueño con sus datos de contacto.
+// Persiste como buy request en /users/{ownerUid}/buyRequests con feedback explícito.
+const handleSendRequest = async (contact: { name: string; phone: string; email: string }) => {
+  const cart = cartStore.getCart(username.value);
+  if (!cart || cart.items.length === 0 || !userId.value) return;
+
+  const res = await buyRequestsStore.submitBuyRequest(userId.value, contact, cart.items);
+  if (res.ok) {
+    cartStore.clearCart(username.value);
+    showCartDrawer.value = false;
+    toastStore.show(t('cart.requestSent'), 'success');
+  } else {
+    toastStore.show(t('cart.requestError'), 'error');
+  }
+};
+
 const handleLoginToMatch = () => {
   const profilePath = `/@${username.value}`;
   void router.push(buildLoginUrl(profilePath));
@@ -624,6 +642,7 @@ onMounted(() => {
         :show="showCartDrawer"
         @close="showCartDrawer = false"
         @share="handleShareCart"
+        @send-request="handleSendRequest"
         @login-to-match="handleLoginToMatch"
         @register-to-match="handleRegisterToMatch"
     />

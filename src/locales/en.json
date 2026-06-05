@@ -218,7 +218,8 @@
       "saveUserError": "Error saving user data",
       "loadUserError": "Error loading user data",
       "passwordUpdated": "Password updated",
-      "usernameTaken": "This username is already taken. Please choose another."
+      "usernameTaken": "This username is already taken. Please choose another.",
+      "usernameInvalidFormat": "Username must be 3-20 letters, numbers, or underscores"
     }
   },
 

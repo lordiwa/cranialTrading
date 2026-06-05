@@ -389,28 +389,19 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const checkUsernameAvailable = async (username: string): Promise<boolean> => {
         try {
+            const norm = normalizeUsername(username);
+
+            // D-13: index-first. If a reservation exists, it's taken.
+            const indexDoc = await getDoc(doc(db, 'usernames', norm));
+            if (indexDoc.exists()) {
+                return false;
+            }
+
+            // Legacy fallback for users not yet backfilled into the index.
             const usersRef = collection(db, 'users');
-            const normalizedUsername = username.toLowerCase();
-
-            // Check lowercase version
-            const qLower = query(usersRef, where('username', '==', normalizedUsername));
-            const snapshotLower = await getDocs(qLower);
-
-            if (!snapshotLower.empty) {
-                return false; // Username taken
-            }
-
-            // Also check original case in case usernames were stored with mixed case
-            if (username !== normalizedUsername) {
-                const qOriginal = query(usersRef, where('username', '==', username));
-                const snapshotOriginal = await getDocs(qOriginal);
-
-                if (!snapshotOriginal.empty) {
-                    return false; // Username taken
-                }
-            }
-
-            return true; // Username available
+            const qLegacy = query(usersRef, where('username', '==', norm));
+            const snapshot = await getDocs(qLegacy);
+            return snapshot.empty;
         } catch (error) {
             console.error('Error checking username:', error);
             return false;
@@ -489,31 +480,37 @@ export const useAuthStore = defineStore('auth', () => {
             return { success: false };
         }
 
-        // Check availability
-        const normalizedUsername = newUsername.toLowerCase();
-        const isAvailable = await checkUsernameAvailable(normalizedUsername);
+        // D-08: reserve the NEW username first (atomic). Fail-safe: abort before any mutation.
+        const newNorm = normalizeUsername(newUsername);
+        const oldNorm = normalizeUsername(user.value.username);
 
-        if (!isAvailable) {
-            const suggestions = await generateUsernameSuggestions(normalizedUsername);
+        const reserved = await reserveUsername(user.value.id, newNorm);
+        if (!reserved) {
+            const suggestions = await generateUsernameSuggestions(newNorm);
             toastStore.show(t('settings.changeUsername.taken'), 'error');
             return { success: false, suggestions };
         }
 
         try {
-            // Update in Firestore
             await updateDoc(doc(db, 'users', user.value.id), {
-                username: normalizedUsername,
+                username: newNorm,
                 lastUsernameChange: new Date()
             });
 
-            // Update local state
-            user.value.username = normalizedUsername;
+            user.value.username = newNorm;
             user.value.lastUsernameChange = new Date();
+
+            // Best-effort release of the previous reservation (D-08 step 4).
+            if (oldNorm && oldNorm !== newNorm) {
+                await releaseUsername(oldNorm);
+            }
 
             toastStore.show(t('settings.changeUsername.success'), 'success');
             return { success: true };
         } catch (error) {
             console.error('Error changing username:', error);
+            // D-08 step 5: roll back the new reservation to avoid a dangling entry.
+            await releaseUsername(newNorm);
             toastStore.show(t('settings.changeUsername.error'), 'error');
             return { success: false };
         }

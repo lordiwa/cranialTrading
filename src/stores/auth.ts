@@ -13,7 +13,7 @@ import {
     signOut,
     updatePassword
 } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { type User } from '../types/user';
 import { useToastStore } from './toast';
@@ -302,6 +302,34 @@ export const useAuthStore = defineStore('auth', () => {
         } catch {
             toastStore.show(t('auth.messages.verifyEmailError'), 'error');
             return false;
+        }
+    };
+
+    /**
+     * Reserve a username atomically via the /usernames index (D-09).
+     * The create-only Firestore rule denies a write onto an existing doc, so a
+     * permission-denied here means "already taken" → return false. Any other
+     * failure is also treated as not-reserved (safe default).
+     * @param norm MUST be a normalized username (use normalizeUsername upstream).
+     */
+    const reserveUsername = async (uid: string, norm: string): Promise<boolean> => {
+        try {
+            await setDoc(doc(db, 'usernames', norm), { uid, createdAt: new Date() });
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    /**
+     * Release a username reservation (best-effort, D-09). Used by changeUsername
+     * to free the previous username. Never throws.
+     */
+    const releaseUsername = async (norm: string): Promise<void> => {
+        try {
+            await deleteDoc(doc(db, 'usernames', norm));
+        } catch {
+            // best-effort: a dangling reservation is acceptable, swallow.
         }
     };
 
@@ -691,6 +719,8 @@ export const useAuthStore = defineStore('auth', () => {
         sendVerificationEmail,
         checkEmailVerification,
         checkUsernameAvailable,
+        reserveUsername,
+        releaseUsername,
         generateUsernameSuggestions,
         canChangeUsername,
         changeUsername,

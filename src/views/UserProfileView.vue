@@ -2,8 +2,9 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead, useSeoMeta } from '@unhead/vue';
-import { addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { resolveUsernameToUid } from '../services/userLookup';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -102,17 +103,11 @@ watch(() => route.params.username, (v) => {
   void loadProfile();
 });
 
-// Helper: query Firestore for user by username (SDK works for both anonymous and authenticated users
-// since the switch to memoryLocalCache in commit 5964701)
+// Helper: resolve a user by username deterministically (D-11). Index-first via
+// /usernames/{norm} with legacy fallback (resolveUsernameToUid). Feeds userId.value
+// → buyRequests ownerUid — closing the SCRUM-70 wrong-account root cause.
 const findUserByUsername = async (uname: string): Promise<{ id: string; data: Record<string, unknown> } | null> => {
-  const usersCol = collection(db, 'users');
-  const q = query(usersCol, where('username', '==', uname), limit(1));
-  const snapshot = await getDocs(q);
-  const firstDoc = snapshot.docs[0];
-  if (!snapshot.empty && firstDoc) {
-    return { id: firstDoc.id, data: firstDoc.data() as Record<string, unknown> };
-  }
-  return null;
+  return resolveUsernameToUid(uname);
 };
 
 // Methods

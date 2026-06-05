@@ -13,7 +13,8 @@ import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
 import { db } from '../services/firebase'
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs } from 'firebase/firestore'
+import { resolveUsernameToUid } from '../services/userLookup'
 import {
   findCardsMatchingPreferences,
   findPreferencesMatchingCards,
@@ -325,20 +326,14 @@ const handleBlockByUsername = async () => {
 
   blockingUser.value = true
   try {
-    // Look up user by username
-    const usersRef = collection(db, 'users')
-    const q = query(usersRef, where('username', '==', username), limit(1))
-    const snapshot = await getDocs(q)
-
-    if (snapshot.empty) {
+    // Look up user by username (deterministic — D-11)
+    const result = await resolveUsernameToUid(username)
+    if (!result) {
       toastStore.show(t('dashboard.blockedUsersModal.userNotFound'), 'error')
       return
     }
-
-    const userDoc = snapshot.docs[0]
-    if (!userDoc) return
-    const foundUserId = userDoc.id
-    const userData = userDoc.data() as Record<string, unknown>
+    const foundUserId = result.id
+    const userData = result.data
 
     // Check if already blocked
     if (discardedMatchIds.value.has(foundUserId)) {

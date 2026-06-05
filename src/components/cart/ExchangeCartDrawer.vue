@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useExchangeCartStore } from '../../stores/exchangeCart'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import type { BuyerContact } from '../../types/buyRequest'
 
 const props = defineProps<{
   username: string
@@ -13,6 +14,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   share: []
+  sendRequest: [contact: BuyerContact]
   loginToMatch: []
   registerToMatch: []
 }>()
@@ -23,6 +25,18 @@ const cartStore = useExchangeCartStore()
 const cart = computed(() => cartStore.getCart(props.username))
 const items = computed(() => cart.value?.items ?? [])
 const totalValue = computed(() => cartStore.getCartTotalValue(props.username))
+
+// SCRUM-70: contacto del comprador para que el dueño pueda responderle
+const buyerName = ref('')
+const buyerPhone = ref('')
+const buyerEmail = ref('')
+const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.value.trim()))
+const canSend = computed(() => buyerPhone.value.trim().length > 0 && emailValid.value)
+
+const submitRequest = () => {
+  if (!canSend.value) return
+  emit('sendRequest', { name: buyerName.value.trim(), phone: buyerPhone.value.trim(), email: buyerEmail.value.trim() })
+}
 
 const updateQty = (scryfallId: string, cardId: string, qty: number) => {
   cartStore.updateItemQuantity(props.username, scryfallId, cardId, qty)
@@ -133,9 +147,35 @@ const removeItem = (scryfallId: string, cardId: string) => {
             <span class="text-body font-bold text-neon">${{ totalValue.toFixed(2) }}</span>
           </div>
 
+          <!-- Contact form (SCRUM-70: para que el dueño pueda responder este pedido) -->
+          <div class="space-y-2">
+            <p class="text-tiny text-silver-50">{{ t('cart.contactPrompt') }}</p>
+            <input
+              v-model="buyerName"
+              type="text"
+              :placeholder="t('cart.namePlaceholder')"
+              class="w-full px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
+            />
+            <input
+              v-model="buyerPhone"
+              type="tel"
+              :placeholder="t('cart.phonePlaceholder')"
+              class="w-full px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
+            />
+            <input
+              v-model="buyerEmail"
+              type="email"
+              :placeholder="t('cart.emailPlaceholder')"
+              class="w-full px-3 py-2 bg-primary border border-silver-30 rounded text-silver text-small placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
+            />
+          </div>
+
           <!-- Actions -->
           <div class="space-y-2">
-            <BaseButton class="w-full" @click="emit('share')">
+            <BaseButton class="w-full" :disabled="!canSend" @click="submitRequest">
+              {{ t('cart.sendRequest') }}
+            </BaseButton>
+            <BaseButton class="w-full" variant="secondary" @click="emit('share')">
               {{ t('cart.share') }}
             </BaseButton>
             <BaseButton class="w-full" variant="secondary" @click="emit('loginToMatch')">

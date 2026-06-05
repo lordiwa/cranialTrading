@@ -17,6 +17,7 @@ import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
 import { getMatchExpirationDate } from '../utils/matchExpiry';
+import { dedupeMatchesByIdentity, matchIdentityKey } from '../utils/matchDedup';
 
 export interface MatchCard {
     scryfallId: string;
@@ -314,19 +315,21 @@ export const useMatchesStore = defineStore('matches', () => {
                 seenUserIds.add(key);
                 return true;
             });
-            newMatches.value = [
+            // SCRUM-71.3: dedup semántico (persona + cartas) sobre el array combinado,
+            // para que un mismo match no aparezca repetido aunque venga de dos fuentes.
+            newMatches.value = dedupeMatchesByIdentity([
                 ...dedupedNewDocs,
                 ...sharedForNew,
-            ];
+            ]);
 
             // ENVIADOS: matches I sent via "ME INTERESA"
             sentMatches.value = sharedForSent;
 
             // GUARDADOS: manually saved + sent matches (combined view)
-            savedMatches.value = [
+            savedMatches.value = dedupeMatchesByIdentity([
                 ...savedFromFirestore,
                 ...sharedForSent,
-            ];
+            ]);
 
             deletedMatches.value = deletedDocs.docs.map(d => parseFirestoreMatch(d.id, d.data() as Record<string, unknown>));
             sharedMatches.value = parsedShared;
@@ -362,7 +365,11 @@ export const useMatchesStore = defineStore('matches', () => {
         const userId = authStore.user.id;
         try {
             const now = new Date();
-            const allCollections = ['matches_nuevos', 'matches_guardados', 'matches_eliminados'];
+            // SCRUM-71.2: 'matches_eliminados' se excluye a propósito. Sus docs son
+            // registros de descarte/bloqueo y NO deben expirar — si se limpiaran por
+            // expiración (15 días), la persona dejaría de estar filtrada y el match
+            // descartado reaparecería en el siguiente recálculo.
+            const allCollections = ['matches_nuevos', 'matches_guardados'];
 
             const snapshots = await Promise.all(
                 allCollections.map(colName =>
@@ -397,6 +404,17 @@ export const useMatchesStore = defineStore('matches', () => {
         if (!authStore.user) return false;
 
         try {
+            // SCRUM-71.3: no crear un duplicado si ya existe un guardado con la
+            // misma identidad (misma persona + mismas cartas).
+            const incomingKey = matchIdentityKey(match);
+            const alreadySaved = savedMatches.value.some(m => matchIdentityKey(m) === incomingKey);
+            if (alreadySaved) {
+                // Asegurar que salga de nuevos aunque ya estuviera guardado
+                newMatches.value = newMatches.value.filter(m => m.docId !== match.docId);
+                toastStore.show(t('matches.messages.saved'), 'info');
+                return true;
+            }
+
             const matchesRef = collection(db, 'users', authStore.user.id, 'matches_guardados');
             const payload = createCleanMatchPayload(match, {
                 status: 'activo',
@@ -451,10 +469,16 @@ export const useMatchesStore = defineStore('matches', () => {
             const firestoreDocId = match.docId ?? matchId;
 
             // Create clean payload for eliminados
+            // SCRUM-71.1: kind:'discard' = descartar SOLO este match (no bloquear a la
+            // persona). Guardamos los arrays de cartas para poder reconstruir la clave
+            // de identidad y suprimir este match en futuros recálculos.
             const payload = createCleanMatchPayload(match, {
                 status: 'eliminado',
                 eliminatedAt: new Date(),
                 lifeExpiresAt: getMatchExpirationDate(),
+                kind: 'discard',
+                myCards: match.myCards ?? [],
+                otherCards: match.otherCards ?? [],
             });
 
             // Add to eliminados
@@ -596,6 +620,56 @@ export const useMatchesStore = defineStore('matches', () => {
     };
 
     /**
+     * SCRUM-71.1: userIds de personas BLOQUEADAS (filtran todos sus matches).
+     * Incluye docs con kind:'block' y los legacy (sin kind, que históricamente
+     * actuaban como bloqueo). Los descartes (kind:'discard') NO bloquean.
+     */
+    const loadBlockedUserIds = async (): Promise<Set<string>> => {
+        if (!authStore.user) return new Set();
+        try {
+            const ref = collection(db, 'users', authStore.user.id, 'matches_eliminados');
+            const snapshot = await getDocs(ref);
+            const ids = new Set<string>();
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                if (data.kind === 'discard') continue; // descarte ≠ bloqueo
+                if (data.otherUserId) ids.add(data.otherUserId as string);
+            }
+            return ids;
+        } catch (err) {
+            console.error('Error loading blocked users:', err);
+            return new Set();
+        }
+    };
+
+    /**
+     * SCRUM-71.1: claves de identidad (persona + cartas) de matches DESCARTADOS
+     * individualmente (kind:'discard'). Se usan para suprimir ese match concreto
+     * en futuros recálculos sin bloquear a la persona.
+     */
+    const loadDiscardedMatchKeys = async (): Promise<Set<string>> => {
+        if (!authStore.user) return new Set();
+        try {
+            const ref = collection(db, 'users', authStore.user.id, 'matches_eliminados');
+            const snapshot = await getDocs(ref);
+            const keys = new Set<string>();
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                if (data.kind !== 'discard') continue;
+                keys.add(matchIdentityKey({
+                    otherUserId: data.otherUserId as string | undefined,
+                    myCards: data.myCards as { scryfallId?: string }[] | undefined,
+                    otherCards: data.otherCards as { scryfallId?: string }[] | undefined,
+                }));
+            }
+            return keys;
+        } catch (err) {
+            console.error('Error loading discarded match keys:', err);
+            return new Set();
+        }
+    };
+
+    /**
      * Sequential two-step discard (preserves DashboardView:200-228 non-atomic
      * behavior — NOT wrapped in writeBatch). Amendment D.
      *
@@ -627,6 +701,7 @@ export const useMatchesStore = defineStore('matches', () => {
             status: 'eliminado',
             eliminatedAt: new Date(),
             lifeExpiresAt: getMatchExpirationDate(),
+            kind: 'discard', // SCRUM-71.1: descartar este match, NO bloquear a la persona
         });
 
         const nuevosRef = collection(db, 'users', authStore.user.id, 'matches_nuevos');
@@ -744,6 +819,7 @@ export const useMatchesStore = defineStore('matches', () => {
         sharedMatches,
         loading,
         loadAllMatches,
+        cleanExpiredMatches,
         saveMatch,
         discardMatch,
         deleteAllMatches,
@@ -752,6 +828,9 @@ export const useMatchesStore = defineStore('matches', () => {
         isMatchSaved,
         // Plan 02-B: match-calculation pipeline (Amendments C, D, G)
         loadDiscardedUserIds,
+        // SCRUM-71.1: descarte (por match) vs bloqueo (por persona) desacoplados
+        loadBlockedUserIds,
+        loadDiscardedMatchKeys,
         discardCalculatedMatch,
         persistCalculatedMatches,
     };

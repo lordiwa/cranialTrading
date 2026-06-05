@@ -230,6 +230,13 @@
     "remove": "QUITAR",
     "total": "Total",
     "share": "COMPARTIR",
+    "sendRequest": "ENVIAR PEDIDO AL DUEÑO",
+    "contactPrompt": "Deja tu contacto para que el dueño pueda responderte por este carrito:",
+    "namePlaceholder": "Tu nombre (opcional)",
+    "phonePlaceholder": "WhatsApp / teléfono",
+    "emailPlaceholder": "Correo",
+    "requestSent": "¡Pedido enviado! El dueño te contactará.",
+    "requestError": "No se pudo enviar el pedido",
     "loginToMatch": "INICIAR SESION",
     "registerToMatch": "REGISTRARSE",
     "shareSuccess": "Carrito compartido!",
@@ -1172,12 +1179,38 @@
       "new": "NUEVOS",
       "sent": "ENVIADOS",
       "saved": "GUARDADOS",
-      "deleted": "ELIMINADOS"
+      "deleted": "ELIMINADOS",
+      "buyRequests": "SOLICITUDES"
+    },
+    "buyRequests": {
+      "empty": {
+        "title": "Aún no hay solicitudes de compra",
+        "message": "Cuando alguien comparta su carrito desde tu perfil, aparecerá aquí con imágenes."
+      },
+      "status": {
+        "pending": "Nueva",
+        "seen": "Vista",
+        "fulfilled": "Vendida"
+      },
+      "total": "Total",
+      "contactWhatsapp": "WhatsApp",
+      "fulfill": "Marcar como vendida",
+      "delete": "Borrar",
+      "fulfillTitle": "¿Marcar como vendida?",
+      "fulfillMessage": "Esto descontará estas cartas de tu colección.",
+      "fulfilled": "Cartas descontadas de tu colección",
+      "fulfilledPartial": "Listo — {count} carta(s) ya no estaban en tu colección",
+      "fulfillError": "No se pudo completar la venta",
+      "deleteTitle": "¿Borrar solicitud?",
+      "deleteMessage": "Esta solicitud de compra se eliminará."
     },
     "controls": {
       "groupByUser": "Agrupar por usuario",
       "saveAllToday": "Guardar todos de hoy ({count})",
-      "matchesCount": "matches"
+      "matchesCount": "matches",
+      "viewProfile": "Ver perfil",
+      "collapseGroup": "Colapsar los matches de {username}",
+      "expandGroup": "Expandir los matches de {username}"
     },
     "empty": {
       "new": {

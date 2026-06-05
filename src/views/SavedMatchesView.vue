@@ -2,12 +2,14 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { type SimpleMatch, useMatchesStore } from '../stores/matches'
+import { useBuyRequestsStore } from '../stores/buyRequests'
 import { useContactsStore } from '../stores/contacts'
 import { useCollectionStore } from '../stores/collection'
 import { usePreferencesStore } from '../stores/preferences'
 import { useAuthStore } from '../stores/auth'
 import { usePriceMatchingStore } from '../stores/priceMatchingHelper'
 import { useToastStore } from '../stores/toast'
+import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
 import { db } from '../services/firebase'
@@ -21,27 +23,31 @@ import BaseLoader from '../components/ui/BaseLoader.vue'
 import BaseModal from '../components/ui/BaseModal.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
+import BuyRequestCard from '../components/matches/BuyRequestCard.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
 import { getMatchExpirationDate } from '../utils/matchExpiry'
 import { groupMatchesByUser } from '../utils/matchGrouping'
+import { matchIdentityKey } from '../utils/matchDedup'
 import { getTotalUserCount } from '../services/stats'
 import type { CardCondition, CardStatus } from '../types/card'
 
 const route = useRoute()
 const router = useRouter()
 const matchesStore = useMatchesStore()
+const buyRequestsStore = useBuyRequestsStore()
 const contactsStore = useContactsStore()
 const collectionStore = useCollectionStore()
 const preferencesStore = usePreferencesStore()
 const authStore = useAuthStore()
 const priceMatching = usePriceMatchingStore()
 const toastStore = useToastStore()
+const confirmStore = useConfirmStore()
 const { t, locale } = useI18n()
 
 // State
-const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted'>('new')
+const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests'>('new')
 const highlightedMatchId = ref<string | null>(null)
 const matchesWithEmails = ref<SimpleMatch[]>([])
 const loading = ref(false)
@@ -52,7 +58,10 @@ const calculatedMatches = ref<SimpleMatch[]>([])
 const progressCurrent = ref(0)
 const progressTotal = ref(0)
 const totalUsers = ref(0)
+// SCRUM-71.1: discardedMatchIds = personas BLOQUEADas (filtran todos sus matches).
+// discardedMatchKeys = matches descartados individualmente (suprimen SOLO ese match).
 const discardedMatchIds = ref<Set<string>>(new Set())
+const discardedMatchKeys = ref<Set<string>>(new Set())
 
 // Blocked users state
 interface BlockedUser {
@@ -99,11 +108,28 @@ const tabs = computed(() => [
     label: t('matches.tabs.deleted'),
     icon: 'trash',
     count: deletedMatches.value.length
+  },
+  {
+    id: 'buyRequests' as const,
+    label: t('matches.tabs.buyRequests'),
+    icon: 'hand',
+    count: buyRequestsStore.pendingCount
   }
 ])
 
 // Group matches by user option
 const groupByUser = ref(true)
+
+// SCRUM-71.4: grupos colapsables. Por defecto TODOS colapsados — un grupo solo
+// está expandido si su userId está en este Set (estado independiente por grupo).
+const expandedGroups = ref<Set<string>>(new Set())
+const isGroupExpanded = (userId: string) => expandedGroups.value.has(userId)
+const toggleGroup = (userId: string) => {
+  const next = new Set(expandedGroups.value)
+  if (next.has(userId)) next.delete(userId)
+  else next.add(userId)
+  expandedGroups.value = next
+}
 
 // Current tab matches
 const currentMatches = computed(() => {
@@ -227,6 +253,8 @@ const loadBlockedUsers = async () => {
       const data = docSnap.data() as Record<string, unknown>
       const otherUserId = data.otherUserId as string | undefined
       if (!otherUserId) continue
+      // SCRUM-71.1: el modal de bloqueados solo muestra bloqueos reales, no descartes
+      if (data.kind === 'discard') continue
 
       if (!userMap.has(otherUserId)) {
         const eliminatedAt = data.eliminatedAt
@@ -328,6 +356,7 @@ const handleBlockByUsername = async () => {
       status: 'eliminado',
       eliminatedAt: new Date(),
       lifeExpiresAt: getMatchExpirationDate(),
+      kind: 'block', // SCRUM-71.1: bloqueo explícito de la persona
     })
 
     discardedMatchIds.value.add(foundUserId)
@@ -464,17 +493,26 @@ const calculateMatches = async () => {
       }
     }
 
-    // Ordenar por compatibilidad descendente y filtrar discardados
+    // Ordenar por compatibilidad descendente y filtrar
+    // SCRUM-71.1: excluir personas bloqueadas (por userId) Y matches descartados
+    // individualmente (por clave de identidad). Descartar un match ya NO bloquea
+    // a la persona — solo suprime ese match concreto.
     foundMatches.sort((a, b) => (b.compatibility ?? 0) - (a.compatibility ?? 0))
-    calculatedMatches.value = foundMatches.filter(m => !discardedMatchIds.value.has(m.otherUserId))
+    calculatedMatches.value = foundMatches.filter(m =>
+      !discardedMatchIds.value.has(m.otherUserId) &&
+      !discardedMatchKeys.value.has(matchIdentityKey(m))
+    )
 
     // Persistir matches en Firestore
     // SimpleMatch has optional otherLocation/otherEmail but persistCalculatedMatches
     // requires strings — coerce via defaults at the call boundary (preserves behavior:
     // foundMatches always has non-empty otherLocation/otherEmail from data.location/data.email).
-    if (foundMatches.length > 0) {
+    // SCRUM-71.1: persistir SOLO los matches visibles (ya filtrados por bloqueo y
+    // descarte). Persistir `foundMatches` crudo re-escribía los descartados y
+    // reaparecían tras el recálculo.
+    if (calculatedMatches.value.length > 0) {
       await matchesStore.persistCalculatedMatches(
-        foundMatches.map(m => ({
+        calculatedMatches.value.map(m => ({
           id: m.id,
           otherUserId: m.otherUserId,
           otherUsername: m.otherUsername,
@@ -524,7 +562,8 @@ const handleDiscardMatch = async (matchId: string) => {
       myCards: calcMatch.myCards ?? [],
       otherCards: calcMatch.otherCards ?? [],
     })
-    discardedMatchIds.value.add(calcMatch.otherUserId) // preserve mutation that was inline in the deleted function
+    // SCRUM-71.1: descartar este match concreto (por identidad), NO bloquear a la persona
+    discardedMatchKeys.value.add(matchIdentityKey(calcMatch))
     calculatedMatches.value = calculatedMatches.value.filter(m => m.id !== matchId)
     toastStore.show(t('matches.messages.deleted'), 'info')
     return
@@ -536,8 +575,44 @@ const handleDiscardMatch = async (matchId: string) => {
   await loadSavedMatchesWithEmails()
 }
 
-const handleTabChange = (tabId: 'new' | 'sent' | 'saved' | 'deleted') => {
+const handleTabChange = async (tabId: 'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests') => {
   activeTab.value = tabId
+  if (tabId === 'buyRequests') {
+    await buyRequestsStore.loadBuyRequests()
+  }
+}
+
+// SCRUM-70.2/70.3: acciones sobre buy requests
+const handleFulfillBuyRequest = async (requestId: string) => {
+  const confirmed = await confirmStore.show({
+    title: t('matches.buyRequests.fulfillTitle'),
+    message: t('matches.buyRequests.fulfillMessage'),
+  })
+  if (!confirmed) return
+  const res = await buyRequestsStore.fulfillRequest(requestId)
+  if (res.ok) {
+    toastStore.show(
+      res.missing.length > 0
+        ? t('matches.buyRequests.fulfilledPartial', { count: res.missing.length })
+        : t('matches.buyRequests.fulfilled'),
+      res.missing.length > 0 ? 'info' : 'success',
+    )
+  } else {
+    toastStore.show(t('matches.buyRequests.fulfillError'), 'error')
+  }
+}
+
+const handleDeleteBuyRequest = async (requestId: string) => {
+  const confirmed = await confirmStore.show({
+    title: t('matches.buyRequests.deleteTitle'),
+    message: t('matches.buyRequests.deleteMessage'),
+  })
+  if (!confirmed) return
+  await buyRequestsStore.deleteRequest(requestId)
+}
+
+const handleSeenBuyRequest = (requestId: string) => {
+  void buyRequestsStore.markSeen(requestId)
 }
 
 // Bulk save all today's matches
@@ -551,6 +626,11 @@ const handleSaveAllToday = async () => {
 // Scroll to a specific match by ID
 const scrollToMatch = async (matchId: string) => {
   highlightedMatchId.value = matchId
+  // SCRUM-71.4: si el match está en un grupo colapsado, expandirlo antes de hacer scroll
+  if (groupByUser.value) {
+    const target = currentMatches.value.find(m => m.docId === matchId || m.id === matchId)
+    if (target) expandedGroups.value = new Set(expandedGroups.value).add(target.otherUserId)
+  }
   await nextTick()
   setTimeout(() => {
     const el = document.querySelector(`[data-match-id="${matchId}"]`)
@@ -574,8 +654,11 @@ watch(() => route.query.match, (matchId) => {
 const initView = async () => {
   if (!authStore.user) return
 
-  // Load discarded matches from Firestore
-  discardedMatchIds.value = await matchesStore.loadDiscardedUserIds()
+  // SCRUM-71.1: cargar por separado personas bloqueadas y matches descartados
+  ;[discardedMatchIds.value, discardedMatchKeys.value] = await Promise.all([
+    matchesStore.loadBlockedUserIds(),
+    matchesStore.loadDiscardedMatchKeys(),
+  ])
 
   loading.value = true
   try {
@@ -585,6 +668,7 @@ const initView = async () => {
       matchesStore.loadAllMatches(),
       collectionStore.loadCollection(),
       preferencesStore.loadPreferences(),
+      buyRequestsStore.loadBuyRequests(), // SCRUM-70.2
     ])
 
     await loadSavedMatchesWithEmails()
@@ -710,6 +794,7 @@ onUnmounted(() => {
           <SvgIcon :name="tab.icon" size="small" />
           <span>{{ tab.label }}</span>
           <HelpTooltip
+              v-if="tab.id !== 'buyRequests'"
               :text="tab.id === 'new' ? t('help.tooltips.matches.tabNew') :
                      tab.id === 'sent' ? t('help.tooltips.matches.tabSent') :
                      tab.id === 'saved' ? t('help.tooltips.matches.tabSaved') :
@@ -725,8 +810,8 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- Controls bar -->
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <!-- Controls bar (no aplica a Buy Requests) -->
+      <div v-if="activeTab !== 'buyRequests'" class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <!-- Group toggle -->
         <label class="flex items-center gap-2 cursor-pointer">
           <input
@@ -747,8 +832,31 @@ onUnmounted(() => {
         </BaseButton>
       </div>
 
+      <!-- Buy Requests tab (SCRUM-70.2) -->
+      <div v-if="activeTab === 'buyRequests'" class="space-y-4">
+        <div v-if="buyRequestsStore.loading" class="flex justify-center items-center py-xl">
+          <BaseLoader size="large" />
+        </div>
+        <div
+            v-else-if="buyRequestsStore.buyRequests.length === 0"
+            class="border border-silver-30 p-6 md:p-8 text-center rounded-md"
+        >
+          <p class="text-body text-silver-70">{{ t('matches.buyRequests.empty.title') }}</p>
+          <p class="text-small text-silver-50 mt-2">{{ t('matches.buyRequests.empty.message') }}</p>
+        </div>
+        <BuyRequestCard
+            v-for="req in buyRequestsStore.buyRequests"
+            v-else
+            :key="req.id"
+            :request="req"
+            @seen="handleSeenBuyRequest"
+            @fulfill="handleFulfillBuyRequest"
+            @delete="handleDeleteBuyRequest"
+        />
+      </div>
+
       <!-- Loading state (no progress bar) -->
-      <div v-if="loading && progressTotal === 0" class="flex justify-center items-center py-xl">
+      <div v-else-if="loading && progressTotal === 0" class="flex justify-center items-center py-xl">
         <BaseLoader size="large" />
       </div>
 
@@ -775,29 +883,50 @@ onUnmounted(() => {
             :key="group.userId"
             class="border border-silver-30 rounded-md overflow-hidden"
         >
-          <!-- Group header -->
-          <div class="bg-silver-5 px-4 py-3 flex items-center gap-3 border-b border-silver-20">
-            <img
-                :src="getAvatarUrlForUser(group.username, 32, group.avatarUrl)"
-                alt=""
-                class="w-8 h-8 rounded-full"
-            />
-            <div class="flex-1">
-              <router-link
-                  :to="`/@${group.username}`"
-                  class="text-body font-bold text-neon hover:underline"
-              >
-                @{{ group.username }}
-              </router-link>
-              <p v-if="group.location" class="text-tiny text-silver-50">{{ group.location }}</p>
-            </div>
-            <span class="text-small text-silver-70">
-              {{ group.matches.length }} {{ t('matches.controls.matchesCount') }}
-            </span>
+          <!-- Group header (SCRUM-71.4: colapsable) -->
+          <div class="bg-silver-5 flex items-center gap-2 border-b border-silver-20 pr-3">
+            <button
+                type="button"
+                class="flex-1 flex items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-inset"
+                :aria-expanded="isGroupExpanded(group.userId)"
+                :aria-controls="`group-body-${group.userId}`"
+                :aria-label="isGroupExpanded(group.userId)
+                  ? t('matches.controls.collapseGroup', { username: group.username })
+                  : t('matches.controls.expandGroup', { username: group.username })"
+                @click="toggleGroup(group.userId)"
+            >
+              <span
+                  aria-hidden="true"
+                  class="inline-block text-silver-70 transition-transform duration-200"
+                  :class="{ 'rotate-90': isGroupExpanded(group.userId) }"
+              >▸</span>
+              <img
+                  :src="getAvatarUrlForUser(group.username, 32, group.avatarUrl)"
+                  alt=""
+                  class="w-8 h-8 rounded-full"
+              />
+              <span class="flex-1 min-w-0">
+                <span class="block text-body font-bold text-neon truncate">@{{ group.username }}</span>
+                <span v-if="group.location" class="block text-tiny text-silver-50">{{ group.location }}</span>
+              </span>
+              <span class="text-small text-silver-70 whitespace-nowrap">
+                {{ group.matches.length }} {{ t('matches.controls.matchesCount') }}
+              </span>
+            </button>
+            <router-link
+                :to="`/@${group.username}`"
+                class="text-tiny text-neon hover:underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon rounded px-1"
+            >
+              {{ t('matches.controls.viewProfile') }}
+            </router-link>
           </div>
 
           <!-- Group matches -->
-          <div class="p-4 space-y-4">
+          <div
+              v-show="isGroupExpanded(group.userId)"
+              :id="`group-body-${group.userId}`"
+              class="p-4 space-y-4"
+          >
             <div
                 v-for="(match, idx) in group.matches"
                 :key="match.docId || match.id"

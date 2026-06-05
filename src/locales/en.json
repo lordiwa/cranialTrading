@@ -230,6 +230,13 @@
     "remove": "REMOVE",
     "total": "Total",
     "share": "SHARE CART",
+    "sendRequest": "SEND REQUEST TO OWNER",
+    "contactPrompt": "Leave your contact so the owner can reply about this cart:",
+    "namePlaceholder": "Your name (optional)",
+    "phonePlaceholder": "WhatsApp / phone",
+    "emailPlaceholder": "Email",
+    "requestSent": "Request sent! The owner will contact you.",
+    "requestError": "Could not send the request",
     "loginToMatch": "LOGIN TO MATCH",
     "registerToMatch": "REGISTER TO MATCH",
     "shareSuccess": "Cart shared successfully!",
@@ -1172,12 +1179,38 @@
       "new": "NEW",
       "sent": "SENT",
       "saved": "SAVED",
-      "deleted": "DELETED"
+      "deleted": "DELETED",
+      "buyRequests": "BUY REQUESTS"
+    },
+    "buyRequests": {
+      "empty": {
+        "title": "No buy requests yet",
+        "message": "When someone shares their cart from your profile, it will appear here with images."
+      },
+      "status": {
+        "pending": "New",
+        "seen": "Seen",
+        "fulfilled": "Sold"
+      },
+      "total": "Total",
+      "contactWhatsapp": "WhatsApp",
+      "fulfill": "Mark as sold",
+      "delete": "Delete",
+      "fulfillTitle": "Mark as sold?",
+      "fulfillMessage": "This will subtract these cards from your collection.",
+      "fulfilled": "Cards subtracted from your collection",
+      "fulfilledPartial": "Done — {count} card(s) were no longer in your collection",
+      "fulfillError": "Could not complete the sale",
+      "deleteTitle": "Delete request?",
+      "deleteMessage": "This buy request will be removed."
     },
     "controls": {
       "groupByUser": "Group by user",
       "saveAllToday": "Save all from today ({count})",
-      "matchesCount": "matches"
+      "matchesCount": "matches",
+      "viewProfile": "View profile",
+      "collapseGroup": "Collapse {username}'s matches",
+      "expandGroup": "Expand {username}'s matches"
     },
     "empty": {
       "new": {

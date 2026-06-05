@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import {
     confirmPasswordReset,
     createUserWithEmailAndPassword,
+    deleteUser,
     type User as FirebaseUser,
     GoogleAuthProvider,
     onAuthStateChanged,
@@ -19,6 +20,7 @@ import { type User } from '../types/user';
 import { useToastStore } from './toast';
 import { t, useI18n } from '../composables/useI18n';
 import { formatDate } from '../utils/formatDate';
+import { isValidUsername, normalizeUsername } from '../utils/username';
 
 let authUnsubscribe: (() => void) | null = null;
 
@@ -69,11 +71,19 @@ export const useAuthStore = defineStore('auth', () => {
             } else {
                 const firebaseUser = auth.currentUser;
                 if (firebaseUser) {
+                    // D-06b: self-heal must also reserve a unique, normalized username
+                    // (was a raw 'Usuario' write that collided for displayName-less users).
+                    /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback */
+                    const rawBase = firebaseUser.displayName
+                        || firebaseUser.email?.split('@')[0]
+                        || `user_${userId.slice(0, 8)}`;
+                    /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
+                    const reservedUsername = await reserveUniqueUsername(userId, rawBase);
+
                     user.value = {
                         id: userId,
                         email: firebaseUser.email ?? '',
-                        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback
-                        username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
+                        username: reservedUsername,
                         location: '',
                         createdAt: new Date(),
                     };
@@ -81,7 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
                     try {
                         await setDoc(doc(db, 'users', userId), {
                             email: user.value.email,
-                            username: user.value.username,
+                            username: reservedUsername,
                             location: user.value.location,
                             createdAt: new Date(),
                         });
@@ -109,19 +119,32 @@ export const useAuthStore = defineStore('auth', () => {
     };
 
     const register = async (email: string, password: string, username: string, location: string) => {
+        // D-06 step 1: validate format BEFORE creating any auth user.
+        if (!isValidUsername(username)) {
+            toastStore.show(t('auth.messages.usernameInvalidFormat'), 'error');
+            return false;
+        }
+
         try {
-            const isAvailable = await checkUsernameAvailable(username);
-            if (!isAvailable) {
+            // D-06 step 2: create the auth user.
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userId = userCredential.user.uid;
+            const norm = normalizeUsername(username);
+
+            // D-06 step 3: atomically reserve the username.
+            const reserved = await reserveUsername(userId, norm);
+            if (!reserved) {
+                // D-06 step 4: rollback — delete the just-created auth user
+                // (allowed: it is the freshly-authenticated current user).
+                await deleteUser(userCredential.user);
                 toastStore.show(t('auth.messages.usernameTaken'), 'error');
                 return false;
             }
 
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const userId = userCredential.user.uid;
-
+            // D-06 step 5: persist the user doc with the NORMALIZED username (D-05).
             await setDoc(doc(db, 'users', userId), {
                 email,
-                username,
+                username: norm,
                 location,
                 createdAt: new Date(),
             });
@@ -155,6 +178,32 @@ export const useAuthStore = defineStore('auth', () => {
         }
     };
 
+    /**
+     * Generate a normalized base username and reserve it atomically, retrying
+     * with suffixes on collision (D-07, D-06b). Always converges to a reserved,
+     * unique username. Shared by loginWithGoogle (new user) and loadUserData
+     * (self-heal) so the two creation paths stay parallel siblings.
+     * Final fallback is uid-derived (user_<uid8>) — never the colliding 'Usuario'.
+     */
+    const reserveUniqueUsername = async (uid: string, base: string): Promise<string> => {
+        const normBase = normalizeUsername(base) || `user_${uid.slice(0, 8)}`;
+        const suffixes = ['', '_mtg', '_tcg', '_cards', '01', '02', '99', '_pro'];
+        for (const suffix of suffixes) {
+            const candidate = normalizeUsername(`${normBase}${suffix}`);
+            if (await reserveUsername(uid, candidate)) return candidate;
+        }
+        let guard = 0;
+        while (guard < 8) {
+            const candidate = normalizeUsername(`${normBase}${Math.floor(Math.random() * 9000) + 1000}`);
+            guard++;
+            if (await reserveUsername(uid, candidate)) return candidate;
+        }
+        // Guaranteed-unique last resort.
+        const fallback = `user_${uid.slice(0, 8)}`;
+        await reserveUsername(uid, fallback);
+        return fallback;
+    };
+
     const loginWithGoogle = async () => {
         try {
             const provider = new GoogleAuthProvider();
@@ -165,16 +214,17 @@ export const useAuthStore = defineStore('auth', () => {
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
 
             if (!userDoc.exists()) {
-                // Create new user document for Google user
+                // D-07: derive a base, then reserve a unique username (shared helper).
                 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback */
-                const username = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
+                const rawBase = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
                     || firebaseUser.email?.split('@')[0]
                     || 'user';
                 /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
+                const finalUsername = await reserveUniqueUsername(firebaseUser.uid, rawBase);
 
                 await setDoc(doc(db, 'users', firebaseUser.uid), {
                     email: firebaseUser.email,
-                    username,
+                    username: finalUsername,
                     location: '',
                     createdAt: new Date(),
                     avatarUrl: firebaseUser.photoURL ?? null,
@@ -721,6 +771,7 @@ export const useAuthStore = defineStore('auth', () => {
         checkUsernameAvailable,
         reserveUsername,
         releaseUsername,
+        reserveUniqueUsername,
         generateUsernameSuggestions,
         canChangeUsername,
         changeUsername,

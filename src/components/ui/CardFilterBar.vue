@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, toRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toRef } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useSearchSuggestions } from '../../composables/useSearchSuggestions'
@@ -41,6 +41,7 @@ const emit = defineEmits<{
   'select-scryfall-card': [cardName: string]
   'open-discovery-sheet': []
   'open-filters': []
+  'open-add-modal-with-name': [name: string]
 }>()
 
 const { t } = useI18n()
@@ -66,6 +67,26 @@ const handleInput = (val: string | number) => {
   onFilterQueryUpdate(val)
 }
 
+// SCRUM-66: in collection mode, when the user typed something but there are no
+// local matches AND no Scryfall suggestions, offer an "add as new card" action.
+const showAddAsNew = computed(() =>
+  props.viewMode === 'collection'
+  && filterQueryRef.value.trim().length > 0
+  && localMatches.value.length === 0
+  && scryfallSuggestions.value.length === 0,
+)
+
+// The composable's showDropdown is false when there are zero local + zero scryfall
+// results, which would hide the container before the add-as-new item can render.
+// Widen visibility for collection mode only — Deck/Binder keep the original behavior.
+const dropdownVisible = computed(() => showDropdown.value || showAddAsNew.value)
+
+const handleAddAsNew = () => {
+  emit('open-add-modal-with-name', filterQueryRef.value.trim())
+  clearSuggestions()
+  dropdownDismissed.value = true
+}
+
 onMounted(() => { document.addEventListener('click', handleClickOutside) })
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 </script>
@@ -83,7 +104,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         />
 
         <!-- Suggestions dropdown -->
-        <div v-if="showSuggestions && showDropdown && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
+        <div v-if="showSuggestions && dropdownVisible && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
         <!-- Local matches section -->
         <div v-if="localMatches.length > 0">
           <div class="px-3 py-1 text-tiny text-silver-50 uppercase bg-silver-10">
@@ -107,6 +128,13 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
             <span class="text-tiny text-neon">{{ t('collection.suggestions.addLabel') }}</span>
           </button>
         </div>
+
+        <!-- Add as new card (collection mode only, no local + no scryfall matches) -->
+        <button v-if="showAddAsNew" type="button" @click="handleAddAsNew"
+          class="w-full px-3 py-2 flex items-center justify-between hover:bg-neon-10 text-silver text-left">
+          <span class="text-small truncate">{{ filterQuery }}</span>
+          <span class="text-tiny text-neon ml-auto whitespace-nowrap">{{ t('collection.suggestions.addAsNew') }}</span>
+        </button>
 
         <!-- Advanced search link (collection mode only) -->
         <RouterLink v-if="viewMode === 'collection'" :to="'/search'" @click="clearSuggestions(); dropdownDismissed = true"

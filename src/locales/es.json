@@ -536,7 +536,8 @@
       "localSection": "En mi colección",
       "scryfallSection": "No en colección",
       "addLabel": "Añadir",
-      "advancedSearch": "Búsqueda avanzada"
+      "advancedSearch": "Búsqueda avanzada",
+      "addAsNew": "Agregar como nueva carta"
     },
     "quickAdd": {
       "allocated": "{name} agregada al mazo",

@@ -536,7 +536,8 @@
       "localSection": "Na minha coleção",
       "scryfallSection": "Não na coleção",
       "addLabel": "Adicionar",
-      "advancedSearch": "Busca avançada"
+      "advancedSearch": "Busca avançada",
+      "addAsNew": "Adicionar como nova carta"
     },
     "quickAdd": {
       "allocated": "{name} adicionada ao deck",

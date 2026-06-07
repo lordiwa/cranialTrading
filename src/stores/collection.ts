@@ -25,6 +25,7 @@ import {
 } from '../services/publicCards'
 import { t } from '../composables/useI18n'
 import { getCardsByIds } from '../services/scryfallCache'
+import { buildEnrichmentPatch } from '../utils/cardEnrichment'
 import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
 import type { QueryCardIndexRequest } from '../services/cloudFunctions'
 
@@ -450,42 +451,6 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /**
-     * Build a patch of missing metadata fields from a Scryfall card.
-     * Returns an empty object if nothing needs updating.
-     */
-    const buildEnrichmentPatch = (card: Card, sc: Record<string, unknown>): Partial<Card> => {
-        const patch: Record<string, unknown> = {}
-        // Fields where falsy means missing
-        const falsyFields = ['type_line', 'colors', 'rarity', 'oracle_text', 'keywords', 'legalities', 'power', 'toughness'] as const
-        for (const field of falsyFields) {
-            // eslint-disable-next-line security/detect-object-injection
-            if (!card[field] && sc[field]) patch[field] = sc[field]
-        }
-        // Fields where undefined means missing
-        const undefinedFields = ['cmc', 'full_art', 'produced_mana'] as const
-        for (const field of undefinedFields) {
-            // eslint-disable-next-line security/detect-object-injection
-            if (card[field] === undefined && sc[field] !== undefined) patch[field] = sc[field]
-        }
-        // Image: extract from Scryfall's nested image_uris or card_faces
-        if (!card.image) {
-            const imageUris = sc.image_uris as Record<string, string> | undefined
-            const cardFaces = sc.card_faces as { image_uris?: Record<string, string> }[] | undefined
-            const image = imageUris?.normal ?? cardFaces?.[0]?.image_uris?.normal ?? ''
-            if (image) patch.image = image
-        }
-
-        // Price: extract from Scryfall's nested prices object
-        if (!card.price || card.price === 0) {
-            const prices = sc.prices as Record<string, string | null> | undefined
-            const usd = prices?.usd
-            if (usd) patch.price = Number.parseFloat(usd)
-        }
-
-        return patch as Partial<Card>
-    }
-
-    /**
      * Persist enrichment updates: Scryfall metadata goes to scryfall_cache,
      * only user-specific fields (price) go to the user's card doc.
      */
@@ -496,6 +461,7 @@ export const useCollectionStore = defineStore('collection', () => {
         const CACHE_ONLY_FIELDS = new Set([
             'type_line', 'colors', 'rarity', 'oracle_text', 'keywords',
             'legalities', 'power', 'toughness', 'cmc', 'full_art', 'produced_mana',
+            'setCode',
         ])
 
         for (let i = 0; i < updates.length; i += BATCH_SIZE) {

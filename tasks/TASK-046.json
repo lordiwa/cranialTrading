@@ -1,0 +1,29 @@
+{
+  "key": "TASK-046",
+  "title": "UI/UX revisit del panel DeckColorAnalysis",
+  "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-46 (tipo: Impovement user personal space, estado original: Defined)\n\n## Contexto\n\nEl panel `DeckColorAnalysis` (`src/components/decks/DeckColorAnalysis.vue`) fue entregado en v1.30.0 con funcionalidad correcta (Karsten thresholds per-spell, lista expandible, dos barras comparativas, mana icons reales), pero el diseño visual / UX merece una segunda pasada con criterios de design system del proyecto.\n\n## Issues conocidos / a explorar\n\n* **Badge \"Karsten (60)\" en el header** — cíptico para usuarios casuales. Considerar: mostrar formato detectado (\"Modern · 60 cartas\"), tooltip explicativo, o removerlo.\n* **Term \"Símbolos\" en tabla expandible** — ya renombrado de \"Pips\" pero sigue requiriendo contexto. Tooltip ⓘ explicando qué son los pips de un costo de maná.\n* **Dos barras apiladas** — actualmente bien comparativas pero podrían ser más legibles con etiquetas absolutas a los lados o un indicador numérico de surplus/deficit.\n* **Layout responsive** — verificar que mobile no se sienta apretado (la fila tiene icono + barras + status + botón expand).\n* **Alineación con** `DeckManaCurve` — visualmente el panel debería armonizar mejor con el componente vecino arriba.\n* **Colores** — status verde (`text-neon`), amarillo (`text-yellow-400`), rojo (`text-rust`) del design system. Verificar consistencia con resto de la app.\n* **Tooltip educativo sobre Karsten** — link al artículo TCGPlayer + explicación breve para usuario que no conozca la metodología.\n* **Estado loading** — cuando los `mana_cost` se están hidratando desde Scryfall, mostrar skeleton claro en vez de \"todo en cero\".\n* **Estado vacío** — deck sin tierras o sin spells: mensaje más útil.\n* **Tabla expandible** — considerar ordenar por status (críticos primero) y/o agrupar por CMC.\n* **Iconos ✓ / ! / ✗** en la tabla — funcionan pero podrían ser badges con color de fondo más claros.\n\n## Acceptance criteria (a definir más en discovery)\n\n- [ ] Audit del panel siguiendo guía de design system del proyecto.\n- [ ] Tooltip educativo sobre Karsten + qué son los símbolos / pips.\n- [ ] Mejor distinción visual entre \"sources\" y \"required\" (más allá de las dos barras actuales).\n- [ ] Skeleton state durante hidratación.\n- [ ] Verificar mobile.\n- [ ] Test visual / manual de los 5 estados (ok / tight / critical / noLands / noDemand) por color.\n\n## Prioridad\n\nMedia. El panel funciona y es útil; este ticket es polish y educación del usuario.\n\n## Out of scope\n\n* Cambios de lógica de cálculo (Karsten ya está implementado correctamente).\n* Incluir sideboard (decisión cerrada — Karsten asume mainboard de 60 cartas).\n* SCRUM-43 (alertas off-color) y SCRUM-44 (MTGJSON 404) son tickets separados.",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "decks",
+    "design-debt",
+    "improvement",
+    "jira-import",
+    "ui"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.140Z",
+      "body": "Migrado desde SCRUM-46 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-05-01T15:34:18.448-0500",
+  "updated_at": "2026-05-01T15:34:46.812-0500",
+  "jira_key": "SCRUM-46"
+}

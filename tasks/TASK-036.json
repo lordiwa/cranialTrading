@@ -1,0 +1,29 @@
+{
+  "key": "TASK-036",
+  "title": "Editor de decks: contador xN no refresca al agregar copia desde modal",
+  "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-36 (tipo: Error, estado original: Q/A)\n\n## Contexto\n\nSub-ticket de **SCRUM-35**. Este es el problema #1 de los tres originales: regresión funcional en la reactividad del grid del editor de decks.\n\n## Comportamiento actual\n\n1. Usuario abre el editor de un deck que ya contiene la carta _X_ (ej. _Lightning Bolt_ x2).\n2. Pulsa el placeholder `+` (o el FAB mobile) → se abre `AddCardModal`.\n3. Busca _Lightning Bolt_, agrega una copia más y cierra el modal.\n4. La carta en el grid **sigue mostrando** `x2` aunque el deck ya tiene 3 copias allocadas.\n5. El número solo se actualiza tras recargar la vista o tocar `+/-` sobre la carta.\n\n## Comportamiento esperado\n\nAl cerrar `AddCardModal` después de agregar copia(s) de una carta ya presente en el deck, el badge `xN` del grid debe reflejar el nuevo total **sin recarga manual** y en menos de 500 ms.\n\n## Notas técnicas (entry points)\n\n* Badge: `src/components/decks/DeckEditorGrid.vue:548` y `:594` — `x{{ getQuantity(card) }}`.\n* `getQuantity` (línea 68) lee `card.allocatedQuantity`.\n* Handler de cierre del modal: `DeckView.vue:312` — `handleAddCardModalClose`.\n* Handler de cantidad existente: `DeckView.vue:396` — `handleDeckGridQuantityUpdate` (este sí funciona, comparar cómo recompone).\n* Sospecha de root cause: el evento `added` del modal no dispara recomputo de `displayDeckCards` (o `decksStore.fetchAllocations` no se reactiva tras añadir).\n\n## Pasos de investigación recomendados\n\n1. Agregar `console.log` en `handleAddCardModalClose` y en el getter de `displayDeckCards` para ver el orden de eventos.\n2. Confirmar si el modal emite `added` con la carta + cantidad nueva o solo cierra.\n3. Verificar si `decksStore.allocations` (o equivalente) es reactivo y se actualiza en el flujo de añadir.\n4. Identificar parallel sibling: `BinderView.vue` puede tener el mismo bug — confirmar antes de fix (Anti-Loop Rule 6).\n\n## Criterios de aceptación\n\n* \\[ \\] Agregar +1 copia desde `AddCardModal` actualiza el `xN` visible en el grid en <500 ms tras cerrar el modal.\n* \\[ \\] Funciona en mainboard y sideboard.\n* \\[ \\] Funciona en mobile (FAB) y desktop (placeholder `+`).\n* \\[ \\] El total del footer `DeckStatsFooter` también refleja el cambio.\n* \\[ \\] BinderView verificado: si replica el bug, fix incluido en este ticket.\n* \\[ \\] Unit test de regresión sobre el handler post-cierre del modal.\n\n## Out of scope\n\n* Cambiar la API de `decksStore` o de `DisplayDeckCard`.\n* Refactorizar `AddCardModal`.\n\n## Relaciona\n\n* **Padre lógico**: SCRUM-35 (ticket original que se partió en 3).\n* **Epic**: SCRUM-14 Deck Editor UX.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "decks",
+    "frontend",
+    "jira-import",
+    "regression"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.026Z",
+      "body": "Migrado desde SCRUM-36 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-04-26T13:49:42.202-0500",
+  "updated_at": "2026-04-27T10:27:54.727-0500",
+  "jira_key": "SCRUM-36"
+}

@@ -1,0 +1,30 @@
+{
+  "key": "TASK-031",
+  "title": "TC-27-04: Cartas MDFC (dos caras) aparecen en bucket del hechizo, no en bucket 0",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-31 (tipo: Error, estado original: Q/A)\n\n## ¿Qué se valida?\n\nLas cartas MDFC (Modal Double-Faced Card — carta de dos caras que pueden ser tierra de un lado y hechizo del otro) deben aparecer en el bucket correspondiente a su CMC del hechizo, NO en el bucket 0.\n\n## Aclaraciones de términos\n\n* **MDFC (Modal Double-Faced Card):** carta con dos caras imprimibles, por ejemplo `Valakut Awakening // Valakut Stoneforge` donde una cara es un Sorcery (costo 3) y la otra una Tierra.\n* **Split card:** cartas con `//` en el nombre (ej. `Valakut Awakening // Valakut Stoneforge`, `Sultai Charm // Sea Serpent`).\n\n## Precondiciones\n\n* Tener a mano una URL de Moxfield de un deck que incluya al menos una carta MDFC tipo hechizo/tierra. Ejemplos fáciles de encontrar:\n\n    * `Valakut Awakening // Valakut Stoneforge` (Zendikar Rising)\n    * `Bala Ged Recovery // Bala Ged Sanctuary`\n    * `Sea Gate Restoration // Sea Gate, Reborn`\n    \n\n## Pasos\n\n1. Importar el deck de Moxfield desde `/decks`.\n2. Abrir la vista del deck.\n3. Localizar visualmente la carta MDFC en la grilla del deck.\n4. Mirar el bucket correspondiente al CMC del lado hechizo (ej. 3 para Valakut Awakening).\n\n## Resultado esperado\n\n* La carta MDFC aparece en el bucket del CMC del hechizo (ej. bucket 3 si es Valakut Awakening).\n* NO aparece en bucket 0 (aunque la cara tierra técnicamente tiene CMC 0).\n* El contador de tierras del header NO la cuenta como tierra pura si el `type_line` de Scryfall es `Sorcery // Land` o similar.\n\n## Pass / Fail\n\n* ✅ **Pass:** la MDFC cuenta en el bucket del spell side.\n* ❌ **Fail:** la MDFC aparece en bucket 0 como si fuera tierra básica, o desaparece de la gráfica.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "decks",
+    "jira-import",
+    "mana-curve",
+    "qa-manual",
+    "scrum-10"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.988Z",
+      "body": "Migrado desde SCRUM-31 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T13:43:22.559-0500",
+  "updated_at": "2026-05-12T14:40:17.074-0500",
+  "jira_key": "SCRUM-31"
+}

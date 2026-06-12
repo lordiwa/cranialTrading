@@ -1,0 +1,32 @@
+{
+  "key": "TASK-026",
+  "title": "TC-P04-08: Screen reader smoke test",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-26 (tipo: Error, estado original: Q/A)\n\n**Componente:** Screen reader announcements\n**Requirement:** ARCH-10 (compliance con lectores de pantalla)\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué es un screen reader (SR)?\n\nSoftware que lee la pantalla en voz alta para usuarios con discapacidad visual. Los más comunes:\n\n* **VoiceOver** — viene preinstalado en Mac. Activar con `Cmd+F5`\n* **NVDA** — gratuito para Windows. Descargar en https://www.nvaccess.org/\n* **ChromeVox** — extensión de Chrome (más ligera para smoke tests)\n\nEsta TC valida que el GlobalSearch anuncia correctamente sus estados (combobox abierto/cerrado, número de resultados, opción resaltada) cuando un usuario navega con SR.\n\n## Preconditions\n\n* Tener instalado al menos uno de los SR de arriba\n* Estar logueado en `cranial-trading-dev.web.app`\n\n## Steps\n\n1. **Activar el screen reader** (VoiceOver: `Cmd+F5` en Mac — NVDA: ejecutar el .exe en Windows)\n2. Pulsar `Tab` hasta llegar al input del GlobalSearch (header arriba)\n3. Escribir `bolt` y esperar resultados (\\~800ms)\n4. Pulsar `ArrowDown` para resaltar el primer resultado\n\n## Expected\n\n* **Step 2:** El SR anuncia algo como `\"combobox, contraído\"` (o equivalente — \"combobox, collapsed\" en inglés)\n* **Step 3:** \\~800ms después de cargar resultados, el SR lee el contenido del `aria-live` (ej: `\"3 resultados en colección\"`)\n* **Step 4:** El SR anuncia el contenido de la opción resaltada (nombre de carta + edición)\n\n## Fail criteria\n\n* El SR no anuncia nada al hacer focus en el input\n* El SR lee la clave literal `header.search.resultsCount` en vez del texto traducido\n* El SR no anuncia las opciones al navegar con flechas\n\n## Tips para ismachucho\n\n* VoiceOver tiene un \"rotor\" (`Ctrl+Opt+U`) para listar elementos accesibles — útil para confirmar que GlobalSearch sale como `combobox`\n* NVDA + Firefox suele dar mejor cobertura ARIA que NVDA + Chrome\n* Si el navegador no anuncia nada, primero verifica que el SR funcione en otra página (ej: google.com)",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "a11y",
+    "arch-10",
+    "bug",
+    "jira-import",
+    "phase-4",
+    "qa-manual",
+    "screen-reader",
+    "search"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.958Z",
+      "body": "Migrado desde SCRUM-26 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-18T17:28:22.490-0500",
+  "updated_at": "2026-05-17T08:29:58.723-0500",
+  "jira_key": "SCRUM-26"
+}

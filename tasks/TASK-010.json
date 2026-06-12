@@ -1,0 +1,29 @@
+{
+  "key": "TASK-010",
+  "title": "Investigar función de curva de maná para cada deck individual",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-10 (tipo: Impovement user personal space, estado original: Finalizada)",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "decks",
+    "frontend",
+    "improvement",
+    "jira-import",
+    "research"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.882Z",
+      "body": "Migrado desde SCRUM-10 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-13T20:50:26.538-0500",
+  "updated_at": "2026-05-09T20:48:35.646-0500",
+  "jira_key": "SCRUM-10"
+}

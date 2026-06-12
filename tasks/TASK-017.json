@@ -1,0 +1,28 @@
+{
+  "key": "TASK-017",
+  "title": "Search & Discovery",
+  "description": "**Migrado de Jira:** SCRUM-17 (tipo: Epic, estado original: Defined)\n\n## Objetivo\n\nGarantizar que ambas superficies de búsqueda (GlobalSearch en header + SearchView avanzada) sean rápidas, accesibles, consistentes entre sí, y entregables vía teclado / lectores de pantalla.\n\n## Cobertura\n\n* Paridad funcional entre buscadores\n* ARIA combobox + navegación por teclado (Phase 4)\n* RouterLink con Cmd+click / middle-click correctos\n* Filtros y resultados",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "a11y",
+    "epic",
+    "jira-import",
+    "search"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.916Z",
+      "body": "Migrado desde SCRUM-17 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-04-18T17:16:29.857-0500",
+  "updated_at": "2026-04-18T17:17:08.379-0500",
+  "jira_key": "SCRUM-17"
+}

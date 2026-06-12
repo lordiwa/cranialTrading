@@ -1,0 +1,29 @@
+{
+  "key": "TASK-044",
+  "title": "Bug: MTGJSON AllPricesToday endpoint devuelve 404 + CORS",
+  "description": "**Epic:** TASK-016 (Pricing & Market Intelligence)\n**Migrado de Jira:** SCRUM-44 (tipo: Impovement user personal space, estado original: Q/A)\n\n## Bug\n\nLa llamada a `https://mtgjson.com/api/v5/AllPricesToday.json.gz` desde `src/services/mtgjson.ts:257` (`fetchGzippedJson`) está fallando con:\n\n* `404 Not Found` — el endpoint no existe o cambió.\n* `CORS: No 'Access-Control-Allow-Origin' header is present` — secundario al 404, MTGJSON no responde con headers CORS para errores.\n\n## Repro\n\n1. Abrir cualquier deck en `cranial-trading-dev.web.app` (o local).\n2. Abrir el detalle de una carta (`CardDetailModal.vue:616`) o disparar fetch desde `DeckView.vue:432`.\n3. Console muestra el TypeError: Failed to fetch + 404.\n\n## Stack\n\n* `src/services/mtgjson.ts:257` (fetchGzippedJson)\n* `src/services/mtgjson.ts:297` (fetchPriceData)\n* `src/services/mtgjson.ts:372` (getCardPrices)\n* `src/composables/useCardPrices.ts:64` (fetchPrices)\n* consumido por `CardDetailModal.vue:609,616` y `DeckView.vue:432`\n\n## Contexto\n\nMTGJSON debe estar como fallback (CK es primary per decisión). El detalle no es bloqueante — el deck funciona, la carta también — pero ensucia consola y probablemente el `useCardPrices` retorna sin datos en ese path.\n\n## Acceptance criteria\n\n* \\[ \\] Identificar el endpoint actual de MTGJSON v5 (puede haber migrado a `AllPrices.json.gz` o similar).\n* \\[ \\] Si MTGJSON ya no expone CORS para llamadas browser → proxiar vía Cloud Function o eliminar el código si CK lo cubre completo.\n* \\[ \\] Test manual: abrir deck + carta sin errores rojos en consola.\n\n## Prioridad\n\nMedia — no bloquea funcionalidad pero es ruido constante en consola y posible regresión silenciosa de pricing fallback.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "external-api",
+    "improvement",
+    "jira-import",
+    "pricing"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.082Z",
+      "body": "Migrado desde SCRUM-44 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-05-01T12:34:23.468-0500",
+  "updated_at": "2026-06-07T16:00:14.661-0500",
+  "jira_key": "SCRUM-44"
+}

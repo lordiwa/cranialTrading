@@ -1,0 +1,32 @@
+{
+  "key": "TASK-023",
+  "title": "TC-P04-05: Click izquierdo normal — regresión",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-23 (tipo: Impovement user personal space, estado original: Finalizada)\n\n**Componente:** Todos los enlaces convertidos a RouterLink\n**Requirement:** NICE-11 regression\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué se valida?\n\nQue el click normal (izquierdo, sin modificadores) siga funcionando como SIEMPRE: navega en la pestaña actual y ejecuta su side effect (dropdown / modal se cierra). Esta TC asegura que el trabajo de Cmd+click no rompió la navegación normal.\n\n## Preconditions\n\n* Desktop, logueado en dev\n* Igual que SCRUM-21 (mismos puntos a probar)\n\n## Steps\n\nHacer click izquierdo normal (sin modificadores) en estos 5 puntos del listado de SCRUM-21:\n\n1. Punto **3.1** — Resultado de colección en GlobalSearch\n2. Punto **3.6** — FAQ del header\n3. Punto **3.7** — Notificación de match\n4. Punto **3.9** — \"Búsqueda Avanzada\" del modal Add Card\n5. Punto **3.10** — \"Búsqueda Avanzada\" en filtro de colección\n\n## Resultado esperado\n\nCada click navega en la **pestaña actual** Y ejecuta su side effect (dropdown / modal se cierra). La página destino carga correctamente.\n\n## Pass / Fail\n\n* **Pass:** los 5 puntos cumplen\n* **Fail:** alguno no navega, o no se cierra el dropdown/modal, o abre nueva pestaña en lugar de navegar\n\n## Nota técnica para futuro\n\nEsto se puede automatizar con Playwright (clicks deterministas + assertions de URL + checks de DOM). Cuando exista esa cobertura E2E, esta TC pasa de manual a automatizada.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "improvement",
+    "jira-import",
+    "nice-11",
+    "phase-4",
+    "qa-auto",
+    "regression",
+    "router",
+    "search"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.948Z",
+      "body": "Migrado desde SCRUM-23 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-18T17:27:59.970-0500",
+  "updated_at": "2026-05-09T19:25:01.290-0500",
+  "jira_key": "SCRUM-23"
+}

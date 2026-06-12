@@ -1,0 +1,329 @@
+{
+  "generated_at": "2026-06-12T14:45:37.222Z",
+  "tasks": [
+    {
+      "key": "TASK-003",
+      "title": "[Archivado] Tarea 3 — placeholder sin contenido",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-005",
+      "title": "Bug binder deck",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-006",
+      "title": "Agilizar el proceso de aumentar cartas en el deck",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-007",
+      "title": "Bug precios de cartas",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-008",
+      "title": "Simulador de mano inicial (mulligan) en editor de deck",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-009",
+      "title": "Automatizar la creación de tokens para cada deck individual",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-010",
+      "title": "Investigar función de curva de maná para cada deck individual",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-011",
+      "title": "Investigar BD para recomendación de cartas por deck",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-012",
+      "title": "Añadir un sector de oportunidades de mercado, esto compara todos los mercados de cartas y tiendas de magic de manera local",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-013",
+      "title": "Paridad de ediciones entre buscadores (rápido vs avanzado)",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-014",
+      "title": "Deck Editor UX",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-015",
+      "title": "Deck Intelligence",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-016",
+      "title": "Pricing & Market Intelligence",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-017",
+      "title": "Search & Discovery",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-018",
+      "title": "Testing Infrastructure",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-019",
+      "title": "TC-P04-01: Navegación por teclado — buscador global (desktop)",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-020",
+      "title": "TC-P04-02: Navegación por teclado — buscador móvil",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-021",
+      "title": "TC-P04-03: Cmd+click / Ctrl+click abre destinos en pestaña nueva",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-022",
+      "title": "TC-P04-04: Click con rueda del mouse abre en pestaña de fondo",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-023",
+      "title": "TC-P04-05: Click izquierdo normal — regresión",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-024",
+      "title": "TC-P04-06: Redirecciones automáticas — regresión",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-025",
+      "title": "TC-P04-07: Verificación de traducciones (i18n) en 3 idiomas",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-026",
+      "title": "TC-P04-08: Screen reader smoke test",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-027",
+      "title": "CMC y type_line se pierden en cartas importadas (rompe curva y filtro de maná)",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-028",
+      "title": "TC-27-01: Importar deck Moxfield por URL guarda CMC y tipo de carta",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-029",
+      "title": "TC-27-02: Datos de cartas importadas persisten tras recargar la página",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-030",
+      "title": "TC-27-03: Tierras básicas NO aparecen en bucket 0 de curva de maná",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-031",
+      "title": "TC-27-04: Cartas MDFC (dos caras) aparecen en bucket del hechizo, no en bucket 0",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-032",
+      "title": "TC-27-05: Imágenes de cartas importadas cargan correctamente tras reload",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-033",
+      "title": "TC-27-06: Import desde /binders preserva el fix de metadata (regresión)",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-034",
+      "title": "Searcher con discovery + version picker (decks/binders/collection)",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-035",
+      "title": "Editor de decks: contador no refresca, stack visual de copias y placeholder duplicado",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-036",
+      "title": "Editor de decks: contador xN no refresca al agregar copia desde modal",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-037",
+      "title": "Editor de decks: stack visual de copias multiples (estilo Moxfield/Arena)",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-038",
+      "title": "Editor de decks: ocultar placeholder + del grid en mobile (duplica al FAB)",
+      "status": "in_review",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-039",
+      "title": "QA: verificar 5 escenarios CardDetailModal post-v1.27.4 (SCRUM-36)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-040",
+      "title": "Tech debt: replicar array spread fix en binders.ts (paralelo a SCRUM-36)",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-041",
+      "title": "Editor decks/binders/collection: + como FAB en desktop (no placeholder en grid)",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-042",
+      "title": "Color analysis en el deckbuilder (símbolos vs fuentes)",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-043",
+      "title": "Alertas de cartas fuera del color identity declarado del deck",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-044",
+      "title": "Bug: MTGJSON AllPricesToday endpoint devuelve 404 + CORS",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-045",
+      "title": "SCRUM-42 Phase 2: panel UI Color Analysis en DeckView",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-046",
+      "title": "UI/UX revisit del panel DeckColorAnalysis",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-064",
+      "title": "Improvement personal user space",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-065",
+      "title": "Cuando se ve el profile de un usuario sin ser uno ese usuario el filtro del buscador ya no existe",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-066",
+      "title": "Buscador /collection: input filtra grid local + remover Discovery + affordance agregar nueva carta",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-067",
+      "title": "Filtros avanzados rotos en perfil publico ajeno (regresion SCRUM-65)",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-068",
+      "title": "Corrupción GPU en vista Collection (modo Visual) en Android Mali gama baja",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-069",
+      "title": "Collection & Performance",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-070",
+      "title": "Mejora necesaria en la interaccion de carrito de compra.",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-071",
+      "title": "Mejora necesaria al sistema de matches",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-072",
+      "title": "QA: Probar SCRUM-70 (Buy Requests) y SCRUM-71 (mejoras de matches)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-073",
+      "title": "Forzar username único al registrarse + resolución robusta de @username",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-074",
+      "title": "Verificación dev de SCRUM-73/66/67/44 (chequeo Rafael → re-QA ismachucho)",
+      "status": "in_progress",
+      "priority": "medium"
+    }
+  ]
+}

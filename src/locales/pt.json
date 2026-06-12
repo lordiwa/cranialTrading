@@ -218,7 +218,8 @@
       "saveUserError": "Erro ao salvar dados do usuário",
       "loadUserError": "Erro ao carregar dados do usuário",
       "passwordUpdated": "Senha atualizada",
-      "usernameTaken": "Este username já está em uso. Escolha outro."
+      "usernameTaken": "Este username já está em uso. Escolha outro.",
+      "usernameInvalidFormat": "O nome de usuário deve ter 3-20 letras, números ou sublinhados"
     }
   },
 
@@ -535,7 +536,8 @@
       "localSection": "Na minha coleção",
       "scryfallSection": "Não na coleção",
       "addLabel": "Adicionar",
-      "advancedSearch": "Busca avançada"
+      "advancedSearch": "Busca avançada",
+      "addAsNew": "Adicionar como nova carta"
     },
     "quickAdd": {
       "allocated": "{name} adicionada ao deck",

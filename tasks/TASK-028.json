@@ -1,0 +1,31 @@
+{
+  "key": "TASK-028",
+  "title": "TC-27-01: Importar deck Moxfield por URL guarda CMC y tipo de carta",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-28 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## ¿Qué se valida?\n\nQue al importar un deck desde una URL de Moxfield, las cartas queden guardadas en la colección con su costo de maná (CMC) y su tipo (type_line) correctos desde el primer momento — sin depender de procesos posteriores.\n\n## Precondiciones\n\n* Usuario autenticado en `cranial-trading-dev.web.app`.\n* Tener a mano una URL pública de un deck de Moxfield (ej. un deck Modern/Commander de la comunidad).\n\n## Pasos\n\n1. Ir a la ruta `/decks`.\n2. Click en el botón **Importar**.\n3. En el modal, pegar la URL de Moxfield y confirmar.\n4. Esperar a que el toast de progreso llegue al 100% y se abra la vista del deck.\n5. Abrir DevTools (F12) → pestaña **Console**.\n6. Escribir en la consola: `JSON.parse(localStorage.getItem('collection-cards-sample') || '[]').slice(0,5)` — NO es requerido; solo si quiere inspeccionar.\n7. Observar la curva de maná del deck recién importado.\n\n## Resultado esperado\n\n* La curva de maná muestra distribución realista (cartas bucketizadas según su CMC real).\n* Las cartas NO están todas colapsadas en el bucket 0.\n* El contador de tierras en el header dice \"X / total\" con número esperado (≈20-25 en decks de 60 cartas).\n\n## Pass / Fail\n\n* ✅ **Pass:** la curva muestra barras en varios buckets (0, 1, 2, 3, 4, etc.) con counts correspondientes al deck importado.\n* ❌ **Fail:** todas las cartas aparecen en bucket 0, o la curva está vacía, o el contador de tierras dice 0.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "decks",
+    "import",
+    "improvement",
+    "jira-import",
+    "qa-manual",
+    "regression",
+    "scrum-27"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.966Z",
+      "body": "Migrado desde SCRUM-28 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T13:42:48.538-0500",
+  "updated_at": "2026-05-09T20:47:57.953-0500",
+  "jira_key": "SCRUM-28"
+}

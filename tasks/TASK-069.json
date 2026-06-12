@@ -1,0 +1,28 @@
+{
+  "key": "TASK-069",
+  "title": "Collection & Performance",
+  "description": "**Migrado de Jira:** SCRUM-69 (tipo: Epic, estado original: Defined)\n\n## Objetivo\n\nAgrupar el trabajo del área de **Collection** (`CollectionView` + grilla de cartas) y los temas de **rendimiento de render** que la afectan, especialmente en dispositivos móviles de gama baja. La colección es la vista con más carga de datos de la app (hasta 59k+ cartas), así que las decisiones de virtualización, paginación y compositing viven aquí.\n\n## Cobertura\n\n* Grilla de Collection: modos Visual / lista, tarjetas (`CollectionGridCardFull` / `Compact`), swipe, context menu.\n* Filtros con URL-sync y paginación server-side.\n* Virtual scroll y límites de reactividad con colecciones grandes.\n* Rendimiento de render en GPUs móviles de gama baja (p. ej. Mali) — corrupción por exceso de `<svg><use>`, capas de compositing, etc.\n* Operaciones masivas (bulk) y wishlist sobre la colección.\n\n## Fuera de alcance\n\n* Editor de decks y binder (ver **SCRUM-14 Deck Editor UX**).\n* Pricing / market data (ver **SCRUM-16 Pricing & Market Intelligence**).\n* Search / discovery global (ver **SCRUM-17 Search & Discovery**).\n\n## Tickets hijos iniciales\n\n* **SCRUM-68** — Corrupción GPU en Collection Visual en Android Mali gama baja (resuelto v1.32.3).",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "collection",
+    "epic",
+    "jira-import",
+    "performance"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.178Z",
+      "body": "Migrado desde SCRUM-69 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-06-01T11:14:23.282-0500",
+  "updated_at": "2026-06-01T11:14:42.209-0500",
+  "jira_key": "SCRUM-69"
+}

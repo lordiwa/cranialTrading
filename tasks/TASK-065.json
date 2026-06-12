@@ -1,0 +1,27 @@
+{
+  "key": "TASK-065",
+  "title": "Cuando se ve el profile de un usuario sin ser uno ese usuario el filtro del buscador ya no existe",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-65 (tipo: Error, estado original: Q/A)\n\n## Síntoma\n\nEn la vista de perfil público de otro usuario (`/@username`, ej. https://cranialtrading.com/@rafael_m) la barra de búsqueda muestra solo el input de texto pero **falta el botón de Filtros avanzados** que sí aparece en `/collection`. El usuario no puede filtrar por color, mana, tipo, rareza, sets, formato, precio, keywords, etc.\n\n## Root cause\n\n`UserProfileView.vue` monta `<CardFilterBar>` pero **no le pasa la prop** `:show-advanced-filters=\"true\"`. La prop tiene default `false` en `CardFilterBar.vue:30`, y el botón de filtros está bajo `v-if=\"showAdvancedFilters\"` en `CardFilterBar.vue:120`. Por eso el botón no se renderiza.\n\n`CollectionView.vue:1007` sí pasa la prop correctamente. El `AdvancedFilterModal` y todo el cableado de filtros (composable `useCardFilter`, `localAdvancedFilters`, `handleLocalFiltersUpdate`, `resetAllChipFilters`) ya están implementados en `UserProfileView.vue` — solo falta exponer el botón que abre el modal.\n\n## Fix\n\nAgregar `:show-advanced-filters=\"true\"` al `<CardFilterBar>` en `UserProfileView.vue:553`. Cambio de una línea, sin lógica nueva.\n\n## Acceptance criteria\n\n* \\[ \\] Visitando `/@<otro-usuario>` aparece el botón de Filtros avanzados al lado del input de búsqueda.\n* \\[ \\] Al hacer click se abre `AdvancedFilterModal` con los filtros locales (sets, creature types, etc.) ya cableados.\n* \\[ \\] Aplicar filtros reduce la lista de cartas mostradas.\n* \\[ \\] El contador de filtros activos (`activeChipFilterCount`) se muestra en el botón.\n* \\[ \\] El botón funciona igual para usuario logueado y anónimo.\n* \\[ \\] No se rompe la vista del perfil propio.\n\n## QA notes\n\n* Verificar en `cranialtrading-dev.web.app/@rafael_m` (anónimo y logueado).\n* Comparar paridad visual con `/collection` (mismo botón, mismo modal).",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "jira-import",
+    "qa-manual"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.162Z",
+      "body": "Migrado desde SCRUM-65 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-05-03T20:18:05.375-0500",
+  "updated_at": "2026-05-12T14:45:53.273-0500",
+  "jira_key": "SCRUM-65"
+}

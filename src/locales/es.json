@@ -218,7 +218,8 @@
       "saveUserError": "Error al guardar datos de usuario",
       "loadUserError": "Error al cargar datos de usuario",
       "passwordUpdated": "Contraseña actualizada",
-      "usernameTaken": "Este username ya está en uso. Elige otro."
+      "usernameTaken": "Este username ya está en uso. Elige otro.",
+      "usernameInvalidFormat": "El nombre de usuario debe tener 3-20 letras, números o guiones bajos"
     }
   },
 
@@ -535,7 +536,8 @@
       "localSection": "En mi colección",
       "scryfallSection": "No en colección",
       "addLabel": "Añadir",
-      "advancedSearch": "Búsqueda avanzada"
+      "advancedSearch": "Búsqueda avanzada",
+      "addAsNew": "Agregar como nueva carta"
     },
     "quickAdd": {
       "allocated": "{name} agregada al mazo",

@@ -1016,6 +1016,7 @@ onUnmounted(() => {
             @change-view-type="viewType = $event"
             @select-local-card="handleLocalCardSelect"
             @select-scryfall-card="handleScryfallSuggestionSelect"
+            @open-add-modal-with-name="handleScryfallSuggestionSelect"
             @open-filters="showAdvancedFiltersModal = true"
         />
 

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-043",
+  "title": "Alertas de cartas fuera del color identity declarado del deck",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-43 (tipo: Impovement user personal space, estado original: Defined)\n\n## Contexto\n\nDesign debt detectado durante el grooming de SCRUM-42 (color analysis del deckbuilder).\n\n## Problema\n\nActualmente el usuario puede agregar cualquier carta a cualquier deck sin que la app le avise si la carta queda fuera de los colores declarados del deck (`Deck.colors`) o, en formatos como Commander, fuera del color identity del comandante.\n\n## Propuesta\n\nMostrar alertas (no bloqueantes) cuando una carta del mainboard / sideboard esté fuera del color identity esperado del deck:\n\n* **Todos los formatos**: si hay cartas con `colors` que incluyen colores no presentes en `Deck.colors`, listarlas en un panel \"Cartas fuera de color\".\n* **Commander específicamente**: validar contra el color identity del comandante (`Deck.commander`). Cartas con cualquier símbolo fuera del color identity son ilegales en Commander.\n* **Visual**: badge \"⚠️ off-color\" en la card del editor + sección agregada en el panel de Color Analysis (SCRUM-42) con la lista.\n\n## Acceptance criteria (borrador)\n\n* \\[ \\] Helper puro: `findOffColorCards(deck, hydratedCards)` retorna lista de cartas fuera de color con razón.\n* \\[ \\] UI badge en `DeckEditorGrid` para off-color cards.\n* \\[ \\] Sección en panel Color Analysis listando off-color cards.\n* \\[ \\] Para Commander, validar contra color identity del commander en lugar de `Deck.colors`.\n* \\[ \\] Tests unitarios (caso por formato).\n\n## Dependencias\n\n* Bloqueado por: SCRUM-42 (necesita el panel Color Analysis ya en la UI).\n\n## Prioridad\n\nDesign debt — backlog, no urgente.",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "backlog",
+    "decks",
+    "design-debt",
+    "improvement",
+    "jira-import"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.073Z",
+      "body": "Migrado desde SCRUM-43 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-05-01T10:54:33.529-0500",
+  "updated_at": "2026-05-01T10:55:11.202-0500",
+  "jira_key": "SCRUM-43"
+}

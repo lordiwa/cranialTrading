@@ -1,0 +1,30 @@
+{
+  "key": "TASK-038",
+  "title": "Editor de decks: ocultar placeholder + del grid en mobile (duplica al FAB)",
+  "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-38 (tipo: Impovement user personal space, estado original: Q/A)\n\n## Contexto\n\nSub-ticket de **SCRUM-35**. Este es el problema #3 de los tres originales: ruido visual en mobile por duplicación de CTA.\n\n## Comportamiento actual\n\nEn mobile coexisten dos puntos de entrada al `AddCardModal` que hacen exactamente lo mismo:\n\n1. **Placeholder** `+` dentro del grid (`DeckEditorGrid.vue:482, 497, 602`) — una \"card\" punteada con un `+` grande.\n2. `FloatingActionButton` flotante en la esquina inferior derecha (`DeckView.vue:1164`).\n\nAmbos disparan `emit('addCard')` → `showAddCardModal = true`. En mobile esto es ruido visual y ocupa un slot del grid.\n\n## Comportamiento esperado\n\n* **Mobile** (≤768 px): ocultar el placeholder `+` del grid y dejar solo el FAB.\n* **Desktop** (≥768 px): mantener el placeholder `+` en el grid (no hay FAB) — sigue siendo el único punto de entrada visible junto a tab nav.\n\n## Entry points\n\n3 instancias del placeholder en `DeckEditorGrid.vue` que comparten handler `emit('addCard')`:\n\n* Línea 482 — empty state (deck vacío).\n* Línea 497 — binder virtual scroll header.\n* Línea 602 — regular grouped view (caso más común).\n\nFAB: `DeckView.vue:1164` con `<Teleport to=\"body\">`.\n\n## Solución sugerida\n\nAplicar `class=\"hidden md:inline-block\"` (o equivalente Tailwind) al wrapper de cada placeholder cuando el deck NO está vacío.\n\n**Decisión abierta para discuss**: el empty state (deck vacío) probablemente debe mantener el placeholder grande también en mobile como CTA principal — confirmar antes de implementar.\n\n## Criterios de aceptación\n\n* \\[ \\] En mobile (viewport ≤768 px) el placeholder `+` del grid no se renderiza cuando hay cartas en el deck.\n* \\[ \\] En mobile el FAB sigue siendo accesible y abre el modal correctamente.\n* \\[ \\] En desktop (>768 px) el placeholder `+` sigue visible como hoy.\n* \\[ \\] Empty state: comportamiento confirmado en discuss (mantener placeholder grande o no).\n* \\[ \\] **BinderView**: aplicar el mismo patrón si replica el problema (parallel sibling, ver Anti-Loop Rule 6).\n* \\[ \\] Test manual mobile real (no solo devtools responsive).\n\n## Out of scope\n\n* Cambiar el diseño del FAB.\n* Cambiar el diseño del placeholder.\n* Tocar la collection grid.\n\n## Relaciona\n\n* **Padre lógico**: SCRUM-35.\n* **Epic**: SCRUM-14 Deck Editor UX.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "low",
+  "labels": [
+    "decks",
+    "frontend",
+    "improvement",
+    "jira-import",
+    "mobile",
+    "ux"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.040Z",
+      "body": "Migrado desde SCRUM-38 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-04-26T13:49:47.330-0500",
+  "updated_at": "2026-04-27T10:27:02.482-0500",
+  "jira_key": "SCRUM-38"
+}

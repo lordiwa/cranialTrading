@@ -1,0 +1,32 @@
+{
+  "key": "TASK-068",
+  "title": "Corrupción GPU en vista Collection (modo Visual) en Android Mali gama baja",
+  "description": "**Epic:** TASK-069 (Collection & Performance)\n**Migrado de Jira:** SCRUM-68 (tipo: Error, estado original: Q/A)\n\n## Contexto / Problema\n\nEn la vista **Collection** en modo **Visual**, dispositivos Android de gama baja con GPU Mali mostraban \"estática\" multicolor rasgada (corrupción de GPU) por encima de las cartas, dejando la vista inutilizable. Verificado y reproducido en **Tecno Spark 30C — MediaTek Helio G81 / Mali-G52 MC2** en `cranial-trading-dev.web.app/collection`.\n\n## Comportamiento actual (antes del fix)\n\nLa grilla virtualizada monta \\~10 cartas a la vez. Cada carta (`CollectionGridCardFull.vue`) renderizaba en su **barra de status (Row 1)** \\~5 íconos `<svg><use>` (toggle público/ojo + 4 botones de status: collection / trade / sale / wishlist). Eso da \\~50 `<use>` simultáneos, que saturan la GPU Mali-G52 y se rasterizan corruptos.\n\n## Causa raíz\n\nBisección **en el dispositivo real** (toggles temporales `?diag=` desplegados a dev):\n\n* `?diag=nostatus` (quita SOLO la barra de status) → **limpio**.\n* `noimg`, `noswipe`, `nospark` → NO arreglan.\n\nConclusión: no eran las imágenes, ni el swipe, ni el sparkline, ni el alto del documento. El patrón de clonado de sombra de `<svg><use>` **en cantidad** es el que corrompe esta GPU. Geometría SVG inline (el `<polyline>` del sparkline) y raster (imágenes de Scryfall) renderizan bien. Mantener ≤ \\~1-2 `SvgIcon` por carta virtualizada. Refs: Chromium #1143158, #552999.\n\n## Solución aplicada\n\nSe **eliminó la barra de status (Row 1)** de la carta en modo Visual. Motivo doble:\n\n1. Corrupción GPU en gama baja (este bug).\n2. Los controles eran **redundantes y demasiado pequeños para usarse en teléfono**.\n\nEl cambio de status y el toggle de visibilidad pública **siguen disponibles**:\n\n* **CardDetailModal** (tap sobre la carta — funciona en touch): distribución de status con +/- y toggle de publicación.\n* **Swipe-right** sobre la carta: cicla el status.\n* **Swipe-left**: eliminar.\n\n(El menú contextual de escritorio también los tiene, pero está deshabilitado en touch, por eso CardDetailModal es el camino móvil.)\n\n## Criterio de aceptación\n\n* \\[x\\] Collection Visual se ve limpia (sin estática multicolor) en Tecno Spark 30C — **verificado por Rafael 2026-06-01**.\n* \\[x\\] Cambio de status sigue accesible en móvil (CardDetailModal + swipe-right).\n* \\[x\\] Toggle público sigue accesible (CardDetailModal).\n* \\[x\\] Build (`npx vite build`) y 1022 unit tests en verde.\n* \\[ \\] (Opcional) Verificación independiente de QA en un dispositivo Mali de gama baja, si hay disponible.\n\n## Refs técnicas\n\n* `src/components/collection/CollectionGridCardFull.vue` — barra Row 1 eliminada; `getStatusIconName` quedó huérfana y se borró.\n* Resuelto en **v1.32.3** (commit `f58ef50`), desplegado a **producción** el 2026-06-01.\n* Antecedente: v1.32.2 (`df9199d`) fue un intento previo (GPU layer) que no resolvió la raíz.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "collection",
+    "frontend",
+    "jira-import",
+    "mobile",
+    "performance",
+    "regression",
+    "ux"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.174Z",
+      "body": "Migrado desde SCRUM-68 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-06-01T11:12:16.131-0500",
+  "updated_at": "2026-06-01T11:14:48.473-0500",
+  "jira_key": "SCRUM-68"
+}

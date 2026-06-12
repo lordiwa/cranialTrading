@@ -50,11 +50,16 @@ export interface CardPrices {
   }
 }
 
+import { isKnownMtgjsonSet, parseSetListCodes } from './mtgjsonSetList'
+
 // IndexedDB configuration
 const DB_NAME = 'mtgjson_cache'
 const DB_VERSION = 1
 const PRICE_STORE = 'prices'
 const MAPPING_STORE = 'mappings'
+
+// SetList cache: how long before we refresh the list of valid MTGJSON set codes
+const SET_LIST_REFRESH_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 // Cache keys for localStorage (small data only)
 const SET_CACHE_PREFIX = 'mtgjson_set_'
@@ -68,6 +73,13 @@ let scryfallToUuidMap = new Map<string, string>()
 let dbInstance: IDBDatabase | null = null
 const failedSets = new Set<string>()
 const loadedSets = new Set<string>()
+
+// Set of UPPERCASE set codes that MTGJSON actually publishes a file for.
+// Loaded lazily from MTGJSON's SetList and cached in IndexedDB. Empty until
+// loaded; an empty set means "unknown" → no pre-filtering (legacy behavior).
+let validSetCodes = new Set<string>()
+// Promise guard so the SetList is only fetched once even under concurrency.
+let setListLoadPromise: Promise<void> | null = null
 
 // One-time cleanup of old/bloated localStorage keys (migrating to IndexedDB)
 ;(() => {
@@ -316,9 +328,83 @@ async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
 }
 
 /**
+ * Ensure the set of valid MTGJSON set codes is loaded into `validSetCodes`.
+ *
+ * MTGJSON does NOT publish a per-set file for every Scryfall set code (promos,
+ * tokens, specialty codes like PLST / PTOKEN / TKHM …). Requesting those yields
+ * a 404 + CORS console error that cannot be silenced from JS. By loading the
+ * authoritative SetList once we can pre-filter and never make those requests.
+ *
+ * Caching: parsed codes are stored in IndexedDB under `setListCodes` together
+ * with a timestamp, and refreshed after SET_LIST_REFRESH_MS.
+ *
+ * GRACEFUL DEGRADATION: if the SetList fetch/parse fails for any reason, we
+ * leave `validSetCodes` empty. `isKnownMtgjsonSet` treats an empty set as
+ * "unknown" and returns true, so callers fall back to the legacy
+ * attempt-and-catch-404 behavior. Pricing is never blocked by this optimization.
+ */
+async function ensureSetListLoaded(): Promise<void> {
+  // Already have it in memory for this session.
+  if (validSetCodes.size > 0) return
+
+  // De-dupe concurrent callers onto a single in-flight load.
+  if (setListLoadPromise) return setListLoadPromise
+
+  setListLoadPromise = (async () => {
+    try {
+      // 1. Try the IndexedDB cache first.
+      const cached = await getFromDB<{ codes: string[]; timestamp: number }>(
+        MAPPING_STORE,
+        'setListCodes'
+      )
+      if (cached && Array.isArray(cached.codes) && cached.codes.length > 0) {
+        const fresh = Date.now() - (cached.timestamp || 0) < SET_LIST_REFRESH_MS
+        if (fresh) {
+          validSetCodes = new Set(cached.codes)
+          return
+        }
+      }
+
+      // 2. Fetch + parse the authoritative SetList from MTGJSON.
+      const response = await fetchGzippedJson<unknown>(`${MTGJSON_API}/SetList.json.gz`)
+      const codes = parseSetListCodes(response)
+
+      if (codes.size > 0) {
+        validSetCodes = codes
+        // Cache for next time (async, don't block).
+        void saveToDB(MAPPING_STORE, 'setListCodes', {
+          codes: Array.from(codes),
+          timestamp: Date.now()
+        })
+        console.info(`MTGJSON SetList loaded: ${codes.size} valid set codes`)
+      } else if (cached && Array.isArray(cached.codes) && cached.codes.length > 0) {
+        // Parse produced nothing but we have a stale cache — use it rather than
+        // degrade to no pre-filtering.
+        validSetCodes = new Set(cached.codes)
+      }
+    } catch (error) {
+      // Graceful degradation: leave validSetCodes empty → no pre-filtering.
+      console.warn('[MTGJSON] SetList unavailable, set pre-filter disabled:', error)
+    } finally {
+      setListLoadPromise = null
+    }
+  })()
+
+  return setListLoadPromise
+}
+
+/**
  * Fetch set data from MTGJSON and build scryfallId -> uuid mapping
  */
 async function fetchSetMapping(setCode: string): Promise<void> {
+  // Pre-filter: skip set codes MTGJSON does not publish a file for, to avoid
+  // 404 + CORS console spam. When the SetList is unavailable (validSetCodes
+  // empty), isKnownMtgjsonSet returns true and we fall back to fetching.
+  if (!isKnownMtgjsonSet(setCode, validSetCodes)) {
+    failedSets.add(setCode.toUpperCase())
+    return
+  }
+
   console.info(`Fetching MTGJSON set data for ${setCode}...`)
 
   try {
@@ -357,6 +443,8 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
 
     // If we don't have the mapping for this card, fetch the set data
     if (!scryfallToUuidMap.has(scryfallId) && setCode && !failedSets.has(setCode.toUpperCase())) {
+      // Load the valid-set list once so fetchSetMapping can pre-filter 404s.
+      await ensureSetListLoaded()
       await fetchSetMapping(setCode)
       // Save updated mapping (async)
       void saveMappingToCache(scryfallToUuidMap)
@@ -439,6 +527,9 @@ export async function preloadSetMappings(setCodes: string[]): Promise<void> {
   // Filter again after loading cache — skip sets already in loadedSets
   const stillNeeded = needed.filter(sc => !loadedSets.has(sc.toUpperCase()))
   if (stillNeeded.length === 0) return
+
+  // Load the valid-set list once so fetchSetMapping can pre-filter 404s.
+  await ensureSetListLoaded()
 
   // Fetch in parallel batches of 5
   const CONCURRENCY = 5

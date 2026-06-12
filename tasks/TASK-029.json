@@ -1,0 +1,31 @@
+{
+  "key": "TASK-029",
+  "title": "TC-27-02: Datos de cartas importadas persisten tras recargar la página",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-29 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## ¿Qué se valida?\n\nQue la información de las cartas recién importadas sobreviva a una recarga completa del navegador (hard reload). Antes del fix, los datos se perdían al recargar y la curva volvía a mostrar todo en bucket 0.\n\n## Precondiciones\n\n* Haber completado el TC-27-01 con resultado Pass (deck importado correctamente).\n* Estar en la vista del deck (URL tipo `/decks/{deckId}`).\n\n## Pasos\n\n1. Anotar mentalmente (o capturar screenshot) la curva de maná actual: cuántas cartas hay en cada bucket.\n2. Hacer **hard reload**: `Ctrl + Shift + R` (Windows/Linux) o `Cmd + Shift + R` (Mac).\n3. Esperar a que la página cargue completamente.\n4. Navegar de vuelta al deck (si la recarga cambió la URL).\n5. Observar la curva de maná.\n\n## Resultado esperado\n\n* La curva muestra EXACTAMENTE la misma distribución que antes del reload.\n* El contador de tierras coincide con el valor previo.\n* Las cartas conservan sus CMCs originales (no volvieron a 0).\n\n## Pass / Fail\n\n* ✅ **Pass:** curva idéntica a la pre-reload, counts por bucket coinciden.\n* ❌ **Fail:** la curva vuelve a colapsar en bucket 0, o faltan datos, o el contador de tierras cambió inesperadamente.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "decks",
+    "import",
+    "improvement",
+    "jira-import",
+    "qa-manual",
+    "regression",
+    "scrum-27"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.970Z",
+      "body": "Migrado desde SCRUM-29 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T13:42:56.614-0500",
+  "updated_at": "2026-05-09T20:33:44.191-0500",
+  "jira_key": "SCRUM-29"
+}

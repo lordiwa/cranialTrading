@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { resolveUsernameToUid } from '../../services/userLookup';
 import BaseLoader from '../ui/BaseLoader.vue';
 import { getAvatarUrlForUser } from '../../utils/avatar';
 
@@ -23,16 +24,11 @@ const loadUserInfo = async () => {
 
   loading.value = true;
   try {
-    // Query users collection by username
-    const usersCol = collection(db, 'users');
-    const q = query(usersCol, where('username', '==', props.username), limit(1));
-    const snapshot = await getDocs(q);
-
-    const firstDoc = snapshot.docs[0]
-    if (!snapshot.empty && firstDoc) {
-      const userData = firstDoc.data();
-      const userId = firstDoc.id;
-      userInfo.value = userData as { username: string; location?: string; avatarUrl?: string | null };
+    // Resolve user by username (deterministic — D-11)
+    const result = await resolveUsernameToUid(props.username);
+    if (result) {
+      const userId = result.id;
+      userInfo.value = result.data as { username: string; location?: string; avatarUrl?: string | null };
 
       // Count public cards
       const cardsCol = collection(db, 'users', userId, 'cards');

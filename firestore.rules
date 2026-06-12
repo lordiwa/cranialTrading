@@ -102,6 +102,16 @@ service cloud.firestore {
       }
     }
 
+    // SCRUM-73: índice de unicidad de usernames. Doc ID = username normalizado (lowercase, trim).
+    // Body: { uid, createdAt }. La regla create-only ES la garantía de unicidad:
+    // un setDoc sobre un doc existente se evalúa como UPDATE (resource != null) y se deniega.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      // Sin regla update — la denegación sobre un doc existente es la señal "username ocupado".
+    }
+
     // ========== COLECCIONES PÚBLICAS PARA MATCHES OPTIMIZADOS ==========
     // Cartas públicas (para trade/sale) - cualquier autenticado puede leer
     match /public_cards/{docId} {

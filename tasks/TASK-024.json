@@ -1,0 +1,30 @@
+{
+  "key": "TASK-024",
+  "title": "TC-P04-06: Redirecciones automáticas — regresión",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-24 (tipo: Impovement user personal space, estado original: Finalizada)\n\n**Componente:** Redirecciones programáticas (las que la app dispara sola, no por click)\n**Requirement:** Regresión de Phase 4\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué se valida?\n\nHay puntos de la app donde la navegación NO es por click — pasa **automáticamente después de una acción** (ej: después de hacer login, te lleva al dashboard). Estas redirecciones siguen una lógica distinta a un link normal. Esta TC asegura que NO se hayan roto al cambiar otros enlaces a RouterLink.\n\n## ¿Por qué importa?\n\nSi una redirección automática se rompe, el usuario hace login y se queda en la página de login (no se mueve), o crea un deck y no llega al editor. Es una experiencia rota.\n\n## Preconditions\n\n* Logueado en dev (algunas pruebas requieren cerrar sesión y volver a abrir)\n\n## Steps\n\nProbar 5 flujos. Cada uno debe terminar en la URL correcta SIN abrir pestaña nueva.\n\n### 1. Logout\n\n* Click en tu avatar (esquina superior derecha) → \"Cerrar sesión\"\n* **Esperado:** la app te redirige a `/login`\n\n### 2. Login\n\n* En `/login`, ingresar credenciales correctas → \"Iniciar sesión\"\n* **Esperado:** la app te redirige a `/dashboard`\n\n### 3. Crear deck nuevo\n\n* Ir a `/decks` → click en \"Nuevo deck\" / \"Crear deck\"\n* **Esperado:** la app te redirige a `/decks/<id-nuevo>/edit` (editor del deck recién creado)\n\n### 4. Botón \"Agregar carta\" del menú\n\n* Click en el menú principal del header → \"Agregar carta\"\n* **Esperado:** se ABRE el modal de Agregar Carta (NO debe abrir pestaña nueva)\n\n### 5. Botón \"Reiniciar tour\"\n\n* Menú del header → \"Reiniciar tour\" (puede estar bajo Ayuda)\n* **Esperado:** la app te redirige a `/collection` y empieza el tour guiado\n\n## Pass / Fail\n\n* **Pass:** los 5 flujos terminan donde deben, en la pestaña actual\n* **Fail:** alguno abre pestaña nueva, o no llega al destino, o el modal del paso 4 no se abre\n\n## Nota técnica para futuro\n\nEsto se puede automatizar con Playwright + fixtures de autenticación.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "improvement",
+    "jira-import",
+    "phase-4",
+    "qa-auto",
+    "regression",
+    "router"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.952Z",
+      "body": "Migrado desde SCRUM-24 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-18T17:28:08.138-0500",
+  "updated_at": "2026-05-06T20:52:38.611-0500",
+  "jira_key": "SCRUM-24"
+}

@@ -1,0 +1,28 @@
+{
+  "key": "TASK-016",
+  "title": "Pricing & Market Intelligence",
+  "description": "**Migrado de Jira:** SCRUM-16 (tipo: Epic, estado original: Defined)\n\n## Objetivo\n\nMejorar la visualización y comparación de precios de cartas en distintas tiendas / mercados, y dar al usuario insights sobre oportunidades de compra/venta.\n\n## Cobertura\n\n* Visualización de precios en grid sin abrir la carta\n* Comparativa entre tiendas locales\n* Histórico / tendencias (futuro)",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "epic",
+    "jira-import",
+    "market",
+    "pricing"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.912Z",
+      "body": "Migrado desde SCRUM-16 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-04-18T17:16:28.529-0500",
+  "updated_at": "2026-04-18T17:17:03.359-0500",
+  "jira_key": "SCRUM-16"
+}

@@ -369,6 +369,9 @@
       "searching": "Buscando…",
       "resultsCount": "{count} resultados em {tabName}",
       "resultsCountSingular": "{count} resultado em {tabName}",
+      "suggestionsCount": "{count} sugestões",
+      "suggestionsCountSingular": "{count} sugestão",
+      "viewAllResults": "Ver todos os resultados",
       "tabNames": {
         "collection": "coleção",
         "users": "usuários",
@@ -1517,7 +1520,10 @@
   "search": {
     "view": {
       "title": "BUSCA AVANÇADA",
-      "backToCollection": "Voltar"
+      "backToCollection": "Voltar",
+      "inCollectionTitle": "Na sua coleção",
+      "otherUsersTitle": "Outros usuários vendem ou trocam",
+      "catalogTitle": "Catálogo de cartas"
     },
     "owned": "x{count} tenho",
     "filterPanel": {

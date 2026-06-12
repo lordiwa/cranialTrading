@@ -1,313 +1,323 @@
 /**
- * Unit tests for useGlobalSearch composable — Plan 04-01.
+ * Unit tests for useGlobalSearch composable — TASK-076 (lightweight header search).
+ *
+ * The header search is now a name-only autocomplete over Scryfall's
+ * /cards/autocomplete endpoint (getCardSuggestions). No Firestore, no card
+ * images, no tabs. Selecting a suggestion (or pressing Enter) navigates to
+ * the /search results page.
  *
  * Tests cover:
- * - moveHighlight (arrow/home/end navigation, wrap, no-op on empty, activeDescendantId)
- * - activeTab watcher (highlight reset on tab switch)
- * - isExpanded computed (open+loading/results logic)
- * - selectHighlighted (no-highlight → /search; valid → correct goTo* path)
- * - route resolvers (resolveCollectionRoute, resolveUserRoute, resolveScryfallRoute)
- * - scheduleLiveRegionUpdate (debounce, coalesce, clearTimeout-on-re-entry)
- * - activeTab watcher extended (announces count via ariaLiveMessage after tab switch)
- * - performSearch loading/count announcements
+ * - handleInput debounce → single getCardSuggestions call
+ * - <2 chars short-circuits and clears suggestions
+ * - suggestions capped at 8
+ * - stale-response guard (out-of-order responses never overwrite newer ones)
+ * - moveHighlight (arrow/home/end navigation, wrap, activeDescendantId)
+ * - selectHighlighted (highlight → /search?q=<suggestion>; none → /search?q=<typed>)
+ * - resolveSuggestionRoute for RouterLink :to= bindings
+ * - isExpanded computed
+ * - live region announcements (searching immediate, count debounced)
  */
 
 import { vi } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 
 const pushMock = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: pushMock }),
 }))
 
-// Mock stores the composable depends on
-vi.mock('@/stores/collection', () => ({
-  useCollectionStore: () => ({ cards: [] }),
-}))
-vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ user: null }),
-}))
-vi.mock('@/stores/toast', () => ({
-  useToastStore: () => ({ show: vi.fn() }),
-}))
 vi.mock('@/composables/useI18n', () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) =>
       params ? `${key}:${JSON.stringify(params)}` : key,
   }),
 }))
+
+const getCardSuggestionsMock = vi.fn()
 vi.mock('@/services/scryfall', () => ({
-  searchCards: vi.fn().mockResolvedValue([]),
+  getCardSuggestions: (...args: unknown[]) => getCardSuggestionsMock(...args),
 }))
-vi.mock('firebase/firestore', () => ({
-  addDoc: vi.fn(),
-  collection: vi.fn(),
-  getDocs: vi.fn().mockResolvedValue({ docs: [] }),
-  query: vi.fn(),
-  where: vi.fn(),
-}))
-vi.mock('@/services/firebase', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
-// eslint-disable-next-line import/first
-import { makeCard } from '../helpers/fixtures'
-// eslint-disable-next-line import/first
-import type { PublicCardResult } from '@/composables/useGlobalSearch'
-// eslint-disable-next-line import/first
-import type { ScryfallCard } from '@/services/scryfall'
 
 beforeEach(() => {
-  setActivePinia(createPinia())
   pushMock.mockClear()
+  getCardSuggestionsMock.mockReset()
+  getCardSuggestionsMock.mockResolvedValue([])
 })
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// ─── describe: handleInput debounce ──────────────────────────────────────────
 
-function makeUserResult(overrides: Partial<PublicCardResult> = {}): PublicCardResult {
-  return {
-    id: 'u1',
-    username: 'alice',
-    cardName: 'Bolt',
-    userId: 'user-1',
-    ...overrides,
-  }
-}
+describe('handleInput debounce', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
-function makeScryfallCard(overrides: Partial<ScryfallCard> = {}): ScryfallCard {
-  return {
-    id: 's1',
-    name: 'Lightning Bolt',
-    ...overrides,
-  }
-}
+  it('debounces: no fetch before 300ms, one fetch after', async () => {
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'bolt'
+    gs.handleInput()
+
+    vi.advanceTimersByTime(299)
+    expect(getCardSuggestionsMock).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+    await vi.runAllTimersAsync()
+    expect(getCardSuggestionsMock).toHaveBeenCalledTimes(1)
+    expect(getCardSuggestionsMock).toHaveBeenCalledWith('bolt')
+  })
+
+  it('coalesces rapid keystrokes into a single fetch with the last query', async () => {
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'bo'
+    gs.handleInput()
+    vi.advanceTimersByTime(100)
+    gs.searchQuery.value = 'bolt'
+    gs.handleInput()
+    await vi.runAllTimersAsync()
+
+    expect(getCardSuggestionsMock).toHaveBeenCalledTimes(1)
+    expect(getCardSuggestionsMock).toHaveBeenCalledWith('bolt')
+  })
+
+  it('clears suggestions without fetching when query drops below 2 chars', async () => {
+    const gs = useGlobalSearch()
+    gs.suggestions.value = ['Lightning Bolt']
+    gs.searchQuery.value = 'b'
+    gs.handleInput()
+    await vi.runAllTimersAsync()
+
+    expect(getCardSuggestionsMock).not.toHaveBeenCalled()
+    expect(gs.suggestions.value).toEqual([])
+  })
+})
+
+// ─── describe: performSearch ─────────────────────────────────────────────────
+
+describe('performSearch', () => {
+  it('fills suggestions capped at 8 entries', async () => {
+    const names = Array.from({ length: 20 }, (_, i) => `Card ${i}`)
+    getCardSuggestionsMock.mockResolvedValueOnce(names)
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'card'
+
+    await gs.performSearch()
+
+    expect(gs.suggestions.value).toHaveLength(8)
+    expect(gs.suggestions.value[0]).toBe('Card 0')
+    expect(gs.loading.value).toBe(false)
+    expect(gs.isOpen.value).toBe(true)
+  })
+
+  it('does nothing for queries shorter than 2 chars', async () => {
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'x'
+    await gs.performSearch()
+    expect(getCardSuggestionsMock).not.toHaveBeenCalled()
+  })
+
+  it('stale guard: an older response never overwrites a newer one', async () => {
+    let resolveFirst: (v: string[]) => void = () => {}
+    const firstPromise = new Promise<string[]>(resolve => { resolveFirst = resolve })
+    getCardSuggestionsMock
+      .mockReturnValueOnce(firstPromise)
+      .mockResolvedValueOnce(['Newer Result'])
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'first'
+    const first = gs.performSearch()
+
+    gs.searchQuery.value = 'second'
+    await gs.performSearch()
+    expect(gs.suggestions.value).toEqual(['Newer Result'])
+
+    // Old response arrives late — must be discarded
+    resolveFirst(['Stale Result'])
+    await first
+    expect(gs.suggestions.value).toEqual(['Newer Result'])
+    expect(gs.loading.value).toBe(false)
+  })
+
+  it('resets highlight when new suggestions arrive', async () => {
+    getCardSuggestionsMock.mockResolvedValueOnce(['A', 'B'])
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'ab'
+    gs.highlightedIndex.value = 1
+    await gs.performSearch()
+
+    expect(gs.highlightedIndex.value).toBe(-1)
+    expect(gs.activeDescendantId.value).toBeNull()
+  })
+})
 
 // ─── describe: moveHighlight ──────────────────────────────────────────────────
 
 describe('moveHighlight', () => {
-  it('moves down from -1 to 0 when results exist', () => {
+  it('moves down from -1 to 0 when suggestions exist', () => {
     const gs = useGlobalSearch()
-    gs.collectionResults.value = [makeCard()]
+    gs.suggestions.value = ['Lightning Bolt']
     gs.moveHighlight('down')
     expect(gs.highlightedIndex.value).toBe(0)
   })
 
-  it('wraps from last index to 0 on down (length 8, start 7 → 0)', () => {
+  it('wraps from last index to 0 on down', () => {
     const gs = useGlobalSearch()
-    const cards = Array.from({ length: 8 }, (_, i) => makeCard({ id: `card-${i}`, name: `Card ${i}` }))
-    gs.collectionResults.value = cards
-    gs.highlightedIndex.value = 7
+    gs.suggestions.value = ['A', 'B', 'C']
+    gs.highlightedIndex.value = 2
     gs.moveHighlight('down')
     expect(gs.highlightedIndex.value).toBe(0)
   })
 
-  it('wraps from 0 to last index on up (length 8, start 0 → 7)', () => {
+  it('wraps from 0 to last index on up', () => {
     const gs = useGlobalSearch()
-    const cards = Array.from({ length: 8 }, (_, i) => makeCard({ id: `card-${i}`, name: `Card ${i}` }))
-    gs.collectionResults.value = cards
+    gs.suggestions.value = ['A', 'B', 'C']
     gs.highlightedIndex.value = 0
     gs.moveHighlight('up')
-    expect(gs.highlightedIndex.value).toBe(7)
+    expect(gs.highlightedIndex.value).toBe(2)
   })
 
-  it('moves up from -1 to last index', () => {
+  it('home/end jump to first/last', () => {
     const gs = useGlobalSearch()
-    const cards = Array.from({ length: 4 }, (_, i) => makeCard({ id: `card-${i}`, name: `Card ${i}` }))
-    gs.collectionResults.value = cards
-    gs.highlightedIndex.value = -1
-    gs.moveHighlight('up')
-    expect(gs.highlightedIndex.value).toBe(3)
-  })
-
-  it('home sets index to 0 when results exist', () => {
-    const gs = useGlobalSearch()
-    const cards = Array.from({ length: 4 }, (_, i) => makeCard({ id: `card-${i}`, name: `Card ${i}` }))
-    gs.collectionResults.value = cards
-    gs.highlightedIndex.value = 3
+    gs.suggestions.value = ['A', 'B', 'C', 'D']
+    gs.highlightedIndex.value = 2
     gs.moveHighlight('home')
     expect(gs.highlightedIndex.value).toBe(0)
-  })
-
-  it('end sets index to length - 1', () => {
-    const gs = useGlobalSearch()
-    const cards = Array.from({ length: 4 }, (_, i) => makeCard({ id: `card-${i}`, name: `Card ${i}` }))
-    gs.collectionResults.value = cards
-    gs.highlightedIndex.value = 0
     gs.moveHighlight('end')
     expect(gs.highlightedIndex.value).toBe(3)
   })
 
-  it('is a no-op when results array is empty (highlightedIndex stays -1, activeDescendantId stays null)', () => {
+  it('is a no-op when suggestions are empty', () => {
     const gs = useGlobalSearch()
-    // activeTab defaults to 'collection', collectionResults is []
-    expect(gs.highlightedIndex.value).toBe(-1)
     gs.moveHighlight('down')
     expect(gs.highlightedIndex.value).toBe(-1)
     expect(gs.activeDescendantId.value).toBeNull()
   })
 
-  it('is a no-op on single-item when direction is down then up (index stays 0)', () => {
+  it('updates activeDescendantId to option-suggestion-{index}', () => {
     const gs = useGlobalSearch()
-    gs.collectionResults.value = [makeCard()]
-    gs.highlightedIndex.value = 0
+    gs.suggestions.value = ['A', 'B']
     gs.moveHighlight('down')
-    // With single item: 0 >= length-1 → wraps to 0
-    expect(gs.highlightedIndex.value).toBe(0)
-    gs.moveHighlight('up')
-    // With single item: 0 <= 0 → wraps to length-1 = 0
-    expect(gs.highlightedIndex.value).toBe(0)
-  })
-
-  it('updates activeDescendantId to option-{activeTab}-{index} after a move', () => {
-    const gs = useGlobalSearch()
-    gs.collectionResults.value = [makeCard(), makeCard({ id: 'card-2', name: 'Counterspell' })]
+    expect(gs.activeDescendantId.value).toBe('option-suggestion-0')
     gs.moveHighlight('down')
-    expect(gs.activeDescendantId.value).toBe('option-collection-0')
-    gs.moveHighlight('down')
-    expect(gs.activeDescendantId.value).toBe('option-collection-1')
+    expect(gs.activeDescendantId.value).toBe('option-suggestion-1')
   })
 })
 
-// ─── describe: activeTab watcher ──────────────────────────────────────────────
+// ─── describe: selectHighlighted / goToResults ────────────────────────────────
 
-describe('activeTab watcher', () => {
-  it('resets highlightedIndex to -1 when activeTab changes', async () => {
-    const { nextTick } = await import('vue')
+describe('selectHighlighted', () => {
+  it('navigates to /search with the highlighted suggestion', () => {
     const gs = useGlobalSearch()
-    gs.collectionResults.value = [makeCard(), makeCard({ id: 'c2', name: 'Counterspell' })]
+    gs.searchQuery.value = 'light'
+    gs.suggestions.value = ['Lightning Bolt', 'Lightning Helix']
     gs.highlightedIndex.value = 1
-    gs.activeTab.value = 'users'
-    await nextTick()
-    expect(gs.highlightedIndex.value).toBe(-1)
+    gs.isOpen.value = true
+
+    gs.selectHighlighted()
+
+    expect(pushMock).toHaveBeenCalledWith({ path: '/search', query: { q: 'Lightning Helix' } })
+    expect(gs.isOpen.value).toBe(false)
+    expect(gs.searchQuery.value).toBe('')
+    expect(gs.suggestions.value).toEqual([])
   })
 
-  it('resets activeDescendantId to null when activeTab changes', async () => {
-    const { nextTick } = await import('vue')
+  it('navigates to /search with the typed text when nothing is highlighted', () => {
     const gs = useGlobalSearch()
-    gs.collectionResults.value = [makeCard()]
-    gs.moveHighlight('down')
-    expect(gs.activeDescendantId.value).not.toBeNull()
-    gs.activeTab.value = 'users'
-    await nextTick()
-    expect(gs.activeDescendantId.value).toBeNull()
+    gs.searchQuery.value = 'bolt'
+    gs.isOpen.value = true
+
+    gs.selectHighlighted()
+
+    expect(pushMock).toHaveBeenCalledWith({ path: '/search', query: { q: 'bolt' } })
+    expect(gs.isOpen.value).toBe(false)
+  })
+
+  it('does not navigate when the query is empty and nothing is highlighted', () => {
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = '   '
+    gs.selectHighlighted()
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('out-of-bounds highlight falls back to typed text (boundary safety)', () => {
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'sol'
+    gs.suggestions.value = ['Sol Ring']
+    gs.highlightedIndex.value = 5
+    gs.selectHighlighted()
+    expect(pushMock).toHaveBeenCalledWith({ path: '/search', query: { q: 'sol' } })
+  })
+})
+
+// ─── describe: resolveSuggestionRoute ─────────────────────────────────────────
+
+describe('resolveSuggestionRoute', () => {
+  it('returns { path: "/search", query: { q: name } }', () => {
+    const gs = useGlobalSearch()
+    expect(gs.resolveSuggestionRoute('Black Lotus')).toEqual({
+      path: '/search',
+      query: { q: 'Black Lotus' },
+    })
   })
 })
 
 // ─── describe: isExpanded ─────────────────────────────────────────────────────
 
 describe('isExpanded', () => {
-  it('is false when isOpen is false regardless of loading/results', () => {
+  it('is false when isOpen is false regardless of loading/suggestions', () => {
     const gs = useGlobalSearch()
     gs.isOpen.value = false
     gs.loading.value = true
-    gs.collectionResults.value = [makeCard()]
+    gs.suggestions.value = ['A']
     expect(gs.isExpanded.value).toBe(false)
   })
 
-  it('is true when isOpen is true and loading is true', () => {
+  it('is true when open and loading', () => {
     const gs = useGlobalSearch()
     gs.isOpen.value = true
     gs.loading.value = true
     expect(gs.isExpanded.value).toBe(true)
   })
 
-  it('is true when isOpen is true and totalResults > 0', () => {
+  it('is true when open with suggestions', () => {
     const gs = useGlobalSearch()
     gs.isOpen.value = true
-    gs.loading.value = false
-    gs.collectionResults.value = [makeCard()]
+    gs.suggestions.value = ['A']
     expect(gs.isExpanded.value).toBe(true)
   })
 
-  it('is false when isOpen is true, loading is false, totalResults is 0', () => {
+  it('is false when open, not loading, no suggestions', () => {
     const gs = useGlobalSearch()
     gs.isOpen.value = true
-    gs.loading.value = false
-    // no results
     expect(gs.isExpanded.value).toBe(false)
   })
 })
 
-// ─── describe: selectHighlighted ──────────────────────────────────────────────
+// ─── describe: clearSearch ────────────────────────────────────────────────────
 
-describe('selectHighlighted', () => {
-  it('navigates to /search with q=searchQuery when highlightedIndex is -1', () => {
+describe('clearSearch', () => {
+  it('resets query, suggestions, highlight and closes the popup', () => {
     const gs = useGlobalSearch()
     gs.searchQuery.value = 'bolt'
+    gs.suggestions.value = ['Lightning Bolt']
+    gs.highlightedIndex.value = 0
     gs.isOpen.value = true
-    gs.selectHighlighted()
-    expect(pushMock).toHaveBeenCalledWith({ path: '/search', query: { q: 'bolt' } })
+
+    gs.clearSearch()
+
+    expect(gs.searchQuery.value).toBe('')
+    expect(gs.suggestions.value).toEqual([])
+    expect(gs.highlightedIndex.value).toBe(-1)
     expect(gs.isOpen.value).toBe(false)
   })
-
-  it('navigates to /search with q=searchQuery when highlightedIndex >= results.length (boundary safety)', () => {
-    const gs = useGlobalSearch()
-    gs.searchQuery.value = 'sol'
-    gs.collectionResults.value = [makeCard()]
-    gs.highlightedIndex.value = 5 // out of bounds
-    gs.selectHighlighted()
-    expect(pushMock).toHaveBeenCalledWith({ path: '/search', query: { q: 'sol' } })
-  })
-
-  it('calls goToCollection equivalent for collection tab', () => {
-    const gs = useGlobalSearch()
-    const card = makeCard({ id: 'bolt-1', name: 'Lightning Bolt' })
-    gs.collectionResults.value = [card]
-    gs.activeTab.value = 'collection'
-    gs.highlightedIndex.value = 0
-    gs.selectHighlighted()
-    expect(pushMock).toHaveBeenCalledWith({ path: '/collection', query: { search: 'Lightning Bolt' } })
-  })
-
-  it('calls goToUserCard equivalent for users tab', () => {
-    const gs = useGlobalSearch()
-    const userCard = makeUserResult({ id: 'u1', username: 'alice' })
-    gs.usersResults.value = [userCard]
-    gs.activeTab.value = 'users'
-    gs.highlightedIndex.value = 0
-    gs.selectHighlighted()
-    expect(pushMock).toHaveBeenCalledWith('/@alice')
-  })
-
-  it('calls goToScryfall equivalent for scryfall tab', () => {
-    const gs = useGlobalSearch()
-    const scryCard = makeScryfallCard({ id: 's1', name: 'Bolt' })
-    gs.scryfallResults.value = [scryCard]
-    gs.activeTab.value = 'scryfall'
-    gs.highlightedIndex.value = 0
-    gs.selectHighlighted()
-    expect(pushMock).toHaveBeenCalledWith({ path: '/collection', query: { addCard: 'Bolt' } })
-  })
 })
 
-// ─── describe: route resolvers ────────────────────────────────────────────────
+// ─── describe: live region announcements ──────────────────────────────────────
 
-describe('route resolvers', () => {
-  it('resolveCollectionRoute returns { path: "/collection", query: { search: card.name } }', () => {
-    const gs = useGlobalSearch()
-    const card = makeCard({ name: 'Counterspell' })
-    const route = gs.resolveCollectionRoute(card)
-    expect(route).toEqual({ path: '/collection', query: { search: 'Counterspell' } })
-  })
-
-  it('resolveUserRoute returns `/@${username}` string', () => {
-    const gs = useGlobalSearch()
-    const user = makeUserResult({ username: 'rafaelmatovelle' })
-    const route = gs.resolveUserRoute(user)
-    expect(route).toBe('/@rafaelmatovelle')
-  })
-
-  it('resolveScryfallRoute returns { path: "/collection", query: { addCard: card.name } }', () => {
-    const gs = useGlobalSearch()
-    const card = makeScryfallCard({ name: 'Black Lotus' })
-    const route = gs.resolveScryfallRoute(card)
-    expect(route).toEqual({ path: '/collection', query: { addCard: 'Black Lotus' } })
-  })
-})
-
-// ─── describe: scheduleLiveRegionUpdate ──────────────────────────────────────
-
-describe('scheduleLiveRegionUpdate', () => {
+describe('live region announcements', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -315,137 +325,19 @@ describe('scheduleLiveRegionUpdate', () => {
     vi.useRealTimers()
   })
 
-  it('does not set ariaLiveMessage synchronously', () => {
-    const gs = useGlobalSearch()
-    gs.scheduleLiveRegionUpdate('hello')
-    expect(gs.ariaLiveMessage.value).toBe('')
-  })
-
-  it('sets ariaLiveMessage 500ms later', () => {
-    const gs = useGlobalSearch()
-    gs.scheduleLiveRegionUpdate('hi')
-    vi.advanceTimersByTime(499)
-    expect(gs.ariaLiveMessage.value).toBe('')
-    vi.advanceTimersByTime(1)
-    expect(gs.ariaLiveMessage.value).toBe('hi')
-  })
-
-  it('coalesces rapid calls — only last message wins', () => {
-    const gs = useGlobalSearch()
-    gs.scheduleLiveRegionUpdate('a')
-    vi.advanceTimersByTime(100)
-    gs.scheduleLiveRegionUpdate('b')
-    vi.advanceTimersByTime(500)
-    expect(gs.ariaLiveMessage.value).toBe('b')
-  })
-
-  it('clears previous timeout when called again', () => {
-    const gs = useGlobalSearch()
-    gs.scheduleLiveRegionUpdate('first')
-    vi.advanceTimersByTime(200)
-    gs.scheduleLiveRegionUpdate('second')
-    vi.advanceTimersByTime(499)
-    // 'first' timer was cleared before it fired
-    expect(gs.ariaLiveMessage.value).toBe('')
-    vi.advanceTimersByTime(1)
-    expect(gs.ariaLiveMessage.value).toBe('second')
-  })
-})
-
-// ─── describe: activeTab watcher (extended — announces count) ─────────────────
-
-describe('activeTab watcher (extended)', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('schedules a resultsCount announcement when activeTab changes to a tab with multiple results', async () => {
-    const { nextTick } = await import('vue')
-    const gs = useGlobalSearch()
-    gs.usersResults.value = [
-      makeUserResult({ id: 'u1', username: 'alice' }),
-      makeUserResult({ id: 'u2', username: 'bob' }),
-      makeUserResult({ id: 'u3', username: 'carol' }),
-    ]
-    gs.activeTab.value = 'users'
-    await nextTick()
-    vi.advanceTimersByTime(500)
-    expect(gs.ariaLiveMessage.value).toContain('header.search.resultsCount')
-  })
-
-  it('schedules a resultsCountSingular announcement when count === 1', async () => {
-    const { nextTick } = await import('vue')
-    const gs = useGlobalSearch()
-    gs.usersResults.value = [makeUserResult({ id: 'u1', username: 'alice' })]
-    gs.activeTab.value = 'users'
-    await nextTick()
-    vi.advanceTimersByTime(500)
-    expect(gs.ariaLiveMessage.value).toContain('header.search.resultsCountSingular')
-  })
-})
-
-// ─── describe: searchScryfall edition parity (SCRUM-13) ──────────────────────
-
-describe('searchScryfall edition parity (SCRUM-13)', () => {
-  it('passes a query that excludes previews (matches /search default onlyReleased)', async () => {
-    const { searchCards } = await import('@/services/scryfall')
-    const mock = vi.mocked(searchCards)
-    mock.mockClear()
-
-    const gs = useGlobalSearch()
-    gs.searchQuery.value = 'lightning bolt'
-    await gs.performSearch()
-
-    expect(mock).toHaveBeenCalledTimes(1)
-    const queryArg = mock.mock.calls[0]?.[0]
-    expect(queryArg).toContain('-is:preview')
-  })
-
-  it('wraps the card name in quotes (matches /search buildQuery)', async () => {
-    const { searchCards } = await import('@/services/scryfall')
-    const mock = vi.mocked(searchCards)
-    mock.mockClear()
-
-    const gs = useGlobalSearch()
-    gs.searchQuery.value = 'lightning bolt'
-    await gs.performSearch()
-
-    const queryArg = mock.mock.calls[0]?.[0] ?? ''
-    expect(queryArg).toContain('"lightning bolt"')
-  })
-})
-
-// ─── describe: performSearch loading announcement ─────────────────────────────
-
-describe('performSearch loading announcement', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('sets ariaLiveMessage to header.search.searching synchronously when loading becomes true', async () => {
-    // We trigger performSearch and check ariaLiveMessage right after it sets loading=true
-    // Since performSearch is async, we check the state mid-execution by running real timers for
-    // the search debounce but not the live-region timer
+  it('announces searching synchronously when performSearch starts', async () => {
     const gs = useGlobalSearch()
     gs.searchQuery.value = 'bolt'
 
-    // Start the search (won't await its completion — check live message mid-flight)
     const searchPromise = gs.performSearch()
-    // After performSearch starts, ariaLiveMessage should be set immediately (no debounce)
     expect(gs.ariaLiveMessage.value).toBe('header.search.searching')
 
-    // Let timers and promises resolve
     await vi.runAllTimersAsync()
     await searchPromise
   })
 
-  it('schedules header.search.resultsCount after performSearch finally block', async () => {
+  it('schedules a suggestionsCount announcement after the search completes', async () => {
+    getCardSuggestionsMock.mockResolvedValueOnce(['A', 'B'])
     const gs = useGlobalSearch()
     gs.searchQuery.value = 'bolt'
 
@@ -453,7 +345,18 @@ describe('performSearch loading announcement', () => {
     await vi.runAllTimersAsync()
     await searchPromise
 
-    // After timers advance past 500ms debounce, ariaLiveMessage should contain resultsCount key
-    expect(gs.ariaLiveMessage.value).toContain('header.search.resultsCount')
+    expect(gs.ariaLiveMessage.value).toContain('header.search.suggestionsCount')
+  })
+
+  it('uses the singular key when exactly one suggestion is returned', async () => {
+    getCardSuggestionsMock.mockResolvedValueOnce(['A'])
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'bolt'
+
+    const searchPromise = gs.performSearch()
+    await vi.runAllTimersAsync()
+    await searchPromise
+
+    expect(gs.ariaLiveMessage.value).toContain('header.search.suggestionsCountSingular')
   })
 })

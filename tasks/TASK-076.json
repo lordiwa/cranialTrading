@@ -1,0 +1,33 @@
+{
+  "key": "TASK-076",
+  "title": "Search revamp A: header con autocomplete ligero de nombres que navega a /search",
+  "description": "Sustituir el dropdown pesado de 3 fuentes del header por un autocomplete ligero de solo nombres estilo Card Kingdom. useGlobalSearch.ts se simplifica: una sola fuente vía getCardSuggestions (endpoint /cards/autocomplete de Scryfall, ya existente con caché), debounce, y guard anti-respuestas-fuera-de-orden. Cero queries Firestore y cero imágenes al teclear. GlobalSearch.vue y MobileSearchOverlay.vue se actualizan EN EL MISMO PASO (par paralelo, Regla 6 de CLAUDE.md): lista de nombres, navegación con flechas/Home/End conservada (ARIA combobox se mantiene), Enter o click en sugerencia → /search?q=<nombre>, Enter sin selección → /search?q=<texto>, footer 'ver todos los resultados'. Eliminar de useGlobalSearch la lógica que quedó obsoleta tras TASK-075 (searchCollection/searchUsers/searchScryfall/tabs/ME INTERESA). i18n en los 3 locales si hacen falta claves nuevas. Depende de TASK-075 (la página de resultados debe existir antes de redirigir el flujo).",
+  "acceptance_criteria": [
+    "Teclear ≥2 caracteres en la barra del header muestra solo una lista de nombres de carta (sin imágenes, sin tabs) obtenida de /cards/autocomplete",
+    "Mientras se teclea NO se ejecuta ninguna query a Firestore ni a /cards/search de Scryfall",
+    "Enter o click sobre una sugerencia navega a /search?q=<nombre>; Enter sin selección navega a /search?q=<texto escrito>",
+    "Respuestas fuera de orden no pisan resultados más recientes (guard por token/secuencia, con test unit)",
+    "GlobalSearch.vue y MobileSearchOverlay.vue tienen el mismo comportamiento (par paralelo actualizado atómicamente)",
+    "Navegación por teclado (flechas/Home/End/Enter/Escape) y wiring ARIA combobox siguen funcionando",
+    "Claves i18n usadas existen en en.json, es.json y pt.json",
+    "Tests unit primero (RED) para debounce, stale-response guard y rutas de navegación; npm run test:unit en verde; npx vite build pasa",
+    "Sin commits: cambios en working tree para verificación local"
+  ],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "search",
+    "frontend",
+    "performance"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-075"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-06-12T16:13:03.137Z",
+  "updated_at": "2026-06-12T16:44:55.072Z",
+  "jira_key": null
+}

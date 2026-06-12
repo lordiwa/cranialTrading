@@ -242,7 +242,7 @@ const isSplitCard = (card) => card.card_faces && card.card_faces.length > 1
 ```
 - Store in Firestore as JSON with `card_faces` array containing `image_uris` and `name` for each side
 - Use toggle button (↔️) to switch between faces
-- `CardGridSearch.vue` uses `.small` images, `CollectionGrid.vue` uses `.normal` images
+- `CollectionGrid.vue` uses `.normal` images
 - Maintain `cardFaceIndex` ref to track which face is displayed per card
 
 ### Modal Behavior
@@ -258,7 +258,7 @@ Internal status values (use these in code):
 
 For UI display, use `getStatusLabel()` in `CollectionView.vue` to translate.
 
-### Price Filter Logic (CardGridSearch)
+### Price Filter Logic (card search results)
 - If results contain cards with `prices.usd > 0`: show ONLY priced cards
 - If NO cards have prices: show all results (including N/A)
 - Prevents spam of unpriced results
@@ -277,7 +277,7 @@ Auto-dismiss after 4 seconds.
 - `CollectionGridCard.vue` ↔ `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (shell + variants — swipe lives in Full via `useSwipe`)
 - `CollectionView.vue` ↔ `composables/useCollectionFilterUrl.ts` ↔ `composables/useCollectionPagination.ts` (URL-synced filters + server pagination)
 - `AddCardModal.vue` ↔ `EditCardModal.vue`
-- `CardGridSearch.vue` ↔ Scryfall service + AddCardModal
+- `SearchView.vue` ↔ Scryfall service + `FilterPanel.vue` + AddCardModal (search results page)
 - `SavedMatchesView.vue` ↔ `utils/matchGrouping`, `services/stats`, `stores/matches` (match-calculation pipeline — Plan 02-C wired SavedMatchesView to extracted infrastructure)
 - `src/locales/en.json` ↔ `src/locales/es.json` ↔ `src/locales/pt.json` (always update all 3 together)
 

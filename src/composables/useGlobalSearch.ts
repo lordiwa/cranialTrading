@@ -1,56 +1,31 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCollectionStore } from '../stores/collection'
-import { useAuthStore } from '../stores/auth'
-import { useToastStore } from '../stores/toast'
 import { useI18n } from './useI18n'
-import { type ScryfallCard, searchCards } from '../services/scryfall'
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
-import { db } from '../services/firebase'
-import type { Card } from '../types/card'
-import { getMatchExpirationDate } from '../utils/matchExpiry'
+import { getCardSuggestions } from '../services/scryfall'
 
-export interface PublicCardResult {
-  id: string
-  cardId?: string
-  scryfallId?: string
-  cardName?: string
-  cardNameLower?: string
-  edition?: string
-  userId?: string
-  username?: string
-  location?: string
-  avatarUrl?: string
-  quantity?: number
-  condition?: string
-  foil?: boolean
-  price?: number
-  image?: string
-  status?: string
-}
+export type { PublicCardResult } from '../services/publicCardSearch'
 
+const MAX_SUGGESTIONS = 8
+const SEARCH_DEBOUNCE_MS = 300
+
+/**
+ * Lightweight header search (TASK-076) — Card Kingdom style.
+ *
+ * While typing, the only network traffic is Scryfall's /cards/autocomplete
+ * endpoint (name strings, ~1KB, cached in the service). No Firestore reads,
+ * no card images. Selecting a suggestion or pressing Enter navigates to the
+ * /search results page, which owns the heavy multi-source search.
+ */
 export function useGlobalSearch() {
   const router = useRouter()
-  const collectionStore = useCollectionStore()
-  const authStore = useAuthStore()
-  const toastStore = useToastStore()
   const { t } = useI18n()
 
   const searchQuery = ref('')
   const isOpen = ref(false)
   const loading = ref(false)
-  const activeTab = ref<'collection' | 'users' | 'scryfall'>('collection')
+  const suggestions = ref<string[]>([])
 
-  // Results
-  const collectionResults = ref<Card[]>([])
-  const usersResults = ref<PublicCardResult[]>([])
-  const scryfallResults = ref<ScryfallCard[]>([])
-
-  const totalResults = computed(() =>
-    collectionResults.value.length + usersResults.value.length + scryfallResults.value.length
-  )
-
-  // ── Keyboard nav state (D-05, D-20) ─────────────────────────────────────────
+  // ── Keyboard nav state (ARIA combobox — D-05, D-20) ─────────────────────────
   const highlightedIndex = ref(-1)
   const activeDescendantId = ref<string | null>(null)
 
@@ -60,15 +35,8 @@ export function useGlobalSearch() {
 
   // ── isExpanded — popup actually rendered (D-06 Pitfall 1) ────────────────────
   const isExpanded = computed(() =>
-    isOpen.value && (loading.value || totalResults.value > 0)
+    isOpen.value && (loading.value || suggestions.value.length > 0)
   )
-
-  // ── Helper: which results array is currently active ───────────────────────────
-  const getActiveResults = (): (Card | PublicCardResult | ScryfallCard)[] => {
-    if (activeTab.value === 'collection') return collectionResults.value
-    if (activeTab.value === 'users') return usersResults.value
-    return scryfallResults.value
-  }
 
   // ── Debounced live-region update (D-12) ──────────────────────────────────────
   const scheduleLiveRegionUpdate = (message: string): void => {
@@ -78,8 +46,19 @@ export function useGlobalSearch() {
     }, 500)
   }
 
-  // Debounced search
+  // Debounced search + stale-response guard
   let searchTimeout: ReturnType<typeof setTimeout> | null = null
+  let searchSeq = 0
+
+  const resetHighlight = () => {
+    highlightedIndex.value = -1
+    activeDescendantId.value = null
+  }
+
+  const clearResults = () => {
+    suggestions.value = []
+    resetHighlight()
+  }
 
   const handleInput = () => {
     if (searchTimeout) clearTimeout(searchTimeout)
@@ -91,103 +70,33 @@ export function useGlobalSearch() {
 
     searchTimeout = setTimeout(() => {
       void performSearch()
-    }, 300)
-  }
-
-  const clearResults = () => {
-    collectionResults.value = []
-    usersResults.value = []
-    scryfallResults.value = []
+    }, SEARCH_DEBOUNCE_MS)
   }
 
   const performSearch = async () => {
     if (searchQuery.value.length < 2) return
 
-    // Immediate "searching" announcement (no debounce — user needs instant feedback per D-13)
+    // Immediate "searching" announcement (no debounce — D-13)
     ariaLiveMessage.value = t('header.search.searching')
 
     loading.value = true
     isOpen.value = true
 
-    const q = searchQuery.value.toLowerCase()
-
+    const seq = ++searchSeq
     try {
-      searchCollection(q)
-      await Promise.all([
-        searchUsers(q),
-        searchScryfall(q)
-      ])
-
-      // Auto-select first tab with results
-      if (collectionResults.value.length > 0) {
-        activeTab.value = 'collection'
-      } else if (usersResults.value.length > 0) {
-        activeTab.value = 'users'
-      } else if (scryfallResults.value.length > 0) {
-        activeTab.value = 'scryfall'
-      }
+      const names = await getCardSuggestions(searchQuery.value)
+      if (seq !== searchSeq) return // a newer search owns the results now
+      suggestions.value = names.slice(0, MAX_SUGGESTIONS)
+      resetHighlight()
     } finally {
-      loading.value = false
-      // Schedule count announcement after load completes (D-14, Pitfall 4)
-      const count = getActiveResults().length
-      const countKey = count === 1
-        ? 'header.search.resultsCountSingular'
-        : 'header.search.resultsCount'
-      scheduleLiveRegionUpdate(
-        t(countKey, { count, tabName: t(`header.search.tabNames.${activeTab.value}`) })
-      )
-    }
-  }
-
-  const searchCollection = (q: string) => {
-    collectionResults.value = collectionStore.cards
-      .filter(card => card.name.toLowerCase().includes(q))
-      .slice(0, 8)
-  }
-
-  const searchUsers = async (searchQ: string) => {
-    if (!authStore.user) return
-
-    try {
-      const publicCardsRef = collection(db, 'public_cards')
-      const q = query(
-        publicCardsRef,
-        where('cardNameLower', '>=', searchQ),
-        where('cardNameLower', '<=', searchQ + '\uf8ff')
-      )
-      const snapshot = await getDocs(q)
-
-      usersResults.value = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as PublicCardResult))
-        .filter((card: PublicCardResult) => card.userId !== authStore.user?.id)
-        .slice(0, 8)
-    } catch {
-      try {
-        const publicCardsRef = collection(db, 'public_cards')
-        const snapshot = await getDocs(publicCardsRef)
-        usersResults.value = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as PublicCardResult))
-          .filter((card: PublicCardResult) =>
-            card.cardName?.toLowerCase().includes(searchQ) &&
-            card.userId !== authStore.user?.id
-          )
-          .slice(0, 8)
-      } catch (error) {
-        console.error('Error searching users:', error)
-        usersResults.value = []
+      if (seq === searchSeq) {
+        loading.value = false
+        const count = suggestions.value.length
+        const countKey = count === 1
+          ? 'header.search.suggestionsCountSingular'
+          : 'header.search.suggestionsCount'
+        scheduleLiveRegionUpdate(t(countKey, { count }))
       }
-    }
-  }
-
-  const searchScryfall = async (q: string) => {
-    try {
-      // SCRUM-13: match /search advanced default (onlyReleased + quoted name).
-      // buildQuery in stores/search.ts wraps filters.name in quotes and appends
-      // `-is:preview` when onlyReleased=true (its default). Mirror that here.
-      const results = await searchCards(`"${q}" -is:preview`)
-      scryfallResults.value = results.slice(0, 8)
-    } catch {
-      scryfallResults.value = []
     }
   }
 
@@ -197,197 +106,68 @@ export function useGlobalSearch() {
     isOpen.value = false
   }
 
-  // Navigation (Enter-key path — invoked by selectHighlighted)
-  const goToCollection = (card: Card) => {
+  // ── Navigation — every selection lands on the /search results page ──────────
+  const goToResults = (name?: string) => {
+    const q = (name ?? searchQuery.value).trim()
     isOpen.value = false
     searchQuery.value = ''
-    void router.push({ path: '/collection', query: { search: card.name } })
-  }
-
-  const goToUserCard = (card: PublicCardResult) => {
-    isOpen.value = false
-    searchQuery.value = ''
-    void router.push(`/@${card.username}`)
-  }
-
-  const goToScryfall = (card: ScryfallCard) => {
-    isOpen.value = false
-    searchQuery.value = ''
-    void router.push({ path: '/collection', query: { addCard: card.name } })
+    clearResults()
+    if (!q) return
+    void router.push({ path: '/search', query: { q } })
   }
 
   // ── Keyboard movement (D-02 — wrap + home/end) ───────────────────────────────
   const moveHighlight = (direction: 'up' | 'down' | 'home' | 'end'): void => {
-    const results = getActiveResults()
-    if (results.length === 0) {
-      highlightedIndex.value = -1
-      activeDescendantId.value = null
+    if (suggestions.value.length === 0) {
+      resetHighlight()
       return
     }
+    const lastIndex = suggestions.value.length - 1
     if (direction === 'home') {
       highlightedIndex.value = 0
     } else if (direction === 'end') {
-      highlightedIndex.value = results.length - 1
+      highlightedIndex.value = lastIndex
     } else if (direction === 'down') {
-      highlightedIndex.value = highlightedIndex.value >= results.length - 1
+      highlightedIndex.value = highlightedIndex.value >= lastIndex
         ? 0
         : highlightedIndex.value + 1
     } else {
       // up
       highlightedIndex.value = highlightedIndex.value <= 0
-        ? results.length - 1
+        ? lastIndex
         : highlightedIndex.value - 1
     }
-    activeDescendantId.value = `option-${activeTab.value}-${highlightedIndex.value}`
+    activeDescendantId.value = `option-suggestion-${highlightedIndex.value}`
   }
 
   // ── Enter key handler (D-03) ──────────────────────────────────────────────────
   const selectHighlighted = (): void => {
-    const results = getActiveResults()
-    if (highlightedIndex.value < 0 || highlightedIndex.value >= results.length) {
-      void router.push({ path: '/search', query: { q: searchQuery.value } })
-      isOpen.value = false
-      searchQuery.value = ''
+    const index = highlightedIndex.value
+    if (index >= 0 && index < suggestions.value.length) {
+      goToResults(suggestions.value[index])
       return
     }
-    if (activeTab.value === 'collection') {
-      goToCollection(results[highlightedIndex.value] as Card)
-    } else if (activeTab.value === 'users') {
-      goToUserCard(results[highlightedIndex.value] as PublicCardResult)
-    } else {
-      goToScryfall(results[highlightedIndex.value] as ScryfallCard)
-    }
+    goToResults()
   }
 
-  // ── Route resolvers for :to= binding on RouterLink (D-21) ────────────────────
-  // Templates bind :to="resolve...(card)" for Cmd+click / middle-click support.
-  // Do NOT use @click.prevent on RouterLink — per D-09 correction, .prevent sets
-  // defaultPrevented=true which causes RouterLink's guardEvent to skip router.push
-  // on normal left-clicks. Use @click="sideEffect" without .prevent.
-  const resolveCollectionRoute = (card: Card) => ({
-    path: '/collection',
-    query: { search: card.name },
+  // ── Route resolver for :to= binding on RouterLink (D-21) ─────────────────────
+  // Templates bind :to="resolveSuggestionRoute(name)" for Cmd+click / middle-click
+  // support. Do NOT use @click.prevent on RouterLink (D-09).
+  const resolveSuggestionRoute = (name: string) => ({
+    path: '/search',
+    query: { q: name },
   })
-
-  const resolveUserRoute = (card: PublicCardResult): string =>
-    `/@${card.username ?? ''}`
-
-  const resolveScryfallRoute = (card: ScryfallCard) => ({
-    path: '/collection',
-    query: { addCard: card.name },
-  })
-
-  // ── Reset highlight + announce count when tab switches (Pitfall 6, D-14) ─────
-  watch(activeTab, () => {
-    highlightedIndex.value = -1
-    activeDescendantId.value = null
-    const count = getActiveResults().length
-    const countKey = count === 1
-      ? 'header.search.resultsCountSingular'
-      : 'header.search.resultsCount'
-    scheduleLiveRegionUpdate(
-      t(countKey, { count, tabName: t(`header.search.tabNames.${activeTab.value}`) })
-    )
-  })
-
-  // ME INTERESA
-  const sentInterestIds = ref<Set<string>>(new Set())
-  const sendingInterest = ref(false)
-
-  const sendInterestFromSearch = async (card: PublicCardResult) => {
-    if (!authStore.user || sentInterestIds.value.has(card.id) || sendingInterest.value) return
-
-    sendingInterest.value = true
-    try {
-      const scryfallId = card.scryfallId ?? ''
-      const edition = card.edition ?? ''
-
-      const sharedMatchesRef = collection(db, 'shared_matches')
-      const existingQuery = query(
-        sharedMatchesRef,
-        where('senderId', '==', authStore.user.id),
-        where('receiverId', '==', card.userId),
-        where('card.scryfallId', '==', scryfallId)
-      )
-      const existingSnapshot = await getDocs(existingQuery)
-
-      const hasDuplicate = existingSnapshot.docs.some(docSnap => {
-        const data = docSnap.data() as Record<string, unknown>
-        const cardField = data.card as Record<string, unknown> | undefined
-        return cardField?.edition === edition
-      })
-
-      if (hasDuplicate) {
-        sentInterestIds.value.add(card.id)
-        toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'info')
-        return
-      }
-
-      const cardData = {
-        id: card.cardId ?? card.id,
-        scryfallId,
-        name: card.cardName ?? '',
-        edition,
-        quantity: card.quantity ?? 1,
-        condition: card.condition ?? 'NM',
-        foil: card.foil ?? false,
-        price: card.price ?? 0,
-        image: card.image ?? '',
-        status: card.status ?? 'sale',
-      }
-
-      const totalValue = (card.price ?? 0) * (card.quantity ?? 1)
-
-      const sharedMatchPayload = {
-        senderId: authStore.user.id,
-        senderUsername: authStore.user.username,
-        senderLocation: authStore.user.location ?? '',
-        senderEmail: authStore.user.email ?? '',
-        receiverId: card.userId,
-        receiverUsername: card.username ?? '',
-        receiverLocation: card.location ?? '',
-        card: cardData,
-        cardType: card.status ?? 'sale',
-        totalValue,
-        status: 'pending',
-        senderStatus: 'interested',
-        receiverStatus: 'new',
-        createdAt: new Date(),
-        lifeExpiresAt: getMatchExpirationDate(),
-      }
-
-      await addDoc(sharedMatchesRef, sharedMatchPayload)
-
-      sentInterestIds.value.add(card.id)
-      toastStore.show(t('dashboard.interest.sent', { username: card.username ?? '' }), 'success')
-    } catch (error) {
-      console.error('Error sending interest:', error)
-      toastStore.show(t('dashboard.interest.error'), 'error')
-    } finally {
-      sendingInterest.value = false
-    }
-  }
 
   return {
     searchQuery,
     isOpen,
     loading,
-    activeTab,
-    collectionResults,
-    usersResults,
-    scryfallResults,
+    suggestions,
     handleInput,
     performSearch,
     clearResults,
     clearSearch,
-    totalResults,
-    goToCollection,
-    goToUserCard,
-    goToScryfall,
-    sentInterestIds,
-    sendingInterest,
-    sendInterestFromSearch,
-    // Plan 04-01 additions: keyboard nav + live region + route resolvers
+    goToResults,
     highlightedIndex,
     activeDescendantId,
     ariaLiveMessage,
@@ -395,8 +175,6 @@ export function useGlobalSearch() {
     moveHighlight,
     selectHighlighted,
     scheduleLiveRegionUpdate,
-    resolveCollectionRoute,
-    resolveUserRoute,
-    resolveScryfallRoute,
+    resolveSuggestionRoute,
   }
 }

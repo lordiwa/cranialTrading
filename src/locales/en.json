@@ -369,6 +369,9 @@
       "searching": "Searching…",
       "resultsCount": "{count} results in {tabName}",
       "resultsCountSingular": "{count} result in {tabName}",
+      "suggestionsCount": "{count} suggestions",
+      "suggestionsCountSingular": "{count} suggestion",
+      "viewAllResults": "View all results",
       "tabNames": {
         "collection": "collection",
         "users": "users",
@@ -1517,7 +1520,10 @@
   "search": {
     "view": {
       "title": "ADVANCED SEARCH",
-      "backToCollection": "Back"
+      "backToCollection": "Back",
+      "inCollectionTitle": "In your collection",
+      "otherUsersTitle": "Other users sell or trade",
+      "catalogTitle": "Card catalog"
     },
     "owned": "x{count} owned",
     "filterPanel": {

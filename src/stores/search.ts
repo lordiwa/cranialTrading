@@ -4,6 +4,7 @@ import { type ScryfallCard, searchAdvanced } from '../services/scryfall'
 import { useToastStore } from './toast'
 import { t } from '../composables/useI18n'
 import { buildQuery, type FilterOptions } from '../utils/scryfallQuery'
+import { sortPricedFirst } from '../utils/searchSections'
 
 // Cache para búsquedas (5 minutos)
 const searchCache = new Map<string, { results: ScryfallCard[], timestamp: number }>()
@@ -52,11 +53,12 @@ export const useSearchStore = defineStore('search', () => {
         try {
             console.info('Buscando con query:', query)
 
-            const searchResults = await searchAdvanced(query, {
+            // Priced printings first — unpriced reprint noise sinks to the tail
+            const searchResults = sortPricedFirst(await searchAdvanced(query, {
                 unique: 'prints',
                 order: 'released',
                 dir: 'desc',
-            })
+            }))
 
             // Guardar en caché
             searchCache.set(query, { results: searchResults, timestamp: Date.now() })

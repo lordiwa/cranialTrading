@@ -1,0 +1,27 @@
+{
+  "key": "TASK-077",
+  "title": "Search revamp C: chore — eliminar componentes de búsqueda muertos",
+  "description": "Eliminar SearchBar.vue, SearchResultsGrid.vue (src/components/search/) y CardGridSearch.vue (src/components/common/) que no se usan en ninguna vista. Antes de borrar: grep completo de referencias en src/, tests/ y e2e/ (regla de eliminación atómica de features — memoria feedback_atomic_feature_removal). Si algún test o page object E2E los referencia, actualizar en el mismo cambio. Commit chore: separado (cuando el usuario apruebe los commits). Depende de TASK-076 para confirmar que el revamp no los reutiliza.",
+  "acceptance_criteria": [
+    "grep de SearchBar, SearchResultsGrid y CardGridSearch en src/, tests/ y e2e/ devuelve cero referencias tras el borrado",
+    "npm run test:unit en verde y npx vite build pasa tras el borrado",
+    "Sin commits hasta aprobación del usuario; el borrado queda preparado como commit chore: separado"
+  ],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "search",
+    "chore",
+    "tech-debt"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-076"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-06-12T16:13:13.769Z",
+  "updated_at": "2026-06-12T16:48:26.831Z",
+  "jira_key": null
+}

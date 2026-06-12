@@ -1,0 +1,30 @@
+{
+  "key": "TASK-075",
+  "title": "Search revamp B: /search como página de resultados central con 3 fuentes (Scryfall + colección + usuarios)",
+  "description": "Convertir SearchView.vue (/search) en la página de resultados central estilo Card Kingdom/SCG. Añadir a la sección Scryfall existente dos secciones nuevas: \"En tu colección\" (filtro en memoria sobre collectionStore.cards) y \"Otros usuarios\" (public_cards de Firestore con botón ME INTERESA). Extraer de useGlobalSearch.ts la búsqueda de public_cards a un módulo reutilizable con limit(20) en la query Firestore y SIN el fallback que descarga la colección entera; extraer sendInterestFromSearch a un composable propio reutilizable. Añadir claves i18n nuevas en en.json, es.json y pt.json en el mismo paso (atómico). NO tocar todavía el dropdown del header (eso es la tarea A).",
+  "acceptance_criteria": [
+    "Navegar a /search?q=lightning muestra: sección de catálogo Scryfall (la actual con FilterPanel), sección 'En tu colección' con las cartas propias que coinciden, y sección 'Otros usuarios' con cartas públicas de otros usuarios y botón ME INTERESA funcional",
+    "La query Firestore de public_cards lleva limit(20) y NO existe ningún camino de código que haga getDocs de la colección public_cards completa sin filtro",
+    "El propio usuario queda excluido de los resultados de 'Otros usuarios'",
+    "sendInterestFromSearch vive en un composable propio reutilizable (no duplicado), con dedup de matches existentes intacto",
+    "Claves i18n nuevas presentes en en.json, es.json y pt.json",
+    "Tests unit escritos primero (RED) para: exclusión del propio usuario, mapeo de resultados públicos, y lógica de secciones; npm run test:unit en verde",
+    "npx vite build pasa",
+    "Sin commits: cambios quedan en working tree para verificación local del usuario"
+  ],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "search",
+    "frontend",
+    "performance"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-06-12T16:12:46.452Z",
+  "updated_at": "2026-06-12T16:37:05.568Z",
+  "jira_key": null
+}

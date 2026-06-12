@@ -3,13 +3,18 @@
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "active",
   "updated_at": "2026-06-12T04:30:09.650Z",
-  "active_task": null,
-  "workflow_step": "idle",
-  "next_action": null,
-  "handoff_summary": "session started",
+  "active_task": "TASK-077",
+  "workflow_step": "verify",
+  "next_action": "TASK-075/076/077 implementadas y en in_review, TODO sin commitear en working tree. Rafael debe verificar en local (npm run dev): header autocomplete de nombres → Enter/click lleva a /search?q= con 3 secciones. Tras su OK: 3 commits lógicos + bump minor 1.34.4→1.35.0 + E2E antes de push a develop.",
+  "handoff_summary": "Search revamp aprobado por Rafael: header pasa a autocomplete ligero de nombres (Scryfall /cards/autocomplete) y Enter/click navega a /search?q=, que se amplía a página de resultados central con 3 fuentes (Scryfall + colección propia + public_cards de otros usuarios con ME INTERESA). Optimización: limit(20) en query Firestore, eliminar fallback que descarga public_cards entera, cero Firestore/imágenes al teclear. Bump minor a 1.35.0 al final. Tickets TASK-075/076/077.",
   "open_questions": [],
   "blockers": [],
-  "decisions": [],
+  "decisions": [
+    "Dropdown header: solo nombres vía /cards/autocomplete (decisión Rafael 2026-06-12)",
+    "/search muestra las 3 fuentes en secciones (decisión Rafael 2026-06-12)",
+    "Borrar SearchBar.vue/SearchResultsGrid.vue/CardGridSearch.vue en commit chore aparte (decisión Rafael 2026-06-12)",
+    "Ningún commit hasta que Rafael verifique en local"
+  ],
   "subagent_results": [],
   "pending_human_confirmation": null
 }

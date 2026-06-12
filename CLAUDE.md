@@ -283,46 +283,19 @@ Auto-dismiss after 4 seconds.
 
 ---
 
-## MANDATORY: Split & Merge Workflow (Parallel Development)
+## Multi-Agent Development (agentic-framework)
 
-**For features/fixes that span multiple files or logical areas, use the split & merge pattern.**
+All multi-agent work runs through the **agentic-framework plugin agents only**: `agentic-framework:orchestrator` (plans and delegates), `agentic-framework:developer` (TDD implementation), `agentic-framework:researcher` (read-only research, writes training skills), `agentic-framework:reviewer` (fresh-context review). Do not define or use project-local agents. The workflow loop and RESUME-FIRST session contract live in the routing block at the end of this file.
 
-### Hierarchy: Milestone → Slice → Task
+### Tickets
 
-- **Milestone:** The full user request (one milestone per feature/fix)
-- **Slice:** A logical group of related tasks that can be verified together
-- **Task:** One context window of work. Touches ~4 files max. Tagged as `parallel-safe` or `sequential`.
+Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json) — the full Jira backlog was migrated here 2026-06-12 (`jira_key` field preserves the original SCRUM key; TASK number = SCRUM number). Jira is no longer required for day-to-day work.
 
-**Sizing rule:** If a task requires reading 8+ files or changing 4+ files, split it further.
+### Task Sizing & Parallelism
 
-### Agent Workflow
-
-```
-1. Planner agent → produces Milestone/Slice/Task plan
-2. Orchestrator agent → reads plan, spawns dev agents
-   - parallel-safe tasks → separate worktrees (isolation: "worktree")
-   - sequential tasks → one dev agent at a time
-3. Dev agent (per task) → TDD implementation in worktree
-4. Review-code agent → verifies each task
-5. Orchestrator → merges task branches to develop
-6. Final verification on merged develop
-```
-
-### Orchestrator Modes
-- **Supervised (default):** Pauses after each slice, waits for user approval
-- **Autonomous:** Runs all slices without pausing. Stops on failure.
-- User controls mode: "go independent" / "go auto" to switch to autonomous
-
-### Branch Naming
-- Task branches: `task/{milestone}-{nn}` (e.g., `task/seo-01`, `task/seo-02`)
-- All task branches fork from current `develop` HEAD
-- Merge back to `develop` after review passes
-
-### Worktree Rules
-- `.worktreeinclude` copies `.env.local`, `.env.development`, `.env.production` to new worktrees
-- Dev agent in worktree stays on its `task/*` branch — does NOT switch to `develop`
-- Commits use format: `task({milestone}): {description}`
-- Worktrees are cleaned up after successful merge
+- One ticket = one context window of work, ~4 files max. If it needs 8+ files read or 4+ changed, split it.
+- Parallel-safe tasks → separate worktrees (`isolation: "worktree"`); `.worktreeinclude` copies `.env.local`, `.env.development`, `.env.production` into new worktrees.
+- An agent in a worktree stays on its task branch — it does NOT switch to `develop`. Worktrees are cleaned up after merge.
 
 ### When to Split vs Stay Sequential
 | Scenario | Approach |
@@ -333,23 +306,6 @@ Auto-dismiss after 4 seconds.
 | i18n keys (en + es + pt) | Same task (atomic) |
 | Bug fix (single file) | Single task, no split needed |
 | Large feature (8+ files) | Split into slices |
-
-### Quick Reference
-```bash
-# Planner produces the plan
-# Orchestrator reads it and spawns dev agents:
-
-# Parallel tasks → worktree isolation
-Agent(dev, isolation: "worktree")  # Task 1
-Agent(dev, isolation: "worktree")  # Task 2 (parallel)
-
-# Sequential tasks → one at a time
-Agent(dev)  # Task 3 (depends on Task 1)
-
-# After all tasks done:
-# Orchestrator merges task/* branches → develop
-# Final review-code run on develop
-```
 
 ---
 
@@ -408,44 +364,11 @@ Agent(dev)  # Task 3 (depends on Task 1)
 - If either fails, fix it before reporting to the user
 - Use `npx vite build` (NOT `npm run build` which includes lint with pre-existing errors)
 
-<!-- GSD:project-start source:PROJECT.md -->
-## Project
+### Rule 8: Never Use async onMounted with await
 
-**Frontend Modernization**
+- Never declare `onMounted` callbacks as `async` with `await` inside — it breaks profile loading for anonymous users in production
+- Call async functions inside `onMounted` WITHOUT awaiting them
 
-A comprehensive accessibility, code quality, and architecture modernization of Cranial Trading — an existing Vue 3 + TypeScript + Tailwind CSS Magic: The Gathering trading platform. The design system (black/neon/rust palette, custom typography) is already distinctive; this work targets structural issues surfaced by a combined Vercel Web Interface Guidelines + Vue Best Practices audit.
-
-**Core Value:** Every interactive element must be accessible to keyboard-only and screen reader users — accessibility fixes are the non-negotiable foundation that everything else builds on.
-
-### Constraints
-
-- **Tech stack**: Vue 3 + TypeScript + Tailwind CSS + Firebase — no framework changes
-- **TDD required**: Per CLAUDE.md, every logic change needs tests first (RED → GREEN → REFACTOR)
-- **Branch**: All work on `develop`, never commit to `main` directly
-- **Build**: Must pass `npx vite build` after every change (pre-existing lint warnings OK)
-- **Anti-loop rules**: Read before touching, trace all callers, identify parallel siblings, verify i18n keys exist
-- **No async onMounted**: Never use async onMounted with await — breaks anonymous user profile loading
-<!-- GSD:project-end -->
-
-<!-- GSD:stack-start source:STACK.md -->
-## Technology Stack
-
-Technology stack not yet documented. Will populate after codebase mapping or first phase.
-<!-- GSD:stack-end -->
-
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
-## Conventions
-
-Conventions not yet established. Will populate as patterns emerge during development.
-<!-- GSD:conventions-end -->
-
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
-## Architecture
-
-Architecture not yet mapped. Follow existing patterns found in the codebase.
-<!-- GSD:architecture-end -->
-
-<!-- GSD:skills-start source:skills/ -->
 ## Project Skills
 
 | Skill | Description | Path |
@@ -454,28 +377,71 @@ Architecture not yet mapped. Follow existing patterns found in the codebase.
 | deploy-prod | Production deployment checklist — verify, merge develop to main, and push | `.claude/skills/deploy-prod/SKILL.md` |
 | frontend-design | Design thinking process and aesthetic guidelines for building visually distinctive frontend interfaces | `.claude/skills/frontend-design/SKILL.md` |
 | i18n-check | Verify all i18n keys exist in en.json, es.json, and pt.json locale files | `.claude/skills/i18n-check/SKILL.md` |
-| jira-pm | Manage Cranial Trading Jira tickets via Atlassian MCP — audit backlog, create/edit issues, import test plans, organize Epics, apply label conventions | `.claude/skills/jira-pm/SKILL.md` |
-| optimize-seo | Run an SEO audit via the seo agent, categorize findings, and generate an actionable implementation plan with optional fix execution | `.claude/skills/optimize-seo/SKILL.md` |
+| jira-pm | LEGACY — Jira backlog was migrated to `tasks/` on 2026-06-12; only use for closing out the old Jira board | `.claude/skills/jira-pm/SKILL.md` |
+| optimize-seo | Run an SEO audit via the agentic-framework researcher agent, categorize findings, and generate an actionable implementation plan with optional fix execution | `.claude/skills/optimize-seo/SKILL.md` |
 | pr | Create a pull request with standard format from current branch to develop or main | `.claude/skills/pr/SKILL.md` |
 | tdd | Walk through the TDD workflow (red/green/refactor) for a given task | `.claude/skills/tdd/SKILL.md` |
-<!-- GSD:skills-end -->
 
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
+## Knowledge Graph (graphify)
 
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+The codebase has a queryable knowledge graph in `graphify-out/` (gitignored, regenerable):
 
-Use these entry points:
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
+- `graphify-out/GRAPH_REPORT.md` — community map of stores, composables, services, and views; read it to orient in an unfamiliar area before grepping
+- `graphify-out/graph.json` — full node/edge graph (1.4k+ nodes) for programmatic lookup
+- Rebuild after code changes: `graphify update .` (no API cost). CLI at `C:\Users\srpar\AppData\Local\Programs\Python\Python311\Scripts\graphify.exe` (not on PATH)
+<!-- BEGIN agentic-framework routing -->
+## Orchestrator activation (agentic-framework)
 
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
+This project is operated by a multi-agent team. The main thread is the
+**Orchestrator**: it plans and delegates to the `researcher`, `developer`, and
+`reviewer` subagents — it does not write production code itself.
 
-<!-- GSD:profile-start -->
-## Developer Profile
+### RESUME-FIRST (do this before anything else in every new chat)
 
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+Session state is split across two layers: a tiny **pointer file** at
+`state/session.json` (`schema_version`, `active_session_id`, `updated_at`) and a
+self-contained **bundle directory** at `state/sessions/<active_session_id>/`
+whose own `session.json` holds the substantive state (`workflow_step`,
+`handoff_summary`, `next_action`, `open_questions`, `blockers`, `decisions`,
+`subagent_results`). The very first action of every new chat is:
+
+1. Read `state/session.json` (the pointer). If it is absent or
+   `active_session_id` is null, the orchestrator is idle — confirm with the
+   human before starting a new session.
+2. If `active_session_id` is non-null, read
+   `state/sessions/<active_session_id>/session.json` for the handoff state.
+3. If that bundle's `active_task` is non-null, read `tasks/<active_task>.json`
+   to load the work item.
+4. Restate `handoff_summary` and `next_action` to the human in one short
+   paragraph and confirm before acting.
+
+See `state/README.md` for the full bundle layout and the pause / resume / end
+lifecycle operations.
+
+### First-chat routing
+
+If `PROJECT.md` does not exist in the repo root, the framework has not been
+initialized for this project — run the `/init-project` command (the project
+intake wizard) before any other workflow step. If `PROJECT.md` already exists,
+proceed to RESUME-FIRST.
+
+### Workflow loop (every unit of work)
+
+1. Read the next `status: todo` ticket and extract acceptance criteria.
+2. Plan: decompose into research / tests / implementation / review.
+3. Research (if needed): spawn the `researcher` for any unknown stack.
+4. Tests first: the `developer` writes failing tests that encode the criteria
+   before any implementation lands.
+5. Implement: the same `developer` makes the new tests pass without breaking
+   existing ones.
+6. Review: spawn the `reviewer` in a fresh context; block on any HIGH finding.
+7. Update the ticket on a green review, then pause or end the session bundle
+   via the lifecycle operations in `state/README.md`.
+
+### Repository etiquette
+
+- Conventional Commits (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`,
+  `chore:`); one logical change per commit.
+- Never commit secrets; never `--no-verify`; never force-push a shared branch.
+- Human-in-the-loop for destructive or irreversible actions.
+<!-- END agentic-framework routing -->

@@ -1,20 +1,20 @@
 ---
 name: optimize-seo
-description: Run an SEO audit via the seo agent, categorize findings, and generate an actionable implementation plan with optional fix execution
+description: Run an SEO audit via the agentic-framework researcher agent, categorize findings, and generate an actionable implementation plan with optional fix execution
 user-invocable: true
 disable-model-invocation: true
 ---
 
 # Optimize SEO Workflow
 
-You drive the end-to-end SEO optimization process: audit, categorize, plan, and optionally implement. This skill orchestrates the SEO agent for analysis and the dev agent for fixes.
+You drive the end-to-end SEO optimization process: audit, categorize, plan, and optionally implement. This skill orchestrates the `agentic-framework:researcher` agent for analysis and the `agentic-framework:developer` agent for fixes.
 
 ## Step 1: Audit Current State
 
-Spawn the **seo** agent to perform a full audit of the app's SEO posture.
+Spawn an **`agentic-framework:researcher`** agent to perform a full audit of the app's SEO posture.
 
 Pass this prompt to the agent:
-> "Perform a full SEO audit across all 9 dimensions. Scope: all public routes and the app shell. Include SEO score calculation."
+> "Read `.claude/skills/optimize-seo/audit-spec.md` and follow it exactly: it defines your role as SEO auditor for this project. Perform a full SEO audit across all 9 dimensions. Scope: all public routes and the app shell. Include SEO score calculation."
 
 Wait for the audit report. Summarize the key findings to the user:
 
@@ -196,7 +196,7 @@ For each fix, follow this workflow:
 
 After all fixes are implemented:
 
-1. **Re-run SEO audit** — Spawn the seo agent again to verify improvements
+1. **Re-run SEO audit** — Spawn an `agentic-framework:researcher` agent again (with `audit-spec.md`) to verify improvements
 2. **Compare scores** — Show before/after comparison
 3. **Check live site** (if deployed) — Use `WebFetch` to verify meta tags render on the live site
 4. **Report**:

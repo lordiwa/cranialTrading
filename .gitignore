@@ -39,8 +39,10 @@ e2e/blob-report/
 .claude/worktrees/
 .claude/plans/
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Build/tool artifacts
+graphify-out/
 eslint-out.json
 NUL
 .firebase/hosting.*.cache

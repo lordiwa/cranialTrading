@@ -1,0 +1,27 @@
+{
+  "key": "TASK-042",
+  "title": "Color analysis en el deckbuilder (símbolos vs fuentes)",
+  "description": "**Migrado de Jira:** SCRUM-42 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## Objetivo\n\nReplicar el análisis de colores tipo Moxfield en el DeckView: contar símbolos de maná en costos vs fuentes de maná de tierras del mainboard, y mostrar la \"playability\" de cada color (si hay suficientes fuentes para soportar la demanda).\n\n## Decisiones groomed\n\n1. **Conteo de cartas por color**: contar **símbolos de maná en el costo** (no color identity). Una carta `{W}{W}{U}` aporta 2 W + 1 U. Cartas híbridas y phyrexian: contar como cada color que pueden pagar (ej: `{W/U}` aporta 1 W + 1 U).\n2. **Conteo de tierras**: sumar 1 al color por cada entrada en `produced_mana` de cada tierra. Una dual `[W,U]` cuenta 1 W + 1 U. **Las tierras tapped se cuentan igual** que las untapped (no se descuentan).\n3. **Playability**: mostrar el ratio fuentes / demanda por color (formato \"tenés X fuentes de U, demanda es Y\"). Definir un threshold visual (verde / amarillo / rojo) según el ratio.\n4. **Ubicación UI**: panel nuevo **debajo de** `DeckManaCurve` en el footer del DeckView. Mismo estilo visual que el componente existente.\n5. **Scope**: solo **mainboard** (excluir sideboard). **Excluir tierras** del conteo de \"cartas por color\" (no contaminar la demanda con sus propios símbolos).\n6. **Formatos**: aplica a todos los formatos.\n\n## Infraestructura existente (reutilizable)\n\n* `HydratedDeckCard.colors[]` y `produced_mana[]` ya están en el tipo (`src/types/deck.ts`).\n* `Deck.colors[]` ya guarda los colores declarados.\n* `DeckManaCurve.vue` (198 líneas) — referencia de estilo y patrón de cálculo.\n* `services/manaCurveLands.ts` — patrón de fetch + cache para datos extra de Scryfall si hace falta `mana_cost`.\n\n## Datos que faltan\n\n* `mana_cost` (string tipo `{W}{W}{U}`) NO está en `HydratedDeckCard`. Hay que agregarlo al tipo y a la hidratación, o fetchearlo bajo demanda vía Scryfall (igual que ETB-tapped lands).\n* Decisión: hidratar `mana_cost` en `HydratedDeckCard` desde `card_index` si está disponible; fallback a Scryfall con cache si no.\n\n## Acceptance criteria\n\n* \\[ \\] Panel \"Color Analysis\" visible debajo de la mana curve en DeckView (ambas variantes desktop/mobile).\n* \\[ \\] Cada color WUBRG muestra: símbolos demandados (mainboard, no-tierras), fuentes (mainboard tierras), y un indicador visual de salud (verde/amarillo/rojo).\n* \\[ \\] Híbridas / phyrexian aportan a cada color que pueden pagar.\n* \\[ \\] Tierras dual aportan a cada color en `produced_mana`.\n* \\[ \\] No incluye sideboard ni wishlist (consistencia: solo mainboard owned).\n* \\[ \\] Tests unitarios del helper de cálculo (input: array de cartas, output: `{W: {demand, sources}, U: {...}, ...}`) cubriendo: costos simples, híbridos, phyrexian, duales, sin tierras.\n* \\[ \\] Build pasa (`npx vite build`).\n\n## Out of scope (tickets relacionados)\n\n* Alertas de cartas fuera del color identity declarado del deck → **SCRUM-43** (backlog, design debt).",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "improvement",
+    "jira-import",
+    "qa-manual"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.063Z",
+      "body": "Migrado desde SCRUM-42 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-05-01T10:44:35.255-0500",
+  "updated_at": "2026-05-09T19:31:19.227-0500",
+  "jira_key": "SCRUM-42"
+}

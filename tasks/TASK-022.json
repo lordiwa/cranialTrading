@@ -1,0 +1,31 @@
+{
+  "key": "TASK-022",
+  "title": "TC-P04-04: Click con rueda del mouse abre en pestaña de fondo",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-22 (tipo: Impovement user personal space, estado original: Finalizada)\n\n**Componente:** RouterLink (comportamiento de modificadores del navegador)\n**Requirement:** NICE-11\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué se valida?\n\nQue hacer **click con la rueda del mouse** (botón central) sobre un enlace abra el destino en una pestaña **de fondo** (sin cambiar el foco) — comportamiento estándar del navegador.\n\n## Preconditions\n\n* Mouse con botón central / rueda clickeable\n* Desktop, logueado en dev\n\n## Steps\n\nHacer click con la rueda del mouse en estos 3 puntos:\n\n1. Un resultado de colección en GlobalSearch (pulsar `/`, escribir algo, click con rueda en un resultado)\n2. \"FAQ\" del menú de ayuda (?) del header\n3. \"Ver todos los matches\" del dropdown de la campana de notificaciones\n\n## Resultado esperado\n\nCada uno abre en **pestaña de fondo** (el foco se queda en la pestaña actual), el side effect se ejecuta en la pestaña actual (dropdown se cierra), pero la pestaña actual NO navega.\n\n## Pass / Fail\n\n* **Pass:** los 3 puntos abren en background tab + side effect en actual + actual no navega\n* **Fail:** alguno navega en pestaña actual o no abre nueva pestaña",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "improvement",
+    "jira-import",
+    "nice-11",
+    "phase-4",
+    "qa-manual",
+    "router",
+    "search"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.939Z",
+      "body": "Migrado desde SCRUM-22 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-18T17:27:53.754-0500",
+  "updated_at": "2026-05-03T12:19:55.806-0500",
+  "jira_key": "SCRUM-22"
+}

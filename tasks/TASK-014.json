@@ -1,0 +1,28 @@
+{
+  "key": "TASK-014",
+  "title": "Deck Editor UX",
+  "description": "**Migrado de Jira:** SCRUM-14 (tipo: Epic, estado original: Defined)\n\n## Objetivo\n\nMejorar la experiencia de edición de decks: agilizar adición de cartas, mantener contexto al volver de modales, automatizar tareas repetitivas.\n\n## Issues que agrupa\n\nMejoras puntuales al editor de deck (UX, accesos rápidos, automatización de tokens).",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "decks",
+    "epic",
+    "jira-import",
+    "ux"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.905Z",
+      "body": "Migrado desde SCRUM-14 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-04-18T17:16:25.614-0500",
+  "updated_at": "2026-04-18T17:16:56.368-0500",
+  "jira_key": "SCRUM-14"
+}

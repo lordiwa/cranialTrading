@@ -1,0 +1,32 @@
+{
+  "key": "TASK-041",
+  "title": "Editor decks/binders/collection: + como FAB en desktop (no placeholder en grid)",
+  "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-41 (tipo: Impovement user personal space, estado original: Q/A)\n\n## Contexto\n\nSibling de **SCRUM-38** pero para desktop. SCRUM-38 ocultó el placeholder `+` en mobile porque duplicaba al FAB; la decisión explícita fue **mantener** el placeholder en desktop como único entry point. Hoy en desktop el placeholder card-con-+ ocupa un slot del grid y se mezcla visualmente con cartas reales — UX subóptimo.\n\n## Comportamiento actual (post-SCRUM-38, v1.27.3)\n\n| Entry point | Mobile | Desktop |\n| --- | --- | --- |\n| Placeholder + en `DeckEditorGrid.vue:482` (empty state) | visible | visible |\n| Placeholder + en `DeckEditorGrid.vue:497` (binder virtual scroll, 35k+) | visible | visible |\n| Placeholder + en `DeckEditorGrid.vue:631` (regular grouped grid) | **oculto** (`hidden md:block` post-SCRUM-38) | visible |\n| `FloatingActionButton.vue` (FAB) | visible (`md:hidden`) | **oculto** |\n\n## Comportamiento esperado\n\n* **Desktop (≥768px)**: el FAB pasa a estar visible (sacar `md:hidden` del `FloatingActionButton.vue`). Placeholders `+` dentro del grid de cartas (líneas 497 binder-virtual y 631 regular grouped) se ocultan en desktop.\n* **Empty state** (`DeckEditorGrid.vue:482`): mantener el placeholder grande como CTA principal en mobile **y** desktop. Es el único caso donde la carta-con-+ aporta valor visual (ahí no hay cartas que rellenen el grid).\n* **Mobile**: sin cambios — sigue mostrando solo FAB.\n\n## Vistas afectadas\n\n* `src/views/DeckView.vue` (FAB líneas 1278-1283)\n* `src/views/BinderView.vue` (FAB líneas 798-803) — parallel sibling, Anti-Loop Rule 6\n* `src/views/CollectionView.vue` (FAB línea 28) — verificar si `md:hidden` también está y aplicar\n* `src/components/decks/DeckEditorGrid.vue` (placeholders líneas 497 y 631)\n* `src/components/ui/FloatingActionButton.vue` (línea 18 — quitar `md:hidden`)\n\n## Out of scope\n\n* No tocar el placeholder del empty state (línea 482).\n* No cambiar el diseño/posición del FAB (`fixed bottom-16 right-4`).\n* No tocar el flujo de `AddCardModal`.\n* No tocar SCRUM-34 (searcher con discovery — ticket aparte).\n\n## Decisiones de diseño confirmadas\n\n* **Ubicación desktop**: FAB (mismo `fixed bottom-16 right-4`, igual que mobile) — confirmado con Rafael.\n* **Empty state**: mantener placeholder grande también en desktop — confirmado.\n* **Scope**: DeckView + BinderView + CollectionView — confirmado.\n\n## Criterios de aceptación\n\n* \\[ \\] En desktop (≥768px) el FAB de `+` es visible en `/decks/:id`, `/binders/:id` y `/collection`.\n* \\[ \\] En desktop el placeholder `+` del grid (línea 631 regular grouped + línea 497 binder virtual scroll) NO se renderiza cuando hay cartas.\n* \\[ \\] En desktop el placeholder grande sigue visible cuando el board está vacío (empty state, línea 482).\n* \\[ \\] En mobile el comportamiento no cambia (FAB visible, placeholder regular oculto, empty state visible).\n* \\[ \\] FAB en `/decks/:id` agrega al mainboard (o sideboard según UX actual).\n* \\[ \\] FAB en `/binders/:id` agrega al binder activo.\n* \\[ \\] FAB en `/collection` agrega con status picker (igual que hoy en mobile).\n* \\[ \\] BinderView se actualiza junto con DeckView (parallel sibling, Anti-Loop Rule 6).\n* \\[ \\] `npm run test:unit` verde.\n* \\[ \\] `npx vite build` verde.\n* \\[ \\] Test manual desktop real (no solo devtools responsive).\n\n## QA\n\nPendiente test plan. Labelear test cases como `qa-manual` o `qa-auto` cuando se redacten.\n\n## Relaciona\n\n* **Sibling**: SCRUM-38 (mismo problema, lado mobile — ya en Q/A v1.27.3).\n* **Padre**: SCRUM-14 Deck Editor UX.\n* **No bloquea ni es bloqueado por**: SCRUM-34 (searcher discovery, ticket independiente).",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "binders",
+    "collection",
+    "decks",
+    "desktop",
+    "frontend",
+    "improvement",
+    "jira-import",
+    "ux"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.059Z",
+      "body": "Migrado desde SCRUM-41 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-04-27T18:22:23.240-0500",
+  "updated_at": "2026-04-27T22:00:28.277-0500",
+  "jira_key": "SCRUM-41"
+}

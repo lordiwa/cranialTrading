@@ -1,0 +1,27 @@
+{
+  "key": "TASK-034",
+  "title": "Searcher con discovery + version picker (decks/binders/collection)",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-34 (tipo: Error, estado original: Q/A)\n\n## Contexto\n\nEl buscador de cartas en `/decks/:id`, `/binders/:id` y `/collection` actualmente solo permite filtrar lo que YA está en el deck/binder/collection. Falta una experiencia de discovery + selección de versión.\n\n## Comportamiento esperado\n\n### 1. Version picker (panel debajo del dropdown)\n\nCuando el usuario elige una carta del dropdown del searcher (sea de \"local matches\" o de \"scryfall suggestions\"), debajo se debe abrir un panel mostrando **todas las printings** de esa carta. El usuario elige la versión (set, foil, full-art, etc.) que quiere agregar.\n\n### 2. Discovery por filtros\n\nCuando el usuario aplica filtros (colors, sets, mana value, type, format legal, keywords, etc.) y NO hay cartas del deck/binder/collection que matcheen, el buscador debe mostrar **todas las cartas que cuadren con los filtros** (en collection del usuario y/o desde Scryfall) para que el usuario las seleccione.\n\n**Ejemplo del usuario**: \"en un azul blanco, el usuario pone todas las cartas azul blancas de un set específico y salen esas y el usuario puede escogerlas para que se agreguen al deck o binder\"\n\n### 3. Acción de \"agregar\"\n\nPara cada carta seleccionada del discovery, el usuario decide destino:\n\n* **Decks**: mainboard o sideboard\n* **Binders**: ese binder\n* **Collection**: status (collection / sale / trade / wishlist)\n\n## Decisiones de diseño abiertas (a definir en PLAN)\n\n* **Fuente de datos del discovery**: ¿solo collection del usuario? ¿Scryfall? ¿ambas con tabs?\n* **Selección**: ¿single-select o multi-select con bulk-add y cantidad?\n* **Layout del panel**: ¿inline (debajo del search), modal, o reemplaza el grid principal?\n* **Indicador visual**: ¿cómo distinguir \"ya tenés esta carta\" vs \"carta nueva\" vs \"ya está en este deck\"?\n* **Mobile vs desktop**: ¿layouts distintos o stack vertical?\n* **Performance**: discovery por filtros sin name puede traer cientos de resultados — ¿paginación? ¿límite duro?\n\n## Vistas afectadas\n\n* `src/views/CollectionView.vue`\n* `src/views/DeckView.vue`\n* `src/views/BinderView.vue`\n* `src/components/ui/CardFilterBar.vue` (probablemente refactor del dropdown)\n* `src/composables/useSearchSuggestions.ts` (extender con printings)\n\n## Criterio de aceptación\n\n1. Usuario en `/decks/:id`: typea \"Lightning Bolt\" en el searcher → dropdown muestra suggestions → click en \"Lightning Bolt\" → panel debajo con todas las printings → click en una → modal de confirmación con choice mainboard/sideboard → carta agregada.\n2. Usuario en `/binders/:id`: aplica filtros (color WU + set MH3) → grid muestra todas las cartas WU del set MH3 (incluso las que no están en el binder) → click en una → carta agregada al binder.\n3. Usuario en `/collection`: idem #2 pero con status picker.\n\n## Notas\n\n* Backend: SCRUM-27 ya persiste full Scryfall metadata en `Card` (rarity, power, toughness, keywords, legalities, full_art, oracle_text). El discovery por filtros sobre collection puede usar esos campos.\n* Discovery sobre Scryfall requiere usar `searchAdvanced` con la query construida desde los filtros (ya existe en `stores/search.ts:buildQuery`).\n* Esta feature surge de la sesión SCRUM-13 (paridad de ediciones + filter button extendido) — ver commit asociado en `develop`.\n\n## QA\n\nPendiente test plan — labelear tests como `qa-manual` o `qa-auto` según corresponda.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "jira-import",
+    "qa-manual"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.010Z",
+      "body": "Migrado desde SCRUM-34 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T16:02:35.885-0500",
+  "updated_at": "2026-05-12T14:45:33.532-0500",
+  "jira_key": "SCRUM-34"
+}

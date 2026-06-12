@@ -1,0 +1,30 @@
+{
+  "key": "TASK-030",
+  "title": "TC-27-03: Tierras básicas NO aparecen en bucket 0 de curva de maná",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-30 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## ¿Qué se valida?\n\nQue la gráfica de curva de maná excluya las tierras básicas (Island, Plains, Forest, Mountain, Swamp) del bucket 0. Las tierras no son hechizos que se \"lancen\" con maná, entonces no deberían contarse en la distribución de costos. Sí siguen contando para el total de tierras que se muestra en el header.\n\n## Aclaraciones de términos\n\n* **CMC (Converted Mana Cost / Costo de Maná Convertido):** el total de maná necesario para jugar una carta. Tierras tienen CMC=0 pero no son hechizos.\n* **Bucket 0:** la primera columna de la gráfica de barras (las cartas con costo cero).\n\n## Precondiciones\n\n* Importar un deck que tenga una cantidad conocida de tierras básicas (por ejemplo 20 Islands + 20 otras cartas).\n\n## Pasos\n\n1. Importar un deck que contenga tierras básicas (ej. un deck mono-azul con 20 Islands).\n2. Abrir la vista del deck.\n3. Observar la curva de maná.\n4. Mirar específicamente el bucket 0 (columna de costo 0).\n5. Mirar el contador de tierras en el header (\"Tierras: X / total\").\n\n## Resultado esperado\n\n* Bucket 0: muestra solo 0 (si el deck no tiene otros cmc=0) o el número de cartas cmc=0 **NO-tierra** (ej. Mox, Black Lotus, artefactos cmc 0).\n* NO muestra el conteo de tierras básicas.\n* Header \"Tierras: X / total\" SÍ muestra el total de tierras (las básicas siguen contando para el total).\n\n## Pass / Fail\n\n* ✅ **Pass:** bucket 0 vacío o con solo no-lands; contador de tierras del header correcto.\n* ❌ **Fail:** bucket 0 muestra el conteo de tierras básicas, o el contador de tierras del header aparece en 0.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "decks",
+    "improvement",
+    "jira-import",
+    "mana-curve",
+    "qa-manual",
+    "scrum-10"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.976Z",
+      "body": "Migrado desde SCRUM-30 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T13:43:09.290-0500",
+  "updated_at": "2026-05-09T20:25:17.199-0500",
+  "jira_key": "SCRUM-30"
+}

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-007",
+  "title": "Bug precios de cartas",
+  "description": "**Epic:** TASK-016 (Pricing & Market Intelligence)\n**Migrado de Jira:** SCRUM-7 (tipo: Error, estado original: Finalizada)\n\nSituación actual: El usuario tiene que ingresar a la carta para poder ver la comparativa de precios en las diferentes páginas.  \nSulución: Sugiero 2  \n1: Poner los precios de todas las tiendas directamente en donde se ubica el cuadro rojo, esto provocaria que se desplacen los textos hacia abajo.  \n2: Poner una flecha o algún asset para poder cambiar los precios y mantener la proporción actual del texto  \nCada una de estas soluciones se deberian integrar en el recuadro rojo marcado",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "frontend",
+    "jira-import",
+    "pricing",
+    "ux"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.871Z",
+      "body": "Migrado desde SCRUM-7 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-04-09T21:08:32.473-0500",
+  "updated_at": "2026-04-18T17:17:30.728-0500",
+  "jira_key": "SCRUM-7"
+}

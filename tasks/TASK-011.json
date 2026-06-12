@@ -1,0 +1,28 @@
+{
+  "key": "TASK-011",
+  "title": "Investigar BD para recomendación de cartas por deck",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-11 (tipo: Impovement user personal space, estado original: Defined)\n\n## Contexto\n\n¿Es factible conseguir una base de datos para realizar la función de recomendación de cartas para los decks de manera individual?\n\n## Objetivo\n\nEvaluar opciones de BD / APIs externas que permitan sugerir cartas complementarias para un deck dado (sinergías, metas de formato, arquetipos).\n\n## Preguntas clave\n\n* ¿Qué fuentes existen? (EDHRec, Scryfall tags, Moxfield recommendations, etc.)\n* ¿Coste / licencia para uso comercial?\n* ¿Latencia aceptable para integrarse en el editor de deck?\n\n## Criterio de aceptación\n\nDocumento o spike que liste al menos 3 fuentes viables con pros/contras y recomendación final.",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "decks",
+    "improvement",
+    "jira-import",
+    "research"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.886Z",
+      "body": "Migrado desde SCRUM-11 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-04-13T20:52:32.762-0500",
+  "updated_at": "2026-04-25T13:45:32.045-0500",
+  "jira_key": "SCRUM-11"
+}

@@ -1,0 +1,31 @@
+{
+  "key": "TASK-032",
+  "title": "TC-27-05: Imágenes de cartas importadas cargan correctamente tras reload",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-32 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## ¿Qué se valida?\n\nQue todas las imágenes de las cartas del deck recién importado se vean correctamente, tanto en la primera carga como después de recargar la página. Antes del fix, algunas cartas quedaban con la casilla de imagen vacía (sin thumbnail).\n\n## Precondiciones\n\n* Deck Moxfield importado correctamente (TC-27-01 Pass).\n* Incluir en el deck cartas de sets relativamente nuevos (últimos 6 meses) para validar que la resolución por nombre funciona para casos donde el scryfall_id cambia.\n\n## Pasos\n\n1. Importar el deck.\n2. Abrir la vista del deck (`/decks/{deckId}`).\n3. Recorrer VISUALMENTE toda la grilla de cartas del deck.\n4. Contar cuántas cartas tienen imagen y cuántas aparecen como placeholder gris (sin imagen).\n5. Hacer **hard reload** (`Ctrl + Shift + R`).\n6. Volver a recorrer la grilla.\n7. Hacer click derecho sobre una carta cualquiera → \"Inspeccionar elemento\" → confirmar que el `<img>` tiene atributo `src=\"https://cards.scryfall.io/...\"`.\n\n## Resultado esperado\n\n* **Primera carga:** todas las cartas muestran su imagen.\n* **Tras reload:** mismas imágenes siguen visibles.\n* No hay \"huecos\" grises en la grilla.\n* Todos los `<img>` tienen `src` que apunta a `cards.scryfall.io`.\n\n## Pass / Fail\n\n* ✅ **Pass:** 100% de las cartas del deck muestran imagen correctamente en ambos estados (primera carga Y post-reload).\n* ❌ **Fail:** cualquier carta aparece sin imagen (hueco gris), o el `<img>` tiene `src=\"\"` o `src={...JSON...}`, o imágenes que cargaban en la primera visita dejan de cargar tras reload.\n\n## Nota técnica (contexto)\n\nEl fix corrige dos causas distintas de imágenes rotas:\n\n1. Cartas sin `scryfall_id` en Moxfield (algunos sets nuevos) → ahora se resuelven por nombre vía `/cards/collection`.\n2. Cartas cuyo `scryfall_id` cambia por canonicalización de variantes → ahora el cliente injecta `doc.id` como fallback al leer cache.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "decks",
+    "import",
+    "improvement",
+    "jira-import",
+    "qa-manual",
+    "regression",
+    "scrum-27"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.995Z",
+      "body": "Migrado desde SCRUM-32 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T13:43:36.407-0500",
+  "updated_at": "2026-05-09T19:30:52.178-0500",
+  "jira_key": "SCRUM-32"
+}

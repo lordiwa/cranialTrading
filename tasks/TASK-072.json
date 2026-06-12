@@ -1,0 +1,27 @@
+{
+  "key": "TASK-072",
+  "title": "QA: Probar SCRUM-70 (Buy Requests) y SCRUM-71 (mejoras de matches)",
+  "description": "**Migrado de Jira:** SCRUM-72 (tipo: Historia, estado original: Defined)\n\nQA manual de las mejoras implementadas en SCRUM-70 y SCRUM-71. Probar en cranial-trading-dev.web.app una vez desplegado (v1.33.0). Reportar cada paso que falle con captura + consola.\n\nPENDIENTE DE DESPLIEGUE: esperar a que esté en dev antes de probar.\n\n=== SCRUM-71 — Sistema de matches ===\n\n\\[71.1\\] Descartar un match NO debe bloquear a la persona\n\n1. En Matches, ver matches de una persona X.\n2. Descartar (IGNORAR) UN match de X.\n3. Recalcular matches.\n4. ESPERADO: X puede seguir apareciendo en otros matches (descartar no la bloqueó).\n5. Abrir el modal de \"usuarios bloqueados\".\n6. ESPERADO: X NO aparece como bloqueada (solo bloqueos explícitos).\n\n\\[71.2\\] Un match descartado NO reaparece\n\n1. Descartar un match.\n2. Recalcular varias veces.\n3. ESPERADO: el match descartado NO vuelve a aparecer (antes reaparecía tras recálculo / a los 15 días).\n\n\\[71.3\\] Sin matches repetidos (dedup)\n\n1. Provocar un repetido (tocar \"ME INTERESA\" dos veces rápido sobre la misma carta/persona).\n2. Revisar pestañas Nuevos y Guardados.\n3. ESPERADO: ese match aparece UNA sola vez. Matches con OTRAS cartas de la misma persona SÍ siguen apareciendo.\n\n\\[71.4\\] Grupos colapsables por persona\n\n1. Con \"Agrupar por usuario\" activo, ver la lista agrupada.\n2. ESPERADO: los grupos arrancan COLAPSADOS mostrando \"@usuario (N matches)\".\n3. Clic en el encabezado → expande; clic de nuevo → colapsa. El chevron rota.\n4. ESPERADO: expandir un grupo NO afecta a los demás.\n5. Accesibilidad: Tab hasta el encabezado y activar con Enter/Espacio.\n6. ESPERADO: el encabezado togglea con teclado; el link \"Ver perfil\" funciona aparte.\n7. Abrir enlace directo a un match cuyo grupo esté colapsado.\n8. ESPERADO: el grupo se auto-expande y hace scroll al match.\n\n=== SCRUM-70 — Buy Requests (carrito a lista del dueño) ===\n\n\\[70.1\\] El carrito se guarda como solicitud en el perfil del dueño\n\n1. SIN sesión (visitante anónimo), entrar a un perfil: cranialtrading.com/@usuario.\n2. Agregar varias cartas al carrito.\n3. Compartir el carrito.\n4. ESPERADO: además del texto compartido, se crea una solicitud para el dueño.\n\n\\[70.2\\] El dueño ve la solicitud con imágenes en la pestaña \"Buy Requests\"\n\n1. Iniciar sesión como dueño de ese perfil.\n2. Matches -> pestaña \"BUY REQUESTS\" (badge con pendientes).\n3. ESPERADO: aparece la solicitud con nombre del comprador, fecha, estado y CADA carta con IMAGEN, cantidad y precio, más el total.\n4. Al abrir la pestaña, las pendientes pasan a \"Vista\".\n5. Botón Borrar -> confirma y elimina.\n\n\\[70.3\\] Marcar como vendida descuenta de la coleccion\n\n1. Anotar la cantidad en colección de una carta de la solicitud.\n2. Pulsar \"Marcar como vendida\" y confirmar.\n3. ESPERADO: la cantidad baja según lo vendido; si llega a 0 se elimina. La solicitud queda \"Vendida\".\n4. Borde: agregar una carta al carrito y luego borrarla de la colección antes de marcar vendida.\n5. ESPERADO: no rompe; avisa que N carta(s) ya no estaban (fallback), el resto se descuenta.\n\n=== Notas ===\n\n* Idiomas: verificar textos nuevos en ES / EN / PT.\n* Móvil gama baja (Mali): confirmar que colapsables y lista de buy requests no causan corrupción visual.\n* Relacionado con SCRUM-70 y SCRUM-71.",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "jira-import",
+    "qa-manual",
+    "story"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.193Z",
+      "body": "Migrado desde SCRUM-72 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-06-05T12:00:36.713-0500",
+  "updated_at": "2026-06-05T12:00:36.812-0500",
+  "jira_key": "SCRUM-72"
+}

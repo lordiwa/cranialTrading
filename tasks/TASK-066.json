@@ -1,0 +1,29 @@
+{
+  "key": "TASK-066",
+  "title": "Buscador /collection: input filtra grid local + remover Discovery + affordance agregar nueva carta",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-66 (tipo: Error, estado original: Q/A)\n\n## Contexto\n\nBuscador en `/collection` tiene 3 bugs reportados por Mato. Originalmente este ticket incluia 4 problemas, pero en grooming (2026-05-12) Rafael decidio separar el Problema 4 (filtros avanzados rotos en perfil publico ajeno) a un ticket aparte — ver Issue Link **Relates to** abajo.\n\n## Decisiones de grooming (2026-05-12)\n\n1. `/collection` NO necesita Discovery: el panel Discovery que SCRUM-34 v1.32.0 agrego a `CollectionView.vue` se va a **REMOVER**. El flujo de agregar cartas a coleccion ya tiene su path por el boton `+` que abre `AddCardModal` — no hace falta duplicarlo en `/collection`.\n2. **El input del** `CardFilterBar` en `/collection` filtra el GRID LOCAL (no Discovery). Re-bind a `filterQuery` del composable `useCardFilter`.\n3. **Affordance \"Agregar como nueva carta\"** debajo de las sugerencias Scryfall — **no** auto-open de `AddCardModal` (respetar regla no-break-existing).\n\n---\n\n## Problema 1 — Dropdown no muestra cartas existentes en coleccion\n\n### Causa raiz (verificada en codigo 2026-05-12, post v1.32.0)\n\nEn `CollectionView.vue:998-1014`, el `CardFilterBar` esta bound `v-model:filter-query=\"discoverQuery\"`. `discoverQuery` solo feed `DiscoveryPanel` (Scryfall search), NO el grid local. El ref `filterQuery` del grid (en `useCardFilter`, `useCardFilter.ts:182`) ES consumido por `filteredCards` pero no esta wireado a ningun input — el usuario no tiene manera de typear ahi.\n\nLa decoupling fue intencional (CollectionView.vue:56-58 — \"deliberately decoupled from the local grid so typing doesn't shrink the collection view\") pero el side-effect es: no se puede filtrar el grid por nombre.\n\n### Fix\n\n* Remover `DiscoveryPanel` + `BottomSheet` + composable `useDiscoveryAddCard('collection', ...)` de `CollectionView.vue`.\n* Remover wiring `show-mobile-discover` / `mobile-discover-active` / `@open-discovery-sheet` en el `CardFilterBar` dentro de CollectionView.\n* Bindear el input del `CardFilterBar` directamente a `filterQuery` (el ref del grid local).\n* El dropdown sigue mostrando matches locales por nombre (gratis via local filter).\n\nVistas afectadas: `src/views/CollectionView.vue`, `src/components/ui/CardFilterBar.vue` (solo el comportamiento dentro de `CollectionView` — `/decks/:id` y `/binders/:id` mantienen Discovery intacto).\n\n---\n\n## Problema 2 — Buscador no abre AddCardModal cuando la carta no existe\n\n### Comportamiento actual\n\nAl typear un nombre que no matchea localmente, el dropdown muestra sugerencias Scryfall pero no hay manera de saltar a `AddCardModal` con ese nombre directamente.\n\n### Fix\n\n* En `CardFilterBar.vue` (o `useSearchSuggestions.ts`), cuando `localMatches.length === 0 && searchQuery.length > 0`, mostrar al final del dropdown un item **\"Agregar 'XYZ' como nueva carta\"** debajo de las sugerencias Scryfall.\n* Click en ese item → emit `open-add-modal-with-name` con `currentInputText`. CollectionView abre `AddCardModal` con el nombre pre-rellenado.\n* **NO auto-open** — Rafael rechaza modales auto-disparados.\n\n---\n\n## Problema 3 — Error de consola al filtrar por nombre\n\n```\nUncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received\n```\n\n### Investigacion previa al fix\n\n1. Reproducir en modo incognito (sin extensiones) — si NO aparece, es una extension de Chrome (translators/ad blockers) y se ignora.\n2. Si SI aparece sin extensiones, buscar `.then(...)` sin `.catch()` en `useSearchSuggestions.ts` (probablemente la debounced llamada a Scryfall).\n\n### Fix\n\nAgregar `.catch(() => {})` o `try/catch` en el debounced handler.\n\n---\n\n## QA — plan de prueba\n\nAmbiente: `cranial-trading-dev.web.app` (version TBD — patch bump v1.32.1 esperado tras fix).\n\n### `/collection` — comportamiento esperado tras fix\n\n* \\[ \\] Typear un nombre de carta en el buscador filtra el GRID LOCAL en vivo.\n* \\[ \\] El dropdown muestra primero las cartas que tenes en coleccion con ese nombre.\n* \\[ \\] Typear un nombre que NO tenes → dropdown muestra \"Agregar 'XYZ' como nueva carta\" debajo de las sugerencias Scryfall.\n* \\[ \\] Click en \"Agregar como nueva carta\" → abre `AddCardModal` con el nombre pre-rellenado.\n* \\[ \\] **No aparece** `DiscoveryPanel` ni boton \"Discover\" en `/collection` (ni desktop ni mobile).\n* \\[ \\] No hay error en consola al filtrar (verificado en incognito sin extensiones).\n\n### Regresion\n\n* \\[ \\] `/decks/:id` Discovery sigue funcionando.\n* \\[ \\] `/binders/:id` Discovery sigue funcionando.\n* \\[ \\] El boton `+` y `AddCardModal` en `/collection` siguen funcionando para agregar cartas nuevas.\n\n## QA labels\n\nPendiente test plan — labelear cada TC como `qa-manual` o `qa-auto`.\n\n## Issue links\n\n* **Relates to**: ticket nuevo (filtros perfil publico — split del Problema 4 original).\n* **Affects**: SCRUM-34 (esta tarea revierte la Parte 2 — Discover en /collection — del fix v1.32.0).",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "collection",
+    "frontend",
+    "jira-import",
+    "search"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.166Z",
+      "body": "Migrado desde SCRUM-66 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-05-06T13:10:33.511-0500",
+  "updated_at": "2026-06-07T13:23:09.282-0500",
+  "jira_key": "SCRUM-66"
+}

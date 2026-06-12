@@ -1,0 +1,29 @@
+{
+  "key": "TASK-045",
+  "title": "SCRUM-42 Phase 2: panel UI Color Analysis en DeckView",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-45 (tipo: Impovement user personal space, estado original: Defined)\n\n## Contexto\n\nPhase 2 de SCRUM-42 (color analysis del deckbuilder). Phase 1 (infra) ya entregada en v1.28.2: `mana_cost` se hidrata reactivamente y los helpers `parseManaCost` + `calculateColorAnalysis` están listos con tests.\n\n## Objetivo\n\nConstruir el panel UI \"Color Analysis\" debajo de `DeckManaCurve` en el footer del DeckView, mostrando demanda de símbolos vs fuentes de tierras por color WUBRG, con indicador de salud por color.\n\n## Infraestructura ya disponible\n\n* `src/utils/manaCost.ts` — `parseManaCost`, `calculateColorAnalysis` (con tests)\n* `src/services/manaCostHydration.ts` — fetch on-demand de `mana_cost` con session cache\n* `src/composables/useDeckManaCosts.ts` — capa reactiva, devuelve `cardsWithManaCost: ComputedRef<HydratedDeckCard[]>`\n\n## Decisiones locked (de SCRUM-42 grooming)\n\n* Solo mainboard owned (excluye sideboard, wishlist, commander).\n* Excluir tierras del conteo de demand (hecho en `calculateColorAnalysis`).\n* Tierras tapped y dual cuentan igual.\n* Híbridos `{W/U}` aportan 1 a cada color.\n* Aplica a todos los formatos.\n\n## Acceptance criteria\n\n* \\[ \\] Componente nuevo `src/components/decks/DeckColorAnalysis.vue` consume `cardsWithManaCost` y `calculateColorAnalysis`.\n* \\[ \\] Visualmente debajo de `<DeckManaCurve>` en el footer del DeckView (desktop + mobile).\n* \\[ \\] Por color WUBRG: muestra `demand` (símbolos), `sources` (fuentes), y un indicador de salud (verde si sources >= demand, amarillo si entre 0.7–1x, rojo si < 0.7x). Threshold ajustable.\n* \\[ \\] Si no hay `mana_cost` hidratado aún (pre-fetch), mostrar skeleton o disabled state — NO crashear ni mostrar todo en cero.\n* \\[ \\] Estilo consistente con `DeckManaCurve.vue` (mismo bg, padding, typography del proyecto).\n* \\[ \\] Test unitario del componente (mounting + props derivation).\n* \\[ \\] Build pasa (`npx vite build`).\n\n## Posibles extensiones (out of scope, evaluar)\n\n* Título / tooltip por color con detalle de cards que más consumen.\n* Toggle entre WUBRG view y mana symbols view.\n\n## Bloquea\n\n* SCRUM-43 (alertas color identity) depende de este panel.",
+  "acceptance_criteria": [],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "decks",
+    "feature",
+    "improvement",
+    "jira-import",
+    "ui"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.131Z",
+      "body": "Migrado desde SCRUM-45 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Defined; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-05-01T12:34:25.412-0500",
+  "updated_at": "2026-05-01T12:34:59.343-0500",
+  "jira_key": "SCRUM-45"
+}

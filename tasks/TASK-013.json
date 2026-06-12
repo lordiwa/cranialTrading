@@ -1,0 +1,28 @@
+{
+  "key": "TASK-013",
+  "title": "Paridad de ediciones entre buscadores (rápido vs avanzado)",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-13 (tipo: Impovement user personal space, estado original: Q/A)\n\n## Problema\n\nEl buscador rápido no tiene las ediciones igual que el de búsqueda avanzada. Hay que revisar que funcione idéntico.\n\n## Contexto\n\nHay dos superficies de búsqueda en la app:\n\n* **GlobalSearch** (buscador rápido en el header)\n* **SearchView** (página `/search` de búsqueda avanzada)\n\nEl filtro / display de ediciones difiere entre ellas.\n\n## Criterio de aceptación\n\nAmbas superficies muestran el mismo catálogo de ediciones y devuelven los mismos resultados para el mismo query + filtro de edición.",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "frontend",
+    "improvement",
+    "jira-import",
+    "search"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.894Z",
+      "body": "Migrado desde SCRUM-13 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-04-14T20:22:46.094-0500",
+  "updated_at": "2026-04-19T16:05:26.808-0500",
+  "jira_key": "SCRUM-13"
+}

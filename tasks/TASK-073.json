@@ -1,0 +1,27 @@
+{
+  "key": "TASK-073",
+  "title": "Forzar username único al registrarse + resolución robusta de @username",
+  "description": "**Migrado de Jira:** SCRUM-73 (tipo: Impovement user personal space, estado original: Q/A)\n\n## Contexto (detectado durante QA de SCRUM-70)\n\nSe descubrió que un mismo username puede tener **varios documentos de usuario** en `/users`. En dev, `@rafael_m` tenía 2 cuentas (mismo email, distinto uid). Esto rompió el flujo de buy requests: el visitante anónimo resolvía al doc viejo y el pedido se guardaba bajo otro uid del que el dueño leía.\n\n## Problema raíz\n\n1. **No hay unicidad de username** al registrarse → se pueden crear duplicados.\n2. `findUserByUsername` (UserProfileView.vue:105) usa `limit(1)` → resuelve al \"primer match\" de forma no determinista. Si hay duplicados, el perfil público puede apuntar al doc equivocado (cartas equivocadas, buy requests al uid equivocado).\n\n## Impacto\n\n* Perfiles públicos `@username` pueden mostrar la cuenta/cartas equivocadas.\n* Cualquier feature que resuelva username→uid para un visitante anónimo (buy requests, ver colección pública) puede ir al doc incorrecto.\n\n## Propuesta\n\n1. **Registro:** validar que el username no exista antes de crear la cuenta (query previa + idealmente un doc de índice `/usernames/{username}` con regla que impida sobrescribir, para atomicidad).\n2. **Resolución:** hacer `findUserByUsername` determinista (p.ej. preferir cuenta activa / con más actividad) o, mejor, eliminar la posibilidad de duplicados de raíz.\n3. **Limpieza de datos existentes:** auditar `/users` por usernames duplicados y consolidar/renombrar (en dev ya se renombró el duplicado de rafael_m a `rafael_m_old`; prod estaba limpio).\n\n## Notas\n\n* Técnica usada para el fix manual en dev: `PATCH` REST API de Firestore con token ADC (`gcloud auth application-default print-access-token`) sobre `users/{id}` con `updateMask.fieldPaths=username`.\n* Relacionado con SCRUM-70.\n\nneeds-grooming: definir alcance (¿solo prevención a futuro, o también auditoría/limpieza masiva?).",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "improvement",
+    "jira-import",
+    "needs-grooming"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.199Z",
+      "body": "Migrado desde SCRUM-73 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-06-05T14:46:40.128-0500",
+  "updated_at": "2026-06-07T13:23:04.554-0500",
+  "jira_key": "SCRUM-73"
+}

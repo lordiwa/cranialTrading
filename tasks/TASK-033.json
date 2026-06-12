@@ -1,0 +1,31 @@
+{
+  "key": "TASK-033",
+  "title": "TC-27-06: Import desde /binders preserva el fix de metadata (regresión)",
+  "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-33 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## ¿Qué se valida?\n\nQue el flujo paralelo de import desde `/binders` (carpetas) mantenga el mismo fix: las cartas se guardan con su metadata (CMC, tipo, colores) y no regresiona por el cambio que se enfocó en decks.\n\n## Aclaraciones de términos\n\n* **Binder / carpeta:** una \"caja\" virtual donde se guardan cartas públicas para venta o trade, separada de la colección regular.\n\n## Precondiciones\n\n* URL de Moxfield (misma que se usó en TC-27-01 está bien — el contenido no importa, lo importante es probar el flow).\n\n## Pasos\n\n1. Ir a la ruta `/binders`.\n2. Click en **Importar**.\n3. Pegar la URL de Moxfield.\n4. Confirmar y esperar a que finalice.\n5. Abrir la vista del binder recién creado.\n6. Hacer **hard reload** (`Ctrl + Shift + R`).\n7. Volver a la vista del binder.\n\n## Resultado esperado\n\n* Import completa sin errores.\n* Cartas en el binder muestran sus imágenes correctamente (ambos antes y después del reload).\n* Si el binder tuviera alguna visualización de CMC/tipo, se ve correcta.\n* No aparece ningún toast de error en el proceso.\n\n## Pass / Fail\n\n* ✅ **Pass:** import completa, cartas visibles con imagen, sin errores en consola ni toasts rojos.\n* ❌ **Fail:** error durante el import, cartas sin imagen, o consola muestra errores (`FirebaseError`, `TypeError`, etc.).",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "binders",
+    "import",
+    "improvement",
+    "jira-import",
+    "qa-manual",
+    "regression",
+    "scrum-27"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.005Z",
+      "body": "Migrado desde SCRUM-33 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-19T13:43:46.323-0500",
+  "updated_at": "2026-05-09T21:22:02.256-0500",
+  "jira_key": "SCRUM-33"
+}

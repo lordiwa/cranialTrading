@@ -1,0 +1,30 @@
+{
+  "key": "TASK-067",
+  "title": "Filtros avanzados rotos en perfil publico ajeno (regresion SCRUM-65)",
+  "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-67 (tipo: Error, estado original: Q/A)\n\n## Contexto\n\nOriginalmente este bug era el Problema 4 de SCRUM-66. En grooming 2026-05-12 Rafael decidio separarlo a un ticket aparte porque toca otra vista (`ProfileView` / `UserProfileView`) y probablemente es regresion de SCRUM-65.\n\n**URL de ejemplo:** https://cranialtrading.com/@rafael_m\n\n## Bug\n\nViendo el perfil de un usuario que NO es uno mismo:\n\n* Buscador por NOMBRE funciona correctamente.\n* Filtros avanzados (color, tipo, set, mana value, combinaciones) devuelven resultados vacios aunque visualmente el grid muestre que esas cartas SI existen en la coleccion publica del usuario.\n\n## Hipotesis tecnica (para grooming en mayor profundidad)\n\n1. **Probable regresion de SCRUM-65** (actualmente en Q/A — filtro avanzado en perfil publico). El fix de SCRUM-65 puede haber cubierto el caso del filtro de NOMBRE pero no los advanced filters.\n2. **Posible causa alternativa**: query a Firestore filtra con campos que solo existen en hidratacion completa (`colors`, `type_line` post-SCRUM-27) y el render publico carga una vista compactada sin esos campos. Verificar el shape del documento que se renderiza en perfil ajeno vs propio.\n\n## Vistas afectadas\n\n* `src/views/ProfileView.vue` (perfil propio)\n* `src/views/UserProfileView.vue` (perfil ajeno — verificar nombre exacto)\n* Composable de filtrado en perfil publico (TBD en grooming tecnico)\n* Posible cross-impact con SCRUM-27 (full Scryfall metadata persistida en Card)\n\n## Criterio de aceptacion\n\n- [ ] Filtros avanzados (color, tipo, set, mana value) en perfil de otro usuario devuelven los mismos resultados que la vista visual del grid.\n- [ ] Equivalencia perfil propio ↔ perfil ajeno con los mismos filtros aplicados.\n- [ ] Combinaciones de filtros (ej. negro + criatura, WU + MH3) funcionan en perfil ajeno.\n\n## QA\n\nPendiente test plan — labelear cada TC como `qa-manual` o `qa-auto`.\n\n## Issue links\n\n* **Split from** SCRUM-66 (originalmente Problema 4).\n* **Probable regresion de** SCRUM-65 (filtro avanzado en perfil publico — en Q/A).",
+  "acceptance_criteria": [],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "frontend",
+    "jira-import",
+    "needs-grooming",
+    "profile",
+    "search"
+  ],
+  "assignee": "Mato",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.170Z",
+      "body": "Migrado desde SCRUM-67 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    }
+  ],
+  "created_at": "2026-05-12T14:45:01.371-0500",
+  "updated_at": "2026-06-07T14:08:06.874-0500",
+  "jira_key": "SCRUM-67"
+}

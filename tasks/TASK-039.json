@@ -1,0 +1,30 @@
+{
+  "key": "TASK-039",
+  "title": "QA: verificar 5 escenarios CardDetailModal post-v1.27.4 (SCRUM-36)",
+  "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-39 (tipo: Impovement user personal space, estado original: Finalizada)\n\n## ¿Qué se valida?\n\nEl `CardDetailModal` (la vista de detalle al tocar una carta del grid) ha pasado por múltiples iteraciones de fix con regresiones acumuladas. La versión actual `v1.27.4` (commit f8f5569 en `develop`) consolida 3 fixes atómicos. Necesitamos validar que los siguientes 5 escenarios funcionan correctamente en https://cranial-trading-dev.web.app sin regresiones cruzadas.\n\n## Setup previo\n\n* Login en https://cranial-trading-dev.web.app\n* Tener al menos 1 deck creado.\n* Para cada escenario, partir del estado descrito.\n\n## Escenarios\n\n### TC-1 — Wishlist save sin cambios (no debe destruir state)\n\n**Setup**: 4 cartas en wishlist + 4 allocadas al deck en mainboard.  \n**Acción**: tap sobre la carta → CardDetailModal → SAVE sin cambiar nada.  \n**Expected**: siguen 4 wishlist en colección + 4 alloc en deck. Badge `x4`.  \n**Pass / Fail**: \\__\\_\n\n### TC-2 — Consolidación de wishlist duplicates (Bug C)\n\n**Setup**: tener una carta donde el bug viejo dejó wishlist duplicates (ej. 7 wishlist en colección que en realidad son W1=4 + W2=3).    \nSi no podés reproducir el setup, saltarlo y reportar.  \n**Acción**: CardDetailModal → bajar wishlist counter a 4 → SAVE.  \n**Expected**: al re-abrir el modal, wishlist muestra 4 (NO 7). Solo queda 1 card en colección.  \n**Pass / Fail**: \\__\\_\n\n### TC-3 — Bajar deck allocation (Bug D)\n\n**Setup**: 4 wishlist + 4 alloc en mainboard.  \n**Acción**: CardDetailModal → bajar el deck alloc del modal a 2 → SAVE.  \n**Expected**: deck queda con 2 alloc apuntando a la wishlist card. La carta NO desaparece del deck.  \n**Pass / Fail**: \\__\\_\n\n### TC-4 — Collection → wishlist con deck alloc (Bug A)\n\n**Setup**: 4 cartas en colección + 4 alloc en mainboard.  \n**Acción**: CardDetailModal → collection 4→0 + wishlist 0→3 + deck alloc 4→2 → SAVE.  \n**Expected**: en colección queda 1 wishlist card con qty=3 (NO duplicado de 7). Deck alloc=2 apuntando a esa wishlist.  \n**Pass / Fail**: \\__\\_\n\n### TC-5 — Mover 1 de wishlist a collection sin tocar deck alloc\n\n**Setup**: 4 wishlist + 4 alloc en mainboard.  \n**Acción**: CardDetailModal → wishlist 4→3 + collection 0→1 (sin tocar deck alloc) → SAVE.  \n**Expected**: al re-abrir el modal, ver collection=1 y wishlist=3. Deck alloc preservado en 4.  \n**Pass / Fail**: \\__\\_\n\n## Notas\n\n* Si algún test falla, abrir DevTools → Console y reportar cualquier error. Si no hay error visible, capturar screenshot del estado.\n* En mobile y desktop ambos (los path internos son iguales pero el FAB en mobile puede ocultar bugs visuales).\n* Reabrir siempre el modal después de SAVE para verificar el estado real (no solo el badge del grid).",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "decks",
+    "frontend",
+    "improvement",
+    "jira-import",
+    "qa-manual",
+    "regression"
+  ],
+  "assignee": "ismachucho",
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:37.049Z",
+      "body": "Migrado desde SCRUM-39 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: ismachucho."
+    }
+  ],
+  "created_at": "2026-04-27T10:26:50.666-0500",
+  "updated_at": "2026-05-03T12:12:07.152-0500",
+  "jira_key": "SCRUM-39"
+}

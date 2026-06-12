@@ -1,0 +1,28 @@
+{
+  "key": "TASK-003",
+  "title": "[Archivado] Tarea 3 — placeholder sin contenido",
+  "description": "**Migrado de Jira:** SCRUM-3 (tipo: Error, estado original: Finalizada)\n\nIssue placeholder creado al inicio del proyecto. Sin contenido, sin contexto. Archivado durante limpieza del backlog 2026-04-18.",
+  "acceptance_criteria": [],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "archived",
+    "bug",
+    "jira-import",
+    "placeholder"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "jira-migration",
+      "at": "2026-06-12T14:45:36.850Z",
+      "body": "Migrado desde SCRUM-3 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Finalizada; asignado a: nadie."
+    }
+  ],
+  "created_at": "2026-04-09T20:46:27.394-0500",
+  "updated_at": "2026-04-18T17:17:27.688-0500",
+  "jira_key": "SCRUM-3"
+}

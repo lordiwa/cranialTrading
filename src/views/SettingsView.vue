@@ -396,7 +396,7 @@ const handleDeleteAllData = async () => {
 };
 
 const handleRestartTour = () => {
-  resetTour();
+  void resetTour();
   void router.push('/collection').then(() => {
     setTimeout(() => { void startTour(); }, 500);
   });

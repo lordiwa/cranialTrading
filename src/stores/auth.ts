@@ -58,6 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
                     createdAt: { toDate: () => Date };
                     lastUsernameChange?: { toDate: () => Date } | null;
                     avatarUrl?: string | null;
+                    tourCompleted?: boolean;
                 };
                 user.value = {
                     id: userId,
@@ -67,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
                     createdAt: data.createdAt.toDate(),
                     lastUsernameChange: data.lastUsernameChange?.toDate() ?? null,
                     avatarUrl: data.avatarUrl ?? null,
+                    tourCompleted: data.tourCompleted ?? false,
                 };
             } else {
                 const firebaseUser = auth.currentUser;

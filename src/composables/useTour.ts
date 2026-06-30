@@ -1,5 +1,7 @@
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '../services/firebase'
 import { useI18n } from './useI18n'
 import { useAuthStore } from '../stores/auth'
 
@@ -28,21 +30,48 @@ export function useTour() {
   const { t } = useI18n()
   const authStore = useAuthStore()
 
+  /**
+   * Returns true if the tour has been completed.
+   * Source of truth: authStore.user.tourCompleted (loaded from Firestore via loadUserData).
+   * Fallback: localStorage (tolerant read for users who completed on this device before TASK-082).
+   * Backfill: if localStorage says done but Firestore doesn't know yet, fires a best-effort write.
+   */
   const isTourCompleted = (): boolean => {
+    // Firestore-backed store is the source of truth
+    if (authStore.user?.tourCompleted) return true
+
+    // localStorage fallback (tolerant read)
     const userId = authStore.user?.id
+    let lsCompleted = false
     try {
-      return localStorage.getItem(getTourKey(userId)) === 'true'
+      lsCompleted = localStorage.getItem(getTourKey(userId)) === 'true'
     } catch {
-      return false
+      // localStorage unavailable (e.g. private browsing)
     }
+
+    if (lsCompleted && authStore.user) {
+      // Backfill: localStorage says done but Firestore doesn't — propagate best-effort.
+      // markTourCompleted sets authStore.user.tourCompleted = true synchronously (before its
+      // first await), so subsequent isTourCompleted calls return early via the store check.
+      void markTourCompleted()
+    }
+
+    return lsCompleted
   }
 
-  const markTourCompleted = () => {
+  /**
+   * Marks the tour as completed.
+   * Writes to: localStorage (cache/offline), authStore.user in memory (session),
+   * and Firestore /users/{uid} (source of truth — best-effort, errors swallowed).
+   */
+  const markTourCompleted = async (): Promise<void> => {
     const userId = authStore.user?.id
+
+    // Write to localStorage
     try {
       localStorage.setItem(getTourKey(userId), 'true')
     } catch {
-      // QuotaExceededError — clean up mtgjson set caches to free space and retry
+      // QuotaExceededError — free space from mtgjson set caches and retry
       try {
         cleanupMtgjsonSetCaches()
         localStorage.setItem(getTourKey(userId), 'true')
@@ -50,18 +79,54 @@ export function useTour() {
         console.warn('Could not save tour completion to localStorage')
       }
     }
+
+    // Update in-memory store immediately (synchronous, before the Firestore await) so
+    // the WelcomeModal won't re-show within the same session without a reload.
+    if (authStore.user) {
+      authStore.user.tourCompleted = true
+    }
+
+    // Write to Firestore (source of truth) — best-effort, skip if no user
+    if (userId) {
+      try {
+        await updateDoc(doc(db, 'users', userId), { tourCompleted: true })
+      } catch {
+        // Swallow: localStorage + in-memory store already updated above
+      }
+    }
   }
 
   const skipTour = () => {
-    markTourCompleted()
+    void markTourCompleted()
   }
 
-  const resetTour = () => {
+  /**
+   * Resets the tour so it can be replayed. Clears all three layers to stay consistent
+   * with the Firestore source of truth: localStorage, in-memory store, and Firestore.
+   * Firestore write is best-effort (errors swallowed); callers fire-and-forget.
+   */
+  const resetTour = async (): Promise<void> => {
     const userId = authStore.user?.id
+
+    // Clear localStorage
     try {
       localStorage.removeItem(getTourKey(userId))
     } catch {
       // ignore
+    }
+
+    // Clear in-memory store flag (synchronous, before the Firestore await)
+    if (authStore.user) {
+      authStore.user.tourCompleted = false
+    }
+
+    // Clear Firestore source of truth — best-effort, skip if no user
+    if (userId) {
+      try {
+        await updateDoc(doc(db, 'users', userId), { tourCompleted: false })
+      } catch {
+        // Swallow: localStorage + in-memory store already cleared above
+      }
     }
   }
 
@@ -109,7 +174,7 @@ export function useTour() {
       doneBtnText: t('tour.nav.done'),
       progressText: '{{current}} / {{total}}',
       onDestroyed: () => {
-        markTourCompleted()
+        void markTourCompleted()
         if (mobile) {
           closeMobileMenu()
         }
@@ -237,6 +302,7 @@ export function useTour() {
 
   return {
     isTourCompleted,
+    markTourCompleted,
     startTour,
     skipTour,
     resetTour,

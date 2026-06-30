@@ -43,7 +43,7 @@ const closeHelpMenu = () => {
 const restartTour = async () => {
   closeHelpMenu()
   closeMobileMenu()
-  resetTour()
+  void resetTour()
   // Navigate to collection page first, then start tour
   if (route.path === '/collection') {
     void startTour()

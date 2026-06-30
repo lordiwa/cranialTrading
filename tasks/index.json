@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-28T14:51:01.677Z",
+  "generated_at": "2026-06-30T00:00:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -377,6 +377,18 @@
       "key": "TASK-083",
       "title": "Fix: notificación de match en cartas de trade muestra '?' en vez del nombre",
       "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-084",
+      "title": "Buscador de catálogo en la página de login (landing pública liviana para anónimos)",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-085",
+      "title": "\"Quién vende\" anónimo en el buscador de login: vendedores públicos + reglas Firestore",
+      "status": "todo",
       "priority": "medium"
     }
   ]

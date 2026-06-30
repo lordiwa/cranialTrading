@@ -1,0 +1,39 @@
+{
+  "key": "TASK-083",
+  "title": "Fix: notificación de match en cartas de trade muestra '?' en vez del nombre",
+  "description": "**Origen:** deep review HP4 (TASK-081). Bug claro e independiente del spec.\n\n## Problema\nEn el dropdown de notificaciones de match, para una carta con status **trade** (BUSCO), el texto sale como \"@sender tiene la carta **?** que buscas\": el nombre de la carta se pierde y la redacción está invertida (el sender está interesado en la carta del receiver, no ofreciendo una).\n\nCausa: en `parseSharedMatch` (`src/stores/matches.ts:243-251`), para el lado receiver de una carta trade, `otherCards = isSender ? [card] : []` queda vacío, y `getAlertDescription` rama BUSCO lee `otherCards?.[0]?.name ?? otherCard?.name ?? '?'` (`src/components/layout/MatchNotificationsDropdown.vue:69-76`) → renderiza \"?\". El nombre real vive en `myCards[0]`, que esa rama nunca mira. Para cartas en venta (VENDO) el texto es correcto.\n\n## Acceptance criteria\n- [ ] El dropdown muestra el nombre real de la carta también para cartas de trade.\n- [ ] La redacción de la notificación de trade es semánticamente correcta (refleja que el sender está interesado en la carta del receiver).\n- [ ] Test unitario que reproduce el caso trade (regresión) y verifica el texto.\n- [ ] Revisar i18n en es/en/pt para la cadena usada.\n\n## Archivos probables\n`src/components/layout/MatchNotificationsDropdown.vue`, `src/stores/matches.ts`, locales.",
+  "acceptance_criteria": [
+    "El dropdown de notificaciones muestra el nombre real de la carta para cartas de trade (no '?')",
+    "La redacción de la notificación de trade es semánticamente correcta",
+    "Test unitario de regresión para el caso trade verifica el texto",
+    "i18n revisado en es/en/pt"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "matches",
+    "bug",
+    "i18n",
+    "from-qa-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-06-28T14:32:49.309Z",
+      "body": "## Implementación + review completas (working tree, SIN commit)\n\n**Developer (TDD):** extrajo la lógica a un helper puro `src/utils/matchNotification.ts` (`getMatchAlertDescription`), el dropdown delega; +9 tests. Fix: una notificación de interés recibida (`isSharedMatch && !isSender`) lee SIEMPRE el nombre desde `myCards[0]` y usa `wantsYourCard`, sin importar venta/trade → corrige el \"?\" y la redacción invertida. Reusa keys i18n existentes (`wantsYourCard`/`hasCardYouWant`, verificadas en en/es/pt:1297-1298). `MatchCard.vue` NO tenía el bug (solo renderiza filas).\n\n**Reviewer (contexto fresco):** **BLOCK** por 1 HIGH — error de tipos: el helper tipaba `t` como `Record<string, unknown>` pero el `t` real es `Record<string, string | number>`; bajo `strictFunctionTypes` rompía `vue-tsc` (gate de CI). El developer corrió `npx vite build` (sin type-check) y se le pasó.\n\n**Fix HIGH aplicado (orchestrator):** cambiado el tipo del parámetro `t` a `Record<string, string | number>` en `matchNotification.ts:17`. Re-verificado: `npm run type-check` (vue-tsc) → **exit 0**; `npm run test:unit` → **1.159/1.159 verdes**. ACs 1-4 cumplidos.\n\n**Nota de commit (MEDIUM del reviewer):** el working tree contiene TAMBIÉN los cambios de TASK-082. Al commitear deben ir en DOS commits separados (no hay solape de archivos):\n- TASK-082: `types/user.ts`, `stores/auth.ts`, `composables/useTour.ts`, `components/layout/AppHeader.vue`, `views/SettingsView.vue`, `tests/unit/composables/useTour.test.ts`\n- TASK-083: `utils/matchNotification.ts`, `components/layout/MatchNotificationsDropdown.vue`, `tests/unit/utils/matchNotification.test.ts`\n\n**Pendiente (bloqueado en humano):** Rafael verifica en local + E2E → confirma \"funciona en local\" → recién entonces commit (split) + bump + push. Nada comiteado."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-06-28T14:51:01.677Z",
+      "body": "## E2E ejecutado (gate antes de push)\n\n`npm run e2e` (working tree 082+083): **123 passed, 8 skipped, 1 failed**. Único fallo = flake conocido en `auth/register.spec.ts` (rate-limit de Firebase en sendEmailVerification durante la suite completa); re-corrido en aislado → PASS. No relacionado con este diff (TASK-083 solo toca el helper de notificaciones + dropdown). Las specs de user-profile (zona relacionada) pasaron todas. Gate efectivamente verde; falta verificación funcional local + OK de Rafael para commit."
+    }
+  ],
+  "created_at": "2026-06-28T04:08:55.830Z",
+  "updated_at": "2026-06-30T00:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,0 +1,39 @@
+{
+  "key": "TASK-080",
+  "title": "QA Happy Path 3: Loop de registro (conversión de anónimo a cliente)",
+  "description": "**Migrado de Jira:** SCRUM-77 (tipo: Impovement user personal space, estado original: Q/A; asignado a: Mato)\n\nQA manual del loop de registro que intercepta acciones críticas de usuarios anónimos. Probar en cranial-trading-dev.web.app.\n\n### TC-05: Intercepción de Acción Crítica a Usuario Anónimo\n**Precondiciones:** usuario NO logueado; accede vía enlace compartido a un binder público de otro usuario (`/binder/usuario-test`).\n**Pasos:**\n1. Visualizar las cartas del binder público y seleccionar una o varias.\n2. Clic en el botón de acción principal \"Deseo\".\n**Esperado:** el sistema intercepta la acción antes de procesar cualquier transacción y despliega un modal bloqueante indicando que es obligatorio estar registrado para realizar transacciones.\n\n### TC-06: Persistencia y Sincronización de Selección Post-Registro\n**Precondiciones:** usuario retenido en el modal de registro obligatorio del TC-05 tras seleccionar cartas de forma anónima.\n**Pasos:**\n1. Completar el registro rápido directamente desde el modal interceptor.\n2. Clic en confirmar registro.\n**Esperado:** el usuario se registra e inicia sesión automáticamente (y la selección hecha como anónimo se mantiene/sincroniza).",
+  "acceptance_criteria": [
+    "TC-05: acción 'Deseo' sobre binder público siendo anónimo se intercepta ANTES de procesar la transacción",
+    "TC-05: aparece un modal bloqueante indicando que el registro es obligatorio para transacciones",
+    "TC-06: completar el registro desde el modal interceptor inicia sesión automáticamente",
+    "TC-06: la selección de cartas hecha como anónimo persiste/sincroniza tras el registro"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "qa-manual",
+    "jira-import",
+    "happy-path",
+    "auth"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "deep-review",
+      "at": "2026-06-28T04:04:56.959Z",
+      "body": "## Deep review (código, read-only) — HP3 Loop de registro anónimo\n\n**Veredicto general: ❌ FAIL (la app implementa lo OPUESTO al spec, a propósito).**\n\nContexto: no existe ruta `/binder/:username`; el binder público compartido = perfil público `/@:username` → `UserProfileView.vue` (sin `requiresAuth`, `router/index.ts:103-108`). Para anónimos entra en \"cart mode\" (`showCartMode = !authStore.user`, `:63`). **No existe botón \"Deseo\"** (Grep confirmado); el anónimo ve \"AGREGAR\" (`CollectionGridCardFull.vue:577`).\n\n- **TC-05 intercepción: FAIL.** `handleAddToCart` (`UserProfileView.vue:442-457`) llama `cartStore.addItem` y muestra toast, SIN guard previo. La \"transacción\" (añadir selección) se completa antes de que algo pudiera interceptar.\n- **TC-05 modal bloqueante de registro obligatorio: FAIL.** No existe tal modal (Grep). Al contrario, el anónimo puede enviar un buy-request real solo con nombre/teléfono/email (`ExchangeCartDrawer.vue:150-177`). Registrarse es UNA CTA opcional, no obligatoria.\n- **TC-06 auto-login desde modal: FAIL (como spec).** \"REGISTRARSE\" hace full-page nav a `/register?returnUrl=/@user` (`UserProfileView.vue:490-493`); no hay registro embebido. Luego muro de verificación de email (`RegisterView.vue:53-61`).\n- **TC-06 persistencia de selección: PARTIAL (sí funciona).** El carrito vive en `localStorage` (`exchangeCart.ts`, key `cranial_exchange_carts`, TTL 7d) y sobrevive el round-trip; post-login se convierte vía `convertCartToMatches` (`UserProfileView.vue:156-159,495-527`) — pero con un confirm de por medio y atado al navegador (keyed por username).\n\n**Decisión de producto (grande):** ¿implementar el interceptor de registro obligatorio del test, o mantener el flujo actual de carrito/buy-request anónimo y reescribir el test?"
+    },
+    {
+      "author": "resolution",
+      "at": "2026-06-28T04:09:17.304Z",
+      "body": "## Resolución (Rafael, 2026-06-27)\n\n- **La app actual es correcta**: se permite a propósito que el usuario anónimo transaccione (carrito + buy-request), priorizando conversión. NO se implementa el interceptor de \"registro obligatorio\" del test.\n- → **Acción: reescribir HP3 completo** contra el comportamiento real:\n  - No existe botón \"Deseo\" → es \"AGREGAR\" (anónimo) / \"ME INTERESA\" (logueado).\n  - No hay modal bloqueante de registro obligatorio; el anónimo puede enviar buy-request solo con nombre/teléfono/email.\n  - Registrarse es una CTA opcional desde el cart drawer.\n  - Lo que SÍ se valida: la selección anónima persiste (carrito en localStorage) y se convierte a matches post-login vía `convertCartToMatches`.\n- **Cero código nuevo.** Esta QA task queda como \"reescribir test cases\"."
+    }
+  ],
+  "created_at": "2026-06-28T03:28:57.295Z",
+  "updated_at": "2026-06-28T04:09:17.304Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

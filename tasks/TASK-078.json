@@ -1,0 +1,38 @@
+{
+  "key": "TASK-078",
+  "title": "QA Happy Path 1: Onboarding (registro + tour guiado)",
+  "description": "**Migrado de Jira:** SCRUM-75 (tipo: Impovement user personal space, estado original: Q/A; asignado a: Mato)\n\nQA manual del flujo de onboarding de un usuario nuevo. Probar en cranial-trading-dev.web.app.\n\n### TC-01: Registro Exitoso e Inicio de Tour Guiado\n**Precondiciones:** navegador sin sesiones ni tokens; usuario en la Landing Page.\n**Pasos:**\n1. Clic en \"Registrarse\".\n2. Completar campos obligatorios (Email, Nombre de usuario, Contraseña válida).\n3. Clic en \"Crear Cuenta\".\n**Esperado:** HTTP 201 y token de sesión guardado de forma segura. Redirige automáticamente a `/my-page`. Aparece un modal/overlay \"Iniciar Tour\" bloqueando temporalmente la interfaz.\n\n### TC-02: Saltar Alerta de Tour Guiado\n**Precondiciones:** registro completado, modal \"Iniciar Tour\" activo en `/my-page`.\n**Pasos:**\n1. Clic en \"Saltar\" o en la \"X\" del modal.\n**Esperado:** el modal desaparece de inmediato; el dashboard pasa a ser interactivo. Tras recargar (F5), el modal NO vuelve a aparecer (el flag de usuario nuevo cambió de estado).",
+  "acceptance_criteria": [
+    "TC-01: Registro con datos válidos responde 201, guarda token y redirige a /my-page con modal 'Iniciar Tour' bloqueante visible",
+    "TC-02: 'Saltar'/'X' cierra el modal de forma fluida y el dashboard queda interactivo",
+    "TC-02: tras recargar (F5) el modal de tour NO reaparece (flag de usuario nuevo persistido)"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "qa-manual",
+    "jira-import",
+    "happy-path",
+    "onboarding"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "deep-review",
+      "at": "2026-06-28T04:04:56.707Z",
+      "body": "## Deep review (código, read-only) — HP1 Onboarding\n\nAclaración: `/my-page` = la landing actual `/saved-matches` (error de nombre en el test, NO divergencia de ruta).\n\n**TC-01 — Registro + tour: ❌ FAIL.** Tras \"Crear Cuenta\" el usuario NO llega a la landing: queda parado en la pantalla \"Verifica tu email\" (`RegisterView.vue:44-46` solo hace `registered=true`; la navegación a la app ocurre solo en `handleCheckVerification` tras verificar, `:53-61`). Por tanto el modal \"Iniciar Tour\" no aparece \"inmediatamente\". Además el `WelcomeModal` solo se monta dentro de `AppContainer.vue:18` y `RegisterView` no usa ese contenedor → ni está en el DOM tras registrarse. Secundario: el form pide un 4º campo obligatorio **Location** que el test no menciona (`RegisterView.vue:33,155`). El \"backend 201\" en realidad es Firebase Auth `createUserWithEmailAndPassword` (`auth.ts:130`).\n\n**TC-02 — Saltar tour: ⚠️ PARTIAL.** \"Saltar\" funciona y tras F5 no reaparece EN EL MISMO NAVEGADOR (`WelcomeModal.vue:35-42` → `markTourCompleted` → `localStorage['cranial_tour_completed_<uid>']`, `useTour.ts:40-53`). Pero el flag vive SOLO en localStorage, no en Firestore → reaparece en otro dispositivo/incógnito/storage borrado. No existe botón \"X\", solo el link \"Saltar\".\n\n**Decisiones de producto pendientes:** (1) ¿flag de onboarding server-side (Firestore) en vez de localStorage? (2) ¿el tour va antes o después de la verificación de email?"
+    },
+    {
+      "author": "resolution",
+      "at": "2026-06-28T04:09:07.904Z",
+      "body": "## Resolución (Rafael, 2026-06-27)\n\n- **`/my-page` = la landing `/saved-matches`** — error de nombre en el test, NO bug.\n- **TC-01 (tour vs email): el flujo actual es correcto.** El tour arranca DESPUÉS de verificar el email. → **Acción: reescribir TC-01** para incluir el paso de verificación de email antes del tour (no exigir \"modal inmediatamente tras Crear Cuenta\"). Mencionar también el 4º campo obligatorio Location.\n- **TC-02 (flag de tour): se mueve a Firestore.** → cubierto por **TASK-082** (persistir flag de onboarding server-side). Tras esa tarea, \"no reaparece\" se cumplirá también cross-device.\n\nSin trabajo de código en esta QA task más allá de TASK-082; pendiente solo reescribir el wording de TC-01."
+    }
+  ],
+  "created_at": "2026-06-28T03:28:54.266Z",
+  "updated_at": "2026-06-28T04:09:07.904Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

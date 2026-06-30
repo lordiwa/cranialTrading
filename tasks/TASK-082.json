@@ -1,0 +1,42 @@
+{
+  "key": "TASK-082",
+  "title": "Persistir flag de onboarding/tour en Firestore (no localStorage)",
+  "description": "**Origen:** deep review de los happy paths QA (TASK-078 HP1-TC02 + TASK-079 HP2 bug del tour). Decisión de Rafael 2026-06-27: el flag debe vivir **server-side en Firestore**, no en localStorage.\n\n## Problema\nHoy el flag de \"tour completado\" vive solo en `localStorage` (`src/composables/useTour.ts:31-53`, key `cranial_tour_completed_<uid>`). El `WelcomeModal` se gatea con `isTourCompleted()` (`src/components/.../WelcomeModal.vue:18-22`), que lee solo localStorage. Consecuencias:\n- HP1-TC02: el flag \"no persiste en DB\" → reaparece en otro dispositivo / incógnito / storage borrado.\n- HP2: un **usuario existente** que entra en un navegador limpio (escenario típico de QA en máquina nueva) ve \"Iniciar Tour\" → viola \"sin alertas de onboarding\".\n\n## Objetivo\nMover el estado de onboarding al doc `/users/{uid}` (p. ej. `tourCompleted: boolean` u `onboardedAt`), de modo que viaje con la cuenta. Mantener localStorage como caché opcional, pero la fuente de verdad es Firestore.\n\n## Acceptance criteria\n- [ ] El doc `/users/{uid}` guarda un flag de onboarding (`tourCompleted`/`onboardedAt`); se escribe al saltar Y al completar el tour.\n- [ ] `WelcomeModal` se muestra solo si el flag de Firestore (no localStorage) indica que el tour NO está completo.\n- [ ] Un usuario existente que ya completó/saltó el tour NO ve el modal al loguearse en un navegador limpio (regresión de HP2 cubierta).\n- [ ] Regla Firestore permite al propio usuario leer/escribir su flag (CI no despliega reglas — desplegar a mano en dev: ver memoria CI rules).\n- [ ] Migración/compat: usuarios con flag solo en localStorage no re-disparan el tour (backfill o lectura tolerante).\n- [ ] Tests unitarios de la lógica de `useTour`/auth store; build pasa (`npx vite build`).\n\n## Archivos probables\n`src/composables/useTour.ts`, `src/stores/auth.ts`, `WelcomeModal.vue`, reglas Firestore.",
+  "acceptance_criteria": [
+    "El doc /users/{uid} persiste un flag de onboarding (tourCompleted/onboardedAt), escrito al saltar y al completar el tour",
+    "WelcomeModal se gatea por el flag de Firestore, no por localStorage",
+    "Usuario existente que ya completó/saltó el tour NO ve el modal en un navegador limpio (regresión HP2)",
+    "Regla Firestore permite al propio usuario leer/escribir su flag (desplegar reglas a mano en dev)",
+    "Usuarios con flag solo en localStorage no re-disparan el tour (lectura tolerante / backfill)",
+    "Tests unitarios de useTour/auth pasan y npx vite build pasa"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "onboarding",
+    "auth",
+    "firestore",
+    "bug",
+    "from-qa-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-06-28T14:17:33.489Z",
+      "body": "## Implementación + review completas (working tree, SIN commit)\n\n**Developer (TDD):** flag de onboarding movido a Firestore como fuente de verdad, localStorage como fallback tolerante + backfill.\nArchivos: `src/types/user.ts` (campo `tourCompleted`), `src/stores/auth.ts` (`loadUserData` mapea el flag), `src/composables/useTour.ts` (lógica), `tests/unit/composables/useTour.test.ts`. `WelcomeModal.vue` sin cambios (gate síncrono, Regla 8 OK). Sin cambio de reglas Firestore (la regla owner ya cubre el `updateDoc`, `firestore.rules:10`).\n\n**Reviewer (contexto fresco):** APPROVE-WITH-NITS — 0 HIGH, 0 MEDIUM. 6 ACs confirmados. Verificó él mismo test:unit + build + type-check. 2 nits LOW: (1) `resetTour` solo limpiaba localStorage; (2) backfill benigno en E2E.\n\n**Fix de nit LOW aplicado (orchestrator):** `resetTour` ahora limpia los 3 niveles (Firestore + memoria + localStorage), async; callers en `AppHeader.vue` y `SettingsView.vue` pasados a `void resetTour()`; +6 tests de regresión.\n\n**Verificación final:** `npm run test:unit` → 1.150/1.150 verdes; `npx vite build` → limpio; `npm run type-check` → sin errores.\n\n**Pendiente (bloqueado en humano):** Rafael verifica en local + corre E2E → confirma \"funciona en local\" → recién entonces commit + bump de versión (recomendado patch 1.35.0→1.35.1) + push a develop. Nada comiteado aún."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-06-28T14:50:58.783Z",
+      "body": "## E2E ejecutado (gate antes de push)\n\n`npm run e2e` sobre el working tree (082+083): **123 passed, 8 skipped, 1 failed**. El único fallo fue `auth/register.spec.ts › successful registration shows email verification screen`. DOM snapshot (error-context.md): tras submit la página seguía en el form de registro → `register()` devolvió false. **No lo causa este diff** (el path de registro no se tocó; el único cambio en auth.ts es el mapeo de `tourCompleted` en loadUserData, con su propio try/catch). Re-corrido en aislado → **PASS (6.7s)**. Flake ambiental: rate-limit de Firebase en `sendEmailVerification` durante la corrida completa (muchas cuentas creadas en 11.5 min).\n\nGates verdes: unit 1.159/1.159, vue-tsc exit 0, build limpio, E2E (sin el flake) verde. Sigue bloqueado en verificación funcional local de Rafael + OK para commit."
+    }
+  ],
+  "created_at": "2026-06-28T04:08:46.061Z",
+  "updated_at": "2026-06-30T00:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

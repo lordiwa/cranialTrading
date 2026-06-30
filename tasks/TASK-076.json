@@ -13,7 +13,7 @@
     "Tests unit primero (RED) para debounce, stale-response guard y rutas de navegación; npm run test:unit en verde; npx vite build pasa",
     "Sin commits: cambios en working tree para verificación local"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "high",
   "labels": [
     "search",
@@ -28,6 +28,6 @@
   "linked_prs": [],
   "comments": [],
   "created_at": "2026-06-12T16:13:03.137Z",
-  "updated_at": "2026-06-12T16:44:55.072Z",
+  "updated_at": "2026-06-12T23:32:28.572Z",
   "jira_key": null
 }

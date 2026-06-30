@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T16:48:26.831Z",
+  "generated_at": "2026-06-28T14:51:01.677Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -328,19 +328,55 @@
     {
       "key": "TASK-075",
       "title": "Search revamp B: /search como página de resultados central con 3 fuentes (Scryfall + colección + usuarios)",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-076",
       "title": "Search revamp A: header con autocomplete ligero de nombres que navega a /search",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-077",
       "title": "Search revamp C: chore — eliminar componentes de búsqueda muertos",
-      "status": "in_review",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-078",
+      "title": "QA Happy Path 1: Onboarding (registro + tour guiado)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-079",
+      "title": "QA Happy Path 2: Login de usuario existente y redirección",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-080",
+      "title": "QA Happy Path 3: Loop de registro (conversión de anónimo a cliente)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-081",
+      "title": "QA Happy Path 4: Notificación de match (\"Me interesa\")",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-082",
+      "title": "Persistir flag de onboarding/tour en Firestore (no localStorage)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-083",
+      "title": "Fix: notificación de match en cartas de trade muestra '?' en vez del nombre",
+      "status": "done",
       "priority": "medium"
     }
   ]

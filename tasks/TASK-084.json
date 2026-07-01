@@ -11,7 +11,7 @@
     "Tests unitarios de la lógica pura nueva escritos en RED primero",
     "i18n de cadenas nuevas en en/es/pt verificado"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "labels": [
     "search",
@@ -25,9 +25,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-06-30T00:00:00.000Z",
+      "body": "## Implementación + review completas (working tree, SIN commit)\n\n**Developer (TDD):** funciones puras en `src/utils/loginCardSearch.ts` (`applyPricedFirstFilter` regla estricta priced-first de CLAUDE.md + `toMinimalResult` con fallback de split-cards y precio inválido->null), 10 tests RED->GREEN. Componente nuevo `src/components/search/LoginCardSearch.vue` (input + grilla mínima de catálogo, img lazy, 0 svg/use por card -> regla Mali OK) embebido en el hero de `LoginView.vue` (no toca el form de login ni el guard). Reusa `useSearchStore.search({name})` (Scryfall, sin auth, sin search-on-mount). Acciones profundas gateadas: toast + router.push(/register). i18n: 3 keys nuevas `landing.catalogSearch.{title,prompt,gateMessage}` en en/es/pt + reuso de `search.filterPanel.*` y `common.actions.searching` (verificados en los 3 locales).\n\n**Catch del developer (Rule 5):** evitó un 2o `type=submit` que habría roto `login.spec.ts` (selector sin .first()); el botón de búsqueda es `type=button` y Enter submitea por el form implícito.\n\n**Reviewer (contexto fresco): APPROVE-WITH-NITS.** 0 HIGH, 0 MEDIUM. Todos los ACs cumplidos; sin fuga de auth en el camino anónimo; sin colisión de selectores Playwright. Nits LOW solo cosméticos.\n\n**Nit aplicado (orchestrator):** precio mostraba $3.2 -> ahora `toFixed(2)` = $3.20 (LoginCardSearch.vue:85). Resto de nits (N/A hardcodeado, empty-state inline, returnUrl) NO aplicados: consistentes con el código existente u opcionales (Rule 2).\n\n**Gates verdes (post-fix):** unit 1169/1169 (10 nuevos), vue-tsc exit 0, `npx vite build` OK, eslint limpio en archivos tocados. **E2E** `login.spec.ts`+`i18n.spec.ts` (proyecto no-auth-tests) = 9 passed, 0 failed.\n\n**Pendiente (bloqueado en humano):** Rafael verifica en local (`npm run dev` -> /login sin sesión -> buscar carta -> ver grilla, y confirmar que el login sigue ok). Al confirmar \"funciona en local\": commit + push a develop. NADA comiteado."
+    }
+  ],
   "created_at": "2026-06-30T00:00:00.000Z",
-  "updated_at": "2026-06-30T00:00:00.000Z",
+  "updated_at": "2026-07-01T00:00:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

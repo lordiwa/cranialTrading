@@ -382,7 +382,7 @@
     {
       "key": "TASK-084",
       "title": "Buscador de catálogo en la página de login (landing pública liviana para anónimos)",
-      "status": "todo",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -390,6 +390,12 @@
       "title": "\"Quién vende\" anónimo en el buscador de login: vendedores públicos + reglas Firestore",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-086",
+      "title": "Landing/login redesign search-first estilo marketplace (reemplaza LoginView de 2 columnas)",
+      "status": "done",
+      "priority": "high"
     }
   ]
 }

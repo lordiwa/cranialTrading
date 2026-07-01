@@ -33,6 +33,11 @@ setup('authenticate', async ({ page }) => {
   await page.goto('/login')
   await page.waitForLoadState('domcontentloaded')
 
+  // TASK-086: the login form lives behind the "Iniciar sesión" header
+  // dropdown/sheet trigger instead of being visible by default. No
+  // .first(): only one layout subtree (and one trigger) is ever mounted.
+  await page.locator('[data-testid="login-trigger"]').click()
+
   // Fill and submit login form
   await page.locator('input[type="email"]').fill(email)
   await page.locator('input[type="password"]').fill(password)

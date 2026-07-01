@@ -1,32 +1,30 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, nextTick, ref } from 'vue';
 import { useSeoMeta } from '@unhead/vue';
-import { useAuthStore } from '../stores/auth';
-import { useToastStore } from '../stores/toast';
 import { type SupportedLocale, useI18n } from '../composables/useI18n';
 import { useScrollReveal } from '../composables/useScrollReveal';
-import BaseInput from '../components/ui/BaseInput.vue';
+import { useSearchStore } from '../stores/search';
+import { applyPricedFirstFilter, isSearchActive, type MinimalCardResult, toMinimalResult } from '../utils/loginCardSearch';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SvgIcon from '../components/ui/SvgIcon.vue';
+import LandingHeader from '../components/landing/LandingHeader.vue';
+import LandingResults from '../components/landing/LandingResults.vue';
+import RegisterPromptModal from '../components/landing/RegisterPromptModal.vue';
 
-const route = useRoute();
-const router = useRouter();
-const authStore = useAuthStore();
-const toastStore = useToastStore();
+// Marketplace, search-first landing (TASK-086) — full structural
+// replacement of the old two-column LoginView. Header owns the search bar
+// + login dropdown; this view owns the idle (hero/marketing) vs active
+// (results grid) body toggle plus the registration-prompt gate.
+
 const { t, locale, setLocale } = useI18n();
 
-// Language options
 const languages = [
   { code: 'es' as SupportedLocale, label: 'ES', name: 'Español' },
   { code: 'en' as SupportedLocale, label: 'EN', name: 'English' },
   { code: 'pt' as SupportedLocale, label: 'PT', name: 'Português' },
 ];
 
-const email = ref('');
-const password = ref('');
-const loading = ref(false);
-const googleLoading = ref(false);
+const searchStore = useSearchStore();
 
 useScrollReveal();
 
@@ -39,36 +37,69 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
 });
 
-const handleLogin = async () => {
-  if (!email.value || !password.value) return;
+// --- Search state (idle <-> active body toggle) ---
+const query = ref('');
+const active = computed(() => isSearchActive(query.value));
+const results = computed<MinimalCardResult[]>(() =>
+  applyPricedFirstFilter(searchStore.results).map(toMinimalResult)
+);
 
-  loading.value = true;
-  try {
-    const success = await authStore.login(email.value, password.value);
+// Review fix (MEDIUM-1): tracks the query a search actually completed for,
+// so LandingResults can tell "still typing, never searched" apart from
+// "searched this exact text and got zero results" — see
+// shouldShowNoResults in utils/loginCardSearch.ts.
+const lastSearchedQuery = ref('');
 
-    if (success) {
-      await router.push(route.query.returnUrl as string || '/dashboard');
-      return;
-    }
+const headerRef = ref<{ focusSearch: () => void; openLogin: () => void } | null>(null);
+const howItWorksRef = ref<HTMLElement | null>(null);
+const footerRef = ref<HTMLElement | null>(null);
 
-    toastStore.show(t('auth.messages.invalidCredentials'), 'error');
-  } catch {
-    toastStore.show(t('auth.messages.invalidCredentials'), 'error');
-  } finally {
-    loading.value = false;
-  }
+const runSearch = async () => {
+  if (!isSearchActive(query.value)) return;
+  lastSearchedQuery.value = query.value;
+  await searchStore.search({ name: query.value });
 };
 
-const handleGoogleLogin = async () => {
-  googleLoading.value = true;
-  try {
-    const success = await authStore.loginWithGoogle();
-    if (success) {
-      await router.push(route.query.returnUrl as string || '/dashboard');
-    }
-  } finally {
-    googleLoading.value = false;
-  }
+const handleChipClick = (term: string) => {
+  query.value = term;
+  void runSearch();
+};
+
+const focusHeaderSearch = () => {
+  headerRef.value?.focusSearch();
+};
+
+const scrollToHowItWorks = async () => {
+  if (active.value) query.value = '';
+  await nextTick();
+  howItWorksRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// COMUNIDAD has no dedicated page yet — the lightest option is to scroll
+// to the footer (platform/help/legal links) rather than add a new route.
+const scrollToCommunity = async () => {
+  if (active.value) query.value = '';
+  await nextTick();
+  footerRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const popularSearches = ['Black Lotus', 'Lightning Bolt', 'Sol Ring', 'Counterspell', 'Brainstorm'];
+
+// --- Registration-prompt gate ---
+const regCard = ref<MinimalCardResult | null>(null);
+const showRegModal = computed(() => regCard.value !== null);
+
+const handleWant = (card: MinimalCardResult) => {
+  regCard.value = card;
+};
+
+const closeRegModal = () => {
+  regCard.value = null;
+};
+
+const openLoginFromModal = () => {
+  closeRegModal();
+  headerRef.value?.openLogin();
 };
 
 const features = computed(() => [
@@ -101,159 +132,74 @@ const comparisonRows = computed(() => [
 
 <template>
   <div class="min-h-screen flex flex-col">
-    <!-- Main Content -->
-    <main id="main-content" class="flex-1 flex flex-col lg:flex-row">
-      <!-- Right Column: Login Form (appears first on mobile, sticky on desktop) -->
-      <div class="w-full lg:w-[400px] xl:w-[440px] flex-shrink-0 order-first lg:order-last lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto border-b lg:border-b-0 lg:border-l border-silver-20 bg-primary">
-        <div class="flex items-center justify-center px-6 py-8 lg:py-12 lg:px-8 lg:min-h-screen">
-          <div class="w-full max-w-sm">
-            <!-- Logo on mobile only -->
-            <div class="lg:hidden flex items-center justify-center gap-3 mb-6">
-              <svg class="w-12 h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
-                <use href="/icons.svg#cranial-logo" />
-              </svg>
-              <span class="text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
-            </div>
+    <LandingHeader
+        ref="headerRef"
+        v-model:query="query"
+        :searching="searchStore.loading"
+        @search="runSearch"
+        @how-it-works="scrollToHowItWorks"
+        @community="scrollToCommunity"
+    />
 
-            <!-- CTA box above login form -->
-            <div class="mb-6 p-4 bg-neon-10 border border-neon-30 rounded-lg text-center">
-              <p class="text-small font-bold text-neon mb-2">{{ t('landing.description') }}</p>
-              <RouterLink to="/register">
-                <BaseButton class="w-full">{{ t('landing.hero.cta') }}</BaseButton>
-              </RouterLink>
-            </div>
-
-            <!-- Separator -->
-            <p class="text-center text-tiny text-silver-50 mb-4">{{ t('landing.login.alreadyHaveAccount') }}</p>
-
-            <div class="bg-primary/95 border border-silver-30 p-6 lg:p-8 rounded-lg">
-              <h2 class="text-h3 lg:text-h2 font-bold text-silver mb-6">{{ t('auth.login.title') }}</h2>
-
-              <form @submit.prevent="handleLogin" class="space-y-md">
-                <BaseInput
-                    v-model="email"
-                    type="email"
-                    :placeholder="t('common.labels.email')"
-                />
-
-                <BaseInput
-                    v-model="password"
-                    type="password"
-                    :placeholder="t('common.labels.password')"
-                />
-
-                <BaseButton
-                    type="submit"
-                    class="w-full"
-                    :disabled="loading || !email || !password"
-                >
-                  {{ loading ? t('auth.login.submitting') : t('auth.login.submit') }}
-                </BaseButton>
-              </form>
-
-              <!-- Divider -->
-              <div class="flex items-center gap-4 my-6">
-                <div class="flex-1 h-px bg-silver-30"></div>
-                <span class="text-tiny text-silver-50">{{ t('auth.login.orContinueWith') }}</span>
-                <div class="flex-1 h-px bg-silver-30"></div>
-              </div>
-
-              <!-- Google Login Button -->
-              <button
-                  @click="handleGoogleLogin"
-                  :disabled="googleLoading"
-                  class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-              >
-                <svg class="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                {{ googleLoading ? '...' : t('auth.login.googleButton') }}
-              </button>
-
-              <div class="mt-6 space-y-sm text-center">
-                <RouterLink
-                    to="/forgot-password"
-                    class="block text-small text-silver-70 hover:text-neon transition-fast"
-                >
-                  {{ t('auth.login.forgotPassword') }}
-                </RouterLink>
-                <div class="text-silver-50 text-tiny">o</div>
-                <RouterLink
-                    to="/register"
-                    class="block text-small text-silver hover:text-neon transition-fast"
-                >
-                  {{ t('auth.login.noAccount') }} {{ t('auth.login.register') }}
-                </RouterLink>
-              </div>
-            </div>
-
-            <!-- Trust badge -->
-            <div class="mt-4 flex items-center justify-center text-tiny text-silver-50">
-              <span class="flex items-center gap-1"><SvgIcon name="lock" size="tiny" /> {{ t('auth.login.secureConnection') }}</span>
-            </div>
-          </div>
-        </div>
+    <main id="main-content" class="flex-1">
+      <!-- Active: search results -->
+      <div v-show="active">
+        <LandingResults
+            :query="query"
+            :loading="searchStore.loading"
+            :results="results"
+            :last-searched-query="lastSearchedQuery"
+            @want="handleWant"
+        />
       </div>
 
-      <!-- Left Column: Content (scrollable) -->
-      <div class="flex-1 px-6 py-12 lg:px-12 xl:px-16 overflow-y-auto">
-<!-- Section 1: Hero -->
-        <div class="mb-16 relative">
-          <!-- Floating card images -->
-          <div class="hidden xl:block absolute right-0 top-0 w-20 2xl:w-28 h-full pointer-events-none overflow-hidden" aria-hidden="true">
-            <img
-              src="https://cards.scryfall.io/art_crop/front/e/0/e01b2a09-d4e1-43f4-9015-4b06bfc0f712.jpg?1547517482"
-              alt=""
-              class="floating-card absolute w-10 2xl:w-14 rounded shadow-lg opacity-50"
-              style="top: 10%; right: 5%; animation-delay: 0s;"
-            />
-            <img
-              src="https://cards.scryfall.io/art_crop/front/d/7/d7749331-3eb8-4f42-aee6-a29e22d4ee82.jpg?1673147665"
-              alt=""
-              class="floating-card absolute w-8 2xl:w-12 rounded shadow-lg opacity-35"
-              style="top: 45%; right: 20%; animation-delay: 1.5s;"
-            />
-            <img
-              src="https://cards.scryfall.io/art_crop/front/0/c/0c3e1e43-b07a-4955-8be5-d340b3044a8e.jpg?1673146614"
-              alt=""
-              class="floating-card absolute w-8 2xl:w-12 rounded shadow-lg opacity-40"
-              style="top: 75%; right: 0%; animation-delay: 3s;"
-            />
-          </div>
+      <!-- Idle: hero + marketing -->
+      <div v-show="!active">
+        <!-- Hero -->
+        <section class="max-w-[1280px] mx-auto px-6 py-12 lg:py-16 text-center">
+          <span class="inline-block px-3 py-1 mb-4 text-tiny font-bold text-neon border border-neon-40 rounded-full">
+            {{ t('landing.marketplace.hero.badge') }}
+          </span>
 
-          <div class="flex items-center gap-4 mb-6">
-            <svg class="w-16 h-16 lg:w-20 lg:h-20 text-neon" viewBox="0 0 100 100" fill="currentColor">
-              <use href="/icons.svg#cranial-logo" />
-            </svg>
-            <div>
-              <h1 class="text-h2 lg:text-h1 font-bold text-neon tracking-wider font-brother">CRANIAL TRADING</h1>
-              <p class="text-small text-silver-70">{{ t('auth.login.subtitle') }}</p>
-            </div>
-          </div>
+          <h1 class="text-h1 lg:text-h1 font-bold text-silver leading-tight mb-4">
+            From Trash<br/>
+            <span class="text-neon">to Treasures</span>
+          </h1>
 
-          <div class="space-y-4">
-            <h2 class="text-h2 lg:text-h1 font-bold text-silver leading-tight">
-              From Trash<br/>
-              <span class="text-neon">to Treasures</span>
-            </h2>
-            <p class="text-body text-silver-70 max-w-lg">
-              {{ t('landing.subtitle') }}
-            </p>
-            <RouterLink to="/register" class="inline-block mt-2">
-              <BaseButton>{{ t('landing.hero.cta') }}</BaseButton>
+          <p class="text-body text-silver-70 max-w-xl mx-auto mb-8">
+            {{ t('landing.subtitle') }}
+          </p>
+
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
+            <BaseButton variant="filled" @click="focusHeaderSearch">
+              {{ t('landing.marketplace.hero.ctaSearch') }}
+            </BaseButton>
+            <RouterLink to="/register">
+              <BaseButton variant="secondary">{{ t('landing.hero.cta') }}</BaseButton>
             </RouterLink>
           </div>
-        </div>
 
-        <!-- Section 2: How It Works -->
-        <section class="scroll-reveal mb-16">
-          <h2 class="text-h3 font-bold text-silver mb-8">{{ t('landing.howItWorks.title') }}</h2>
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-tiny text-silver-50">{{ t('landing.marketplace.hero.popularLabel') }}</p>
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <button
+                  v-for="term in popularSearches"
+                  :key="term"
+                  type="button"
+                  class="px-3 py-1 text-tiny text-silver-70 border border-silver-20 rounded-full hover:border-neon hover:text-neon transition-fast"
+                  @click="handleChipClick(term)"
+              >
+                {{ term }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- How It Works -->
+        <section ref="howItWorksRef" class="scroll-reveal max-w-[1280px] mx-auto px-6 py-12">
+          <h2 class="text-h3 font-bold text-silver mb-8 text-center">{{ t('landing.howItWorks.title') }}</h2>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Step 1 -->
-            <div class="text-center md:text-left">
+            <div class="text-center">
               <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
                 <SvgIcon name="plus" size="large" class="text-neon" />
               </div>
@@ -261,8 +207,7 @@ const comparisonRows = computed(() => [
               <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step1.desc') }}</p>
             </div>
 
-            <!-- Step 2 -->
-            <div class="text-center md:text-left">
+            <div class="text-center">
               <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
                 <SvgIcon name="search" size="large" class="text-neon" />
               </div>
@@ -270,8 +215,7 @@ const comparisonRows = computed(() => [
               <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step2.desc') }}</p>
             </div>
 
-            <!-- Step 3 -->
-            <div class="text-center md:text-left">
+            <div class="text-center">
               <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
                 <SvgIcon name="chat" size="large" class="text-neon" />
               </div>
@@ -281,15 +225,15 @@ const comparisonRows = computed(() => [
           </div>
         </section>
 
-        <!-- Section 4: Feature Deep-Dive -->
-        <section class="scroll-reveal mb-16">
+        <!-- Feature Deep-Dive -->
+        <section class="scroll-reveal max-w-[1280px] mx-auto px-6 py-12">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div
                 v-for="feature in features"
                 :key="feature.title"
-                class="bg-primary/90 border border-silver-20 p-5 hover:border-neon-30 transition-all rounded-md group"
+                class="bg-primary/90 border border-silver-20 p-5 hover:border-neon-40 transition-all rounded-md group"
             >
-              <div class="mb-3 w-10 h-10 bg-neon-10 rounded-full flex items-center justify-center group-hover:bg-neon-20 transition-colors">
+              <div class="mb-3 w-10 h-10 bg-neon-10 rounded-full flex items-center justify-center group-hover:bg-neon-15 transition-colors">
                 <SvgIcon :name="feature.icon" size="small" class="text-neon" />
               </div>
               <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
@@ -298,10 +242,10 @@ const comparisonRows = computed(() => [
           </div>
         </section>
 
-        <!-- Section 5: Why Cranial Trading + Final CTA -->
-        <section class="scroll-reveal mb-16">
-          <h2 class="text-h3 font-bold text-silver mb-6">{{ t('landing.comparison.title') }}</h2>
-          <ul class="space-y-4">
+        <!-- Why Cranial Trading + footer-strip CTA -->
+        <section class="scroll-reveal max-w-[1280px] mx-auto px-6 py-12">
+          <h2 class="text-h3 font-bold text-silver mb-6 text-center">{{ t('landing.comparison.title') }}</h2>
+          <ul class="space-y-4 max-w-2xl mx-auto">
             <li
               v-for="row in comparisonRows"
               :key="row"
@@ -316,7 +260,7 @@ const comparisonRows = computed(() => [
           </ul>
           <div class="mt-8 text-center">
             <RouterLink to="/register" class="inline-block">
-              <BaseButton>{{ t('landing.comparison.cta') }}</BaseButton>
+              <BaseButton variant="filled">{{ t('landing.comparison.cta') }}</BaseButton>
             </RouterLink>
           </div>
         </section>
@@ -324,8 +268,8 @@ const comparisonRows = computed(() => [
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-silver-20 bg-secondary/30">
-      <div class="max-w-[1200px] mx-auto px-6 py-8">
+    <footer ref="footerRef" class="border-t border-silver-20 bg-secondary/30">
+      <div class="max-w-[1280px] mx-auto px-6 py-8">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <!-- Platform -->
           <div>
@@ -394,29 +338,17 @@ const comparisonRows = computed(() => [
         </div>
       </div>
     </footer>
+
+    <RegisterPromptModal
+        :show="showRegModal"
+        :card-name="regCard?.name ?? ''"
+        @close="closeRegModal"
+        @login="openLoginFromModal"
+    />
   </div>
 </template>
 
 <style scoped>
-.border-neon-30 {
-  border-color: rgba(90, 193, 104, 0.3);
-}
-.bg-neon-10 {
-  background-color: rgba(90, 193, 104, 0.1);
-}
-.bg-neon-20 {
-  background-color: rgba(90, 193, 104, 0.2);
-}
-
-/* Floating card animation */
-.floating-card {
-  animation: float 6s ease-in-out infinite;
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(-2deg); }
-  50% { transform: translateY(-15px) rotate(2deg); }
-}
-
 /* Scroll reveal */
 .scroll-reveal {
   opacity: 0;

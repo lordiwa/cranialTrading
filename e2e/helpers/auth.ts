@@ -32,6 +32,10 @@ export async function ensureLoggedIn(page: Page, targetUrl?: string) {
 
   if (page.url().includes('/login') || await loginForm.isVisible().catch(() => false)) {
     // Fallback: form login (should rarely happen with storageState)
+    // TASK-086: open the header "Iniciar sesión" dropdown/sheet first —
+    // the form is no longer visible by default. No .first(): only one
+    // layout subtree (and one trigger) is ever mounted.
+    await page.locator('[data-testid="login-trigger"]').click();
     await page.locator('input[type="email"]').fill(email);
     await page.locator('input[type="password"]').fill(password);
     await page.locator('button[type="submit"]').click();

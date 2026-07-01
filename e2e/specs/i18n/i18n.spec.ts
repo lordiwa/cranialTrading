@@ -55,6 +55,11 @@ test.describe('Internationalization', () => {
     await page.getByRole('button', { name: 'EN', exact: true }).click();
     await page.waitForTimeout(500);
 
+    // TASK-086: open the header "Sign in" dropdown/sheet first — the form
+    // is no longer visible by default. No .first(): only one layout
+    // subtree (and one trigger) is ever mounted.
+    await page.locator('[data-testid="login-trigger"]').click();
+
     // Login with fail-fast race pattern
     await page.locator('input[type="email"]').fill(process.env.TEST_USER_A_EMAIL!);
     await page.locator('input[type="password"]').fill(process.env.TEST_USER_A_PASSWORD!);

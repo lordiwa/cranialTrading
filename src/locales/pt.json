@@ -334,6 +334,9 @@
         "noResults": "Sem resultados. Tente outro nome.",
         "wantThis": "Eu quero essa"
       },
+      "sellers": {
+        "title": "Quem está vendendo"
+      },
       "modal": {
         "title": "Crie sua conta para trocar",
         "body": "Para propor uma troca por “{card}” você precisa de uma conta — é grátis e leva um minuto.",

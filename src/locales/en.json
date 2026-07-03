@@ -334,6 +334,9 @@
         "noResults": "No results. Try another name.",
         "wantThis": "I want this"
       },
+      "sellers": {
+        "title": "Who's selling it"
+      },
       "modal": {
         "title": "Create your account to trade",
         "body": "To propose a trade for “{card}” you need an account — it's free and takes a minute.",

@@ -4,12 +4,18 @@ import { useSeoMeta } from '@unhead/vue';
 import { type SupportedLocale, useI18n } from '../composables/useI18n';
 import { useScrollReveal } from '../composables/useScrollReveal';
 import { useSearchStore } from '../stores/search';
-import { applyPricedFirstFilter, isSearchActive, type MinimalCardResult, toMinimalResult } from '../utils/loginCardSearch';
+import { searchPublicCards } from '../services/publicCardSearch';
+import { applyPricedFirstFilter, isSearchActive, mapSellers, type MinimalCardResult, type SellerResult, toMinimalResult } from '../utils/loginCardSearch';
 import BaseButton from '../components/ui/BaseButton.vue';
 import SvgIcon from '../components/ui/SvgIcon.vue';
 import LandingHeader from '../components/landing/LandingHeader.vue';
 import LandingResults from '../components/landing/LandingResults.vue';
+import LandingSellers from '../components/landing/LandingSellers.vue';
 import RegisterPromptModal from '../components/landing/RegisterPromptModal.vue';
+
+// TASK-085 seller-teaser cap — small on purpose, this is a landing teaser,
+// not the full /search "other users" list (which uses the default max=20).
+const SELLERS_MAX = 6;
 
 // Marketplace, search-first landing (TASK-086) — full structural
 // replacement of the old two-column LoginView. Header owns the search bar
@@ -50,13 +56,40 @@ const results = computed<MinimalCardResult[]>(() =>
 // shouldShowNoResults in utils/loginCardSearch.ts.
 const lastSearchedQuery = ref('');
 
+// TASK-085: "Quién la vende" — independent from the Scryfall catalog's own
+// loading state so a slow public_cards read never blocks the catalog render
+// (or vice versa). Fired-and-forgotten from runSearch, not awaited.
+const sellers = ref<SellerResult[]>([]);
+const loadingSellers = ref(false);
+
 const headerRef = ref<{ focusSearch: () => void; openLogin: () => void } | null>(null);
 const howItWorksRef = ref<HTMLElement | null>(null);
 const footerRef = ref<HTMLElement | null>(null);
 
+// Review fix (M2, polished): two quick submits fire two overlapping
+// loadSellers calls for different terms — nothing guarantees they resolve
+// in the order they were issued. Compare against lastSearchedQuery (the
+// last SUBMITTED term), not query (the live v-model) — otherwise typing
+// further without re-submitting would drop the in-flight response and
+// leave loadingSellers wedged true until the next submit. Only apply a
+// response (and clear loading) if its term is still the last submitted
+// term when it resolves; an out-of-order stale response is silently
+// dropped instead of clobbering a newer one.
+const loadSellers = async (term: string) => {
+  loadingSellers.value = true;
+  try {
+    const cards = await searchPublicCards(term, null, SELLERS_MAX);
+    if (term !== lastSearchedQuery.value) return;
+    sellers.value = mapSellers(cards);
+  } finally {
+    if (term === lastSearchedQuery.value) loadingSellers.value = false;
+  }
+};
+
 const runSearch = async () => {
   if (!isSearchActive(query.value)) return;
   lastSearchedQuery.value = query.value;
+  void loadSellers(query.value);
   await searchStore.search({ name: query.value });
 };
 
@@ -151,6 +184,7 @@ const comparisonRows = computed(() => [
             :last-searched-query="lastSearchedQuery"
             @want="handleWant"
         />
+        <LandingSellers :sellers="sellers" :loading="loadingSellers" />
       </div>
 
       <!-- Idle: hero + marketing -->

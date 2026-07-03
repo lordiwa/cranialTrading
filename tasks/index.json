@@ -388,13 +388,19 @@
     {
       "key": "TASK-085",
       "title": "\"Quién vende\" anónimo en el buscador de login: vendedores públicos + reglas Firestore",
-      "status": "todo",
+      "status": "qa",
       "priority": "medium"
     },
     {
       "key": "TASK-086",
       "title": "Landing/login redesign search-first estilo marketplace (reemplaza LoginView de 2 columnas)",
       "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-087",
+      "title": "Seguridad: endurecer regla de users/{uid}/cards — hoy permite leer colección/wishlist privada por query directa",
+      "status": "todo",
       "priority": "high"
     }
   ]

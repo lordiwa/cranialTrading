@@ -10,7 +10,7 @@
     "Tests de la lógica pura de armado de vendedores en RED primero",
     "i18n en en/es/pt"
   ],
-  "status": "todo",
+  "status": "qa",
   "priority": "medium",
   "labels": [
     "search",
@@ -26,7 +26,13 @@
   ],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "date": "2026-07-03",
+      "text": "IMPLEMENTADO+REVISADO+DESPLEGADO EN DEV+VERIFICADO EN VIVO. Flujo: research (TASK-085-RESEARCH.md) -> developer TDD -> reviewer BLOCK HIGH-1 (docs wishlist legacy en public_cards quedarian expuestos; el backfill los indexaba) -> fixes H1+M1+M2+M3 -> re-review APPROVE-WITH-NITS. Gates: unit 1200/1200, vue-tsc 0, vite build OK. INFRA (documentado por AC): (1) reglas desplegadas con `firebase deploy --only firestore:rules --project dev` (compiled+released OK); (2) backfill `node scripts/backfill-cardnamelower.cjs --project cranial-trading-dev --apply` -> 3800 docs escaneados, 3791 sale/trade con cardNameLower agregado, 9 wishlist legacy BORRADOS (el H1 era real: 6 eran de la cuenta dev de Rafael). BUG DE PROD DESCUBIERTO Y ARREGLADO: cardNameLower nunca se escribia -> la seccion 'Otros usuarios' de /search devolvia [] SIEMPRE, tambien autenticado. VERIFICADO EN VIVO anonimo en 127.0.0.1:5173/login: buscar 'Blood Crypt' -> catalogo + seccion 'Quien la vende' con 3 filas reales (@RafaMoose · Venta · $10.74), sin wishlists. SIN COMMITEAR (espera 'funciona en local' de Rafael). PENDIENTE PARA CERRAR: OK de Rafael -> E2E completo -> commit+bump+push develop -> backfill+reglas en PROD (con OK explicito). NOTA: working tree tambien contiene el RED hub merge ajeno a este ticket - separar al commitear."
+    }
+  ],
   "created_at": "2026-06-30T00:00:00.000Z",
   "updated_at": "2026-06-30T00:00:00.000Z",
   "jira_key": null,

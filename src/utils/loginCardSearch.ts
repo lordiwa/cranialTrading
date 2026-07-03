@@ -3,6 +3,7 @@
  */
 
 import type { ScryfallCard } from '../services/scryfall'
+import type { PublicCardResult } from '../services/publicCardSearch'
 
 const parseUsd = (usd?: string | null): number | null => {
   const value = parseFloat(usd ?? '')
@@ -78,4 +79,38 @@ export function shouldShowNoResults({ loading, query, lastSearchedQuery, results
  */
 export function formatCardMeta(setName: string | null | undefined, typeLine: string | null | undefined): string {
   return [setName, typeLine].filter((part): part is string => !!part && part.trim().length > 0).join(' · ')
+}
+
+export interface SellerResult {
+  id: string
+  cardName: string
+  username: string
+  avatarUrl: string | null
+  status: string
+  price: number | null
+}
+
+/**
+ * TASK-085: normalizes a raw public_cards search hit into the minimal shape
+ * the landing "Quién la vende" section renders. Price is nulled out when
+ * missing/zero so the template can hide the price tag instead of showing
+ * "$0.00" (mirrors toMinimalResult's priceUsd handling above).
+ *
+ * Review fix (M1): includes cardName — the prefix query in searchPublicCards
+ * can return a different card than the exact term searched, so the row must
+ * say which card a seller is selling.
+ */
+export function toSellerResult(card: PublicCardResult): SellerResult {
+  return {
+    id: card.id,
+    cardName: card.cardName ?? '',
+    username: card.username ?? '',
+    avatarUrl: card.avatarUrl ?? null,
+    status: card.status ?? '',
+    price: typeof card.price === 'number' && card.price > 0 ? card.price : null,
+  }
+}
+
+export function mapSellers(cards: PublicCardResult[]): SellerResult[] {
+  return cards.map(toSellerResult)
 }

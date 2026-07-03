@@ -10,8 +10,9 @@
  * cards (card_faces) and missing images/prices.
  */
 
-import { applyPricedFirstFilter, formatCardMeta, isSearchActive, shouldShowNoResults, toMinimalResult } from '@/utils/loginCardSearch'
+import { applyPricedFirstFilter, formatCardMeta, isSearchActive, mapSellers, shouldShowNoResults, toMinimalResult, toSellerResult } from '@/utils/loginCardSearch'
 import type { ScryfallCard } from '@/services/scryfall'
+import type { PublicCardResult } from '@/services/publicCardSearch'
 
 const makeCard = (overrides: Partial<ScryfallCard> = {}): ScryfallCard => ({
   id: 'c1',
@@ -193,5 +194,73 @@ describe('formatCardMeta', () => {
   it('returns an empty string when both are missing', () => {
     expect(formatCardMeta(undefined, undefined)).toBe('')
     expect(formatCardMeta('', '')).toBe('')
+  })
+})
+
+/**
+ * TASK-085: pure mapping for the anonymous landing's "Quién la vende"
+ * section — turns a raw public_cards search hit into the minimal shape
+ * the seller row renders (username, avatar, status, price).
+ */
+const makePublicCardResult = (overrides: Partial<PublicCardResult> = {}): PublicCardResult => ({
+  id: 'doc-1',
+  cardName: 'Lightning Bolt',
+  userId: 'user-a',
+  username: 'alice',
+  status: 'sale',
+  price: 1.5,
+  ...overrides,
+})
+
+describe('toSellerResult', () => {
+  it('maps username, cardName, avatar, status and price from a public card result', () => {
+    const card = makePublicCardResult({ cardName: 'Lightning Bolt', username: 'alice', avatarUrl: 'https://example.com/a.png', status: 'trade', price: 2.5 })
+
+    expect(toSellerResult(card)).toEqual({
+      id: 'doc-1',
+      cardName: 'Lightning Bolt',
+      username: 'alice',
+      avatarUrl: 'https://example.com/a.png',
+      status: 'trade',
+      price: 2.5,
+    })
+  })
+
+  // Review fix (M1): the prefix query in searchPublicCards can return a
+  // different card name than what the user searched for. Without cardName
+  // on the row, there's no way to tell which card a seller is selling.
+  it('defaults cardName to empty string when missing', () => {
+    expect(toSellerResult(makePublicCardResult({ cardName: undefined })).cardName).toBe('')
+  })
+
+  it('returns null price when price is missing (renders no price tag)', () => {
+    expect(toSellerResult(makePublicCardResult({ price: undefined })).price).toBeNull()
+  })
+
+  it('returns null price when price is 0 (renders no price tag)', () => {
+    expect(toSellerResult(makePublicCardResult({ price: 0 })).price).toBeNull()
+  })
+
+  it('returns null avatarUrl when missing (component falls back to generated avatar)', () => {
+    expect(toSellerResult(makePublicCardResult({ avatarUrl: undefined })).avatarUrl).toBeNull()
+  })
+
+  it('defaults username to empty string when missing', () => {
+    expect(toSellerResult(makePublicCardResult({ username: undefined })).username).toBe('')
+  })
+})
+
+describe('mapSellers', () => {
+  it('maps every card in the list', () => {
+    const cards = [
+      makePublicCardResult({ id: 'a', username: 'alice' }),
+      makePublicCardResult({ id: 'b', username: 'bob' }),
+    ]
+
+    expect(mapSellers(cards).map(s => s.username)).toEqual(['alice', 'bob'])
+  })
+
+  it('returns [] for an empty list', () => {
+    expect(mapSellers([])).toEqual([])
   })
 })

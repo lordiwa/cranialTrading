@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-30T00:00:00.000Z",
+  "generated_at": "2026-07-06T23:34:41.088Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -402,6 +402,30 @@
       "title": "Seguridad: endurecer regla de users/{uid}/cards — hoy permite leer colección/wishlist privada por query directa",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-088",
+      "title": "Design→app D1a: toggles público/en-venta de binders como switch estilo iOS",
+      "status": "in_review",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-089",
+      "title": "Design→app D1b: avatar-inicial en Contactos + página 404 genérica estilo guest",
+      "status": "in_progress",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-090",
+      "title": "Design→app D2: Settings según proto — título \"Ajustes\", label \"Eliminar cuenta\", selector de idioma ES/EN/PT",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-091",
+      "title": "Design→app D3a: Messages como split-pane persistente (lista + hilo lado a lado)",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

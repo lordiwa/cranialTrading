@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import AppContainer from '../components/layout/AppContainer.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import { useI18n } from '../composables/useI18n';
 
@@ -7,37 +6,17 @@ const { t } = useI18n();
 </script>
 
 <template>
-  <AppContainer>
-    <div class="flex flex-col items-center justify-center min-h-screen text-center">
-      <div class="mb-8">
-        <h1 class="text-h1 font-bold text-rust mb-4">{{ t('notFound.title') }}</h1>
-        <h2 class="text-h2 font-bold text-silver mb-4">{{ t('notFound.userNotFound') }}</h2>
-        <p class="text-body text-silver-70 max-w-md">
-          {{ t('notFound.message') }}
-        </p>
-      </div>
+  <main id="main-content" class="min-h-screen flex flex-col items-center justify-center text-center px-6">
+    <p class="text-[64px] md:text-[96px] font-bold text-rust leading-none tracking-tight">{{ t('notFound.title') }}</p>
+    <h1 class="text-h2 font-bold text-silver mt-5">{{ t('notFound.heading') }}</h1>
+    <p class="text-body text-silver-50 mt-3 max-w-md">
+      {{ t('notFound.message') }}
+    </p>
 
-      <div class="flex flex-col md:flex-row gap-4">
-        <RouterLink to="/dashboard" class="flex-1">
-          <BaseButton class="w-full">
-            {{ t('notFound.backToDashboard') }}
-          </BaseButton>
-        </RouterLink>
-        <RouterLink to="/collection" class="flex-1">
-          <BaseButton variant="secondary" class="w-full">
-            {{ t('notFound.viewCollection') }}
-          </BaseButton>
-        </RouterLink>
-      </div>
-
-      <div class="mt-8 border-t border-silver-20 pt-8 max-w-md">
-        <p class="text-small text-silver-70 mb-4">
-          {{ t('notFound.needHelp') }}
-        </p>
-        <RouterLink to="/settings" class="text-neon text-small hover:underline">
-          {{ t('notFound.contactUs') }}
-        </RouterLink>
-      </div>
-    </div>
-  </AppContainer>
+    <RouterLink to="/" class="mt-7">
+      <BaseButton variant="filled">
+        {{ t('notFound.backHome') }}
+      </BaseButton>
+    </RouterLink>
+  </main>
 </template>

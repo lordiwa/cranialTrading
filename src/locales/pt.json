@@ -1395,7 +1395,7 @@
   },
 
   "settings": {
-    "title": "CONFIGURAÇÕES",
+    "title": "Configurações",
     "sections": {
       "emailVerification": {
         "title": "VERIFICAÇÃO DE EMAIL",
@@ -1457,6 +1457,9 @@
       "success": "Avatar atualizado com sucesso.",
       "error": "Erro ao alterar avatar. Tente novamente."
     },
+    "language": {
+      "title": "Idioma"
+    },
     "restartTour": {
       "label": "Tour guiado",
       "hint": "Repita o tour de boas-vindas que mostra a plataforma.",
@@ -1467,6 +1470,7 @@
       "description": "As ações nesta seção são irreversíveis. Proceda com cuidado.",
       "deleteData": {
         "label": "Excluir todos os meus dados",
+        "button": "Excluir conta",
         "hint": "Exclui permanentemente cartas, decks, matches e contatos.",
         "title": "Excluir todos os seus dados?",
         "message": "Esta ação excluirá permanentemente todas as suas cartas, decks, matches salvos e contatos. Esta ação NÃO pode ser desfeita.",
@@ -1642,12 +1646,9 @@
 
   "notFound": {
     "title": "404",
-    "userNotFound": "Usuário não encontrado",
-    "message": "O usuário que você procura não existe ou o perfil é privado.",
-    "backToDashboard": "VOLTAR AO DASHBOARD",
-    "viewCollection": "VER MINHA COLEÇÃO",
-    "needHelp": "Precisa de ajuda?",
-    "contactUs": "Entre em contato pelas configurações"
+    "heading": "Página não encontrada",
+    "message": "A página que você procura não existe ou foi movida.",
+    "backHome": "VOLTAR AO INÍCIO"
   },
 
   "legal": {

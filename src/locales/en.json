@@ -1395,7 +1395,7 @@
   },
 
   "settings": {
-    "title": "SETTINGS",
+    "title": "Settings",
     "sections": {
       "emailVerification": {
         "title": "EMAIL VERIFICATION",
@@ -1457,6 +1457,9 @@
       "success": "Avatar updated successfully.",
       "error": "Error changing avatar. Try again."
     },
+    "language": {
+      "title": "Language"
+    },
     "restartTour": {
       "label": "Guided tour",
       "hint": "Replay the onboarding tour that shows you around the app.",
@@ -1467,6 +1470,7 @@
       "description": "Actions in this section are irreversible. Proceed with caution.",
       "deleteData": {
         "label": "Delete all my data",
+        "button": "Delete account",
         "hint": "Permanently deletes cards, decks, matches and contacts.",
         "title": "Delete all your data?",
         "message": "This action will permanently delete all your cards, decks, saved matches and contacts. This action CANNOT be undone.",
@@ -1642,12 +1646,9 @@
 
   "notFound": {
     "title": "404",
-    "userNotFound": "User not found",
-    "message": "The user you're looking for doesn't exist or the profile is private.",
-    "backToDashboard": "BACK TO DASHBOARD",
-    "viewCollection": "VIEW MY COLLECTION",
-    "needHelp": "Need help?",
-    "contactUs": "Contact us from settings"
+    "heading": "Page not found",
+    "message": "The page you're looking for doesn't exist or was moved.",
+    "backHome": "BACK TO HOME"
   },
 
   "legal": {

@@ -639,20 +639,42 @@ onUnmounted(() => {
             </div>
             <div class="flex items-center gap-2 flex-wrap">
               <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="selectedBinder.isPublic"
                   @click="toggleBinderPublic"
-                  class="flex items-center gap-1 px-2 py-1 text-tiny border transition-150"
-                  :class="selectedBinder.isPublic ? 'border-neon text-neon bg-neon/10' : 'border-silver-30 text-silver-50'"
+                  class="flex items-center gap-2 px-1 py-1 text-tiny transition-150 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+                  :class="selectedBinder.isPublic ? 'text-neon' : 'text-silver-50'"
               >
-                <span>{{ selectedBinder.isPublic ? '&#x1F441;' : '&#x1F512;' }}</span>
                 {{ t('binders.header.public') }}
+                <span
+                    class="relative inline-block w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150"
+                    :class="selectedBinder.isPublic ? 'bg-neon' : 'bg-silver-10 border border-silver-30'"
+                >
+                  <span
+                      class="absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-silver transition-transform duration-150"
+                      :class="selectedBinder.isPublic ? 'translate-x-[18px]' : 'translate-x-0'"
+                  ></span>
+                </span>
               </button>
               <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="selectedBinder.forSale"
                   @click="toggleBinderForSale"
-                  class="flex items-center gap-1 px-2 py-1 text-tiny border transition-150"
-                  :class="selectedBinder.forSale ? 'border-neon text-neon bg-neon/10' : 'border-silver-30 text-silver-50'"
+                  class="flex items-center gap-2 px-1 py-1 text-tiny transition-150 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+                  :class="selectedBinder.forSale ? 'text-neon' : 'text-silver-50'"
               >
-                <span>{{ selectedBinder.forSale ? '&#x1F4B0;' : '&#x1F6AB;' }}</span>
                 {{ t('binders.header.forSale') }}
+                <span
+                    class="relative inline-block w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150"
+                    :class="selectedBinder.forSale ? 'bg-neon' : 'bg-silver-10 border border-silver-30'"
+                >
+                  <span
+                      class="absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-silver transition-transform duration-150"
+                      :class="selectedBinder.forSale ? 'translate-x-[18px]' : 'translate-x-0'"
+                  ></span>
+                </span>
               </button>
               <span class="text-silver-30">|</span>
               <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards ?? 0 }} cards</span>

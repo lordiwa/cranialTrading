@@ -388,7 +388,7 @@
     {
       "key": "TASK-085",
       "title": "\"Quién vende\" anónimo en el buscador de login: vendedores públicos + reglas Firestore",
-      "status": "qa",
+      "status": "done",
       "priority": "medium"
     },
     {

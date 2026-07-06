@@ -1,0 +1,190 @@
+{
+  "global": {
+    "color": {
+      "bg": {
+        "primary": {
+          "value": "#000000",
+          "type": "color",
+          "description": "Pure black background (brand manual). App also overlays rgba(0,0,0,0.93) via body::before."
+        }
+      },
+      "text": {
+        "silver": {
+          "DEFAULT": {
+            "value": "#FFFFFF",
+            "type": "color",
+            "description": "Primary text. CLEANUP: canonical = #FFFFFF (tailwind.config). CLAUDE.md's #EEEEEE is stale docs — confirm with Rafael if brand wants off-white."
+          },
+          "70": { "value": "rgba(255, 255, 255, 0.85)", "type": "color", "description": "85% — strong secondary text" },
+          "50": { "value": "rgba(255, 255, 255, 0.7)", "type": "color", "description": "70% — muted text" },
+          "30": { "value": "rgba(255, 255, 255, 0.4)", "type": "color", "description": "40% — disabled / faint" },
+          "20": { "value": "rgba(255, 255, 255, 0.25)", "type": "color", "description": "25% — default border color" },
+          "10": { "value": "rgba(255, 255, 255, 0.15)", "type": "color", "description": "15% — subtle border" },
+          "5":  { "value": "rgba(255, 255, 255, 0.08)", "type": "color", "description": "8% — hover surface tint" }
+        }
+      },
+      "accent": {
+        "neon": {
+          "DEFAULT": {
+            "value": "#5AC168",
+            "type": "color",
+            "description": "Brand green accent. CLEANUP: canonical = #5AC168. The legacy #00FF88 in BaseBadge.vue (.bg-neon-5) is an orphan — should be migrated to this."
+          },
+          "40": { "value": "rgba(90, 193, 104, 0.4)", "type": "color" },
+          "15": { "value": "rgba(90, 193, 104, 0.15)", "type": "color" },
+          "10": { "value": "rgba(90, 193, 104, 0.1)", "type": "color" },
+          "5":  { "value": "rgba(90, 193, 104, 0.05)", "type": "color" }
+        }
+      },
+      "error": {
+        "rust": {
+          "DEFAULT": { "value": "#8B2E1F", "type": "color", "description": "Errors, negatives, rejection, VENDO/sale badges." },
+          "10": { "value": "rgba(139, 46, 31, 0.1)", "type": "color" },
+          "5":  { "value": "rgba(139, 46, 31, 0.05)", "type": "color" }
+        }
+      },
+      "warning": {
+        "DEFAULT": {
+          "value": "#FACC15",
+          "type": "color",
+          "description": "Caution / tight / 'deseado' (wishlist) states. CLEANUP: consolidates the orphan amber #F59E0B used in BaseBadge (deseado/warning variants) into this single caution token. Matches Tailwind yellow-400."
+        },
+        "40": { "value": "rgba(250, 204, 21, 0.4)", "type": "color" },
+        "15": { "value": "rgba(250, 204, 21, 0.15)", "type": "color" },
+        "10": { "value": "rgba(250, 204, 21, 0.1)", "type": "color" },
+        "5":  { "value": "rgba(250, 204, 21, 0.05)", "type": "color" }
+      },
+      "info": {
+        "DEFAULT": {
+          "value": "#60A5FA",
+          "type": "color",
+          "description": "Informational (info badge). CLEANUP: promoted from orphan Tailwind blue-400 used inline in BaseBadge into a named semantic token. Matches Tailwind blue-400."
+        },
+        "5": { "value": "rgba(96, 165, 250, 0.05)", "type": "color" }
+      }
+    },
+
+    "fontFamilies": {
+      "sans": { "value": "Open Sans", "type": "fontFamilies", "description": "Body/UI. Weights 400/500/600/700 loaded via @font-face." },
+      "brother": { "value": "Brother", "type": "fontFamilies", "description": "Display / logo wordmark only." }
+    },
+    "fontWeights": {
+      "regular": { "value": "400", "type": "fontWeights" },
+      "medium": { "value": "500", "type": "fontWeights" },
+      "semibold": { "value": "600", "type": "fontWeights" },
+      "bold": { "value": "700", "type": "fontWeights" }
+    },
+    "fontSizes": {
+      "h1": { "value": "28", "type": "fontSizes" },
+      "h2": { "value": "24", "type": "fontSizes" },
+      "h3": { "value": "20", "type": "fontSizes" },
+      "h5": { "value": "16", "type": "fontSizes" },
+      "body": { "value": "16", "type": "fontSizes" },
+      "small": { "value": "14", "type": "fontSizes" },
+      "tiny": { "value": "14", "type": "fontSizes" }
+    },
+    "lineHeights": {
+      "tight": { "value": "130%", "type": "lineHeights" },
+      "snug": { "value": "140%", "type": "lineHeights" },
+      "normal": { "value": "150%", "type": "lineHeights" }
+    },
+    "letterSpacing": {
+      "h1": { "value": "-0.3px", "type": "letterSpacing" },
+      "none": { "value": "0px", "type": "letterSpacing" },
+      "h5body": { "value": "0.3px", "type": "letterSpacing" },
+      "small": { "value": "0.2px", "type": "letterSpacing" },
+      "tiny": { "value": "0.15px", "type": "letterSpacing" }
+    },
+    "typography": {
+      "h1": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.bold}", "fontSize": "{fontSizes.h1}", "lineHeight": "{lineHeights.tight}", "letterSpacing": "{letterSpacing.h1}" },
+        "type": "typography",
+        "description": "Page titles. 28/700, lh 1.3, ls -0.3px."
+      },
+      "h2": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.bold}", "fontSize": "{fontSizes.h2}", "lineHeight": "{lineHeights.tight}", "letterSpacing": "{letterSpacing.none}" },
+        "type": "typography",
+        "description": "Section titles. 24/700, lh 1.3."
+      },
+      "h3": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.medium}", "fontSize": "{fontSizes.h3}", "lineHeight": "{lineHeights.snug}", "letterSpacing": "{letterSpacing.none}" },
+        "type": "typography",
+        "description": "Subsection titles. 20/500, lh 1.4."
+      },
+      "h5": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.bold}", "fontSize": "{fontSizes.h5}", "lineHeight": "{lineHeights.normal}", "letterSpacing": "{letterSpacing.h5body}" },
+        "type": "typography",
+        "description": "Small bold label. 16/700, lh 1.5, ls 0.3px."
+      },
+      "body": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.regular}", "fontSize": "{fontSizes.body}", "lineHeight": "{lineHeights.normal}", "letterSpacing": "{letterSpacing.h5body}" },
+        "type": "typography",
+        "description": "Body copy. 16/400, lh 1.5, ls 0.3px."
+      },
+      "small": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.regular}", "fontSize": "{fontSizes.small}", "lineHeight": "{lineHeights.normal}", "letterSpacing": "{letterSpacing.small}" },
+        "type": "typography",
+        "description": "Small text. 14/400, lh 1.5, ls 0.2px."
+      },
+      "tiny": {
+        "value": { "fontFamily": "{fontFamilies.sans}", "fontWeight": "{fontWeights.regular}", "fontSize": "{fontSizes.tiny}", "lineHeight": "{lineHeights.snug}", "letterSpacing": "{letterSpacing.tiny}" },
+        "type": "typography",
+        "description": "Captions/meta. 14/400, lh 1.4, ls 0.15px. NOTE: same 14px as 'small' — differs only in lh/ls."
+      }
+    },
+
+    "spacing": {
+      "xs": { "value": "4", "type": "spacing" },
+      "sm": { "value": "8", "type": "spacing" },
+      "md": { "value": "16", "type": "spacing" },
+      "lg": { "value": "24", "type": "spacing" },
+      "xl": { "value": "32", "type": "spacing" },
+      "2xl": { "value": "60", "type": "spacing", "description": "Tailwind's spacing.15 (60px). Renamed to 2xl for a consistent scale." }
+    },
+
+    "borderRadius": {
+      "none": { "value": "0", "type": "borderRadius" },
+      "sm": { "value": "2", "type": "borderRadius" },
+      "DEFAULT": { "value": "3", "type": "borderRadius" },
+      "md": { "value": "4", "type": "borderRadius" },
+      "lg": { "value": "6", "type": "borderRadius" },
+      "xl": { "value": "8", "type": "borderRadius" },
+      "full": { "value": "9999", "type": "borderRadius" }
+    },
+
+    "boxShadow": {
+      "subtle": {
+        "value": { "x": "0", "y": "2", "blur": "4", "spread": "0", "color": "rgba(0, 0, 0, 0.2)", "type": "dropShadow" },
+        "type": "boxShadow"
+      },
+      "medium": {
+        "value": { "x": "0", "y": "4", "blur": "12", "spread": "0", "color": "rgba(0, 0, 0, 0.3)", "type": "dropShadow" },
+        "type": "boxShadow"
+      },
+      "strong": {
+        "value": { "x": "0", "y": "8", "blur": "24", "spread": "0", "color": "rgba(0, 0, 0, 0.4)", "type": "dropShadow" },
+        "type": "boxShadow"
+      },
+      "glow-strong": {
+        "value": { "x": "0", "y": "0", "blur": "12", "spread": "0", "color": "rgba(90, 193, 104, 0.15)", "type": "dropShadow" },
+        "type": "boxShadow",
+        "description": "Neon glow used for emphasis/focus on accent elements."
+      }
+    },
+
+    "size": {
+      "touchTarget": { "value": "44", "type": "sizing", "description": "Minimum interactive target (min-h-44 / min-w-44). Maps to buttons/inputs min height." }
+    },
+
+    "motion": {
+      "fast": { "value": "150ms", "type": "other", "description": "transition-fast — ease-out. Default UI transition." },
+      "normal": { "value": "300ms", "type": "other", "description": "transition-normal — ease-in-out." },
+      "slow": { "value": "500ms", "type": "other", "description": "transition-slow — ease-in-out." }
+    }
+  },
+
+  "$themes": [],
+  "$metadata": {
+    "tokenSetOrder": ["global"]
+  }
+}

@@ -31,6 +31,7 @@ export interface PublicCard {
   username: string
   avatarUrl?: string | null
   cardName: string
+  cardNameLower: string // lowercased cardName — matches the prefix query in publicCardSearch.ts
   scryfallId: string
   status: 'trade' | 'sale'
   price: number
@@ -83,8 +84,10 @@ export async function syncCardToPublic(
   const publicCardId = `${userId}_${card.id}`
   const publicCardRef = doc(db, 'public_cards', publicCardId)
 
-  // Only publish non-collection cards that are marked as public
-  const isPublicCard = card.status !== 'collection' && card.public === true
+  // TASK-085: whitelist sale/trade explicitly (not a 'collection' blacklist) —
+  // public_cards is now readable by anonymous users, so a 'wishlist' card
+  // marked public must never slip through as "not collection".
+  const isPublicCard = (card.status === 'sale' || card.status === 'trade') && card.public === true
 
   if (isPublicCard) {
     const publicCard = {
@@ -93,6 +96,7 @@ export async function syncCardToPublic(
       username,
       avatarUrl: userAvatarUrl ?? null,
       cardName: card.name,
+      cardNameLower: card.name.toLowerCase(),
       scryfallId: card.scryfallId,
       status: card.status as 'trade' | 'sale',
       price: card.price || 0,
@@ -138,7 +142,8 @@ export async function batchSyncCardsToPublic(
     for (const card of chunk) {
       const publicCardId = `${userId}_${card.id}`
       const publicCardRef = doc(db, 'public_cards', publicCardId)
-      const isPublicCard = card.status !== 'collection' && card.public === true
+      // TASK-085: whitelist sale/trade (see syncCardToPublic comment above).
+      const isPublicCard = (card.status === 'sale' || card.status === 'trade') && card.public === true
 
       if (isPublicCard) {
         batch.set(publicCardRef, {
@@ -147,6 +152,7 @@ export async function batchSyncCardsToPublic(
           username,
           avatarUrl: userAvatarUrl ?? null,
           cardName: card.name,
+          cardNameLower: card.name.toLowerCase(),
           scryfallId: card.scryfallId,
           status: card.status as 'trade' | 'sale',
           price: card.price || 0,
@@ -229,8 +235,8 @@ export async function syncAllUserCards(
   userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
-  // Filter non-collection cards that are marked as public
-  const publicCards = cards.filter(c => c.status !== 'collection' && c.public === true)
+  // TASK-085: whitelist sale/trade (see syncCardToPublic comment above).
+  const publicCards = cards.filter(c => (c.status === 'sale' || c.status === 'trade') && c.public === true)
 
   // First, remove all existing public cards for this user
   const existingQuery = query(
@@ -264,6 +270,7 @@ export async function syncAllUserCards(
         username,
         avatarUrl: userAvatarUrl ?? null,
         cardName: card.name,
+        cardNameLower: card.name.toLowerCase(),
         scryfallId: card.scryfallId,
         status: card.status,
         price: card.price || 0,

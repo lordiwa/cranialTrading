@@ -1,0 +1,37 @@
+{
+  "key": "TASK-087",
+  "title": "Seguridad: endurecer regla de users/{uid}/cards — hoy permite leer colección/wishlist privada por query directa",
+  "description": "**Origen:** hallazgo del research de TASK-085 (2026-07-03, ver tasks/TASK-085-RESEARCH.md §3).\n\n## Problema\n`firestore.rules:22` tiene `allow read: if true` INCONDICIONAL sobre `users/{userId}/cards/{cardId}`. Las reglas de Firestore validan documentos devueltos pero NO pueden exigir que una query incluya un `where()` concreto. Resultado: cualquier caller (anónimo o autenticado) que arme una query directa contra el SDK (p.ej. `collectionGroup('cards')` sin filtros, o `getDocs(collection(db,'users/X/cards'))`) puede leer TODAS las cartas de cualquier usuario, incluyendo `collection` y `wishlist` privadas. Hoy solo la convención del cliente (filtrar por `public === true`) lo evita.\n\nNota: la app NO usa `collectionGroup` en ningún lado (verificado por grep), así que no hay tráfico legítimo que dependa del hueco más allá de `UserProfileView.loadAllPublicCards` (lee la subcolección completa de UN usuario y filtra en cliente).\n\n## Dirección de fix (a diseñar)\n- Opción A: `allow read: if request.auth.uid == userId || resource.data.public == true;` — obliga a que las queries cross-user incluyan `where('public','==',true)` (las reglas validan que cada doc devuelto cumpla). OJO: rompe `UserProfileView.loadAllPublicCards` tal como está (lee todo y filtra en cliente) → habría que añadir el where a esa query, o migrarla a `public_cards`.\n- Opción B: migrar los consumidores de lectura pública de perfil a `public_cards` (ya abierta a anónimos por TASK-085) y cerrar `users/{uid}/cards` a solo-dueño.\n- Evaluar impacto en el flujo anónimo de carrito/buy-request de UserProfileView (`showCartMode`).\n\n## Acceptance criteria (a refinar)\n- [ ] Un caller sin sesión NO puede leer cartas con status collection/wishlist de otro usuario por ninguna query.\n- [ ] Un caller autenticado NO puede leer cartas privadas de OTRO usuario.\n- [ ] `UserProfileView` (perfil público + carrito anónimo) sigue funcionando.\n- [ ] Reglas desplegadas a mano en dev Y prod (CI no despliega reglas — memoria project_ci_no_firestore_rules_deploy).\n- [ ] Test manual documentado de la query maliciosa antes/después.",
+  "acceptance_criteria": [
+    "Anónimo no puede leer cartas collection/wishlist ajenas por ninguna query",
+    "Autenticado no puede leer cartas privadas de otro usuario",
+    "UserProfileView (perfil público + carrito anónimo) sigue funcionando",
+    "Reglas desplegadas a mano en dev y prod (comando documentado)",
+    "Test manual de la query maliciosa antes/después documentado"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "security",
+    "firestore-rules",
+    "tech-debt",
+    "needs-research"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-085"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "date": "2026-07-03",
+      "text": "Creado desde el research de TASK-085. Gap PRE-EXISTENTE (no introducido por 085 — 085 usa public_cards justamente para no apoyarse en este hueco). Prioridad high por ser exposición de datos privados, pero no urgente-urgente: requiere un atacante que hable SDK de Firestore directamente."
+    }
+  ],
+  "created_at": "2026-07-03T16:15:00.000Z",
+  "updated_at": "2026-07-03T16:15:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

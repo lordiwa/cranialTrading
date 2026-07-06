@@ -1,0 +1,39 @@
+{
+  "key": "TASK-084",
+  "title": "Buscador de catálogo en la página de login (landing pública liviana para anónimos)",
+  "description": "**Origen:** pedido de Rafael 2026-06-30. Quiere que la página de login sea la página inicial: liviana y que cualquier anónimo pueda buscar cartas sin loguearse.\n\n## Decisiones de producto (Rafael 2026-06-30)\n- **Landing:** el buscador se integra DENTRO de `LoginView.vue` (mismo form de login + buscador). `/` sigue mandando al anónimo a `/login` (vía guard actual).\n- **UI de resultados:** lista mínima propia (grid simple de cartas de catálogo, liviano, sin filtros avanzados). NO reusar `FilterPanel`/`SearchResultCard` del revamp.\n- **Alcance de esta tarea (084):** SOLO el buscador de catálogo (Scryfall) para anónimos + lista mínima. El \"quién vende\" (vendedores públicos) se hace aparte en TASK-085 para aislar el riesgo de lecturas públicas + reglas Firestore.\n\n## Contexto técnico (verificado)\n- `useSearchStore.search()` (`src/stores/search.ts:30`) llama a `searchAdvanced` (Scryfall) y NO requiere auth → reusable tal cual para anónimos.\n- `LoginView.vue` ya importa `useScryfall`-free; agregar un input de búsqueda + estado local o usar `useSearchStore`.\n- Hoy `/search` es `requiresAuth: true` (`router/index.ts:56`) y `/login` es `requiresGuest: true` (línea 22). El buscador embebido en login evita tocar el guard; el anónimo busca sin salir de `/login`.\n- Aplicar el filtro priced-first del proyecto (CLAUDE.md): si hay cartas con `prices.usd > 0`, mostrar solo esas; si ninguna tiene precio, mostrar todas.\n- Acciones más profundas (interesarse / agregar a colección / ver vendedores) deben gatear a login/registro (toast o redirect a /register con returnUrl).\n\n## Acceptance criteria\n- [ ] Un usuario anónimo en `/login` ve un buscador de cartas y, al buscar por nombre, obtiene una grilla mínima de resultados de catálogo (Scryfall) sin necesidad de loguearse.\n- [ ] El buscador respeta el filtro priced-first del proyecto.\n- [ ] El form de login sigue funcionando y visible (el buscador no lo rompe ni lo tapa).\n- [ ] Cualquier acción más allá de ver el catálogo (interesarse/agregar) lleva al anónimo a login/registro, sin romper.\n- [ ] La página sigue siendo liviana: sin imports pesados nuevos de auth en el camino del buscador anónimo (respetar regla Mali: ≤1-2 SvgIcon por card virtualizada).\n- [ ] Tests unitarios de la lógica pura nueva (filtrado/normalización de resultados) en RED primero.\n- [ ] i18n de las cadenas nuevas en en/es/pt (verificar las 3).\n\n## Archivos probables\n`src/views/LoginView.vue`, nuevo componente de lista mínima de resultados (p.ej. `src/components/search/LoginCardSearch.vue`), posible util pura nueva en `src/utils/`, `src/stores/search.ts` (reuso), locales en/es/pt.\n\n## Notas de sizing\nMantener ≤4 archivos de cambio. Si la lista mínima + el wiring en LoginView crecen, partir el componente de resultados en su propia tarea.",
+  "acceptance_criteria": [
+    "Anónimo en /login puede buscar cartas y ver grilla mínima de catálogo (Scryfall) sin loguearse",
+    "El buscador respeta el filtro priced-first del proyecto",
+    "El form de login sigue funcionando y visible junto al buscador",
+    "Acciones más allá del catálogo gatean a login/registro sin romper",
+    "Página liviana: sin imports pesados nuevos en el camino anónimo (regla Mali respetada)",
+    "Tests unitarios de la lógica pura nueva escritos en RED primero",
+    "i18n de cadenas nuevas en en/es/pt verificado"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "search",
+    "login",
+    "anonymous",
+    "landing",
+    "i18n",
+    "feature"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-06-30T00:00:00.000Z",
+      "body": "## Implementación + review completas (working tree, SIN commit)\n\n**Developer (TDD):** funciones puras en `src/utils/loginCardSearch.ts` (`applyPricedFirstFilter` regla estricta priced-first de CLAUDE.md + `toMinimalResult` con fallback de split-cards y precio inválido->null), 10 tests RED->GREEN. Componente nuevo `src/components/search/LoginCardSearch.vue` (input + grilla mínima de catálogo, img lazy, 0 svg/use por card -> regla Mali OK) embebido en el hero de `LoginView.vue` (no toca el form de login ni el guard). Reusa `useSearchStore.search({name})` (Scryfall, sin auth, sin search-on-mount). Acciones profundas gateadas: toast + router.push(/register). i18n: 3 keys nuevas `landing.catalogSearch.{title,prompt,gateMessage}` en en/es/pt + reuso de `search.filterPanel.*` y `common.actions.searching` (verificados en los 3 locales).\n\n**Catch del developer (Rule 5):** evitó un 2o `type=submit` que habría roto `login.spec.ts` (selector sin .first()); el botón de búsqueda es `type=button` y Enter submitea por el form implícito.\n\n**Reviewer (contexto fresco): APPROVE-WITH-NITS.** 0 HIGH, 0 MEDIUM. Todos los ACs cumplidos; sin fuga de auth en el camino anónimo; sin colisión de selectores Playwright. Nits LOW solo cosméticos.\n\n**Nit aplicado (orchestrator):** precio mostraba $3.2 -> ahora `toFixed(2)` = $3.20 (LoginCardSearch.vue:85). Resto de nits (N/A hardcodeado, empty-state inline, returnUrl) NO aplicados: consistentes con el código existente u opcionales (Rule 2).\n\n**Gates verdes (post-fix):** unit 1169/1169 (10 nuevos), vue-tsc exit 0, `npx vite build` OK, eslint limpio en archivos tocados. **E2E** `login.spec.ts`+`i18n.spec.ts` (proyecto no-auth-tests) = 9 passed, 0 failed.\n\n**Pendiente (bloqueado en humano):** Rafael verifica en local (`npm run dev` -> /login sin sesión -> buscar carta -> ver grilla, y confirmar que el login sigue ok). Al confirmar \"funciona en local\": commit + push a develop. NADA comiteado."
+    }
+  ],
+  "created_at": "2026-06-30T00:00:00.000Z",
+  "updated_at": "2026-07-01T00:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

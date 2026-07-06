@@ -2,19 +2,23 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "active",
-  "updated_at": "2026-06-12T04:30:09.650Z",
-  "active_task": "TASK-077",
-  "workflow_step": "verify",
-  "next_action": "TASK-075/076/077 implementadas y en in_review, TODO sin commitear en working tree. Rafael debe verificar en local (npm run dev): header autocomplete de nombres → Enter/click lleva a /search?q= con 3 secciones. Tras su OK: 3 commits lógicos + bump minor 1.34.4→1.35.0 + E2E antes de push a develop.",
-  "handoff_summary": "Search revamp aprobado por Rafael: header pasa a autocomplete ligero de nombres (Scryfall /cards/autocomplete) y Enter/click navega a /search?q=, que se amplía a página de resultados central con 3 fuentes (Scryfall + colección propia + public_cards de otros usuarios con ME INTERESA). Optimización: limit(20) en query Firestore, eliminar fallback que descarga public_cards entera, cero Firestore/imágenes al teclear. Bump minor a 1.35.0 al final. Tickets TASK-075/076/077.",
-  "open_questions": [],
+  "updated_at": "2026-07-03T18:45:00.000Z",
+  "active_task": "TASK-085",
+  "workflow_step": "task-085-pushed-to-develop-awaiting-ci-and-dev-verify",
+  "next_action": "TASK-085 COMMITEADO Y PUSHEADO a develop (v1.37.0) tras OK de Rafael ('ya comprobe solo deploya' 2026-07-03). Gates pre-push: unit 1200/1200, vite build OK, E2E completo 123 passed / 8 skipped / 0 failed. AL RETOMAR: (1) verificar CI verde y deploy a cranial-trading-dev.web.app; (2) verificar en dev la seccion 'Quien la vende' anonima (reglas+backfill YA aplicados en dev); (3) para PROD solo con OK explicito de Rafael: merge develop->main + `firebase deploy --only firestore:rules --project cranial-trading` + `node scripts/backfill-cardnamelower.cjs --project cranial-trading --apply` (CI NO despliega reglas ni corre backfill); (4) TASK-087 (priority high, reglas users/{uid}/cards allow read:if true) sigue en todo. RED hub merge sigue SIN commitear en working tree.",
+  "handoff_summary": "TASK-085 (busqueda anonima 'quien la vende' en login) implementado, revisado, verificado en vivo, y 2026-07-03 pusheado a develop como v1.37.0 con OK de Rafael. Reglas y backfill de cardNameLower ya aplicados en dev (3791 fixed, 9 wishlist legacy borrados). Working tree conserva el RED hub merge (Contactos->tab de /saved-matches) sin commitear — destino a decidir por Rafael. Landing v1.36.0 sigue pendiente de validacion de Rafael en dev.",
+  "open_questions": [
+    "Working tree sin commitear (RED hub merge): commitear como feature, descartar, o taskear?",
+    "Componentes en Figma via design/figma-build-prompt.md: sigue pendiente de la sesion interactiva de Rafael (aunque el MCP de Figma YA carga en background desde 2026-07-02 — se podria hacer desde aca si Rafael lo pide)",
+    "Tramos A/B/C de la auditoria de fidelidad del prototipo (decision de Rafael)"
+  ],
   "blockers": [],
   "decisions": [
-    "Dropdown header: solo nombres vía /cards/autocomplete (decisión Rafael 2026-06-12)",
-    "/search muestra las 3 fuentes en secciones (decisión Rafael 2026-06-12)",
-    "Borrar SearchBar.vue/SearchResultsGrid.vue/CardGridSearch.vue en commit chore aparte (decisión Rafael 2026-06-12)",
-    "Ningún commit hasta que Rafael verifique en local"
+    "TASK-084+086 cerrados y desplegados a dev (CI verde 2026-07-01). NADA a main sin OK explicito.",
+    "TASK-085: research-first obligatorio antes de tocar codigo (definido en el ticket).",
+    "TASK-085 pusheado a develop 2026-07-03 (v1.37.0) con OK de Rafael; prod (reglas+backfill+merge main) requiere OK explicito aparte.",
+    "Frente cranial-design cerrado 2026-07-03; trabajo de disenio pausado hasta feedback de Rafael."
   ],
   "subagent_results": [],
-  "pending_human_confirmation": null
+  "pending_human_confirmation": "Rafael: (1) validar landing v1.36.0 y TASK-085 v1.37.0 en cranial-trading-dev.web.app; (2) OK explicito para prod de TASK-085 (merge main + reglas + backfill); (3) destino del working tree sin commitear (RED hub merge); (4) revision visual del prototipo cranial-design + tramos A/B/C."
 }

@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { type SimpleMatch, useMatchesStore } from '../../stores/matches'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
+import { getMatchAlertDescription } from '../../utils/matchNotification'
 
 defineProps<{
   active: boolean
@@ -66,15 +67,8 @@ onUnmounted(() => {
   document.removeEventListener('mousedown', handleMouseDown)
 })
 
-const getAlertDescription = (match: SimpleMatch): string => {
-  if (match.type === 'VENDO') {
-    const cardName = match.myCards?.[0]?.name ?? match.myCard?.name ?? '?'
-    return t('matches.notifications.wantsYourCard', { card: cardName })
-  } else {
-    const cardName = match.otherCards?.[0]?.name ?? match.otherCard?.name ?? '?'
-    return t('matches.notifications.hasCardYouWant', { card: cardName })
-  }
-}
+const getAlertDescription = (match: SimpleMatch): string =>
+  getMatchAlertDescription(match, t)
 
 const timeAgo = (date: Date | string | number): string => {
   const d = date instanceof Date ? date : new Date(date)

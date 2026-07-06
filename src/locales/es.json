@@ -312,6 +312,37 @@
     "login": {
       "alreadyHaveAccount": "¿Ya tienes cuenta? Inicia sesión:"
     },
+    "marketplace": {
+      "header": {
+        "searchPlaceholder": "Buscá cualquier carta de Magic…",
+        "loginTrigger": "Iniciar sesión",
+        "wantTrigger": "Quiero",
+        "catalog": "CATÁLOGO",
+        "howItWorks": "CÓMO FUNCIONA",
+        "community": "COMUNIDAD",
+        "createAccount": "CREAR CUENTA GRATIS",
+        "menuAria": "Menú",
+        "personAria": "Iniciar sesión"
+      },
+      "hero": {
+        "badge": "Sin cuenta · Sin comisiones · Sin intermediarios",
+        "ctaSearch": "EMPEZÁ A BUSCAR ↑",
+        "popularLabel": "Búsquedas populares:"
+      },
+      "results": {
+        "titleFor": "Resultados para «{query}»",
+        "noResults": "Sin resultados. Probá con otro nombre.",
+        "wantThis": "Quiero esta"
+      },
+      "sellers": {
+        "title": "Quién la vende"
+      },
+      "modal": {
+        "title": "Creá tu cuenta para tradear",
+        "body": "Para proponer un intercambio por «{card}» necesitás una cuenta — es gratis y toma un minuto.",
+        "haveAccount": "Ya tengo cuenta — Iniciar sesión"
+      }
+    },
     "footer": {
       "platform": "PLATAFORMA",
       "resources": "RECURSOS",

@@ -1,0 +1,44 @@
+{
+  "key": "TASK-086",
+  "title": "Landing/login redesign search-first estilo marketplace (reemplaza LoginView de 2 columnas)",
+  "description": "Origen: Rafael importo un rediseno desde Claude Design (proyecto 'Mobile search-first redesign', archivo 'Cranial Landing Redesign.dc.html'). Spec destilado en design/redesign/SPEC.md.\n\nReemplazo COMPLETO de LoginView.vue: de dos columnas (buscador arriba + form login a la derecha) a un LANDING MARKETPLACE search-first (estilo Card Kingdom): header con wordmark + buscador full-width siempre visible + 'Iniciar sesion' como dropdown + fila de categorias; body que alterna hero+marketing (idle) vs grilla de resultados (al tipear); modal 'crea cuenta para tradear' como gate; mobile con hamburguesa + buscador primero.\n\nCONSTRAINT DURA (Rafael 2026-06-30): copiar SOLO la ESTRUCTURA del mockup; NO cambiar fonts ni colores. Mantener Brother para el wordmark (no Metal Mania) y los tokens Tailwind existentes (primary/silver/neon/rust), no hardcodear hex del mockup.\n\nReusar: loginCardSearch.ts + useSearchStore (busqueda real, ya de TASK-084), authStore.login/loginWithGoogle + handlers existentes (mover el MISMO form al dropdown), contenido marketing + i18n existentes. Supersede la ubicacion del buscador de TASK-084 (el componente/util se reusan).",
+  "acceptance_criteria": [
+    "LoginView reemplazado por el landing marketplace search-first del mockup (estructura), full replace",
+    "Header: wordmark Brother + buscador full-width + 'Iniciar sesion' dropdown con el form de login existente + fila de categorias + CREAR CUENTA",
+    "Body alterna: idle (hero + How It Works + footer CTA) vs active (grilla de resultados reales priced-first) segun query",
+    "Grilla con estados empty/no-results/grid; 'Quiero esta' abre modal de registro (gate)",
+    "Mobile search-first: header hamburguesa + wordmark + persona; buscador full-width como primer contenido; login como sheet del icono persona",
+    "NO se cambian fonts ni colores: Brother para wordmark, tokens existentes para colores, cero hex nuevos del mockup",
+    "Logica pura nueva (toggle idle/active, chips) con unit tests; reuso de tests de loginCardSearch",
+    "i18n de todas las cadenas nuevas en en/es/pt verificado",
+    "Gates verdes: unit, vue-tsc 0, vite build"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "login",
+    "landing",
+    "search",
+    "redesign",
+    "anonymous",
+    "i18n",
+    "feature"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-084"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-06-30T00:00:00.000Z",
+      "body": "## Implementacion + review + fix completos (working tree, SIN commit)\n\n**Developer (TDD):** reemplazo completo de LoginView por landing marketplace search-first. Nuevos: src/components/landing/{LandingHeader,HeaderLoginDropdown,LandingResults,RegisterPromptModal}.vue; loginCardSearch.ts extendido (isSearchActive, setName/typeLine, shouldShowNoResults, formatCardMeta). Borrado LoginCardSearch.vue (absorbido). Reusa busqueda real + auth + marketing/i18n. Constraint de Rafael respetada: estructura del mockup, fonts (Brother) y colores (tokens) SIN cambiar.\n\n**Reviewer (contexto fresco): BLOCK** por HIGH-1 = dos forms de login en el DOM (HeaderLoginDropdown montado en subtree desktop Y mobile, split solo CSS) -> strict-mode rompia auth.setup.ts y TODA la suite autenticada. Confirmado por corrida e2e del orchestrator (14 failed, 103 did not run). + MEDIUM-1 (no-results parpadea al tipear) + LOW (keys muertas, setName/typeLine).\n\n**Fix (mismo developer):** HIGH-1 de raiz -> isDesktop ref (matchMedia) + v-if/v-else, un solo HeaderLoginDropdown montado; saco .first() de los e2e para que regresiones fallen fuerte. MEDIUM-1 -> lastSearchedQuery + shouldShowNoResults (TDD). LOW -> borradas landing.marketplace.results.emptyPrompt y landing.catalogSearch.* en 3 locales; formatCardMeta con separador condicional. Modal close (X+backdrop) verificado.\n\n**Gates VERDES post-fix:** unit 1183/1183, vue-tsc 0, vite build 0, E2E completo 124 passed/8 skipped/0 failed. Verificado en vivo por orchestrator en localhost:5174 (header, idle/active, grilla real, modal con nombre real, dropdown login, no-results-flash arreglado).\n\n**Pendiente:** OK de Rafael + decision de commit (supersede ubicacion de TASK-084). NADA comiteado. Orchestrator re-corriendo e2e en paralelo para corroborar."
+    }
+  ],
+  "created_at": "2026-06-30T00:00:00.000Z",
+  "updated_at": "2026-07-01T00:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

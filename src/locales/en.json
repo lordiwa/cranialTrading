@@ -312,6 +312,37 @@
     "login": {
       "alreadyHaveAccount": "Already have an account? Sign in:"
     },
+    "marketplace": {
+      "header": {
+        "searchPlaceholder": "Search any Magic card…",
+        "loginTrigger": "Sign in",
+        "wantTrigger": "Want",
+        "catalog": "CATALOG",
+        "howItWorks": "HOW IT WORKS",
+        "community": "COMMUNITY",
+        "createAccount": "CREATE FREE ACCOUNT",
+        "menuAria": "Menu",
+        "personAria": "Sign in"
+      },
+      "hero": {
+        "badge": "No account · No fees · No middlemen",
+        "ctaSearch": "START SEARCHING ↑",
+        "popularLabel": "Popular searches:"
+      },
+      "results": {
+        "titleFor": "Results for “{query}”",
+        "noResults": "No results. Try another name.",
+        "wantThis": "I want this"
+      },
+      "sellers": {
+        "title": "Who's selling it"
+      },
+      "modal": {
+        "title": "Create your account to trade",
+        "body": "To propose a trade for “{card}” you need an account — it's free and takes a minute.",
+        "haveAccount": "Already have an account — Sign in"
+      }
+    },
     "footer": {
       "platform": "PLATFORM",
       "resources": "RESOURCES",

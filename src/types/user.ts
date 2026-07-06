@@ -6,4 +6,5 @@ export interface User {
     createdAt: Date;
     lastUsernameChange?: Date | null;
     avatarUrl?: string | null; // Custom avatar URL, if null uses generated avatar
+    tourCompleted?: boolean;   // Server-side onboarding flag (TASK-082)
 }

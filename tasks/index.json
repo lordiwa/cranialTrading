@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T16:48:26.831Z",
+  "generated_at": "2026-06-30T00:00:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -328,20 +328,80 @@
     {
       "key": "TASK-075",
       "title": "Search revamp B: /search como página de resultados central con 3 fuentes (Scryfall + colección + usuarios)",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-076",
       "title": "Search revamp A: header con autocomplete ligero de nombres que navega a /search",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-077",
       "title": "Search revamp C: chore — eliminar componentes de búsqueda muertos",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-078",
+      "title": "QA Happy Path 1: Onboarding (registro + tour guiado)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-079",
+      "title": "QA Happy Path 2: Login de usuario existente y redirección",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-080",
+      "title": "QA Happy Path 3: Loop de registro (conversión de anónimo a cliente)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-081",
+      "title": "QA Happy Path 4: Notificación de match (\"Me interesa\")",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-082",
+      "title": "Persistir flag de onboarding/tour en Firestore (no localStorage)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-083",
+      "title": "Fix: notificación de match en cartas de trade muestra '?' en vez del nombre",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-084",
+      "title": "Buscador de catálogo en la página de login (landing pública liviana para anónimos)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-085",
+      "title": "\"Quién vende\" anónimo en el buscador de login: vendedores públicos + reglas Firestore",
+      "status": "qa",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-086",
+      "title": "Landing/login redesign search-first estilo marketplace (reemplaza LoginView de 2 columnas)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-087",
+      "title": "Seguridad: endurecer regla de users/{uid}/cards — hoy permite leer colección/wishlist privada por query directa",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

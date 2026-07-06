@@ -25,6 +25,8 @@ import BaseModal from '../components/ui/BaseModal.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import MatchCard from '../components/matches/MatchCard.vue'
 import BuyRequestCard from '../components/matches/BuyRequestCard.vue'
+import SavedContactCard from '../components/contacts/SavedContactCard.vue'
+import ChatModal from '../components/chat/ChatModal.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
@@ -48,7 +50,7 @@ const confirmStore = useConfirmStore()
 const { t, locale } = useI18n()
 
 // State
-const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests'>('new')
+const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests' | 'contacts'>('new')
 const highlightedMatchId = ref<string | null>(null)
 const matchesWithEmails = ref<SimpleMatch[]>([])
 const loading = ref(false)
@@ -115,6 +117,13 @@ const tabs = computed(() => [
     label: t('matches.tabs.buyRequests'),
     icon: 'hand',
     count: buyRequestsStore.pendingCount
+  },
+  {
+    // RED hub: Contactos graduates from a separate /contacts page into a tab here.
+    id: 'contacts' as const,
+    label: t('matches.tabs.contacts'),
+    icon: 'user',
+    count: contactsStore.contacts.length
   }
 ])
 
@@ -570,10 +579,39 @@ const handleDiscardMatch = async (matchId: string) => {
   await loadSavedMatchesWithEmails()
 }
 
-const handleTabChange = async (tabId: 'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests') => {
+const handleTabChange = async (tabId: 'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests' | 'contacts') => {
   activeTab.value = tabId
   if (tabId === 'buyRequests') {
     await buyRequestsStore.loadBuyRequests()
+  } else if (tabId === 'contacts') {
+    contactsStore.loadSavedContacts()
+  }
+}
+
+// RED hub — Contactos tab (merged from the former /contacts page)
+const showChat = ref(false)
+const selectedContact = ref<{ id: string; userId?: string; username: string; email?: string } | null>(null)
+
+const handleContactChat = (contact: { id: string; userId?: string; username: string; email?: string }) => {
+  selectedContact.value = contact
+  showChat.value = true
+}
+
+const closeContactChat = () => {
+  showChat.value = false
+  selectedContact.value = null
+}
+
+const handleDeleteContact = async (contactId: string) => {
+  const confirmed = await confirmStore.show({
+    title: t('common.actions.delete'),
+    message: t('contacts.messages.deleted'),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
+    confirmVariant: 'danger'
+  })
+  if (confirmed) {
+    await contactsStore.deleteContact(contactId)
   }
 }
 
@@ -644,6 +682,14 @@ watch(() => route.query.match, (matchId) => {
     void router.replace({ query: { ...route.query, match: undefined } })
   }
 })
+
+// RED hub: the former /contacts route redirects here with ?tab=contacts — open the Contactos tab
+watch(() => route.query.tab, (tab) => {
+  if (tab === 'contacts') {
+    activeTab.value = 'contacts'
+    contactsStore.loadSavedContacts()
+  }
+}, { immediate: true })
 
 // ✅ CARGAR DATOS AL MONTAR
 const initView = async () => {
@@ -760,7 +806,7 @@ onUnmounted(() => {
       </p>
 
       <!-- Progress bar -->
-      <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6 rounded-md">
+      <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6 rounded-none">
         <div class="flex items-center justify-between mb-2">
           <p class="text-small text-neon font-bold">{{ t('dashboard.calculatingMatches.title') }}</p>
           <p class="text-tiny text-silver-70">{{ progressCurrent }} / {{ progressTotal }}</p>
@@ -789,7 +835,7 @@ onUnmounted(() => {
           <SvgIcon :name="tab.icon" size="small" />
           <span>{{ tab.label }}</span>
           <HelpTooltip
-              v-if="tab.id !== 'buyRequests'"
+              v-if="tab.id !== 'buyRequests' && tab.id !== 'contacts'"
               :text="tab.id === 'new' ? t('help.tooltips.matches.tabNew') :
                      tab.id === 'sent' ? t('help.tooltips.matches.tabSent') :
                      tab.id === 'saved' ? t('help.tooltips.matches.tabSaved') :
@@ -799,14 +845,14 @@ onUnmounted(() => {
                       tab.id === 'saved' ? t('help.titles.tabSaved') :
                       t('help.titles.tabDeleted')"
           />
-          <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-sm">
+          <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-none">
             {{ tab.count }}
           </span>
         </button>
       </div>
 
-      <!-- Controls bar (no aplica a Buy Requests) -->
-      <div v-if="activeTab !== 'buyRequests'" class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <!-- Controls bar (no aplica a Buy Requests ni Contactos) -->
+      <div v-if="activeTab !== 'buyRequests' && activeTab !== 'contacts'" class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <!-- Group toggle -->
         <label class="flex items-center gap-2 cursor-pointer">
           <input
@@ -834,7 +880,7 @@ onUnmounted(() => {
         </div>
         <div
             v-else-if="buyRequestsStore.buyRequests.length === 0"
-            class="border border-silver-30 p-6 md:p-8 text-center rounded-md"
+            class="border border-silver-30 p-6 md:p-8 text-center rounded-none"
         >
           <p class="text-body text-silver-70">{{ t('matches.buyRequests.empty.title') }}</p>
           <p class="text-small text-silver-50 mt-2">{{ t('matches.buyRequests.empty.message') }}</p>
@@ -850,13 +896,36 @@ onUnmounted(() => {
         />
       </div>
 
+      <!-- Contactos tab (RED hub merge) -->
+      <div v-else-if="activeTab === 'contacts'">
+        <div v-if="contactsStore.loading" class="flex justify-center items-center py-xl">
+          <BaseLoader size="large" />
+        </div>
+        <div
+            v-else-if="contactsStore.contacts.length === 0"
+            class="border border-silver-30 p-6 md:p-8 text-center"
+        >
+          <p class="text-body text-silver-70">{{ t('contacts.empty.title') }}</p>
+          <p class="text-small text-silver-50 mt-2">{{ t('contacts.empty.message') }}</p>
+        </div>
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+          <SavedContactCard
+              v-for="contact in contactsStore.contacts"
+              :key="contact.id"
+              :contact="contact"
+              @delete="handleDeleteContact"
+              @chat="handleContactChat"
+          />
+        </div>
+      </div>
+
       <!-- Loading state (no progress bar) -->
       <div v-else-if="loading && progressTotal === 0" class="flex justify-center items-center py-xl">
         <BaseLoader size="large" />
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="currentMatches.length === 0 && !loading" class="border border-silver-30 p-6 md:p-8 text-center rounded-md">
+      <div v-else-if="currentMatches.length === 0 && !loading" class="border border-silver-30 p-6 md:p-8 text-center rounded-none">
         <p class="text-body text-silver-70">
           {{ activeTab === 'new' ? t('matches.empty.new.title') :
             activeTab === 'sent' ? t('matches.empty.sent.title') :
@@ -876,7 +945,7 @@ onUnmounted(() => {
         <div
             v-for="group in groupedMatches"
             :key="group.userId"
-            class="border border-silver-30 rounded-md overflow-hidden"
+            class="border border-silver-30 rounded-none overflow-hidden"
         >
           <!-- Group header (SCRUM-71.4: colapsable) -->
           <div class="bg-silver-5 flex items-center gap-2 border-b border-silver-20 pr-3">
@@ -926,7 +995,7 @@ onUnmounted(() => {
                 v-for="(match, idx) in group.matches"
                 :key="match.docId || match.id"
                 :data-match-id="match.docId || match.id"
-                :class="{ 'ring-2 ring-neon rounded-md transition-all duration-500': highlightedMatchId === (match.docId || match.id) }"
+                :class="{ 'ring-2 ring-neon rounded-none transition-all duration-500': highlightedMatchId === (match.docId || match.id) }"
             >
               <MatchCard
                   :match="match"
@@ -946,7 +1015,7 @@ onUnmounted(() => {
             v-for="(match, idx) in currentMatches"
             :key="match.docId || match.id"
             :data-match-id="match.docId || match.id"
-            :class="{ 'ring-2 ring-neon rounded-md transition-all duration-500': highlightedMatchId === (match.docId || match.id) }"
+            :class="{ 'ring-2 ring-neon rounded-none transition-all duration-500': highlightedMatchId === (match.docId || match.id) }"
         >
           <MatchCard
               :match="match"
@@ -999,7 +1068,7 @@ onUnmounted(() => {
             <div
                 v-for="user in blockedUsers"
                 :key="user.odifUserId"
-                class="flex items-center justify-between p-3 border border-silver-30 rounded-md"
+                class="flex items-center justify-between p-3 border border-silver-30 rounded-none"
             >
               <div class="flex items-center gap-3">
                 <img
@@ -1024,5 +1093,13 @@ onUnmounted(() => {
         </div>
       </div>
     </BaseModal>
+
+    <!-- Chat modal for Contactos tab -->
+    <ChatModal
+        :show="showChat"
+        :other-user-id="selectedContact?.userId || ''"
+        :other-username="selectedContact?.username || ''"
+        @close="closeContactChat"
+    />
   </AppContainer>
 </template>

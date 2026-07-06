@@ -6,7 +6,8 @@ test.describe('Contacts', () => {
   });
 
   test('contacts page loads contact list', async ({ contactsPage, page }) => {
-    await expect(page).toHaveURL(/\/contacts/);
+    // RED hub: /contacts now redirects into the merged MATCHES hub (Contactos tab)
+    await expect(page).toHaveURL(/\/saved-matches/);
     await page.waitForTimeout(2000);
     // Page should show contacts or empty state
     const contactsOrEmpty = page.locator('text=/contact|no.*contact/i');

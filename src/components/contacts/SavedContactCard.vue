@@ -32,7 +32,7 @@ const copyEmail = async () => {
 </script>
 
 <template>
-  <div class="border border-silver-30 p-md bg-primary rounded-md">
+  <div class="border border-silver-30 p-md bg-primary rounded-none">
     <div class="mb-md">
       <p class="text-body font-bold text-silver flex items-center gap-2">
         <img

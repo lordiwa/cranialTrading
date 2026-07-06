@@ -27,7 +27,7 @@ const statusClass = (status: BuyRequest['status']) => {
 </script>
 
 <template>
-  <div class="border border-silver-30 rounded-md overflow-hidden">
+  <div class="border border-silver-30 rounded-none overflow-hidden">
     <!-- Header -->
     <div class="bg-silver-5 px-4 py-3 flex items-center gap-3 border-b border-silver-20">
       <div class="flex-1 min-w-0">
@@ -52,7 +52,7 @@ const statusClass = (status: BuyRequest['status']) => {
           </a>
         </div>
       </div>
-      <span class="text-tiny px-2 py-1 rounded-sm font-bold uppercase" :class="statusClass(request.status)">
+      <span class="text-tiny px-2 py-1 rounded-none font-bold uppercase" :class="statusClass(request.status)">
         {{ t(`matches.buyRequests.status.${request.status}`) }}
       </span>
     </div>
@@ -68,7 +68,7 @@ const statusClass = (status: BuyRequest['status']) => {
             :src="item.image"
             :alt="item.name"
             loading="lazy"
-            class="w-10 h-14 object-cover rounded-sm bg-silver-10 flex-shrink-0"
+            class="w-10 h-14 object-cover rounded-none bg-silver-10 flex-shrink-0"
         />
         <div class="flex-1 min-w-0">
           <p class="text-small font-bold text-silver truncate">{{ item.quantity }}× {{ item.name }}</p>

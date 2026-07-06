@@ -154,7 +154,7 @@ const handleSaveContact = async () => {
 </script>
 
 <template>
-  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300 rounded-md bg-primary/80">
+  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300 rounded-none bg-primary/80">
     <!-- Header: Match Title + Compatibility -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
@@ -247,11 +247,11 @@ const handleSaveContact = async () => {
 
     <!-- Match Type Badge -->
     <div class="flex gap-2 mb-6 items-center">
-      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-sm">
+      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-none">
         <SvgIcon name="check" size="tiny" />
         <p class="text-tiny font-bold text-neon">{{ t('matches.card.bidirectional') }}</p>
       </span>
-      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-sm">
+      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-none">
         <p class="text-tiny font-bold text-silver-70">{{ t('matches.card.unidirectional') }}</p>
       </span>
       <HelpTooltip

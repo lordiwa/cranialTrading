@@ -1216,7 +1216,8 @@
       "sent": "SENT",
       "saved": "SAVED",
       "deleted": "DELETED",
-      "buyRequests": "BUY REQUESTS"
+      "buyRequests": "BUY REQUESTS",
+      "contacts": "CONTACTS"
     },
     "buyRequests": {
       "empty": {

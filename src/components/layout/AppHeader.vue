@@ -105,11 +105,11 @@ const closeMobileMenu = () => {
 // Combined badge for matches section (saved + messages + contacts)
 const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessagesCount.value)
 
+// RED hub redesign: MERCADO removed from nav; CONTACTOS merged into the MATCHES hub
+// (rendered as the MatchNotificationsDropdown item below).
 const navigationLinks = computed(() => [
   { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: collectionStore.cards.length },
   { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
-  { path: '/contacts', label: t('header.nav.contacts'), icon: 'user', badge: 0 },
-  { path: '/market', label: t('header.nav.market'), icon: 'fire', badge: 0 },
 ])
 
 const isMatchesActive = computed(() => route.path.startsWith('/saved-matches'))
@@ -178,7 +178,8 @@ onUnmounted(() => {
 <template>
   <header class="bg-primary border-b border-silver-20 sticky top-0 z-50">
     <div class="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-14 md:h-20">
+      <!-- ROW 1: logo · big search · help · avatar -->
+      <div class="flex items-center gap-4 md:gap-6 h-14 md:h-20">
         <!-- Logo -->
         <router-link to="/saved-matches" class="flex items-center gap-2 flex-shrink-0">
           <svg class="w-8 h-8 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
@@ -187,35 +188,13 @@ onUnmounted(() => {
           <span class="hidden sm:inline text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
         </router-link>
 
-        <!-- Navigation Links (Desktop) -->
-        <nav v-if="isAuthenticated" aria-label="Main navigation" class="hidden md:flex items-center gap-1">
-          <router-link
-              v-for="link in navigationLinks"
-              :key="link.path + link.label"
-              :to="link.path"
-              :data-testid="`nav-${link.icon}`"
-              :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
-              :class="[
-                'px-3 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
-                isActive(link.path)
-                  ? 'bg-neon-10 border-b-2 border-neon text-neon'
-                  : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
-              ]"
-          >
-            <span class="relative">
-              <SvgIcon :name="link.icon" size="small" />
-            </span>
-            {{ link.label }}
-          </router-link>
-          <!-- Matches dropdown (replaces simple nav link) -->
-          <MatchNotificationsDropdown data-testid="nav-matches" data-tour="nav-matches" :active="isMatchesActive" />
-        </nav>
-
-        <!-- Global Search (Desktop) -->
-        <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="hidden md:block min-w-0 w-[180px] lg:w-[230px]" />
+        <!-- Global Search (Desktop, promoted + centered) -->
+        <div class="hidden md:flex flex-1 justify-center min-w-0">
+          <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="w-full max-w-[640px] min-w-0" />
+        </div>
 
         <!-- Right side: User & Settings -->
-        <div class="flex items-center gap-2 md:gap-4 flex-shrink-0 ml-2">
+        <div class="flex items-center gap-2 md:gap-4 flex-shrink-0 ml-auto md:ml-0">
           <!-- User Menu -->
           <div v-if="isAuthenticated" class="flex items-center">
             <!-- Mobile search icon -->
@@ -247,18 +226,18 @@ onUnmounted(() => {
                     class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                     :title="t('help.menu.faq')"
                 >
-                  <span class="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+                  <span class="w-5 h-5 md:w-6 md:h-6 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
                 </button>
                 <div
                     v-if="showHelpMenu"
-                    class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-md shadow-lg z-50 overflow-hidden"
+                    class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-none shadow-lg z-50 overflow-hidden"
                 >
                   <RouterLink
                       :to="'/faq'"
                       @click="closeHelpMenu(); closeMobileMenu()"
                       class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
                   >
-                    <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
+                    <span class="w-5 h-5 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
                     {{ t('help.menu.faq') }}
                   </RouterLink>
                   <button
@@ -328,18 +307,18 @@ onUnmounted(() => {
                   class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
                   :title="t('help.menu.faq')"
               >
-                <span class="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+                <span class="w-5 h-5 md:w-6 md:h-6 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
               </button>
               <div
                   v-if="showHelpMenu"
-                  class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-md shadow-lg z-50 overflow-hidden"
+                  class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-none shadow-lg z-50 overflow-hidden"
               >
                 <RouterLink
                     :to="'/faq'"
                     @click="closeHelpMenu(); closeMobileMenu()"
                     class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
                 >
-                  <span class="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
+                  <span class="w-5 h-5 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
                   {{ t('help.menu.faq') }}
                 </RouterLink>
                 <!-- Legal links -->
@@ -377,18 +356,44 @@ onUnmounted(() => {
             </div>
             <a
                 href="/login"
-                class="px-4 py-2 text-silver-70 hover:text-neon transition-fast rounded text-small font-bold"
+                class="px-4 py-2 text-silver-70 hover:text-neon transition-fast rounded-none text-small font-bold"
             >
               {{ t('header.auth.login') }}
             </a>
             <a
                 href="/register"
-                class="px-4 py-2 bg-neon text-primary font-bold hover:bg-neon/90 transition-fast rounded text-small"
+                class="px-4 py-2 bg-neon text-primary font-bold hover:bg-neon/90 transition-fast rounded-none text-small"
             >
               {{ t('header.auth.register') }}
             </a>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ROW 2: primary nav (desktop, authenticated) -->
+    <div v-if="isAuthenticated" class="hidden md:block border-t border-silver-10">
+      <div class="max-w-[1200px] mx-auto px-2 md:px-6 lg:px-8">
+        <nav aria-label="Main navigation" class="flex items-stretch gap-1">
+          <router-link
+              v-for="link in navigationLinks"
+              :key="link.path + link.label"
+              :to="link.path"
+              :data-testid="`nav-${link.icon}`"
+              :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
+              :class="[
+                'px-3 py-3 text-small font-bold transition-fast rounded-none flex items-center gap-2 relative uppercase border-b-2',
+                isActive(link.path)
+                  ? 'border-neon text-neon'
+                  : 'border-transparent text-silver-70 hover:text-silver hover:border-silver'
+              ]"
+          >
+            <SvgIcon :name="link.icon" size="small" />
+            {{ link.label }}
+          </router-link>
+          <!-- MATCHES = merged Matches + Contactos hub -->
+          <MatchNotificationsDropdown data-testid="nav-matches" data-tour="nav-matches" :active="isMatchesActive" />
+        </nav>
       </div>
     </div>
 
@@ -450,7 +455,7 @@ onUnmounted(() => {
           <SvgIcon name="handshake" size="small" />
           <span
               v-if="matchesSectionBadge > 0"
-              class="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-0.5"
+              class="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-rust text-primary text-[10px] font-bold rounded-none flex items-center justify-center px-0.5"
           >
             {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
           </span>
@@ -467,17 +472,6 @@ onUnmounted(() => {
       >
         <SvgIcon name="star" size="small" />
         <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.wishlist') }}</span>
-      </router-link>
-      <!-- Market -->
-      <router-link
-          to="/market"
-          :class="[
-            'flex flex-col items-center gap-0 py-1 px-1 transition-fast min-w-0',
-            isActive('/market') ? 'text-neon' : 'text-silver-50'
-          ]"
-      >
-        <SvgIcon name="fire" size="small" />
-        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.market') }}</span>
       </router-link>
     </div>
   </nav>

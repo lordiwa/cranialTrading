@@ -13,14 +13,13 @@ test.describe('Navigation Smoke Tests', () => {
     await expect(page).toHaveURL(/\/collection/);
   });
 
-  test('nav: Market link navigates to /market', async ({ navigationPage, page }) => {
-    await navigationPage.navigateTo('market');
-    await expect(page).toHaveURL(/\/market/);
-  });
-
-  test('nav: Contacts link navigates to /contacts', async ({ navigationPage, page }) => {
-    await navigationPage.navigateTo('contacts');
-    await expect(page).toHaveURL(/\/contacts/);
+  // RED hub redesign: MERCADO removed from nav and CONTACTOS merged into the MATCHES hub.
+  // The legacy /contacts route now redirects into /saved-matches with the Contactos tab.
+  test('legacy /contacts redirects into the MATCHES hub', async ({ page }) => {
+    await page.goto('/contacts');
+    await expect(page).toHaveURL(/\/saved-matches/);
+    // Contactos tab is present in the merged hub
+    await expect(page.getByRole('button', { name: /contact/i }).first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('nav: Matches dropdown navigates to /saved-matches', async ({ navigationPage, page }) => {

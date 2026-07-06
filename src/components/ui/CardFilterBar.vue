@@ -147,7 +147,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <button
           v-if="showAdvancedFilters"
           type="button"
-          class="flex items-center gap-1 px-3 min-h-[44px] md:min-h-0 md:py-1 rounded border text-tiny font-bold transition-150"
+          class="flex items-center gap-1 px-3 min-h-[44px] md:min-h-0 md:py-1 rounded-none border text-tiny font-bold transition-150"
           :class="activeFilterCount > 0
             ? 'bg-neon text-primary border-neon'
             : 'bg-primary text-silver border-silver-30 hover:border-neon hover:text-neon'"
@@ -160,13 +160,13 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <span>{{ t('discovery.mobile.openSheetFilter') }}</span>
         <span
             v-if="activeFilterCount > 0"
-            class="ml-1 px-1.5 rounded-full bg-primary text-neon text-tiny font-bold"
+            class="ml-1 px-1.5 rounded-none bg-primary text-neon text-tiny font-bold"
         >{{ activeFilterCount }}</span>
       </button>
       <button
           v-if="showMobileDiscover"
           type="button"
-          class="md:hidden flex items-center gap-1 px-3 min-h-[44px] rounded border text-tiny font-bold transition-150"
+          class="md:hidden flex items-center gap-1 px-3 min-h-[44px] rounded-none border text-tiny font-bold transition-150"
           :class="mobileDiscoverActive
             ? 'bg-neon text-primary border-neon'
             : 'bg-primary text-neon border-neon hover:bg-neon hover:text-primary'"
@@ -187,7 +187,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="sortBy"
             @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="recent">{{ t('collection.sort.recent') }}</option>
           <option value="name">{{ t('collection.sort.name') }}</option>
@@ -201,7 +201,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="groupBy"
             @change="emit('update:groupBy', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="none">{{ t('collection.group.none') }}</option>
           <option value="name">{{ t('collection.group.name') }}</option>
@@ -217,7 +217,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="viewType"
             @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'visual' | 'texto')"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <option value="visual">{{ t('collection.view.visual') }}</option>
           <option value="texto">{{ t('collection.view.texto') }}</option>
@@ -230,7 +230,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
           v-if="showBulkSelect"
           @click="emit('toggle-bulk-select')"
           :class="[
-            'px-2 py-1 text-tiny font-bold rounded transition-colors flex items-center gap-1',
+            'px-2 py-1 text-tiny font-bold rounded-none transition-colors flex items-center gap-1',
             selectionMode ? 'bg-rust/20 text-rust' : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
           ]"
           :title="t('collection.bulkDelete.toggle')"

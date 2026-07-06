@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useI18n } from '../../composables/useI18n'
 import type { Card } from '../../types/card'
 
 const props = withDefaults(defineProps<{
@@ -33,6 +34,8 @@ const emit = defineEmits<{
   addToCart: [card: Card]
   toggleSelect: [cardId: string]
 }>()
+
+const { t } = useI18n()
 
 // Ref for IntersectionObserver
 const compactCardRef = ref<HTMLElement | null>(null)
@@ -118,7 +121,14 @@ onUnmounted(() => {
 
 <template>
   <div ref="compactCardRef" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
-    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded">
+    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded-none">
+      <!-- TRADE / SALE chip -->
+      <div
+          v-if="card.status === 'trade' || card.status === 'sale'"
+          class="absolute top-1 left-1 z-10 bg-neon text-primary text-[10px] font-bold uppercase px-1.5 py-0.5"
+      >
+        {{ card.status === 'sale' ? t('common.status.sale') : t('common.status.trade') }}
+      </div>
       <template v-if="hasImage">
         <img
             :src="getCardImage(card)"
@@ -138,7 +148,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Qty Badge - BIGGER for compact -->
-      <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1 rounded">
+      <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1 rounded-none">
         <p class="text-small font-bold text-neon">x{{ card.quantity }}</p>
       </div>
     </div>

@@ -1216,7 +1216,8 @@
       "sent": "ENVIADOS",
       "saved": "SALVOS",
       "deleted": "EXCLUÍDOS",
-      "buyRequests": "PEDIDOS"
+      "buyRequests": "PEDIDOS",
+      "contacts": "CONTATOS"
     },
     "buyRequests": {
       "empty": {

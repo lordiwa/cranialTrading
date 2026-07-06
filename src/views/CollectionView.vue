@@ -915,6 +915,7 @@ onUnmounted(() => {
         <h1 class="text-h1 font-bold text-silver">{{ t('collection.title') }}</h1>
         <p class="text-small text-silver-70">
           {{ t('collection.subtitle', { owned: ownedCount }) }}
+          <span v-if="availableCount > 0" class="text-neon">• {{ availableCount }} {{ t('collection.filters.available') }}</span>
           <span v-if="wishlistTotalCount > 0" class="text-yellow-400">• {{ t('collection.wishlistCount', { count: wishlistTotalCount }) }}</span>
         </p>
       </div>
@@ -934,21 +935,21 @@ onUnmounted(() => {
           <div class="flex gap-1 mb-4">
             <RouterLink
                 to="/collection"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center bg-neon text-primary"
+                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded-none text-center bg-neon text-primary"
             >
               {{ t('collection.tabs.collection') }}
             </RouterLink>
             <RouterLink
                 data-tour="deck-tab"
                 to="/decks"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded-none text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
             >
               {{ t('collection.tabs.decks') }}
               <span class="ml-1 opacity-70">({{ decksList.length }})</span>
             </RouterLink>
             <RouterLink
                 to="/binders"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded-none text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
             >
               {{ t('collection.tabs.binders') }}
               <span class="ml-1 opacity-70">({{ bindersList.length }})</span>
@@ -971,7 +972,7 @@ onUnmounted(() => {
             <button
                 @click="statusFilter = status as typeof statusFilter"
                 :class="[
-                  'px-3 py-2 md:py-1 min-h-[44px] md:min-h-0 text-small md:text-tiny font-bold whitespace-nowrap transition-150 rounded',
+                  'px-3 py-2 md:py-1 min-h-[44px] md:min-h-0 text-small md:text-tiny font-bold whitespace-nowrap transition-150 rounded-none',
                   statusFilter === status
                     ? 'bg-neon text-primary'
                     : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
@@ -1224,7 +1225,7 @@ button {
 
 ::-webkit-scrollbar-thumb {
   background: #666666;
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {

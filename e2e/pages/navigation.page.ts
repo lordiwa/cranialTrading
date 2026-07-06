@@ -3,9 +3,7 @@ import { type Page, type Locator } from '@playwright/test';
 export class NavigationPage {
   readonly page: Page;
   readonly collectionLink: Locator;
-  readonly marketLink: Locator;
   readonly matchesLink: Locator;
-  readonly contactsLink: Locator;
   readonly wishlistLink: Locator;
   readonly globalSearch: Locator;
   readonly helpMenu: Locator;
@@ -21,9 +19,7 @@ export class NavigationPage {
   constructor(page: Page) {
     this.page = page;
     this.collectionLink = page.locator('[data-testid="nav-collection"], [data-tour="nav-collection"]').first();
-    this.marketLink = page.locator('[data-testid="nav-fire"]');
     this.matchesLink = page.locator('[data-testid="nav-matches"]');
-    this.contactsLink = page.locator('[data-testid="nav-user"]');
     this.wishlistLink = page.locator('[data-testid="nav-star"]');
     this.globalSearch = page.locator('[data-tour="nav-search"]');
     this.helpMenu = page.locator('button:has-text("?")');
@@ -40,9 +36,7 @@ export class NavigationPage {
   async navigateTo(section: string) {
     const links: Record<string, Locator> = {
       collection: this.collectionLink,
-      market: this.marketLink,
       matches: this.matchesLink,
-      contacts: this.contactsLink,
       wishlist: this.wishlistLink,
     };
     const link = links[section];

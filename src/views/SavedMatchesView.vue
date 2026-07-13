@@ -27,12 +27,19 @@ import MatchCard from '../components/matches/MatchCard.vue'
 import BuyRequestCard from '../components/matches/BuyRequestCard.vue'
 import SavedContactCard from '../components/contacts/SavedContactCard.vue'
 import ChatModal from '../components/chat/ChatModal.vue'
-import SvgIcon from '../components/ui/SvgIcon.vue'
 import HelpTooltip from '../components/ui/HelpTooltip.vue'
+import IconV2 from '../components/ui/IconV2.vue'
 import { getAvatarUrlForUser } from '../utils/avatar'
 import { getMatchExpirationDate } from '../utils/matchExpiry'
 import { groupMatchesByUser } from '../utils/matchGrouping'
 import { matchIdentityKey } from '../utils/matchDedup'
+import {
+  buildMatchChipSummaries,
+  defaultExpandedGroupIds,
+  type MatchChipId,
+  selectMatchesForChip,
+  sumPotentialValue,
+} from '../utils/matchChipFilter'
 import { getTotalUserCount } from '../services/stats'
 import type { CardCondition, CardStatus } from '../types/card'
 
@@ -50,7 +57,14 @@ const confirmStore = useConfirmStore()
 const { t, locale } = useI18n()
 
 // State
-const activeTab = ref<'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests' | 'contacts'>('new')
+// v2 redesign — 6 tabs collapse to 3 primary tabs; the 4 match states (new/sent/
+// saved/deleted) become filter chips inside the MATCHES primary tab (F2, see
+// cranial-design/prototype/DESIGN-DIRECTION.md §8.2).
+type PrimaryTab = 'matches' | 'buyRequests' | 'contacts'
+const activeTab = ref<PrimaryTab>('matches')
+const activeChip = ref<MatchChipId>('new')
+const showOverflowMenu = ref(false)
+const overflowMenuRef = ref<HTMLElement | null>(null)
 const highlightedMatchId = ref<string | null>(null)
 const matchesWithEmails = ref<SimpleMatch[]>([])
 const loading = ref(false)
@@ -86,36 +100,18 @@ const sentMatches = computed(() => matchesStore.sentMatches)
 const savedMatches = computed(() => matchesStore.savedMatches)
 const deletedMatches = computed(() => matchesStore.deletedMatches)
 
-// Tabs configuration
-const tabs = computed(() => [
+// Primary tabs configuration (3: Matches · Solicitudes · Contactos)
+const primaryTabs = computed(() => [
   {
-    id: 'new' as const,
-    label: t('matches.tabs.new'),
-    icon: 'dot',
-    count: newMatches.value.length
-  },
-  {
-    id: 'sent' as const,
-    label: t('matches.tabs.sent'),
-    icon: 'hand',
-    count: sentMatches.value.length
-  },
-  {
-    id: 'saved' as const,
-    label: t('matches.tabs.saved'),
-    icon: 'star',
-    count: savedMatches.value.length
-  },
-  {
-    id: 'deleted' as const,
-    label: t('matches.tabs.deleted'),
-    icon: 'trash',
-    count: deletedMatches.value.length
+    id: 'matches' as const,
+    label: t('matches.primaryTabs.matches'),
+    icon: 'swap',
+    count: 0,
   },
   {
     id: 'buyRequests' as const,
     label: t('matches.tabs.buyRequests'),
-    icon: 'hand',
+    icon: 'chat',
     count: buyRequestsStore.pendingCount
   },
   {
@@ -127,30 +123,48 @@ const tabs = computed(() => [
   }
 ])
 
-// Group matches by user option
+// Filter chips within the MATCHES primary tab — counts come straight from the
+// store's raw arrays (matchChipFilter.ts is pure/tested, see tests/unit/utils/matchChipFilter.test.ts).
+const matchChips = computed(() => buildMatchChipSummaries({
+  new: newMatches.value,
+  sent: sentMatches.value,
+  saved: savedMatches.value,
+  deleted: deletedMatches.value,
+}))
+
+// Group matches by user — v2 redesign always shows the grouped "vitrina" view (no
+// manual toggle in the UI, DESIGN-DIRECTION.md §8.2). The flat (ungrouped) branch
+// below stays as a dead-code safety net; its removal is deferred to TASK-106.
 const groupByUser = ref(true)
 
 // SCRUM-71.4: grupos colapsables. Por defecto TODOS colapsados — un grupo solo
-// está expandido si su userId está en este Set (estado independiente por grupo).
-const expandedGroups = ref<Set<string>>(new Set())
-const isGroupExpanded = (userId: string) => expandedGroups.value.has(userId)
+// está expandido si su userId está en este Set. Se trackea POR CHIP (Map keyed by
+// MatchChipId) porque cada chip (new/sent/saved/deleted) tiene su propio conjunto de
+// grupos — compartir un único Set entre chips pisaba el estado del chip anterior en
+// un round-trip new→sent→new, dejando todos los grupos colapsados (review finding).
+const expandedGroupsByChip = ref<Map<MatchChipId, Set<string>>>(new Map())
+const currentExpandedGroups = computed(() => expandedGroupsByChip.value.get(activeChip.value) ?? new Set<string>())
+const isGroupExpanded = (userId: string) => currentExpandedGroups.value.has(userId)
 const toggleGroup = (userId: string) => {
-  const next = new Set(expandedGroups.value)
+  const next = new Set(currentExpandedGroups.value)
   if (next.has(userId)) next.delete(userId)
   else next.add(userId)
-  expandedGroups.value = next
+  const map = new Map(expandedGroupsByChip.value)
+  map.set(activeChip.value, next)
+  expandedGroupsByChip.value = map
 }
 
-// Current tab matches
-const currentMatches = computed(() => {
-  switch (activeTab.value) {
-    case 'new': return newMatches.value
-    case 'sent': return sentMatches.value
-    case 'saved': return matchesWithEmails.value
-    case 'deleted': return deletedMatches.value
-    default: return []
-  }
-})
+// Current chip's matches — 'saved' reads from matchesWithEmails (email-enriched)
+// while chip counts above read from the raw store array (savedMatches).
+const currentMatches = computed(() => selectMatchesForChip(activeChip.value, {
+  new: newMatches.value,
+  sent: sentMatches.value,
+  saved: matchesWithEmails.value,
+  deleted: deletedMatches.value,
+}))
+
+// Potential value stat-chip: sum of what you'd receive across your new matches.
+const potentialValue = computed(() => sumPotentialValue(newMatches.value))
 
 // Grouped matches by user
 const groupedMatches = computed(() => {
@@ -174,6 +188,20 @@ const groupedMatches = computed(() => {
 
   return Object.values(groups).sort((a, b) => b.matches.length - a.matches.length)
 })
+
+// v2 redesign — first group expanded by default, rest collapsed (never a screen of
+// pure collapsed headers). Applied once per chip the first time its group list becomes
+// non-empty, writing only that chip's entry in the map so other chips' expansion state
+// (default or user-toggled) survives switching away and back.
+const chipsWithDefaultExpansion = ref<Set<MatchChipId>>(new Set())
+watch(groupedMatches, (groups) => {
+  if (!groups || groups.length === 0) return
+  if (chipsWithDefaultExpansion.value.has(activeChip.value)) return
+  const map = new Map(expandedGroupsByChip.value)
+  map.set(activeChip.value, defaultExpandedGroupIds(groups.map(g => g.userId)))
+  expandedGroupsByChip.value = map
+  chipsWithDefaultExpansion.value = new Set(chipsWithDefaultExpansion.value).add(activeChip.value)
+}, { immediate: true })
 
 // Today's matches (for bulk action)
 const todaysNewMatches = computed(() => {
@@ -546,6 +574,18 @@ const calculateMatches = async () => {
   }
 }
 
+// v2 redesign — Recalcular + Sincronizar fuse into a single "Actualizar" button
+// (F2, DESIGN-DIRECTION.md §8.2). Sync first (push my collection to public data),
+// then recalculate matches against everyone else's now-fresher public data.
+const refreshing = computed(() => loading.value || syncing.value)
+const canRefresh = computed(() =>
+  !refreshing.value && (collectionStore.cards.length > 0 || preferencesStore.preferences.length > 0)
+)
+const handleRefresh = async () => {
+  await syncPublicData()
+  await calculateMatches()
+}
+
 // ========== MATCH ACTIONS ==========
 
 const handleSaveMatch = async (match: SimpleMatch) => {
@@ -574,17 +614,27 @@ const handleDiscardMatch = async (matchId: string) => {
   }
 
   // Otherwise use the store for tab-based matches
-  const tab = activeTab.value === 'new' ? 'new' : 'saved'
+  const tab = activeChip.value === 'new' ? 'new' : 'saved'
   await matchesStore.discardMatch(matchId, tab)
   await loadSavedMatchesWithEmails()
 }
 
-const handleTabChange = async (tabId: 'new' | 'sent' | 'saved' | 'deleted' | 'buyRequests' | 'contacts') => {
+const handleTabChange = async (tabId: PrimaryTab) => {
   activeTab.value = tabId
   if (tabId === 'buyRequests') {
     await buyRequestsStore.loadBuyRequests()
   } else if (tabId === 'contacts') {
     contactsStore.loadSavedContacts()
+  }
+}
+
+const handleChipChange = (chipId: MatchChipId) => {
+  activeChip.value = chipId
+}
+
+const handleOverflowMenuClickOutside = (e: MouseEvent) => {
+  if (overflowMenuRef.value && !overflowMenuRef.value.contains(e.target as Node)) {
+    showOverflowMenu.value = false
   }
 }
 
@@ -662,7 +712,11 @@ const scrollToMatch = async (matchId: string) => {
   // SCRUM-71.4: si el match está en un grupo colapsado, expandirlo antes de hacer scroll
   if (groupByUser.value) {
     const target = currentMatches.value.find(m => m.docId === matchId || m.id === matchId)
-    if (target) expandedGroups.value = new Set(expandedGroups.value).add(target.otherUserId)
+    if (target) {
+      const map = new Map(expandedGroupsByChip.value)
+      map.set(activeChip.value, new Set(currentExpandedGroups.value).add(target.otherUserId))
+      expandedGroupsByChip.value = map
+    }
   }
   await nextTick()
   setTimeout(() => {
@@ -677,7 +731,8 @@ const scrollToMatch = async (matchId: string) => {
 // Watch for match query param
 watch(() => route.query.match, (matchId) => {
   if (matchId && typeof matchId === 'string') {
-    activeTab.value = 'new'
+    activeTab.value = 'matches'
+    activeChip.value = 'new'
     void scrollToMatch(matchId)
     void router.replace({ query: { ...route.query, match: undefined } })
   }
@@ -730,80 +785,99 @@ onMounted(() => {
   void initView().then(() => {
     const matchId = route.query.match
     if (matchId && typeof matchId === 'string') {
-      activeTab.value = 'new'
+      activeTab.value = 'matches'
+      activeChip.value = 'new'
       void scrollToMatch(matchId)
       void router.replace({ query: { ...route.query, match: undefined } })
     }
   })
+  document.addEventListener('click', handleOverflowMenuClickOutside)
 })
 
 onUnmounted(() => {
   contactsStore.stopListeningContacts()
+  document.removeEventListener('click', handleOverflowMenuClickOutside)
 })
 </script>
 
 <template>
   <AppContainer>
     <div>
-      <!-- Header -->
+      <!-- Header (v2 redesign — stat-chips + unified Actualizar, F2 DESIGN-DIRECTION.md §8.2) -->
       <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-lg md:mb-xl">
         <div>
-          <h1 class="text-h2 md:text-h1 font-bold text-silver mb-sm flex items-center gap-sm">
+          <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-1">{{ t('matches.header.kicker') }}</p>
+          <h1 class="font-display text-h2 md:text-h1 font-bold text-silver flex items-center gap-sm">
             {{ t('matches.title') }}
             <HelpTooltip
                 :text="t('help.tooltips.matches.compatibility')"
                 :title="t('help.titles.compatibility')"
             />
           </h1>
-          <p class="text-small md:text-body text-silver-70">
-            {{ t('matches.subtitle') }}
-          </p>
+          <div class="flex flex-wrap gap-2.5 mt-3.5">
+            <div class="flex flex-col gap-0.5 px-4 py-2.5 bg-surface-1 border border-line rounded-lg">
+              <span class="font-display font-tnum text-[26px] font-bold leading-none text-neon">{{ newMatches.length }}</span>
+              <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('matches.header.newMatches') }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5 px-4 py-2.5 bg-surface-1 border border-line rounded-lg">
+              <span class="font-display font-tnum text-[20px] font-bold leading-none text-silver">${{ potentialValue.toFixed(0) }}</span>
+              <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('matches.header.potentialValue') }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5 px-4 py-2.5 bg-surface-1 border border-line rounded-lg">
+              <span class="font-display font-tnum text-[20px] font-bold leading-none text-silver">{{ totalUsers }}</span>
+              <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('matches.header.activeTraders') }}</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Action buttons -->
-        <div class="flex flex-col md:flex-row gap-2">
+        <!-- Head tools: unified refresh + overflow menu -->
+        <div class="flex items-center gap-3">
           <div class="flex items-center gap-1">
-            <BaseButton
-                variant="secondary"
-                size="small"
-                @click="calculateMatches"
-                :disabled="loading || (collectionStore.cards.length === 0 && preferencesStore.preferences.length === 0)"
-                class="w-full md:w-auto"
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 min-h-9 px-3.5 rounded-md border border-line-strong text-silver-70 text-tiny font-bold uppercase tracking-wide transition-all duration-200 ease-v2 hover:border-silver-30 hover:text-silver hover:bg-surface-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="!canRefresh"
+                @click="handleRefresh"
             >
-              {{ loading ? t('dashboard.calculating') : t('dashboard.recalculate') }}
-            </BaseButton>
-            <HelpTooltip :text="t('help.tooltips.dashboard.recalculate')" :title="t('help.titles.recalculate')" />
+              <IconV2 name="sync" :size="16" :class="{ 'animate-spin': refreshing }" />
+              {{ refreshing ? t('matches.actions.refreshing') : t('matches.actions.refresh') }}
+            </button>
+            <HelpTooltip :text="t('help.tooltips.dashboard.refreshMatches')" :title="t('help.titles.refreshMatches')" />
           </div>
-          <div class="flex items-center gap-1">
-            <BaseButton
-                variant="secondary"
-                size="small"
-                @click="syncPublicData"
-                :disabled="syncing"
-                class="w-full md:w-auto"
+          <span v-if="collectionStore.lastSyncAt" class="text-tiny text-silver-30 whitespace-nowrap">
+            {{ formatLastSync(collectionStore.lastSyncAt) }}
+          </span>
+
+          <div ref="overflowMenuRef" class="relative">
+            <button
+                type="button"
+                class="w-10 h-10 inline-flex items-center justify-center rounded-md text-silver-50 hover:text-silver hover:bg-surface-2 transition-colors"
+                :aria-label="t('matches.menu.moreOptions')"
+                aria-haspopup="menu"
+                :aria-expanded="showOverflowMenu"
+                @click="showOverflowMenu = !showOverflowMenu"
             >
-              {{ syncing ? t('dashboard.syncing') : t('dashboard.sync') }}
-            </BaseButton>
-            <HelpTooltip :text="t('help.tooltips.dashboard.sync')" :title="t('help.titles.sync')" />
-          </div>
-          <div class="flex items-center gap-1">
-            <BaseButton
-                variant="secondary"
-                size="small"
-                @click="openBlockedUsersModal"
-                class="w-full md:w-auto"
+              <IconV2 name="dots" :size="20" />
+            </button>
+            <div
+                v-if="showOverflowMenu"
+                role="menu"
+                class="absolute top-[calc(100%+8px)] right-0 min-w-[200px] bg-[#0b0b0b] border border-line-strong rounded-md shadow-strong p-1.5 z-50"
             >
-              {{ t('dashboard.blockedUsers') }} ({{ discardedMatchIds.size }})
-            </BaseButton>
-            <HelpTooltip :text="t('help.tooltips.dashboard.blockedUsers')" :title="t('help.titles.blockedUsers')" />
+              <button
+                  type="button"
+                  role="menuitem"
+                  class="flex w-full items-center gap-2.5 min-h-10 px-2.5 rounded text-small text-silver-70 hover:bg-surface-2 hover:text-silver transition-colors"
+                  @click="showOverflowMenu = false; openBlockedUsersModal()"
+              >
+                <IconV2 name="block" :size="18" />
+                {{ t('dashboard.blockedUsers') }}
+                <span class="ml-auto font-display font-tnum text-tiny text-silver-50">{{ discardedMatchIds.size }}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      <!-- Last sync indicator -->
-      <p v-if="collectionStore.lastSyncAt" class="text-tiny text-silver-50 mb-4">
-        {{ t('dashboard.lastSync') }}: {{ formatLastSync(collectionStore.lastSyncAt) }}
-      </p>
 
       <!-- Progress bar -->
       <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6 rounded-none">
@@ -819,56 +893,47 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Tabs -->
-      <div class="flex flex-wrap gap-sm md:gap-md mb-lg md:mb-xl border-b border-silver-20">
+      <!-- Primary tabs: MATCHES · SOLICITUDES · CONTACTOS -->
+      <!-- No role="tab"/"tablist": plain buttons, same ARIA shape as before (v1) —
+           e2e/pages/navigation.page.ts and matches.page.ts locate these via getByRole('button'). -->
+      <nav class="flex gap-0.5 border-b border-line mb-5 overflow-x-auto" :aria-label="t('matches.primaryTabs.nav')">
         <button
-            v-for="tab in tabs"
+            v-for="tab in primaryTabs"
             :key="tab.id"
-            @click="handleTabChange(tab.id)"
+            type="button"
+            :aria-current="activeTab === tab.id ? 'page' : undefined"
             :class="[
-            'pb-md border-b-2 transition-fast whitespace-nowrap font-bold text-small md:text-body flex items-center gap-sm',
-            activeTab === tab.id
-              ? 'border-neon text-neon'
-              : 'border-transparent text-silver-70 hover:text-silver'
-          ]"
+              'relative inline-flex items-center gap-2 px-4 py-3 text-tiny font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors duration-200 ease-v2',
+              activeTab === tab.id ? 'text-neon border-neon' : 'text-silver-50 border-transparent hover:text-silver'
+            ]"
+            @click="handleTabChange(tab.id)"
         >
-          <SvgIcon :name="tab.icon" size="small" />
-          <span>{{ tab.label }}</span>
-          <HelpTooltip
-              v-if="tab.id !== 'buyRequests' && tab.id !== 'contacts'"
-              :text="tab.id === 'new' ? t('help.tooltips.matches.tabNew') :
-                     tab.id === 'sent' ? t('help.tooltips.matches.tabSent') :
-                     tab.id === 'saved' ? t('help.tooltips.matches.tabSaved') :
-                     t('help.tooltips.matches.tabDeleted')"
-              :title="tab.id === 'new' ? t('help.titles.tabNew') :
-                      tab.id === 'sent' ? t('help.titles.tabSent') :
-                      tab.id === 'saved' ? t('help.titles.tabSaved') :
-                      t('help.titles.tabDeleted')"
-          />
-          <span v-if="tab.count > 0" class="text-tiny bg-neon text-primary px-sm py-xs font-bold rounded-none">
-            {{ tab.count }}
-          </span>
+          <IconV2 :name="tab.icon" :size="17" />
+          {{ tab.label }}
+          <span v-if="tab.count > 0" class="font-display font-tnum text-[13px] font-semibold text-silver-50">{{ tab.count }}</span>
+        </button>
+      </nav>
+
+      <!-- Filter chips (within MATCHES): Nuevos · Enviados · Guardados · Eliminados -->
+      <div v-if="activeTab === 'matches'" class="flex flex-wrap gap-2 mb-5">
+        <button
+            v-for="chip in matchChips"
+            :key="chip.id"
+            type="button"
+            :class="[
+              'inline-flex items-center gap-2 min-h-9 px-3.5 rounded-full text-small font-semibold border transition-all duration-200 ease-v2',
+              activeChip === chip.id ? 'text-neon bg-neon-10 border-neon-40' : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'
+            ]"
+            @click="handleChipChange(chip.id)"
+        >
+          {{ t(`matches.tabs.${chip.id}`) }}
+          <span class="font-display font-tnum font-bold">{{ chip.count }}</span>
         </button>
       </div>
 
-      <!-- Controls bar (no aplica a Buy Requests ni Contactos) -->
-      <div v-if="activeTab !== 'buyRequests' && activeTab !== 'contacts'" class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <!-- Group toggle -->
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-              v-model="groupByUser"
-              type="checkbox"
-              class="w-4 h-4 accent-neon"
-          />
-          <span class="text-small text-silver-70">{{ t('matches.controls.groupByUser') }}</span>
-        </label>
-
-        <!-- Bulk action -->
-        <BaseButton
-            v-if="activeTab === 'new' && todaysNewMatches.length > 0"
-            size="small"
-            @click="handleSaveAllToday"
-        >
+      <!-- Bulk action (Matches / Nuevos only) -->
+      <div v-if="activeTab === 'matches' && activeChip === 'new' && todaysNewMatches.length > 0" class="flex justify-end mb-4">
+        <BaseButton size="small" @click="handleSaveAllToday">
           {{ t('matches.controls.saveAllToday', { count: todaysNewMatches.length }) }}
         </BaseButton>
       </div>
@@ -927,28 +992,28 @@ onUnmounted(() => {
       <!-- Empty state -->
       <div v-else-if="currentMatches.length === 0 && !loading" class="border border-silver-30 p-6 md:p-8 text-center rounded-none">
         <p class="text-body text-silver-70">
-          {{ activeTab === 'new' ? t('matches.empty.new.title') :
-            activeTab === 'sent' ? t('matches.empty.sent.title') :
-            activeTab === 'saved' ? t('matches.empty.saved.title') :
+          {{ activeChip === 'new' ? t('matches.empty.new.title') :
+            activeChip === 'sent' ? t('matches.empty.sent.title') :
+            activeChip === 'saved' ? t('matches.empty.saved.title') :
                 t('matches.empty.deleted.title') }}
         </p>
         <p class="text-small text-silver-50 mt-2">
-          {{ activeTab === 'new' ? t('matches.empty.new.message') :
-            activeTab === 'sent' ? t('matches.empty.sent.message') :
-            activeTab === 'saved' ? t('matches.empty.saved.message') :
+          {{ activeChip === 'new' ? t('matches.empty.new.message') :
+            activeChip === 'sent' ? t('matches.empty.sent.message') :
+            activeChip === 'saved' ? t('matches.empty.saved.message') :
                 t('matches.empty.deleted.message') }}
         </p>
       </div>
 
       <!-- Matches list - Grouped by user -->
-      <div v-else-if="groupByUser && groupedMatches" class="space-y-8">
+      <div v-else-if="groupByUser && groupedMatches" class="space-y-3.5">
         <div
             v-for="group in groupedMatches"
             :key="group.userId"
-            class="border border-silver-30 rounded-none overflow-hidden"
+            class="border border-line rounded-lg overflow-hidden"
         >
-          <!-- Group header (SCRUM-71.4: colapsable) -->
-          <div class="bg-silver-5 flex items-center gap-2 border-b border-silver-20 pr-3">
+          <!-- Group header (SCRUM-71.4: colapsable; v2 surface tokens F2 §8.2) -->
+          <div class="bg-surface-2 flex items-center gap-2 border-b border-line pr-3">
             <button
                 type="button"
                 class="flex-1 flex items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-inset"
@@ -959,22 +1024,19 @@ onUnmounted(() => {
                   : t('matches.controls.expandGroup', { username: group.username })"
                 @click="toggleGroup(group.userId)"
             >
-              <span
-                  aria-hidden="true"
-                  class="inline-block text-silver-70 transition-transform duration-200"
-                  :class="{ 'rotate-90': isGroupExpanded(group.userId) }"
-              >▸</span>
+              <IconV2 :name="isGroupExpanded(group.userId) ? 'chev-d' : 'chev-r'" :size="18" class="text-silver-50 flex-shrink-0" />
               <img
                   :src="getAvatarUrlForUser(group.username, 32, group.avatarUrl)"
                   alt=""
-                  class="w-8 h-8 rounded-full"
+                  class="w-8 h-8 rounded-full flex-shrink-0"
               />
               <span class="flex-1 min-w-0">
-                <span class="block text-body font-bold text-neon truncate">@{{ group.username }}</span>
+                <span class="block font-display text-body font-bold text-neon truncate">@{{ group.username }}</span>
                 <span v-if="group.location" class="block text-tiny text-silver-50">{{ group.location }}</span>
               </span>
-              <span class="text-small text-silver-70 whitespace-nowrap">
-                {{ group.matches.length }} {{ t('matches.controls.matchesCount') }}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-3 text-tiny text-silver-70 whitespace-nowrap">
+                <span class="font-display font-tnum font-bold text-neon">{{ group.matches.length }}</span>
+                {{ t('matches.controls.matchesCount') }}
               </span>
             </button>
             <router-link
@@ -1000,7 +1062,7 @@ onUnmounted(() => {
               <MatchCard
                   :match="match"
                   :match-index="idx + 1"
-                  :tab="activeTab"
+                  :tab="activeChip"
                   @save="handleSaveMatch"
                   @discard="handleDiscardMatch"
               />
@@ -1020,7 +1082,7 @@ onUnmounted(() => {
           <MatchCard
               :match="match"
               :match-index="idx + 1"
-              :tab="activeTab"
+              :tab="activeChip"
               @save="handleSaveMatch"
               @discard="handleDiscardMatch"
           />

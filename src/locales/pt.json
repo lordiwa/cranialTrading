@@ -1220,15 +1220,27 @@
   },
 
   "matches": {
-    "title": "MEUS MATCHES",
-    "subtitle": "novos, enviados, salvos",
+    "title": "Matches",
     "tabs": {
-      "new": "NOVOS",
-      "sent": "ENVIADOS",
-      "saved": "SALVOS",
-      "deleted": "EXCLUÍDOS",
+      "new": "Novos",
+      "sent": "Enviados",
+      "saved": "Salvos",
+      "deleted": "Excluídos",
       "buyRequests": "PEDIDOS",
       "contacts": "CONTATOS"
+    },
+    "primaryTabs": {
+      "matches": "MATCHES",
+      "nav": "Seções de Matches"
+    },
+    "header": {
+      "kicker": "Sua vitrine de trocas",
+      "newMatches": "Novos matches",
+      "potentialValue": "Valor potencial",
+      "activeTraders": "Traders ativos"
+    },
+    "menu": {
+      "moreOptions": "Mais opções"
     },
     "buyRequests": {
       "empty": {
@@ -1289,7 +1301,9 @@
       "youReceiveAdvantage": "Você recebe vantagem",
       "otherReceivesAdvantage": "O outro recebe vantagem",
       "bidirectional": "BIDIRECIONAL",
-      "unidirectional": "→ UNIDIRECIONAL"
+      "unidirectional": "→ UNIDIRECIONAL",
+      "priceDiffFavor": "a seu favor",
+      "priceDiffAgainst": "contra você"
     },
     "actions": {
       "interested": "TENHO INTERESSE",
@@ -1298,7 +1312,9 @@
       "contact": "CONTATO",
       "completed": "CONCLUÍDO",
       "delete": "EXCLUIR",
-      "recover": "RECUPERAR"
+      "recover": "RECUPERAR",
+      "refresh": "ATUALIZAR",
+      "refreshing": "ATUALIZANDO…"
     },
     "contactModal": {
       "title": "VER CONTATO",
@@ -1790,6 +1806,7 @@
       "matchesFound": "Matches Encontrados",
       "recalculate": "Recalcular Matches",
       "sync": "Sincronizar Cartas",
+      "refreshMatches": "Atualizar Matches",
       "deleteData": "Excluir Dados",
       "searchOthers": "Buscar em Outros Usuários",
       "blockedUsers": "Usuários Bloqueados",
@@ -1800,10 +1817,6 @@
       "importDeck": "Importar Deck",
       "compatibility": "Compatibilidade",
       "matchType": "Tipo de Match",
-      "tabNew": "Matches Novos",
-      "tabSent": "Matches Enviados",
-      "tabSaved": "Matches Salvos",
-      "tabDeleted": "Matches Excluídos",
       "emailVerification": "Verificação de Email",
       "password": "Senha",
       "username": "Nome de Usuário",
@@ -1829,6 +1842,7 @@
       "dashboard": {
         "recalculate": "Busca novos matches comparando suas cartas à venda/troca com a wishlist de outros usuários, e vice-versa.",
         "sync": "Atualiza suas cartas públicas no sistema para que outros usuários possam encontrar você nas buscas.",
+        "refreshMatches": "Sincroniza suas cartas públicas e recalcula matches contra as coleções e wishlists de outros usuários.",
         "deleteData": "Exclui permanentemente todas as suas cartas, decks, preferências e matches. Esta ação não pode ser desfeita.",
         "searchOthers": "Busca cartas que outros usuários têm disponíveis para venda ou troca. Se encontrar, pode expressar seu interesse.",
         "matchesFound": "Quantidade de usuários que têm cartas que você procura, ou procuram cartas que você tem.",
@@ -1848,11 +1862,7 @@
       "matches": {
         "compatibility": "Percentual que indica quão bem suas necessidades coincidem com as do outro usuário. Maior % = melhor match.",
         "bidirectional": "Match bidirecional: ambos têm algo que o outro procura. Ideal para trocas diretas.",
-        "unidirectional": "Match unidirecional: apenas um tem o que o outro procura. Pode exigir pagamento ou negociação.",
-        "tabNew": "Matches recém-calculados que você ainda não revisou.",
-        "tabSent": "Matches onde você expressou interesse. Aguardando resposta do outro usuário.",
-        "tabSaved": "Matches que você salvou para contatar depois.",
-        "tabDeleted": "Matches excluídos. São removidos permanentemente após 15 dias."
+        "unidirectional": "Match unidirecional: apenas um tem o que o outro procura. Pode exigir pagamento ou negociação."
       },
       "conditions": {
         "M": "Mint - Perfeita, como recém-aberta do booster. Sem nenhum defeito visível.",

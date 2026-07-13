@@ -1220,15 +1220,27 @@
   },
 
   "matches": {
-    "title": "MIS MATCHES",
-    "subtitle": "nuevos, enviados, guardados",
+    "title": "Matches",
     "tabs": {
-      "new": "NUEVOS",
-      "sent": "ENVIADOS",
-      "saved": "GUARDADOS",
-      "deleted": "ELIMINADOS",
+      "new": "Nuevos",
+      "sent": "Enviados",
+      "saved": "Guardados",
+      "deleted": "Eliminados",
       "buyRequests": "SOLICITUDES",
       "contacts": "CONTACTOS"
+    },
+    "primaryTabs": {
+      "matches": "MATCHES",
+      "nav": "Secciones de Matches"
+    },
+    "header": {
+      "kicker": "Tu vitrina de intercambios",
+      "newMatches": "Matches nuevos",
+      "potentialValue": "Valor potencial",
+      "activeTraders": "Traders activos"
+    },
+    "menu": {
+      "moreOptions": "Más opciones"
     },
     "buyRequests": {
       "empty": {
@@ -1289,7 +1301,9 @@
       "youReceiveAdvantage": "Tú recibes ventaja",
       "otherReceivesAdvantage": "El otro recibe ventaja",
       "bidirectional": "BIDIRECCIONAL",
-      "unidirectional": "→ UNIDIRECCIONAL"
+      "unidirectional": "→ UNIDIRECCIONAL",
+      "priceDiffFavor": "a tu favor",
+      "priceDiffAgainst": "en contra"
     },
     "actions": {
       "interested": "ME INTERESA",
@@ -1298,7 +1312,9 @@
       "contact": "CONTACTO",
       "completed": "COMPLETADO",
       "delete": "ELIMINAR",
-      "recover": "RECUPERAR"
+      "recover": "RECUPERAR",
+      "refresh": "ACTUALIZAR",
+      "refreshing": "ACTUALIZANDO…"
     },
     "contactModal": {
       "title": "VER CONTACTO",
@@ -1790,6 +1806,7 @@
       "matchesFound": "Matches Encontrados",
       "recalculate": "Recalcular Matches",
       "sync": "Sincronizar Cartas",
+      "refreshMatches": "Actualizar Matches",
       "deleteData": "Eliminar Datos",
       "searchOthers": "Buscar en Otros Usuarios",
       "blockedUsers": "Usuarios Bloqueados",
@@ -1800,10 +1817,6 @@
       "importDeck": "Importar Mazo",
       "compatibility": "Compatibilidad",
       "matchType": "Tipo de Match",
-      "tabNew": "Nuevos Matches",
-      "tabSent": "Matches Enviados",
-      "tabSaved": "Matches Guardados",
-      "tabDeleted": "Matches Eliminados",
       "emailVerification": "Verificación de Email",
       "password": "Contraseña",
       "username": "Nombre de Usuario",
@@ -1829,6 +1842,7 @@
       "dashboard": {
         "recalculate": "Busca nuevos matches comparando tus cartas en venta/cambio con la wishlist de otros usuarios, y viceversa.",
         "sync": "Actualiza tus cartas públicas en el sistema para que otros usuarios puedan encontrarte en sus búsquedas.",
+        "refreshMatches": "Sincroniza tus cartas públicas y recalcula matches contra las colecciones y wishlists de otros usuarios.",
         "deleteData": "Elimina permanentemente todas tus cartas, mazos, preferencias y matches. Esta acción no se puede deshacer.",
         "searchOthers": "Busca cartas que otros usuarios tienen disponibles para venta o cambio. Si la encuentras, puedes expresar tu interés.",
         "matchesFound": "Cantidad de usuarios que tienen cartas que buscas, o buscan cartas que tienes.",
@@ -1848,11 +1862,7 @@
       "matches": {
         "compatibility": "Porcentaje que indica qué tan bien coinciden tus necesidades con las del otro usuario. Mayor % = mejor match.",
         "bidirectional": "Match bidireccional: ambos tienen algo que el otro busca. Ideal para intercambios directos.",
-        "unidirectional": "Match unidireccional: solo uno tiene lo que el otro busca. Puede requerir pago o negociación.",
-        "tabNew": "Matches recién calculados que aún no has revisado.",
-        "tabSent": "Matches donde expresaste interés. Esperando respuesta del otro usuario.",
-        "tabSaved": "Matches que guardaste para contactar después.",
-        "tabDeleted": "Matches eliminados. Se borran permanentemente después de 15 días."
+        "unidirectional": "Match unidireccional: solo uno tiene lo que el otro busca. Puede requerir pago o negociación."
       },
       "conditions": {
         "M": "Mint - Perfecta, como recién abierta del booster. Sin ningún defecto visible.",

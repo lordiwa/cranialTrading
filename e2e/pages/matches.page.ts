@@ -3,8 +3,10 @@ import { type Page, type Locator } from '@playwright/test';
 
 export class MatchesPage {
   readonly page: Page;
-  readonly calculateButton: Locator;
-  readonly syncButton: Locator;
+  // v2 redesign (TASK-094 F2): Recalcular + Sincronizar fused into one "Actualizar"/
+  // "Update" button — the old calculateButton/syncButton locators no longer match anything.
+  readonly refreshButton: Locator;
+  readonly overflowMenuButton: Locator;
   readonly tabs: {
     new: Locator;
     sent: Locator;
@@ -17,8 +19,8 @@ export class MatchesPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.calculateButton = page.locator('button').filter({ hasText: /calculate|calcular|recalcul/i }).first();
-    this.syncButton = page.locator('button').filter({ hasText: /sync|sincronizar/i }).first();
+    this.refreshButton = page.locator('button').filter({ hasText: /actualizar|update/i }).first();
+    this.overflowMenuButton = page.getByRole('button', { name: /more options|más opciones|mais opções/i });
 
     this.tabs = {
       new: page.locator('button').filter({ hasText: /new|nuev/i }).first(),
@@ -29,7 +31,9 @@ export class MatchesPage {
 
     this.matchCards = page.locator('[data-match-id]');
     this.noMatchesMessage = page.locator('text=/no.*match|no.*coincidencia/i');
-    this.blockedUsersButton = page.getByRole('button', { name: /block|bloque/i });
+    // Bloqueados lives inside the overflow ⋯ menu and has role="menuitem" (not "button")
+    // once the menu is open — call openOverflowMenu() first.
+    this.blockedUsersButton = page.getByRole('menuitem', { name: /block|bloque/i });
   }
 
   async goto() {
@@ -40,6 +44,10 @@ export class MatchesPage {
 
   async switchTab(tab: 'new' | 'sent' | 'saved' | 'deleted') {
     await this.tabs[tab].click();
+  }
+
+  async openOverflowMenu() {
+    await this.overflowMenuButton.click();
   }
 
   async openMatchDetail(index = 0) {

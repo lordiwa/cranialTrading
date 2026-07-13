@@ -29,5 +29,7 @@
     <symbol id="i-block" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></symbol>
     <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12M7 10.5 12 15.5l5-5M4 21h16" /></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20S3.5 15 3.5 9.2C3.5 6.3 5.7 4.5 8 4.5c1.6 0 3 .8 4 2.2 1-1.4 2.4-2.2 4-2.2 2.3 0 4.5 1.8 4.5 4.7C20.5 15 12 20 12 20z" /></symbol>
+    <!-- v2 redesign — overflow-menu ellipsis (design→app v2 F2, DESIGN-DIRECTION.md §8.2) -->
+    <symbol id="i-dots" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="2.6" /></symbol>
   </svg>
 </template>

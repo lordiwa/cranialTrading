@@ -5,13 +5,18 @@ test.describe('Match Calculation', () => {
     await matchesPage.goto();
   });
 
-  test('calculate matches button triggers scanning with progress', async ({ matchesPage, page }) => {
-    if (await matchesPage.calculateButton.isVisible()) {
-      await matchesPage.calculateButton.click();
+  test('actualizar button triggers sync + recalculate with progress', async ({ matchesPage, page }) => {
+    // v2 redesign (TASK-094 F2): Recalcular + Sincronizar fused into one "Actualizar"/
+    // "Update" button. No conditional skip — this flow must stay covered.
+    await expect(matchesPage.refreshButton).toBeVisible();
+    await expect(matchesPage.refreshButton).toBeEnabled({ timeout: 10_000 });
+    await matchesPage.refreshButton.click();
 
-      // Should show some loading/progress indicator
-      await page.waitForTimeout(3000);
-    }
+    // Should show some loading/progress indicator while syncing + recalculating
+    await page.waitForTimeout(3000);
+
+    // Button returns to its idle label once the refresh settles
+    await expect(matchesPage.refreshButton).toBeVisible({ timeout: 15_000 });
     await expect(matchesPage.tabs.new).toBeVisible();
   });
 

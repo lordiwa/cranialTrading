@@ -1220,15 +1220,27 @@
   },
 
   "matches": {
-    "title": "MY MATCHES",
-    "subtitle": "new, sent, saved",
+    "title": "Matches",
     "tabs": {
-      "new": "NEW",
-      "sent": "SENT",
-      "saved": "SAVED",
-      "deleted": "DELETED",
+      "new": "New",
+      "sent": "Sent",
+      "saved": "Saved",
+      "deleted": "Deleted",
       "buyRequests": "BUY REQUESTS",
       "contacts": "CONTACTS"
+    },
+    "primaryTabs": {
+      "matches": "MATCHES",
+      "nav": "Matches sections"
+    },
+    "header": {
+      "kicker": "Your trading showcase",
+      "newMatches": "New matches",
+      "potentialValue": "Potential value",
+      "activeTraders": "Active traders"
+    },
+    "menu": {
+      "moreOptions": "More options"
     },
     "buyRequests": {
       "empty": {
@@ -1289,7 +1301,9 @@
       "youReceiveAdvantage": "You receive advantage",
       "otherReceivesAdvantage": "Other receives advantage",
       "bidirectional": "BIDIRECTIONAL",
-      "unidirectional": "→ UNIDIRECTIONAL"
+      "unidirectional": "→ UNIDIRECTIONAL",
+      "priceDiffFavor": "in your favor",
+      "priceDiffAgainst": "against you"
     },
     "actions": {
       "interested": "I'M INTERESTED",
@@ -1298,7 +1312,9 @@
       "contact": "CONTACT",
       "completed": "COMPLETED",
       "delete": "DELETE",
-      "recover": "RECOVER"
+      "recover": "RECOVER",
+      "refresh": "UPDATE",
+      "refreshing": "UPDATING…"
     },
     "contactModal": {
       "title": "VIEW CONTACT",
@@ -1790,6 +1806,7 @@
       "matchesFound": "Matches Found",
       "recalculate": "Recalculate Matches",
       "sync": "Sync Cards",
+      "refreshMatches": "Update Matches",
       "deleteData": "Delete Data",
       "searchOthers": "Search Other Users",
       "blockedUsers": "Blocked Users",
@@ -1800,10 +1817,6 @@
       "importDeck": "Import Deck",
       "compatibility": "Compatibility",
       "matchType": "Match Type",
-      "tabNew": "New Matches",
-      "tabSent": "Sent Matches",
-      "tabSaved": "Saved Matches",
-      "tabDeleted": "Deleted Matches",
       "emailVerification": "Email Verification",
       "password": "Password",
       "username": "Username",
@@ -1829,6 +1842,7 @@
       "dashboard": {
         "recalculate": "Finds new matches by comparing your cards for sale/trade with other users' wishlists, and vice versa.",
         "sync": "Updates your public cards in the system so other users can find you in their searches.",
+        "refreshMatches": "Syncs your public cards and recalculates matches against other users' collections and wishlists.",
         "deleteData": "Permanently deletes all your cards, decks, preferences and matches. This action cannot be undone.",
         "searchOthers": "Search for cards that other users have available for sale or trade. If you find it, you can express your interest.",
         "matchesFound": "Number of users who have cards you're looking for, or are looking for cards you have.",
@@ -1848,11 +1862,7 @@
       "matches": {
         "compatibility": "Percentage indicating how well your needs match with the other user. Higher % = better match.",
         "bidirectional": "Bidirectional match: both have something the other is looking for. Ideal for direct trades.",
-        "unidirectional": "Unidirectional match: only one has what the other is looking for. May require payment or negotiation.",
-        "tabNew": "Newly calculated matches you haven't reviewed yet.",
-        "tabSent": "Matches where you expressed interest. Waiting for the other user's response.",
-        "tabSaved": "Matches you saved to contact later.",
-        "tabDeleted": "Deleted matches. They are permanently removed after 15 days."
+        "unidirectional": "Unidirectional match: only one has what the other is looking for. May require payment or negotiation."
       },
       "conditions": {
         "M": "Mint - Perfect, as if just opened from the booster. No visible defects.",

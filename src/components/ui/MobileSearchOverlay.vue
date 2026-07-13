@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import SvgIcon from './SvgIcon.vue'
+import IconV2 from './IconV2.vue'
 
 const props = defineProps<{
   open: boolean
@@ -126,11 +127,11 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             <button
               v-if="searchQuery.length > 0"
               @click.stop="clearSearch"
-              class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+              class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20 focus-visible:outline-none focus-visible:shadow-glow-neon"
               type="button"
               :aria-label="t('header.search.clearAriaLabel')"
             >
-              ✕
+              <IconV2 name="x" :size="14" />
             </button>
           </div>
           <button

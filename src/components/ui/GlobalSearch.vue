@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import SvgIcon from './SvgIcon.vue'
+import IconV2 from './IconV2.vue'
 
 const { t } = useI18n()
 
@@ -118,11 +119,11 @@ defineExpose({
       <button
         v-if="searchQuery.length > 0"
         @click.stop="handleClearSearch"
-        class="self-center w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors flex-shrink-0"
+        class="self-center w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon"
         type="button"
         :aria-label="t('header.search.clearAriaLabel')"
       >
-        ✕
+        <IconV2 name="x" :size="16" />
       </button>
       <!-- Keyboard hint (shows when no text) — aria-hidden: decorative shortcut hint -->
       <kbd

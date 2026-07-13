@@ -7,6 +7,7 @@ import { version as appVersion } from '../../../package.json'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 import SvgIcon from './SvgIcon.vue'
+import IconV2 from './IconV2.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -227,7 +228,8 @@ const handleLogout = async () => {
     <!-- Trigger button (avatar only) -->
     <button
         @click.stop="togglePopover"
-        class="flex items-center p-1 text-silver-50 hover:text-neon transition-fast rounded-full"
+        class="flex items-center p-1 text-silver-50 hover:text-neon transition-fast rounded-full focus-visible:outline-none focus-visible:shadow-glow-neon"
+        :aria-label="t('header.profile.viewPublicProfile')"
         :title="t('header.profile.viewPublicProfile')"
     >
       <img
@@ -278,17 +280,19 @@ const handleLogout = async () => {
               <button
                   v-if="!editingAvatar"
                   @click.stop="startEditAvatar"
-                  class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:shadow-glow-neon"
+                  :aria-label="t('settings.changeAvatar.edit')"
                   :title="t('settings.changeAvatar.edit')"
               >
-                <span class="text-white text-tiny">✎</span>
+                <IconV2 name="import" :size="18" class="text-white" />
               </button>
               <button
                   v-else
                   @click.stop="triggerFileInput"
-                  class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:shadow-glow-neon"
+                  :aria-label="t('settings.changeAvatar.upload')"
               >
-                <span class="text-white text-tiny">📷</span>
+                <IconV2 name="import" :size="18" class="text-white" />
               </button>
             </div>
             <div class="flex-1 min-w-0">
@@ -356,7 +360,6 @@ const handleLogout = async () => {
 
           <div v-if="!editingLocation">
             <p class="text-small text-silver flex items-center gap-1">
-              <span>📍</span>
               {{ authStore.user?.location || t('settings.changeLocation.notSet') }}
             </p>
           </div>
@@ -386,7 +389,7 @@ const handleLogout = async () => {
                     @click.stop="selectLocationSuggestion(suggestion)"
                     class="w-full px-3 py-2 text-left text-tiny text-silver hover:bg-silver-5 hover:text-neon transition-fast"
                 >
-                  📍 {{ suggestion }}
+                  {{ suggestion }}
                 </button>
               </div>
             </div>
@@ -422,7 +425,8 @@ const handleLogout = async () => {
               @click="closePopover"
               class="flex items-center gap-2 px-3 py-2 text-tiny text-silver-70 hover:text-neon hover:bg-silver-5 rounded transition-fast"
           >
-            ⭐ {{ t('header.profile.wishlist') }}
+            <IconV2 name="star" :size="16" class="flex-shrink-0" />
+            {{ t('header.profile.wishlist') }}
           </router-link>
           <router-link
               to="/settings"

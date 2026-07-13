@@ -7,7 +7,7 @@ import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
 import { type SupportedLocale, useI18n } from '../../composables/useI18n'
 import { useTour } from '../../composables/useTour'
-import SvgIcon from '../ui/SvgIcon.vue'
+import IconV2 from '../ui/IconV2.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import MatchNotificationsDropdown from './MatchNotificationsDropdown.vue'
 import GlobalSearch from '../ui/GlobalSearch.vue'
@@ -107,9 +107,11 @@ const matchesSectionBadge = computed(() => newMatchesCount.value + unreadMessage
 
 // RED hub redesign: MERCADO removed from nav; CONTACTOS merged into the MATCHES hub
 // (rendered as the MatchNotificationsDropdown item below).
+// `testid` stays on the pre-v2-icon slug (nav-collection / nav-star) — e2e/pages/navigation.page.ts
+// locates these by data-testid, independent of which SVG symbol backs the icon.
 const navigationLinks = computed(() => [
-  { path: '/collection', label: t('header.nav.collection'), icon: 'collection', badge: collectionStore.cards.length },
-  { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', badge: 0 },
+  { path: '/collection', label: t('header.nav.collection'), icon: 'cards', testid: 'nav-collection', badge: collectionStore.cards.length },
+  { path: '/collection?filter=wishlist', label: t('header.nav.wishlist'), icon: 'star', testid: 'nav-star', badge: 0 },
 ])
 
 const isMatchesActive = computed(() => route.path.startsWith('/saved-matches'))
@@ -176,16 +178,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <header class="bg-primary border-b border-silver-20 sticky top-0 z-50">
+  <header class="bg-hdr backdrop-blur-md sticky top-0 z-50 border-b border-line">
     <div class="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8">
       <!-- ROW 1: logo · big search · help · avatar -->
-      <div class="flex items-center gap-4 md:gap-6 h-14 md:h-20">
+      <div class="flex items-center gap-4 md:gap-6 h-14 md:h-[72px]">
         <!-- Logo -->
-        <router-link to="/saved-matches" class="flex items-center gap-2 flex-shrink-0">
-          <svg class="w-8 h-8 md:w-12 md:h-12 text-neon" viewBox="0 0 100 100" fill="currentColor">
+        <router-link to="/saved-matches" class="flex items-center gap-2.5 flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon rounded-md">
+          <svg class="w-7 h-7 md:w-[30px] md:h-[30px] text-neon flex-shrink-0" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
-          <span class="hidden sm:inline text-h3 font-bold text-neon font-brother">CRANIAL TRADING</span>
+          <span class="hidden md:inline font-display font-bold text-[17px] tracking-[.14em] text-neon whitespace-nowrap">CRANIAL TRADING</span>
         </router-link>
 
         <!-- Global Search (Desktop, promoted + centered) -->
@@ -194,62 +196,77 @@ onUnmounted(() => {
         </div>
 
         <!-- Right side: User & Settings -->
-        <div class="flex items-center gap-2 md:gap-4 flex-shrink-0 ml-auto md:ml-0">
+        <div class="flex items-center gap-1 flex-shrink-0 ml-auto md:ml-0">
           <!-- User Menu -->
-          <div v-if="isAuthenticated" class="flex items-center">
-            <!-- Mobile search icon -->
+          <div v-if="isAuthenticated" class="flex items-center gap-1">
+            <!-- Mobile search icon-btn -->
             <button
                 @click="showMobileSearch = true"
-                class="md:hidden p-1.5 text-silver-50 hover:text-neon transition-fast flex items-center justify-center rounded"
-                :title="t('header.search.placeholder')"
+                :aria-label="t('header.search.placeholder')"
+                class="md:hidden relative inline-flex items-center justify-center rounded-md w-11 h-11 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
-              <SvgIcon name="search" size="small" />
+              <IconV2 name="search" :size="20" />
             </button>
-            <!-- Mobile "+" add card button -->
+            <!-- Mobile "+" add card icon-btn -->
             <button
                 @click="handleMobileAdd"
-                class="md:hidden p-1.5 text-neon hover:text-neon/80 transition-fast flex items-center justify-center rounded"
-                :title="t('header.search.addToCollection')"
+                :aria-label="t('header.search.addToCollection')"
+                class="md:hidden relative inline-flex items-center justify-center rounded-md w-11 h-11 text-neon transition-all duration-200 ease-v2 hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
-              <SvgIcon name="plus" size="small" />
+              <IconV2 name="plus" :size="20" />
             </button>
 
+            <!-- Messages icon-btn (row1, desktop + mobile) — badge from messages store, hidden at 0 -->
+            <router-link
+                to="/messages"
+                :aria-label="t('header.nav.messages')"
+                class="relative inline-flex items-center justify-center rounded-md w-11 h-11 md:w-10 md:h-10 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
+            >
+              <IconV2 name="chat" :size="20" />
+              <span
+                  v-if="unreadMessagesCount > 0"
+                  class="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-neon text-primary font-display font-tnum text-[11px] font-bold"
+              >
+                {{ unreadMessagesCount > 9 ? '9+' : unreadMessagesCount }}
+              </span>
+            </router-link>
+
             <!-- Divider -->
-            <div class="hidden md:block w-px h-6 bg-silver-30 mr-4"></div>
+            <div class="hidden md:block w-px h-6 bg-line-strong mx-3"></div>
 
             <!-- User actions -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1">
               <!-- Help Menu -->
               <div ref="helpMenuRef" class="relative">
                 <button
                     @click="toggleHelpMenu"
-                    class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
-                    :title="t('help.menu.faq')"
+                    :aria-label="t('help.menu.faq')"
+                    class="relative inline-flex items-center justify-center rounded-md w-11 h-11 md:w-10 md:h-10 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
                 >
-                  <span class="w-5 h-5 md:w-6 md:h-6 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+                  <IconV2 name="help" :size="20" />
                 </button>
                 <div
                     v-if="showHelpMenu"
-                    class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-none shadow-lg z-50 overflow-hidden"
+                    class="absolute right-0 top-full mt-2 w-56 bg-primary border border-line-strong rounded-md shadow-strong z-50 overflow-hidden"
                 >
                   <RouterLink
                       :to="'/faq'"
                       @click="closeHelpMenu(); closeMobileMenu()"
-                      class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
+                      class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-surface-2 hover:text-neon transition-fast text-left"
                   >
-                    <span class="w-5 h-5 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
+                    <IconV2 name="help" :size="18" class="flex-shrink-0" />
                     {{ t('help.menu.faq') }}
                   </RouterLink>
                   <button
                       v-if="isAuthenticated"
                       @click="restartTour"
-                      class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left border-t border-silver-20"
+                      class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-surface-2 hover:text-neon transition-fast text-left border-t border-line"
                   >
-                    <SvgIcon name="eye-open" size="tiny" class="flex-shrink-0" />
+                    <IconV2 name="eye" :size="18" class="flex-shrink-0" />
                     {{ t('help.menu.restartTour') }}
                   </button>
                   <!-- Legal links -->
-                  <div class="border-t border-silver-20 px-4 py-2 flex flex-col gap-1">
+                  <div class="border-t border-line px-4 py-2 flex flex-col gap-1">
                     <router-link
                         to="/terms"
                         @click="closeHelpMenu"
@@ -273,7 +290,7 @@ onUnmounted(() => {
                     </router-link>
                   </div>
                   <!-- Language selector -->
-                  <div class="border-t border-silver-20 px-4 py-2 flex items-center gap-2">
+                  <div class="border-t border-line px-4 py-2 flex items-center gap-2">
                     <span class="text-tiny text-silver-50">{{ t('help.menu.language') }}:</span>
                     <div class="flex items-center gap-1">
                       <button
@@ -284,7 +301,7 @@ onUnmounted(() => {
                             'px-2 py-0.5 text-tiny font-bold rounded transition-colors',
                             locale === lang.code
                               ? 'bg-neon text-primary'
-                              : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                              : 'text-silver-50 hover:text-neon hover:bg-surface-2'
                           ]"
                       >
                         {{ lang.label }}
@@ -304,25 +321,25 @@ onUnmounted(() => {
             <div ref="helpMenuRef" class="relative">
               <button
                   @click="toggleHelpMenu"
-                  class="p-1.5 text-silver-50 hover:text-neon hover:bg-silver-5 transition-fast flex items-center justify-center rounded"
-                  :title="t('help.menu.faq')"
+                  :aria-label="t('help.menu.faq')"
+                  class="relative inline-flex items-center justify-center rounded-md w-11 h-11 md:w-10 md:h-10 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
               >
-                <span class="w-5 h-5 md:w-6 md:h-6 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold">?</span>
+                <IconV2 name="help" :size="20" />
               </button>
               <div
                   v-if="showHelpMenu"
-                  class="absolute right-0 top-full mt-2 w-56 bg-primary border border-silver-30 rounded-none shadow-lg z-50 overflow-hidden"
+                  class="absolute right-0 top-full mt-2 w-56 bg-primary border border-line-strong rounded-md shadow-strong z-50 overflow-hidden"
               >
                 <RouterLink
                     :to="'/faq'"
                     @click="closeHelpMenu(); closeMobileMenu()"
-                    class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-silver-5 hover:text-neon transition-fast text-left"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-small text-silver hover:bg-surface-2 hover:text-neon transition-fast text-left"
                 >
-                  <span class="w-5 h-5 rounded-none border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">?</span>
+                  <IconV2 name="help" :size="18" class="flex-shrink-0" />
                   {{ t('help.menu.faq') }}
                 </RouterLink>
                 <!-- Legal links -->
-                <div class="border-t border-silver-20 px-4 py-2 flex flex-col gap-1">
+                <div class="border-t border-line px-4 py-2 flex flex-col gap-1">
                   <router-link to="/terms" @click="closeHelpMenu" class="text-tiny text-silver-50 hover:text-silver hover:underline transition-fast">
                     {{ t('help.menu.terms') }}
                   </router-link>
@@ -334,7 +351,7 @@ onUnmounted(() => {
                   </router-link>
                 </div>
                 <!-- Language selector -->
-                <div class="border-t border-silver-20 px-4 py-2 flex items-center gap-2">
+                <div class="border-t border-line px-4 py-2 flex items-center gap-2">
                   <span class="text-tiny text-silver-50">{{ t('help.menu.language') }}:</span>
                   <div class="flex items-center gap-1">
                     <button
@@ -345,7 +362,7 @@ onUnmounted(() => {
                           'px-2 py-0.5 text-tiny font-bold rounded transition-colors',
                           locale === lang.code
                             ? 'bg-neon text-primary'
-                            : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                            : 'text-silver-50 hover:text-neon hover:bg-surface-2'
                         ]"
                     >
                       {{ lang.label }}
@@ -356,13 +373,13 @@ onUnmounted(() => {
             </div>
             <a
                 href="/login"
-                class="px-4 py-2 text-silver-70 hover:text-neon transition-fast rounded-none text-small font-bold"
+                class="px-4 py-2 min-h-[44px] flex items-center border border-neon text-neon font-bold hover:bg-neon/10 hover:shadow-glow-neon transition-all duration-200 ease-v2 rounded-md text-small focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('header.auth.login') }}
             </a>
             <a
                 href="/register"
-                class="px-4 py-2 bg-neon text-primary font-bold hover:bg-neon/90 transition-fast rounded-none text-small"
+                class="px-4 py-2 min-h-[44px] flex items-center bg-neon text-primary font-bold hover:bg-neon/90 hover:shadow-glow-neon transition-all duration-200 ease-v2 rounded-md text-small focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('header.auth.register') }}
             </a>
@@ -372,24 +389,25 @@ onUnmounted(() => {
     </div>
 
     <!-- ROW 2: primary nav (desktop, authenticated) -->
-    <div v-if="isAuthenticated" class="hidden md:block border-t border-silver-10">
+    <div v-if="isAuthenticated" class="hidden md:block border-t border-line">
       <div class="max-w-[1200px] mx-auto px-2 md:px-6 lg:px-8">
         <nav aria-label="Main navigation" class="flex items-stretch gap-1">
           <router-link
               v-for="link in navigationLinks"
               :key="link.path + link.label"
               :to="link.path"
-              :data-testid="`nav-${link.icon}`"
+              :data-testid="link.testid"
               :data-tour="link.path === '/collection' ? 'nav-collection' : undefined"
               :class="[
-                'px-3 py-3 text-small font-bold transition-fast rounded-none flex items-center gap-2 relative uppercase border-b-2',
+                'px-3.5 min-h-[44px] text-[12px] font-bold uppercase tracking-[.12em] transition-colors duration-200 ease-v2 flex items-center gap-2 relative border-b-2 focus-visible:outline-none focus-visible:shadow-glow-neon',
                 isActive(link.path)
-                  ? 'border-neon text-neon'
-                  : 'border-transparent text-silver-70 hover:text-silver hover:border-silver'
+                  ? 'border-neon text-neon [text-shadow:0_0_12px_rgba(90,193,104,.4)]'
+                  : 'border-transparent text-silver-50 hover:text-silver'
               ]"
           >
-            <SvgIcon :name="link.icon" size="small" />
+            <IconV2 :name="link.icon" :size="18" />
             {{ link.label }}
+            <span v-if="link.badge > 0" class="font-display font-tnum text-[13px] font-semibold text-silver-50">{{ link.badge }}</span>
           </router-link>
           <!-- MATCHES = merged Matches + Contactos hub -->
           <MatchNotificationsDropdown data-testid="nav-matches" data-tour="nav-matches" :active="isMatchesActive" />
@@ -404,20 +422,21 @@ onUnmounted(() => {
     >
       <div class="max-w-[1200px] mx-auto flex items-center justify-between gap-4">
         <p class="text-tiny text-silver">
-          📍 {{ t('header.locationSuggestion.message', { location: detectedLocation }) }}
+          {{ t('header.locationSuggestion.message', { location: detectedLocation }) }}
         </p>
         <div class="flex items-center gap-2">
           <button
               @click="handleUpdateLocation"
-              class="px-3 py-1 text-tiny bg-neon text-primary font-bold rounded hover:bg-neon/90 transition-fast"
+              class="px-3 py-1 text-tiny bg-neon text-primary font-bold rounded hover:bg-neon/90 transition-fast focus-visible:outline-none focus-visible:shadow-glow-neon"
           >
             {{ t('header.locationSuggestion.update') }}
           </button>
           <button
               @click="dismissLocationSuggestion"
-              class="px-2 py-1 text-tiny text-silver-50 hover:text-silver transition-fast"
+              :aria-label="t('common.actions.close')"
+              class="p-1 text-silver-50 hover:text-silver transition-fast rounded-md focus-visible:outline-none focus-visible:shadow-glow-neon"
           >
-            ✕
+            <IconV2 name="x" :size="18" />
           </button>
         </div>
       </div>
@@ -428,52 +447,53 @@ onUnmounted(() => {
   <MobileSearchOverlay v-if="isAuthenticated" :open="showMobileSearch" @close="showMobileSearch = false" />
 
   <!-- Bottom Tab Bar (mobile only) -->
-  <nav v-if="isAuthenticated" class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-primary border-t border-silver-20 tab-bar-safe">
-    <div class="flex items-center justify-around h-12 px-1">
-      <!-- Collection -->
-      <router-link
-          to="/collection"
-          data-testid="nav-collection-mobile"
-          :class="[
-            'flex flex-col items-center gap-0 py-1 px-1 transition-fast min-w-0',
-            isActive('/collection') ? 'text-neon' : 'text-silver-50'
-          ]"
-      >
-        <SvgIcon name="collection" size="small" />
-        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.collection') }}</span>
-      </router-link>
-      <!-- Matches -->
-      <router-link
-          to="/saved-matches"
-          data-testid="nav-matches-mobile"
-          :class="[
-            'flex flex-col items-center gap-0 py-1 px-1 transition-fast relative min-w-0',
-            isMatchesActive ? 'text-neon' : 'text-silver-50'
-          ]"
-      >
-        <span class="relative">
-          <SvgIcon name="handshake" size="small" />
-          <span
-              v-if="matchesSectionBadge > 0"
-              class="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-rust text-primary text-[10px] font-bold rounded-none flex items-center justify-center px-0.5"
-          >
-            {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
-          </span>
+  <nav v-if="isAuthenticated" class="md:hidden fixed bottom-0 left-0 right-0 z-50 h-14 flex bg-hdr backdrop-blur-md border-t border-line tab-bar-safe">
+    <!-- Collection -->
+    <router-link
+        to="/collection"
+        data-testid="nav-collection-mobile"
+        :class="[
+          'flex-1 relative flex flex-col items-center justify-center gap-[3px] text-[10px] font-bold uppercase tracking-[.08em] transition-colors duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon',
+          isActive('/collection') ? 'text-neon' : 'text-silver-30'
+        ]"
+    >
+      <span v-if="isActive('/collection')" class="absolute top-0 w-6 h-0.5 rounded-full bg-neon shadow-[0_0_8px_rgba(90,193,104,.4)]"></span>
+      <IconV2 name="cards" :size="22" />
+      <span class="truncate max-w-full">{{ t('header.nav.collection') }}</span>
+    </router-link>
+    <!-- Matches -->
+    <router-link
+        to="/saved-matches"
+        data-testid="nav-matches-mobile"
+        :class="[
+          'flex-1 relative flex flex-col items-center justify-center gap-[3px] text-[10px] font-bold uppercase tracking-[.08em] transition-colors duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon',
+          isMatchesActive ? 'text-neon' : 'text-silver-30'
+        ]"
+    >
+      <span v-if="isMatchesActive" class="absolute top-0 w-6 h-0.5 rounded-full bg-neon shadow-[0_0_8px_rgba(90,193,104,.4)]"></span>
+      <span class="relative">
+        <IconV2 name="swap" :size="22" />
+        <span
+            v-if="matchesSectionBadge > 0"
+            class="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-neon text-primary font-display font-tnum text-[11px] font-bold"
+        >
+          {{ matchesSectionBadge > 9 ? '9+' : matchesSectionBadge }}
         </span>
-        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.matches') }}</span>
-      </router-link>
-      <!-- Wishlist -->
-      <router-link
-          to="/collection?filter=wishlist"
-          :class="[
-            'flex flex-col items-center gap-0 py-1 px-1 transition-fast min-w-0',
-            isActive('/collection?filter=wishlist') ? 'text-neon' : 'text-silver-50'
-          ]"
-      >
-        <SvgIcon name="star" size="small" />
-        <span class="text-[10px] font-bold uppercase truncate max-w-full">{{ t('header.nav.wishlist') }}</span>
-      </router-link>
-    </div>
+      </span>
+      <span class="truncate max-w-full">{{ t('header.nav.matches') }}</span>
+    </router-link>
+    <!-- Wishlist -->
+    <router-link
+        to="/collection?filter=wishlist"
+        :class="[
+          'flex-1 relative flex flex-col items-center justify-center gap-[3px] text-[10px] font-bold uppercase tracking-[.08em] transition-colors duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon',
+          isActive('/collection?filter=wishlist') ? 'text-neon' : 'text-silver-30'
+        ]"
+    >
+      <span v-if="isActive('/collection?filter=wishlist')" class="absolute top-0 w-6 h-0.5 rounded-full bg-neon shadow-[0_0_8px_rgba(90,193,104,.4)]"></span>
+      <IconV2 name="star" :size="22" />
+      <span class="truncate max-w-full">{{ t('header.nav.wishlist') }}</span>
+    </router-link>
   </nav>
 </template>
 

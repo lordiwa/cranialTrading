@@ -7,6 +7,9 @@ export class MatchesPage {
   // "Update" button — the old calculateButton/syncButton locators no longer match anything.
   readonly refreshButton: Locator;
   readonly overflowMenuButton: Locator;
+  // Progress bar shown while calculateMatches() runs (SavedMatchesView.vue,
+  // `v-if="loading && progressTotal > 0"`) — text is dashboard.calculatingMatches.title.
+  readonly progressIndicator: Locator;
   readonly tabs: {
     new: Locator;
     sent: Locator;
@@ -32,6 +35,7 @@ export class MatchesPage {
       hasText: /actualizar|actualizando|update|updating|sincronizando|syncing/i,
     }).first();
     this.overflowMenuButton = page.getByRole('button', { name: /more options|más opciones|mais opções/i });
+    this.progressIndicator = page.getByText(/calculating matches|calculando matches/i);
 
     this.tabs = {
       new: page.locator('button').filter({ hasText: /new|nuev/i }).first(),
@@ -59,6 +63,16 @@ export class MatchesPage {
 
   async openOverflowMenu() {
     await this.overflowMenuButton.click();
+  }
+
+  // True when the refresh flow (sync + recalculate) is already in progress — either the
+  // button shows its in-progress label, or the calculate-phase progress bar is visible.
+  // Large accounts (CI's 59k-card fixture) can be mid-refresh before the test even starts.
+  async isRefreshBusy(): Promise<boolean> {
+    const label = (await this.refreshButton.textContent().catch(() => '')) ?? '';
+    const busyLabel = /actualizando|updating|sincronizando|syncing/i.test(label);
+    const progressShown = await this.progressIndicator.isVisible().catch(() => false);
+    return busyLabel || progressShown;
   }
 
   async openMatchDetail(index = 0) {

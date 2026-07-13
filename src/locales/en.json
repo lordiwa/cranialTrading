@@ -247,9 +247,13 @@
     "convertMessage": "Convert {count} items to match requests with @{username}?",
     "convertSuccess": "{count} match requests sent successfully!",
     "convertPartial": "{success} of {total} match requests sent",
-    "itemCount": "{count} item | {count} items",
+    "itemsFromLabel": "Cards from",
+    "itemsSuffix": "items",
+    "emailInvalid": "Enter a valid email (e.g. name@email.com)",
     "each": "each",
-    "qtyLabel": "Qty"
+    "qtyLabel": "Qty",
+    "decreaseQty": "Decrease quantity",
+    "increaseQty": "Increase quantity"
   },
 
   "landing": {
@@ -1333,13 +1337,11 @@
     },
     "detailModal": {
       "title": "MATCH DETAILS",
-      "user": "USER",
+      "kicker": "Proposed exchange",
       "youHave": "YOU HAVE",
       "wants": "WANTS",
       "youSearch": "YOU SEARCH",
       "has": "HAS",
-      "qty": "Qty",
-      "cond": "Cond",
       "contact": "CONTACT"
     },
     "savedCard": {

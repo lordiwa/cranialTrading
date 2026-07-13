@@ -31,5 +31,8 @@
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20S3.5 15 3.5 9.2C3.5 6.3 5.7 4.5 8 4.5c1.6 0 3 .8 4 2.2 1-1.4 2.4-2.2 4-2.2 2.3 0 4.5 1.8 4.5 4.7C20.5 15 12 20 12 20z" /></symbol>
     <!-- v2 redesign — overflow-menu ellipsis (design→app v2 F2, DESIGN-DIRECTION.md §8.2) -->
     <symbol id="i-dots" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="2.6" /></symbol>
+    <!-- v2 redesign — exchange cart + form-error icons (design→app v2 F2b, cranial-design/prototype/76-exchange-cart-*.html) -->
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.2L21 7H6" /></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5M12 16.3v.2" /></symbol>
   </svg>
 </template>

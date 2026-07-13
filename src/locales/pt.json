@@ -247,9 +247,13 @@
     "convertMessage": "Converter {count} itens em solicitacoes de match com @{username}?",
     "convertSuccess": "{count} solicitacoes enviadas!",
     "convertPartial": "{success} de {total} solicitacoes enviadas",
-    "itemCount": "{count} item | {count} itens",
+    "itemsFromLabel": "Cartas de",
+    "itemsSuffix": "itens",
+    "emailInvalid": "Digite um e-mail válido (ex. nome@email.com)",
     "each": "cada",
-    "qtyLabel": "Qtd"
+    "qtyLabel": "Qtd",
+    "decreaseQty": "Diminuir quantidade",
+    "increaseQty": "Aumentar quantidade"
   },
 
   "landing": {
@@ -1333,13 +1337,11 @@
     },
     "detailModal": {
       "title": "DETALHES DO MATCH",
-      "user": "USUÁRIO",
+      "kicker": "Troca proposta",
       "youHave": "VOCÊ TEM",
       "wants": "QUER",
       "youSearch": "VOCÊ PROCURA",
       "has": "TEM",
-      "qty": "Qtd",
-      "cond": "Cond",
       "contact": "CONTATAR"
     },
     "savedCard": {

@@ -9,7 +9,7 @@
     "Literales nuevos en en/es/pt en el mismo cambio",
     "npm run test:unit verde y npx vite build OK"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "design-sync",
@@ -22,7 +22,9 @@
   "depends_on": [
     "TASK-090"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "e4e7000"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -34,10 +36,15 @@
       "author": "orchestrator",
       "at": "2026-07-06T23:34:41.088Z",
       "body": "REVIEW light: APPROVE-WITH-NITS (0 HIGH, 0 MEDIUM). Reviewer re-corrió unit 1208/1208 + vue-tsc + vite build (15.9s), todos verdes. Verificado contra diff real: SavedContactCard es el ÚNICO card de contacto (sin siblings); catch-all a nivel raíz del router SIN layout padre que meta shell (App.vue usa RouterView directo) — quitar AppContainer del componente basta; main#main-content mantiene el landmark + skip-link; UserProfileView intacto (namespace profile.notFound.* distinto); keys viejas borradas sin consumidores restantes ni locators E2E; clases Tailwind nuevas existen todas en config. FIXES A APLICAR post-E2E (dev-089, dentro del scope del ticket): (1) LOW hardening: contact.username?.charAt(0) ?? '' — un doc legacy sin username lanzaría y rompería el render de toda la lista (el código viejo degradaba sin crashear); (2) NIT copy: es.json notFound.message 'buscás'→'buscas' (única forma voseo entre 49 tuteos). E2E en curso: 53/131 verdes al momento del comentario, incl. los 5 specs de contacts."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:52:55.314Z",
+      "body": "CERRADO. Avatar-inicial en contactos + 404 genérica guest shipped en commit e4e7000 (v1.39.0) pusheado a develop. Flujo: dev (SavedContactCard + NotFoundView + locales x3, UserProfileView intacto) → review light APPROVE-WITH-NITS → fixes aplicados (hardening username?.charAt(0) ?? '' contra docs legacy; 'buscás'→'buscas') → UAT local de Rafael PASS → gates finales verdes (unit 1208/1208, build, E2E 122+5) → deploy a dev vía CI."
     }
   ],
   "created_at": "2026-07-06T23:04:36.735Z",
-  "updated_at": "2026-07-06T23:34:41.088Z",
+  "updated_at": "2026-07-06T23:52:55.314Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

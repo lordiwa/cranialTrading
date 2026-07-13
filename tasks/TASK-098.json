@@ -1,0 +1,33 @@
+{
+  "key": "TASK-098",
+  "title": "Design→app v2 F5a: alta e import de cartas — AddCard, Import, ImportResult, ImportProgress",
+  "description": "Fuente de verdad: cards 60-add-card, 61-import, 69-import-result, 70-import-progress (d+m) + DESIGN-DIRECTION.md §5 y §8.4 (una sola puerta de alta: + del header → AddCardModal; en Search el resultado abre el MISMO modal). Superficie: AddCardModal.vue, ImportDeckModal.vue (+useCollectionImport SOLO si hay que tocar copys), ImportResultModal.vue, ImportProgressToast.vue. Estilo v2 sin tocar la lógica de import (Cloud Function, allocations compactas). Modales mantienen closeOnClickOutside=false donde ya lo tienen. Fondo modal #0d0d0f.",
+  "acceptance_criteria": [
+    "Los 4 flujos fieles a sus cards v2 (desktop y mobile)",
+    "Alta unificada verificada: header + y search abren el mismo AddCardModal",
+    "Sin regresión en el flujo de import progresivo; E2E de import verdes",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F5a",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-096"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-13T19:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

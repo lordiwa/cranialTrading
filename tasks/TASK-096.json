@@ -1,0 +1,48 @@
+{
+  "key": "TASK-096",
+  "title": "Design→app v2 F1b: Colección según proto 11-collection (adelantada — pantalla principal)",
+  "description": "Adelantada por pedido de Rafael 2026-07-13 ('lo del design system y lo que corriste en local no se parecen en nada en collection') — el cuerpo de Colección estaba planificado en F4 (última fase); pasa a ser la fase inmediata post-shell. Fuente de verdad: cranial-design/prototype/11-collection-desktop.html + 11-collection-mobile.html + DESIGN-DIRECTION.md §5 (stats/hero, badges dot, carta MTG, grupos), §8.1b (segmented control), §8.7 (mobile pulgar-primero).\n\nAlcance (reskin de la vista Colección — la funcionalidad NO cambia):\n1. Hero de página: kicker 'MI VITRINA' (11px/700 tracking .18em neon) + título 'Mi Colección' display; stat-chips a la derecha (VALOR COLECCIÓN en neon display 28px como momento de orgullo, CARTAS, EN VENTA) en surface-1 con números Space Grotesk tabulares.\n2. View-tabs Colección/Mazos/Binders → segmented control sobrio (surface-1, activo surface-3 + texto neon) manteniendo RouterLink (arquitectura three-view intacta).\n3. Chips de filtro de estado estilo pill v2 (Todas n · Colección n · En venta n · En cambio n · Wishlist n) reemplazando los chips v1 con (?); mantener la semántica interna collection|sale|trade|wishlist y los conteos existentes — NO inventar estados nuevos; si el mapeo proto↔app de algún chip es ambiguo (ej. BUSCO vs DESEADO vs NECESITO), preguntar al orquestador antes de inventar.\n4. Input de filtro + botón filtros + selectores de orden/agrupación con estilo inputs v2 (surface-1, focus neon glow).\n5. Grid de cartas: badge de estado con dot 6px (vendo=rust texto #C4553F, cambio=info, deseado=gold — fondo tinte 12%, radius 9999) en lugar del SALE amarillo; contador xN placa inferior; precio en display tabular. OJO CRÍTICO Mali GPU (memoria reference_mali_svg_use_corruption): el grid es VIRTUALIZADO — máx 1-2 <svg><use> por card; preferir CSS puro (dot = ::before/span redondo, NO svg) en elementos por-card.\n6. Footer de stats (barra inferior) con tratamiento v2 (surface, números display, VALOR TOTAL neon).\n7. AGREGAR CARTA como btn-filled (único filled de la pantalla).\n8. Mobile (11-collection-mobile): FAB + 56px, swipe hints visibles, misma jerarquía.\n9. i18n en/es/pt para labels nuevos ('Mi Vitrina', etc.).\n\nNO tocar: lógica de filtros/paginación/URL-sync (useCollectionFilterUrl/useCollectionPagination), stores, swipe (useSwipe), CardDetailModal, ni Decks/Binders (van en su propia fase).",
+  "acceptance_criteria": [
+    "Colección desktop se ve como 11-collection-desktop: hero con kicker+stat-chips, segmented control, chips pill, cards con badge dot y precio display, footer v2",
+    "Colección mobile se ve como 11-collection-mobile: FAB +, tab bar (ya de F1), jerarquía del proto",
+    "Semántica de estados interna intacta (collection|sale|trade|wishlist) — solo cambia la presentación; conteos y filtros funcionan igual",
+    "Regla Mali respetada: cero (o ≤1) <svg><use> nuevos por card virtualizado — dots/badges en CSS puro",
+    "Sin regresión funcional: filtros, paginación, selección múltiple, swipe y modales siguen funcionando; E2E de collection verdes",
+    "i18n en/es/pt; test:unit + vite build + type-check verdes"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F1b",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-093"
+  ],
+  "linked_commits": [
+    "34acc9a"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13: creado y adelantado en vivo tras feedback de Rafael durante el UAT de F1 — Colección es la pantalla principal y no puede quedar última. TASK-094 (Matches) pasa a depender de este; TASK-095 (F4) pierde el alcance de Colección (queda Deck/Binder, alta única, empty/skeleton, landing).",
+      "at": "2026-07-13T17:45:00.000Z"
+    },
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13 CERRADO por loop autonomo. Review FULL APPROVE (1 MEDIUM $NaN fixeado + 4 LOW deuda). UAT visual delegado: PASS (badge base opaca, Title Case, separador miles verificados en Chrome). E2E completo 123 passed/0 failed incluye collection. Ambiguedad 5 vs 4 chips resuelta por Rafael: app queda en 4, Design se sincroniza via TASK-107. Commit: 34acc9a.",
+      "at": "2026-07-13T20:55:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T17:45:00.000Z",
+  "updated_at": "2026-07-13T20:55:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

@@ -1,0 +1,40 @@
+{
+  "key": "TASK-095",
+  "title": "Design→app v2 F4a: Deck = Binder — misma anatomía según protos 13/14",
+  "description": "Re-scopeado 2026-07-13 (era 'F4 resto por pantalla'; Colección se adelantó como TASK-096 y el resto se desglosó en F4b-F9). Fuente de verdad: cranial-design/prototype/13-decks-desktop/mobile.html + 14-binders-desktop/mobile.html + DESIGN-DIRECTION.md §5 y §8.5.\n\nAlcance: DeckView.vue + BinderView.vue + DeckEditorGrid.vue con estilo v2 y ANATOMÍA IDÉNTICA entre deck y binder (layout, tabs, discovery, footer de stats, copys y confirmaciones iguales — cierra el drift Deck≠Binder del estudio UX); binder agrega solo la fila de toggles Público/En venta (switch iOS ya shipped v1.39.0). Regla de paralelismo del proyecto: deck handlers ↔ binder handlers SIEMPRE en el mismo cambio.",
+  "acceptance_criteria": [
+    "Deck y Binder desktop+mobile fieles a los protos 13/14 con anatomía idéntica salvo los toggles de binder",
+    "Confirmaciones con el mismo patrón e idioma en ambos",
+    "Sin regresión: allocations, import, export CSV/clipboard, stats footer funcionan igual; E2E de decks/binders verdes",
+    "i18n en/es/pt; test:unit + vite build + type-check verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F4a",
+    "decks",
+    "binders"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-096"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13: re-scope — el 'F4 resto' original se desglosó en el plan completo pantalla-por-pantalla aprobado por Rafael (F2b, F5a/b, F4a/b, F6-F9 + chore dead-code + sync Design). Este ticket queda solo con Deck=Binder.",
+      "at": "2026-07-13T19:00:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T16:16:47.000Z",
+  "updated_at": "2026-07-13T19:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

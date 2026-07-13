@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T23:34:41.088Z",
+  "generated_at": "2026-07-13T20:55:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -406,24 +406,120 @@
     {
       "key": "TASK-088",
       "title": "Design→app D1a: toggles público/en-venta de binders como switch estilo iOS",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-089",
       "title": "Design→app D1b: avatar-inicial en Contactos + página 404 genérica estilo guest",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-090",
       "title": "Design→app D2: Settings según proto — título \"Ajustes\", label \"Eliminar cuenta\", selector de idioma ES/EN/PT",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-091",
-      "title": "Design→app D3a: Messages como split-pane persistente (lista + hilo lado a lado)",
+      "title": "Design→app v2 F3: Messages como split-pane persistente (lista + hilo lado a lado) + unreadCount real",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-092",
+      "title": "Design→app v2 F0: tokens + tipografía base (Space Grotesk display, capas surface, tokens v2)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-093",
+      "title": "Design→app v2 F1: AppHeader + tab bar mobile + set de iconos SVG (cero emojis en el shell)",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-094",
+      "title": "Design→app v2 F2: Matches hub — 3 tabs + chips de filtro, stat-chips, botón Actualizar unificado, primer grupo expandido",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-095",
+      "title": "Design→app v2 F4a: Deck = Binder — misma anatomía según protos 13/14",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-096",
+      "title": "Design→app v2 F1b: Colección según proto 11-collection (adelantada — pantalla principal)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-097",
+      "title": "Design→app v2 F2b: modales de matches — match detail, carrito de intercambio, buy request",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-098",
+      "title": "Design→app v2 F5a: alta e import de cartas — AddCard, Import, ImportResult, ImportProgress",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-099",
+      "title": "Design→app v2 F5b: detalle y estado de carta — CardDetail, CardStatus, Confirm/Prompt",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-100",
+      "title": "Design→app v2 F4b: modales de deck/binder — NewDeck, AddToDeck, NewBinder, EditDeckCard, ManageDecks, Discovery",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-101",
+      "title": "Design→app v2 F6: búsqueda — SearchView + filtros avanzados",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-102",
+      "title": "Design→app v2 F7a: landing guest — Login search-first, resultados, dropdown login, register prompt",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-103",
+      "title": "Design→app v2 F7b: auth — Register, verificación de email, Forgot/Reset password",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-104",
+      "title": "Design→app v2 F8: perfil público + Settings (pase v2) + welcome tour",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-105",
+      "title": "Design→app v2 F9: páginas estáticas — about, contact, faq, guías, terms, privacy, cookies, 404",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-106",
+      "title": "Chore: limpiar dead code de vistas/modales huérfanos (EditCardModal, DecksView, NewPreferenceModal, ImportPreferencesModal, SavedContactsView)",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-107",
+      "title": "Design-sync: actualizar cards 11-collection en Claude Design a 4 chips de filtro (paridad con la app)",
       "status": "todo",
       "priority": "low"
     }

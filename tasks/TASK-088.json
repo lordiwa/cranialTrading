@@ -9,7 +9,7 @@
     "Accesible: role switch o equivalente con aria-checked y focus visible",
     "npm run test:unit verde y npx vite build OK; cero cambios de lógica en stores"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "design-sync",
@@ -19,7 +19,9 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "e4e7000"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -31,10 +33,15 @@
       "author": "uat",
       "at": "2026-07-06T23:32:40.927Z",
       "body": "UAT local de Rafael 2026-07-06: PASS global (\"ya lo probé me gusta\") tras correr npm run dev y revisar la app. Cobertura de ACs: AC1 (switch iOS visible en binders) y AC4 (interacción del switch) verificados visualmente por Rafael en local; AC2 (comportamiento idéntico — handlers/persistencia intactos) y AC3 (modo deck intacto) verificados por Orquestador+Reviewer a pedido del flujo (cambio solo-template confirmado por diff); AC5 (gates) verificado por Orquestador (unit 1208/1208, build OK). Resultado global: PASS. Pendiente solo re-verificación en dev tras deploy (orden de Rafael: deploy a dev al terminar)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:52:52.010Z",
+      "body": "CERRADO. Switch iOS en toggles de binder shipped en commit e4e7000 (v1.39.0) pusheado a develop. Flujo completo: dev (solo template, handlers intactos) → review light APPROVE (0 findings; rúbrica: 1 archivo ~38 líneas, sin superficie mandatory-FULL) → UAT local de Rafael PASS ('ya lo probé me gusta') → gates finales re-corridos por orquestador (unit 1208/1208, build 13.4s, E2E 122 passed + flake de collection-filters descartado con re-run 5/5 en aislado) → deploy a dev vía CI."
     }
   ],
   "created_at": "2026-07-06T23:04:18.458Z",
-  "updated_at": "2026-07-06T23:32:40.927Z",
+  "updated_at": "2026-07-06T23:52:52.010Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

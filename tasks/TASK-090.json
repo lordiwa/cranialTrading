@@ -10,7 +10,7 @@
     "Literales nuevos en en/es/pt en el mismo cambio",
     "npm run test:unit verde y npx vite build OK; sin regresión en la detección de idioma actual para usuarios sin preferencia guardada"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "high",
   "labels": [
     "design-sync",
@@ -21,7 +21,9 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "e4e7000"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -38,10 +40,15 @@
       "author": "uat",
       "at": "2026-07-06T23:32:47.212Z",
       "body": "UAT local de Rafael 2026-07-06: PASS global (\"ya lo probé me gusta\") tras correr npm run dev y revisar la app — incluye implícitamente el copy 'Eliminar cuenta' (la tensión de wording quedaba a su decisión; no objetó) y el selector de idioma en Settings. ACs técnicos (helper puro TDD, regresión de boot, i18n x3, gates) verificados por Developer+Reviewer FULL (APPROVE-WITH-NITS). Resultado global: PASS."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:53:00.042Z",
+      "body": "CERRADO. Settings según proto (título Ajustes, label Eliminar cuenta, selector idioma ES/EN/PT) shipped en commit e4e7000 (v1.39.0) pusheado a develop. Flujo tdd: RED evidencia capturada (8 tests fallando por módulo inexistente) → helper puro localePreference + wiring en SettingsView reusando setLocale/persistencia pre-existentes de useI18n → review FULL APPROVE-WITH-NITS (rúbrica: lógica tdd nueva fuerza full; regresión de boot descartada exhaustivamente) → UAT local de Rafael PASS (copy 'Eliminar cuenta' incluido) → gates finales verdes → deploy a dev vía CI. NITs abiertos no bloqueantes documentados en comentario del review (readonly SUPPORTED_LOCALES, aria-pressed, centralizar labels)."
     }
   ],
   "created_at": "2026-07-06T23:05:01.328Z",
-  "updated_at": "2026-07-06T23:32:47.212Z",
+  "updated_at": "2026-07-06T23:53:00.042Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

@@ -1,0 +1,43 @@
+{
+  "key": "TASK-093",
+  "title": "Design→app v2 F1: AppHeader + tab bar mobile + set de iconos SVG (cero emojis en el shell)",
+  "description": "Fase 1 del rediseño v2 (spec: DESIGN-DIRECTION.md §4-5 y §8.1; cards de referencia en Claude Design: shell v2 / headers de cualquier card, p.ej. 10-matches, 02-collection).\n\nAlcance:\n1. Set de iconos SVG inline stroke (viewBox 24, stroke-width 1.7, round) como symbols compartidos: i-search i-plus i-cards i-star i-swap i-chat i-x i-trash i-gear i-filter i-user i-help i-sync i-chev-d i-chev-r i-eye i-arrow-r i-check i-block i-import i-heart. Copiar geometría del _shell-reference.html. OJO Mali GPU (memoria reference_mali_svg_use_corruption): en listas virtualizadas máx 1-2 <svg><use> por item — el header/tabbar NO son virtualizados, ahí no hay riesgo.\n2. Header desktop (72px + nav row 44px): fondo hdr-bg + backdrop-blur(12px), wordmark display 17px letter-spacing .14em, búsqueda central con icono SVG, acciones como icon-btns fantasma, nav activo = neon + barra inferior 2px con glow; icon-btn de MENSAJES con badge en row1 (§8.1a — el badge se alimenta del store; el unreadCount real llega en F3/TASK-091).\n3. Header mobile 56px translúcido + tab bar mobile 56px+safe-area (icono 22 + label 10px, activo neon con dot superior, badge display).\n4. Quitar TODOS los emojis de UI del shell (header, nav, tabbar, popovers del header) reemplazándolos por los iconos SVG.\n5. i18n: labels nuevos en en/es/pt en el mismo cambio.\n\nNO incluye: pantallas internas (F2/F4), unreadCount real (F3).",
+  "acceptance_criteria": [
+    "Header desktop y mobile según proto: translúcido con blur, wordmark en Space Grotesk, icon-btns fantasma, nav activo neon con barra 2px",
+    "Tab bar mobile con iconos SVG 22px + labels 10px, item activo neon con dot",
+    "Icon-btn Mensajes con badge visible en header row1 (desktop y mobile), enlazado al store de mensajes",
+    "Cero emojis de UI en el shell (header/nav/tabbar) — grep de 🔍🤝💬★✕⚙▣👤 etc. limpio en los componentes tocados",
+    "Todo icon-btn con aria-label; focus-visible con glow; targets ≥44px",
+    "i18n en en/es/pt para cualquier label nuevo",
+    "test:unit + vite build + E2E verdes; version bump; deploy dev"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F1"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-092"
+  ],
+  "linked_commits": [
+    "05ac3ba"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13 CERRADO por loop autonomo. Review FULL APPROVE (0 HIGH/MEDIUM, 4 LOW como deuda para F-fases). UAT visual delegado al orquestador por Rafael: PASS. Gates: unit 1208, build, type-check, E2E completo 123 passed/0 failed. Commit: 05ac3ba.",
+      "at": "2026-07-13T20:55:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T16:16:47.000Z",
+  "updated_at": "2026-07-13T20:55:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

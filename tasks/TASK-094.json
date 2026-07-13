@@ -1,0 +1,35 @@
+{
+  "key": "TASK-094",
+  "title": "Design→app v2 F2: Matches hub — 3 tabs + chips de filtro, stat-chips, botón Actualizar unificado, primer grupo expandido",
+  "description": "Fase 2 del rediseño v2 (spec: DESIGN-DIRECTION.md §8.2; cards de referencia: 10-matches d+m en Claude Design). Reestructura del hub de SavedMatchesView.\n\nAlcance:\n1. Tabs primarios 6→3: MATCHES · SOLICITUDES (n) · CONTACTOS. Dentro de Matches, chips de filtro (Nuevos n · Enviados n · Guardados n · Eliminados n) — la lógica de conteo/filtrado por chip es lógica de store/pure function → TDD.\n2. Header de página con stat-chips (nuevos, valor potencial estimado) en Space Grotesk tabular.\n3. Recalcular + Sincronizar se funden en UN botón \"Actualizar\" con timestamp de última actualización al lado; Bloqueados pasa a menú overflow ⋯ (la funcionalidad de bloqueados NO se pierde — memoria: blocked-users inline vive en SavedMatchesView).\n4. Primer grupo expandido por defecto, resto colapsado — nunca una pantalla de puros headers colapsados.\n5. Fila de match: mini-cards con icono i-swap entre \"das\" y \"recibís\" + diferencia de precio en display tabular (verde si te favorece).\n6. i18n en/es/pt para labels nuevos.\n\nNO revertir decisiones de producto: Contactos ya vive dentro de MATCHES (RED hub v1.38.0), Mercado fuera de la nav. NO tocar el indicador \"en línea\" (D4 excluido).",
+  "acceptance_criteria": [
+    "Tabs primarios reducidos a MATCHES · SOLICITUDES (n) · CONTACTOS; los 4 estados de match viven como chips de filtro dentro de Matches",
+    "Lógica de conteo/filtrado de chips con tests unitarios escritos ANTES de la implementación (tdd)",
+    "Un solo botón Actualizar (funde Recalcular+Sincronizar) con timestamp; Bloqueados accesible desde overflow ⋯ sin pérdida de funcionalidad",
+    "Primer grupo de matches expandido por defecto, resto colapsado",
+    "Fila de match con i-swap y diff de precio tabular verde/neutro",
+    "i18n en/es/pt; sin regresión en E2E de matches; test:unit + build verdes; deploy dev"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F2",
+    "matches"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-093"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-13T16:16:47.000Z",
+  "updated_at": "2026-07-13T16:16:47.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

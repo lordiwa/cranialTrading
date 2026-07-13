@@ -44,10 +44,27 @@ export default {
                     10: 'rgba(250, 204, 21, 0.1)',
                     5: 'rgba(250, 204, 21, 0.05)',
                 },
+                // v2 redesign — surface layering (design→app v2 F0, see cranial-design/prototype/DESIGN-DIRECTION.md §2-3)
+                surface: {
+                    1: 'rgba(255, 255, 255, 0.04)',
+                    2: 'rgba(255, 255, 255, 0.07)',
+                    3: 'rgba(255, 255, 255, 0.10)',
+                },
+                // v2 redesign — hairline borders/dividers
+                line: {
+                    DEFAULT: 'rgba(255, 255, 255, 0.10)',
+                    strong: 'rgba(255, 255, 255, 0.18)',
+                },
+                // v2 redesign — premium accent
+                gold: '#D4A843',
+                // v2 redesign — sticky header background
+                hdr: 'rgba(0, 0, 0, 0.78)',
             },
             fontFamily: {
                 sans: ['Open Sans', 'sans-serif'],
                 brother: ['Brother', 'sans-serif'],
+                // v2 redesign — display typeface for headings/numerics (design→app v2 F0)
+                display: ['Space Grotesk', 'sans-serif'],
             },
             fontSize: {
                 'h1': ['28px', { lineHeight: '1.3', letterSpacing: '-0.3px', fontWeight: '700' }],
@@ -71,6 +88,8 @@ export default {
                 'medium': '0 4px 12px rgba(0, 0, 0, 0.3)',
                 'strong': '0 8px 24px rgba(0, 0, 0, 0.4)',
                 'glow-strong': '0 0 12px rgba(90, 193, 104, 0.15)',
+                // v2 redesign — focus/highlight glow (design→app v2 F0)
+                'glow-neon': '0 0 0 1px rgba(90, 193, 104, 0.35), 0 0 18px rgba(90, 193, 104, 0.18)',
             },
             borderRadius: {
                 'none': '0px',
@@ -86,6 +105,10 @@ export default {
             },
             minWidth: {
                 '44': '44px',
+            },
+            transitionTimingFunction: {
+                // v2 redesign — standard ease for motion (design→app v2 F0)
+                'v2': 'cubic-bezier(0.2, 0.7, 0.3, 1)',
             },
         },
     },

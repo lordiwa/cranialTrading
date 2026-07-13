@@ -492,6 +492,17 @@
     "fab": {
       "addCard": "Adicionar carta"
     },
+    "hero": {
+      "kicker": "MINHA VITRINE",
+      "value": "VALOR DA COLEÇÃO",
+      "cards": "CARTAS",
+      "forSale": "À VENDA"
+    },
+    "badges": {
+      "vendo": "VENDENDO",
+      "cambio": "TROCA",
+      "deseado": "DESEJADA"
+    },
     "filters": {
       "all": "TODAS",
       "owned": "TENHO",

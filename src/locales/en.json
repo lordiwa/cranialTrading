@@ -492,6 +492,17 @@
     "fab": {
       "addCard": "Add card"
     },
+    "hero": {
+      "kicker": "MY SHOWCASE",
+      "value": "COLLECTION VALUE",
+      "cards": "CARDS",
+      "forSale": "FOR SALE"
+    },
+    "badges": {
+      "vendo": "SELLING",
+      "cambio": "TRADE",
+      "deseado": "WANTED"
+    },
     "filters": {
       "all": "ALL",
       "owned": "OWNED",

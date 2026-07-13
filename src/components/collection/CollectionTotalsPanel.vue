@@ -215,7 +215,7 @@ async function toggleChart() {
 </script>
 
 <template>
-  <div class="fixed md:!bottom-0 left-0 right-0 z-40 bg-primary/95 backdrop-blur border-t border-neon overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
+  <div class="fixed md:!bottom-0 left-0 right-0 z-40 bg-hdr backdrop-blur-md border-t border-neon-40 overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
     <!-- Loading bar -->
     <div v-if="loading" class="h-1 bg-primary overflow-hidden">
       <div
@@ -294,10 +294,10 @@ async function toggleChart() {
               :key="src"
               @click="priceSource = src"
               :class="[
-                'px-2 py-0.5 font-bold rounded transition-colors uppercase',
+                'px-2.5 py-0.5 font-bold rounded-full transition-all duration-200 ease-v2 uppercase',
                 priceSource === src
                   ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
-                  : 'text-silver-50 hover:text-silver hover:bg-silver-5'
+                  : 'bg-surface-1 border border-line text-silver-50 hover:text-silver hover:border-line-strong'
               ]"
           >
             {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'Buylist' }}
@@ -305,8 +305,8 @@ async function toggleChart() {
           <button
             @click="toggleChart"
             :class="[
-              'ml-1 px-1.5 py-0.5 rounded transition-colors text-[14px]',
-              showChart ? 'bg-silver-10 text-silver' : 'text-silver-50 hover:text-silver hover:bg-silver-5'
+              'ml-1 px-1.5 py-0.5 rounded-full transition-all duration-200 ease-v2 text-[14px]',
+              showChart ? 'bg-surface-2 text-silver' : 'text-silver-50 hover:text-silver hover:bg-surface-2'
             ]"
             :title="t('collection.totals.history.title')"
           >
@@ -315,19 +315,19 @@ async function toggleChart() {
             </svg>
           </button>
         </div>
-        <span class="text-silver-50">{{ t('collection.totals.cards') }} <span class="font-bold text-silver text-small">{{ totalCardCount }}</span></span>
+        <span class="text-silver-50">{{ t('collection.totals.cards') }} <span class="font-display font-tnum font-bold text-silver text-small">{{ totalCardCount }}</span></span>
         <span class="text-silver-30">|</span>
-        <span class="text-silver-50">{{ t('collection.totals.unique') }} <span class="font-bold text-silver text-small">{{ uniqueCardCount }}</span></span>
+        <span class="text-silver-50">{{ t('collection.totals.unique') }} <span class="font-display font-tnum font-bold text-silver text-small">{{ uniqueCardCount }}</span></span>
         <span class="text-silver-30">|</span>
-        <span class="text-silver-50">{{ t('collection.totals.headers.collection') }} <span class="font-bold text-small" :class="sourceColor">{{ fmt(collectionValue) }}</span></span>
+        <span class="text-silver-50">{{ t('collection.totals.headers.collection') }} <span class="font-display font-tnum font-bold text-small" :class="sourceColor">{{ fmt(collectionValue) }}</span></span>
         <span class="text-silver-30">|</span>
-        <span class="text-silver-50">{{ t('collection.totals.headers.wishlist') }} <span class="font-bold text-yellow-400 text-small">{{ fmt(wishlistValue) }}</span></span>
+        <span class="text-silver-50">{{ t('collection.totals.headers.wishlist') }} <span class="font-display font-tnum font-bold text-yellow-400 text-small">{{ fmt(wishlistValue) }}</span></span>
         <span class="text-silver-30">|</span>
-        <span class="text-silver-50">{{ t('collection.totals.headers.forSale') }} <span class="font-bold text-small" :class="sourceColor">{{ fmt(saleValue) }}</span></span>
+        <span class="text-silver-50">{{ t('collection.totals.headers.forSale') }} <span class="font-display font-tnum font-bold text-small" :class="sourceColor">{{ fmt(saleValue) }}</span></span>
         <span class="text-silver-30">|</span>
-        <span class="text-silver-50">{{ t('collection.totals.headers.forTrade') }} <span class="font-bold text-small" :class="sourceColor">{{ fmt(tradeValue) }}</span></span>
+        <span class="text-silver-50">{{ t('collection.totals.headers.forTrade') }} <span class="font-display font-tnum font-bold text-small" :class="sourceColor">{{ fmt(tradeValue) }}</span></span>
         <span class="text-silver-30">|</span>
-        <span class="text-silver-50">{{ t('collection.totals.headers.total') }} <span class="font-bold text-small" :class="sourceColor">{{ fmt(totalValue) }}</span></span>
+        <span class="text-silver-50 ml-auto">{{ t('collection.totals.headers.total') }} <span class="font-display font-tnum font-bold text-[18px]" :class="sourceColor">{{ fmt(totalValue) }}</span></span>
         <span v-if="loading" class="text-tiny text-silver-50 ml-auto">{{ progress }}%</span>
       </div>
 
@@ -341,7 +341,7 @@ async function toggleChart() {
           <div class="flex items-center gap-1.5 text-[11px]">
             <span class="font-bold uppercase" :class="sourceColor">{{ activeSourceLabel }}</span>
             <span class="text-silver-30">|</span>
-            <span class="text-silver-50">{{ fmt(totalValue) }}</span>
+            <span class="font-display font-tnum font-bold text-neon">{{ fmt(totalValue) }}</span>
             <span v-if="loading" class="text-silver-50">({{ progress }}%)</span>
           </div>
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -360,10 +360,10 @@ async function toggleChart() {
                   :key="src"
                   @click.stop="priceSource = src"
                   :class="[
-                    'px-1.5 py-0.5 text-[11px] font-bold rounded transition-colors uppercase',
+                    'px-1.5 py-0.5 text-[11px] font-bold rounded-full transition-all duration-200 ease-v2 uppercase',
                     priceSource === src
                       ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
-                      : 'text-silver-50'
+                      : 'bg-surface-1 border border-line text-silver-50'
                   ]"
               >
                 {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
@@ -371,8 +371,8 @@ async function toggleChart() {
               <button
                 @click.stop="toggleChart"
                 :class="[
-                  'px-1 py-0.5 rounded transition-colors',
-                  showChart ? 'bg-silver-10 text-silver' : 'text-silver-50'
+                  'px-1 py-0.5 rounded-full transition-all duration-200 ease-v2',
+                  showChart ? 'bg-surface-2 text-silver' : 'text-silver-50'
                 ]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -384,16 +384,16 @@ async function toggleChart() {
             <span class="text-[11px] text-silver-50">{{ totalCardCount }}<span class="text-silver-30 mx-1">·</span>{{ uniqueCardCount }}u</span>
           </div>
           <!-- Row 2: price breakdowns -->
-          <div class="flex items-center gap-2 text-[11px]">
-            <span class="flex-shrink-0"><span class="text-silver-50">Col </span><span class="font-bold" :class="sourceColor">{{ fmt(collectionValue) }}</span></span>
+          <div class="flex items-center gap-2 text-[11px] font-display font-tnum">
+            <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Col </span><span class="font-bold" :class="sourceColor">{{ fmt(collectionValue) }}</span></span>
             <span class="text-silver-30 flex-shrink-0">|</span>
-            <span class="flex-shrink-0"><span class="text-silver-50">Wish </span><span class="font-bold text-yellow-400">{{ fmt(wishlistValue) }}</span></span>
+            <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Wish </span><span class="font-bold text-yellow-400">{{ fmt(wishlistValue) }}</span></span>
             <span class="text-silver-30 flex-shrink-0">|</span>
-            <span class="flex-shrink-0"><span class="text-silver-50">Sale </span><span class="font-bold" :class="sourceColor">{{ fmt(saleValue) }}</span></span>
+            <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Sale </span><span class="font-bold" :class="sourceColor">{{ fmt(saleValue) }}</span></span>
             <span class="text-silver-30 flex-shrink-0">|</span>
-            <span class="flex-shrink-0"><span class="text-silver-50">Trade </span><span class="font-bold" :class="sourceColor">{{ fmt(tradeValue) }}</span></span>
+            <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Trade </span><span class="font-bold" :class="sourceColor">{{ fmt(tradeValue) }}</span></span>
             <span class="text-silver-30 flex-shrink-0">|</span>
-            <span class="flex-shrink-0"><span class="text-silver-50">Total </span><span class="font-bold" :class="sourceColor">{{ fmt(totalValue) }}</span></span>
+            <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Total </span><span class="font-bold text-neon">{{ fmt(totalValue) }}</span></span>
           </div>
         </div>
 

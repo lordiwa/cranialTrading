@@ -40,7 +40,7 @@ const decksStore = useDecksStore()
 const binderStore = useBindersStore()
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { getAllocationsForCard } = useCardAllocation()
 
 // ========== STATE ==========
@@ -149,6 +149,37 @@ const getStatusLabel = (status: string): string => {
 
 const decksList = computed(() => decksStore.decks)
 const bindersList = computed(() => binderStore.binders)
+
+// Hero stat-chip: uses the store's already-loaded totalValue (card.price-based, no
+// extra CK fetch) to avoid duplicating CollectionTotalsPanel's live price fetching.
+// No existing money formatter in the codebase does thousands-grouping (utils/formatters.ts
+// and services/mtgjson.ts formatPrice() are both plain `.toFixed(2)`), so this uses the
+// platform's native Intl.NumberFormat — locale-aware via the app's own useI18n locale —
+// rather than inventing a bespoke grouping format.
+const intlLocaleMap: Record<string, string> = { es: 'es-AR', en: 'en-US', pt: 'pt-BR' }
+const heroCollectionValue = computed(() => {
+  const intlLocale = intlLocaleMap[locale.value] ?? 'es-AR'
+  // collectionStore.totalValue (stores/collection.ts) sums card.price * quantity with no
+  // nullish guard — a single priceless imported card (price undefined after compact-import
+  // hydration) poisons the whole sum to NaN. Guarded here (view-only); the store-side fix
+  // is out of this ticket's scope and will be its own follow-up.
+  const rawValue = Number.isFinite(collectionStore.totalValue) ? collectionStore.totalValue : 0
+  const grouped = new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 0 }).format(rawValue)
+  return `$${grouped}`
+})
+
+// collection.title ("MI COLECCIÓN") is shared with DeckView/BinderView h1's — cannot edit
+// the i18n string itself without changing those screens too. This is a presentation-only
+// title-case transform scoped to the Collection hero's own h1, matching the proto's
+// "Mi Colección" (display font, Title Case) without touching the shared string or other screens.
+const heroTitle = computed(() => {
+  const raw = t('collection.title')
+  return raw
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+})
 
 // ========== COLLECTION FILTER (composable) ==========
 
@@ -909,55 +940,63 @@ onUnmounted(() => {
 
 <template>
   <AppContainer>
-    <!-- ========== HEADER ========== -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <!-- ========== HERO ========== -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-h1 font-bold text-silver">{{ t('collection.title') }}</h1>
-        <p class="text-small text-silver-70">
-          {{ t('collection.subtitle', { owned: ownedCount }) }}
-          <span v-if="availableCount > 0" class="text-neon">• {{ availableCount }} {{ t('collection.filters.available') }}</span>
-          <span v-if="wishlistTotalCount > 0" class="text-yellow-400">• {{ t('collection.wishlistCount', { count: wishlistTotalCount }) }}</span>
-        </p>
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-1">{{ t('collection.hero.kicker') }}</p>
+        <h1 class="font-display text-h1 font-bold text-silver">{{ heroTitle }}</h1>
       </div>
-      <div class="flex gap-2" data-tour="add-card-btn">
-        <BaseButton size="small" variant="secondary" @click="selectedScryfallCard = undefined; showAddCardModal = true">
-          <SvgIcon name="plus" size="tiny" class="inline-block mr-1" />
-          {{ t('collection.actions.addCard') }}
-        </BaseButton>
+      <div class="flex gap-3 flex-wrap">
+        <div class="flex flex-col gap-0.5 px-4 py-2.5 bg-surface-1 border border-line rounded-lg min-w-[112px]">
+          <span class="font-display font-tnum text-[28px] font-bold leading-none text-neon">{{ heroCollectionValue }}</span>
+          <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('collection.hero.value') }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5 px-4 py-2.5 bg-surface-1 border border-line rounded-lg min-w-[80px]">
+          <span class="font-display font-tnum text-h3 font-bold leading-none text-silver">{{ ownedCount }}</span>
+          <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('collection.hero.cards') }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5 px-4 py-2.5 bg-surface-1 border border-line rounded-lg min-w-[80px]">
+          <span class="font-display font-tnum text-h3 font-bold leading-none text-silver">{{ availableCount }}</span>
+          <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('collection.hero.forSale') }}</span>
+        </div>
       </div>
     </div>
 
     <!-- ========== CONTENIDO PRINCIPAL ========== -->
     <div class="mt-6 pb-24 sm:pb-20">
       <div>
-        <!-- ========== MAIN TABS: COLECCIÓN / MAZOS / BINDERS ========== -->
-        <div class="mb-6">
-          <div class="flex gap-1 mb-4">
-            <RouterLink
-                to="/collection"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded-none text-center bg-neon text-primary"
-            >
+        <!-- ========== SEGMENTED CONTROL: COLECCIÓN / MAZOS / BINDERS + ALTA ========== -->
+        <div class="flex flex-wrap items-center gap-3 mb-6">
+          <div class="inline-flex bg-surface-1 border border-line rounded-lg p-[3px] gap-0.5">
+            <span class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-neon bg-surface-3">
               {{ t('collection.tabs.collection') }}
-            </RouterLink>
+            </span>
             <RouterLink
                 data-tour="deck-tab"
                 to="/decks"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded-none text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-silver-50 transition-all duration-200 ease-v2 hover:text-silver focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.decks') }}
-              <span class="ml-1 opacity-70">({{ decksList.length }})</span>
+              <span class="font-display font-tnum text-tiny" style="color:inherit">{{ decksList.length }}</span>
             </RouterLink>
             <RouterLink
                 to="/binders"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded-none text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-silver-50 transition-all duration-200 ease-v2 hover:text-silver focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.binders') }}
-              <span class="ml-1 opacity-70">({{ bindersList.length }})</span>
+              <span class="font-display font-tnum text-tiny" style="color:inherit">{{ bindersList.length }}</span>
             </RouterLink>
+          </div>
+          <span class="flex-1"></span>
+          <div data-tour="add-card-btn">
+            <BaseButton size="small" variant="filled" class="uppercase tracking-wide" @click="selectedScryfallCard = undefined; showAddCardModal = true">
+              <SvgIcon name="plus" size="tiny" class="inline-block mr-1" />
+              {{ t('collection.actions.addCard') }}
+            </BaseButton>
           </div>
         </div>
 
-        <!-- ========== STATUS FILTERS ========== -->
+        <!-- ========== STATUS FILTERS (pill chips v2) ========== -->
         <div data-tour="status-filters" class="flex flex-wrap items-center gap-2 mb-4 pb-2">
           <div
               v-for="(count, status) in {
@@ -972,14 +1011,14 @@ onUnmounted(() => {
             <button
                 @click="statusFilter = status as typeof statusFilter"
                 :class="[
-                  'px-3 py-2 md:py-1 min-h-[44px] md:min-h-0 text-small md:text-tiny font-bold whitespace-nowrap transition-150 rounded-none',
+                  'inline-flex items-center gap-1.5 min-h-[34px] px-3.5 rounded-full text-small font-semibold whitespace-nowrap transition-all duration-200 ease-v2 border',
                   statusFilter === status
-                    ? 'bg-neon text-primary'
-                    : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
+                    ? 'text-neon bg-neon-10 border-neon-40'
+                    : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'
                 ]"
             >
               {{ getStatusLabel(status) }}
-              <span class="ml-1" :class="statusFilter === status ? 'text-primary' : 'text-neon'">({{ count }})</span>
+              <span class="font-display font-tnum" style="color:inherit">{{ count }}</span>
             </button>
             <HelpTooltip
                 v-if="status === 'collection'"
@@ -1007,6 +1046,7 @@ onUnmounted(() => {
             v-model:sort-by="sortBy"
             v-model:group-by="collectionGroupBy"
             view-mode="collection"
+            :v2="true"
             :show-bulk-select="true"
             :selection-mode="selectionMode"
             :show-view-type="true"
@@ -1198,6 +1238,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <FloatingActionButton
         icon="plus"
+        size="large"
         :label="t('collection.fab.addCard')"
         @click="showAddCardModal = true"
         :style="totalsPanelExpanded ? { bottom: 'calc(10rem + env(safe-area-inset-bottom, 0px))' } : { bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }"

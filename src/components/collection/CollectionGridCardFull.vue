@@ -278,15 +278,22 @@ const isCardAllocated = computed((): boolean => {
   return getTotalAllocated(props.card.id) > 0
 })
 
-const getStatusColor = (status: string) => {
-  const colors = {
-    collection: 'text-neon',
-    sale: 'text-yellow-400',
-    trade: 'text-blue-400',
-    wishlist: 'text-red-400',
-  }
-  return colors[status as keyof typeof colors] || 'text-silver-70'
+// v2 redesign — status badge (dot + pill, DESIGN-DIRECTION.md §5). Pure CSS dot
+// (span, not svg) per the Mali GPU rule: this card is rendered inside a virtualized grid.
+// Semantics unchanged: sale/trade/wishlist get a badge, plain `collection` gets none.
+// Opaque dark base (not just a color tint) — the proto's 12-14% tint only reads on its
+// own flat placeholder background; over real card art/name-bars it was unreadable.
+const badgeMap: Record<string, { labelKey: string; classes: string }> = {
+  sale: { labelKey: 'collection.badges.vendo', classes: 'bg-[rgba(13,13,15,.85)] text-[#C4553F]' },
+  trade: { labelKey: 'collection.badges.cambio', classes: 'bg-[rgba(13,13,15,.85)] text-[#60A5FA]' },
+  wishlist: { labelKey: 'collection.badges.deseado', classes: 'bg-[rgba(13,13,15,.85)] text-gold' },
 }
+const badgeInfo = computed(() => {
+  // eslint-disable-next-line security/detect-object-injection
+  const entry = badgeMap[props.card.status]
+  if (!entry) return null
+  return { label: t(entry.labelKey), classes: entry.classes }
+})
 
 // Price mover badge
 const priceChangeData = computed(() => {
@@ -389,12 +396,15 @@ const handleContextMenuSelect = async (itemId: string) => {
          cards corrupted low-end Mali GPUs (cranialBugColl / Tecno Spark 30C, Mali-G52).
          Status changes + public toggle remain available via the context menu and swipe-right. -->
     <div
-        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
+        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
         :class="[
           selectionMode && isSelected ? 'border-neon border-2' : '',
           !selectionMode && isBeingDeleted ? 'border-rust animate-pulse' : '',
           !selectionMode && !isBeingDeleted ? (isCardAllocated ? 'border-neon-30' : 'border-silver-30 group-hover:border-neon') : '',
           selectionMode && !isSelected ? 'border-silver-30' : '',
+          // v2 redesign — mobile swipe-affordance hint (DESIGN-DIRECTION.md §8.7): permanent
+          // inset border (rust=delete left, neon=status-change right), independent of live swipe state.
+          !readonly && !isBeingDeleted ? 'md:!shadow-none shadow-[inset_3px_0_0_#8B2E1F,inset_-3px_0_0_#5AC168]' : '',
         ]"
         :style="swipeStyle"
         :tabindex="isBeingDeleted ? -1 : 0"
@@ -449,12 +459,22 @@ const handleContextMenuSelect = async (itemId: string) => {
         <SvgIcon name="flip" size="tiny" />
       </button>
 
-      <!-- Status label overlay (bottom center of card) -->
+      <!-- Status badge (v2 dot pill, DESIGN-DIRECTION.md §5) — sale/trade/wishlist only, plain collection gets none -->
       <span
-          class="absolute top-1 left-1 bg-primary/85 border border-silver-20 px-2 py-0.5 rounded-none text-tiny font-bold uppercase z-10 hidden lg:inline"
-          :class="getStatusColor(card.status)"
+          v-if="badgeInfo"
+          class="absolute top-1.5 left-1.5 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide shadow-[0_1px_5px_rgba(0,0,0,.45)]"
+          :class="badgeInfo.classes"
       >
-        {{ card.status }}
+        <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+        {{ badgeInfo.label }}
+      </span>
+
+      <!-- Quantity plate (v2, DESIGN-DIRECTION.md §5) -->
+      <span
+          v-if="card.quantity > 0"
+          class="absolute bottom-1.5 right-1.5 z-10 px-2 py-0.5 rounded bg-black/70 border border-line-strong font-display font-tnum text-[11px] font-bold text-silver"
+      >
+        x{{ card.quantity }}
       </span>
 
       <!-- Deleting overlay -->
@@ -504,27 +524,27 @@ const handleContextMenuSelect = async (itemId: string) => {
     <div class="mt-1 space-y-0.5">
       <!-- Card Kingdom Price (primary) -->
       <div class="flex items-center gap-1">
-        <p v-if="hasCardKingdomPrices" class="text-tiny font-bold text-neon">
+        <p v-if="hasCardKingdomPrices" class="font-display font-tnum text-tiny font-bold text-neon">
           CK: {{ formatPrice(cardKingdomRetail) }}
         </p>
-        <p v-else class="text-tiny text-silver-50">CK: -</p>
+        <p v-else class="font-display font-tnum text-tiny text-silver-50">CK: -</p>
         <span
             v-if="priceChangeData"
-            class="text-[14px] font-bold px-1 rounded-none"
+            class="font-display font-tnum text-[14px] font-bold px-1 rounded-none"
             :class="priceChangeData.isPositive ? 'text-neon bg-neon/10' : 'text-rust bg-rust/10'"
         >
           {{ priceChangeData.isPositive ? '&#x25B2;' : '&#x25BC;' }} {{ Math.abs(priceChangeData.percentChange).toFixed(1) }}%
         </span>
       </div>
       <!-- TCGPlayer Price -->
-      <p class="text-tiny text-silver">
+      <p class="font-display font-tnum text-tiny text-silver">
         TCG: ${{ card.price ? card.price.toFixed(2) : 'N/A' }}
       </p>
       <!-- CK Buylist -->
-      <p v-if="cardKingdomBuylist" class="text-tiny text-silver">
+      <p v-if="cardKingdomBuylist" class="font-display font-tnum text-tiny text-silver">
         BL: {{ formatPrice(cardKingdomBuylist) }}
       </p>
-      <p v-else class="text-tiny text-silver-50">BL: -</p>
+      <p v-else class="font-display font-tnum text-tiny text-silver-50">BL: -</p>
     </div>
 
     <!-- Row 7: Sparkline (always reserve space) -->

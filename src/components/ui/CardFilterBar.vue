@@ -21,6 +21,9 @@ const props = withDefaults(defineProps<{
   mobileDiscoverActive?: boolean
   showAdvancedFilters?: boolean
   activeFilterCount?: number
+  // v2 redesign — opt-in only (design→app v2, DESIGN-DIRECTION.md §5). Defaults to false so
+  // Deck/Binder/UserProfile/DiscoveryPanel callers keep the exact v1 look until their own tickets land.
+  v2?: boolean
 }>(), {
   viewMode: 'collection',
   showSuggestions: true,
@@ -29,6 +32,7 @@ const props = withDefaults(defineProps<{
   mobileDiscoverActive: false,
   showAdvancedFilters: false,
   activeFilterCount: 0,
+  v2: false,
 })
 
 const emit = defineEmits<{
@@ -94,20 +98,48 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 <template>
   <div class="mb-6 space-y-3">
     <div class="flex items-center gap-2">
-      <div ref="wrapperRef" class="relative flex-1">
+      <div ref="wrapperRef" class="relative flex-1" :class="v2 ? 'max-w-[420px]' : ''">
         <BaseInput
+            v-if="!v2"
             :model-value="filterQuery"
             @update:model-value="handleInput"
             :placeholder="t('collection.filters.searchPlaceholder')"
             type="text"
             clearable
         />
+        <!-- v2 redesign: input surface-1 + focus glow (DESIGN-DIRECTION.md §5) -->
+        <label
+            v-else
+            class="flex items-center gap-2.5 min-h-11 px-3.5 bg-surface-1 border border-line rounded-md transition-all duration-200 ease-v2 focus-within:border-neon focus-within:shadow-glow-neon"
+        >
+          <SvgIcon name="search" size="tiny" class="text-silver-30 flex-shrink-0" />
+          <input
+              :value="filterQuery"
+              @input="handleInput(($event.target as HTMLInputElement).value)"
+              type="text"
+              :placeholder="t('collection.filters.searchPlaceholder')"
+              class="flex-1 min-w-0 bg-transparent border-none outline-none text-silver text-small placeholder:text-silver-30"
+          />
+          <button
+              v-if="filterQuery.length > 0"
+              type="button"
+              @click.stop="handleInput('')"
+              :aria-label="t('common.aria.clearInput')"
+              class="flex-shrink-0 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-surface-2"
+          >
+            ✕
+          </button>
+        </label>
 
         <!-- Suggestions dropdown -->
-        <div v-if="showSuggestions && dropdownVisible && !dropdownDismissed" class="absolute left-0 right-0 top-full bg-primary border-2 border-neon max-h-80 overflow-y-auto z-20">
+        <div
+            v-if="showSuggestions && dropdownVisible && !dropdownDismissed"
+            class="absolute left-0 right-0 top-full max-h-80 overflow-y-auto z-20"
+            :class="v2 ? 'mt-1 bg-primary border border-line-strong rounded-md shadow-strong' : 'bg-primary border-2 border-neon'"
+        >
         <!-- Local matches section -->
         <div v-if="localMatches.length > 0">
-          <div class="px-3 py-1 text-tiny text-silver-50 uppercase bg-silver-10">
+          <div class="px-3 py-1 text-tiny text-silver-50 uppercase" :class="v2 ? 'bg-surface-2' : 'bg-silver-10'">
             {{ t('collection.suggestions.localSection') }}
           </div>
           <button v-for="card in localMatches" :key="card.id" @click="emit('select-local-card', card); clearSuggestions(); dropdownDismissed = true"
@@ -119,7 +151,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 
         <!-- Scryfall suggestions section -->
         <div v-if="scryfallSuggestions.length > 0">
-          <div class="px-3 py-1 text-tiny text-silver-50 uppercase bg-silver-10">
+          <div class="px-3 py-1 text-tiny text-silver-50 uppercase" :class="v2 ? 'bg-surface-2' : 'bg-silver-10'">
             {{ t('collection.suggestions.scryfallSection') }}
           </div>
           <button v-for="name in scryfallSuggestions" :key="name" @click="emit('select-scryfall-card', name); clearSuggestions(); dropdownDismissed = true"
@@ -138,7 +170,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 
         <!-- Advanced search link (collection mode only) -->
         <RouterLink v-if="viewMode === 'collection'" :to="'/search'" @click="clearSuggestions(); dropdownDismissed = true"
-          class="w-full px-3 py-2 text-small text-neon hover:bg-neon-10 border-t border-silver-30 flex items-center gap-1">
+          class="w-full px-3 py-2 text-small text-neon hover:bg-neon-10 border-t flex items-center gap-1" :class="v2 ? 'border-line' : 'border-silver-30'">
           <SvgIcon name="search" size="tiny" />
           {{ t('collection.suggestions.advancedSearch') }} →
         </RouterLink>
@@ -147,10 +179,15 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <button
           v-if="showAdvancedFilters"
           type="button"
-          class="flex items-center gap-1 px-3 min-h-[44px] md:min-h-0 md:py-1 rounded-none border text-tiny font-bold transition-150"
-          :class="activeFilterCount > 0
-            ? 'bg-neon text-primary border-neon'
-            : 'bg-primary text-silver border-silver-30 hover:border-neon hover:text-neon'"
+          :class="v2
+            ? [
+                'inline-flex items-center gap-2 min-h-11 px-3.5 rounded-md border text-tiny font-bold uppercase tracking-wide transition-all duration-200 ease-v2',
+                activeFilterCount > 0 ? 'bg-neon-10 text-neon border-neon-40' : 'bg-surface-1 text-silver-50 border-line hover:border-line-strong hover:text-silver'
+              ]
+            : [
+                'flex items-center gap-1 px-3 min-h-[44px] md:min-h-0 md:py-1 rounded-none border text-tiny font-bold transition-150',
+                activeFilterCount > 0 ? 'bg-neon text-primary border-neon' : 'bg-primary text-silver border-silver-30 hover:border-neon hover:text-neon'
+              ]"
           :aria-label="t('discovery.mobile.openSheetFilter')"
           aria-haspopup="dialog"
           data-testid="cardfilterbar-open-filters"
@@ -187,7 +224,9 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="sortBy"
             @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            :class="v2
+              ? 'appearance-none bg-surface-1 border border-line text-silver text-tiny font-bold px-3 py-2 pr-8 min-h-[36px] rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon'
+              : 'appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary'"
         >
           <option value="recent">{{ t('collection.sort.recent') }}</option>
           <option value="name">{{ t('collection.sort.name') }}</option>
@@ -201,7 +240,9 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="groupBy"
             @change="emit('update:groupBy', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            :class="v2
+              ? 'appearance-none bg-surface-1 border border-line text-silver text-tiny font-bold px-3 py-2 pr-8 min-h-[36px] rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon'
+              : 'appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary'"
         >
           <option value="none">{{ t('collection.group.none') }}</option>
           <option value="name">{{ t('collection.group.name') }}</option>
@@ -217,7 +258,9 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
         <select
             :value="viewType"
             @change="emit('change-view-type', ($event.target as HTMLSelectElement).value as 'visual' | 'texto')"
-            class="appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            :class="v2
+              ? 'appearance-none bg-surface-1 border border-line text-silver text-tiny font-bold px-3 py-2 pr-8 min-h-[36px] rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon'
+              : 'appearance-none bg-primary border border-silver-10 text-silver text-tiny font-bold px-2 py-1 pr-7 h-[32px] rounded-none cursor-pointer focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary'"
         >
           <option value="visual">{{ t('collection.view.visual') }}</option>
           <option value="texto">{{ t('collection.view.texto') }}</option>
@@ -229,10 +272,15 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
       <button
           v-if="showBulkSelect"
           @click="emit('toggle-bulk-select')"
-          :class="[
-            'px-2 py-1 text-tiny font-bold rounded-none transition-colors flex items-center gap-1',
-            selectionMode ? 'bg-rust/20 text-rust' : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
-          ]"
+          :class="v2
+            ? [
+                'inline-flex items-center gap-1.5 px-3.5 min-h-[34px] rounded-full text-small font-semibold transition-all duration-200 ease-v2 border',
+                selectionMode ? 'bg-rust/15 text-[#C4553F] border-rust/40' : 'bg-surface-1 text-silver-50 border-line hover:text-silver hover:border-line-strong'
+              ]
+            : [
+                'px-2 py-1 text-tiny font-bold rounded-none transition-colors flex items-center gap-1',
+                selectionMode ? 'bg-rust/20 text-rust' : 'border border-silver-10 text-silver-50 hover:text-silver hover:border-silver-30'
+              ]"
           :title="t('collection.bulkDelete.toggle')"
       >
         <SvgIcon name="check" size="tiny" />

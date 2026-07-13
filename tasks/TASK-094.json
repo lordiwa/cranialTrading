@@ -10,7 +10,7 @@
     "Fila de match con i-swap y diff de precio tabular verde/neutro",
     "i18n en/es/pt; sin regresión en E2E de matches; test:unit + build verdes; deploy dev"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "design-sync",
@@ -24,11 +24,25 @@
   "depends_on": [
     "TASK-093"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "8f42556",
+    "8bfcd3a"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13: implementado por loop autonomo. Review FULL APPROVE-WITH-NOTES (0 HIGH, 3 MEDIUM fixeados en batch + 4 LOW aplicados). Pase visual delegado vs proto 10-saved-matches: PASS (kicker/titulo/chips corregidos a fidelidad). Commit 8f42556. Cierre pendiente del push de tanda 2 (E2E completo + deploy dev, junto a TASK-097).",
+      "at": "2026-07-13T21:45:00.000Z"
+    },
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13 CERRADO por loop autonomo. Review FULL APPROVE-WITH-NOTES (0 HIGH; 3 MEDIUM + 4 LOW fixeados en 2 batches incl. fidelidad visual kicker/titulo/chips). UAT delegado: PASS vs proto 10-saved-matches (swap-bar con imagen real, +$2 a favor verde, grupo expandido). E2E completo 123 passed/0 failed post-cambio (page objects actualizados en el mismo commit). Tanda 2 v1.41.0 pusheada a develop.",
+      "at": "2026-07-13T22:40:00.000Z"
+    }
+  ],
   "created_at": "2026-07-13T16:16:47.000Z",
-  "updated_at": "2026-07-13T16:16:47.000Z",
+  "updated_at": "2026-07-13T22:40:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

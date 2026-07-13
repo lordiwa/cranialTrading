@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-13T20:55:00.000Z",
+  "generated_at": "2026-07-13T22:40:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -442,7 +442,7 @@
     {
       "key": "TASK-094",
       "title": "Design→app v2 F2: Matches hub — 3 tabs + chips de filtro, stat-chips, botón Actualizar unificado, primer grupo expandido",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -460,7 +460,7 @@
     {
       "key": "TASK-097",
       "title": "Design→app v2 F2b: modales de matches — match detail, carrito de intercambio, buy request",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

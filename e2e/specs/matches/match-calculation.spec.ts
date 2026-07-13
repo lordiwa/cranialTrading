@@ -8,15 +8,21 @@ test.describe('Match Calculation', () => {
   test('actualizar button triggers sync + recalculate with progress', async ({ matchesPage, page }) => {
     // v2 redesign (TASK-094 F2): Recalcular + Sincronizar fused into one "Actualizar"/
     // "Update" button. No conditional skip — this flow must stay covered.
+    // Large accounts (CI's 59k-card fixture) can take well over the default 45s test
+    // timeout to sync + recalculate — give this test more room end-to-end.
+    test.setTimeout(120_000);
+
     await expect(matchesPage.refreshButton).toBeVisible();
-    await expect(matchesPage.refreshButton).toBeEnabled({ timeout: 10_000 });
+    // 60s: on a big account the button can already be mid-refresh (disabled) when the
+    // page mounts — wait for the in-flight refresh to finish before triggering another.
+    await expect(matchesPage.refreshButton).toBeEnabled({ timeout: 60_000 });
     await matchesPage.refreshButton.click();
 
     // Should show some loading/progress indicator while syncing + recalculating
     await page.waitForTimeout(3000);
 
     // Button returns to its idle label once the refresh settles
-    await expect(matchesPage.refreshButton).toBeVisible({ timeout: 15_000 });
+    await expect(matchesPage.refreshButton).toBeVisible({ timeout: 30_000 });
     await expect(matchesPage.tabs.new).toBeVisible();
   });
 

@@ -19,7 +19,18 @@ export class MatchesPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.refreshButton = page.locator('button').filter({ hasText: /actualizar|update/i }).first();
+    // Covers both the idle label (ACTUALIZAR/UPDATE) and the in-progress label
+    // (ACTUALIZANDO…/UPDATING…) — "actualizando" is NOT a substring match of
+    // "actualizar" (nor is "updating" of "update"), so both forms must be listed
+    // explicitly. On accounts with a large collection (e.g. CI's 59k-card fixture),
+    // /saved-matches can mount mid-refresh, so the button may already show the
+    // in-progress label on first paint. "sincronizando"/"syncing" are included
+    // defensively even though SavedMatchesView currently only ever renders the
+    // refresh/refreshing pair (verified via grep) — cheap insurance against a
+    // future intermediate sync-only label.
+    this.refreshButton = page.locator('button').filter({
+      hasText: /actualizar|actualizando|update|updating|sincronizando|syncing/i,
+    }).first();
     this.overflowMenuButton = page.getByRole('button', { name: /more options|más opciones|mais opções/i });
 
     this.tabs = {

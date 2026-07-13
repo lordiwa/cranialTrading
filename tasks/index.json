@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-13T22:40:00.000Z",
+  "generated_at": "2026-07-13T23:45:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -466,7 +466,7 @@
     {
       "key": "TASK-098",
       "title": "Design→app v2 F5a: alta e import de cartas — AddCard, Import, ImportResult, ImportProgress",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

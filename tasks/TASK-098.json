@@ -8,7 +8,7 @@
     "Sin regresión en el flujo de import progresivo; E2E de import verdes",
     "i18n en/es/pt; gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "design-sync",
@@ -22,11 +22,20 @@
   "depends_on": [
     "TASK-096"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "27f0547",
+    "9c5063e"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13 CERRADO por loop autonomo. Review FULL APPROVE-WITH-NOTES (1 MEDIUM concatenacion string en stepper fixeado + 2 LOW fixeados: cobertura wishlist chip real en preferences-crud, scroll err-list; 1 LOW registro es.json documentado). Alta unificada verificada (header + y search -> mismo AddCardModal). Hallazgo: ImportProgressToast/ImportResultModal huerfanos -> anotado TASK-106. E2E completo 123 passed/0 failed. v1.42.0. Near-miss git checkout de dev reportado, sin perdida verificada.",
+      "at": "2026-07-13T23:45:00.000Z"
+    }
+  ],
   "created_at": "2026-07-13T19:00:00.000Z",
-  "updated_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-13T23:45:00.000Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

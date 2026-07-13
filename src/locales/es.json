@@ -121,7 +121,8 @@
       "resumeError": "Error al resumir importación",
       "resumeFailed": "Importación de \"{name}\" falló. Limpiando…",
       "fetchingDataProgress": "Obteniendo datos: {current}/{total}…",
-      "savingProgress": "Guardando cartas: {current}/{total}…"
+      "savingProgress": "Guardando cartas: {current}/{total}…",
+      "doNotClose": "Procesando… No cierres esta ventana."
     },
     "aria": {
       "loading": "Cargando",
@@ -692,7 +693,10 @@
       "submit": "AGREGAR",
       "submitting": "GUARDANDO…",
       "success": "✓ {name} agregada",
-      "splitCardSide": "Lado {current} de {total}"
+      "splitCardSide": "Lado {current} de {total}",
+      "decreaseQty": "Restar uno",
+      "increaseQty": "Sumar uno",
+      "zoomHint": "Ampliar"
     },
     "editModal": {
       "title": "EDITAR CARTA",
@@ -922,6 +926,8 @@
       "inputPlaceholder": "https://moxfield.com/decks/… o 3 Arid Mesa…",
       "analyze": "ANALIZAR",
       "analyzing": "ANALIZANDO…",
+      "pasteDivider": "o pegá una lista",
+      "autoDetectHint": "Detecta Moxfield · lista de texto · CSV automáticamente",
       "moxfieldDetected": {
         "title": "Link de Moxfield detectado",
         "instruction": "Moxfield no permite importar directamente. Sigue estos pasos:",
@@ -931,8 +937,8 @@
         "step4": "Pega el texto aquí"
       },
       "preview": {
-        "total": "Total: {total} cartas",
-        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}"
+        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
+        "cardsLabel": "Cartas"
       },
       "options": {
         "conditionLabel": "Condición por defecto",
@@ -1104,11 +1110,12 @@
       "onlyAvailable": "Solo tienes {qty} copias disponibles"
     },
     "importResult": {
+      "kicker": "Import completo",
       "title": "RESULTADOS DE IMPORTACIÓN",
       "total": "TOTAL",
       "success": "EXITOSAS",
       "failed": "FALLIDAS",
-      "successRate": "Tasa de éxito:",
+      "rateLine": "{total} líneas procesadas · Tasa de éxito",
       "notFound": "CARTAS NO ENCONTRADAS",
       "confirmMessage": "¿Deseas agregar las",
       "correctCards": "{count} cartas correctas",

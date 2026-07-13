@@ -10,6 +10,8 @@
   <svg style="display:none" aria-hidden="true">
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5 21 21" /></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+    <!-- v2 redesign — quantity stepper minus (design→app v2 F5a, cranial-design/prototype/60-add-card-*.html) -->
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
     <symbol id="i-cards" viewBox="0 0 24 24"><rect x="4" y="4" width="11" height="16" rx="2" /><path d="M15 7h2.5A2.5 2.5 0 0 1 20 9.5V18a3 3 0 0 1-3 3h-6" /></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.8L12 16.8l-5.3 2.8 1.1-5.8-4.3-4.1 5.9-.8z" /></symbol>
     <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h13M14 4.5 17.5 8 14 11.5M20 16H7M10 12.5 6.5 16l3.5 3.5" /></symbol>

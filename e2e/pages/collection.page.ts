@@ -18,9 +18,6 @@ export class CollectionPage {
     searchButton: Locator;
     resultCards: Locator;
     quantityInput: Locator;
-    conditionSelect: Locator;
-    statusSelect: Locator;
-    foilCheckbox: Locator;
     saveButton: Locator;
     cancelButton: Locator;
   };
@@ -57,9 +54,9 @@ export class CollectionPage {
       searchButton: addModalContainer.getByRole('button', { name: /^search$|^buscar$/i }).first(),
       resultCards: addModalContainer.locator('.max-h-\\[300px\\] img'),
       quantityInput: addModalContainer.locator('input[type="number"]').first(),
-      conditionSelect: addModalContainer.locator('select').filter({ has: page.locator('option[value="NM"]') }),
-      statusSelect: addModalContainer.locator('select').filter({ has: page.locator('option[value="collection"]') }),
-      foilCheckbox: addModalContainer.locator('input[type="checkbox"]').first(),
+      // Condition/status pickers moved to chip/badge button groups in v2 (AddCardModal.vue,
+      // design→app v2 F5a) — no spec currently exercises them, so no locator is kept here.
+      // Foil checkbox → toggle switch; also unexercised by any spec.
       saveButton: addModalContainer.getByRole('button', { name: /^add$|agregar/i }),
       cancelButton: addModalContainer.getByRole('button', { name: /cancel|close|cerrar/i }),
     };

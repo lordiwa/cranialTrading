@@ -121,7 +121,8 @@
       "resumeError": "Error resuming import",
       "resumeFailed": "Import of \"{name}\" failed. Cleaning up…",
       "fetchingDataProgress": "Fetching card data: {current}/{total}…",
-      "savingProgress": "Saving cards: {current}/{total}…"
+      "savingProgress": "Saving cards: {current}/{total}…",
+      "doNotClose": "Processing… Don't close this window."
     },
     "aria": {
       "loading": "Loading",
@@ -692,7 +693,10 @@
       "submit": "ADD",
       "submitting": "SAVING…",
       "success": "✓ {name} added",
-      "splitCardSide": "Side {current} of {total}"
+      "splitCardSide": "Side {current} of {total}",
+      "decreaseQty": "Decrease by one",
+      "increaseQty": "Increase by one",
+      "zoomHint": "Zoom"
     },
     "editModal": {
       "title": "EDIT CARD",
@@ -922,6 +926,8 @@
       "inputPlaceholder": "https://moxfield.com/decks/… or 3 Arid Mesa…",
       "analyze": "ANALYZE",
       "analyzing": "ANALYZING…",
+      "pasteDivider": "or paste a list",
+      "autoDetectHint": "Auto-detects Moxfield · text list · CSV",
       "moxfieldDetected": {
         "title": "Moxfield link detected",
         "instruction": "Moxfield doesn't allow direct imports. Follow these steps:",
@@ -931,8 +937,8 @@
         "step4": "Paste the text here"
       },
       "preview": {
-        "total": "Total: {total} cards",
-        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}"
+        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
+        "cardsLabel": "Cards"
       },
       "options": {
         "conditionLabel": "Default condition",
@@ -1104,11 +1110,12 @@
       "onlyAvailable": "You only have {qty} copies available"
     },
     "importResult": {
+      "kicker": "Import complete",
       "title": "IMPORT RESULTS",
       "total": "TOTAL",
       "success": "SUCCESSFUL",
       "failed": "FAILED",
-      "successRate": "Success rate:",
+      "rateLine": "{total} lines processed · Success rate",
       "notFound": "CARDS NOT FOUND",
       "confirmMessage": "Do you want to add the",
       "correctCards": "{count} correct cards",

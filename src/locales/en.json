@@ -1219,6 +1219,20 @@
       "removeCommander": "Remove Commander",
       "edit": "Edit",
       "removeFromDeck": "Remove from Deck"
+    },
+    "hero": {
+      "kicker": "DECK EDITOR"
+    },
+    "header": {
+      "confirmDeleteTitle": "Delete this deck?",
+      "confirmDeleteMessage": "\"{name}\" will be removed from your account. Cards return to your collection — this can't be undone.",
+      "confirmDeleteCta": "DELETE DECK",
+      "confirmDeleteCardsTitle": "Delete cards too?",
+      "confirmDeleteCardsMessage": "YES = Delete deck and cards from collection\nNO = Only delete deck (cards stay)",
+      "confirmDeleteCardsYes": "YES, DELETE CARDS",
+      "confirmDeleteCardsNo": "NO, KEEP THEM",
+      "confirmRemoveCardTitle": "Remove from deck?",
+      "confirmRemoveCardMessage": "Remove \"{name}\" from the deck?"
     }
   },
 
@@ -2280,15 +2294,28 @@
       "submit": "CREATE",
       "cancel": "CANCEL"
     },
+    "hero": {
+      "kicker": "BINDER EDITOR"
+    },
     "header": {
       "delete": "DELETE",
-      "confirmDelete": "Delete binder \"{name}\"?",
+      "confirmDeleteTitle": "Delete this binder?",
+      "confirmDelete": "\"{name}\" will be removed from your account. Cards return to your collection — this can't be undone.",
+      "confirmDeleteCta": "DELETE BINDER",
       "deleteCardsTitle": "Delete cards too?",
       "deleteCardsMessage": "YES = Delete binder and cards from collection\nNO = Only delete binder (cards stay)",
       "deleteCardsConfirm": "YES, DELETE CARDS",
       "deleteCardsCancel": "NO, KEEP THEM",
+      "confirmRemoveCardTitle": "Remove from binder?",
+      "confirmRemoveCardMessage": "Remove \"{name}\" from the binder?",
       "public": "PUBLIC",
       "forSale": "FOR SALE"
+    },
+    "stats": {
+      "cards": "CARDS",
+      "forSale": "FOR SALE",
+      "trade": "TRADE",
+      "value": "BINDER VALUE"
     },
     "empty": "No cards in this binder yet. Search and add cards above.",
     "noBinders": "You have no binders yet. Create one to start organizing your cards.",

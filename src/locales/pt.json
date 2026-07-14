@@ -1219,6 +1219,20 @@
       "removeCommander": "Remover Comandante",
       "edit": "Editar",
       "removeFromDeck": "Remover do Deck"
+    },
+    "hero": {
+      "kicker": "EDITOR DE BARALHO"
+    },
+    "header": {
+      "confirmDeleteTitle": "Excluir este baralho?",
+      "confirmDeleteMessage": "\"{name}\" será removido da sua conta. As cartas voltam para sua coleção; esta ação não pode ser desfeita.",
+      "confirmDeleteCta": "EXCLUIR BARALHO",
+      "confirmDeleteCardsTitle": "Excluir cartas também?",
+      "confirmDeleteCardsMessage": "SIM = Excluir baralho e cartas da coleção\nNÃO = Excluir apenas o baralho (cartas permanecem)",
+      "confirmDeleteCardsYes": "SIM, EXCLUIR CARTAS",
+      "confirmDeleteCardsNo": "NÃO, MANTER",
+      "confirmRemoveCardTitle": "Remover do baralho?",
+      "confirmRemoveCardMessage": "Remover \"{name}\" do baralho?"
     }
   },
 
@@ -2280,15 +2294,28 @@
       "submit": "CRIAR",
       "cancel": "CANCELAR"
     },
+    "hero": {
+      "kicker": "EDITOR DE PASTA"
+    },
     "header": {
       "delete": "EXCLUIR",
-      "confirmDelete": "Excluir pasta \"{name}\"?",
+      "confirmDeleteTitle": "Excluir esta pasta?",
+      "confirmDelete": "\"{name}\" será removida da sua conta. As cartas voltam para sua coleção; esta ação não pode ser desfeita.",
+      "confirmDeleteCta": "EXCLUIR PASTA",
       "deleteCardsTitle": "Excluir cartas também?",
       "deleteCardsMessage": "SIM = Excluir pasta e cartas da coleção\nNÃO = Apenas excluir pasta (cartas permanecem)",
       "deleteCardsConfirm": "SIM, EXCLUIR CARTAS",
       "deleteCardsCancel": "NÃO, MANTER",
+      "confirmRemoveCardTitle": "Remover da pasta?",
+      "confirmRemoveCardMessage": "Remover \"{name}\" da pasta?",
       "public": "PÚBLICA",
       "forSale": "À VENDA"
+    },
+    "stats": {
+      "cards": "CARTAS",
+      "forSale": "À VENDA",
+      "trade": "PARA TROCA",
+      "value": "VALOR DA PASTA"
     },
     "empty": "Nenhuma carta nesta pasta ainda. Pesquise e adicione cartas acima.",
     "noBinders": "Você não tem pastas ainda. Crie uma para começar a organizar suas cartas.",

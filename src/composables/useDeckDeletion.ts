@@ -262,12 +262,12 @@ export function useDeckDeletion(opts: UseDeckDeletionOptions) {
       ? [...new Set((deck.allocations ?? []).map(a => a.cardId))]
       : []
 
-    // First confirmation: delete the deck
+    // First confirmation: delete the deck — same pattern/copy as binder deletion (design→app v2 F4a)
     const confirmDelete = await confirmStore.show({
-      title: `Eliminar deck`,
-      message: `¿Eliminar el deck "${deckName}"?`,
-      confirmText: 'ELIMINAR',
-      cancelText: 'CANCELAR',
+      title: t('decks.header.confirmDeleteTitle'),
+      message: t('decks.header.confirmDeleteMessage', { name: deckName }),
+      confirmText: t('decks.header.confirmDeleteCta'),
+      cancelText: t('common.actions.cancel'),
       confirmVariant: 'danger'
     })
 
@@ -277,10 +277,10 @@ export function useDeckDeletion(opts: UseDeckDeletionOptions) {
     let deleteCards = false
     if (cardIds.length > 0) {
       deleteCards = await confirmStore.show({
-        title: '¿Eliminar cartas también?',
-        message: 'SÍ = Eliminar deck y cartas de la colección\nNO = Solo eliminar deck (cartas permanecen)',
-        confirmText: 'SÍ, ELIMINAR CARTAS',
-        cancelText: 'NO, CONSERVAR',
+        title: t('decks.header.confirmDeleteCardsTitle'),
+        message: t('decks.header.confirmDeleteCardsMessage'),
+        confirmText: t('decks.header.confirmDeleteCardsYes'),
+        cancelText: t('decks.header.confirmDeleteCardsNo'),
         confirmVariant: 'danger'
       })
     }

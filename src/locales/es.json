@@ -1219,6 +1219,20 @@
       "removeCommander": "Quitar Comandante",
       "edit": "Editar",
       "removeFromDeck": "Quitar del Mazo"
+    },
+    "hero": {
+      "kicker": "EDITOR DE MAZO"
+    },
+    "header": {
+      "confirmDeleteTitle": "¿Eliminar este mazo?",
+      "confirmDeleteMessage": "Se quitará «{name}» de tu cuenta. Las cartas vuelven a tu colección; esta acción no se puede deshacer.",
+      "confirmDeleteCta": "ELIMINAR MAZO",
+      "confirmDeleteCardsTitle": "¿Eliminar cartas también?",
+      "confirmDeleteCardsMessage": "SÍ = Eliminar mazo y cartas de la colección\nNO = Solo eliminar mazo (cartas permanecen)",
+      "confirmDeleteCardsYes": "SÍ, ELIMINAR CARTAS",
+      "confirmDeleteCardsNo": "NO, CONSERVAR",
+      "confirmRemoveCardTitle": "¿Eliminar del mazo?",
+      "confirmRemoveCardMessage": "¿Eliminar «{name}» del mazo?"
     }
   },
 
@@ -2280,15 +2294,28 @@
       "submit": "CREAR",
       "cancel": "CANCELAR"
     },
+    "hero": {
+      "kicker": "EDITOR DE CARPETA"
+    },
     "header": {
       "delete": "ELIMINAR",
-      "confirmDelete": "¿Eliminar carpeta \"{name}\"?",
+      "confirmDeleteTitle": "¿Eliminar esta carpeta?",
+      "confirmDelete": "Se quitará «{name}» de tu cuenta. Las cartas vuelven a tu colección; esta acción no se puede deshacer.",
+      "confirmDeleteCta": "ELIMINAR CARPETA",
       "deleteCardsTitle": "¿Eliminar cartas también?",
       "deleteCardsMessage": "SÍ = Eliminar carpeta y cartas de la colección\nNO = Solo eliminar carpeta (cartas permanecen)",
       "deleteCardsConfirm": "SÍ, ELIMINAR CARTAS",
       "deleteCardsCancel": "NO, CONSERVAR",
+      "confirmRemoveCardTitle": "¿Eliminar de la carpeta?",
+      "confirmRemoveCardMessage": "¿Eliminar «{name}» de la carpeta?",
       "public": "PÚBLICA",
       "forSale": "EN VENTA"
+    },
+    "stats": {
+      "cards": "CARTAS",
+      "forSale": "EN VENTA",
+      "trade": "CAMBIO",
+      "value": "VALOR DE LA CARPETA"
     },
     "empty": "No hay cartas en esta carpeta aún. Busca y agrega cartas arriba.",
     "noBinders": "No tienes carpetas aún. Crea una para empezar a organizar tus cartas.",

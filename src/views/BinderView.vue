@@ -11,6 +11,7 @@ import CardDetailModal from '../components/collection/CardDetailModal.vue'
 import ImportDeckModal from '../components/collection/ImportDeckModal.vue'
 import CreateBinderModal from '../components/binders/CreateBinderModal.vue'
 import DeckEditorGrid from '../components/decks/DeckEditorGrid.vue'
+import BinderStatsFooter from '../components/binders/BinderStatsFooter.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
 import SvgIcon from '../components/ui/SvgIcon.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
@@ -125,6 +126,23 @@ const fabBottomStyle = computed(() => {
   return { bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }
 })
 
+// ========== BINDER STATS FOOTER (design→app v2 F4a — same footer anatomy as DeckStatsFooter) ==========
+// Binder cards don't carry a status field of their own — status (sale/trade/collection) lives on
+// the underlying collection Card, so it's cross-referenced by cardId here (read-only, no store change).
+const binderForSaleCount = computed(() => {
+  return binderDisplayCards.value.reduce((sum, c) => {
+    const card = collectionStore.getCardById(c.cardId)
+    return card?.status === 'sale' ? sum + c.allocatedQuantity : sum
+  }, 0)
+})
+
+const binderTradeCount = computed(() => {
+  return binderDisplayCards.value.reduce((sum, c) => {
+    const card = collectionStore.getCardById(c.cardId)
+    return card?.status === 'trade' ? sum + c.allocatedQuantity : sum
+  }, 0)
+})
+
 // ========== METHODS ==========
 
 const handleLocalCardSelect = (card: Card) => {
@@ -187,10 +205,10 @@ const handleBinderGridRemove = async (displayCard: DisplayDeckCard) => {
   const cardName = displayCard.name
   const cardId = displayCard.cardId
   const confirmed = await confirmStore.show({
-    title: t('binders.cardRemoved'),
-    message: `Remove "${cardName}" from binder?`,
-    confirmText: t('binders.header.delete'),
-    cancelText: t('binders.create.cancel'),
+    title: t('binders.header.confirmRemoveCardTitle'),
+    message: t('binders.header.confirmRemoveCardMessage', { name: cardName }),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -358,10 +376,10 @@ const handleDeleteBinder = async () => {
     : []
 
   const confirmed = await confirmStore.show({
-    title: t('binders.header.delete'),
+    title: t('binders.header.confirmDeleteTitle'),
     message: t('binders.header.confirmDelete', { name: binderName }),
-    confirmText: t('binders.header.delete'),
-    cancelText: t('binders.create.cancel'),
+    confirmText: t('binders.header.confirmDeleteCta'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -555,10 +573,23 @@ onUnmounted(() => {
 
 <template>
   <AppContainer>
-    <!-- ========== HEADER ========== -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <!-- ========== HERO ========== -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-h1 font-bold text-silver">{{ t('collection.title') }}</h1>
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-1">
+          {{ selectedBinder ? t('binders.hero.kicker') : t('collection.hero.kicker') }}
+        </p>
+        <div class="flex items-center gap-3 flex-wrap mt-1">
+          <h1 class="font-display text-h1 font-bold text-silver">{{ selectedBinder ? selectedBinder.name : t('collection.title') }}</h1>
+          <span
+              v-if="selectedBinder"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase before:content-[''] before:w-1.5 before:h-1.5 before:rounded-full before:bg-current"
+              :class="selectedBinder.forSale ? 'bg-rust-10 text-rust' : 'bg-surface-2 text-silver-70'"
+          >
+            {{ selectedBinder.forSale ? t('binders.header.forSale') : t('binders.header.public') }}
+          </span>
+        </div>
+        <p v-if="selectedBinder?.description" class="text-tiny text-silver-50 mt-1">{{ selectedBinder.description }}</p>
       </div>
       <div class="flex gap-2" data-tour="add-card-btn">
         <BaseButton size="small" variant="secondary" @click="showImportBinderModal = true">
@@ -576,45 +607,45 @@ onUnmounted(() => {
 
     <div :class="['mt-6', selectedBinder ? 'pb-24 sm:pb-20' : '']">
       <div>
-        <!-- ========== MAIN TABS ========== -->
+        <!-- ========== SEGMENTED CONTROL: COLECCIÓN / MAZOS / BINDERS ========== -->
         <div class="mb-6">
-          <div class="flex gap-1 mb-4">
+          <div class="inline-flex bg-surface-1 border border-line rounded-lg p-[3px] gap-0.5 mb-4">
             <RouterLink
                 to="/collection"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-silver-50 transition-all duration-200 ease-v2 hover:text-silver focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.collection') }}
             </RouterLink>
             <RouterLink
                 to="/decks"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-silver-50 transition-all duration-200 ease-v2 hover:text-silver focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.decks') }}
             </RouterLink>
             <RouterLink
                 to="/binders"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center bg-neon text-primary"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-neon bg-surface-3 transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.binders') }}
-              <span class="ml-1 opacity-70">({{ bindersList.length }})</span>
+              <span class="font-display font-tnum text-tiny" style="color:inherit">{{ bindersList.length }}</span>
             </RouterLink>
           </div>
 
-          <!-- ========== BINDER SUB-TABS ========== -->
+          <!-- ========== BINDER SUB-TABS (switcher) ========== -->
           <div v-if="bindersList.length > 0" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon min-w-0 max-w-full">
             <button
                 v-for="binder in bindersList"
                 :key="binder.id"
                 @click="binderFilter = binder.id"
-                class="px-4 py-3 min-h-[44px] md:min-h-0 md:py-2 text-small font-bold whitespace-nowrap transition-150 border-2"
+                class="px-4 py-3 min-h-[44px] md:min-h-0 md:py-2 rounded-full text-small font-semibold whitespace-nowrap transition-all duration-200 ease-v2 border"
                 :class="[
                   binderFilter === binder.id
-                    ? 'bg-neon text-primary border-neon'
-                    : 'bg-primary border-silver-30 text-silver-70 hover:border-neon/70'
+                    ? 'text-neon bg-neon-10 border-neon-40'
+                    : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'
                 ]"
             >
               {{ binder.name }}
-              <span class="ml-1 opacity-70">{{ binder.stats?.totalCards ?? 0 }}</span>
+              <span class="font-display font-tnum ml-1" style="color:inherit">{{ binder.stats?.totalCards ?? 0 }}</span>
             </button>
             <BaseButton size="small" variant="filled" @click="showCreateBinderModal = true">
               {{ t('collection.actions.new') }}
@@ -630,75 +661,65 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- ========== BINDER HEADER ========== -->
-        <div v-if="selectedBinder" class="bg-neon/10 border-2 border-neon p-3 md:p-4 mb-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 class="text-body md:text-h3 font-bold text-silver">{{ selectedBinder.name }}</h2>
-              <p v-if="selectedBinder.description" class="text-tiny text-silver-50">{{ selectedBinder.description }}</p>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <button
-                  type="button"
-                  role="switch"
-                  :aria-checked="selectedBinder.isPublic"
-                  @click="toggleBinderPublic"
-                  class="flex items-center gap-2 px-1 py-1 text-tiny transition-150 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
-                  :class="selectedBinder.isPublic ? 'text-neon' : 'text-silver-50'"
-              >
-                {{ t('binders.header.public') }}
-                <span
-                    class="relative inline-block w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150"
-                    :class="selectedBinder.isPublic ? 'bg-neon' : 'bg-silver-10 border border-silver-30'"
-                >
-                  <span
-                      class="absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-silver transition-transform duration-150"
-                      :class="selectedBinder.isPublic ? 'translate-x-[18px]' : 'translate-x-0'"
-                  ></span>
-                </span>
-              </button>
-              <button
-                  type="button"
-                  role="switch"
-                  :aria-checked="selectedBinder.forSale"
-                  @click="toggleBinderForSale"
-                  class="flex items-center gap-2 px-1 py-1 text-tiny transition-150 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
-                  :class="selectedBinder.forSale ? 'text-neon' : 'text-silver-50'"
-              >
-                {{ t('binders.header.forSale') }}
-                <span
-                    class="relative inline-block w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150"
-                    :class="selectedBinder.forSale ? 'bg-neon' : 'bg-silver-10 border border-silver-30'"
-                >
-                  <span
-                      class="absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-silver transition-transform duration-150"
-                      :class="selectedBinder.forSale ? 'translate-x-[18px]' : 'translate-x-0'"
-                  ></span>
-                </span>
-              </button>
-              <span class="text-silver-30">|</span>
-              <span class="text-tiny text-silver-50">{{ selectedBinder.stats?.totalCards ?? 0 }} cards</span>
-              <span class="text-silver-30">|</span>
-              <span class="text-tiny text-silver-50">CK: ${{ (selectedBinder.stats?.totalPrice ?? 0).toFixed(2) }}</span>
-              <BaseButton size="small" variant="secondary" @click="handleExportBinder">
-                <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
-                <span class="sm:hidden">📋</span>
-              </BaseButton>
-              <BaseButton size="small" variant="secondary" @click="handleExportBinderCsv">
-                <span class="hidden sm:inline">CSV</span>
-                <span class="sm:hidden">CSV</span>
-              </BaseButton>
-              <BaseButton size="small" variant="secondary" @click="handleDeleteBinder" :disabled="isDeletingBinder">
-                <template v-if="isDeletingBinder">
-                  <span class="animate-spin inline-block">&#x23F3;</span>
-                </template>
-                <template v-else>
-                  <span class="hidden sm:inline">{{ t('binders.header.delete') }}</span>
-                  <span class="sm:hidden">&#x1F5D1;&#xFE0F;</span>
-                </template>
-              </BaseButton>
-            </div>
-          </div>
+        <!-- ========== BINDER TOOLBAR (Público/En venta toggles — the one anatomy difference vs. Mazos — + export/delete actions) ========== -->
+        <!-- gap-3 (vs. Mazos' gap-2): two switch-fields need more breathing room than Mazos' single visibility button -->
+        <div v-if="selectedBinder" class="flex flex-wrap items-center gap-3 pb-4 mb-6 border-b border-line">
+          <button
+              type="button"
+              role="switch"
+              :aria-checked="selectedBinder.isPublic"
+              @click="toggleBinderPublic"
+              class="flex items-center gap-2 px-1 py-1 text-tiny transition-150 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+              :class="selectedBinder.isPublic ? 'text-neon' : 'text-silver-50'"
+          >
+            {{ t('binders.header.public') }}
+            <span
+                class="relative inline-block w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150"
+                :class="selectedBinder.isPublic ? 'bg-neon' : 'bg-silver-10 border border-silver-30'"
+            >
+              <span
+                  class="absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-silver transition-transform duration-150"
+                  :class="selectedBinder.isPublic ? 'translate-x-[18px]' : 'translate-x-0'"
+              ></span>
+            </span>
+          </button>
+          <button
+              type="button"
+              role="switch"
+              :aria-checked="selectedBinder.forSale"
+              @click="toggleBinderForSale"
+              class="flex items-center gap-2 px-1 py-1 text-tiny transition-150 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+              :class="selectedBinder.forSale ? 'text-neon' : 'text-silver-50'"
+          >
+            {{ t('binders.header.forSale') }}
+            <span
+                class="relative inline-block w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150"
+                :class="selectedBinder.forSale ? 'bg-neon' : 'bg-silver-10 border border-silver-30'"
+            >
+              <span
+                  class="absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-silver transition-transform duration-150"
+                  :class="selectedBinder.forSale ? 'translate-x-[18px]' : 'translate-x-0'"
+              ></span>
+            </span>
+          </button>
+          <span class="flex-1"></span>
+          <BaseButton size="small" variant="secondary" @click="handleExportBinder">
+            <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
+            <span class="sm:hidden">📋</span>
+          </BaseButton>
+          <BaseButton size="small" variant="secondary" @click="handleExportBinderCsv">
+            <span class="hidden sm:inline">CSV</span>
+            <span class="sm:hidden">CSV</span>
+          </BaseButton>
+          <BaseButton size="small" variant="secondary" @click="handleDeleteBinder" :disabled="isDeletingBinder">
+            <template v-if="isDeletingBinder">
+              <span class="animate-spin inline-block">&#x23F3;</span>
+            </template>
+            <template v-else>
+              <span class="hidden sm:inline">{{ t('binders.header.delete') }}</span>
+              <span class="sm:hidden">&#x1F5D1;&#xFE0F;</span>
+            </template>
+          </BaseButton>
         </div>
 
         <!-- ========== SEARCH ========== -->
@@ -707,6 +728,7 @@ onUnmounted(() => {
             v-model:sort-by="sortBy"
             v-model:group-by="deckGroupBy"
             view-mode="binders"
+            :v2="true"
             :show-bulk-select="false"
             :show-view-type="false"
             :show-mobile-discover="true"
@@ -824,6 +846,15 @@ onUnmounted(() => {
         :style="fabBottomStyle"
     />
   </Teleport>
+
+  <!-- ========== BINDER STATS FOOTER (same footer anatomy as DeckStatsFooter — design→app v2 F4a) ========== -->
+  <BinderStatsFooter
+      v-if="selectedBinder"
+      :total-cards="selectedBinder.stats?.totalCards ?? 0"
+      :for-sale-count="binderForSaleCount"
+      :trade-count="binderTradeCount"
+      :total-value="selectedBinder.stats?.totalPrice ?? 0"
+  />
 </template>
 
 <style scoped>

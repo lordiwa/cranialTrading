@@ -3,7 +3,6 @@ import { ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
-import BaseInput from '../ui/BaseInput.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { CreateBinderInput } from '../../types/binder'
 
@@ -50,55 +49,58 @@ watch(() => props.show, (show) => {
 
 <template>
   <BaseModal :show="show" @close="emit('close')">
-    <div class="space-y-6">
+    <div class="space-y-5">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('binders.create.title') }}</h2>
-        <p class="text-small text-silver-70">{{ t('binders.create.subtitle') }}</p>
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('binders.create.title') }}</h2>
+        <p class="text-small text-silver-70 mt-1">{{ t('binders.create.subtitle') }}</p>
       </div>
 
       <!-- Form -->
-      <div class="space-y-4">
+      <div class="space-y-5">
         <!-- Name -->
         <div>
-          <label for="create-binder-name" class="text-small text-silver-70 block mb-2">{{ t('binders.create.name') }}</label>
-          <BaseInput
+          <label for="create-binder-name" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('binders.create.name') }}</label>
+          <input
               id="create-binder-name"
               v-model="form.name"
-              :placeholder="t('binders.create.namePlaceholder')"
               type="text"
+              :placeholder="t('binders.create.namePlaceholder')"
+              class="w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver placeholder:text-silver-30 text-small focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
               @keydown.enter="handleCreate"
           />
         </div>
 
         <!-- Description -->
         <div>
-          <label for="create-binder-description" class="text-small text-silver-70 block mb-2">{{ t('binders.create.description') }}</label>
+          <label for="create-binder-description" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('binders.create.description') }}</label>
           <textarea
               id="create-binder-description"
               v-model="form.description"
               :placeholder="t('binders.create.descPlaceholder')"
-              class="w-full px-4 py-3 bg-primary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150 resize-none h-20"
+              rows="2"
+              class="w-full px-3.5 py-2.5 bg-surface-1 border border-line rounded-md text-silver placeholder:text-silver-30 font-sans text-small focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2 resize-none"
           />
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="flex gap-3 pt-4">
-        <BaseButton
-            class="flex-1"
-            :disabled="loading"
-            @click="handleCreate"
-        >
-          {{ loading ? '...' : t('binders.create.submit') }}
-        </BaseButton>
+      <div class="flex gap-2 justify-end pt-4 border-t border-line">
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="uppercase tracking-[.1em] !text-[12px]"
             :disabled="loading"
             @click="emit('close')"
         >
           {{ t('binders.create.cancel') }}
+        </BaseButton>
+        <BaseButton
+            variant="filled"
+            class="uppercase tracking-[.1em] !text-[12px]"
+            :disabled="loading"
+            @click="handleCreate"
+        >
+          {{ loading ? '...' : t('binders.create.submit') }}
         </BaseButton>
       </div>
     </div>

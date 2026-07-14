@@ -1,5 +1,5 @@
 import { ensureLoggedIn } from '../helpers/auth';
-import { type Page, type Locator } from '@playwright/test';
+import { type Locator, type Page } from '@playwright/test';
 
 export class DecksPage {
   readonly page: Page;
@@ -11,7 +11,9 @@ export class DecksPage {
   // Create deck modal
   readonly createModal: {
     nameInput: Locator;
-    formatSelect: Locator;
+    // v2 redesign — format is now a chip group, not a <select> (design→app v2 F4b,
+    // cranial-design/prototype/62-new-deck-*.html). formatChip(label) replaces formatSelect.
+    formatChip: (label: string) => Locator;
     createButton: Locator;
     cancelButton: Locator;
   };
@@ -44,7 +46,7 @@ export class DecksPage {
     // Create modal - uses id selectors; exact match avoids "+ CREATE DECK" page button
     this.createModal = {
       nameInput: page.locator('#create-deck-name'),
-      formatSelect: page.locator('#create-deck-format'),
+      formatChip: (label: string) => page.locator('.fixed.inset-0.z-50').getByRole('button', { name: label, exact: true }),
       createButton: page.getByRole('button', { name: 'CREATE DECK', exact: true }),
       cancelButton: page.locator('.fixed.inset-0.z-50').getByRole('button', { name: /cancel|cancelar/i }),
     };
@@ -80,7 +82,9 @@ export class DecksPage {
     await this.createModal.nameInput.waitFor({ state: 'visible', timeout: 5000 });
     await this.createModal.nameInput.fill(name);
     if (format) {
-      await this.createModal.formatSelect.selectOption(format);
+      // Chip labels are capitalized (Vintage, Modern, Commander, Standard, Custom)
+      const label = format.charAt(0).toUpperCase() + format.slice(1);
+      await this.createModal.formatChip(label).click();
     }
     await this.createModal.createButton.click();
   }

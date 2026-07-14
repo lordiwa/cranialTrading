@@ -3,9 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import BaseButton from '../ui/BaseButton.vue'
-import BaseInput from '../ui/BaseInput.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
+import IconV2 from '../ui/IconV2.vue'
 import type { CreateDeckInput } from '../../types/deck'
 
 const props = defineProps<{
@@ -74,6 +73,17 @@ const colorOptions = [
   { value: 'G', label: '🟢 Verde' },
 ]
 
+// v2 redesign — mana dot swatch per color, matching DESIGN-DIRECTION.md §5 chip pattern
+// (design→app v2 F4b, cranial-design/prototype/62-new-deck-*.html)
+const MANA_DOT_CLASSES: Record<string, string> = {
+  W: 'bg-[#efe7c8]',
+  U: 'bg-[#4a7fd0]',
+  B: 'bg-[#3c3744]',
+  R: 'bg-[#c0402f]',
+  G: 'bg-[#3f9d5a]',
+}
+const manaDotClass = (value: string): string => MANA_DOT_CLASSES[value] ?? 'bg-silver-30'
+
 const toggleColor = (color: string) => {
   const idx = form.value.colors.indexOf(color)
   if (idx >= 0) {
@@ -117,107 +127,125 @@ watch(() => props.show, (show) => {
 
 <template>
   <BaseModal :show="show" @close="emit('close')">
-    <div class="space-y-6">
+    <div class="space-y-5">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.createModal.title') }}</h2>
-        <p class="text-small text-silver-70">{{ t('decks.createModal.subtitle') }}</p>
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('decks.createModal.title') }}</h2>
+        <p class="text-small text-silver-70 mt-1">{{ t('decks.createModal.subtitle') }}</p>
       </div>
 
       <!-- Form -->
-      <div class="space-y-4">
+      <div class="space-y-5">
         <!-- Name -->
         <div>
-          <label for="create-deck-name" class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.nameLabel') }}</label>
-          <BaseInput
+          <label for="create-deck-name" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.createModal.nameLabel') }}</label>
+          <input
               id="create-deck-name"
               v-model="form.name"
-              :placeholder="t('decks.createModal.namePlaceholder')"
               type="text"
+              :placeholder="t('decks.createModal.namePlaceholder')"
+              class="w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver placeholder:text-silver-30 text-small focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
               @keydown.enter="handleCreate"
           />
         </div>
 
         <!-- Format -->
         <div>
-          <label for="create-deck-format" class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.formatLabel') }}</label>
-          <BaseSelect
-              id="create-deck-format"
-              v-model="form.format"
-              :options="formatOptions"
-          />
+          <span class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.createModal.formatLabel') }}</span>
+          <div class="flex flex-wrap gap-2" role="group" :aria-label="t('decks.createModal.formatLabel')">
+            <button
+                v-for="opt in formatOptions"
+                :key="opt.value"
+                type="button"
+                class="min-h-[36px] px-3.5 rounded-full text-small font-semibold border transition-all duration-200 ease-v2"
+                :class="form.format === opt.value
+                  ? 'text-neon bg-neon-10 border-neon-40'
+                  : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'"
+                :aria-pressed="form.format === opt.value"
+                @click="form.format = (opt.value as CreateDeckInput['format'])"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Colors -->
+        <div>
+          <span class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.createModal.colorsLabel') }}</span>
+          <div class="flex flex-wrap gap-2" role="group" :aria-label="t('decks.createModal.colorsLabel')">
+            <button
+                v-for="color in colorOptions"
+                :key="color.value"
+                type="button"
+                class="inline-flex items-center gap-2 min-h-[36px] px-3.5 rounded-full text-small font-semibold border transition-all duration-200 ease-v2"
+                :class="form.colors.includes(color.value)
+                  ? 'text-neon bg-neon-10 border-neon-40'
+                  : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'"
+                :aria-pressed="form.colors.includes(color.value)"
+                @click="toggleColor(color.value)"
+            >
+              <span class="w-3.5 h-3.5 rounded-full border border-white/20 flex-shrink-0" :class="manaDotClass(color.value)"></span>
+              {{ color.label.replace(/^\S+\s/, '') }}
+            </button>
+          </div>
         </div>
 
         <!-- Description -->
         <div>
-          <label for="create-deck-description" class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.descriptionLabel') }}</label>
+          <label for="create-deck-description" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.createModal.descriptionLabel') }}</label>
           <textarea
               id="create-deck-description"
               v-model="form.description"
               :placeholder="t('decks.createModal.descriptionPlaceholder')"
-              class="w-full px-4 py-3 bg-primary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150 resize-none h-20"
+              rows="2"
+              class="w-full px-3.5 py-2.5 bg-surface-1 border border-line rounded-md text-silver placeholder:text-silver-30 font-sans text-small focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2 resize-none"
           />
         </div>
 
         <!-- Deck List (opcional) -->
         <div>
-          <label for="create-deck-list" class="text-small text-silver-70 block mb-2">
+          <label for="create-deck-list" class="text-small font-semibold text-silver-70 block mb-1.5">
             {{ t('decks.createModal.cardListLabel') }}
           </label>
           <textarea
               id="create-deck-list"
               v-model="deckList"
               :placeholder="t('decks.createModal.cardListPlaceholder')"
-              class="w-full px-4 py-3 bg-primary border border-silver-30 text-silver placeholder:text-silver-50 font-sans text-tiny focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150 resize-none h-32"
+              rows="4"
+              class="w-full px-3.5 py-2.5 bg-surface-1 border border-line rounded-md text-silver placeholder:text-silver-30 font-sans text-tiny focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2 resize-none"
           />
           <!-- Preview -->
-          <div v-if="deckListPreview" class="mt-2 p-2 border border-silver-30 bg-primary">
-            <p class="text-tiny text-neon font-bold">
-              {{ t('decks.createModal.preview', { total: deckListPreview.total }) }}
-            </p>
-            <p class="text-tiny text-silver-70">
-              {{ t('decks.createModal.previewDetail', { mainboard: deckListPreview.mainboard, sideboard: deckListPreview.sideboard }) }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Colors -->
-        <div>
-          <span class="text-small text-silver-70 block mb-2">{{ t('decks.createModal.colorsLabel') }}</span>
-          <div class="flex flex-wrap gap-2">
-            <button
-                v-for="color in colorOptions"
-                :key="color.value"
-                @click="toggleColor(color.value)"
-                :class="[
-                  'px-3 py-2 border-2 text-small font-bold transition-150',
-                  form.colors.includes(color.value)
-                    ? 'bg-neon-10 border-neon text-neon'
-                    : 'border-silver-30 text-silver-70 hover:border-neon'
-                ]"
-            >
-              {{ color.label }}
-            </button>
+          <div v-if="deckListPreview" class="mt-2 flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-1 border border-neon-40 rounded-md">
+            <IconV2 name="check" :size="16" class="text-neon flex-shrink-0" />
+            <div>
+              <p class="text-small text-neon font-bold">
+                {{ t('decks.createModal.preview', { total: deckListPreview.total }) }}
+              </p>
+              <p class="text-tiny text-silver-50">
+                {{ t('decks.createModal.previewDetail', { mainboard: deckListPreview.mainboard, sideboard: deckListPreview.sideboard }) }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="flex gap-3 pt-4">
-        <BaseButton
-            class="flex-1"
-            :disabled="loading"
-            @click="handleCreate"
-        >
-          {{ loading ? '...' : t('decks.createModal.submit') }}
-        </BaseButton>
+      <div class="flex gap-2 justify-end pt-4 border-t border-line">
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="uppercase tracking-[.1em] !text-[12px]"
             :disabled="loading"
             @click="emit('close')"
         >
           {{ t('common.actions.cancel') }}
+        </BaseButton>
+        <BaseButton
+            variant="filled"
+            class="uppercase tracking-[.1em] !text-[12px]"
+            :disabled="loading"
+            @click="handleCreate"
+        >
+          {{ loading ? '...' : t('decks.createModal.submit') }}
         </BaseButton>
       </div>
     </div>

@@ -1594,6 +1594,17 @@
       "moreOptions": "Más opciones",
       "statusLabel": "Estado"
     },
+    "confirmModal": {
+      "addingToSideboard": "Agregando al sideboard de {deck}.",
+      "addingToMainboard": "Agregando al mainboard de {deck}.",
+      "chooseCopy": "Elegí condición y foil para la copia nueva.",
+      "chooseCopies": "Elegí condición y foil para las {count} copias nuevas.",
+      "copiesLabel": "Copias",
+      "conditionLabel": "Condición",
+      "foilLabel": "Foil",
+      "cancel": "CANCELAR",
+      "submit": "AGREGAR"
+    },
     "bar": {
       "discoverButton": "DESCUBRIR MÁS",
       "discoverButtonShort": "DESCUBRIR"

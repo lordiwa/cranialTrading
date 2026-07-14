@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-13T23:45:00.000Z",
+  "generated_at": "2026-07-14T00:50:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -472,7 +472,7 @@
     {
       "key": "TASK-099",
       "title": "Design→app v2 F5b: detalle y estado de carta — CardDetail, CardStatus, Confirm/Prompt",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

@@ -7,7 +7,11 @@ export class MessagesPage {
   readonly page: Page;
   readonly conversationList: Locator;
   readonly searchInput: Locator;
+  // Zero-conversations state (account has no conversations at all) — distinct from the
+  // "no results match this filter" text inside the list, which only exists once the
+  // split-pane itself renders (i.e. conversations.length > 0).
   readonly emptyState: Locator;
+  readonly emptyStateCta: Locator;
   readonly errorRetryButton: Locator;
 
   readonly thread: {
@@ -20,7 +24,8 @@ export class MessagesPage {
     this.page = page;
     this.conversationList = page.locator('[data-testid="messages-conv-item"]');
     this.searchInput = page.locator('[data-testid="messages-search-input"]');
-    this.emptyState = page.locator('text=/no.*conversation|no.*mensaje/i');
+    this.emptyState = page.locator('[data-testid="messages-empty-state"]');
+    this.emptyStateCta = page.locator('[data-testid="messages-empty-cta"]');
     this.errorRetryButton = page.locator('[data-testid="messages-error-retry"]');
 
     this.thread = {
@@ -51,5 +56,20 @@ export class MessagesPage {
 
   async getConversationCount(): Promise<number> {
     return this.conversationList.count();
+  }
+
+  /**
+   * Waits for Firestore data to settle into one of two mutually exclusive states:
+   * the search input (split-pane rendered, at least 1 conversation) or the
+   * zero-conversations empty state (account has none — search UI isn't rendered).
+   * Returns whether conversations are present, so callers can skip filter-dependent
+   * assertions on accounts with no conversations (e.g. a fresh CI test account).
+   */
+  async hasConversations(): Promise<boolean> {
+    await Promise.race([
+      this.searchInput.waitFor({ state: 'visible', timeout: 10_000 }),
+      this.emptyState.waitFor({ state: 'visible', timeout: 10_000 }),
+    ]).catch(() => {});
+    return !(await this.emptyState.isVisible());
   }
 }

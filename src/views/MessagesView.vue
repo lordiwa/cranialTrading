@@ -138,12 +138,14 @@ onUnmounted(() => {
     <!-- Zero conversations -->
     <div
         v-else-if="conversations.length === 0"
+        data-testid="messages-empty-state"
         class="bg-surface-1 border border-line rounded-lg p-8 md:p-10 flex flex-col items-center gap-3 text-center"
     >
       <IconV2 name="chat" :size="32" class="text-silver-30" />
       <p class="text-small text-silver-50 max-w-sm">{{ t('messages.empty.whenContact') }}</p>
       <router-link
           to="/saved-matches"
+          data-testid="messages-empty-cta"
           class="inline-flex items-center gap-2 min-h-11 px-5 rounded-md border border-neon text-neon font-bold text-tiny uppercase tracking-wide hover:bg-neon-10 hover:shadow-glow-neon transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
       >
         <IconV2 name="swap" :size="15" />

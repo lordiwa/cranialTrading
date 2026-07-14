@@ -13,7 +13,9 @@ export interface Conversation {
     participantIds: string[]; // [userId1, userId2]
     participantNames: Record<string, string>;
     participantAvatars?: Record<string, string | null>;
-    lastMessage?: Message;
+    // ✅ FIX (TASK-091): stores/messages.ts persiste/lee lastMessage como texto plano
+    // (campo `lastMessage: string` en el doc de Firestore), no como objeto Message.
+    lastMessage?: string;
     lastMessageTime?: Date;
     unreadCount: number;
 }

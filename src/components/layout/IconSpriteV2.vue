@@ -36,5 +36,8 @@
     <!-- v2 redesign — exchange cart + form-error icons (design→app v2 F2b, cranial-design/prototype/76-exchange-cart-*.html) -->
     <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.2L21 7H6" /></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5M12 16.3v.2" /></symbol>
+    <!-- v2 redesign — messages split-pane composer + mobile back nav (design→app v2 F3, cranial-design/prototype/20-messages-*.html) -->
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-7 18-3.5-7.5L3 10z" /></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></symbol>
   </svg>
 </template>

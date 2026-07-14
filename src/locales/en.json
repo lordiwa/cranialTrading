@@ -1385,22 +1385,36 @@
     "title": "MESSAGES",
     "subtitle": "active conversations",
     "searchPlaceholder": "Search by user…",
+    "kicker": "INBOX",
+    "unreadLabel": "unread",
+    "send": "Send",
+    "viewProfile": "View profile",
+    "time": {
+      "now": "now",
+      "minutesShort": "m",
+      "hoursShort": "h",
+      "daysShort": "d"
+    },
     "empty": {
       "noResults": "No conversations found",
       "noMessages": "You have no messages yet",
-      "tryAnother": "Try another name",
-      "whenContact": "When you contact users, they'll appear here"
+      "whenContact": "When you contact users, they'll appear here",
+      "cta": "View my matches"
     },
     "chat": {
       "title": "Chat with @{username}",
       "noMessages": "No messages yet. Be the first to write!",
-      "inputPlaceholder": "Write a message…"
+      "inputPlaceholder": "Write a message…",
+      "selectPrompt": "Select a conversation to start chatting",
+      "today": "Today",
+      "yesterday": "Yesterday"
     },
     "errors": {
       "selfChat": "You cannot chat with yourself",
       "createError": "Error creating conversation",
       "sendError": "Error sending message",
       "loadError": "Error loading conversations",
+      "loadErrorHint": "We couldn't load your messages. Check your connection and try again.",
       "listenError": "Error listening for messages"
     }
   },

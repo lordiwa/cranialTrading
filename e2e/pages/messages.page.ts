@@ -1,33 +1,32 @@
 import { ensureLoggedIn } from '../helpers/auth';
 import { type Page, type Locator } from '@playwright/test';
 
+// TASK-091 — Messages split-pane v2. No modal: the thread renders inline
+// (desktop right pane / mobile full-screen overlay), targeted via stable testids.
 export class MessagesPage {
   readonly page: Page;
   readonly conversationList: Locator;
   readonly searchInput: Locator;
   readonly emptyState: Locator;
+  readonly errorRetryButton: Locator;
 
-  // Chat modal
-  readonly chat: {
-    container: Locator;
+  readonly thread: {
     messageInput: Locator;
     sendButton: Locator;
-    messages: Locator;
-    closeButton: Locator;
+    backButton: Locator;
   };
 
   constructor(page: Page) {
     this.page = page;
-    this.conversationList = page.locator('[class*="border-silver-30"][class*="cursor-pointer"]');
-    this.searchInput = page.locator('input[type="text"]').first();
+    this.conversationList = page.locator('[data-testid="messages-conv-item"]');
+    this.searchInput = page.locator('[data-testid="messages-search-input"]');
     this.emptyState = page.locator('text=/no.*conversation|no.*mensaje/i');
+    this.errorRetryButton = page.locator('[data-testid="messages-error-retry"]');
 
-    this.chat = {
-      container: page.locator('[class*="chat"], [class*="modal"]').last(),
-      messageInput: page.locator('input[type="text"], textarea').last(),
-      sendButton: page.getByRole('button', { name: /send|enviar|✓/ }).last(),
-      messages: page.locator('[class*="rounded"][class*="px-4"][class*="py-2"]'),
-      closeButton: page.locator('button:has(svg)').first(),
+    this.thread = {
+      messageInput: page.locator('[data-testid="messages-thread-input"]'),
+      sendButton: page.locator('[data-testid="messages-thread-send"]'),
+      backButton: page.locator('[data-testid="messages-thread-back"]'),
     };
   }
 
@@ -42,8 +41,8 @@ export class MessagesPage {
   }
 
   async sendMessage(text: string) {
-    await this.chat.messageInput.fill(text);
-    await this.chat.sendButton.click();
+    await this.thread.messageInput.fill(text);
+    await this.thread.sendButton.click();
   }
 
   async filterByUsername(username: string) {

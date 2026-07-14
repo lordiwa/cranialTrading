@@ -7,6 +7,7 @@ import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
 import { type SupportedLocale, useI18n } from '../../composables/useI18n'
 import { useTour } from '../../composables/useTour'
+import { sumUnreadCounts } from '../../utils/messageUnread'
 import IconV2 from '../ui/IconV2.vue'
 import UserPopover from '../ui/UserPopover.vue'
 import MatchNotificationsDropdown from './MatchNotificationsDropdown.vue'
@@ -63,9 +64,7 @@ const isAuthenticated = computed(() => !!authStore.user)
 
 // Badge counts
 const newMatchesCount = computed(() => matchesStore.getUnseenCount())
-const unreadMessagesCount = computed(() => {
-  return messagesStore.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
-})
+const unreadMessagesCount = computed(() => sumUnreadCounts(messagesStore.conversations))
 const detectedLocation = ref<string | null>(null)
 const showLocationSuggestion = ref(false)
 

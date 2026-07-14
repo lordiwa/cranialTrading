@@ -1385,22 +1385,36 @@
     "title": "MENSAGENS",
     "subtitle": "conversas ativas",
     "searchPlaceholder": "Buscar por usuário…",
+    "kicker": "CAIXA DE ENTRADA",
+    "unreadLabel": "não lidas",
+    "send": "Enviar",
+    "viewProfile": "Ver perfil",
+    "time": {
+      "now": "agora",
+      "minutesShort": "m",
+      "hoursShort": "h",
+      "daysShort": "d"
+    },
     "empty": {
       "noResults": "Nenhuma conversa encontrada",
       "noMessages": "Você não tem mensagens ainda",
-      "tryAnother": "Tente outro nome",
-      "whenContact": "Quando contatar usuários, aparecerão aqui"
+      "whenContact": "Quando contatar usuários, aparecerão aqui",
+      "cta": "Ver meus matches"
     },
     "chat": {
       "title": "Chat com @{username}",
       "noMessages": "Nenhuma mensagem ainda. Seja o primeiro a escrever!",
-      "inputPlaceholder": "Escreva uma mensagem…"
+      "inputPlaceholder": "Escreva uma mensagem…",
+      "selectPrompt": "Selecione uma conversa para começar a conversar",
+      "today": "Hoje",
+      "yesterday": "Ontem"
     },
     "errors": {
       "selfChat": "Você não pode conversar consigo mesmo",
       "createError": "Erro ao criar conversa",
       "sendError": "Erro ao enviar mensagem",
       "loadError": "Erro ao carregar conversas",
+      "loadErrorHint": "Não conseguimos carregar suas mensagens. Verifique sua conexão e tente novamente.",
       "listenError": "Erro ao escutar mensagens"
     }
   },

@@ -696,7 +696,8 @@
       "splitCardSide": "Side {current} of {total}",
       "decreaseQty": "Decrease by one",
       "increaseQty": "Increase by one",
-      "zoomHint": "Zoom"
+      "zoomHint": "Zoom",
+      "zoomCloseHint": "Click to close"
     },
     "editModal": {
       "title": "EDIT CARD",
@@ -716,7 +717,6 @@
     "statusModal": {
       "title": "CHANGE STATUS",
       "subtitle": "Manage this card's status",
-      "prices": "Prices:",
       "loadingCKPrices": "Loading CK prices…",
       "currentStatus": "Current status:",
       "newStatus": "New status",
@@ -728,29 +728,21 @@
       },
       "statusInfo": {
         "collection": {
-          "icon": "✓",
-          "label": "COLLECTION",
           "description": "Cards you own"
         },
         "sale": {
-          "icon": "💰",
-          "label": "SALE",
           "description": "Cards to sell"
         },
         "trade": {
-          "icon": "🔄",
-          "label": "TRADE",
           "description": "Cards to trade"
         },
         "wishlist": {
-          "icon": "⭐",
-          "label": "WANTED",
           "description": "Cards you're looking for"
         }
       },
       "publishLabel": "Publish on my profile",
       "publishHint": "Visible to other users on your public profile",
-      "submit": "✓ CHANGE"
+      "submit": "CHANGE"
     },
     "detailModal": {
       "title": "CARD DETAILS",

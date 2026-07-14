@@ -26,7 +26,6 @@ export class CollectionPage {
   readonly editModal: {
     quantityInput: Locator;
     conditionSelect: Locator;
-    foilCheckbox: Locator;
     saveButton: Locator;
     cancelButton: Locator;
     deleteButton: Locator;
@@ -66,7 +65,9 @@ export class CollectionPage {
     this.editModal = {
       quantityInput: editModalContainer.locator('input[type="number"]').first(),
       conditionSelect: editModalContainer.locator('select').first(),
-      foilCheckbox: editModalContainer.locator('input[type="checkbox"]').first(),
+      // Foil is a hidden native checkbox styled as a switch (CardDetailModal.vue, design→app
+      // v2 F5b) — `input[type="checkbox"]` also matches the "publish to profile" checkbox in
+      // the same modal, and no spec exercises foil directly, so no locator is kept here.
       saveButton: editModalContainer.getByRole('button', { name: /save|guardar/i }),
       cancelButton: editModalContainer.getByRole('button', { name: /cancel|cancelar/i }),
       deleteButton: editModalContainer.getByRole('button', { name: /delete|eliminar/i }),

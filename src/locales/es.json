@@ -696,7 +696,8 @@
       "splitCardSide": "Lado {current} de {total}",
       "decreaseQty": "Restar uno",
       "increaseQty": "Sumar uno",
-      "zoomHint": "Ampliar"
+      "zoomHint": "Ampliar",
+      "zoomCloseHint": "Click para cerrar"
     },
     "editModal": {
       "title": "EDITAR CARTA",
@@ -716,7 +717,6 @@
     "statusModal": {
       "title": "CAMBIAR STATUS",
       "subtitle": "Gestiona el estado de esta carta",
-      "prices": "Precios:",
       "loadingCKPrices": "Cargando precios CK…",
       "currentStatus": "Status actual:",
       "newStatus": "Nuevo status",
@@ -728,29 +728,21 @@
       },
       "statusInfo": {
         "collection": {
-          "icon": "✓",
-          "label": "COLECCIÓN",
           "description": "Cartas que tienes"
         },
         "sale": {
-          "icon": "💰",
-          "label": "VENTA",
           "description": "Cartas para vender"
         },
         "trade": {
-          "icon": "🔄",
-          "label": "CAMBIO",
           "description": "Cartas para trocar"
         },
         "wishlist": {
-          "icon": "⭐",
-          "label": "DESEADO",
           "description": "Cartas que buscas"
         }
       },
       "publishLabel": "Publicar en mi perfil",
       "publishHint": "Visible para otros usuarios en tu perfil público",
-      "submit": "✓ CAMBIAR"
+      "submit": "CAMBIAR"
     },
     "detailModal": {
       "title": "DETALLE DE CARTA",

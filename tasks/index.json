@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-14T02:00:00.000Z",
+  "generated_at": "2026-07-14T03:00:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -448,7 +448,7 @@
     {
       "key": "TASK-095",
       "title": "Design→app v2 F4a: Deck = Binder — misma anatomía según protos 13/14",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-14T00:50:00.000Z",
+  "generated_at": "2026-07-14T02:00:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -424,7 +424,7 @@
     {
       "key": "TASK-091",
       "title": "Design→app v2 F3: Messages como split-pane persistente (lista + hilo lado a lado) + unreadCount real",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

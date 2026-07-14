@@ -2,7 +2,7 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "active",
-  "updated_at": "2026-07-14T00:29:20.705Z",
+  "updated_at": "2026-07-14T01:34:34.732Z",
   "active_task": "TASK-096",
   "workflow_step": "update",
   "next_action": "LOOP AUTONOMO ACTIVO (2026-07-13, autorizado por Rafael: autonomia total = unattended + auto_push + auto_version_bump; UAT F0/F1/F1b delegado al orquestador). GOAL keys: TASK-091..107 (backlog design->app v2 completo + chores). Paso actual: tanda 1 — commits separados F0(092)/F1(093)/F1b(096), bump minor 1.40.0, E2E completo, push develop; luego backlog en orden 094,097,098,099,091,095,100,101,102,103,104,105,106,107. Campos legacy del bundle archivados en legacy-freeform.json (mismo dir).",
@@ -102,10 +102,10 @@
     "auto_version_bump_on_milestone": true
   },
   "loop_state": {
-    "current_ticket": "TASK-099",
+    "current_ticket": "TASK-091",
     "phase": "update",
-    "iteration": 5,
-    "completed_this_run": 6,
+    "iteration": 6,
+    "completed_this_run": 7,
     "run_started_at": "2026-07-13T20:00:00.000Z"
   }
 }

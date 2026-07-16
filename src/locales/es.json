@@ -1451,6 +1451,7 @@
   },
 
   "settings": {
+    "kicker": "Tu cuenta",
     "title": "Ajustes",
     "sections": {
       "emailVerification": {
@@ -1549,11 +1550,16 @@
       "backToDashboard": "VOLVER AL DASHBOARD",
       "login": "INICIAR SESIÓN"
     },
-    "contact": "💬 CONTACTAR",
+    "contact": "CONTACTAR",
     "viewWishlist": "Mi Wishlist",
     "publicCollection": "Colección pública",
+    "publicPricesUsd": "Colección pública · precios en USD",
     "cards": "cartas",
     "noPublicCards": "Este usuario no tiene cartas públicas en su colección.",
+    "stats": {
+      "sale": "En venta",
+      "trade": "En cambio"
+    },
     "messages": {
       "loadError": "Error al cargar perfil",
       "loadCardsError": "Error al cargar cartas del perfil"
@@ -2114,10 +2120,25 @@
 
   "tour": {
     "welcome": {
+      "kicker": "Te damos la bienvenida",
       "title": "BIENVENIDO A CRANIAL TRADING",
       "subtitle": "Te mostramos la plataforma. En unos pasos sabrás todo lo necesario para empezar a tradear.",
       "startButton": "INICIAR TOUR",
-      "skipButton": "Saltar, prefiero explorar solo"
+      "skipButton": "Saltar, prefiero explorar solo",
+      "steps": {
+        "collect": {
+          "title": "Agregá tu colección",
+          "description": "Cargá tus cartas, mazos y binders."
+        },
+        "match": {
+          "title": "Encontrá matches",
+          "description": "Te conectamos con quien busca lo tuyo."
+        },
+        "trade": {
+          "title": "Concretá trades",
+          "description": "Chateá y cerrá el intercambio."
+        }
+      }
     },
     "steps": {
       "collection": {

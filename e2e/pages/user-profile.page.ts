@@ -15,7 +15,9 @@ export class UserProfilePage {
     this.page = page;
     this.avatar = page.locator('img[class*="rounded-full"]');
     this.username = page.locator('h1').first();
-    this.location = page.locator('text=📍').first();
+    // v2 redesign (design→app v2 F8) — profile header dropped the 📍 emoji glyph
+    // per cranial-design/prototype/22-user-profile-*.html; select by test id instead.
+    this.location = page.locator('[data-testid="profile-location"]').first();
     this.contactButton = page.getByRole('button', { name: /contact|contactar/i });
     this.wishlistLink = page.locator('a', { hasText: /wishlist|deseado/i });
     this.searchInput = page.locator('input[type="text"]').first();

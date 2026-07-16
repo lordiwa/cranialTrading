@@ -4,14 +4,19 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { useToastStore } from '../../stores/toast';
 import { useI18n } from '../../composables/useI18n';
-import BaseInput from '../ui/BaseInput.vue';
-import BaseButton from '../ui/BaseButton.vue';
+import IconV2 from '../ui/IconV2.vue';
 import SvgIcon from '../ui/SvgIcon.vue';
 
 // The same login form that used to live in the right column of LoginView
 // (TASK-086): now shown inside the header "Iniciar sesión" dropdown
 // (desktop) / sheet (mobile). Self-contained so LandingHeader doesn't need
 // to thread auth state through props.
+//
+// TASK-102 (F7a): visual-only v2 restyle (elevated surface, IconV2, v2
+// inputs/buttons) — BaseInput/BaseButton/BaseModal are shared app-wide and
+// still v1-styled, so this file uses hand-rolled markup instead of
+// widening the blast radius to every other consumer of those components.
+// The Google button (TASK-118) keeps its exact handler/store call.
 
 const emit = defineEmits<{
   close: [];
@@ -62,52 +67,54 @@ const handleGoogleLogin = async () => {
 </script>
 
 <template>
-  <div class="bg-primary border border-neon rounded-lg p-5 w-full shadow-strong">
+  <div class="bg-[#0d0d0f] border border-line-strong rounded-lg p-5 w-full shadow-strong">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-h3 font-bold text-silver">{{ t('auth.login.title') }}</h2>
+      <h2 class="font-display text-[18px] font-bold text-silver">{{ t('auth.login.title') }}</h2>
       <button
           type="button"
-          class="text-silver-50 hover:text-neon transition-fast p-1"
+          class="relative inline-flex items-center justify-center rounded-md w-9 h-9 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
           :aria-label="t('common.actions.close')"
           @click="emit('close')"
       >
-        <SvgIcon name="x-mark" size="small" />
+        <IconV2 name="x" :size="18" />
       </button>
     </div>
 
-    <form @submit.prevent="handleLogin" class="space-y-md">
-      <BaseInput
+    <form @submit.prevent="handleLogin" class="space-y-3">
+      <input
           v-model="email"
           type="email"
           :placeholder="t('common.labels.email')"
+          class="w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
       />
 
-      <BaseInput
+      <input
           v-model="password"
           type="password"
           :placeholder="t('common.labels.password')"
+          class="w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
       />
 
-      <BaseButton
+      <button
           type="submit"
-          class="w-full"
+          class="w-full min-h-[44px] bg-neon text-primary font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-neon disabled:hover:shadow-none"
           :disabled="loading || !email || !password"
       >
         {{ loading ? t('auth.login.submitting') : t('auth.login.submit') }}
-      </BaseButton>
+      </button>
     </form>
 
     <div class="flex items-center gap-4 my-5">
-      <div class="flex-1 h-px bg-silver-30"></div>
+      <div class="flex-1 h-px bg-line"></div>
       <span class="text-tiny text-silver-50">{{ t('auth.login.orContinueWith') }}</span>
-      <div class="flex-1 h-px bg-silver-30"></div>
+      <div class="flex-1 h-px bg-line"></div>
     </div>
 
     <button
         @click="handleGoogleLogin"
         :disabled="googleLoading"
         type="button"
-        class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+        class="w-full flex items-center justify-center gap-3 min-h-[44px] px-4 bg-white text-gray-700 font-medium rounded-md hover:bg-gray-100 transition-colors duration-200 ease-v2 disabled:opacity-50"
     >
       <svg class="w-5 h-5" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -118,18 +125,18 @@ const handleGoogleLogin = async () => {
       {{ googleLoading ? '...' : t('auth.login.googleButton') }}
     </button>
 
-    <div class="mt-5 space-y-sm text-center">
+    <div class="mt-5 space-y-2.5 text-center">
       <RouterLink
           to="/forgot-password"
-          class="block text-small text-silver-70 hover:text-neon transition-fast"
+          class="block text-small text-silver-70 hover:text-neon transition-colors duration-200 ease-v2"
           @click="emit('close')"
       >
         {{ t('auth.login.forgotPassword') }}
       </RouterLink>
-      <div class="text-silver-50 text-tiny">o</div>
+      <div class="text-silver-30 text-tiny">o</div>
       <RouterLink
           to="/register"
-          class="block text-small text-silver hover:text-neon transition-fast"
+          class="block text-small text-silver hover:text-neon transition-colors duration-200 ease-v2"
           @click="emit('close')"
       >
         {{ t('auth.login.noAccount') }} {{ t('auth.login.register') }}

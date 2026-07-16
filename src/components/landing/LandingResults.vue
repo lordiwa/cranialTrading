@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useI18n } from '../../composables/useI18n';
 import { formatCardMeta, type MinimalCardResult, shouldShowNoResults } from '../../utils/loginCardSearch';
 import BaseLoader from '../ui/BaseLoader.vue';
+import IconV2 from '../ui/IconV2.vue';
 
 // Marketplace results grid (TASK-086). Only mounted by LoginView while the
 // query is active (non-empty) — the "no query" idle state lives in the
@@ -35,8 +36,8 @@ const showNoResults = computed(() => shouldShowNoResults({
 </script>
 
 <template>
-  <section class="max-w-[1280px] mx-auto px-6 py-8">
-    <h2 class="text-h3 font-bold text-silver mb-6">
+  <section class="max-w-[1000px] mx-auto px-6 py-9 border-t border-line mt-8">
+    <h2 class="font-display text-h2 font-bold text-silver mb-5">
       {{ t('landing.marketplace.results.titleFor', { query: props.query }) }}
     </h2>
 
@@ -44,13 +45,13 @@ const showNoResults = computed(() => shouldShowNoResults({
       <BaseLoader size="large" />
     </div>
 
-    <div v-else-if="results.length > 0" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));">
+    <div v-else-if="results.length > 0" class="grid gap-3.5" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
       <div
           v-for="card in results"
           :key="card.id"
-          class="bg-primary/90 border border-silver-20 rounded-md p-2 hover:border-neon transition-fast flex flex-col"
+          class="flex flex-col gap-2 p-2.5 bg-surface-1 border border-line rounded-lg hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 hover:shadow-medium transition-all duration-200 ease-v2"
       >
-        <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden rounded">
+        <div class="aspect-[63/88] bg-primary border border-line rounded-md overflow-hidden">
           <img
               v-if="card.imageUrl"
               :src="card.imageUrl"
@@ -59,18 +60,19 @@ const showNoResults = computed(() => shouldShowNoResults({
               class="w-full h-full object-cover"
           />
         </div>
-        <p class="text-tiny font-bold text-silver mt-2 truncate" :title="card.name">{{ card.name }}</p>
+        <p class="text-small font-bold text-silver truncate" :title="card.name">{{ card.name }}</p>
         <p v-if="formatCardMeta(card.setName, card.typeLine)" class="text-tiny text-silver-50 truncate">
           {{ formatCardMeta(card.setName, card.typeLine) }}
         </p>
-        <p class="text-small font-bold text-neon mt-1">
+        <p class="font-display font-tnum text-[16px] font-bold text-neon">
           {{ card.priceUsd !== null ? `$${card.priceUsd.toFixed(2)}` : 'N/A' }}
         </p>
         <button
             type="button"
-            class="mt-2 w-full px-2 py-1.5 border border-neon text-neon text-tiny font-bold rounded hover:bg-neon-10 transition-fast"
+            class="w-full min-h-[38px] border border-neon text-neon text-[11px] font-bold uppercase tracking-[.1em] rounded-md hover:bg-neon-10 hover:shadow-glow-neon transition-all duration-200 ease-v2 flex items-center justify-center gap-1.5"
             @click="emit('want', card)"
         >
+          <IconV2 name="heart" :size="14" />
           {{ t('landing.marketplace.results.wantThis') }}
         </button>
       </div>

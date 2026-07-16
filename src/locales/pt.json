@@ -660,7 +660,8 @@
     "pagination": {
       "loading": "Carregando coleção…",
       "slowLoad": "Coleção grande — pode demorar um momento",
-      "showingOf": "mostrando {count} de {total}"
+      "showingOf": "mostrando {count} de {total}",
+      "filtering": "Atualizando resultados…"
     }
   },
 

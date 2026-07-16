@@ -222,6 +222,26 @@ function cardToIndex(card: Card): IndexCard {
     }
 }
 
+/**
+ * True when no card_index filter is active (the common default, unfiltered
+ * collection view). Used by addCard's optimistic paginatedCards patch (TASK-116)
+ * to decide whether a newly added card can safely be assumed to belong on the
+ * currently displayed page without replicating the server's full filter engine
+ * (functions/index.js filterIndexCards) client-side.
+ */
+function hasNoActiveFilters(filters: QueryCardIndexRequest['filters']): boolean {
+    return !filters.search
+        && !filters.status?.length
+        && !filters.edition?.length
+        && !filters.color?.length
+        && !filters.rarity?.length
+        && !filters.type?.length
+        && filters.foil === undefined
+        && !filters.condition?.length
+        && filters.minPrice === undefined
+        && filters.maxPrice === undefined
+}
+
 export const useCollectionStore = defineStore('collection', () => {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -580,13 +600,59 @@ export const useCollectionStore = defineStore('collection', () => {
      */
     let _indexPersistTimer: ReturnType<typeof setTimeout> | null = null
 
+    /**
+     * Set by addCard/deleteCard (TASK-116) when a mutation changes card_index
+     * membership. _doPersistIndex checks this once the debounced persist above
+     * has actually flushed, and only then re-queries the current page — an
+     * immediate re-query (the pre-fix behavior) would hit the still-stale
+     * server card_index and revert/miss the change, the same race TASK-113
+     * fixed for updateCard's field-only patches.
+     */
+    let _pendingMembershipRefresh = false
+
+    /**
+     * Generation counter for _doPersistIndex (TASK-116 follow-up, reviewer HIGH
+     * PEDIDO #2/#3). At 59k cards a persist is ~30 sequential setDoc calls — a
+     * multi-second window. If a second mutation reschedules and its own persist
+     * STARTS (enters _doPersistIndex) before the first one's writes finish, the
+     * first (now-stale) persist's finally must not be the one to consume
+     * _pendingMembershipRefresh: it would call refreshCurrentPage() reading back
+     * its own stale snapshot (still containing whatever the second mutation just
+     * removed/changed), and since the flag is already consumed, the second
+     * (correct) persist's finally never issues the corrective re-query —
+     * the wrong state then persists indefinitely. Each _doPersistIndex call
+     * captures the post-increment counter; only the invocation whose captured
+     * value still matches the live counter at finally-time is allowed to consume
+     * the flag, guaranteeing it's always the MOST RECENTLY STARTED persist.
+     *
+     * That alone isn't sufficient (PEDIDO #3): "latest STARTED" isn't "latest
+     * SCHEDULED" — _persistGen only increments when _doPersistIndex is actually
+     * ENTERED (the timer firing), not when a newer mutation merely RESCHEDULES
+     * the debounce timer. If the second mutation lands in the last <2s of
+     * persist-1's writes, timer-2 is pending but hasn't fired yet when
+     * persist-1's finally runs — gen still matches, so persist-1 would
+     * incorrectly consume the flag. _indexPersistTimer !== null therefore also
+     * supersedes a stale persist: a PENDING (not yet fired) timer means a newer
+     * mutation is waiting, so no in-flight persist may consume the flag until
+     * that timer has fired (see the timeout callback below, which nulls the
+     * timer immediately before entering _doPersistIndex).
+     */
+    let _persistGen = 0
+
     function persistIndexToFirestore() {
         if (_indexPersistTimer) clearTimeout(_indexPersistTimer)
-        _indexPersistTimer = setTimeout(() => { _doPersistIndex() }, 2000)
+        _indexPersistTimer = setTimeout(() => {
+            _indexPersistTimer = null
+            _doPersistIndex()
+        }, 2000)
     }
 
     function _doPersistIndex() {
-        if (!authStore.user) return
+        const gen = ++_persistGen
+        if (!authStore.user) {
+            if (gen === _persistGen && _indexPersistTimer === null) _pendingMembershipRefresh = false
+            return
+        }
         const userId = authStore.user.id
         const INDEX_CHUNK_SIZE = 2000
 
@@ -613,6 +679,16 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             } catch (err) {
                 console.warn('[IndexSync] Failed to persist index:', err)
+            } finally {
+                // TASK-116: run the deferred grid re-query only now that the
+                // write above has settled (success or failure), never immediately,
+                // and only if THIS persist is still the latest STARTED one (gen)
+                // AND no newer mutation has a persist SCHEDULED-but-not-yet-fired
+                // (_indexPersistTimer === null) — see PEDIDO #3 above.
+                if (gen === _persistGen && _indexPersistTimer === null && _pendingMembershipRefresh) {
+                    _pendingMembershipRefresh = false
+                    refreshCurrentPage().catch(() => {})
+                }
             }
         })()
     }
@@ -655,8 +731,22 @@ export const useCollectionStore = defineStore('collection', () => {
                     })
             }
 
-            // Refresh paginated view so the new card appears in the grid
-            refreshCurrentPage().catch(() => {})
+            // Optimistically patch the paginated grid (TASK-116) — CollectionView
+            // renders paginatedCards, not cards.value. Only safe to guess
+            // membership when on the first page with no active filters (the
+            // common default view); otherwise wait for the deferred re-query
+            // below rather than replicating the server's filter engine here.
+            if (paginationMeta.value.page === 0 && hasNoActiveFilters(_lastQueryFilters)) {
+                paginatedCards.value = [...paginatedCards.value, newCard]
+            }
+
+            // Re-query the server card_index for the definitive membership/order
+            // (covers filtered/other-page cases, and corrects sort position for
+            // the optimistic case above) — deferred until the debounced persist
+            // above has actually written; an immediate call here would hit the
+            // still-stale server index and revert/miss the new card (TASK-113's
+            // race, recurring for addCard/deleteCard — see _doPersistIndex).
+            _pendingMembershipRefresh = true
 
             return docRef.id
         } catch (error) {
@@ -894,6 +984,13 @@ export const useCollectionStore = defineStore('collection', () => {
         cards.value = cards.value.filter(c => c.id !== cardId)
         cardsById.delete(cardId)
 
+        // Also patch the paginated grid (TASK-116) — CollectionView renders
+        // paginatedCards, not cards.value. No-op if the card isn't on this page.
+        const paginatedIndex = paginatedCards.value.findIndex((c) => c.id === cardId)
+        if (paginatedIndex > -1) {
+            paginatedCards.value = paginatedCards.value.filter((c) => c.id !== cardId)
+        }
+
         // Sync with Firebase in background
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
@@ -909,8 +1006,13 @@ export const useCollectionStore = defineStore('collection', () => {
                     console.error('[PublicSync] Error removing card:', err)
                 })
 
-            // Refresh paginated view so the deleted card disappears from the grid
-            refreshCurrentPage().catch(() => {})
+            // Re-query the server card_index for the definitive membership/order
+            // (fills the gap left by the deleted card, corrects total/hasMore) —
+            // deferred until the debounced persist above has actually written;
+            // an immediate call here would hit the still-stale server index and
+            // bring the just-deleted card back (TASK-113's race, recurring for
+            // addCard/deleteCard — see _doPersistIndex).
+            _pendingMembershipRefresh = true
 
             return true
         } catch (error) {
@@ -920,6 +1022,11 @@ export const useCollectionStore = defineStore('collection', () => {
             restored.splice(cardIndex, 0, deletedCard)
             cards.value = restored
             cardsById.set(cardId, deletedCard)
+            if (paginatedIndex > -1) {
+                const restoredPaginated = [...paginatedCards.value]
+                restoredPaginated.splice(paginatedIndex, 0, deletedCard)
+                paginatedCards.value = restoredPaginated
+            }
             toastStore.show(t('collection.messages.deleteError'), 'error')
             return false
         }

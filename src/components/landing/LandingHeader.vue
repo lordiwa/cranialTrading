@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from '../../composables/useI18n';
-import SvgIcon from '../ui/SvgIcon.vue';
-import BaseButton from '../ui/BaseButton.vue';
+import IconV2 from '../ui/IconV2.vue';
 import HeaderLoginDropdown from './HeaderLoginDropdown.vue';
 
 // Marketplace header (TASK-086): replaces the old two-column LoginView
@@ -10,6 +9,9 @@ import HeaderLoginDropdown from './HeaderLoginDropdown.vue';
 // sesión" dropdown + category row. Mobile = sticky [hamburger | wordmark |
 // person] bar with the search bar as the first content right below it
 // (search-first, the whole point of the redesign).
+//
+// TASK-102 (F7a): visual-only v2 restyle (bg-hdr/blur, surface/line tokens,
+// IconV2, font-display) — no structural/behavioral change from TASK-086.
 //
 // Review fix (HIGH-1): the desktop/mobile split used to be CSS-only
 // (hidden lg:block / lg:hidden), so BOTH subtrees were always in the DOM —
@@ -101,27 +103,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <header class="bg-primary border-b border-neon-15 sticky top-0 z-40">
+  <header class="bg-hdr backdrop-blur-md sticky top-0 z-40 border-b border-line">
     <!-- ============ Desktop ============ -->
-    <div v-if="isDesktop" class="max-w-[1280px] mx-auto px-6">
+    <div v-if="isDesktop" class="max-w-[1200px] mx-auto px-6">
       <!-- Row 1: wordmark + centered search + actions -->
-      <div class="flex items-center gap-6 h-20">
-        <RouterLink to="/login" class="flex items-center gap-2 flex-shrink-0">
+      <div class="flex items-center gap-6 h-16">
+        <RouterLink to="/login" class="flex items-center gap-2.5 flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon rounded-md">
           <svg class="w-9 h-9 text-neon" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
-          <span class="text-h3 font-bold text-neon tracking-wider font-brother">CRANIAL TRADING</span>
+          <span class="font-display font-bold text-[17px] tracking-[.14em] text-neon whitespace-nowrap">CRANIAL TRADING</span>
         </RouterLink>
 
         <form class="flex-1 flex justify-center" @submit.prevent="submitSearch">
-          <div class="w-full max-w-[560px] flex items-center gap-2 border-2 border-neon rounded-full px-4 py-2 bg-primary focus-within:bg-neon-10 transition-fast">
-            <SvgIcon name="search" size="small" class="text-neon flex-shrink-0" />
+          <div class="w-full max-w-[560px] flex items-center gap-2 border border-line rounded-full px-4 py-2 bg-surface-1 focus-within:border-neon focus-within:shadow-glow-neon transition-all duration-200 ease-v2">
+            <IconV2 name="search" :size="18" class="text-silver-30 flex-shrink-0" />
             <input
                 ref="searchInputRef"
                 v-model="queryModel"
                 type="text"
                 :placeholder="t('landing.marketplace.header.searchPlaceholder')"
-                class="flex-1 min-w-0 bg-transparent text-silver placeholder-silver-50 outline-none text-small"
+                class="flex-1 min-w-0 bg-transparent text-silver placeholder-silver-30 outline-none text-small"
             />
             <!--
               type="button" (not "submit") is intentional: only ONE
@@ -133,7 +135,7 @@ onUnmounted(() => {
             <button
                 type="button"
                 :disabled="searching"
-                class="px-4 py-1.5 bg-neon text-primary font-bold text-tiny rounded-full hover:brightness-110 transition-fast disabled:opacity-50 flex-shrink-0"
+                class="px-4 py-1.5 bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-full hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 disabled:opacity-50 flex-shrink-0"
                 @click="submitSearch"
             >
               {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
@@ -141,16 +143,16 @@ onUnmounted(() => {
           </div>
         </form>
 
-        <div class="flex items-center gap-4 flex-shrink-0">
+        <div class="flex items-center gap-3 flex-shrink-0">
           <div ref="loginPanelRef" class="relative">
             <button
                 type="button"
                 data-testid="login-trigger"
                 data-menu-trigger
-                class="flex items-center gap-2 text-silver-70 hover:text-neon transition-fast text-small font-bold"
+                class="min-h-[44px] flex items-center gap-2 px-3.5 py-2 border border-line-strong text-silver-70 hover:text-silver hover:bg-surface-1 transition-all duration-200 ease-v2 rounded-md text-small font-bold focus-visible:outline-none focus-visible:shadow-glow-neon"
                 @click="toggleLogin"
             >
-              <SvgIcon name="user" size="small" />
+              <IconV2 name="user" :size="18" />
               {{ t('landing.marketplace.header.loginTrigger') }}
             </button>
 
@@ -164,45 +166,46 @@ onUnmounted(() => {
 
           <RouterLink
               to="/register"
-              class="flex items-center gap-2 text-silver-70 hover:text-neon transition-fast text-small font-bold"
+              class="min-h-[44px] flex items-center gap-2 px-3.5 py-2 border border-neon text-neon font-bold hover:bg-neon-10 hover:shadow-glow-neon transition-all duration-200 ease-v2 rounded-md text-small focus-visible:outline-none focus-visible:shadow-glow-neon"
               :title="t('landing.marketplace.header.wantTrigger')"
           >
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7-4.35-9.33-8.06C1.07 10.4 1.6 7.27 4.1 5.6 6.2 4.2 8.94 4.7 10.5 6.6L12 8.4l1.5-1.8c1.56-1.9 4.3-2.4 6.4-1 2.5 1.67 3.03 4.8 1.43 7.34C19 16.65 12 21 12 21z" />
-            </svg>
+            <IconV2 name="heart" :size="18" />
             {{ t('landing.marketplace.header.wantTrigger') }}
           </RouterLink>
         </div>
       </div>
 
       <!-- Row 2: categories -->
-      <div class="flex items-center justify-between h-12 border-t border-silver-10">
+      <div class="flex items-center justify-between h-12 border-t border-line">
         <nav class="flex items-center gap-6">
           <button
               type="button"
-              class="text-tiny font-bold text-silver-70 hover:text-neon transition-fast uppercase tracking-wide"
+              class="text-[12px] font-bold uppercase tracking-[.12em] text-silver-50 hover:text-silver transition-colors duration-200 ease-v2"
               @click="focusSearch"
           >
             {{ t('landing.marketplace.header.catalog') }}
           </button>
           <button
               type="button"
-              class="text-tiny font-bold text-silver-70 hover:text-neon transition-fast uppercase tracking-wide"
+              class="text-[12px] font-bold uppercase tracking-[.12em] text-silver-50 hover:text-silver transition-colors duration-200 ease-v2"
               @click="emit('how-it-works')"
           >
             {{ t('landing.marketplace.header.howItWorks') }}
           </button>
           <button
               type="button"
-              class="text-tiny font-bold text-silver-70 hover:text-neon transition-fast uppercase tracking-wide"
+              class="text-[12px] font-bold uppercase tracking-[.12em] text-silver-50 hover:text-silver transition-colors duration-200 ease-v2"
               @click="emit('community')"
           >
             {{ t('landing.marketplace.header.community') }}
           </button>
         </nav>
 
-        <RouterLink to="/register">
-          <BaseButton variant="filled" size="small">{{ t('landing.marketplace.header.createAccount') }}</BaseButton>
+        <RouterLink
+            to="/register"
+            class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
+        >
+          {{ t('landing.marketplace.header.createAccount') }}
         </RouterLink>
       </div>
     </div>
@@ -213,10 +216,11 @@ onUnmounted(() => {
         <button
             type="button"
             data-menu-trigger
-            class="p-2 text-silver hover:text-neon transition-fast"
+            class="relative inline-flex items-center justify-center rounded-md w-11 h-11 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
             :aria-label="t('landing.marketplace.header.menuAria')"
             @click="toggleMobileMenu"
         >
+          <!-- No hamburger glyph in the IconV2 sprite (design→app v2 F1 set) — keep the inline stroke icon. -->
           <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
@@ -226,18 +230,18 @@ onUnmounted(() => {
           <svg class="w-7 h-7 text-neon" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>
-          <span class="text-small font-bold text-neon tracking-wider font-brother">CRANIAL TRADING</span>
+          <span class="font-display font-bold text-[14px] tracking-[.14em] text-neon whitespace-nowrap">CRANIAL TRADING</span>
         </RouterLink>
 
         <button
             type="button"
             data-testid="login-trigger"
             data-menu-trigger
-            class="p-2 text-silver hover:text-neon transition-fast"
+            class="relative inline-flex items-center justify-center rounded-md w-11 h-11 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
             :aria-label="t('landing.marketplace.header.personAria')"
             @click="toggleLogin"
         >
-          <SvgIcon name="user" size="small" />
+          <IconV2 name="user" :size="20" />
         </button>
       </div>
 
@@ -245,37 +249,40 @@ onUnmounted(() => {
       <div
           v-if="mobileMenuOpen"
           ref="mobileMenuPanelRef"
-          class="border-t border-silver-20 bg-primary px-4 py-3 flex flex-col gap-3"
+          class="border-t border-line bg-primary px-4 py-3 flex flex-col gap-3"
       >
-        <button type="button" class="text-left text-small font-bold text-silver-70 hover:text-neon transition-fast" @click="focusSearch">
+        <button type="button" class="text-left text-[12px] font-bold uppercase tracking-[.12em] text-silver-50 hover:text-silver transition-colors duration-200 ease-v2" @click="focusSearch">
           {{ t('landing.marketplace.header.catalog') }}
         </button>
-        <button type="button" class="text-left text-small font-bold text-silver-70 hover:text-neon transition-fast" @click="emit('how-it-works'); mobileMenuOpen = false">
+        <button type="button" class="text-left text-[12px] font-bold uppercase tracking-[.12em] text-silver-50 hover:text-silver transition-colors duration-200 ease-v2" @click="emit('how-it-works'); mobileMenuOpen = false">
           {{ t('landing.marketplace.header.howItWorks') }}
         </button>
-        <button type="button" class="text-left text-small font-bold text-silver-70 hover:text-neon transition-fast" @click="emit('community'); mobileMenuOpen = false">
+        <button type="button" class="text-left text-[12px] font-bold uppercase tracking-[.12em] text-silver-50 hover:text-silver transition-colors duration-200 ease-v2" @click="emit('community'); mobileMenuOpen = false">
           {{ t('landing.marketplace.header.community') }}
         </button>
-        <RouterLink to="/register" class="mt-1">
-          <BaseButton variant="filled" size="small" class="w-full">{{ t('landing.marketplace.header.createAccount') }}</BaseButton>
+        <RouterLink
+            to="/register"
+            class="mt-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 w-full focus-visible:outline-none focus-visible:shadow-glow-neon"
+        >
+          {{ t('landing.marketplace.header.createAccount') }}
         </RouterLink>
       </div>
 
       <!-- Search-first: full-width search bar is the first content under the sticky bar -->
-      <form class="px-4 py-3 border-t border-silver-20" @submit.prevent="submitSearch">
-        <div class="flex items-center gap-2 border-2 border-neon rounded-full px-3 py-2 bg-primary">
-          <SvgIcon name="search" size="small" class="text-neon flex-shrink-0" />
+      <form class="px-4 py-3 border-t border-line" @submit.prevent="submitSearch">
+        <div class="flex items-center gap-2 border border-line rounded-full px-3 py-2 bg-surface-1 focus-within:border-neon focus-within:shadow-glow-neon transition-all duration-200 ease-v2">
+          <IconV2 name="search" :size="18" class="text-silver-30 flex-shrink-0" />
           <input
               ref="searchInputRef"
               v-model="queryModel"
               type="text"
               :placeholder="t('landing.marketplace.header.searchPlaceholder')"
-              class="flex-1 min-w-0 bg-transparent text-silver placeholder-silver-50 outline-none text-small"
+              class="flex-1 min-w-0 bg-transparent text-silver placeholder-silver-30 outline-none text-small"
           />
           <button
               type="button"
               :disabled="searching"
-              class="px-3 py-1.5 bg-neon text-primary font-bold text-tiny rounded-full hover:brightness-110 transition-fast disabled:opacity-50 flex-shrink-0"
+              class="px-3 py-1.5 bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-full hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 disabled:opacity-50 flex-shrink-0"
               @click="submitSearch"
           >
             {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
@@ -284,7 +291,7 @@ onUnmounted(() => {
       </form>
 
       <!-- Inline sign-in sheet -->
-      <div v-if="loginOpen" ref="loginPanelRef" class="border-t border-silver-20 px-4 py-3">
+      <div v-if="loginOpen" ref="loginPanelRef" class="border-t border-line px-4 py-3">
         <HeaderLoginDropdown @close="closeLogin" />
       </div>
     </div>

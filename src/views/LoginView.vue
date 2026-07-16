@@ -6,8 +6,7 @@ import { useScrollReveal } from '../composables/useScrollReveal';
 import { useSearchStore } from '../stores/search';
 import { searchPublicCards } from '../services/publicCardSearch';
 import { applyPricedFirstFilter, isSearchActive, mapSellers, type MinimalCardResult, type SellerResult, toMinimalResult } from '../utils/loginCardSearch';
-import BaseButton from '../components/ui/BaseButton.vue';
-import SvgIcon from '../components/ui/SvgIcon.vue';
+import IconV2 from '../components/ui/IconV2.vue';
 import LandingHeader from '../components/landing/LandingHeader.vue';
 import LandingResults from '../components/landing/LandingResults.vue';
 import LandingSellers from '../components/landing/LandingSellers.vue';
@@ -135,19 +134,22 @@ const openLoginFromModal = () => {
   headerRef.value?.openLogin();
 };
 
+// Icon names map to the IconV2 sprite (design→app v2 F1) — swap/cards/chat
+// mirror the equivalent DESIGN-DIRECTION §5 feature icons (i-swap, i-cards,
+// i-chat) used by cranial-design/prototype/01-login-desktop.html.
 const features = computed(() => [
   {
-    icon: 'handshake',
+    icon: 'swap',
     title: t('landing.features.matching.title'),
     description: t('landing.features.matching.description')
   },
   {
-    icon: 'collection',
+    icon: 'cards',
     title: t('landing.features.collection.title'),
     description: t('landing.features.collection.description')
   },
   {
-    icon: 'box',
+    icon: 'cards',
     title: t('landing.features.decks.title'),
     description: t('landing.features.decks.description')
   },
@@ -190,37 +192,44 @@ const comparisonRows = computed(() => [
       <!-- Idle: hero + marketing -->
       <div v-show="!active">
         <!-- Hero -->
-        <section class="max-w-[1280px] mx-auto px-6 py-12 lg:py-16 text-center">
-          <span class="inline-block px-3 py-1 mb-4 text-tiny font-bold text-neon border border-neon-40 rounded-full">
+        <section class="max-w-[1000px] mx-auto px-6 py-16 lg:py-20 text-center">
+          <p class="rise font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-4">
             {{ t('landing.marketplace.hero.badge') }}
-          </span>
+          </p>
 
-          <h1 class="text-h1 lg:text-h1 font-bold text-silver leading-tight mb-4">
+          <h1 class="rise font-display text-h1 lg:text-[54px] font-bold text-silver leading-[1.1] mb-4">
             From Trash<br/>
             <span class="text-neon">to Treasures</span>
           </h1>
 
-          <p class="text-body text-silver-70 max-w-xl mx-auto mb-8">
+          <p class="rise text-body text-silver-50 max-w-xl mx-auto mb-8">
             {{ t('landing.subtitle') }}
           </p>
 
-          <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
-            <BaseButton variant="filled" @click="focusHeaderSearch">
+          <div class="rise flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
+            <button
+                type="button"
+                class="min-h-[44px] px-6 bg-neon text-primary font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
+                @click="focusHeaderSearch"
+            >
               {{ t('landing.marketplace.hero.ctaSearch') }}
-            </BaseButton>
-            <RouterLink to="/register">
-              <BaseButton variant="secondary">{{ t('landing.hero.cta') }}</BaseButton>
+            </button>
+            <RouterLink
+                to="/register"
+                class="min-h-[44px] flex items-center px-6 border border-line-strong text-silver-70 font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:border-silver-30 hover:text-silver hover:bg-surface-1 transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
+            >
+              {{ t('landing.hero.cta') }}
             </RouterLink>
           </div>
 
-          <div class="flex flex-col items-center gap-2">
-            <p class="text-tiny text-silver-50">{{ t('landing.marketplace.hero.popularLabel') }}</p>
+          <div class="rise flex flex-col items-center gap-2">
+            <p class="text-tiny text-silver-30 uppercase tracking-[.12em]">{{ t('landing.marketplace.hero.popularLabel') }}</p>
             <div class="flex flex-wrap items-center justify-center gap-2">
               <button
                   v-for="term in popularSearches"
                   :key="term"
                   type="button"
-                  class="px-3 py-1 text-tiny text-silver-70 border border-silver-20 rounded-full hover:border-neon hover:text-neon transition-fast"
+                  class="min-h-[36px] px-3.5 text-small font-semibold text-silver-50 bg-surface-1 border border-line rounded-full hover:text-silver hover:border-line-strong hover:bg-surface-2 transition-all duration-200 ease-v2"
                   @click="handleChipClick(term)"
               >
                 {{ term }}
@@ -230,62 +239,64 @@ const comparisonRows = computed(() => [
         </section>
 
         <!-- How It Works -->
-        <section ref="howItWorksRef" class="scroll-reveal max-w-[1280px] mx-auto px-6 py-12">
-          <h2 class="text-h3 font-bold text-silver mb-8 text-center">{{ t('landing.howItWorks.title') }}</h2>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="text-center">
-              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
-                <SvgIcon name="plus" size="large" class="text-neon" />
+        <section ref="howItWorksRef" class="scroll-reveal max-w-[1000px] mx-auto px-6 py-14 border-t border-line">
+          <h2 class="font-display text-h2 font-bold text-silver mb-10 text-center">{{ t('landing.howItWorks.title') }}</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="text-center p-7 bg-surface-1 border border-line rounded-lg hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 transition-all duration-200 ease-v2">
+              <div class="inline-flex items-center justify-center w-[52px] h-[52px] rounded-full bg-neon-10 border border-neon-40 mb-4 text-neon">
+                <IconV2 name="plus" :size="24" />
               </div>
-              <h3 class="text-small font-bold text-silver mb-2">{{ t('landing.howItWorks.step1.title') }}</h3>
-              <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step1.desc') }}</p>
+              <h3 class="text-h3 font-bold text-silver mb-2">{{ t('landing.howItWorks.step1.title') }}</h3>
+              <p class="text-small text-silver-50">{{ t('landing.howItWorks.step1.desc') }}</p>
             </div>
 
-            <div class="text-center">
-              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
-                <SvgIcon name="search" size="large" class="text-neon" />
+            <div class="text-center p-7 bg-surface-1 border border-line rounded-lg hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 transition-all duration-200 ease-v2">
+              <div class="inline-flex items-center justify-center w-[52px] h-[52px] rounded-full bg-neon-10 border border-neon-40 mb-4 text-neon">
+                <IconV2 name="search" :size="24" />
               </div>
-              <h3 class="text-small font-bold text-silver mb-2">{{ t('landing.howItWorks.step2.title') }}</h3>
-              <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step2.desc') }}</p>
+              <h3 class="text-h3 font-bold text-silver mb-2">{{ t('landing.howItWorks.step2.title') }}</h3>
+              <p class="text-small text-silver-50">{{ t('landing.howItWorks.step2.desc') }}</p>
             </div>
 
-            <div class="text-center">
-              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neon-10 border-2 border-neon mb-4">
-                <SvgIcon name="chat" size="large" class="text-neon" />
+            <div class="text-center p-7 bg-surface-1 border border-line rounded-lg hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 transition-all duration-200 ease-v2">
+              <div class="inline-flex items-center justify-center w-[52px] h-[52px] rounded-full bg-neon-10 border border-neon-40 mb-4 text-neon">
+                <IconV2 name="chat" :size="24" />
               </div>
-              <h3 class="text-small font-bold text-silver mb-2">{{ t('landing.howItWorks.step3.title') }}</h3>
-              <p class="text-tiny text-silver-50">{{ t('landing.howItWorks.step3.desc') }}</p>
+              <h3 class="text-h3 font-bold text-silver mb-2">{{ t('landing.howItWorks.step3.title') }}</h3>
+              <p class="text-small text-silver-50">{{ t('landing.howItWorks.step3.desc') }}</p>
             </div>
           </div>
         </section>
 
         <!-- Feature Deep-Dive -->
-        <section class="scroll-reveal max-w-[1280px] mx-auto px-6 py-12">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section class="scroll-reveal max-w-[1000px] mx-auto px-6 py-14 border-t border-line">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div
                 v-for="feature in features"
                 :key="feature.title"
-                class="bg-primary/90 border border-silver-20 p-5 hover:border-neon-40 transition-all rounded-md group"
+                class="flex gap-4 bg-surface-1 border border-line p-5 hover:bg-surface-2 hover:border-line-strong transition-all duration-200 ease-v2 rounded-lg"
             >
-              <div class="mb-3 w-10 h-10 bg-neon-10 rounded-full flex items-center justify-center group-hover:bg-neon-15 transition-colors">
-                <SvgIcon :name="feature.icon" size="small" class="text-neon" />
+              <div class="flex-shrink-0 w-[42px] h-[42px] bg-surface-3 rounded-md flex items-center justify-center text-neon">
+                <IconV2 :name="feature.icon" :size="22" />
               </div>
-              <h3 class="text-small font-bold text-silver mb-1">{{ feature.title }}</h3>
-              <p class="text-tiny text-silver-50">{{ feature.description }}</p>
+              <div>
+                <h3 class="text-h3 font-bold text-silver mb-1">{{ feature.title }}</h3>
+                <p class="text-small text-silver-50">{{ feature.description }}</p>
+              </div>
             </div>
           </div>
         </section>
 
         <!-- Why Cranial Trading + footer-strip CTA -->
-        <section class="scroll-reveal max-w-[1280px] mx-auto px-6 py-12">
-          <h2 class="text-h3 font-bold text-silver mb-6 text-center">{{ t('landing.comparison.title') }}</h2>
-          <ul class="space-y-4 max-w-2xl mx-auto">
+        <section class="scroll-reveal max-w-[1000px] mx-auto px-6 py-14 border-t border-line">
+          <h2 class="font-display text-h2 font-bold text-silver mb-6 text-center">{{ t('landing.comparison.title') }}</h2>
+          <ul class="space-y-3 max-w-xl mx-auto">
             <li
               v-for="row in comparisonRows"
               :key="row"
-              class="flex items-start gap-3 p-4 bg-secondary/20 border border-silver-10 rounded-md"
+              class="flex items-start gap-3 p-4 bg-surface-1 border border-line rounded-lg"
             >
-              <span class="text-neon text-body mt-0.5 flex-shrink-0">&#10003;</span>
+              <IconV2 name="check" :size="18" class="text-neon mt-0.5 flex-shrink-0" />
               <div>
                 <h3 class="text-small font-bold text-silver">{{ t(`landing.comparison.rows.${row}.label`) }}</h3>
                 <p class="text-tiny text-silver-50">{{ t(`landing.comparison.rows.${row}.us`) }}</p>
@@ -293,8 +304,11 @@ const comparisonRows = computed(() => [
             </li>
           </ul>
           <div class="mt-8 text-center">
-            <RouterLink to="/register" class="inline-block">
-              <BaseButton variant="filled">{{ t('landing.comparison.cta') }}</BaseButton>
+            <RouterLink
+                to="/register"
+                class="inline-flex items-center justify-center min-h-[44px] px-6 bg-neon text-primary font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
+            >
+              {{ t('landing.comparison.cta') }}
             </RouterLink>
           </div>
         </section>
@@ -302,15 +316,15 @@ const comparisonRows = computed(() => [
     </main>
 
     <!-- Footer -->
-    <footer ref="footerRef" class="border-t border-silver-20 bg-secondary/30">
-      <div class="max-w-[1280px] mx-auto px-6 py-8">
+    <footer ref="footerRef" class="border-t border-line">
+      <div class="max-w-[1000px] mx-auto px-6 py-12">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <!-- Platform -->
           <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.platform') }}</h4>
-            <ul class="space-y-2 text-tiny text-silver-50">
-              <li><RouterLink to="/login" class="hover:text-neon transition-fast">{{ t('auth.login.title') }}</RouterLink></li>
-              <li><RouterLink to="/register" class="hover:text-neon transition-fast">{{ t('auth.register.title') }}</RouterLink></li>
+            <h4 class="font-display text-[12px] font-semibold uppercase tracking-[.1em] text-silver-50 mb-3.5">{{ t('landing.footer.platform') }}</h4>
+            <ul class="space-y-2.5 text-small text-silver-30">
+              <li><RouterLink to="/login" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('auth.login.title') }}</RouterLink></li>
+              <li><RouterLink to="/register" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('auth.register.title') }}</RouterLink></li>
               <li><span class="text-silver-30">{{ t('header.nav.collection') }}</span></li>
               <li><span class="text-silver-30">Matches</span></li>
             </ul>
@@ -318,36 +332,36 @@ const comparisonRows = computed(() => [
 
           <!-- Help -->
           <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.help') }}</h4>
-            <ul class="space-y-2 text-tiny text-silver-50">
-              <li><RouterLink to="/faq" class="hover:text-neon transition-fast">{{ t('landing.footer.faq') }}</RouterLink></li>
-              <li><RouterLink to="/guide/card-conditions" class="hover:text-neon transition-fast">{{ t('landing.footer.cardConditionGuide') }}</RouterLink></li>
-              <li><RouterLink to="/guide/how-to-trade" class="hover:text-neon transition-fast">{{ t('landing.footer.howToTradeSafely') }}</RouterLink></li>
-              <li><RouterLink to="/about" class="hover:text-neon transition-fast">{{ t('landing.footer.about') }}</RouterLink></li>
-              <li><RouterLink to="/contact" class="hover:text-neon transition-fast">{{ t('landing.footer.contactUs') }}</RouterLink></li>
+            <h4 class="font-display text-[12px] font-semibold uppercase tracking-[.1em] text-silver-50 mb-3.5">{{ t('landing.footer.help') }}</h4>
+            <ul class="space-y-2.5 text-small text-silver-30">
+              <li><RouterLink to="/faq" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('landing.footer.faq') }}</RouterLink></li>
+              <li><RouterLink to="/guide/card-conditions" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('landing.footer.cardConditionGuide') }}</RouterLink></li>
+              <li><RouterLink to="/guide/how-to-trade" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('landing.footer.howToTradeSafely') }}</RouterLink></li>
+              <li><RouterLink to="/about" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('landing.footer.about') }}</RouterLink></li>
+              <li><RouterLink to="/contact" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('landing.footer.contactUs') }}</RouterLink></li>
             </ul>
           </div>
 
           <!-- Legal -->
           <div>
-            <h4 class="text-tiny font-bold text-silver mb-3">{{ t('landing.footer.legal') }}</h4>
-            <ul class="space-y-2 text-tiny text-silver-50">
-              <li><RouterLink to="/terms" class="hover:text-neon transition-fast">{{ t('legal.terms.title') }}</RouterLink></li>
-              <li><RouterLink to="/privacy" class="hover:text-neon transition-fast">{{ t('legal.privacy.title') }}</RouterLink></li>
-              <li><RouterLink to="/cookies" class="hover:text-neon transition-fast">{{ t('legal.cookies.title') }}</RouterLink></li>
+            <h4 class="font-display text-[12px] font-semibold uppercase tracking-[.1em] text-silver-50 mb-3.5">{{ t('landing.footer.legal') }}</h4>
+            <ul class="space-y-2.5 text-small text-silver-30">
+              <li><RouterLink to="/terms" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('legal.terms.title') }}</RouterLink></li>
+              <li><RouterLink to="/privacy" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('legal.privacy.title') }}</RouterLink></li>
+              <li><RouterLink to="/cookies" class="hover:text-neon transition-colors duration-200 ease-v2">{{ t('legal.cookies.title') }}</RouterLink></li>
             </ul>
           </div>
         </div>
 
         <!-- Bottom bar -->
-        <div class="pt-6 border-t border-silver-20 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p class="text-tiny text-silver-50">
+        <div class="pt-6 border-t border-line flex flex-col md:flex-row items-center justify-between gap-4">
+          <p class="text-tiny text-silver-30">
             {{ t('legal.footer.copyright') }}
           </p>
 
           <!-- Language Selector -->
           <div class="flex items-center gap-2">
-            <span class="text-tiny text-silver-50">{{ t('footer.language') }}:</span>
+            <span class="text-tiny text-silver-30">{{ t('footer.language') }}:</span>
             <div class="flex items-center gap-1">
               <button
                 v-for="lang in languages"
@@ -355,10 +369,10 @@ const comparisonRows = computed(() => [
                 @click="setLocale(lang.code)"
                 :title="lang.name"
                 :class="[
-                  'px-2 py-1 text-tiny font-bold rounded transition-colors',
+                  'px-2 py-0.5 font-display text-tiny font-bold rounded transition-colors duration-200 ease-v2',
                   locale === lang.code
-                    ? 'bg-neon text-primary'
-                    : 'text-silver-50 hover:text-neon hover:bg-silver-5'
+                    ? 'bg-neon-15 text-neon'
+                    : 'text-silver-30 hover:text-neon hover:bg-surface-2'
                 ]"
               >
                 {{ lang.label }}

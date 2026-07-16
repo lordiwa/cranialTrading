@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { useI18n } from '../../composables/useI18n';
 import BaseModal from '../ui/BaseModal.vue';
-import BaseButton from '../ui/BaseButton.vue';
+import IconV2 from '../ui/IconV2.vue';
 
 // Registration gate (TASK-086): replaces the old toast+redirect for
 // "Quiero esta" on the anonymous catalog search results. Closes on
 // backdrop click — this is a soft gate, not a data-editing modal, so it
 // doesn't follow the closeOnClickOutside=false rule reserved for
 // Add/Edit/StatusModal.
+//
+// TASK-102 (F7a): visual-only v2 restyle of the modal CONTENT (icon-ring,
+// typography, button treatment per cranial-design/prototype/83-register-
+// prompt-*.html) — BaseModal's own chrome (backdrop, close button, focus
+// trap) is shared app-wide and stays untouched (see HeaderLoginDropdown
+// for the same scoping decision).
 
 const props = defineProps<{
   show: boolean;
@@ -26,25 +32,29 @@ const { t } = useI18n();
   <BaseModal :show="show" :close-on-click-outside="true" max-width="max-w-md" @close="emit('close')">
     <div class="text-center space-y-4">
       <div class="flex justify-center">
-        <svg class="w-12 h-12 text-neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7-4.35-9.33-8.06C1.07 10.4 1.6 7.27 4.1 5.6 6.2 4.2 8.94 4.7 10.5 6.6L12 8.4l1.5-1.8c1.56-1.9 4.3-2.4 6.4-1 2.5 1.67 3.03 4.8 1.43 7.34C19 16.65 12 21 12 21z" />
-        </svg>
+        <div class="w-[60px] h-[60px] rounded-full bg-neon-10 border border-neon-40 flex items-center justify-center text-neon shadow-glow-neon">
+          <IconV2 name="heart" :size="26" />
+        </div>
       </div>
 
-      <h2 class="text-h3 font-bold text-silver">{{ t('landing.marketplace.modal.title') }}</h2>
+      <h2 class="font-display text-[22px] font-bold text-silver">{{ t('landing.marketplace.modal.title') }}</h2>
 
-      <p class="text-small text-silver-70">
+      <p class="text-small text-silver-50 leading-relaxed">
         {{ t('landing.marketplace.modal.body', { card: props.cardName }) }}
       </p>
 
-      <div class="space-y-3 pt-2">
-        <RouterLink to="/register" class="block" @click="emit('close')">
-          <BaseButton variant="filled" class="w-full">{{ t('landing.marketplace.header.createAccount') }}</BaseButton>
+      <div class="space-y-2.5 pt-2">
+        <RouterLink
+            to="/register"
+            class="flex items-center justify-center min-h-[48px] w-full bg-neon text-primary font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2"
+            @click="emit('close')"
+        >
+          {{ t('landing.marketplace.header.createAccount') }}
         </RouterLink>
 
         <button
             type="button"
-            class="text-small text-silver-70 hover:text-neon transition-fast"
+            class="flex items-center justify-center min-h-[48px] w-full border border-line-strong text-silver-70 font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:border-silver-30 hover:text-silver hover:bg-surface-1 transition-all duration-200 ease-v2"
             @click="emit('login')"
         >
           {{ t('landing.marketplace.modal.haveAccount') }}

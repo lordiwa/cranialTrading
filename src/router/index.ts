@@ -10,10 +10,9 @@ const router = createRouter({
             redirect: '/saved-matches',
         },
         {
+            // RED hub merge: Contactos is now a tab inside /saved-matches, not a standalone page.
             path: '/contacts',
-            name: 'contacts',
-            component: () => import('../views/SavedContactsView.vue'),
-            meta: { requiresAuth: true, title: 'seo.pages.contacts.title', description: 'seo.pages.contacts.description', robots: 'noindex, nofollow' },
+            redirect: { path: '/saved-matches', query: { tab: 'contacts' } },
         },
         {
             path: '/login',

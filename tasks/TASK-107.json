@@ -1,0 +1,28 @@
+{
+  "key": "TASK-107",
+  "title": "Design-sync: actualizar cards 11-collection en Claude Design a 4 chips de filtro (paridad con la app)",
+  "description": "Decisión de Rafael 2026-07-13: los chips de filtro de Colección quedan en 4 (Todas/Colección/Disponible/Wishlist) como la app — el proto v2 muestra 5 (separa En venta/En cambio). Sincronizar Design→realidad: editar cranial-design/prototype/11-collection-desktop.html y 11-collection-mobile.html para mostrar los 4 chips reales con sus conteos verosímiles, y re-subir ambos cards a Claude Design vía DesignSync. GOTCHA operativo (memoria design-sync-pipeline): DesignSync SOLO existe en la sesión principal — los agentes pueden editar los HTML pero la subida (finalize_plan con deletes:[] + write_files) la hace el orquestador. Actualizar también la nota del card si menciona 5 estados.",
+  "acceptance_criteria": [
+    "11-collection-desktop.html y -mobile.html muestran 4 chips (Todas/Colección/Disponible/Wishlist)",
+    "Ambos cards re-subidos a Claude Design y verificados visualmente",
+    "mapping.json/notas coherentes con la decisión"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "design-sync",
+    "app-to-design",
+    "collection",
+    "v2-redesign"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-13T19:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

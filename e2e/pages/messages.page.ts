@@ -1,33 +1,37 @@
 import { ensureLoggedIn } from '../helpers/auth';
 import { type Page, type Locator } from '@playwright/test';
 
+// TASK-091 — Messages split-pane v2. No modal: the thread renders inline
+// (desktop right pane / mobile full-screen overlay), targeted via stable testids.
 export class MessagesPage {
   readonly page: Page;
   readonly conversationList: Locator;
   readonly searchInput: Locator;
+  // Zero-conversations state (account has no conversations at all) — distinct from the
+  // "no results match this filter" text inside the list, which only exists once the
+  // split-pane itself renders (i.e. conversations.length > 0).
   readonly emptyState: Locator;
+  readonly emptyStateCta: Locator;
+  readonly errorRetryButton: Locator;
 
-  // Chat modal
-  readonly chat: {
-    container: Locator;
+  readonly thread: {
     messageInput: Locator;
     sendButton: Locator;
-    messages: Locator;
-    closeButton: Locator;
+    backButton: Locator;
   };
 
   constructor(page: Page) {
     this.page = page;
-    this.conversationList = page.locator('[class*="border-silver-30"][class*="cursor-pointer"]');
-    this.searchInput = page.locator('input[type="text"]').first();
-    this.emptyState = page.locator('text=/no.*conversation|no.*mensaje/i');
+    this.conversationList = page.locator('[data-testid="messages-conv-item"]');
+    this.searchInput = page.locator('[data-testid="messages-search-input"]');
+    this.emptyState = page.locator('[data-testid="messages-empty-state"]');
+    this.emptyStateCta = page.locator('[data-testid="messages-empty-cta"]');
+    this.errorRetryButton = page.locator('[data-testid="messages-error-retry"]');
 
-    this.chat = {
-      container: page.locator('[class*="chat"], [class*="modal"]').last(),
-      messageInput: page.locator('input[type="text"], textarea').last(),
-      sendButton: page.getByRole('button', { name: /send|enviar|✓/ }).last(),
-      messages: page.locator('[class*="rounded"][class*="px-4"][class*="py-2"]'),
-      closeButton: page.locator('button:has(svg)').first(),
+    this.thread = {
+      messageInput: page.locator('[data-testid="messages-thread-input"]'),
+      sendButton: page.locator('[data-testid="messages-thread-send"]'),
+      backButton: page.locator('[data-testid="messages-thread-back"]'),
     };
   }
 
@@ -42,8 +46,8 @@ export class MessagesPage {
   }
 
   async sendMessage(text: string) {
-    await this.chat.messageInput.fill(text);
-    await this.chat.sendButton.click();
+    await this.thread.messageInput.fill(text);
+    await this.thread.sendButton.click();
   }
 
   async filterByUsername(username: string) {
@@ -52,5 +56,20 @@ export class MessagesPage {
 
   async getConversationCount(): Promise<number> {
     return this.conversationList.count();
+  }
+
+  /**
+   * Waits for Firestore data to settle into one of two mutually exclusive states:
+   * the search input (split-pane rendered, at least 1 conversation) or the
+   * zero-conversations empty state (account has none — search UI isn't rendered).
+   * Returns whether conversations are present, so callers can skip filter-dependent
+   * assertions on accounts with no conversations (e.g. a fresh CI test account).
+   */
+  async hasConversations(): Promise<boolean> {
+    await Promise.race([
+      this.searchInput.waitFor({ state: 'visible', timeout: 10_000 }),
+      this.emptyState.waitFor({ state: 'visible', timeout: 10_000 }),
+    ]).catch(() => {});
+    return !(await this.emptyState.isVisible());
   }
 }

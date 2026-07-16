@@ -7,8 +7,8 @@ import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import BaseButton from '../ui/BaseButton.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
+import IconV2 from '../ui/IconV2.vue'
 import type { DisplayDeckCard } from '../../types/deck'
 import type { CardCondition } from '../../types/card'
 
@@ -219,17 +219,29 @@ const handleClose = () => {
   selectedPrint.value = null
   emit('close')
 }
+
+// v2 redesign — quantity stepper controls (design→app v2 F4b, cranial-design/prototype/72-edit-deck-card-*.html).
+// Pure presentation on top of the existing form.quantity ref; no new logic/emits.
+const decQty = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- v-model.number can yield '' at runtime; the `number` type is a compile-time lie
+  form.value.quantity = Math.max(1, (Number(form.value.quantity) || 0) - 1)
+}
+const incQty = () => {
+  const max = isOwnedCard.value ? maxQuantityForOwned.value : 99
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- v-model.number can yield '' at runtime; the `number` type is a compile-time lie
+  form.value.quantity = Math.min(max, (Number(form.value.quantity) || 0) + 1)
+}
 </script>
 
 <template>
   <BaseModal :show="show" @close="handleClose" :close-on-click-outside="false">
-    <div class="space-y-6 w-full">
+    <div class="space-y-5 w-full">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">
           {{ isWishlistCard ? t('decks.editDeckCard.titleWishlist') : t('decks.editDeckCard.titleOwned') }}
         </h2>
-        <p class="text-small text-silver-70">
+        <p class="text-small text-silver-70 mt-1">
           <template v-if="isOwnedCard">
             {{ t('decks.editDeckCard.subtitleOwned') }}
           </template>
@@ -241,17 +253,17 @@ const handleClose = () => {
 
       <div v-if="card" class="space-y-4">
         <!-- Card Preview -->
-        <div class="flex gap-4">
+        <div class="flex flex-col md:flex-row gap-4">
           <!-- Image -->
-          <div class="flex-shrink-0">
+          <div class="flex-shrink-0 flex justify-center">
             <img
                 v-if="currentImage"
                 :src="currentImage"
                 :alt="card.name"
                 loading="lazy"
-                class="w-32 h-44 object-cover border border-silver-30"
+                class="w-32 aspect-[2/3] object-cover border border-line rounded-lg"
             />
-            <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
+            <div v-else class="w-32 aspect-[2/3] bg-surface-2 border border-line rounded-lg flex items-center justify-center">
               <span class="text-tiny text-silver-50">{{ t('decks.addToDeck.noImage') }}</span>
             </div>
           </div>
@@ -260,40 +272,41 @@ const handleClose = () => {
           <div class="flex-1 space-y-3">
             <div>
               <div class="flex items-center gap-2 mb-1">
-                <p class="font-bold text-silver text-h3">{{ card.name }}</p>
+                <p class="font-display font-bold text-silver text-h3">{{ card.name }}</p>
                 <span
                     v-if="isWishlistCard"
-                    class="px-2 py-0.5 text-tiny bg-amber-10 border border-amber text-amber"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-[rgba(212,168,67,.12)] text-gold"
                 >
+                  <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
                   WISHLIST
                 </span>
               </div>
               <!-- Multi-source prices -->
               <div class="mt-2 space-y-1">
-                <div class="flex justify-between items-center">
-                  <span class="text-tiny text-silver-70">CK:</span>
-                  <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
-                  <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
-                  <span v-else class="text-small text-silver-50">-</span>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-silver-50">CK:</span>
+                  <span v-if="hasCardKingdomPrices" class="font-display font-tnum text-neon font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                  <span v-else-if="loadingCKPrices" class="text-silver-50">...</span>
+                  <span v-else class="text-silver-50">-</span>
                 </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-tiny text-silver-70">TCG:</span>
-                  <span class="text-body text-silver">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-silver-50">TCG:</span>
+                  <span class="font-display font-tnum text-silver">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
                 </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-tiny text-silver-70">BL:</span>
-                  <span v-if="cardKingdomBuylist" class="text-body font-bold text-silver">{{ formatPrice(cardKingdomBuylist) }}</span>
-                  <span v-else class="text-small text-silver-50">-</span>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-silver-50">BL:</span>
+                  <span v-if="cardKingdomBuylist" class="font-display font-tnum text-silver font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
+                  <span v-else class="text-silver-50">-</span>
                 </div>
               </div>
             </div>
 
             <!-- Allocation info for owned cards -->
-            <div v-if="isOwnedCard && allocationSummary" class="p-2 bg-secondary border border-silver-30">
-              <p class="text-tiny text-silver-70 mb-1">{{ t('decks.editDeckCard.inYourCollection') }}</p>
+            <div v-if="isOwnedCard && allocationSummary" class="p-2.5 bg-surface-1 border border-line rounded-md">
+              <p class="text-[11px] font-bold uppercase tracking-[.08em] text-silver-30 mb-1">{{ t('decks.editDeckCard.inYourCollection') }}</p>
               <p class="text-small text-silver">
-                <span class="text-neon font-bold">{{ allocationSummary.owned }}</span> {{ t('decks.editDeckCard.copiesTotal', { qty: '' }).replace('{qty}', '') }}
-                <span class="font-bold">{{ allocationSummary.available }}</span> {{ t('decks.editDeckCard.available', { qty: '' }).replace('{qty}', '') }}
+                <span class="text-neon font-display font-tnum font-bold">{{ allocationSummary.owned }}</span> {{ t('decks.editDeckCard.copiesTotal', { qty: '' }).replace('{qty}', '') }}
+                <span class="font-display font-tnum font-bold">{{ allocationSummary.available }}</span> {{ t('decks.editDeckCard.available', { qty: '' }).replace('{qty}', '') }}
               </p>
               <div v-if="allocationSummary.allocations.length > 0" class="mt-1">
                 <p class="text-tiny text-silver-50">
@@ -307,88 +320,120 @@ const handleClose = () => {
 
             <!-- Print Selector -->
             <div v-if="availablePrints.length > 1">
-              <label for="edit-deck-card-print" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.editionPrint') }}</label>
-              <select
-                  id="edit-deck-card-print"
-                  :value="selectedPrint?.id"
-                  @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                  class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150"
-              >
-                <option
-                    v-for="print in availablePrints"
-                    :key="print.id"
-                    :value="print.id"
+              <label for="edit-deck-card-print" class="text-xs text-silver-70 font-semibold block mb-1.5">{{ t('decks.editDeckCard.editionPrint') }}</label>
+              <div class="relative">
+                <select
+                    id="edit-deck-card-print"
+                    :value="selectedPrint?.id"
+                    class="w-full appearance-none px-3 py-2 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+                    @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
                 >
-                  {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
-                </option>
-              </select>
-              <p class="text-tiny text-silver-50 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>
+                  <option
+                      v-for="print in availablePrints"
+                      :key="print.id"
+                      :value="print.id"
+                  >
+                    {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
+                  </option>
+                </select>
+                <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+              </div>
+              <p class="text-xs text-silver-30 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>
             </div>
-            <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('decks.editDeckCard.loadingPrints') }}</p>
+            <p v-else-if="loadingPrints" class="text-xs text-silver-50">{{ t('decks.editDeckCard.loadingPrints') }}</p>
             <p v-else class="text-small text-silver-70">{{ card.edition }}</p>
           </div>
         </div>
 
         <!-- Form Fields -->
-        <div class="bg-secondary border border-silver-30 p-4 space-y-4">
-          <div class="grid grid-cols-2 gap-4">
-            <!-- Quantity -->
-            <div>
-              <label for="edit-deck-card-quantity" class="text-tiny text-silver-70 block mb-1">
-                {{ isOwnedCard ? t('decks.editDeckCard.quantityAssigned') : t('decks.editDeckCard.quantityDesired') }}
-                <span v-if="isOwnedCard" class="text-neon">{{ t('decks.editDeckCard.maxQty', { max: maxQuantityForOwned }) }}</span>
-              </label>
+        <div class="bg-surface-1 border border-line rounded-lg p-4 space-y-4">
+          <!-- Quantity stepper -->
+          <div>
+            <label id="edit-deck-card-qty-lbl" for="edit-deck-card-quantity" class="text-xs text-silver-70 font-semibold block mb-1.5">
+              {{ isOwnedCard ? t('decks.editDeckCard.quantityAssigned') : t('decks.editDeckCard.quantityDesired') }}
+              <span v-if="isOwnedCard" class="text-neon">{{ t('decks.editDeckCard.maxQty', { max: maxQuantityForOwned }) }}</span>
+            </label>
+            <div class="inline-flex items-stretch bg-surface-2 border border-line rounded-md overflow-hidden" role="group" aria-labelledby="edit-deck-card-qty-lbl">
+              <button
+                  type="button"
+                  class="w-[44px] h-[44px] flex items-center justify-center text-silver-70 hover:text-neon transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-silver-70"
+                  :disabled="form.quantity <= 1"
+                  :aria-label="t('cards.addModal.decreaseQty')"
+                  @click="decQty"
+              >
+                <IconV2 name="minus" :size="16" />
+              </button>
               <input
                   id="edit-deck-card-quantity"
                   v-model.number="form.quantity"
                   type="number"
                   min="1"
                   :max="isOwnedCard ? maxQuantityForOwned : 99"
-                  class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150"
+                  class="no-spinner w-[56px] text-center bg-transparent border-x border-line font-display font-tnum text-[16px] font-semibold text-silver focus:outline-none"
               />
+              <button
+                  type="button"
+                  class="w-[44px] h-[44px] flex items-center justify-center text-silver-70 hover:text-neon transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-silver-70"
+                  :disabled="form.quantity >= (isOwnedCard ? maxQuantityForOwned : 99)"
+                  :aria-label="t('cards.addModal.increaseQty')"
+                  @click="incQty"
+              >
+                <IconV2 name="plus" :size="16" />
+              </button>
             </div>
+          </div>
 
-            <!-- Condition -->
-            <div>
-              <label for="edit-deck-card-condition" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.conditionLabel') }}</label>
-              <BaseSelect
+          <!-- Condition -->
+          <div>
+            <label for="edit-deck-card-condition" class="text-xs text-silver-70 font-semibold block mb-1.5">{{ t('decks.editDeckCard.conditionLabel') }}</label>
+            <div class="relative">
+              <select
                   id="edit-deck-card-condition"
                   v-model="form.condition"
-                  :options="conditionOptions"
-              />
+                  class="w-full appearance-none px-3 py-2 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+              >
+                <option v-for="opt in conditionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+              <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
             </div>
           </div>
 
-          <!-- Checkboxes -->
-          <div class="flex gap-6">
-            <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
-              <input v-model="form.foil" type="checkbox" class="w-4 h-4" />
-              <span class="text-small text-silver">{{ t('decks.editDeckCard.foilLabel') }}</span>
-            </label>
-          </div>
+          <!-- Foil -->
+          <button
+              type="button"
+              role="switch"
+              :aria-checked="form.foil"
+              class="w-full flex items-center justify-between gap-3.5 min-h-[46px] px-3.5 bg-surface-2 border border-line rounded-md"
+              @click="form.foil = !form.foil"
+          >
+            <span class="text-[14px] font-semibold text-silver">{{ t('decks.editDeckCard.foilLabel') }}</span>
+            <span
+                class="relative w-[44px] h-[26px] rounded-full border flex-shrink-0 transition-colors duration-200 ease-v2"
+                :class="form.foil ? 'bg-gold border-gold' : 'bg-surface-3 border-line'"
+            >
+              <span
+                  class="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2"
+                  :class="form.foil ? 'right-0.5' : 'left-0.5'"
+              ></span>
+            </span>
+          </button>
 
           <!-- Info message for owned cards -->
-          <p v-if="isOwnedCard" class="text-tiny text-silver-50 border-t border-silver-20 pt-3">
+          <p v-if="isOwnedCard" class="text-tiny text-silver-50 border-t border-line pt-3">
             {{ t('decks.editDeckCard.infoMessage') }}
           </p>
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="flex gap-3 pt-4 border-t border-silver-20">
-        <BaseButton class="flex-1" @click="handleSave">
-          {{ t('decks.editDeckCard.submit') }}
-        </BaseButton>
-        <BaseButton variant="secondary" class="flex-1" @click="handleClose">
+      <div class="flex gap-2 justify-end pt-4 border-t border-line">
+        <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="handleClose">
           {{ t('common.actions.cancel') }}
+        </BaseButton>
+        <BaseButton variant="filled" class="uppercase tracking-[.1em] !text-[12px]" @click="handleSave">
+          {{ t('decks.editDeckCard.submit') }}
         </BaseButton>
       </div>
     </div>
   </BaseModal>
 </template>
-
-<style scoped>
-.bg-amber-10 {
-  background-color: rgba(245, 158, 11, 0.1);
-}
-</style>

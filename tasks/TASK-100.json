@@ -1,0 +1,48 @@
+{
+  "key": "TASK-100",
+  "title": "Design→app v2 F4b: modales de deck/binder — NewDeck, AddToDeck, NewBinder, EditDeckCard, ManageDecks, Discovery",
+  "description": "Fuente de verdad: cards 62-new-deck, 63-add-to-deck, 64-new-binder, 72-edit-deck-card, 68-manage-decks, 67-discovery (d+m) + DESIGN-DIRECTION.md §5. Superficie: CreateDeckModal.vue, AddCardToDeckModal.vue, CreateBinderModal.vue, EditDeckCardModal.vue, ManageDecksModal.vue (título real 'ASIGNAR A MAZOS'), DiscoveryPanel/DiscoveryCard/DiscoveryAddConfirmModal. 6 flujos — evaluar split en 2 slices si el diff crece (~4 archivos por slice). Paralelismo deck↔binder respetado (Create* en el mismo cambio). Fondo modal #0d0d0f.",
+  "acceptance_criteria": [
+    "PRE-REFINAMIENTO: decidir si va en 1 o 2 slices",
+    "Los 6 flujos fieles a sus cards v2 (desktop y mobile)",
+    "Sin regresión en creación/edición/asignación y discovery; E2E verdes",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F4b",
+    "decks",
+    "binders"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-095"
+  ],
+  "linked_commits": [
+    "dd08589",
+    "6ad1d12"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-14 PRE-REFINAMIENTO resuelto: 1 slice. Justificacion: patron de reskin de modales ya establecido y shipped 2 veces (F5a 4 modales, F5b 4 modales), cero HIGH en ambos reviews; los 6 flujos son mecanicos con superficie disjunta de logica. Mitigacion: review FULL + E2E completo pre-push como siempre.",
+      "at": "2026-07-14T03:05:00.000Z"
+    },
+    {
+      "author": "orchestrator",
+      "body": "2026-07-16 CERRADO: E2E completo local verde (123 passed, 1 flake conocido search-autocomplete confirmado pasando en aislado), push a develop b4ff272..6ad1d12, CI run 29467500570 verde (build+e2e), v1.46.0 desplegada a cranial-trading-dev. Review previa: APPROVE-WITH-NOTES con fix Mali DiscoveryCard aplicado.",
+      "at": "2026-07-16T03:00:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-16T03:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

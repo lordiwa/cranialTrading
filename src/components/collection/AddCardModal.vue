@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import IconV2 from '../ui/IconV2.vue'
 import { useCollectionStore } from '../../stores/collection'
 import { useToastStore } from '../../stores/toast'
 import { useAuthStore } from '../../stores/auth'
@@ -210,6 +210,17 @@ const statusOptions = computed(() => [
   { value: 'wishlist', label: t('cards.addModal.statusOptions.wishlist') },
 ])
 
+// v2 redesign — status dot-badge tint classes (design→app v2 F5a, DESIGN-DIRECTION.md §5).
+// Same badge variant vocabulary as MatchDetailModal's badgeClasses(): collection=neutral
+// surface, sale=rust, trade=info, wishlist=gold.
+const STATUS_BADGE_CLASSES: Record<CardStatus, string> = {
+  collection: 'bg-surface-3 text-silver-70',
+  sale: 'bg-rust-10 text-[#C4553F]',
+  trade: 'bg-[rgba(96,165,250,.12)] text-[#60A5FA]',
+  wishlist: 'bg-[rgba(212,168,67,.12)] text-gold',
+}
+const statusBadgeClass = (status: CardStatus): string => STATUS_BADGE_CLASSES[status]
+
 // Show public checkbox only for sale/trade
 // Public option available for all statuses (default: true)
 const showPublicOption = computed(() => true)
@@ -231,6 +242,14 @@ const handleAddCard = async () => {
 
     const imageToSave = currentCardImage.value ?? ''
 
+    // Defensive coercion: v-model.number leaves form.quantity as '' when the user
+    // clears the stepper's number input, and the stepper's own +/- handlers relied
+    // on `+`/`-` operators that silently string-concatenate on a non-numeric value
+    // (e.g. '' + 1 → '1', then '1' + 1 → '11'). Compute one safe integer here and
+    // use it everywhere the submit path touches quantity, instead of raw form.quantity.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- v-model.number can yield '' at runtime; the `number` type is a compile-time lie
+    const safeQuantity = Math.max(1, Number(form.quantity) || 0)
+
     // SCRUM-35 bug #1: if user already has the SAME print (scryfallId+edition+condition+foil+status),
     // increment that row's quantity instead of creating a duplicate. Without this, repeated AddCardModal
     // adds left dupes that the deck grid rendered as separate xN entries instead of a single x(N+1).
@@ -244,7 +263,7 @@ const handleAddCard = async () => {
 
     let cardId: string | null
     if (existing) {
-      const ok = await collectionStore.updateCard(existing.id, { quantity: existing.quantity + form.quantity })
+      const ok = await collectionStore.updateCard(existing.id, { quantity: existing.quantity + safeQuantity })
       cardId = ok ? existing.id : null
     } else {
       cardId = await collectionStore.addCard({
@@ -252,7 +271,7 @@ const handleAddCard = async () => {
         name: cardName,
         edition: selectedPrint.value.set_name,
         setCode: selectedPrint.value.set,
-        quantity: form.quantity,
+        quantity: safeQuantity,
         condition: form.condition,
         foil: form.foil,
         status: form.status,
@@ -277,7 +296,7 @@ const handleAddCard = async () => {
       await decksStore.allocateCardToDeck(
         form.deckName,  // deckId
         cardId,
-        form.quantity,
+        safeQuantity,
         form.isInSideboard
       )
     }
@@ -287,7 +306,7 @@ const handleAddCard = async () => {
       await bindersStore.allocateCardToBinder(
         props.selectedBinderId,
         cardId,
-        form.quantity
+        safeQuantity
       )
     }
 
@@ -297,7 +316,7 @@ const handleAddCard = async () => {
         scryfallId: selectedPrint.value.id,
         name: cardName,
         type: 'BUSCO',
-        quantity: form.quantity,
+        quantity: safeQuantity,
         condition: form.condition,
         edition: selectedPrint.value.set_name,
         image: imageToSave,
@@ -423,30 +442,33 @@ const handleClose = () => {
   <BaseModal :show="show" @close="handleClose" :close-on-click-outside="false">
     <div class="space-y-4">
       <!-- Título -->
-      <h2 class="text-xl font-bold text-[#EEEEEE]">{{ t('cards.addModal.title') }}</h2>
+      <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('cards.addModal.title') }}</h2>
 
       <!-- Search Section (when no card pre-selected) -->
       <div v-if="!selectedPrint" class="space-y-4">
         <!-- Search Input -->
         <div ref="searchContainer" class="relative">
-          <input
-              v-model="searchQuery"
-              type="text"
-              :placeholder="t('cards.addModal.searchPlaceholder')"
-              class="w-full bg-primary border border-silver-30 px-3 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
-              @input="handleSearchInput"
-              @keyup.enter="performSearch"
-          />
+          <label class="flex items-center gap-2.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md transition-all duration-200 ease-v2 focus-within:border-neon focus-within:shadow-glow-neon">
+            <IconV2 name="search" :size="18" class="text-silver-30 flex-shrink-0" />
+            <input
+                v-model="searchQuery"
+                type="text"
+                :placeholder="t('cards.addModal.searchPlaceholder')"
+                class="flex-1 min-w-0 bg-transparent border-none outline-none text-silver placeholder:text-silver-30 text-small"
+                @input="handleSearchInput"
+                @keyup.enter="performSearch"
+            />
+          </label>
           <!-- Auto-suggest dropdown -->
           <div
               v-if="showSuggestions && suggestions.length > 0"
-              class="absolute top-full left-0 right-0 bg-primary border border-silver-30 mt-1 max-h-48 overflow-y-auto z-20 rounded"
+              class="absolute top-full left-0 right-0 bg-[#0d0d0f] border border-line-strong mt-1 max-h-48 overflow-y-auto z-20 rounded-md shadow-strong"
           >
             <div
                 v-for="suggestion in suggestions"
                 :key="suggestion"
                 @mousedown.prevent="selectSuggestion(suggestion)"
-                class="px-4 py-2 hover:bg-silver-10 cursor-pointer text-small text-silver border-b border-silver-30 transition-all"
+                class="px-4 py-2.5 hover:bg-surface-2 cursor-pointer text-small text-silver border-b border-line last:border-b-0 transition-colors"
             >
               {{ suggestion }}
             </div>
@@ -460,7 +482,7 @@ const handleClose = () => {
               size="small"
               @click="performSearch"
               :disabled="searching || !searchQuery.trim()"
-              class="flex-1"
+              class="flex-1 uppercase tracking-[.1em] !text-[12px]"
           >
             {{ searching ? t('common.actions.searching') : t('common.actions.search') }}
           </BaseButton>
@@ -479,7 +501,7 @@ const handleClose = () => {
               v-for="card in searchResults"
               :key="card.id"
               @click="selectSearchResult(card)"
-              class="relative group cursor-pointer rounded overflow-hidden border border-silver-30 hover:border-neon transition-colors"
+              class="relative group cursor-pointer rounded-md overflow-hidden border border-line hover:border-neon transition-colors"
           >
             <img
                 :src="card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small"
@@ -487,8 +509,8 @@ const handleClose = () => {
                 loading="lazy"
                 class="w-full aspect-[2/3] object-cover"
             />
-            <div class="absolute bottom-0 left-0 right-0 bg-primary/80 px-1 py-0.5">
-              <p class="text-tiny text-silver truncate">{{ card.name }}</p>
+            <div class="absolute bottom-0 left-0 right-0 bg-black/55 px-1.5 py-1">
+              <p class="text-tiny text-silver-70 truncate">{{ card.name }}</p>
             </div>
           </button>
         </div>
@@ -500,7 +522,7 @@ const handleClose = () => {
       </div>
 
       <!-- Datos de la carta (when card is selected) -->
-      <div v-else class="border border-[#EEEEEE]/30 p-4 space-y-4 rounded">
+      <div v-else class="bg-surface-1 border border-line p-4 space-y-4 rounded-lg">
         <!-- Imagen y Formulario - responsive: columna en móvil, fila en desktop -->
         <div class="flex flex-col md:flex-row gap-4 md:gap-6">
           <!-- IZQUIERDA: Imagen -->
@@ -510,40 +532,39 @@ const handleClose = () => {
               <button
                   v-if="currentCardImage"
                   @click="showZoom = true"
-                  class="relative group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded w-full"
+                  class="relative group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded-lg w-full"
               >
                 <img
                     :src="currentCardImage"
                     :alt="currentCardName"
                     loading="lazy"
-                    class="w-full aspect-[2/3] object-cover border border-[#EEEEEE]/20 rounded group-hover:border-neon transition-colors"
+                    class="w-full aspect-[2/3] object-cover border border-line rounded-lg group-hover:border-neon transition-colors"
                 />
-                <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
-                  <span class="text-tiny text-silver font-bold">🔍 Zoom</span>
+                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 rounded-lg">
+                  <IconV2 name="eye" :size="16" class="text-silver" />
+                  <span class="text-tiny text-silver font-bold">{{ t('cards.addModal.zoomHint') }}</span>
                 </div>
               </button>
-              <div v-else class="w-full aspect-[2/3] bg-[#333333] border border-[#EEEEEE]/20 flex items-center justify-center rounded">
-                <span class="text-[#EEEEEE]/50">{{ t('cards.detailModal.noImage') }}</span>
+              <div v-else class="w-full aspect-[2/3] bg-surface-2 border border-line flex items-center justify-center rounded-lg">
+                <span class="text-silver-50">{{ t('cards.detailModal.noImage') }}</span>
               </div>
 
               <!-- ✅ Botón toggle flotante en esquina (SOLO para split cards) -->
               <button
                   v-if="isSplitCard"
                   @click.stop="toggleCardFace"
-                  class="absolute top-2 right-2 bg-[#000000]/80 border-2 border-[#5AC168] p-2 hover:bg-[#5AC168]/20 transition-all rounded z-10"
+                  class="absolute top-2 right-2 bg-black/80 border border-neon p-2 hover:bg-neon-10 transition-all rounded-md z-10"
                   :title="`Ver lado ${cardFaceIndex === 0 ? 2 : 1}`"
                   :aria-label="t('common.aria.flipCard')"
               >
-                <svg class="w-5 h-5 text-[#5AC168]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
-                </svg>
+                <IconV2 name="swap" :size="18" class="text-neon" />
               </button>
             </div>
 
             <!-- Info bajo la imagen -->
             <div class="text-center w-full">
-              <p class="font-bold text-[#EEEEEE]">{{ currentCardName }}</p>
-              <p v-if="isSplitCard" class="text-xs text-[#5AC168] mt-1">
+              <p class="font-display font-bold text-silver">{{ currentCardName }}</p>
+              <p v-if="isSplitCard" class="text-xs text-neon mt-1">
                 {{ t('cards.addModal.splitCardSide', { current: cardFaceIndex + 1, total: selectedPrint?.card_faces?.length ?? 0 }) }}
               </p>
 
@@ -551,45 +572,48 @@ const handleClose = () => {
               <div class="mt-3 space-y-1">
                 <!-- Card Kingdom Price (primary) -->
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">CK:</span>
-                  <span v-if="hasCardKingdomPrices" class="text-neon font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
-                  <span v-else-if="loadingCKPrices" class="text-[#EEEEEE]/50">...</span>
-                  <span v-else class="text-[#EEEEEE]/50">-</span>
+                  <span class="text-silver-50">CK:</span>
+                  <span v-if="hasCardKingdomPrices" class="font-display font-tnum text-neon font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                  <span v-else-if="loadingCKPrices" class="text-silver-50">...</span>
+                  <span v-else class="text-silver-50">-</span>
                 </div>
                 <!-- TCGPlayer Price -->
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">TCG:</span>
-                  <span class="text-[#EEEEEE]/70">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
+                  <span class="text-silver-50">TCG:</span>
+                  <span class="font-display font-tnum text-silver-50">${{ selectedPrint?.prices?.usd ?? 'N/A' }}</span>
                 </div>
                 <!-- Buylist -->
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-[#EEEEEE]/70">BL:</span>
-                  <span v-if="cardKingdomBuylist" class="text-silver font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
-                  <span v-else class="text-[#EEEEEE]/50">-</span>
+                  <span class="text-silver-50">BL:</span>
+                  <span v-if="cardKingdomBuylist" class="font-display font-tnum text-silver font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
+                  <span v-else class="text-silver-50">-</span>
                 </div>
               </div>
 
               <!-- Print Selector -->
               <div v-if="availablePrints.length > 1" class="mt-3">
-                <label for="print-select" class="text-xs text-[#EEEEEE]/70 block mb-1">{{ t('cards.addModal.editionLabel') }}</label>
-                <select
-                    id="print-select"
-                    :value="selectedPrint?.id"
-                    @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                    class="w-full px-2 py-1 bg-[#000000] border border-[#EEEEEE]/30 text-[#EEEEEE] text-xs focus:outline-none focus:border-[#5AC168] focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
-                >
-                  <option
-                      v-for="print in availablePrints"
-                      :key="print.id"
-                      :value="print.id"
+                <label for="print-select" class="text-xs text-silver-70 font-semibold block mb-1.5">{{ t('cards.addModal.editionLabel') }}</label>
+                <div class="relative">
+                  <select
+                      id="print-select"
+                      :value="selectedPrint?.id"
+                      @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
+                      class="w-full appearance-none px-3 py-2 pr-8 bg-surface-1 border border-line text-silver text-xs rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
                   >
-                    {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
-                  </option>
-                </select>
-                <p class="text-xs text-[#EEEEEE]/50 mt-1">{{ t('cards.addModal.printsAvailable', { count: availablePrints.length }) }}</p>
+                    <option
+                        v-for="print in availablePrints"
+                        :key="print.id"
+                        :value="print.id"
+                    >
+                      {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
+                    </option>
+                  </select>
+                  <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+                </div>
+                <p class="text-xs text-silver-30 mt-1">{{ t('cards.addModal.printsAvailable', { count: availablePrints.length }) }}</p>
               </div>
-              <p v-else-if="loadingPrints" class="text-xs text-[#EEEEEE]/50 mt-2">{{ t('cards.editModal.loadingPrints') }}</p>
-              <p v-else class="text-xs text-[#EEEEEE]/70 mt-2">{{ selectedPrint?.set_name }}</p>
+              <p v-else-if="loadingPrints" class="text-xs text-silver-50 mt-2">{{ t('cards.editModal.loadingPrints') }}</p>
+              <p v-else class="text-xs text-silver-70 mt-2">{{ selectedPrint?.set_name }}</p>
             </div>
           </div>
 
@@ -597,77 +621,135 @@ const handleClose = () => {
           <div class="flex-1 space-y-4">
             <!-- Cantidad -->
             <div>
-              <label for="quantity" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.quantityLabel') }}</label>
-              <input
-                  id="quantity"
-                  v-model.number="form.quantity"
-                  type="number"
-                  min="1"
-                  class="w-full mt-1 bg-[#000000] border border-[#EEEEEE] text-[#EEEEEE] px-3 py-2 rounded"
-              />
+              <label id="qty-lbl" for="quantity" class="text-small font-semibold text-silver-70">{{ t('cards.addModal.quantityLabel') }}</label>
+              <div class="inline-flex items-stretch mt-1.5 bg-surface-1 border border-line rounded-md overflow-hidden" role="group" aria-labelledby="qty-lbl">
+                <button
+                    type="button"
+                    class="w-[46px] h-[46px] flex items-center justify-center text-silver-50 hover:text-neon transition-colors"
+                    :aria-label="t('cards.addModal.decreaseQty')"
+                    @click="form.quantity = Math.max(1, (Number(form.quantity) || 0) - 1)"
+                >
+                  <IconV2 name="minus" :size="16" />
+                </button>
+                <input
+                    id="quantity"
+                    v-model.number="form.quantity"
+                    type="number"
+                    min="1"
+                    class="no-spinner w-[56px] text-center bg-transparent border-x border-line font-display font-tnum text-[18px] font-semibold text-silver focus:outline-none"
+                />
+                <button
+                    type="button"
+                    class="w-[46px] h-[46px] flex items-center justify-center text-silver-50 hover:text-neon transition-colors"
+                    :aria-label="t('cards.addModal.increaseQty')"
+                    @click="form.quantity = (Number(form.quantity) || 0) + 1"
+                >
+                  <IconV2 name="plus" :size="16" />
+                </button>
+              </div>
             </div>
 
             <!-- Condición -->
             <div>
-              <label for="condition" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.conditionLabel') }}</label>
-              <BaseSelect
-                  id="condition"
-                  v-model="form.condition"
-                  :options="conditionOptions"
-                  class="mt-1"
-              />
-            </div>
-
-            <!-- Foil -->
-            <div class="flex items-center gap-2">
-              <input
-                  v-model="form.foil"
-                  type="checkbox"
-                  id="foil"
-                  class="w-4 h-4"
-              />
-              <label for="foil" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.foilLabel') }}</label>
-            </div>
-
-            <!-- Estado -->
-            <div>
-              <label for="status" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.statusLabel') }}</label>
-              <BaseSelect
-                  id="status"
-                  v-model="form.status"
-                  :options="statusOptions"
-                  class="mt-1"
-              />
-            </div>
-
-            <!-- Publicar en perfil (solo para sale/trade) -->
-            <div v-if="showPublicOption" class="flex items-center gap-2 p-3 bg-[#111111] border border-[#5AC168]/30 rounded">
-              <input
-                  v-model="form.public"
-                  type="checkbox"
-                  id="public"
-                  class="w-4 h-4"
-              />
-              <div>
-                <label for="public" class="text-sm text-[#EEEEEE] cursor-pointer">{{ t('cards.addModal.publishLabel') }}</label>
-                <p class="text-xs text-[#EEEEEE]/50">{{ t('cards.addModal.publishHint', { username: authStore.user?.username ?? '' }) }}</p>
+              <label class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('cards.addModal.conditionLabel') }}</label>
+              <div class="flex flex-wrap gap-2" role="group" :aria-label="t('cards.addModal.conditionLabel')">
+                <button
+                    v-for="opt in conditionOptions"
+                    :key="opt.value"
+                    type="button"
+                    class="min-h-[38px] px-3.5 rounded-full text-tiny font-bold border transition-all duration-200 ease-v2"
+                    :class="form.condition === opt.value
+                      ? 'text-neon bg-neon-10 border-neon-40'
+                      : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'"
+                    :aria-pressed="form.condition === opt.value"
+                    @click="form.condition = (opt.value as CardCondition)"
+                >
+                  {{ opt.value }}
+                </button>
               </div>
             </div>
 
+            <!-- Foil -->
+            <button
+                type="button"
+                role="switch"
+                :aria-checked="form.foil"
+                class="w-full flex items-center justify-between gap-3.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md"
+                @click="form.foil = !form.foil"
+            >
+              <span class="text-[14px] font-semibold text-silver">{{ t('cards.addModal.foilLabel') }}</span>
+              <span
+                  class="relative w-[44px] h-[26px] rounded-full border flex-shrink-0 transition-colors duration-200 ease-v2"
+                  :class="form.foil ? 'bg-neon border-neon' : 'bg-surface-3 border-line'"
+              >
+                <span
+                    class="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2"
+                    :class="form.foil ? 'right-0.5' : 'left-0.5'"
+                ></span>
+              </span>
+            </button>
+
+            <!-- Estado -->
+            <div>
+              <label class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('cards.addModal.statusLabel') }}</label>
+              <div class="flex flex-wrap gap-2" role="group" :aria-label="t('cards.addModal.statusLabel')">
+                <button
+                    v-for="opt in statusOptions"
+                    :key="opt.value"
+                    type="button"
+                    class="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ease-v2"
+                    :class="[statusBadgeClass(opt.value as CardStatus), form.status === opt.value ? 'opacity-100 shadow-[inset_0_0_0_1.5px_currentColor]' : 'opacity-55 hover:opacity-80']"
+                    :aria-pressed="form.status === opt.value"
+                    @click="form.status = (opt.value as CardStatus)"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Publicar en perfil -->
+            <button
+                v-if="showPublicOption"
+                type="button"
+                role="switch"
+                :aria-checked="form.public"
+                class="w-full flex items-center justify-between gap-3.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md text-left"
+                @click="form.public = !form.public"
+            >
+              <span>
+                <span class="block text-[14px] font-semibold text-silver">{{ t('cards.addModal.publishLabel') }}</span>
+                <span class="block text-xs text-silver-50 font-normal">{{ t('cards.addModal.publishHint', { username: authStore.user?.username ?? '' }) }}</span>
+              </span>
+              <span
+                  class="relative w-[44px] h-[26px] rounded-full border flex-shrink-0 transition-colors duration-200 ease-v2"
+                  :class="form.public ? 'bg-neon border-neon' : 'bg-surface-3 border-line'"
+              >
+                <span
+                    class="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2"
+                    :class="form.public ? 'right-0.5' : 'left-0.5'"
+                ></span>
+              </span>
+            </button>
+
             <!-- Deck (opcional) -->
             <div>
-              <label for="deck" class="text-sm text-[#EEEEEE]">{{ t('cards.addModal.assignDeck') }}</label>
-              <BaseSelect
-                  id="deck"
-                  v-model="form.deckName"
-                  :options="deckOptions"
-                  class="mt-1"
-              />
+              <label for="deck" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('cards.addModal.assignDeck') }}</label>
+              <div class="relative">
+                <select
+                    id="deck"
+                    v-model="form.deckName"
+                    class="w-full appearance-none px-3.5 py-2.5 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+                >
+                  <option v-for="opt in deckOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+                <IconV2 name="chev-d" :size="14" class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+              </div>
             </div>
 
             <!-- Board (MB/SB) — SCRUM-34: only when a deck is selected -->
             <div v-if="form.deckName">
-              <span class="text-sm text-[#EEEEEE] block mb-1">{{ t('cards.addModal.boardLabel') }}</span>
+              <span class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('cards.addModal.boardLabel') }}</span>
               <div class="flex gap-3" role="radiogroup" :aria-label="t('cards.addModal.boardLabel')">
                 <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
                   <input
@@ -679,7 +761,7 @@ const handleClose = () => {
                   />
                   <span class="text-sm text-silver">{{ t('cards.addModal.boardMainboard') }}</span>
                 </label>
-                <label class="flex items-center gap-2 cursor-pointer hover:text-amber transition-colors">
+                <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
                   <input
                       type="radio"
                       name="board"
@@ -696,11 +778,12 @@ const handleClose = () => {
       </div>
 
       <!-- Botones -->
-      <div class="flex gap-2 justify-end pt-4 border-t border-[#EEEEEE]/20">
-        <BaseButton variant="secondary" @click="handleClose">
+      <div class="flex gap-2 justify-end pt-4 border-t border-line">
+        <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="handleClose">
           {{ t('common.actions.cancel') }}
         </BaseButton>
-        <BaseButton @click="handleAddCard" :disabled="loading">
+        <BaseButton variant="filled" class="uppercase tracking-[.1em] !text-[12px] gap-2" @click="handleAddCard" :disabled="loading">
+          <IconV2 v-if="!loading" name="plus" :size="16" />
           {{ loading ? t('cards.addModal.submitting') : t('cards.addModal.submit') }}
         </BaseButton>
       </div>
@@ -725,9 +808,7 @@ const handleClose = () => {
             class="absolute top-4 right-4 text-silver hover:text-neon transition-colors p-2"
             :aria-label="t('common.aria.closeModal')"
         >
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+          <IconV2 name="x" :size="28" />
         </button>
         <p class="absolute bottom-4 left-1/2 -translate-x-1/2 text-silver-70 text-small">
           Click para cerrar

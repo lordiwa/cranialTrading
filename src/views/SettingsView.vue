@@ -8,7 +8,7 @@ import { useCollectionStore } from '../stores/collection';
 import { useDecksStore } from '../stores/decks';
 import { useMatchesStore } from '../stores/matches';
 import { useContactsStore } from '../stores/contacts';
-import { useI18n } from '../composables/useI18n';
+import { type SupportedLocale, useI18n } from '../composables/useI18n';
 import { useTour } from '../composables/useTour';
 import { formatDate } from '../utils/formatDate';
 import { cancelPriceFetch } from '../composables/useCollectionTotals';
@@ -26,8 +26,11 @@ const collectionStore = useCollectionStore();
 const decksStore = useDecksStore();
 const matchesStore = useMatchesStore();
 const contactsStore = useContactsStore();
-const { t, locale } = useI18n();
+const { t, locale, setLocale, getAvailableLocales } = useI18n();
 const { startTour, resetTour } = useTour();
+
+const languageOptions = getAvailableLocales();
+const languageLabels: Record<SupportedLocale, string> = { es: 'ES', en: 'EN', pt: 'PT' };
 
 const formattedCreatedAt = computed(() => formatDate(authStore.user?.createdAt, locale.value));
 
@@ -834,6 +837,29 @@ const handleRestartTour = () => {
         </div>
       </div>
 
+      <!-- Language selector -->
+      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
+        <div class="flex items-center justify-between">
+          <p class="text-small font-bold text-silver">{{ t('settings.language.title') }}</p>
+          <div class="inline-flex border border-silver-30 rounded overflow-hidden">
+            <button
+                v-for="lang in languageOptions"
+                :key="lang"
+                type="button"
+                @click="setLocale(lang)"
+                :class="[
+                  'px-3 py-1.5 text-tiny font-bold transition-colors',
+                  locale === lang
+                    ? 'bg-neon text-primary'
+                    : 'text-silver-50 hover:text-neon'
+                ]"
+            >
+              {{ languageLabels[lang] }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Restart Tour -->
       <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
         <div class="flex items-center justify-between">
@@ -870,7 +896,7 @@ const handleRestartTour = () => {
                 @click="handleDeleteAllData"
                 :disabled="deletingData"
             >
-              {{ deletingData ? t('common.actions.deleting') : t('common.actions.delete') }}
+              {{ deletingData ? t('common.actions.deleting') : t('settings.dangerZone.deleteData.button') }}
             </BaseButton>
           </div>
 

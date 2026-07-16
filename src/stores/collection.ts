@@ -689,6 +689,20 @@ export const useCollectionStore = defineStore('collection', () => {
             cardsById.set(cardId, updated)
         }
 
+        // Also patch the paginated grid — CollectionView renders paginatedCards
+        // (fed by the server-side card_index), not cards.value directly.
+        const paginatedIndex = paginatedCards.value.findIndex((c) => c.id === cardId)
+        // eslint-disable-next-line security/detect-object-injection
+        const existingPaginatedCard = paginatedCards.value[paginatedIndex]
+        const paginatedSnapshot = existingPaginatedCard ? { ...existingPaginatedCard } : null
+        if (paginatedIndex > -1 && existingPaginatedCard) {
+            const updatedPaginated = { ...existingPaginatedCard, ...updates, updatedAt: new Date() }
+            const newPaginated = [...paginatedCards.value]
+            // eslint-disable-next-line security/detect-object-injection
+            newPaginated[paginatedIndex] = updatedPaginated
+            paginatedCards.value = newPaginated
+        }
+
         try {
             // Strip undefined values — Firestore rejects them
             const cleanUpdates: Record<string, unknown> = {}
@@ -720,8 +734,11 @@ export const useCollectionStore = defineStore('collection', () => {
                 }
             }
 
-            // Refresh paginated view so the updated card reflects in the grid
-            refreshCurrentPage().catch(() => {})
+            // NOTE: no refreshCurrentPage() here (removed — see TASK-113).
+            // The optimistic patch above already keeps paginatedCards in sync;
+            // an immediate re-query would hit the server card_index before the
+            // debounced persistIndexToFirestore() (2s) has written, reading back
+            // the pre-update value and reverting the patch we just applied.
 
             return true
         } catch (error) {
@@ -732,6 +749,12 @@ export const useCollectionStore = defineStore('collection', () => {
                 rollbackCards[index] = snapshot
                 cards.value = rollbackCards
                 cardsById.set(cardId, snapshot)
+            }
+            if (paginatedIndex > -1 && paginatedSnapshot) {
+                const rollbackPaginated = [...paginatedCards.value]
+                // eslint-disable-next-line security/detect-object-injection
+                rollbackPaginated[paginatedIndex] = paginatedSnapshot
+                paginatedCards.value = rollbackPaginated
             }
             console.error('Error updating card:', error)
             toastStore.show(t('collection.messages.updateError'), 'error')
@@ -779,6 +802,25 @@ export const useCollectionStore = defineStore('collection', () => {
             // Update local state
             const updatedCards = applyLocalCardUpdates(cardIds, updates)
 
+            // Also patch the paginated grid — CollectionView renders paginatedCards
+            // (fed by the server-side card_index), not cards.value directly.
+            applyPaginatedCardUpdates(cardIds, updates)
+
+            // Sync index — batchUpdateCards previously never touched cardIndexRaw,
+            // leaving card_index (and therefore paginatedCards on reload) stale
+            // indefinitely. Single O(n+k) pass over cardIndexRaw (not per-card
+            // syncIndexLocal, which is O(n) findIndex + full-array copy EACH call —
+            // with select-all on a 59k-card index that's a guaranteed multi-second
+            // freeze / Mali crash). Same shape as batchDeleteCards' index rebuild.
+            if (updatedCards.length > 0) {
+                const updatedById = new Map(updatedCards.map(c => [c.id, c]))
+                cardIndexRaw.value = cardIndexRaw.value.map((ic) => {
+                    const updated = updatedById.get(ic.i)
+                    return updated ? cardToIndex(updated) : ic
+                })
+                persistIndexToFirestore()
+            }
+
             // Only sync cards that transition to/from public state
             const cardsToSync = getCardsNeedingPublicSync(updatedCards, previouslyPublicIds)
 
@@ -817,6 +859,22 @@ export const useCollectionStore = defineStore('collection', () => {
         }
         if (updatedCards.length > 0) cards.value = newCards
         return updatedCards
+    }
+
+    /**
+     * Apply the same patch to matching cards in paginatedCards (the array the
+     * collection grid actually renders). No-op for ids not on the current page.
+     */
+    const applyPaginatedCardUpdates = (cardIds: string[], updates: Partial<Card>): void => {
+        if (paginatedCards.value.length === 0 || cardIds.length === 0) return
+        const idSet = new Set(cardIds)
+        let changed = false
+        const newPaginated = paginatedCards.value.map((c) => {
+            if (!idSet.has(c.id)) return c
+            changed = true
+            return { ...c, ...updates, updatedAt: new Date() }
+        })
+        if (changed) paginatedCards.value = newPaginated
     }
 
     /**

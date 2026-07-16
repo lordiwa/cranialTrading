@@ -1,0 +1,55 @@
+{
+  "key": "TASK-090",
+  "title": "Design→app D2: Settings según proto — título \"Ajustes\", label \"Eliminar cuenta\", selector de idioma ES/EN/PT",
+  "description": "Origen: decisión de Rafael 2026-07-06 (alcance D2 confirmado explícitamente — es el ítem de más valor del design→app). Fuente de diseño: prototipo Claude Design — cards cranial-design/prototype/21-settings-*.html; auditoría cranial-design/audit/21-settings.md.\n\nTres cambios en la vista de Settings:\n1. Título de la pantalla: \"Ajustes\" (estilo proto) en vez de \"CONFIGURACIÓN\" — vía locales (los 3 idiomas: Settings/Ajustes/Configurações o el término que ya usen los locales, coherente con el proto).\n2. Label del botón de borrado: \"Eliminar cuenta\" como en el proto. ATENCIÓN semántica: la acción real borra los datos, NO la cuenta de auth. Mantener el texto descriptivo/confirmación explicando exactamente qué borra (no mentir al usuario); solo el label del botón adopta el término del proto. Si al implementarlo queda engañoso, proponer alternativa y marcar para decisión de Rafael en el reporte.\n3. SELECTOR DE IDIOMA ES/EN/PT (núcleo del ticket): el proto lo tiene y la app no, pero los 3 locales YA EXISTEN en src/locales/. Implementar: control en Settings (segmented/select estilo proto), cambio en vivo del locale de vue-i18n, persistencia de la preferencia (localStorage; si existe patrón de preferencias de usuario en Firestore, evaluar y decidir por el más simple — smallest change), aplicación al boot (respetar preferencia guardada; fallback al comportamiento actual de detección). \n\nTDD OBLIGATORIO para la lógica: helper/composable puro de resolución+persistencia de locale (leer/escribir preferencia, validar valores es|en|pt, fallback) con tests unitarios en RED primero. La parte visual (control en Settings) no requiere test.\n\ni18n: los literales nuevos del selector en en/es/pt en el mismo paso. NO tocar detección/carga existente de i18n más allá de lo mínimo (no romper lo que existe). NO COMMITEAR — Rafael verifica en local primero. NO async onMounted con await (regla crítica del proyecto).",
+  "acceptance_criteria": [
+    "Título de Settings según proto ('Ajustes' en es) vía locales en los 3 idiomas",
+    "Label del botón de borrado según proto ('Eliminar cuenta') sin engañar sobre lo que hace (confirmación/descripción exacta se mantiene)",
+    "Selector de idioma ES/EN/PT en Settings estilo proto: cambia el idioma en vivo, persiste la preferencia y se respeta al recargar/boot",
+    "Lógica pura de locale (validación es|en|pt, persistencia, fallback) con tests unitarios escritos en RED primero, todos verdes al cierre",
+    "Literales nuevos en en/es/pt en el mismo cambio",
+    "npm run test:unit verde y npx vite build OK; sin regresión en la detección de idioma actual para usuarios sin preferencia guardada"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "design-sync",
+    "ui",
+    "settings",
+    "i18n",
+    "design-to-app"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "e4e7000"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:18:41.030Z",
+      "body": "IMPLEMENTADO (dev, sin commits) — en review FULL (lógica tdd nueva). RED evidencia capturada (test file falla por import inexistente antes del helper; 8 tests escritos primero). GREEN: 8/8 helper + suite completa 1208/1208 + vue-tsc limpio + vite build 13.6s. Archivos: src/utils/localePreference.ts (NUEVO helper puro: isSupportedLocale/resolveLocale/SUPPORTED_LOCALES/DEFAULT_LOCALE), tests/unit/utils/localePreference.test.ts (NUEVO), src/composables/useI18n.ts (initI18n/getAvailableLocales delegan al helper; SupportedLocale re-exportado sin breaking changes), src/views/SettingsView.vue (tarjeta Idioma con segmented ES/EN/PT estilo proto + key nueva del botón de borrado), locales x3 (settings.title CONFIGURACIÓN→Ajustes / SETTINGS→Settings / CONFIGURAÇÕES→Configurações; +settings.language.title; +settings.dangerZone.deleteData.button 'Eliminar cuenta'/'Delete account'/'Excluir conta'). DESCUBRIMIENTO: ya existía selector de idioma en menú ayuda de AppHeader (setLocale + localStorage 'cranial_locale') — se REUTILIZÓ esa persistencia, solo se extrajo la validación inline a helper testeable; Settings y header comparten currentLocale reactivo (cambio en vivo cruzado). Boot sin regresión: saved==null → 'es' idéntico a antes, sin navigator.language (nunca la usó). E2E: orquestador verificó que ningún spec referencia el título de Settings. DECISIÓN PARA RAFAEL en UAT: botón dice 'Eliminar cuenta' (proto) pero el encabezado de la fila sigue 'Eliminar todos mis datos' + hint + modal precisos (la acción borra datos, NO la cuenta de auth) — si esa tensión resulta engañosa, se revierte solo el label del botón. common.actions.delete NO tocada (12 usos en 8 archivos)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:28:10.573Z",
+      "body": "REVIEW FULL: APPROVE-WITH-NITS (0 HIGH, 0 MEDIUM). Reviewer re-corrió los 3 gates: unit 1208/1208 (incl. 8 nuevos), vue-tsc limpio, vite build OK. AC 6/6 PASS verificados contra el diff real; regresión de initI18n descartada por análisis exhaustivo (inline viejo vs resolveLocale: comportamiento idéntico para todo string|null, sin trim/case/navigator). Consumidores OK (re-export de SupportedLocale; AppHeader/LoginView intactos; common.actions.delete intacta con sus 10 usos). Tier-audit: los 8 tests no vacuos, RED evidencia estructuralmente plausible (sin commit test-first porque la corrida es sin commits — evidencia en hand-off). LOWs anotados sin fix (fuera de scope): L1 getAvailableLocales devuelve SUPPORTED_LOCALES por referencia (sugerencia readonly/copy); L2 a11y mínima del segmented (sin aria-pressed). NITs: 3ª copia hardcodeada de labels ES/EN/PT (candidato a centralizar), promise de setLocale sin handler (patrón pre-existente), tensión de copy 'Eliminar cuenta' (decisión de Rafael, AC la sanciona). Pendiente: deploy a dev (orden de Rafael 2026-07-06) → verificación en dev."
+    },
+    {
+      "author": "uat",
+      "at": "2026-07-06T23:32:47.212Z",
+      "body": "UAT local de Rafael 2026-07-06: PASS global (\"ya lo probé me gusta\") tras correr npm run dev y revisar la app — incluye implícitamente el copy 'Eliminar cuenta' (la tensión de wording quedaba a su decisión; no objetó) y el selector de idioma en Settings. ACs técnicos (helper puro TDD, regresión de boot, i18n x3, gates) verificados por Developer+Reviewer FULL (APPROVE-WITH-NITS). Resultado global: PASS."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:53:00.042Z",
+      "body": "CERRADO. Settings según proto (título Ajustes, label Eliminar cuenta, selector idioma ES/EN/PT) shipped en commit e4e7000 (v1.39.0) pusheado a develop. Flujo tdd: RED evidencia capturada (8 tests fallando por módulo inexistente) → helper puro localePreference + wiring en SettingsView reusando setLocale/persistencia pre-existentes de useI18n → review FULL APPROVE-WITH-NITS (rúbrica: lógica tdd nueva fuerza full; regresión de boot descartada exhaustivamente) → UAT local de Rafael PASS (copy 'Eliminar cuenta' incluido) → gates finales verdes → deploy a dev vía CI. NITs abiertos no bloqueantes documentados en comentario del review (readonly SUPPORTED_LOCALES, aria-pressed, centralizar labels)."
+    }
+  ],
+  "created_at": "2026-07-06T23:05:01.328Z",
+  "updated_at": "2026-07-06T23:53:00.042Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

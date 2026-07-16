@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from '../../composables/useI18n';
-import { type SimpleMatch, useMatchesStore } from '../../stores/matches';
+import { type MatchCard, type MatchPreference, type SimpleMatch, useMatchesStore } from '../../stores/matches';
 import BaseModal from '../ui/BaseModal.vue';
 import BaseButton from '../ui/BaseButton.vue';
 import ChatModal from '../chat/ChatModal.vue';
-import BaseBadge from '../ui/BaseBadge.vue';
+import SvgIcon from '../ui/SvgIcon.vue';
+import IconV2 from '../ui/IconV2.vue';
 import UserProfileHoverCard from '../user/UserProfileHoverCard.vue';
 
 const props = defineProps<{
@@ -76,30 +77,74 @@ const getVisualFor = (obj: { type?: string; status?: string } | null | undefined
   if (obj.status) return STATUS_VISUALS[obj.status.toLowerCase()] ?? DEFAULT_VISUAL;
   return DEFAULT_VISUAL;
 };
+
+// v2 redesign — dot-badge tint classes (design→app v2 F2b, DESIGN-DIRECTION.md §5).
+// Same badge variant vocabulary as getVisualFor() above; only the rendering changed
+// from BaseBadge (v1 border pill) to a translucent-tint + dot pill, matching the
+// proto's badge-vendo/cambio/busco/deseado treatment for status chips inside a panel
+// (as opposed to the opaque-dark variant CollectionGridCardFull/MatchCard use over card art).
+const BADGE_CLASSES: Partial<Record<BadgeVariant, string>> = {
+  vendo: 'bg-rust-10 text-[#C4553F]',
+  cambio: 'bg-[rgba(96,165,250,.12)] text-[#60A5FA]',
+  busco: 'bg-neon-15 text-neon',
+  deseado: 'bg-[rgba(212,168,67,.12)] text-gold',
+};
+const badgeClasses = (variant: BadgeVariant): string => {
+  // eslint-disable-next-line security/detect-object-injection
+  return BADGE_CLASSES[variant] ?? 'bg-surface-3 text-silver-70';
+};
+
+// v2 redesign — swap layout (proto 75): a single "das/recibís" pair instead of the
+// old two-stacked-panels layout. VENDO = my card vs. their preference; BUSCO (else)
+// = my preference vs. their card. Same fields as before (myCard/otherPreference/
+// myPreference/otherCard), just read into one left/right pair for the shared template.
+const leftItem = computed<MatchCard | MatchPreference | null>(() => {
+  if (!props.match) return null;
+  return props.match.type === 'VENDO' ? (props.match.myCard ?? null) : (props.match.myPreference ?? null);
+});
+const rightItem = computed<MatchCard | MatchPreference | null>(() => {
+  if (!props.match) return null;
+  return props.match.type === 'VENDO' ? (props.match.otherPreference ?? null) : (props.match.otherCard ?? null);
+});
+const itemPrice = (item: MatchCard | MatchPreference | null): number | undefined =>
+  item && 'price' in item && item.price > 0 ? item.price : undefined;
 </script>
 
 <template>
   <BaseModal :show="show" @close="emit('close')">
     <div v-if="match" class="w-full max-w-md">
-      <h2 class="text-h2 font-bold text-silver mb-6">{{ t('matches.detailModal.title') }}</h2>
+      <p class="text-[11px] font-bold uppercase tracking-[.18em] text-neon mb-1">{{ t('matches.detailModal.kicker') }}</p>
+      <h2 class="font-display text-h2 font-bold text-silver mb-5">{{ t('matches.detailModal.title') }}</h2>
 
-      <div class="space-y-lg">
-        <!-- Usuario con hover preview -->
+      <div class="space-y-4">
+        <!-- Usuario -->
         <div
             @mouseenter="showHoverCard = true"
             @mouseleave="showHoverCard = false"
-            class="relative"
+            class="relative flex items-center gap-3 p-3 bg-surface-1 border border-line rounded-lg"
         >
-          <p class="text-small font-bold text-silver-70 mb-2">{{ t('matches.detailModal.user') }}</p>
-          <router-link
-              :to="`/@${match.otherUsername}`"
-              class="text-body text-neon hover:underline transition-fast font-bold"
+          <span class="w-10 h-10 rounded-full bg-neon-15 border border-neon-40 flex items-center justify-center text-neon font-display font-bold text-[15px] flex-shrink-0">
+            {{ match.otherUsername.charAt(0).toUpperCase() }}
+          </span>
+          <div class="min-w-0 flex-1">
+            <router-link
+                :to="`/@${match.otherUsername}`"
+                class="font-display font-bold text-neon hover:underline transition-fast block truncate"
+            >
+              @{{ match.otherUsername }}
+            </router-link>
+            <p v-if="match.otherLocation" class="flex items-center gap-1.5 text-tiny text-silver-50 mt-0.5">
+              <IconV2 name="user" :size="14" />
+              {{ match.otherLocation }}
+            </p>
+          </div>
+          <span
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide flex-shrink-0"
+              :class="badgeClasses(getVisualFor(match).badge)"
           >
-            @{{ match.otherUsername }}
-          </router-link>
-          <p v-if="match.otherLocation" class="text-small text-silver-50 mt-1">
-            📍 {{ match.otherLocation }}
-          </p>
+            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+            {{ getVisualFor(match).label }}
+          </span>
 
           <!-- Hover preview card -->
           <UserProfileHoverCard
@@ -108,116 +153,90 @@ const getVisualFor = (obj: { type?: string; status?: string } | null | undefined
           />
         </div>
 
-        <!-- Si es VENDO (otro user quiere mis cartas) -->
-        <div v-if="match.type === 'VENDO'">
-          <p class="text-small font-bold text-silver-70 mb-2">{{ t('matches.detailModal.youHave') }}</p>
-          <div v-if="match.myCard" :class="['bg-primary-dark p-md rounded', getVisualFor(match.myCard).border]">
-            <div class="flex gap-4">
-              <img v-if="match.myCard.image" :src="match.myCard.image" :alt="match.myCard.name" class="w-20 h-24 object-cover rounded" />
-              <div class="flex-1">
-                <div class="flex items-center justify-between">
-                  <p
-                      class="text-body font-bold"
-                      :class="getVisualFor(match.myCard).badge === 'busco'
-                        ? 'text-neon'
-                        : getVisualFor(match.myCard).badge === 'vendo'
-                          ? 'text-rust'
-                          : 'text-silver'"
-                  >
-                    {{ match.myCard.name }}
-                  </p>
-                  <BaseBadge :variant="getVisualFor(match.myCard).badge">
-                    {{ getVisualFor(match.myCard).label }}
-                  </BaseBadge>
-                </div>
-                <p class="text-small text-silver-70 mt-1">{{ match.myCard.edition }}</p>
-                <div class="flex gap-4 mt-3 text-tiny text-silver-50">
-                  <span>{{ t('matches.detailModal.qty') }}: {{ match.myCard.quantity }}</span>
-                  <span>{{ t('matches.detailModal.cond') }}: {{ match.myCard.condition }}</span>
-                </div>
-                <p v-if="match.myCard.price" class="text-small text-neon mt-2">
-                  $ {{ match.myCard.price }}
-                </p>
-              </div>
+        <!-- Das / Recibís -->
+        <div class="grid grid-cols-[1fr_auto_1fr] gap-3 items-start bg-surface-1 border border-line rounded-lg p-4">
+          <div class="flex flex-col gap-2 min-w-0">
+            <span class="text-[10px] font-bold uppercase tracking-[.12em] text-silver-30">
+              {{ match.type === 'VENDO' ? t('matches.detailModal.youHave') : t('matches.detailModal.youSearch') }}
+            </span>
+            <div class="relative aspect-[63/88] rounded-md border border-line overflow-hidden bg-gradient-to-br from-[#101c12] via-[#060a07] to-[#0c130d]">
+              <img
+                  v-if="leftItem?.image"
+                  :src="leftItem.image"
+                  :alt="leftItem.name"
+                  class="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
+            <div class="min-w-0">
+              <p class="text-[14px] font-bold text-silver truncate">{{ leftItem?.name }}</p>
+              <p class="text-tiny text-silver-50 mt-0.5 truncate">{{ leftItem?.edition }}</p>
+              <p v-if="itemPrice(leftItem)" class="font-display font-tnum text-neon text-[15px] mt-1">${{ itemPrice(leftItem) }}</p>
             </div>
           </div>
 
-          <p class="text-small font-bold text-silver-70 mt-4 mb-2">{{ t('matches.detailModal.wants') }}</p>
-          <div v-if="match.otherPreference" :class="['bg-primary-dark p-md rounded', getVisualFor(match.otherPreference).border]">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-body font-bold text-silver">{{ match.otherPreference.name }}</p>
-                <p class="text-small text-silver-70 mt-1">{{ match.otherPreference.edition }}</p>
-                <div class="flex gap-4 mt-3 text-tiny text-silver-50">
-                  <span>{{ t('matches.detailModal.qty') }}: {{ match.otherPreference.quantity }}</span>
-                  <span>{{ t('matches.detailModal.cond') }}: {{ match.otherPreference.condition }}</span>
-                </div>
-              </div>
-              <BaseBadge :variant="getVisualFor(match.otherPreference).badge">
-                {{ getVisualFor(match.otherPreference).label }}
-              </BaseBadge>
+          <IconV2 name="swap" :size="26" class="text-silver-30 mt-11 flex-shrink-0" />
+
+          <div class="flex flex-col gap-2 min-w-0">
+            <span class="text-[10px] font-bold uppercase tracking-[.12em] text-silver-30">
+              {{ match.type === 'VENDO' ? t('matches.detailModal.wants') : t('matches.detailModal.has') }}
+            </span>
+            <div class="relative aspect-[63/88] rounded-md border border-line overflow-hidden bg-gradient-to-br from-[#0d1626] via-[#060a12] to-[#0a1220]">
+              <img
+                  v-if="rightItem?.image"
+                  :src="rightItem.image"
+                  :alt="rightItem.name"
+                  class="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
+            <div class="min-w-0">
+              <p class="text-[14px] font-bold text-silver truncate">{{ rightItem?.name }}</p>
+              <p class="text-tiny text-silver-50 mt-0.5 truncate">{{ rightItem?.edition }}</p>
+              <p v-if="itemPrice(rightItem)" class="font-display font-tnum text-neon text-[15px] mt-1">${{ itemPrice(rightItem) }}</p>
             </div>
           </div>
         </div>
 
-        <!-- Si es BUSCO (otro user tiene mis preferencias) -->
-        <div v-else>
-          <p class="text-small font-bold text-silver-70 mb-2">{{ t('matches.detailModal.youSearch') }}</p>
-          <div v-if="match.myPreference" class="bg-primary-dark p-md rounded border border-silver-30">
-            <p class="text-body font-bold text-silver">{{ match.myPreference.name }}</p>
-            <p class="text-small text-silver-70 mt-1">{{ match.myPreference.edition }}</p>
-            <div class="flex gap-4 mt-3 text-tiny text-silver-50">
-              <span>{{ t('matches.detailModal.qty') }}: {{ match.myPreference.quantity }}</span>
-              <span>{{ t('matches.detailModal.cond') }}: {{ match.myPreference.condition }}</span>
-            </div>
-          </div>
-
-          <p class="text-small font-bold text-silver-70 mt-4 mb-2">{{ t('matches.detailModal.has') }}</p>
-          <div v-if="match.otherCard" :class="['bg-primary-dark p-md rounded', getVisualFor(match.otherCard).border]">
-            <div class="flex gap-4">
-              <img v-if="match.otherCard.image" :src="match.otherCard.image" :alt="match.otherCard.name" class="w-20 h-24 object-cover rounded" />
-              <div class="flex-1">
-                <div class="flex items-center justify-between">
-                  <p class="text-body font-bold text-neon">{{ match.otherCard.name }}</p>
-                  <BaseBadge :variant="getVisualFor(match.otherCard).badge">
-                    {{ getVisualFor(match.otherCard).label }}
-                  </BaseBadge>
-                </div>
-                <p class="text-small text-silver-70 mt-1">{{ match.otherCard.edition }}</p>
-                <div class="flex gap-4 mt-3 text-tiny text-silver-50">
-                  <span>{{ t('matches.detailModal.qty') }}: {{ match.otherCard.quantity }}</span>
-                  <span>{{ t('matches.detailModal.cond') }}: {{ match.otherCard.condition }}</span>
-                </div>
-                <p v-if="match.otherCard.price" class="text-small text-neon mt-2">
-                  $ {{ match.otherCard.price }}
-                </p>
-              </div>
-            </div>
+        <!-- Diferencia de valor -->
+        <div class="flex items-center justify-between gap-3 p-3 bg-surface-1 border border-line rounded-lg">
+          <span class="text-small text-silver-50">{{ t('matches.card.priceDifference') }}</span>
+          <div class="text-right">
+            <span
+                class="block font-display font-tnum text-[22px] font-bold"
+                :class="(match.valueDifference ?? 0) >= 0 ? 'text-neon' : 'text-[#C4553F]'"
+            >
+              {{ (match.valueDifference ?? 0) >= 0 ? '+' : '−' }}${{ Math.abs(match.valueDifference ?? 0).toFixed(0) }}
+            </span>
+            <span class="block text-[11px] font-bold uppercase tracking-[.06em] text-silver-30 mt-0.5">
+              {{ (match.valueDifference ?? 0) >= 0 ? t('matches.card.priceDiffFavor') : t('matches.card.priceDiffAgainst') }}
+            </span>
           </div>
         </div>
 
         <!-- Botones de acción -->
-        <div class="flex gap-3 mt-6 pt-4 border-t border-silver-30">
+        <div class="flex gap-3 pt-4 border-t border-line">
           <BaseButton
               variant="secondary"
-              class="flex-1"
+              class="flex-1 flex items-center justify-center gap-2"
               @click="emit('close')"
           >
+            <SvgIcon name="x-mark" size="tiny" />
             {{ t('common.actions.close') }}
           </BaseButton>
           <BaseButton
               v-if="!isMatchSaved"
-              class="flex-1"
+              class="flex-1 flex items-center justify-center gap-2"
               :disabled="isSaving"
               @click="handleSaveMatch"
           >
+            <SvgIcon name="star" size="tiny" />
             {{ isSaving ? t('common.actions.saving') : t('matches.actions.interested') }}
           </BaseButton>
           <BaseButton
               v-else
-              class="flex-1"
+              class="flex-1 flex items-center justify-center gap-2"
               @click="handleContact"
           >
+            <SvgIcon name="chat" size="tiny" />
             {{ t('matches.detailModal.contact') }}
           </BaseButton>
         </div>

@@ -18,9 +18,6 @@ export class CollectionPage {
     searchButton: Locator;
     resultCards: Locator;
     quantityInput: Locator;
-    conditionSelect: Locator;
-    statusSelect: Locator;
-    foilCheckbox: Locator;
     saveButton: Locator;
     cancelButton: Locator;
   };
@@ -29,7 +26,6 @@ export class CollectionPage {
   readonly editModal: {
     quantityInput: Locator;
     conditionSelect: Locator;
-    foilCheckbox: Locator;
     saveButton: Locator;
     cancelButton: Locator;
     deleteButton: Locator;
@@ -57,9 +53,9 @@ export class CollectionPage {
       searchButton: addModalContainer.getByRole('button', { name: /^search$|^buscar$/i }).first(),
       resultCards: addModalContainer.locator('.max-h-\\[300px\\] img'),
       quantityInput: addModalContainer.locator('input[type="number"]').first(),
-      conditionSelect: addModalContainer.locator('select').filter({ has: page.locator('option[value="NM"]') }),
-      statusSelect: addModalContainer.locator('select').filter({ has: page.locator('option[value="collection"]') }),
-      foilCheckbox: addModalContainer.locator('input[type="checkbox"]').first(),
+      // Condition/status pickers moved to chip/badge button groups in v2 (AddCardModal.vue,
+      // design→app v2 F5a) — no spec currently exercises them, so no locator is kept here.
+      // Foil checkbox → toggle switch; also unexercised by any spec.
       saveButton: addModalContainer.getByRole('button', { name: /^add$|agregar/i }),
       cancelButton: addModalContainer.getByRole('button', { name: /cancel|close|cerrar/i }),
     };
@@ -69,7 +65,9 @@ export class CollectionPage {
     this.editModal = {
       quantityInput: editModalContainer.locator('input[type="number"]').first(),
       conditionSelect: editModalContainer.locator('select').first(),
-      foilCheckbox: editModalContainer.locator('input[type="checkbox"]').first(),
+      // Foil is a hidden native checkbox styled as a switch (CardDetailModal.vue, design→app
+      // v2 F5b) — `input[type="checkbox"]` also matches the "publish to profile" checkbox in
+      // the same modal, and no spec exercises foil directly, so no locator is kept here.
       saveButton: editModalContainer.getByRole('button', { name: /save|guardar/i }),
       cancelButton: editModalContainer.getByRole('button', { name: /cancel|cancelar/i }),
       deleteButton: editModalContainer.getByRole('button', { name: /delete|eliminar/i }),

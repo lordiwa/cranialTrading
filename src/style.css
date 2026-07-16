@@ -39,6 +39,14 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/Fonts/Space-Grotesk/SpaceGrotesk-Variable.woff2') format('woff2');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -50,6 +58,17 @@
 
     html {
         @apply bg-primary text-silver font-sans;
+        /* Native form widgets (select popups, scrollbars, pickers) must render in
+           the browser's dark theme — without this Chrome paints the <select> option
+           list with the OS light theme (white bg) under our silver text. */
+        color-scheme: dark;
+    }
+
+    /* Fallback for engines that style <option> directly (Chromium on Windows):
+       explicit dark bg + readable text regardless of color-scheme support. */
+    select option {
+        background-color: #000000;
+        color: #EEEEEE;
     }
 
     body {
@@ -339,6 +358,47 @@
     .focus-visible {
         outline: 2px solid #5AC168;
         outline-offset: 2px;
+    }
+
+    /* v2 redesign utilities (design→app v2 F0) — foundation only, not yet applied to components */
+    .font-tnum {
+        font-feature-settings: 'tnum';
+    }
+
+    .sk {
+        position: relative;
+        overflow: hidden;
+        background-color: rgba(255, 255, 255, 0.07);
+    }
+
+    .sk::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+        animation: skeleton-shimmer 1.5s infinite;
+    }
+
+    @keyframes skeleton-shimmer {
+        100% { transform: translateX(100%); }
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .rise {
+        animation: rise 400ms cubic-bezier(0.2, 0.7, 0.3, 1);
+    }
+
+    @keyframes rise {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 }
 

@@ -19,7 +19,11 @@ export class PreferencesPage {
     searchInput: Locator;
     resultCards: Locator;
     quantityInput: Locator;
-    statusSelect: Locator;
+    // v2 redesign (design→app v2 F5a) replaced the native status <select> with a
+    // dot-badge chip group (role="group", each option an aria-pressed button) —
+    // see AddCardModal.vue. Target the WISHLIST chip by its accessible name; the
+    // word "Wishlist" appears in all 3 locale labels (en/es/pt).
+    statusChipWishlist: Locator;
     saveButton: Locator;
     cancelButton: Locator;
   };
@@ -36,7 +40,9 @@ export class PreferencesPage {
       searchInput: page.locator('input[placeholder*="earch"]').last(),
       resultCards: page.locator('.max-h-\\[300px\\] img'),
       quantityInput: page.locator('input[type="number"]').first(),
-      statusSelect: page.locator('select').filter({ has: page.locator('option[value="collection"]') }),
+      // Scoped to the modal overlay — an unscoped "wishlist" name match could also hit
+      // the WANTED status-filter button on the page behind the modal.
+      statusChipWishlist: page.locator('.fixed.inset-0.z-50').first().getByRole('button', { name: /wishlist/i }),
       saveButton: page.getByRole('button', { name: /^add$|agregar/i }),
       cancelButton: page.getByRole('button', { name: /cancel|close|cerrar/i }),
     };
@@ -68,7 +74,7 @@ export class PreferencesPage {
     await this.addModal.resultCards.first().click({ force: true });
     // Select "wishlist" status
     await this.page.waitForTimeout(500);
-    await this.addModal.statusSelect.selectOption('wishlist');
+    await this.addModal.statusChipWishlist.click();
     await this.addModal.saveButton.click();
   }
 }

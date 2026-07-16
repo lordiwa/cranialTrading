@@ -7,6 +7,7 @@ import { useI18n } from '../../composables/useI18n'
 import { useDiscoveryPanel } from '../../composables/useDiscoveryPanel'
 import DiscoveryCard from './DiscoveryCard.vue'
 import FilterPanel from '../search/FilterPanel.vue'
+import IconV2 from '../ui/IconV2.vue'
 
 interface DisplayDeckCardLike {
   scryfallId?: string
@@ -136,30 +137,30 @@ defineExpose({
 
 <template>
   <section
-    class="discovery-panel border-2 border-neon/40 bg-secondary/40 rounded mb-3"
+    class="discovery-panel border border-neon-40 bg-surface-1 rounded-lg mb-3"
     :aria-label="title"
     data-testid="discovery-panel"
   >
-    <header class="flex items-center justify-between gap-2 px-2 py-1.5 border-b border-neon/20">
+    <header class="flex items-center justify-between gap-2 px-3 py-2 border-b border-neon-15">
       <div class="flex items-baseline gap-2 min-w-0 flex-1">
         <h3 class="text-small font-bold text-neon whitespace-nowrap">{{ title }}</h3>
-        <p class="text-tiny text-silver/70 truncate" v-if="subtitle">{{ subtitle }}</p>
+        <p class="text-tiny text-silver-70 truncate" v-if="subtitle">{{ subtitle }}</p>
         <span
           v-if="panel.results.value.length > 0"
-          class="text-tiny text-silver/60 ml-auto shrink-0"
+          class="text-tiny font-display font-tnum text-silver-50 ml-auto shrink-0"
           data-testid="counter"
         >· {{ panel.results.value.length }}</span>
       </div>
       <div class="flex items-center gap-1 shrink-0">
         <button
           type="button"
-          class="text-silver/70 hover:text-neon text-small min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 px-1.5 flex items-center justify-center"
+          class="text-silver-70 hover:text-neon min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 px-1.5 flex items-center justify-center transition-colors"
           :aria-label="panel.collapsed.value ? t('discovery.panel.expand') : t('discovery.panel.collapse')"
           @click="onToggleCollapsed"
           data-testid="toggle-collapse"
         >
-{{ panel.collapsed.value ? '▾' : '▴' }}
-</button>
+          <IconV2 name="chev-d" :size="16" :class="['transition-transform duration-200 ease-v2', !panel.collapsed.value ? '-rotate-180' : '']" />
+        </button>
       </div>
     </header>
 
@@ -180,15 +181,15 @@ defineExpose({
         class="mb-2"
       />
 
-      <div v-if="panel.loading.value && panel.results.value.length === 0" class="text-silver/70 text-small py-4 text-center" data-testid="loading">
+      <div v-if="panel.loading.value && panel.results.value.length === 0" class="text-silver-70 text-small py-4 text-center" data-testid="loading">
         {{ t('discovery.panel.loading') }}
       </div>
 
-      <div v-else-if="panel.error.value" class="text-rust text-small py-4 text-center" data-testid="error">
+      <div v-else-if="panel.error.value" class="text-[#C4553F] text-small py-4 text-center" data-testid="error">
         {{ t('discovery.panel.error') }}
       </div>
 
-      <div v-else-if="panel.results.value.length === 0" class="text-silver/60 text-small py-4 text-center" data-testid="empty">
+      <div v-else-if="panel.results.value.length === 0" class="text-silver-50 text-small py-4 text-center" data-testid="empty">
         {{ panel.mode.value === 'version' ? t('discovery.panel.noResults') : t('discovery.panel.noFiltersResults') }}
       </div>
 
@@ -218,7 +219,7 @@ defineExpose({
         <div v-if="panel.hasMore.value" class="flex justify-center pt-3">
           <button
             type="button"
-            class="text-tiny font-bold px-3 py-1 rounded border border-neon text-neon hover:bg-neon hover:text-primary disabled:opacity-40 transition"
+            class="text-tiny font-bold uppercase tracking-[.08em] px-3.5 py-1.5 rounded-full border border-neon-40 text-neon hover:bg-neon hover:text-primary disabled:opacity-40 transition-all duration-200 ease-v2"
             :disabled="panel.loading.value"
             @click="onLoadMore"
             data-testid="load-more"

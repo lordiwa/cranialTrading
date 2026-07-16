@@ -1,0 +1,48 @@
+{
+  "key": "TASK-088",
+  "title": "Design→app D1a: toggles público/en-venta de binders como switch estilo iOS",
+  "description": "Origen: decisión de Rafael 2026-07-06 (\"convierte a la app en lo de design en lo que respecta a diseño\", alcance D1+D2 confirmado vía AskUserQuestion). Fuente de diseño: prototipo Claude Design / Figma — card cranial-design/prototype/14-binders-desktop.html y -mobile.html (toggles como switch iOS); reporte de auditoría cranial-design/audit/ grupo 14 (\"toggles como switch iOS vs botón-badge real\").\n\nCambiar el control de \"público\" y \"en venta\" del editor de binders de botón-badge a switch deslizante estilo iOS, replicando el look del prototipo (track redondeado, thumb circular, estado activo neon #5AC168), manteniendo EXACTAMENTE el comportamiento actual (mismos handlers, misma lógica, mismos estados).\n\nOJO paralelismo (Anti-Loop Rule 1/6): DeckEditorGrid.vue es COMPARTIDO entre DeckView y BinderView (prop binder-mode). El switch aplica SOLO al render de binder-mode; el modo deck no debe cambiar visualmente ni funcionalmente. Verificar dónde vive hoy el botón-badge (puede estar en BinderView.vue, DeckEditorGrid.vue o CollectionGridCard*) antes de tocar.\n\nUI/styling puro: sin lógica nueva. NO COMMITEAR — Rafael verifica en local primero. Accesibilidad: el switch mantiene role/aria del control actual (o role=\"switch\" + aria-checked).",
+  "acceptance_criteria": [
+    "Los toggles público/en-venta del editor de binders se ven como switch estilo iOS (track+thumb, activo neon) en desktop y mobile, fiel al card 14-binders del prototipo",
+    "El comportamiento es idéntico al actual: mismos eventos, misma persistencia, mismos estados iniciales",
+    "El modo deck de DeckEditorGrid NO cambia ni visual ni funcionalmente",
+    "Accesible: role switch o equivalente con aria-checked y focus visible",
+    "npm run test:unit verde y npx vite build OK; cero cambios de lógica en stores"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "ui",
+    "binders",
+    "design-to-app"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "e4e7000"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:14:35.425Z",
+      "body": "IMPLEMENTADO + REVIEW APPROVE (light; rúbrica: 1 archivo template ~38 líneas, sin superficie mandatory-FULL, tier uat-only). Cambio: src/views/BinderView.vue:641-678 — botón-badges Público/En venta → switches iOS (track 40x22, thumb 18x18, activo neon, role=switch + aria-checked, focus-visible ring), handlers/lógica/persistencia INTACTOS. Sin siblings (verificado por dev y reviewer: toggleBinderPublic/ForSale solo en BinderView; DeckEditorGrid intacto). Gates: unit 1208/1208 verde (dev + reviewer), vue-tsc limpio (reviewer), vite build OK 15.21s (dev). E2E: verificado por orquestador que ningún spec asierta sobre estos toggles. NITS del review (para UAT visual de Rafael): (1) thumb silver en vez del negro del proto — decisión del dev para legibilidad del estado off, cambiable a pixel-exacto; (2) se quitaron los emojis indicadores (coherente con proto). SIN COMMITEAR. PENDIENTE para cerrar: UAT local de Rafael (uat-only done-guard) → E2E centralizado → commit."
+    },
+    {
+      "author": "uat",
+      "at": "2026-07-06T23:32:40.927Z",
+      "body": "UAT local de Rafael 2026-07-06: PASS global (\"ya lo probé me gusta\") tras correr npm run dev y revisar la app. Cobertura de ACs: AC1 (switch iOS visible en binders) y AC4 (interacción del switch) verificados visualmente por Rafael en local; AC2 (comportamiento idéntico — handlers/persistencia intactos) y AC3 (modo deck intacto) verificados por Orquestador+Reviewer a pedido del flujo (cambio solo-template confirmado por diff); AC5 (gates) verificado por Orquestador (unit 1208/1208, build OK). Resultado global: PASS. Pendiente solo re-verificación en dev tras deploy (orden de Rafael: deploy a dev al terminar)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:52:52.010Z",
+      "body": "CERRADO. Switch iOS en toggles de binder shipped en commit e4e7000 (v1.39.0) pusheado a develop. Flujo completo: dev (solo template, handlers intactos) → review light APPROVE (0 findings; rúbrica: 1 archivo ~38 líneas, sin superficie mandatory-FULL) → UAT local de Rafael PASS ('ya lo probé me gusta') → gates finales re-corridos por orquestador (unit 1208/1208, build 13.4s, E2E 122 passed + flake de collection-filters descartado con re-run 5/5 en aislado) → deploy a dev vía CI."
+    }
+  ],
+  "created_at": "2026-07-06T23:04:18.458Z",
+  "updated_at": "2026-07-06T23:52:52.010Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

@@ -121,7 +121,8 @@
       "resumeError": "Error al resumir importación",
       "resumeFailed": "Importación de \"{name}\" falló. Limpiando…",
       "fetchingDataProgress": "Obteniendo datos: {current}/{total}…",
-      "savingProgress": "Guardando cartas: {current}/{total}…"
+      "savingProgress": "Guardando cartas: {current}/{total}…",
+      "doNotClose": "Procesando… No cierres esta ventana."
     },
     "aria": {
       "loading": "Cargando",
@@ -247,9 +248,13 @@
     "convertMessage": "Convertir {count} items en solicitudes de match con @{username}?",
     "convertSuccess": "{count} solicitudes enviadas!",
     "convertPartial": "{success} de {total} solicitudes enviadas",
-    "itemCount": "{count} item | {count} items",
+    "itemsFromLabel": "Cartas de",
+    "itemsSuffix": "items",
+    "emailInvalid": "Ingresá un correo válido (ej. nombre@correo.com)",
     "each": "c/u",
-    "qtyLabel": "Cant"
+    "qtyLabel": "Cant",
+    "decreaseQty": "Restar cantidad",
+    "increaseQty": "Sumar cantidad"
   },
 
   "landing": {
@@ -492,6 +497,17 @@
     "fab": {
       "addCard": "Agregar carta"
     },
+    "hero": {
+      "kicker": "MI VITRINA",
+      "value": "VALOR COLECCIÓN",
+      "cards": "CARTAS",
+      "forSale": "EN VENTA"
+    },
+    "badges": {
+      "vendo": "VENDO",
+      "cambio": "CAMBIO",
+      "deseado": "DESEADO"
+    },
     "filters": {
       "all": "TODAS",
       "owned": "TENGO",
@@ -677,7 +693,11 @@
       "submit": "AGREGAR",
       "submitting": "GUARDANDO…",
       "success": "✓ {name} agregada",
-      "splitCardSide": "Lado {current} de {total}"
+      "splitCardSide": "Lado {current} de {total}",
+      "decreaseQty": "Restar uno",
+      "increaseQty": "Sumar uno",
+      "zoomHint": "Ampliar",
+      "zoomCloseHint": "Click para cerrar"
     },
     "editModal": {
       "title": "EDITAR CARTA",
@@ -697,7 +717,6 @@
     "statusModal": {
       "title": "CAMBIAR STATUS",
       "subtitle": "Gestiona el estado de esta carta",
-      "prices": "Precios:",
       "loadingCKPrices": "Cargando precios CK…",
       "currentStatus": "Status actual:",
       "newStatus": "Nuevo status",
@@ -709,29 +728,21 @@
       },
       "statusInfo": {
         "collection": {
-          "icon": "✓",
-          "label": "COLECCIÓN",
           "description": "Cartas que tienes"
         },
         "sale": {
-          "icon": "💰",
-          "label": "VENTA",
           "description": "Cartas para vender"
         },
         "trade": {
-          "icon": "🔄",
-          "label": "CAMBIO",
           "description": "Cartas para trocar"
         },
         "wishlist": {
-          "icon": "⭐",
-          "label": "DESEADO",
           "description": "Cartas que buscas"
         }
       },
       "publishLabel": "Publicar en mi perfil",
       "publishHint": "Visible para otros usuarios en tu perfil público",
-      "submit": "✓ CAMBIAR"
+      "submit": "CAMBIAR"
     },
     "detailModal": {
       "title": "DETALLE DE CARTA",
@@ -907,6 +918,8 @@
       "inputPlaceholder": "https://moxfield.com/decks/… o 3 Arid Mesa…",
       "analyze": "ANALIZAR",
       "analyzing": "ANALIZANDO…",
+      "pasteDivider": "o pegá una lista",
+      "autoDetectHint": "Detecta Moxfield · lista de texto · CSV automáticamente",
       "moxfieldDetected": {
         "title": "Link de Moxfield detectado",
         "instruction": "Moxfield no permite importar directamente. Sigue estos pasos:",
@@ -916,8 +929,8 @@
         "step4": "Pega el texto aquí"
       },
       "preview": {
-        "total": "Total: {total} cartas",
-        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}"
+        "detail": "Mainboard: {mainboard} | Sideboard: {sideboard}",
+        "cardsLabel": "Cartas"
       },
       "options": {
         "conditionLabel": "Condición por defecto",
@@ -1089,11 +1102,12 @@
       "onlyAvailable": "Solo tienes {qty} copias disponibles"
     },
     "importResult": {
+      "kicker": "Import completo",
       "title": "RESULTADOS DE IMPORTACIÓN",
       "total": "TOTAL",
       "success": "EXITOSAS",
       "failed": "FALLIDAS",
-      "successRate": "Tasa de éxito:",
+      "rateLine": "{total} líneas procesadas · Tasa de éxito",
       "notFound": "CARTAS NO ENCONTRADAS",
       "confirmMessage": "¿Deseas agregar las",
       "correctCards": "{count} cartas correctas",
@@ -1205,18 +1219,45 @@
       "removeCommander": "Quitar Comandante",
       "edit": "Editar",
       "removeFromDeck": "Quitar del Mazo"
+    },
+    "hero": {
+      "kicker": "EDITOR DE MAZO"
+    },
+    "header": {
+      "confirmDeleteTitle": "¿Eliminar este mazo?",
+      "confirmDeleteMessage": "Se quitará «{name}» de tu cuenta. Las cartas vuelven a tu colección; esta acción no se puede deshacer.",
+      "confirmDeleteCta": "ELIMINAR MAZO",
+      "confirmDeleteCardsTitle": "¿Eliminar cartas también?",
+      "confirmDeleteCardsMessage": "SÍ = Eliminar mazo y cartas de la colección\nNO = Solo eliminar mazo (cartas permanecen)",
+      "confirmDeleteCardsYes": "SÍ, ELIMINAR CARTAS",
+      "confirmDeleteCardsNo": "NO, CONSERVAR",
+      "confirmRemoveCardTitle": "¿Eliminar del mazo?",
+      "confirmRemoveCardMessage": "¿Eliminar «{name}» del mazo?"
     }
   },
 
   "matches": {
-    "title": "MIS MATCHES",
-    "subtitle": "nuevos, enviados, guardados",
+    "title": "Matches",
     "tabs": {
-      "new": "NUEVOS",
-      "sent": "ENVIADOS",
-      "saved": "GUARDADOS",
-      "deleted": "ELIMINADOS",
-      "buyRequests": "SOLICITUDES"
+      "new": "Nuevos",
+      "sent": "Enviados",
+      "saved": "Guardados",
+      "deleted": "Eliminados",
+      "buyRequests": "SOLICITUDES",
+      "contacts": "CONTACTOS"
+    },
+    "primaryTabs": {
+      "matches": "MATCHES",
+      "nav": "Secciones de Matches"
+    },
+    "header": {
+      "kicker": "Tu vitrina de intercambios",
+      "newMatches": "Matches nuevos",
+      "potentialValue": "Valor potencial",
+      "activeTraders": "Traders activos"
+    },
+    "menu": {
+      "moreOptions": "Más opciones"
     },
     "buyRequests": {
       "empty": {
@@ -1277,7 +1318,9 @@
       "youReceiveAdvantage": "Tú recibes ventaja",
       "otherReceivesAdvantage": "El otro recibe ventaja",
       "bidirectional": "BIDIRECCIONAL",
-      "unidirectional": "→ UNIDIRECCIONAL"
+      "unidirectional": "→ UNIDIRECCIONAL",
+      "priceDiffFavor": "a tu favor",
+      "priceDiffAgainst": "en contra"
     },
     "actions": {
       "interested": "ME INTERESA",
@@ -1286,7 +1329,9 @@
       "contact": "CONTACTO",
       "completed": "COMPLETADO",
       "delete": "ELIMINAR",
-      "recover": "RECUPERAR"
+      "recover": "RECUPERAR",
+      "refresh": "ACTUALIZAR",
+      "refreshing": "ACTUALIZANDO…"
     },
     "contactModal": {
       "title": "VER CONTACTO",
@@ -1305,13 +1350,11 @@
     },
     "detailModal": {
       "title": "DETALLES DEL MATCH",
-      "user": "USUARIO",
+      "kicker": "Intercambio propuesto",
       "youHave": "TÚ TIENES",
       "wants": "QUIERE",
       "youSearch": "TÚ BUSCAS",
       "has": "TIENE",
-      "qty": "Cant",
-      "cond": "Cond",
       "contact": "CONTACTAR"
     },
     "savedCard": {
@@ -1356,22 +1399,36 @@
     "title": "MENSAJES",
     "subtitle": "conversaciones activas",
     "searchPlaceholder": "Buscar por usuario…",
+    "kicker": "BANDEJA",
+    "unreadLabel": "sin leer",
+    "send": "Enviar",
+    "viewProfile": "Ver perfil",
+    "time": {
+      "now": "ahora",
+      "minutesShort": "m",
+      "hoursShort": "h",
+      "daysShort": "d"
+    },
     "empty": {
       "noResults": "No se encontraron conversaciones",
       "noMessages": "No tienes mensajes aún",
-      "tryAnother": "Intenta con otro nombre",
-      "whenContact": "Cuando contactes usuarios, aparecerán aquí"
+      "whenContact": "Cuando contactes usuarios, aparecerán aquí",
+      "cta": "Ver mis matches"
     },
     "chat": {
       "title": "Chat con @{username}",
       "noMessages": "No hay mensajes aún. ¡Sé el primero en escribir!",
-      "inputPlaceholder": "Escribe un mensaje…"
+      "inputPlaceholder": "Escribe un mensaje…",
+      "selectPrompt": "Elegí una conversación para empezar a chatear",
+      "today": "Hoy",
+      "yesterday": "Ayer"
     },
     "errors": {
       "selfChat": "No puedes conversar contigo mismo",
       "createError": "Error al crear conversación",
       "sendError": "Error al enviar mensaje",
       "loadError": "Error al cargar conversaciones",
+      "loadErrorHint": "No pudimos cargar tus mensajes. Revisá tu conexión e intentá de nuevo.",
       "listenError": "Error al escuchar mensajes"
     }
   },
@@ -1394,7 +1451,7 @@
   },
 
   "settings": {
-    "title": "CONFIGURACIÓN",
+    "title": "Ajustes",
     "sections": {
       "emailVerification": {
         "title": "VERIFICACIÓN DE EMAIL",
@@ -1456,6 +1513,9 @@
       "success": "Avatar actualizado correctamente.",
       "error": "Error al cambiar el avatar. Intenta de nuevo."
     },
+    "language": {
+      "title": "Idioma"
+    },
     "restartTour": {
       "label": "Tour guiado",
       "hint": "Repite el tour de bienvenida que te muestra la plataforma.",
@@ -1466,6 +1526,7 @@
       "description": "Las acciones en esta sección son irreversibles. Procede con cuidado.",
       "deleteData": {
         "label": "Eliminar todos mis datos",
+        "button": "Eliminar cuenta",
         "hint": "Borra permanentemente cartas, mazos, matches y contactos.",
         "title": "¿Eliminar todos tus datos?",
         "message": "Esta acción eliminará permanentemente todas tus cartas, mazos, matches guardados y contactos. Esta acción NO se puede deshacer.",
@@ -1533,6 +1594,17 @@
       "moreOptions": "Más opciones",
       "statusLabel": "Estado"
     },
+    "confirmModal": {
+      "addingToSideboard": "Agregando al sideboard de {deck}.",
+      "addingToMainboard": "Agregando al mainboard de {deck}.",
+      "chooseCopy": "Elegí condición y foil para la copia nueva.",
+      "chooseCopies": "Elegí condición y foil para las {count} copias nuevas.",
+      "copiesLabel": "Copias",
+      "conditionLabel": "Condición",
+      "foilLabel": "Foil",
+      "cancel": "CANCELAR",
+      "submit": "AGREGAR"
+    },
     "bar": {
       "discoverButton": "DESCUBRIR MÁS",
       "discoverButtonShort": "DESCUBRIR"
@@ -1550,11 +1622,27 @@
 
   "search": {
     "view": {
-      "title": "BÚSQUEDA AVANZADA",
+      "title": "Buscar cartas",
+      "kicker": "Catálogo global",
       "backToCollection": "Volver",
       "inCollectionTitle": "En tu colección",
       "otherUsersTitle": "Otros usuarios venden o cambian",
-      "catalogTitle": "Catálogo de cartas"
+      "catalogTitle": "Catálogo de cartas",
+      "viewInCollection": "Ver en colección",
+      "addButton": "Agregar",
+      "toolbar": {
+        "sortLabel": "Ordenar",
+        "sortDefault": "Más reciente",
+        "sortPopular": "Popular",
+        "sortName": "Nombre",
+        "sortPriceAsc": "Precio: menor a mayor",
+        "sortPriceDesc": "Precio: mayor a menor",
+        "perPageLabel": "Por página",
+        "resultsRange": "{from}–{to} de {total}",
+        "prevPage": "Anterior",
+        "nextPage": "Siguiente",
+        "pageIndicator": "Página {page} de {totalPages}"
+      }
     },
     "owned": "x{count} tengo",
     "filterPanel": {
@@ -1574,6 +1662,7 @@
     "modal": {
       "title": "FILTROS AVANZADOS",
       "apply": "APLICAR FILTROS",
+      "activeFilters": "activos",
       "sections": {
         "colors": "Colores",
         "rarity": "Rareza",
@@ -1641,12 +1730,9 @@
 
   "notFound": {
     "title": "404",
-    "userNotFound": "Usuario no encontrado",
-    "message": "El usuario que buscas no existe o el perfil es privado.",
-    "backToDashboard": "VOLVER AL DASHBOARD",
-    "viewCollection": "VER MI COLECCIÓN",
-    "needHelp": "¿Necesitas ayuda?",
-    "contactUs": "Contáctanos desde configuración"
+    "heading": "Página no encontrada",
+    "message": "La página que buscas no existe o fue movida.",
+    "backHome": "VOLVER AL INICIO"
   },
 
   "legal": {
@@ -1777,6 +1863,7 @@
       "matchesFound": "Matches Encontrados",
       "recalculate": "Recalcular Matches",
       "sync": "Sincronizar Cartas",
+      "refreshMatches": "Actualizar Matches",
       "deleteData": "Eliminar Datos",
       "searchOthers": "Buscar en Otros Usuarios",
       "blockedUsers": "Usuarios Bloqueados",
@@ -1787,10 +1874,6 @@
       "importDeck": "Importar Mazo",
       "compatibility": "Compatibilidad",
       "matchType": "Tipo de Match",
-      "tabNew": "Nuevos Matches",
-      "tabSent": "Matches Enviados",
-      "tabSaved": "Matches Guardados",
-      "tabDeleted": "Matches Eliminados",
       "emailVerification": "Verificación de Email",
       "password": "Contraseña",
       "username": "Nombre de Usuario",
@@ -1816,6 +1899,7 @@
       "dashboard": {
         "recalculate": "Busca nuevos matches comparando tus cartas en venta/cambio con la wishlist de otros usuarios, y viceversa.",
         "sync": "Actualiza tus cartas públicas en el sistema para que otros usuarios puedan encontrarte en sus búsquedas.",
+        "refreshMatches": "Sincroniza tus cartas públicas y recalcula matches contra las colecciones y wishlists de otros usuarios.",
         "deleteData": "Elimina permanentemente todas tus cartas, mazos, preferencias y matches. Esta acción no se puede deshacer.",
         "searchOthers": "Busca cartas que otros usuarios tienen disponibles para venta o cambio. Si la encuentras, puedes expresar tu interés.",
         "matchesFound": "Cantidad de usuarios que tienen cartas que buscas, o buscan cartas que tienes.",
@@ -1835,11 +1919,7 @@
       "matches": {
         "compatibility": "Porcentaje que indica qué tan bien coinciden tus necesidades con las del otro usuario. Mayor % = mejor match.",
         "bidirectional": "Match bidireccional: ambos tienen algo que el otro busca. Ideal para intercambios directos.",
-        "unidirectional": "Match unidireccional: solo uno tiene lo que el otro busca. Puede requerir pago o negociación.",
-        "tabNew": "Matches recién calculados que aún no has revisado.",
-        "tabSent": "Matches donde expresaste interés. Esperando respuesta del otro usuario.",
-        "tabSaved": "Matches que guardaste para contactar después.",
-        "tabDeleted": "Matches eliminados. Se borran permanentemente después de 15 días."
+        "unidirectional": "Match unidireccional: solo uno tiene lo que el otro busca. Puede requerir pago o negociación."
       },
       "conditions": {
         "M": "Mint - Perfecta, como recién abierta del booster. Sin ningún defecto visible.",
@@ -2242,15 +2322,28 @@
       "submit": "CREAR",
       "cancel": "CANCELAR"
     },
+    "hero": {
+      "kicker": "EDITOR DE CARPETA"
+    },
     "header": {
       "delete": "ELIMINAR",
-      "confirmDelete": "¿Eliminar carpeta \"{name}\"?",
+      "confirmDeleteTitle": "¿Eliminar esta carpeta?",
+      "confirmDelete": "Se quitará «{name}» de tu cuenta. Las cartas vuelven a tu colección; esta acción no se puede deshacer.",
+      "confirmDeleteCta": "ELIMINAR CARPETA",
       "deleteCardsTitle": "¿Eliminar cartas también?",
       "deleteCardsMessage": "SÍ = Eliminar carpeta y cartas de la colección\nNO = Solo eliminar carpeta (cartas permanecen)",
       "deleteCardsConfirm": "SÍ, ELIMINAR CARTAS",
       "deleteCardsCancel": "NO, CONSERVAR",
+      "confirmRemoveCardTitle": "¿Eliminar de la carpeta?",
+      "confirmRemoveCardMessage": "¿Eliminar «{name}» de la carpeta?",
       "public": "PÚBLICA",
       "forSale": "EN VENTA"
+    },
+    "stats": {
+      "cards": "CARTAS",
+      "forSale": "EN VENTA",
+      "trade": "CAMBIO",
+      "value": "VALOR DE LA CARPETA"
     },
     "empty": "No hay cartas en esta carpeta aún. Busca y agrega cartas arriba.",
     "noBinders": "No tienes carpetas aún. Crea una para empezar a organizar tus cartas.",

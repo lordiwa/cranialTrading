@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue'
+import { resolveLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../utils/localePreference'
 
 // Tipo para los locales soportados
-export type SupportedLocale = 'es' | 'en' | 'pt'
+export type { SupportedLocale }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface LocaleMessages extends Record<string, string | LocaleMessages> {}
@@ -72,7 +73,7 @@ async function setLocale(newLocale: SupportedLocale): Promise<void> {
  * Obtiene todos los idiomas disponibles
  */
 function getAvailableLocales(): SupportedLocale[] {
-  return ['es', 'en', 'pt']
+  return SUPPORTED_LOCALES
 }
 
 /**
@@ -124,8 +125,8 @@ export function useI18n() {
  * Inicializa el idioma desde localStorage o usa el default
  */
 export async function initI18n(): Promise<void> {
-  const saved = localStorage.getItem('cranial_locale') as SupportedLocale | null
-  const lang = (saved && ['es', 'en', 'pt'].includes(saved)) ? saved : 'es'
+  const saved = localStorage.getItem('cranial_locale')
+  const lang = resolveLocale(saved)
   await loadLocale(lang)
   currentLocale.value = lang
   document.documentElement.lang = lang

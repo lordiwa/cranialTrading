@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
 import SvgIcon from './SvgIcon.vue'
+import IconV2 from './IconV2.vue'
 
 const { t } = useI18n()
 
@@ -90,12 +91,12 @@ defineExpose({
     <!-- sr-only live region for screen reader announcements (D-12, D-15) -->
     <span aria-live="polite" aria-atomic="true" class="sr-only">{{ ariaLiveMessage }}</span>
 
-    <!-- Search Input -->
-    <div class="relative">
+    <!-- Search Input (promoted header search — big, square, neon border) -->
+    <div class="flex items-stretch bg-primary border-[1.5px] border-neon/50 focus-within:border-neon transition-colors">
       <SvgIcon
         name="search"
         size="small"
-        class="absolute left-3 top-1/2 -translate-y-1/2 text-silver-50 pointer-events-none"
+        class="self-center ml-3 mr-1 text-neon pointer-events-none flex-shrink-0"
       />
       <input
         ref="inputRef"
@@ -109,7 +110,7 @@ defineExpose({
         :aria-activedescendant="activeDescendantId ?? undefined"
         :aria-label="t('header.search.placeholder')"
         :placeholder="t('header.search.placeholder')"
-        class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded transition-all"
+        class="flex-1 min-w-0 bg-transparent border-none px-2 py-2.5 text-body text-silver placeholder-silver-50 focus:outline-none"
         @input="handleInput"
         @focus="searchQuery.length >= 2 && (isOpen = true)"
         @keydown="handleInputKeydown"
@@ -118,20 +119,29 @@ defineExpose({
       <button
         v-if="searchQuery.length > 0"
         @click.stop="handleClearSearch"
-        class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+        class="self-center w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon"
         type="button"
         :aria-label="t('header.search.clearAriaLabel')"
       >
-        ✕
+        <IconV2 name="x" :size="16" />
       </button>
       <!-- Keyboard hint (shows when no text) — aria-hidden: decorative shortcut hint -->
-      <span
+      <kbd
         v-else
         aria-hidden="true"
-        class="absolute right-3 top-1/2 -translate-y-1/2 text-tiny text-silver-50 hidden lg:inline pointer-events-none"
+        class="self-center text-tiny text-silver-50 px-2 hidden lg:inline flex-shrink-0"
       >
         /
-      </span>
+      </kbd>
+      <div class="w-px bg-silver-20 my-2 hidden sm:block flex-shrink-0"></div>
+      <!-- BUSCAR button -->
+      <RouterLink
+        :to="searchQuery.length > 0 ? { path: '/search', query: { q: searchQuery } } : '/search'"
+        @click="isOpen = false"
+        class="flex items-center bg-neon text-primary font-bold text-tiny uppercase tracking-wide px-4 hover:bg-neon/90 transition-colors flex-shrink-0"
+      >
+        {{ t('header.nav.search') }}
+      </RouterLink>
     </div>
     <!-- Advanced search link -->
     <div class="flex justify-end mt-1">
@@ -147,7 +157,7 @@ defineExpose({
     <!-- Suggestions dropdown — name-only autocomplete (TASK-076) -->
     <div
       v-if="isExpanded"
-      class="absolute top-full right-0 mt-2 w-[320px] bg-primary border border-silver-30 rounded shadow-lg max-h-[70vh] overflow-hidden z-50"
+      class="absolute top-full left-0 right-0 mt-2 bg-primary border border-silver-30 rounded-none shadow-lg max-h-[70vh] overflow-hidden z-50"
     >
       <!-- Loading -->
       <div v-if="loading" class="p-4 text-center">

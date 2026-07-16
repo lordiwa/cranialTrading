@@ -1,0 +1,32 @@
+{
+  "key": "TASK-105",
+  "title": "Design→app v2 F9: páginas estáticas — about, contact, faq, guías, terms, privacy, cookies, 404",
+  "description": "Fuente de verdad: cards 30-about, 31-contact, 32-faq, 33-guide-card-conditions, 34-guide-how-to-trade, 35-terms, 36-privacy, 37-cookies, 38-not-found (d+m). Superficie: AboutView, ContactView, FaqView, CardConditionGuideView, HowToTradeGuideView, TermsView, PrivacyView, CookiesView, NotFoundView (9 views de contenido/plantilla). Pase tipográfico + capas v2 (kicker+display headings, surface-1 en paneles, botones v2). Son plantillas de contenido — bajo riesgo, un solo ticket. Mantener un solo <main id=\"main-content\"> por ruta (regla landmark). NotFound ya tuvo pase D1 en v1.39 — solo alinear a v2.",
+  "acceptance_criteria": [
+    "Las 9 páginas fieles a sus cards v2 (desktop y mobile)",
+    "SEO intacto: headings semánticos, meta/unhead sin cambios",
+    "i18n en/es/pt; gates verdes; E2E de páginas estáticas (si existen) verdes"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F9",
+    "static-pages"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-093"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-13T19:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

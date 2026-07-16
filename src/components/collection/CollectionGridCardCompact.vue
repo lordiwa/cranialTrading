@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCardPrices } from '../../composables/useCardPrices'
+import { useI18n } from '../../composables/useI18n'
 import type { Card } from '../../types/card'
 
 const props = withDefaults(defineProps<{
@@ -33,6 +34,8 @@ const emit = defineEmits<{
   addToCart: [card: Card]
   toggleSelect: [cardId: string]
 }>()
+
+const { t } = useI18n()
 
 // Ref for IntersectionObserver
 const compactCardRef = ref<HTMLElement | null>(null)
@@ -84,6 +87,23 @@ const hasImage = computed(() => {
   return img.length > 0 && img.startsWith('http')
 })
 
+// v2 redesign — status badge (dot + pill, DESIGN-DIRECTION.md §5). Pure CSS dot
+// (span, not svg) per the Mali GPU rule: this card is rendered inside a virtualized grid.
+// Semantics unchanged: sale/trade/wishlist get a badge, plain `collection` gets none.
+// Opaque dark base (not just a color tint) — the proto's 12-14% tint only reads on its
+// own flat placeholder background; over real card art/name-bars it was unreadable.
+const badgeMap: Record<string, { labelKey: string; classes: string }> = {
+  sale: { labelKey: 'collection.badges.vendo', classes: 'bg-[rgba(13,13,15,.85)] text-[#C4553F]' },
+  trade: { labelKey: 'collection.badges.cambio', classes: 'bg-[rgba(13,13,15,.85)] text-[#60A5FA]' },
+  wishlist: { labelKey: 'collection.badges.deseado', classes: 'bg-[rgba(13,13,15,.85)] text-gold' },
+}
+const badgeInfo = computed(() => {
+  // eslint-disable-next-line security/detect-object-injection
+  const entry = badgeMap[props.card.status]
+  if (!entry) return null
+  return { label: t(entry.labelKey), classes: entry.classes }
+})
+
 // Track image loading state for showing spinner overlay
 const imageLoaded = ref(false)
 const onImageLoad = () => { imageLoaded.value = true }
@@ -118,7 +138,16 @@ onUnmounted(() => {
 
 <template>
   <div ref="compactCardRef" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
-    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded">
+    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded-lg">
+      <!-- Status badge (v2 dot pill, DESIGN-DIRECTION.md §5) — sale/trade/wishlist only -->
+      <span
+          v-if="badgeInfo"
+          class="absolute top-1.5 left-1.5 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide shadow-[0_1px_5px_rgba(0,0,0,.45)]"
+          :class="badgeInfo.classes"
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+        {{ badgeInfo.label }}
+      </span>
       <template v-if="hasImage">
         <img
             :src="getCardImage(card)"
@@ -137,10 +166,10 @@ onUnmounted(() => {
         <span class="text-[12px] text-silver-30 text-center px-1 line-clamp-2">{{ card.name }}</span>
       </div>
 
-      <!-- Qty Badge - BIGGER for compact -->
-      <div class="absolute bottom-1 left-1 bg-primary/90 border border-neon px-2 py-1 rounded">
-        <p class="text-small font-bold text-neon">x{{ card.quantity }}</p>
-      </div>
+      <!-- Quantity plate (v2, DESIGN-DIRECTION.md §5) -->
+      <span class="absolute bottom-1.5 right-1.5 z-10 px-2 py-0.5 rounded bg-black/70 border border-line-strong font-display font-tnum text-[11px] font-bold text-silver">
+        x{{ card.quantity }}
+      </span>
     </div>
 
     <!-- Minimal Card Info -->
@@ -148,10 +177,10 @@ onUnmounted(() => {
       <p class="text-[14px] font-bold text-silver line-clamp-2 group-hover:text-neon transition-colors leading-tight">
         {{ card.name }}
       </p>
-      <p v-if="hasCardKingdomPrices" class="text-[14px] text-neon">{{ formatPrice(cardKingdomRetail) }} c/u</p>
-      <p v-else class="text-[14px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
-      <p v-if="hasCardKingdomPrices" class="text-[14px] text-neon font-bold">{{ formatPrice((cardKingdomRetail ?? 0) * card.quantity) }}</p>
-      <p v-else class="text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
+      <p v-if="hasCardKingdomPrices" class="font-display font-tnum text-[14px] text-neon">{{ formatPrice(cardKingdomRetail) }} c/u</p>
+      <p v-else class="font-display font-tnum text-[14px] text-silver-70">${{ card.price ? card.price.toFixed(2) : 'N/A' }} c/u</p>
+      <p v-if="hasCardKingdomPrices" class="font-display font-tnum text-[14px] text-neon font-bold">{{ formatPrice((cardKingdomRetail ?? 0) * card.quantity) }}</p>
+      <p v-else class="font-display font-tnum text-[14px] text-neon font-bold">${{ card.price ? (card.price * card.quantity).toFixed(2) : 'N/A' }}</p>
     </div>
   </div>
 </template>

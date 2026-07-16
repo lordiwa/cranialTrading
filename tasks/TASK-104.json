@@ -1,0 +1,33 @@
+{
+  "key": "TASK-104",
+  "title": "Design→app v2 F8: perfil público + Settings (pase v2) + welcome tour",
+  "description": "Fuente de verdad: cards 22-user-profile, 21-settings, 82-welcome-tour (d+m). Superficie: UserProfileView.vue, SettingsView.vue (pase v2 ENCIMA de lo shipped en D2/v1.39 — título Ajustes, selector idioma y Eliminar cuenta ya existen, solo restyle), WelcomeModal.vue + HelpCarouselModal.vue (useTour.ts solo si hay que ajustar selectores data-tour — NO tocar la lógica del tour ni el flag Firestore de onboarding). Nota: el grid del perfil público ya heredó los cards v2 de TASK-096 (componentes compartidos) — acá va el resto de la vista (header de perfil, filtros públicos).",
+  "acceptance_criteria": [
+    "Los 3 flujos fieles a sus cards v2 (desktop y mobile)",
+    "Sin regresión en perfil ajeno (filtros públicos — regresión SCRUM-65/67 vigilada), settings y tour de onboarding; E2E verdes",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F8",
+    "profile",
+    "settings"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-093"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-13T19:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

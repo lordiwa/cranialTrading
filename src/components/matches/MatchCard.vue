@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import ChatModal from '../chat/ChatModal.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
+import IconV2 from '../ui/IconV2.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { type MatchCard as MatchCardType, type SimpleMatch } from '../../stores/matches'
@@ -62,6 +63,27 @@ onMounted(async () => {
   }
 
   matchPrices.value = results
+})
+
+// v2 redesign — compact swap-set summary bar: mini "Das/Recibís" placeholders +
+// i-swap + tabular price diff (F2, DESIGN-DIRECTION.md §8.2). Reuses the exact
+// status→badge mapping already used for collection cards (collection.badges.*)
+// instead of inventing new vendo/cambio/deseado semantics.
+const badgeMap: Record<string, { labelKey: string; classes: string }> = {
+  sale: { labelKey: 'collection.badges.vendo', classes: 'bg-[rgba(13,13,15,.85)] text-[#C4553F]' },
+  trade: { labelKey: 'collection.badges.cambio', classes: 'bg-[rgba(13,13,15,.85)] text-[#60A5FA]' },
+  wishlist: { labelKey: 'collection.badges.deseado', classes: 'bg-[rgba(13,13,15,.85)] text-gold' },
+}
+
+const giveCard = computed(() => props.match.myCards?.[0])
+const receiveCard = computed(() => props.match.otherCards?.[0])
+
+const rowBadge = computed(() => {
+  const status = giveCard.value?.status
+  // eslint-disable-next-line security/detect-object-injection
+  const entry = status ? badgeMap[status] : undefined
+  if (!entry) return null
+  return { label: t(entry.labelKey), classes: entry.classes }
 })
 
 // TAB: NEW - Guardar match
@@ -154,32 +176,92 @@ const handleSaveContact = async () => {
 </script>
 
 <template>
-  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300 rounded-md bg-primary/80">
-    <!-- Header: Match Title + Compatibility -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-      <div>
-        <h3 class="text-h3 text-silver font-bold flex items-center gap-2">
-          {{ t('matches.card.header', { index: matchIndex, compatibility: match.compatibility ?? 0 }) }}
-          <HelpTooltip
-              :text="t('help.tooltips.matches.compatibility')"
-              :title="t('help.titles.compatibility')"
+  <div class="border border-silver-30 p-6 md:p-8 hover:border-neon-30 hover:shadow-lg transition-all duration-300 rounded-none bg-primary/80">
+    <!-- Meta: user + compatibility (compact — group header already shows @username) -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <p class="text-small text-silver-70 flex items-center gap-2">
+        <router-link
+            :to="`/@${match.otherUsername}`"
+            class="text-neon hover:underline font-bold inline-flex items-center gap-1"
+        >
+          <img
+              :src="getAvatarUrlForUser(match.otherUsername, 20, match.otherAvatarUrl)"
+              alt=""
+              class="w-5 h-5 rounded-full"
           />
-        </h3>
-        <p class="text-small text-silver-70 mt-1 flex items-center gap-2">
-          {{ t('matches.card.with', { username: '', location: match.otherLocation ?? '' }).split('@')[0] }}
-          <router-link
-              :to="`/@${match.otherUsername}`"
-              class="text-neon hover:underline font-bold inline-flex items-center gap-1"
+          @{{ match.otherUsername }}
+        </router-link>
+        <span v-if="match.otherLocation">• {{ match.otherLocation }}</span>
+      </p>
+      <p class="text-tiny text-silver-50 flex items-center gap-1">
+        {{ t('matches.card.header', { index: matchIndex, compatibility: match.compatibility ?? 0 }) }}
+        <HelpTooltip
+            :text="t('help.tooltips.matches.compatibility')"
+            :title="t('help.titles.compatibility')"
+        />
+      </p>
+    </div>
+
+    <!-- v2 redesign — swap-set summary bar: mini "Das/Recibís" + i-swap + tabular price diff -->
+    <div class="flex items-center gap-4 md:gap-5 mb-6">
+      <div class="w-16 md:w-[72px] flex-shrink-0">
+        <p class="text-[9px] md:text-[10px] font-bold uppercase tracking-[.12em] text-silver-30 mb-1.5">{{ t('matches.card.youOffer') }}</p>
+        <div class="relative aspect-[63/88] rounded-md border border-line overflow-hidden bg-gradient-to-br from-[#101c12] via-[#060a07] to-[#0c130d]">
+          <img
+              v-if="giveCard?.image?.startsWith('http')"
+              :src="giveCard.image"
+              alt=""
+              class="absolute inset-0 w-full h-full object-cover"
+          />
+          <span
+              v-if="(match.myCards?.length ?? 0) > 1"
+              class="absolute top-1 right-1 text-[9px] font-bold bg-black/70 text-silver-70 px-1 rounded"
+          >+{{ (match.myCards?.length ?? 1) - 1 }}</span>
+          <div class="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-1">
+            <p class="text-[9px] leading-tight text-silver-70 truncate">{{ giveCard?.name ?? t('matches.card.noSpecificCards') }}</p>
+          </div>
+        </div>
+      </div>
+      <IconV2 name="swap" :size="22" class="text-silver-30 flex-shrink-0" />
+      <div class="w-16 md:w-[72px] flex-shrink-0">
+        <p class="text-[9px] md:text-[10px] font-bold uppercase tracking-[.12em] text-silver-30 mb-1.5">{{ t('matches.card.youReceive') }}</p>
+        <div class="relative aspect-[63/88] rounded-md border border-line overflow-hidden bg-gradient-to-br from-[#0d1626] via-[#060a12] to-[#0a1220]">
+          <img
+              v-if="receiveCard?.image?.startsWith('http')"
+              :src="receiveCard.image"
+              alt=""
+              class="absolute inset-0 w-full h-full object-cover"
+          />
+          <span
+              v-if="(match.otherCards?.length ?? 0) > 1"
+              class="absolute top-1 right-1 text-[9px] font-bold bg-black/70 text-silver-70 px-1 rounded"
+          >+{{ (match.otherCards?.length ?? 1) - 1 }}</span>
+          <div class="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-1">
+            <p class="text-[9px] leading-tight text-silver-70 truncate">{{ receiveCard?.name ?? t('matches.card.noSpecificCards') }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ml-auto flex flex-col items-end gap-1.5">
+        <span
+            v-if="rowBadge"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-tiny font-bold uppercase tracking-wide"
+            :class="rowBadge.classes"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+          {{ rowBadge.label }}
+        </span>
+        <div class="text-right">
+          <span
+              class="block font-display font-tnum text-[16px] font-bold"
+              :class="(match.valueDifference ?? 0) >= 0 ? 'text-neon' : 'text-[#C4553F]'"
           >
-            <img
-                :src="getAvatarUrlForUser(match.otherUsername, 20, match.otherAvatarUrl)"
-                alt=""
-                class="w-5 h-5 rounded-full"
-            />
-            @{{ match.otherUsername }}
-          </router-link>
-          • 📍 {{ match.otherLocation }}
-        </p>
+            {{ (match.valueDifference ?? 0) >= 0 ? '+' : '−' }}${{ Math.abs(match.valueDifference ?? 0).toFixed(0) }}
+          </span>
+          <span class="block text-[10px] font-bold uppercase tracking-[.08em] text-silver-30">
+            {{ (match.valueDifference ?? 0) >= 0 ? t('matches.card.priceDiffFavor') : t('matches.card.priceDiffAgainst') }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -229,29 +311,13 @@ const handleSaveContact = async () => {
       </div>
     </div>
 
-    <!-- Price Difference -->
-    <div class="bg-silver-5 border border-silver-20 p-4 mb-6 rounded">
-      <div class="flex justify-between items-center">
-        <p class="text-small text-silver-70">{{ t('matches.card.priceDifference') }}</p>
-        <p :class="[
-          'text-h3 font-bold',
-          (match.valueDifference ?? 0) >= 0 ? 'text-neon' : 'text-silver-50'
-        ]">
-          {{ (match.valueDifference ?? 0) >= 0 ? '+' : '' }}${{ Math.abs(match.valueDifference ?? 0).toFixed(2) }}
-        </p>
-      </div>
-      <p class="text-tiny text-silver-70 mt-2">
-        {{ (match.valueDifference ?? 0) >= 0 ? t('matches.card.youReceiveAdvantage') : t('matches.card.otherReceivesAdvantage') }}
-      </p>
-    </div>
-
     <!-- Match Type Badge -->
     <div class="flex gap-2 mb-6 items-center">
-      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-sm">
+      <span v-if="match.type === 'BIDIRECTIONAL'" class="inline-flex items-center gap-2 bg-neon-10 border border-neon px-3 py-1 rounded-none">
         <SvgIcon name="check" size="tiny" />
         <p class="text-tiny font-bold text-neon">{{ t('matches.card.bidirectional') }}</p>
       </span>
-      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-sm">
+      <span v-else class="inline-block bg-silver-10 border border-silver-30 px-3 py-1 rounded-none">
         <p class="text-tiny font-bold text-silver-70">{{ t('matches.card.unidirectional') }}</p>
       </span>
       <HelpTooltip

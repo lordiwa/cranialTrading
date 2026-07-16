@@ -1,0 +1,51 @@
+{
+  "key": "TASK-089",
+  "title": "Design→app D1b: avatar-inicial en Contactos + página 404 genérica estilo guest",
+  "description": "Origen: decisión de Rafael 2026-07-06 (alcance D1 confirmado). Fuente de diseño: prototipo Claude Design — cards cranial-design/prototype/23-saved-contacts-*.html (avatar circular con INICIAL del username en vez de <img>) y 38-not-found-*.html (404 genérica \"Página no encontrada\", página guest centrada sin shell auth).\n\nDos retoques visuales independientes:\n1. CONTACTOS (tab Contactos del hub /saved-matches, post-RED-hub v1.38): las filas/cards de contacto muestran avatar circular con la inicial del username (fondo neutro, letra silver/neon) como en el proto, en lugar del <img> actual. Si hoy hay imagen real de perfil disponible, decisión: usar inicial SOLO como fallback cuando no hay imagen (no romper lo que existe — la inicial es el estilo, la imagen real sigue teniendo prioridad si existe).\n2. 404: la vista not-found adopta el diseño del proto: página centrada estilo guest sin shell auth, titular genérico \"Página no encontrada\" + botón de volver. OJO: hoy el 404 real dice \"Usuario no encontrado\" (posiblemente es UserProfileView para username inexistente, no la ruta catch-all). Investigar AMBOS casos: la ruta catch-all adopta el diseño genérico del proto; el caso usuario-inexistente puede conservar su mensaje específico dentro del nuevo layout.\n\ni18n: cualquier literal nuevo va a en.json + es.json + pt.json en el mismo paso (Anti-Loop Rule 3). NO COMMITEAR — Rafael verifica en local primero. NOTA de secuencia: este ticket toca locales — ejecutar DESPUÉS de TASK-090 (que también toca locales) para no pisarse.",
+  "acceptance_criteria": [
+    "Filas de contacto con avatar-inicial circular estilo proto (imagen real como prioridad si existe, inicial como estilo/fallback)",
+    "Ruta catch-all 404 con diseño guest centrado del proto: 'Página no encontrada' + botón volver, sin shell auth",
+    "El caso usuario-inexistente conserva su mensaje específico dentro del nuevo layout",
+    "Literales nuevos en en/es/pt en el mismo cambio",
+    "npm run test:unit verde y npx vite build OK"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "ui",
+    "contacts",
+    "404",
+    "design-to-app"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-090"
+  ],
+  "linked_commits": [
+    "e4e7000"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "uat",
+      "at": "2026-07-06T23:32:44.600Z",
+      "body": "UAT local de Rafael 2026-07-06: PASS global (\"ya lo probé me gusta\") tras correr npm run dev y revisar la app. Cobertura de ACs: AC1 (avatar-inicial en contactos) y AC2 (404 guest centrada) verificados visualmente por Rafael en local; AC3 (usuario-inexistente intacto — UserProfileView sin tocar) verificado por Orquestador por diff a pedido del flujo; AC4 (i18n x3) y AC5 (gates: unit 1208/1208, build 11.69s) verificados por Developer+Orquestador. Resultado global: PASS. Review independiente en curso al momento de este UAT; cualquier finding HIGH posterior reabre."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:34:41.088Z",
+      "body": "REVIEW light: APPROVE-WITH-NITS (0 HIGH, 0 MEDIUM). Reviewer re-corrió unit 1208/1208 + vue-tsc + vite build (15.9s), todos verdes. Verificado contra diff real: SavedContactCard es el ÚNICO card de contacto (sin siblings); catch-all a nivel raíz del router SIN layout padre que meta shell (App.vue usa RouterView directo) — quitar AppContainer del componente basta; main#main-content mantiene el landmark + skip-link; UserProfileView intacto (namespace profile.notFound.* distinto); keys viejas borradas sin consumidores restantes ni locators E2E; clases Tailwind nuevas existen todas en config. FIXES A APLICAR post-E2E (dev-089, dentro del scope del ticket): (1) LOW hardening: contact.username?.charAt(0) ?? '' — un doc legacy sin username lanzaría y rompería el render de toda la lista (el código viejo degradaba sin crashear); (2) NIT copy: es.json notFound.message 'buscás'→'buscas' (única forma voseo entre 49 tuteos). E2E en curso: 53/131 verdes al momento del comentario, incl. los 5 specs de contacts."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-06T23:52:55.314Z",
+      "body": "CERRADO. Avatar-inicial en contactos + 404 genérica guest shipped en commit e4e7000 (v1.39.0) pusheado a develop. Flujo: dev (SavedContactCard + NotFoundView + locales x3, UserProfileView intacto) → review light APPROVE-WITH-NITS → fixes aplicados (hardening username?.charAt(0) ?? '' contra docs legacy; 'buscás'→'buscas') → UAT local de Rafael PASS → gates finales verdes (unit 1208/1208, build, E2E 122+5) → deploy a dev vía CI."
+    }
+  ],
+  "created_at": "2026-07-06T23:04:36.735Z",
+  "updated_at": "2026-07-06T23:52:55.314Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

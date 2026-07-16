@@ -14,8 +14,7 @@ import { buildOriginalBinderSlots, computeBinderSlotOps } from '../../utils/bind
 import { type CardIdentity, computeStatusOperations } from '../../utils/cardSaveDiff'
 import { buildOriginalSlots, computeDeckSlotOps, type DeckSlot } from '../../utils/deckSlotDiff'
 import BaseButton from '../ui/BaseButton.vue'
-import SvgIcon from '../ui/SvgIcon.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
+import IconV2 from '../ui/IconV2.vue'
 import BaseModal from '../ui/BaseModal.vue'
 import type { Card, CardCondition, CardStatus } from '../../types/card'
 
@@ -704,139 +703,136 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
     <div class="space-y-5 w-full max-w-xl">
       <!-- Title -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('cards.detailModal.title') }}</h2>
-        <p class="text-small text-silver-70">{{ t('cards.detailModal.subtitle') }}</p>
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('cards.detailModal.title') }}</h2>
+        <p class="text-small text-silver-50 mt-1">{{ t('cards.detailModal.subtitle') }}</p>
       </div>
 
       <!-- Card Preview -->
-      <div v-if="card" class="flex flex-col sm:flex-row gap-4">
+      <div v-if="card" class="flex flex-col sm:flex-row gap-5">
         <!-- Image (clickable for zoom) -->
         <div class="flex-shrink-0 mx-auto sm:mx-0">
           <button
               v-if="currentImage"
               @click="showZoom = true"
-              class="relative group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
+              class="relative group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded-lg block w-[130px] sm:w-[150px]"
           >
             <img
                 :src="currentImage"
                 :alt="card.name"
                 loading="lazy"
-                class="w-28 sm:w-32 aspect-[2/3] object-cover border border-silver-30 rounded group-hover:border-neon transition-colors"
+                class="w-full aspect-[2/3] object-cover border border-line rounded-lg group-hover:border-neon transition-colors"
             />
-            <div class="absolute inset-0 bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
-              <span class="text-tiny text-silver font-bold">🔍 Zoom</span>
-            </div>
+            <span class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 text-tiny text-silver-70 bg-black/60 border border-line rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+              <IconV2 name="eye" :size="14" />{{ t('cards.addModal.zoomHint') }}
+            </span>
             <!-- Flip button for dual-faced cards -->
             <button
                 v-if="isSplitCard"
                 @click.stop="toggleCardFace"
-                class="absolute top-1 left-1 bg-primary/90 border border-neon px-1.5 py-0.5 hover:bg-neon/20 transition-all rounded z-10"
+                class="absolute top-2 left-2 bg-black/80 border border-neon p-1.5 hover:bg-neon-10 transition-all rounded-md z-10"
                 :title="t('cards.grid.flipTitle')"
             >
-              <SvgIcon name="flip" size="tiny" />
+              <IconV2 name="swap" :size="16" class="text-neon" />
             </button>
           </button>
-          <div v-else class="w-28 sm:w-32 aspect-[2/3] bg-primary border border-silver-30 flex items-center justify-center rounded">
+          <div v-else class="w-[130px] sm:w-[150px] aspect-[2/3] bg-surface-2 border border-line flex items-center justify-center rounded-lg">
             <span class="text-tiny text-silver-50">{{ t('cards.detailModal.noImage') }}</span>
           </div>
         </div>
 
         <!-- Info -->
-        <div class="flex-1 space-y-3">
-          <div>
-            <p class="font-bold text-silver text-h3">{{ card.name }}</p>
-            <p v-if="cardTypeLine" class="text-tiny text-silver-50 mt-0.5">{{ cardTypeLine }}</p>
+        <div class="flex-1 min-w-0">
+          <p class="font-display text-h3 font-bold text-silver">{{ card.name }}</p>
+          <p v-if="cardTypeLine" class="text-small text-silver-50 mt-0.5">{{ cardTypeLine }}</p>
 
-            <!-- Multi-source prices -->
-            <div class="mt-2 space-y-1">
-              <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">CK:</span>
-                <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
-                <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
-                <span v-else class="text-small text-silver-50">-</span>
+          <!-- Multi-source prices -->
+          <div class="flex items-baseline gap-4 flex-wrap mt-3.5">
+            <div class="flex flex-col">
+              <span class="text-tiny uppercase tracking-wide text-silver-50">Card Kingdom</span>
+              <span v-if="hasCardKingdomPrices" class="font-display font-tnum text-[26px] sm:text-[30px] font-bold text-neon leading-none">{{ formatPrice(cardKingdomRetail) }}</span>
+              <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
+              <span v-else class="text-small text-silver-50">-</span>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <div class="flex gap-2 items-baseline">
+                <span class="text-tiny uppercase text-silver-50 min-w-[46px]">TCG</span>
+                <span class="font-display font-tnum text-small font-semibold text-silver-70">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
               </div>
-              <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">TCG:</span>
-                <span class="text-body text-silver">${{ (props.card?.price ?? 0).toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-tiny text-silver-70">BL:</span>
-                <span v-if="cardKingdomBuylist" class="text-body font-bold text-silver">{{ formatPrice(cardKingdomBuylist) }}</span>
+              <div class="flex gap-2 items-baseline">
+                <span class="text-tiny uppercase text-silver-50 min-w-[46px]">Buylist</span>
+                <span v-if="cardKingdomBuylist" class="font-display font-tnum text-small font-semibold text-silver-70">{{ formatPrice(cardKingdomBuylist) }}</span>
                 <span v-else class="text-small text-silver-50">-</span>
               </div>
             </div>
+          </div>
 
-            <!-- Price History Toggle -->
-            <div class="mt-2">
-              <button
-                @click="togglePriceChart"
-                class="flex items-center gap-1 text-tiny text-silver-50 hover:text-silver transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <span>{{ t('cards.detailModal.priceHistory.toggle') }}</span>
-                <span class="text-[14px]">{{ showPriceChart ? '▲' : '▼' }}</span>
-              </button>
+          <!-- Price History Toggle -->
+          <div class="mt-3">
+            <button
+              @click="togglePriceChart"
+              class="flex items-center gap-1.5 text-tiny text-silver-50 hover:text-silver transition-colors"
+            >
+              <IconV2 name="chev-d" :size="14" :class="['transition-transform duration-200 ease-v2', showPriceChart ? '-rotate-180' : '']" />
+              <span>{{ t('cards.detailModal.priceHistory.toggle') }}</span>
+            </button>
 
-              <!-- Chart panel -->
-              <div v-if="showPriceChart" class="mt-2">
-                <div v-if="chartLoading" class="flex items-center justify-center h-[60px]">
-                  <span class="text-tiny text-silver-50 animate-pulse">...</span>
-                </div>
-                <div v-else-if="!chartHasData" class="text-tiny text-silver-50 py-2">
-                  {{ t('cards.detailModal.priceHistory.noData') }}
-                </div>
-                <div v-else>
-                  <!-- Source selector -->
-                  <div class="flex items-center gap-1 mb-1">
-                    <button
-                      v-for="src in (['tcg', 'ck', 'buylist'] as ChartSource[])"
-                      :key="src"
-                      @click="chartSource = src"
-                      :class="[
-                        'px-1.5 py-0.5 text-[14px] font-bold rounded transition-colors uppercase',
-                        chartSource === src
-                          ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
-                          : 'text-silver-50 hover:text-silver hover:bg-silver-5'
-                      ]"
-                    >
-                      {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
-                    </button>
-                  </div>
-
-                  <!-- SVG Chart -->
-                  <svg
-                    :viewBox="`0 0 ${chartSvgW} ${chartSvgH}`"
-                    class="w-full h-[100px]"
-                    preserveAspectRatio="none"
+            <!-- Chart panel -->
+            <div v-if="showPriceChart" class="mt-2.5 bg-surface-1 border border-line rounded-lg p-3.5">
+              <div v-if="chartLoading" class="flex items-center justify-center h-[60px]">
+                <span class="text-tiny text-silver-50 animate-pulse">...</span>
+              </div>
+              <div v-else-if="!chartHasData" class="text-tiny text-silver-50 py-2">
+                {{ t('cards.detailModal.priceHistory.noData') }}
+              </div>
+              <div v-else>
+                <!-- Source selector -->
+                <div class="flex items-center gap-1.5 mb-2">
+                  <button
+                    v-for="src in (['tcg', 'ck', 'buylist'] as ChartSource[])"
+                    :key="src"
+                    @click="chartSource = src"
+                    :class="[
+                      'px-2.5 py-0.5 text-[11px] font-bold rounded-full transition-colors uppercase tracking-wide',
+                      chartSource === src
+                        ? src === 'tcg' ? 'bg-neon text-primary' : src === 'ck' ? 'bg-[#4CAF50] text-primary' : 'bg-[#FF9800] text-primary'
+                        : 'text-silver-50 border border-line hover:text-silver hover:bg-surface-2'
+                    ]"
                   >
-                    <line
-                      :x1="chartPad.left" :y1="chartPad.top"
-                      :x2="chartSvgW - chartPad.right" :y2="chartPad.top"
-                      stroke="#333" stroke-width="0.5"
-                    />
-                    <line
-                      :x1="chartPad.left" :y1="chartSvgH - chartPad.bottom"
-                      :x2="chartSvgW - chartPad.right" :y2="chartSvgH - chartPad.bottom"
-                      stroke="#333" stroke-width="0.5"
-                    />
-                    <polyline
-                      :points="chartPolyline"
-                      fill="none"
-                      :stroke="chartSourceColor"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                      stroke-linecap="round"
-                    />
-                  </svg>
+                    {{ src === 'tcg' ? 'TCG' : src === 'ck' ? 'CK' : 'BUY' }}
+                  </button>
+                </div>
 
-                  <!-- Labels -->
-                  <div class="flex items-center justify-between text-[14px] text-silver-50 -mt-1">
-                    <span>{{ chartFirstDate }}</span>
-                    <span class="font-bold" :style="{ color: chartSourceColor }">{{ chartLastValue }}</span>
-                    <span>{{ chartLastDate }}</span>
-                  </div>
+                <!-- SVG Chart -->
+                <svg
+                  :viewBox="`0 0 ${chartSvgW} ${chartSvgH}`"
+                  class="w-full h-[80px]"
+                  preserveAspectRatio="none"
+                >
+                  <line
+                    :x1="chartPad.left" :y1="chartPad.top"
+                    :x2="chartSvgW - chartPad.right" :y2="chartPad.top"
+                    stroke="rgba(255,255,255,.1)" stroke-width="0.5"
+                  />
+                  <line
+                    :x1="chartPad.left" :y1="chartSvgH - chartPad.bottom"
+                    :x2="chartSvgW - chartPad.right" :y2="chartSvgH - chartPad.bottom"
+                    stroke="rgba(255,255,255,.1)" stroke-width="0.5"
+                  />
+                  <polyline
+                    :points="chartPolyline"
+                    fill="none"
+                    :stroke="chartSourceColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                  />
+                </svg>
+
+                <!-- Labels -->
+                <div class="flex items-center justify-between text-tiny text-silver-50 -mt-1">
+                  <span>{{ chartFirstDate }}</span>
+                  <span class="font-bold" :style="{ color: chartSourceColor }">{{ chartLastValue }}</span>
+                  <span>{{ chartLastDate }}</span>
                 </div>
               </div>
             </div>
@@ -845,150 +841,152 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
       </div>
 
       <!-- Edition / Print Selector -->
-      <div v-if="availablePrints.length > 1" class="bg-secondary border border-silver-30 p-4 rounded">
-        <p class="text-small font-bold text-silver mb-2">{{ t('cards.detailModal.editionPrintLabel') }}</p>
-        <select
-            id="detail-print-select"
-            :value="selectedPrint?.id"
-            @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150 rounded"
-        >
-          <option
-              v-for="print in availablePrints"
-              :key="print.id"
-              :value="print.id"
+      <div v-if="availablePrints.length > 1" class="bg-surface-1 border border-line rounded-lg p-4">
+        <p class="text-[11px] font-bold uppercase tracking-[.12em] text-silver-50 mb-2.5">{{ t('cards.detailModal.editionPrintLabel') }}</p>
+        <div class="relative">
+          <select
+              id="detail-print-select"
+              :value="selectedPrint?.id"
+              @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
+              class="w-full appearance-none px-3 py-2 pr-8 bg-surface-2 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
           >
-            {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
-          </option>
-        </select>
-        <p class="text-tiny text-silver-50 mt-1">{{ t('cards.detailModal.printsAvailable', { count: availablePrints.length }) }}</p>
+            <option
+                v-for="print in availablePrints"
+                :key="print.id"
+                :value="print.id"
+            >
+              {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
+            </option>
+          </select>
+          <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+        </div>
+        <p class="text-tiny text-silver-30 mt-1.5">{{ t('cards.detailModal.printsAvailable', { count: availablePrints.length }) }}</p>
       </div>
       <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('cards.detailModal.loadingPrints') }}</p>
 
       <!-- Status Distribution -->
-      <div class="bg-secondary border border-silver-30 p-4 rounded">
+      <div class="bg-surface-1 border border-line rounded-lg p-4">
         <div class="flex justify-between items-center mb-3">
-          <p class="text-small font-bold text-silver">{{ t('cards.detailModal.distribution') }}</p>
-          <p class="text-small text-neon font-bold">{{ t('cards.detailModal.totalLabel', { qty: totalQuantity }) }}</p>
+          <p class="text-[11px] font-bold uppercase tracking-[.12em] text-silver-50">{{ t('cards.detailModal.distribution') }}</p>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-surface-3 text-silver-70">
+            {{ t('cards.detailModal.totalLabel', { qty: totalQuantity }) }}
+          </span>
         </div>
 
-        <div class="space-y-2">
+        <div class="space-y-1">
           <!-- Collection -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-neon flex-shrink-0"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="flex items-center justify-between py-1.5">
+            <div class="flex items-center gap-2.5">
+              <span class="w-[9px] h-[9px] rounded-full bg-neon flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.collection') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
                 @click="adjustQuantity('collection', -1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-[34px] h-[34px] flex items-center justify-center border border-line-strong text-silver rounded-md hover:border-neon-40 hover:text-neon transition-all duration-200 ease-v2 disabled:opacity-30 disabled:cursor-not-allowed"
                 :disabled="statusDistribution.collection <= 0"
               >
--
-</button>
-              <span class="w-8 text-center text-small font-bold text-neon">{{ statusDistribution.collection }}</span>
+                <IconV2 name="minus" :size="14" />
+              </button>
+              <span class="w-7 text-center font-display font-tnum font-bold text-neon">{{ statusDistribution.collection }}</span>
               <button
                 @click="adjustQuantity('collection', 1)"
-                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
+                class="w-[34px] h-[34px] flex items-center justify-center bg-neon text-primary border border-neon rounded-md hover:brightness-110 transition-all duration-200 ease-v2"
               >
-+
-</button>
+                <IconV2 name="plus" :size="14" />
+              </button>
             </div>
           </div>
 
           <!-- Sale -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-yellow-400 flex-shrink-0"><circle cx="12" cy="12" r="10"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="#000">$</text></svg>
+          <div class="flex items-center justify-between py-1.5">
+            <div class="flex items-center gap-2.5">
+              <span class="w-[9px] h-[9px] rounded-full bg-[#C4553F] flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.sale') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
                 @click="adjustQuantity('sale', -1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-[34px] h-[34px] flex items-center justify-center border border-line-strong text-silver rounded-md hover:border-neon-40 hover:text-neon transition-all duration-200 ease-v2 disabled:opacity-30 disabled:cursor-not-allowed"
                 :disabled="statusDistribution.sale <= 0"
               >
--
-</button>
-              <span class="w-8 text-center text-small font-bold text-yellow-400">{{ statusDistribution.sale }}</span>
+                <IconV2 name="minus" :size="14" />
+              </button>
+              <span class="w-7 text-center font-display font-tnum font-bold text-[#C4553F]">{{ statusDistribution.sale }}</span>
               <button
                 @click="adjustQuantity('sale', 1)"
-                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
+                class="w-[34px] h-[34px] flex items-center justify-center bg-neon text-primary border border-neon rounded-md hover:brightness-110 transition-all duration-200 ease-v2"
               >
-+
-</button>
+                <IconV2 name="plus" :size="14" />
+              </button>
             </div>
           </div>
 
           <!-- Trade -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400 flex-shrink-0"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <div class="flex items-center justify-between py-1.5">
+            <div class="flex items-center gap-2.5">
+              <span class="w-[9px] h-[9px] rounded-full bg-[#60A5FA] flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.trade') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
                 @click="adjustQuantity('trade', -1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-[34px] h-[34px] flex items-center justify-center border border-line-strong text-silver rounded-md hover:border-neon-40 hover:text-neon transition-all duration-200 ease-v2 disabled:opacity-30 disabled:cursor-not-allowed"
                 :disabled="statusDistribution.trade <= 0"
               >
--
-</button>
-              <span class="w-8 text-center text-small font-bold text-blue-400">{{ statusDistribution.trade }}</span>
+                <IconV2 name="minus" :size="14" />
+              </button>
+              <span class="w-7 text-center font-display font-tnum font-bold text-[#60A5FA]">{{ statusDistribution.trade }}</span>
               <button
                 @click="adjustQuantity('trade', 1)"
-                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
+                class="w-[34px] h-[34px] flex items-center justify-center bg-neon text-primary border border-neon rounded-md hover:brightness-110 transition-all duration-200 ease-v2"
               >
-+
-</button>
+                <IconV2 name="plus" :size="14" />
+              </button>
             </div>
           </div>
 
           <!-- Wishlist -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-400 flex-shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <div class="flex items-center justify-between py-1.5">
+            <div class="flex items-center gap-2.5">
+              <span class="w-[9px] h-[9px] rounded-full bg-gold flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.wishlist') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
                 @click="adjustQuantity('wishlist', -1)"
-                class="w-8 h-8 bg-primary border border-silver-30 text-silver hover:border-neon transition-150"
+                class="w-[34px] h-[34px] flex items-center justify-center border border-line-strong text-silver rounded-md hover:border-neon-40 hover:text-neon transition-all duration-200 ease-v2 disabled:opacity-30 disabled:cursor-not-allowed"
                 :disabled="statusDistribution.wishlist <= 0"
               >
--
-</button>
-              <span class="w-8 text-center text-small font-bold text-red-400">{{ statusDistribution.wishlist }}</span>
+                <IconV2 name="minus" :size="14" />
+              </button>
+              <span class="w-7 text-center font-display font-tnum font-bold text-gold">{{ statusDistribution.wishlist }}</span>
               <button
                 @click="adjustQuantity('wishlist', 1)"
-                class="w-8 h-8 bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded"
+                class="w-[34px] h-[34px] flex items-center justify-center bg-neon text-primary border border-neon rounded-md hover:brightness-110 transition-all duration-200 ease-v2"
               >
-+
-</button>
+                <IconV2 name="plus" :size="14" />
+              </button>
             </div>
           </div>
         </div>
 
         <!-- Validation Error -->
-        <p v-if="validationError" class="text-tiny text-rust mt-3">
+        <p v-if="validationError" class="text-tiny text-[#C4553F] mt-3 pt-3 border-t border-line">
           {{ validationError }}
         </p>
 
         <!-- Allocation Warning -->
-        <p v-if="allocationWarning && !validationError" class="text-tiny text-yellow-400 mt-3">
-          ⚠️ {{ allocationWarning }}
+        <p v-if="allocationWarning && !validationError" class="flex items-center gap-1.5 text-tiny text-warning mt-3 pt-3 border-t border-line">
+          <IconV2 name="alert" :size="16" class="flex-shrink-0" />
+          {{ allocationWarning }}
         </p>
       </div>
 
       <!-- Publish to Profile -->
-      <div v-if="showPublicOption" class="bg-secondary border border-silver-30 p-4 rounded">
+      <div v-if="showPublicOption" class="bg-surface-1 border border-line rounded-lg p-4">
         <label class="flex items-center gap-3 cursor-pointer">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-neon flex-shrink-0">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-          </svg>
+          <IconV2 name="eye" :size="18" class="text-neon flex-shrink-0" />
           <div class="flex-1">
             <span class="text-small text-silver font-bold">{{ t('cards.statusModal.publishLabel') }}</span>
             <p class="text-tiny text-silver-50">{{ t('cards.statusModal.publishHint') }}</p>
@@ -996,42 +994,45 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           <input
               v-model="isPublic"
               type="checkbox"
-              class="w-4 h-4 cursor-pointer flex-shrink-0"
+              class="w-[18px] h-[18px] cursor-pointer accent-neon flex-shrink-0"
           />
         </label>
       </div>
 
       <!-- Condition & Foil -->
-      <div class="bg-secondary border border-silver-30 p-4 space-y-4 rounded">
-        <p class="text-small font-bold text-silver">{{ t('cards.detailModal.properties') }}</p>
+      <div class="bg-surface-1 border border-line rounded-lg p-4">
+        <p class="text-[11px] font-bold uppercase tracking-[.12em] text-silver-50 mb-3">{{ t('cards.detailModal.properties') }}</p>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-[1fr_auto] gap-4 items-end">
           <div>
-            <label for="detail-condition" class="text-tiny text-silver-70 block mb-1">{{ t('cards.detailModal.conditionLabel') }}</label>
-            <BaseSelect
-                id="detail-condition"
-                v-model="condition"
-                :options="conditionOptions"
-            />
+            <label for="detail-condition" class="text-tiny text-silver-70 font-semibold block mb-1.5">{{ t('cards.detailModal.conditionLabel') }}</label>
+            <div class="relative">
+              <select
+                  id="detail-condition"
+                  v-model="condition"
+                  class="w-full appearance-none px-3 py-2 pr-8 bg-surface-2 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+              >
+                <option v-for="opt in conditionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+              <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+            </div>
           </div>
 
-          <div class="flex items-end">
-            <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors pb-2">
-              <input
-                  v-model="foil"
-                  type="checkbox"
-                  class="w-4 h-4 cursor-pointer"
-              />
-              <span class="text-small text-silver">{{ t('cards.detailModal.foilLabel') }}</span>
-            </label>
-          </div>
+          <label class="flex items-center gap-2.5 pb-2 cursor-pointer select-none">
+            <span class="text-small text-silver">{{ t('cards.detailModal.foilLabel') }}</span>
+            <span class="relative inline-flex items-center flex-shrink-0">
+              <input v-model="foil" type="checkbox" class="peer sr-only" />
+              <span class="w-[44px] h-[26px] rounded-full border border-line bg-surface-3 peer-checked:bg-neon peer-checked:border-neon transition-colors duration-200 ease-v2 peer-focus-visible:ring-2 peer-focus-visible:ring-neon peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-primary"></span>
+              <span class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2 peer-checked:translate-x-[18px]"></span>
+            </span>
+          </label>
         </div>
       </div>
 
       <!-- Deck Allocations -->
-      <div v-if="allDecks.length > 0" class="bg-secondary border border-silver-30 p-4 rounded">
+      <div v-if="allDecks.length > 0" class="bg-surface-1 border border-line rounded-lg p-4">
         <div class="flex justify-between items-center mb-3">
-          <p class="text-small font-bold text-silver">{{ t('cards.detailModal.assignToDecks') }}</p>
+          <p class="text-[11px] font-bold uppercase tracking-[.12em] text-silver-50">{{ t('cards.detailModal.assignToDecks') }}</p>
           <p class="text-tiny" :class="availableForAllocation > 0 ? 'text-neon' : 'text-silver-50'">
             {{ t('cards.detailModal.available', { qty: availableForAllocation }) }}
           </p>
@@ -1041,73 +1042,73 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           <div
               v-for="deck in allDecks"
               :key="deck.id"
-              class="flex items-center justify-between p-2 border transition-150 gap-2"
-              :class="getDeckTotal(deck.id) > 0 ? 'border-neon bg-neon-5' : 'border-silver-20'"
+              class="flex items-center justify-between p-2.5 border rounded-md transition-all duration-200 ease-v2 gap-2"
+              :class="getDeckTotal(deck.id) > 0 ? 'border-neon-40 bg-neon-5' : 'border-line bg-surface-2'"
           >
             <!-- Deck info -->
             <div class="flex-1 min-w-0 pr-2">
               <p class="text-small font-bold text-silver truncate">{{ deck.name }}</p>
-              <p class="text-tiny text-silver-50">{{ deck.format.toUpperCase() }}</p>
+              <p class="text-tiny text-silver-50 uppercase tracking-wide">{{ deck.format }}</p>
             </div>
 
             <!-- MB / SB slot controls -->
-            <div class="flex items-center gap-3">
-              <div class="flex flex-col items-center">
-                <span class="text-tiny text-silver-50 font-bold mb-0.5">{{ t('cards.detailModal.slotMb') }}</span>
-                <div class="flex items-center gap-1">
+            <div class="flex items-center gap-4">
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-tiny text-silver-50 font-bold">{{ t('cards.detailModal.slotMb') }}</span>
+                <div class="flex items-center gap-1.5">
                   <button
                     @click="adjustSlot(deck.id, 'mb', -1)"
                     :disabled="getSlotQty(deck.id, 'mb') === 0"
-                    class="w-6 h-6 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 text-tiny"
+                    class="w-[26px] h-[26px] flex items-center justify-center border border-line-strong text-silver rounded disabled:opacity-30 disabled:cursor-not-allowed"
                   >
--
-</button>
-                  <span class="w-5 text-center text-small font-bold" :class="getSlotQty(deck.id, 'mb') > 0 ? 'text-neon' : 'text-silver-50'">
+                    <IconV2 name="minus" :size="12" />
+                  </button>
+                  <span class="w-4 text-center font-display font-tnum font-bold text-small" :class="getSlotQty(deck.id, 'mb') > 0 ? 'text-neon' : 'text-silver-50'">
                     {{ getSlotQty(deck.id, 'mb') }}
                   </span>
                   <button
                     @click="adjustSlot(deck.id, 'mb', 1)"
-                    class="w-6 h-6 flex items-center justify-center bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded text-tiny"
+                    class="w-[26px] h-[26px] flex items-center justify-center bg-neon text-primary border border-neon rounded font-bold"
                   >
-+
-</button>
+                    <IconV2 name="plus" :size="12" />
+                  </button>
                 </div>
               </div>
 
-              <div class="flex flex-col items-center">
-                <span class="text-tiny text-silver-50 font-bold mb-0.5">{{ t('cards.detailModal.slotSb') }}</span>
-                <div class="flex items-center gap-1">
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-tiny text-silver-50 font-bold">{{ t('cards.detailModal.slotSb') }}</span>
+                <div class="flex items-center gap-1.5">
                   <button
                     @click="adjustSlot(deck.id, 'sb', -1)"
                     :disabled="getSlotQty(deck.id, 'sb') === 0"
-                    class="w-6 h-6 flex items-center justify-center border border-silver-30 text-silver hover:border-amber hover:text-amber transition-150 disabled:opacity-30 text-tiny"
+                    class="w-[26px] h-[26px] flex items-center justify-center border border-line-strong text-silver rounded disabled:opacity-30 disabled:cursor-not-allowed"
                   >
--
-</button>
-                  <span class="w-5 text-center text-small font-bold" :class="getSlotQty(deck.id, 'sb') > 0 ? 'text-amber' : 'text-silver-50'">
+                    <IconV2 name="minus" :size="12" />
+                  </button>
+                  <span class="w-4 text-center font-display font-tnum font-bold text-small" :class="getSlotQty(deck.id, 'sb') > 0 ? 'text-gold' : 'text-silver-50'">
                     {{ getSlotQty(deck.id, 'sb') }}
                   </span>
                   <button
                     @click="adjustSlot(deck.id, 'sb', 1)"
-                    class="w-6 h-6 flex items-center justify-center bg-amber text-primary font-bold border border-amber hover:brightness-110 transition-150 rounded text-tiny"
+                    class="w-[26px] h-[26px] flex items-center justify-center bg-gold text-primary border border-gold rounded font-bold"
                   >
-+
-</button>
+                    <IconV2 name="plus" :size="12" />
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <p v-if="totalAllocated > 0" class="text-tiny text-silver-50 mt-2 pt-2 border-t border-silver-20">
+        <p v-if="totalAllocated > 0" class="text-tiny text-silver-50 mt-3 pt-3 border-t border-line">
           {{ t('cards.detailModal.totalAssigned', { qty: totalAllocated }) }}
         </p>
       </div>
 
       <!-- Binder Allocations (SCRUM-40) -->
-      <div v-if="allBinders.length > 0" class="bg-secondary border border-silver-30 p-4 rounded">
+      <div v-if="allBinders.length > 0" class="bg-surface-1 border border-line rounded-lg p-4">
         <div class="flex justify-between items-center mb-3">
-          <p class="text-small font-bold text-silver">{{ t('cards.detailModal.assignToBinders') }}</p>
+          <p class="text-[11px] font-bold uppercase tracking-[.12em] text-silver-50">{{ t('cards.detailModal.assignToBinders') }}</p>
           <p class="text-tiny" :class="availableForAllocation > 0 ? 'text-neon' : 'text-silver-50'">
             {{ t('cards.detailModal.available', { qty: availableForAllocation }) }}
           </p>
@@ -1117,29 +1118,29 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           <div
               v-for="binder in allBinders"
               :key="binder.id"
-              class="flex items-center justify-between p-2 border transition-150 gap-2"
-              :class="getBinderQty(binder.id) > 0 ? 'border-neon bg-neon-5' : 'border-silver-20'"
+              class="flex items-center justify-between p-2.5 border rounded-md transition-all duration-200 ease-v2 gap-2"
+              :class="getBinderQty(binder.id) > 0 ? 'border-neon-40 bg-neon-5' : 'border-line bg-surface-2'"
           >
             <div class="flex-1 min-w-0 pr-2">
               <p class="text-small font-bold text-silver truncate">{{ binder.name }}</p>
             </div>
 
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1.5">
               <button
                 @click="adjustBinder(binder.id, -1)"
                 :disabled="getBinderQty(binder.id) === 0"
-                class="w-6 h-6 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 text-tiny"
+                class="w-[26px] h-[26px] flex items-center justify-center border border-line-strong text-silver rounded disabled:opacity-30 disabled:cursor-not-allowed"
               >
--
+                <IconV2 name="minus" :size="12" />
               </button>
-              <span class="w-5 text-center text-small font-bold" :class="getBinderQty(binder.id) > 0 ? 'text-neon' : 'text-silver-50'">
+              <span class="w-4 text-center font-display font-tnum font-bold text-small" :class="getBinderQty(binder.id) > 0 ? 'text-neon' : 'text-silver-50'">
                 {{ getBinderQty(binder.id) }}
               </span>
               <button
                 @click="adjustBinder(binder.id, 1)"
-                class="w-6 h-6 flex items-center justify-center bg-neon text-primary font-bold border border-neon hover:brightness-110 transition-150 rounded text-tiny"
+                class="w-[26px] h-[26px] flex items-center justify-center bg-neon text-primary border border-neon rounded font-bold"
               >
-+
+                <IconV2 name="plus" :size="12" />
               </button>
             </div>
           </div>
@@ -1147,21 +1148,22 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
       </div>
 
       <!-- Actions -->
-      <div class="flex gap-3 pt-4 border-t border-silver-20">
-        <BaseButton
-            class="flex-1"
-            :disabled="isLoading || !canSave"
-            @click="handleSave"
-        >
-          {{ isLoading ? t('common.actions.saving') : t('common.actions.save') }}
-        </BaseButton>
+      <div class="flex gap-2 justify-end pt-4 border-t border-line">
         <BaseButton
             variant="secondary"
-            class="flex-1"
+            class="uppercase tracking-[.1em] !text-[12px]"
             :disabled="isLoading"
             @click="handleClose"
         >
           {{ t('common.actions.cancel') }}
+        </BaseButton>
+        <BaseButton
+            variant="filled"
+            class="uppercase tracking-[.1em] !text-[12px]"
+            :disabled="isLoading || !canSave"
+            @click="handleSave"
+        >
+          {{ isLoading ? t('common.actions.saving') : t('common.actions.save') }}
         </BaseButton>
       </div>
     </div>
@@ -1183,31 +1185,14 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
         <button
             @click="showZoom = false"
             class="absolute top-4 right-4 text-silver hover:text-neon transition-colors p-2"
-            aria-label="Cerrar zoom"
+            :aria-label="t('common.aria.closeModal')"
         >
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+          <IconV2 name="x" :size="28" />
         </button>
         <p class="absolute bottom-4 left-1/2 -translate-x-1/2 text-silver-70 text-small">
-          Click para cerrar
+          {{ t('cards.addModal.zoomCloseHint') }}
         </p>
       </div>
     </Teleport>
   </BaseModal>
 </template>
-
-<style scoped>
-.border-neon-30 {
-  border-color: rgba(90, 193, 104, 0.3);
-}
-
-.bg-neon-5 {
-  background-color: rgba(90, 193, 104, 0.05);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-</style>

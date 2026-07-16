@@ -1,0 +1,41 @@
+{
+  "key": "TASK-101",
+  "title": "Design→app v2 F6: búsqueda — SearchView + filtros avanzados",
+  "description": "Fuente de verdad: cards 12-search, 73-advanced-filters (d+m) + DESIGN-DIRECTION.md §5 y §8.4 (el resultado de search tiene botón '+ Agregar' que abre el MISMO AddCardModal — la puerta única se implementa en F5a/TASK-098; acá solo el estilo del botón). Superficie: SearchView.vue, AdvancedFilterModal.vue, FilterPanel.vue si aplica. Estilo v2 sin tocar las 3 fuentes de resultados (Scryfall + colección + usuarios) ni la lógica del price filter (mostrar solo con precio si hay precios).",
+  "acceptance_criteria": [
+    "Search y filtros avanzados fieles a sus cards v2 (desktop y mobile)",
+    "Sin regresión en autocomplete del header → /search, 3 fuentes y price filter; E2E de search verdes (ojo flake conocido de autocomplete — descartar en aislado)",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F6",
+    "search"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-093"
+  ],
+  "linked_commits": [
+    "c324904",
+    "2e10025"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-16 CERRADO: reskin F6 fiel a cards 12/73 (4 desviaciones documentadas: sidebar desktop diferido a TASK-110, chev-l por arrow-l inexistente en sprite, ManaIcon por dots, modal sin sticky por BaseModal). Review FULL rev-f6-search: REQUEST-CHANGES→APPROVE-WITH-NOTES (H1 locator E2E selectAutocomplete div→button, detectado en paralelo por E2E real y fixeado; L1 icono sync y L2 a11y/placeholder aplicados; L3/L4 notas). Gates verdes (unit 1249, type-check 0, build OK). E2E completo 124 passed/0 fail. CI run 29516502745 verde. v1.47.0 en dev. Fix colateral legítimo: key rota common.loading→common.actions.loading.",
+      "at": "2026-07-16T16:50:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-16T16:50:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

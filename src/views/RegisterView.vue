@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSeoMeta } from '@unhead/vue';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
-import BaseInput from '../components/ui/BaseInput.vue';
-import BaseButton from '../components/ui/BaseButton.vue';
+import { getPasswordStrengthLabel, getPasswordStrengthScore } from '../utils/passwordStrength';
+import IconV2 from '../components/ui/IconV2.vue';
+
+// design→app v2 F7b (TASK-103): visual-only restyle to the v2 auth-card
+// idiom (surface-1/line, font-display, glow-neon focus, IconV2) per
+// cranial-design/prototype/02-register-*.html and 81-email-verification-*.html.
+// Zero auth-logic changes — same handlers/store calls as before this ticket.
+//
+// No sticky guest header here (unlike the prototype's `.hdr` bar): register.page.ts's
+// `loginLink = page.locator('a[href="/login"]')` assumes exactly ONE such anchor on
+// this page (the footer "already have account?" link) and calls `.click()` on it —
+// strict-mode Playwright throws on 2+ matches, so a header with its own logo/login
+// links would have broken that e2e locator. Deliberate scope trim, not an oversight.
 
 const route = useRoute();
 const router = useRouter();
@@ -29,6 +40,10 @@ const loading = ref(false);
 const registered = ref(false);
 const checkingVerification = ref(false);
 const googleLoading = ref(false);
+
+// Presentation-only advisory meter (TASK-103) — never gates submission.
+const passwordScore = computed(() => getPasswordStrengthScore(password.value));
+const passwordStrengthKey = computed(() => getPasswordStrengthLabel(passwordScore.value));
 
 const handleRegister = async () => {
   if (!email.value || !password.value || !username.value || !location.value) return;
@@ -77,6 +92,14 @@ const handleCheckVerification = async () => {
   }
 };
 
+// Local-state-only reset (no store/auth call) — lets the user go back and
+// fix the email they registered with, per cranial-design/prototype/81-email-verification-*.html
+// "Cambiar email" link. Same route, so this can't be a RouterLink (no-op on
+// same-route nav) — it just re-shows the form.
+const handleChangeEmail = () => {
+  registered.value = false;
+};
+
 onMounted(() => {
   if (authStore.user && authStore.emailVerified) {
     void router.push(route.query.returnUrl as string || '/dashboard');
@@ -85,132 +108,168 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-4 py-8">
-    <div class="w-full max-w-md">
-      <div class="flex flex-col items-center mb-8">
-        <svg class="w-24 h-24 mb-4 text-neon" viewBox="0 0 100 100" fill="currentColor">
-          <use href="/icons.svg#cranial-logo" />
-        </svg>
-        <h1 class="text-h1 font-bold text-neon text-center tracking-wider font-brother">CRANIAL TRADING</h1>
-      </div>
+  <div class="min-h-screen flex flex-col">
+    <main id="main-content" class="flex-1 flex items-center justify-center px-4 py-10 md:py-14">
+      <div class="w-full max-w-[440px] flex flex-col items-center gap-5">
+        <div class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-neon-10 border border-neon-40 flex items-center justify-center shadow-[0_0_28px_rgba(90,193,104,.14)]">
+          <svg class="w-8 h-8 md:w-9 md:h-9 text-neon" viewBox="0 0 100 100" fill="currentColor">
+            <use href="/icons.svg#cranial-logo" />
+          </svg>
+        </div>
 
-      <!-- Verification screen -->
-      <div v-if="registered" class="bg-primary border border-silver-30 p-8 rounded-lg">
-        <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.verify.title') }}</h2>
+        <!-- Verification screen -->
+        <div v-if="registered" class="w-full bg-surface-1 border border-line rounded-xl p-8 md:p-9 shadow-medium text-center">
+          <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-neon-10 border border-neon-40 flex items-center justify-center text-neon shadow-[0_0_24px_rgba(90,193,104,.18)]">
+            <IconV2 name="mail" :size="28" />
+          </div>
+          <h2 class="font-display text-h2 font-bold text-silver mb-5">{{ t('auth.verify.title') }}</h2>
 
-        <div class="space-y-lg">
-          <div class="bg-primary-dark border border-silver-30 p-md rounded">
+          <div class="bg-surface-2 border border-line rounded-md p-4 text-left mb-5">
             <p class="text-small text-silver-70">
               {{ t('auth.verify.message') }} <span class="text-neon font-bold">{{ email }}</span>
             </p>
-            <p class="text-tiny text-silver-50 mt-2">
+            <p class="text-tiny text-silver-50 mt-1.5">
               {{ t('auth.verify.instruction') }}
             </p>
           </div>
 
-          <div class="space-y-sm">
-            <BaseButton
-                @click="handleCheckVerification"
+          <div class="flex flex-col gap-2.5">
+            <button
+                type="button"
                 :disabled="checkingVerification"
-                class="w-full"
+                class="min-h-[48px] bg-neon text-primary font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 disabled:opacity-50 disabled:cursor-not-allowed"
+                @click="handleCheckVerification"
             >
               {{ checkingVerification ? t('auth.verify.checking') : t('auth.verify.checkButton') }}
-            </BaseButton>
+            </button>
 
-            <BaseButton
-                variant="secondary"
-                size="small"
+            <button
+                type="button"
+                class="min-h-[44px] flex items-center justify-center gap-2 text-silver-70 text-small font-semibold hover:text-neon transition-colors duration-200 ease-v2"
                 @click="handleResendEmail"
-                class="w-full"
             >
-              {{ t('auth.verify.resend') }}
-            </BaseButton>
+              <IconV2 name="mail" :size="16" />{{ t('auth.verify.resend') }}
+            </button>
+
+            <button
+                type="button"
+                class="min-h-[36px] text-silver-50 text-tiny hover:text-silver transition-colors duration-200 ease-v2"
+                @click="handleChangeEmail"
+            >
+              {{ t('auth.verify.changeEmail') }}
+            </button>
           </div>
 
-          <div class="text-center">
-            <RouterLink
-                to="/login"
-                class="text-small text-silver hover:text-neon transition-fast"
-            >
-              {{ t('auth.forgotPassword.backToLogin') }}
-            </RouterLink>
-          </div>
-        </div>
-      </div>
-
-      <!-- Registration form -->
-      <div v-else class="bg-primary border border-silver-30 p-8 rounded-lg">
-        <h2 class="text-h2 font-bold text-silver mb-6">{{ t('auth.register.title') }}</h2>
-
-        <form @submit.prevent="handleRegister" class="space-y-md">
-          <BaseInput
-              v-model="email"
-              type="email"
-              required
-              :placeholder="t('auth.register.emailLabel')"
-          />
-
-          <BaseInput
-              v-model="password"
-              type="password"
-              required
-              :placeholder="t('auth.register.passwordLabel')"
-          />
-
-          <BaseInput
-              v-model="username"
-              type="text"
-              required
-              :placeholder="t('auth.register.usernameLabel')"
-          />
-
-          <BaseInput
-              v-model="location"
-              type="text"
-              required
-              :placeholder="t('auth.register.locationLabel')"
-          />
-
-          <BaseButton
-              type="submit"
-              class="w-full"
-              data-testid="register-submit"
-              :disabled="loading"
-          >
-            {{ loading ? t('auth.register.submitting') : t('auth.register.submit') }}
-          </BaseButton>
-        </form>
-
-        <div class="flex items-center gap-4 my-5">
-          <div class="flex-1 h-px bg-silver-30"></div>
-          <span class="text-tiny text-silver-50">{{ t('auth.login.orContinueWith') }}</span>
-          <div class="flex-1 h-px bg-silver-30"></div>
-        </div>
-
-        <button
-            @click="handleGoogleRegister"
-            :disabled="googleLoading"
-            type="button"
-            class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-        >
-          <svg class="w-5 h-5" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
-          {{ googleLoading ? '...' : t('auth.login.googleButton') }}
-        </button>
-
-        <div class="mt-6 text-center">
           <RouterLink
               to="/login"
-              class="text-small text-silver hover:text-neon transition-fast"
+              class="inline-flex items-center gap-2 mt-6 text-small text-silver-50 hover:text-neon transition-colors duration-200 ease-v2"
           >
-            {{ t('auth.register.hasAccount') }} {{ t('auth.register.login') }}
+            <IconV2 name="chev-l" :size="16" />{{ t('auth.forgotPassword.backToLogin') }}
           </RouterLink>
         </div>
+
+        <!-- Registration form -->
+        <form v-else class="w-full bg-surface-1 border border-line rounded-xl p-7 md:p-9 shadow-medium" @submit.prevent="handleRegister">
+          <div class="text-center mb-6">
+            <h2 class="font-display text-h2 font-bold text-silver">{{ t('auth.register.title') }}</h2>
+          </div>
+
+          <div class="mb-4">
+            <label for="register-email" class="block text-small font-semibold text-silver-70 mb-1.5">{{ t('auth.register.emailLabel') }}</label>
+            <input
+                id="register-email"
+                v-model="email"
+                type="email"
+                required
+                autocomplete="email"
+                :placeholder="t('auth.login.emailPlaceholder')"
+                class="w-full min-h-[44px] px-3.5 bg-[rgba(0,0,0,.28)] border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label for="register-username" class="block text-small font-semibold text-silver-70 mb-1.5">{{ t('auth.register.usernameLabel') }}</label>
+            <input
+                id="register-username"
+                v-model="username"
+                type="text"
+                required
+                class="w-full min-h-[44px] px-3.5 bg-[rgba(0,0,0,.28)] border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label for="register-password" class="block text-small font-semibold text-silver-70 mb-1.5">{{ t('auth.register.passwordLabel') }}</label>
+            <input
+                id="register-password"
+                v-model="password"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="w-full min-h-[44px] px-3.5 bg-[rgba(0,0,0,.28)] border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
+            />
+            <div v-if="password" class="flex gap-1.5 mt-2" aria-hidden="true">
+              <span
+                  v-for="seg in 4"
+                  :key="seg"
+                  :class="['flex-1 h-1 rounded-full transition-colors duration-200 ease-v2', seg <= passwordScore ? 'bg-neon' : 'bg-surface-3']"
+              />
+            </div>
+            <p v-if="password" class="mt-1.5 text-tiny text-silver-50">
+              {{ t('auth.passwordStrength.label') }}: <span class="text-neon font-semibold">{{ t(`auth.passwordStrength.${passwordStrengthKey}`) }}</span>
+            </p>
+          </div>
+
+          <div class="mb-5">
+            <label for="register-location" class="block text-small font-semibold text-silver-70 mb-1.5">{{ t('auth.register.locationLabel') }}</label>
+            <input
+                id="register-location"
+                v-model="location"
+                type="text"
+                required
+                autocomplete="address-level2"
+                class="w-full min-h-[44px] px-3.5 bg-[rgba(0,0,0,.28)] border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
+            />
+          </div>
+
+          <button
+              type="submit"
+              data-testid="register-submit"
+              :disabled="loading"
+              class="w-full min-h-[48px] bg-neon text-primary font-bold text-[12px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ loading ? t('auth.register.submitting') : t('auth.register.submit') }}
+          </button>
+
+          <div class="flex items-center gap-4 my-5">
+            <div class="flex-1 h-px bg-line"></div>
+            <span class="text-tiny text-silver-50">{{ t('auth.login.orContinueWith') }}</span>
+            <div class="flex-1 h-px bg-line"></div>
+          </div>
+
+          <button
+              type="button"
+              :disabled="googleLoading"
+              class="w-full flex items-center justify-center gap-3 min-h-[44px] px-4 bg-white text-gray-700 font-medium rounded-md hover:bg-gray-100 transition-colors duration-200 ease-v2 disabled:opacity-50"
+              @click="handleGoogleRegister"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            {{ googleLoading ? '...' : t('auth.login.googleButton') }}
+          </button>
+
+          <p class="text-center mt-5 text-small text-silver-50">
+            {{ t('auth.register.hasAccount') }}
+            <RouterLink to="/login" class="text-silver font-semibold hover:text-neon transition-colors duration-200 ease-v2">
+              {{ t('auth.register.login') }}
+            </RouterLink>
+          </p>
+        </form>
       </div>
-    </div>
+    </main>
   </div>
 </template>

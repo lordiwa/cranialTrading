@@ -39,5 +39,8 @@
     <!-- v2 redesign — messages split-pane composer + mobile back nav (design→app v2 F3, cranial-design/prototype/20-messages-*.html) -->
     <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-7 18-3.5-7.5L3 10z" /></symbol>
     <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></symbol>
+    <!-- v2 redesign — email-verification/forgot-password mail glyph + reset-password lock glyph (design→app v2 F7b, cranial-design/prototype/81-email-verification-*.html, 04-reset-password-*.html) -->
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M4 7.5l8 5.5 8-5.5" /></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
   </svg>
 </template>

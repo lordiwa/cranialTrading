@@ -22,6 +22,10 @@ describe('priceAggregation (TASK-114 CK-first aggregate math)', () => {
       expect(ckFirstUnitPrice({ price: Number.NaN, quantity: 1 }, undefined)).toBe(0)
       expect(ckFirstUnitPrice({ price: undefined as unknown as number, quantity: 1 }, undefined)).toBe(0)
     })
+
+    it('falls back to entry.price when CK price is NaN (non-finite, but not null/undefined)', () => {
+      expect(ckFirstUnitPrice({ price: 5, quantity: 1 }, Number.NaN)).toBe(5)
+    })
   })
 
   describe('sumCkFirst', () => {
@@ -62,6 +66,15 @@ describe('priceAggregation (TASK-114 CK-first aggregate math)', () => {
         { price: 5, quantity: 2 },
       ]
       // poisoned entry contributes 0, second contributes 10
+      expect(sumCkFirst(entries, () => undefined)).toBe(10)
+    })
+
+    it('does not let a single non-finite quantity (e.g. NaN) poison the whole sum', () => {
+      const entries = [
+        { price: 5, quantity: Number.NaN },
+        { price: 5, quantity: 2 },
+      ]
+      // poisoned-quantity entry contributes 0, second contributes 10
       expect(sumCkFirst(entries, () => undefined)).toBe(10)
     })
   })

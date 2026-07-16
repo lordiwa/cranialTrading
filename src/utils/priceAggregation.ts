@@ -13,7 +13,7 @@ export interface CkFirstEntry {
 
 /** Per-unit price: CK retail if present and finite, otherwise the entry's own (TCG) price. */
 export function ckFirstUnitPrice(entry: CkFirstEntry, ckPrice: number | null | undefined): number {
-  const value = ckPrice ?? entry.price
+  const value = ckPrice !== null && ckPrice !== undefined && Number.isFinite(ckPrice) ? ckPrice : entry.price
   return Number.isFinite(value) ? value : 0
 }
 
@@ -21,11 +21,15 @@ export function ckFirstUnitPrice(entry: CkFirstEntry, ckPrice: number | null | u
  * Sums quantity * ckFirstUnitPrice over a list of entries. `getCkPrice` looks up
  * each entry's Card Kingdom retail price (null/undefined when not yet fetched or
  * unavailable — falls back to entry.price). Never produces NaN: a single
- * priceless/unfetched entry only zeroes its own contribution, not the whole sum.
+ * priceless/unfetched entry, or one with a non-finite quantity, only zeroes its
+ * own contribution, not the whole sum.
  */
 export function sumCkFirst<T extends CkFirstEntry>(
   entries: T[],
   getCkPrice: (entry: T) => number | null | undefined
 ): number {
-  return entries.reduce((sum, entry) => sum + ckFirstUnitPrice(entry, getCkPrice(entry)) * entry.quantity, 0)
+  return entries.reduce((sum, entry) => {
+    const quantity = Number.isFinite(entry.quantity) ? entry.quantity : 0
+    return sum + ckFirstUnitPrice(entry, getCkPrice(entry)) * quantity
+  }, 0)
 }

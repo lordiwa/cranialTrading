@@ -29,10 +29,11 @@ import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
-import { cancelPriceFetch } from '../composables/useCollectionTotals'
+import { cancelPriceFetch, useCollectionTotals } from '../composables/useCollectionTotals'
 import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
 import { useCollectionPagination } from '../composables/useCollectionPagination'
 import { useDelayedFlag } from '../composables/useDelayedFlag'
+import { sumCkFirst } from '../utils/priceAggregation'
 
 const route = useRoute()
 const router = useRouter()
@@ -151,8 +152,22 @@ const getStatusLabel = (status: string): string => {
 const decksList = computed(() => decksStore.decks)
 const bindersList = computed(() => binderStore.binders)
 
-// Hero stat-chip: uses the store's already-loaded totalValue (card.price-based, no
-// extra CK fetch) to avoid duplicating CollectionTotalsPanel's live price fetching.
+// TASK-114: CK-first hero value. This composable instance intentionally never calls
+// fetchAllPrices() — CollectionTotalsPanel (Teleported footer, always mounted alongside
+// this hero) already owns the single full-collection price fetch and populates the
+// module-level sharedCardPrices map (see composables/useCollectionTotals.ts). Reading
+// that same shared map here means the hero recomputes for free as prices stream in,
+// with zero extra network calls (mirrors the read-only pattern DeckView already uses
+// for its own CK-priced totals).
+const { cardPrices: heroCardPrices } = useCollectionTotals(() => collectionCards.value)
+
+// Hero stat-chip: Card Kingdom retail is the primary price source, falling back to
+// card.price (TCG) per-card whenever CK hasn't loaded yet or has no data for that
+// card (sumCkFirst — utils/priceAggregation.ts). Never $0.00/NaN: a card with no CK
+// price yet still contributes its TCG price, so the total gracefully starts at the
+// TCG-derived figure and refines upward/downward as CK prices arrive — no separate
+// loading spinner needed on the hero itself (CollectionTotalsPanel's progress bar
+// already surfaces fetch-in-progress state).
 // No existing money formatter in the codebase does thousands-grouping (utils/formatters.ts
 // and services/mtgjson.ts formatPrice() are both plain `.toFixed(2)`), so this uses the
 // platform's native Intl.NumberFormat — locale-aware via the app's own useI18n locale —
@@ -160,11 +175,8 @@ const bindersList = computed(() => binderStore.binders)
 const intlLocaleMap: Record<string, string> = { es: 'es-AR', en: 'en-US', pt: 'pt-BR' }
 const heroCollectionValue = computed(() => {
   const intlLocale = intlLocaleMap[locale.value] ?? 'es-AR'
-  // collectionStore.totalValue (stores/collection.ts) sums card.price * quantity with no
-  // nullish guard — a single priceless imported card (price undefined after compact-import
-  // hydration) poisons the whole sum to NaN. Guarded here (view-only); the store-side fix
-  // is out of this ticket's scope and will be its own follow-up.
-  const rawValue = Number.isFinite(collectionStore.totalValue) ? collectionStore.totalValue : 0
+  const ownedCards = collectionCards.value.filter(c => c.status !== 'wishlist')
+  const rawValue = sumCkFirst(ownedCards, c => heroCardPrices.value.get(c.id)?.cardKingdom?.retail)
   const grouped = new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 0 }).format(rawValue)
   return `$${grouped}`
 })

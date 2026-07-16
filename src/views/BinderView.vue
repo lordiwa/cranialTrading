@@ -27,8 +27,9 @@ import { useDecksStore } from '../stores/decks'
 import { type ScryfallCard } from '../services/scryfallCache'
 import { buildManaboxCsv, buildMoxfieldCsv, downloadAsFile } from '../utils/cardHelpers'
 import { useCardFilter } from '../composables/useCardFilter'
-import { cancelPriceFetch } from '../composables/useCollectionTotals'
+import { cancelPriceFetch, useCollectionTotals } from '../composables/useCollectionTotals'
 import { useCollectionImport } from '../composables/useCollectionImport'
+import { sumCkFirst } from '../utils/priceAggregation'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,6 +142,28 @@ const binderTradeCount = computed(() => {
     const card = collectionStore.getCardById(c.cardId)
     return card?.status === 'trade' ? sum + c.allocatedQuantity : sum
   }, 0)
+})
+
+// TASK-114: CK-first binder total. Same client-side override pattern DeckView already
+// uses for deckOwnedCostBySource (DeckView.vue) — this composable instance reads the
+// shared module-level price map but never calls fetchAllPrices() itself, so it never
+// triggers a second full-collection price fetch. Falls back per-card to card.price
+// (TCG) when CK hasn't loaded/has no data. binder.stats.totalPrice (stores/binders.ts
+// calculateStats) is left untouched — it's a separate, TCG-only Firestore-persisted
+// field out of this ticket's scope; this is a view-only display override.
+const { cardPrices: binderCardPrices } = useCollectionTotals(() => collectionCards.value)
+
+const binderTotalValueCk = computed(() => {
+  const binder = selectedBinder.value
+  if (!binder?.allocations) return 0
+  const cardMap = new Map(collectionCards.value.map(c => [c.id, c]))
+  const entries = binder.allocations
+    .map(a => {
+      const card = cardMap.get(a.cardId)
+      return card ? { price: card.price, quantity: a.quantity, cardId: card.id } : null
+    })
+    .filter((e): e is { price: number; quantity: number; cardId: string } => e !== null)
+  return sumCkFirst(entries, e => binderCardPrices.value.get(e.cardId)?.cardKingdom?.retail)
 })
 
 // ========== METHODS ==========
@@ -853,7 +876,7 @@ onUnmounted(() => {
       :total-cards="selectedBinder.stats?.totalCards ?? 0"
       :for-sale-count="binderForSaleCount"
       :trade-count="binderTradeCount"
-      :total-value="selectedBinder.stats?.totalPrice ?? 0"
+      :total-value="binderTotalValueCk"
   />
 </template>
 

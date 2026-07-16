@@ -564,6 +564,30 @@
       "title": "Bug precios: header de Colección (y otros agregados) suman card.price (TCG) — deben usar CK como fuente primaria siempre",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-115",
+      "title": "Bug UI mobile: panel de totales de Colección tapa el badge de matches del tabbar + Total recortado horizontalmente",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-116",
+      "title": "Bug latente colección: refreshCurrentPage tras addCard/deleteCard corre contra el índice stale (misma race que TASK-113)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-117",
+      "title": "UX: loader al filtrar la colección — feedback visual mientras la query paginada está en vuelo (mobile/conexión lenta)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-118",
+      "title": "Auth: restaurar login con Google — existía en la app y se quitó con el rediseño",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

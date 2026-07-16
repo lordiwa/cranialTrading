@@ -34,7 +34,7 @@
     },
     {
       "author": "orchestrator",
-      "body": "2026-07-16 CERRADO: sort/count/per-page shipped v1.48.0 (feat 19e5ea5), CI run 29521891563 verde. Review FULL rev-108-sort: APPROVE final tras 2 rondas review-driven (MEDIUM race setSort → fix reqId; HIGH loading colgado via cache-hit introducido por ese fix → fix + test red-vs-cache; ambos con RED verificado). 27 unit tests nuevos. E2E completo 124 passed. PENDIENTE del AC: design-push del card 12-search (en curso por el orquestador). Follow-up aceptado por Rafael: auto-fetch de páginas >175 si el límite molesta. LOW constatados: rango '1-25 de N' con Next deshabilitado al agotar lo cargado sin explicación UI; toast noResults en error de red (preexistente); totalResults sin consumidores.",
+      "body": "2026-07-16 CERRADO: sort/count/per-page shipped v1.48.0 (feat 19e5ea5), CI run 29521891563 verde. Review FULL rev-108-sort: APPROVE final tras 2 rondas review-driven (MEDIUM race setSort → fix reqId; HIGH loading colgado via cache-hit introducido por ese fix → fix + test red-vs-cache; ambos con RED verificado). 27 unit tests nuevos. E2E completo 124 passed. AC design-push COMPLETO 2026-07-16: toolbar v2.1 agregado a 12-search-desktop/mobile.html y subido a Claude Design (write_files 2/2); push PARCIAL a proposito — el sidebar del card desktop se conserva como diseno-por-delante para TASK-110; Figma omitido (descartado por Rafael); nota registrada en mapping.json. Follow-up aceptado por Rafael: auto-fetch de páginas >175 si el límite molesta. LOW constatados: rango '1-25 de N' con Next deshabilitado al agotar lo cargado sin explicación UI; toast noResults en error de red (preexistente); totalResults sin consumidores.",
       "at": "2026-07-16T18:40:00.000Z"
     }
   ],

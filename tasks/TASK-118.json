@@ -1,0 +1,30 @@
+{
+  "key": "TASK-118",
+  "title": "Auth: restaurar login con Google — existía en la app y se quitó con el rediseño",
+  "description": "Pedido de Rafael 2026-07-16: la app tenía login con Google y se quitó en el design — volver a agregarlo. REFINAMIENTO/FORENSE primero: (1) git log sobre LoginView.vue / HeaderLoginDropdown.vue / RegisterView.vue / services/firebase para ubicar el commit que quitó el botón (candidatos: rediseño landing search-first v1.36, TASK-085 landing results v1.37, o algún F del v2) y qué se llevó (¿solo UI o también el flujo signInWithPopup/GoogleAuthProvider?); (2) verificar que el provider Google siga habilitado en Firebase Auth (dev y prod) y que el código del servicio siga existiendo; (3) restaurar el botón/flujo en login Y register Y el dropdown del header (paralelismo: los tres puntos de entrada de auth juntos, estilo v2); (4) DESIGN: agregar el botón Google a los cards 01-login (d+m), 80-login-dropdown (d+m) y 02-register si aplica + subir a Claude Design (design-push) — Design es fuente de verdad y hoy no lo tiene, por eso se perdió; (5) cuidado Rule 8: nada de async onMounted con await en el flujo de auth (rompe perfiles anónimos en prod).",
+  "acceptance_criteria": [
+    "FORENSE: commit que lo quitó identificado y alcance documentado en comment del ticket",
+    "Login con Google funcional en login, register y dropdown del header (estilo v2), verificado en dev con cuenta real",
+    "Cards de Design actualizados (01-login, 80-login-dropdown, 02-register si aplica) y subidos a Claude Design",
+    "i18n en/es/pt; sin regresión en login email/password ni en flujo guest; E2E auth verdes; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "auth",
+    "google-login",
+    "regression",
+    "design-sync",
+    "reported-by-rafael"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T19:10:00.000Z",
+  "updated_at": "2026-07-16T19:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

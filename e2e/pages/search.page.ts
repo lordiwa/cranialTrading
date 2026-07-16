@@ -21,8 +21,9 @@ export class SearchPage {
     this.searchButton = page.locator('main').getByRole('button', { name: /^search$|^buscar$/i });
     this.autocompleteDropdown = page.locator('.absolute.z-20, [class*="autocomplete"], [class*="suggestion"]');
     this.resultsGrid = page.locator('.grid').first();
-    // SearchResultCard uses cursor-pointer group class
-    this.resultCards = page.locator('.cursor-pointer.group');
+    // design→app v2 F6 (TASK-101): SearchResultCard root carries data-testid instead of a
+    // styling-coupled class selector (cursor-pointer/group class names changed in the reskin)
+    this.resultCards = page.locator('[data-testid="search-result-card"]');
     this.noResultsMessage = page.locator('text=/no.*cards.*found|no.*result|no se encontraron|no.*filters/i');
     // "MORE" button on the search page opens the advanced filters modal
     this.advancedFiltersButton = page.locator('main').getByRole('button', { name: /more|advanced|avanzad|más/i }).first();
@@ -59,7 +60,9 @@ export class SearchPage {
   }
 
   async selectAutocomplete(index = 0) {
-    await this.autocompleteDropdown.locator('div, li').nth(index).click();
+    // design→app v2 F6 (TASK-101): FilterPanel's suggestion items are now <button>
+    // elements (a11y fix) instead of <div>; keep div/li too for other autocomplete surfaces.
+    await this.autocompleteDropdown.locator('button, div, li').nth(index).click();
   }
 
   async clickResultCard(index = 0) {
@@ -77,6 +80,6 @@ export class SearchPage {
   }
 
   ownedBadge(cardIndex = 0): Locator {
-    return this.resultCards.nth(cardIndex).locator('.bg-neon.absolute');
+    return this.resultCards.nth(cardIndex).locator('[data-testid="owned-badge"]');
   }
 }

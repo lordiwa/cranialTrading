@@ -1622,11 +1622,14 @@
 
   "search": {
     "view": {
-      "title": "BUSCA AVANÇADA",
+      "title": "Buscar cartas",
+      "kicker": "Catálogo global",
       "backToCollection": "Voltar",
       "inCollectionTitle": "Na sua coleção",
       "otherUsersTitle": "Outros usuários vendem ou trocam",
-      "catalogTitle": "Catálogo de cartas"
+      "catalogTitle": "Catálogo de cartas",
+      "viewInCollection": "Ver na coleção",
+      "addButton": "Adicionar"
     },
     "owned": "x{count} tenho",
     "filterPanel": {
@@ -1646,6 +1649,7 @@
     "modal": {
       "title": "FILTROS AVANÇADOS",
       "apply": "APLICAR FILTROS",
+      "activeFilters": "ativos",
       "sections": {
         "colors": "Cores",
         "rarity": "Raridade",

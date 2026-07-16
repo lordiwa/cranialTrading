@@ -5,6 +5,7 @@ import { allCommonEffects, allCreatureTypes, allSetMechanics, combatAbilities, c
 import { getAllSets, type ScryfallSet } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseModal from '../ui/BaseModal.vue'
+import IconV2 from '../ui/IconV2.vue'
 import ManaIcon from '../ui/ManaIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 
@@ -318,129 +319,151 @@ const handleReset = () => {
   emit('reset')
   emitUpdate()
 }
+
+// v2 redesign — rarity square badge palette + shared pill treatment
+// (design→app v2 F6, cranial-design/prototype/73-advanced-filters-*.html)
+const RARITY_ON_CLASSES: Record<string, string> = {
+  common: 'bg-white border-white text-black',
+  uncommon: 'bg-[#C0C0C0] border-[#C0C0C0] text-black',
+  rare: 'bg-gold border-gold text-black',
+  mythic: 'bg-[#CD7F32] border-[#CD7F32] text-black',
+}
+const RARITY_OFF_CLASSES: Record<string, string> = {
+  common: 'bg-surface-1 border-line text-silver hover:border-line-strong',
+  uncommon: 'bg-surface-1 border-line text-[#C0C0C0] hover:border-line-strong',
+  rare: 'bg-surface-1 border-line text-gold hover:border-line-strong',
+  mythic: 'bg-surface-1 border-line text-[#CD7F32] hover:border-line-strong',
+}
+const pillClasses = 'inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-neon-10 border border-neon-40 text-neon text-tiny font-semibold hover:bg-rust-10 hover:border-rust hover:text-[#C4553F] transition-all duration-200 ease-v2'
+const chipClasses = (active: boolean) => [
+  'min-h-[34px] px-3.5 rounded-full text-tiny font-semibold border transition-all duration-200 ease-v2',
+  active
+    ? 'text-neon bg-neon-10 border-neon-40'
+    : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong',
+]
+const inputClasses = 'w-full min-h-[40px] bg-surface-1 border border-line rounded-md px-3 text-small text-silver placeholder:text-silver-30 focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2'
 </script>
 
 <template>
   <BaseModal
       :show="show"
-      :title="t('search.modal.title')"
       @close="emit('close'); filterSearchQuery = ''"
   >
-    <div class="space-y-4">
+    <div class="space-y-5">
+      <!-- Header -->
+      <div class="flex items-center gap-3 pr-8">
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('search.modal.title') }}</h2>
+        <template v-if="activeFilterCount > 0">
+          <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-2 rounded-full bg-neon text-primary font-display text-tiny font-bold">{{ activeFilterCount }}</span>
+          <span class="text-small text-silver-50">{{ t('search.modal.activeFilters') }}</span>
+        </template>
+      </div>
+
       <!-- Buscador de filtros -->
       <div class="relative">
+        <IconV2 name="search" :size="18" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-silver-30 pointer-events-none" />
         <input
             v-model="filterSearchQuery"
             type="text"
             :placeholder="t('search.filterPanel.filterSearchPlaceholder')"
-            class="w-full bg-primary border-2 border-neon px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            class="w-full min-h-[46px] bg-surface-1 border border-neon-40 rounded-md pl-11 pr-10 text-body text-silver placeholder:text-silver-50 focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
         />
         <button
             v-if="filterSearchQuery.length > 0"
             @click="filterSearchQuery = ''"
-            class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+            :aria-label="t('common.actions.clear')"
+            class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors duration-200 ease-v2 rounded-full hover:bg-surface-2"
             type="button"
         >
-          ✕
+          <IconV2 name="x" :size="14" />
         </button>
         <div
             v-if="filterSearchResults.length > 0"
-            class="absolute top-full left-0 right-0 bg-primary border-2 border-neon border-t-0 max-h-64 overflow-y-auto z-20"
+            class="absolute top-full left-0 right-0 mt-1 bg-[#0d0d0f] border border-line-strong rounded-md max-h-64 overflow-y-auto z-20 shadow-strong"
         >
           <button
               v-for="result in filterSearchResults"
               :key="result.value"
+              type="button"
               @click="result.isCreatureType ? toggleCreatureType(result.value) : toggleKeyword(result.value)"
-              class="w-full px-4 py-2 flex items-center justify-between hover:bg-neon-10 transition-fast border-b border-silver-30 last:border-b-0"
+              class="w-full px-4 py-2 flex items-center justify-between hover:bg-neon-10 transition-colors duration-200 ease-v2 border-b border-line last:border-b-0"
           >
             <span class="text-small text-silver">
               {{ result.label }}
               <span class="text-tiny text-silver-50 ml-2">{{ result.category }}</span>
             </span>
-            <span v-if="result.isCreatureType ? f.creatureTypes?.includes(result.value) : f.keywords?.includes(result.value)" class="text-neon text-tiny font-bold">✓</span>
+            <IconV2 v-if="result.isCreatureType ? f.creatureTypes?.includes(result.value) : f.keywords?.includes(result.value)" name="check" :size="14" class="text-neon" />
           </button>
         </div>
         <div
             v-if="filterSearchQuery.length >= 2 && filterSearchResults.length === 0"
-            class="absolute top-full left-0 right-0 bg-primary border-2 border-neon border-t-0 px-4 py-3 text-small text-silver-50"
+            class="absolute top-full left-0 right-0 mt-1 bg-[#0d0d0f] border border-line-strong rounded-md px-4 py-3 text-small text-silver-50 z-20 shadow-strong"
         >
           {{ t('search.filterPanel.noFilterResults', { query: filterSearchQuery }) }}
         </div>
       </div>
 
       <!-- Active filter pills -->
-      <div v-if="activeFilterCount > 0" class="flex flex-wrap gap-1">
-        <button v-for="color in f.colors" :key="`c-${color}`" @click="removeFilter('color', color)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getColorLabel(color) }} <span class="opacity-70">×</span>
+      <div v-if="activeFilterCount > 0" class="flex flex-wrap gap-1.5">
+        <button v-for="color in f.colors" :key="`c-${color}`" type="button" @click="removeFilter('color', color)" :class="pillClasses">
+          {{ getColorLabel(color) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="type in f.types" :key="`t-${type}`" @click="removeFilter('type', type)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getTypeLabel(type) }} <span class="opacity-70">×</span>
+        <button v-for="type in f.types" :key="`t-${type}`" type="button" @click="removeFilter('type', type)" :class="pillClasses">
+          {{ getTypeLabel(type) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="rarity in f.rarity" :key="`r-${rarity}`" @click="removeFilter('rarity', rarity)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getRarityLabel(rarity) }} <span class="opacity-70">×</span>
+        <button v-for="rarity in f.rarity" :key="`r-${rarity}`" type="button" @click="removeFilter('rarity', rarity)" :class="pillClasses">
+          {{ getRarityLabel(rarity) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="format in f.formatLegal" :key="`f-${format}`" @click="removeFilter('format', format)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getFormatLabel(format) }} <span class="opacity-70">×</span>
+        <button v-for="format in f.formatLegal" :key="`f-${format}`" type="button" @click="removeFilter('format', format)" :class="pillClasses">
+          {{ getFormatLabel(format) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="setCode in f.sets" :key="`s-${setCode}`" @click="removeFilter('set', setCode)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getSetName(setCode) }} <span class="opacity-70">×</span>
+        <button v-for="setCode in f.sets" :key="`s-${setCode}`" type="button" @click="removeFilter('set', setCode)" :class="pillClasses">
+          {{ getSetName(setCode) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="keyword in f.keywords" :key="`k-${keyword}`" @click="removeFilter('keyword', keyword)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getKeywordLabel(keyword) }} <span class="opacity-70">×</span>
+        <button v-for="keyword in f.keywords" :key="`k-${keyword}`" type="button" @click="removeFilter('keyword', keyword)" :class="pillClasses">
+          {{ getKeywordLabel(keyword) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="ct in f.creatureTypes" :key="`ct-${ct}`" @click="removeFilter('creatureType', ct)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getCreatureTypeLabel(ct) }} <span class="opacity-70">×</span>
+        <button v-for="ct in f.creatureTypes" :key="`ct-${ct}`" type="button" @click="removeFilter('creatureType', ct)" :class="pillClasses">
+          {{ getCreatureTypeLabel(ct) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="f.manaValue?.values?.length || f.manaValue?.min !== undefined || f.manaValue?.max !== undefined"
-            @click="removeFilter('manaValue')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          MV: {{ f.manaValue?.values?.length ? f.manaValue.values.map(v => v === 10 ? '10+' : v).join(', ') : `${f.manaValue?.min ?? '?'}-${f.manaValue?.max ?? '?'}` }} <span class="opacity-70">×</span>
+        <button
+            v-if="f.manaValue?.values?.length || f.manaValue?.min !== undefined || f.manaValue?.max !== undefined"
+            type="button" @click="removeFilter('manaValue')" :class="pillClasses"
+        >
+          MV: {{ f.manaValue?.values?.length ? f.manaValue.values.map(v => v === 10 ? '10+' : v).join(', ') : `${f.manaValue?.min ?? '?'}-${f.manaValue?.max ?? '?'}` }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="f.power?.min !== undefined || f.power?.max !== undefined" @click="removeFilter('power')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          POW: {{ f.power?.min ?? '?' }}-{{ f.power?.max ?? '?' }} <span class="opacity-70">×</span>
+        <button v-if="f.power?.min !== undefined || f.power?.max !== undefined" type="button" @click="removeFilter('power')" :class="pillClasses">
+          POW: {{ f.power?.min ?? '?' }}-{{ f.power?.max ?? '?' }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="f.toughness?.min !== undefined || f.toughness?.max !== undefined" @click="removeFilter('toughness')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          TOU: {{ f.toughness?.min ?? '?' }}-{{ f.toughness?.max ?? '?' }} <span class="opacity-70">×</span>
+        <button v-if="f.toughness?.min !== undefined || f.toughness?.max !== undefined" type="button" @click="removeFilter('toughness')" :class="pillClasses">
+          TOU: {{ f.toughness?.min ?? '?' }}-{{ f.toughness?.max ?? '?' }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="f.priceUSD?.min !== undefined || f.priceUSD?.max !== undefined" @click="removeFilter('priceUSD')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          ${{ f.priceUSD?.min ?? '?' }}-${{ f.priceUSD?.max ?? '?' }} <span class="opacity-70">×</span>
+        <button v-if="f.priceUSD?.min !== undefined || f.priceUSD?.max !== undefined" type="button" @click="removeFilter('priceUSD')" :class="pillClasses">
+          ${{ f.priceUSD?.min ?? '?' }}-${{ f.priceUSD?.max ?? '?' }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="f.isFoil" @click="removeFilter('isFoil')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          Foil <span class="opacity-70">×</span>
+        <button v-if="f.isFoil" type="button" @click="removeFilter('isFoil')" :class="pillClasses">
+          Foil <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="f.isFullArt" @click="removeFilter('isFullArt')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          Full Art <span class="opacity-70">×</span>
+        <button v-if="f.isFullArt" type="button" @click="removeFilter('isFullArt')" :class="pillClasses">
+          Full Art <IconV2 name="x" :size="12" />
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <!-- Colores -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.colors') || 'Colors' }}
           </span>
-          <div class="flex gap-1">
+          <div class="flex gap-1.5 flex-wrap">
             <button
                 v-for="color in colorOptions"
                 :key="color.value"
+                type="button"
                 @click="toggleColor(color.value)"
                 :class="[
-                  'w-8 h-8 text-sm font-bold transition-fast flex items-center justify-center rounded',
-                  f.colors?.includes(color.value)
-                    ? 'bg-neon text-primary border-2 border-neon'
-                    : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
+                  'w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ease-v2',
+                  f.colors?.includes(color.value) ? 'border-neon shadow-glow-neon' : 'border-line-strong hover:border-silver-30'
                 ]"
                 :title="color.label"
             >
@@ -448,25 +471,23 @@ const handleReset = () => {
             </button>
           </div>
           <!-- ANY / EXACT toggle (local mode only) -->
-          <div v-if="mode === 'local' && f.colors && f.colors.length > 0" class="flex gap-1 mt-2">
+          <div v-if="mode === 'local' && f.colors && f.colors.length > 0" class="flex gap-1.5 mt-2.5">
             <button
+                type="button"
                 @click="emit('update:exactColorMode', false)"
                 :class="[
-                  'px-2 py-0.5 text-tiny font-bold transition-fast rounded',
-                  !exactColorMode
-                    ? 'bg-neon text-primary'
-                    : 'bg-silver-10 border border-silver-30 text-silver-50 hover:border-neon'
+                  'px-2.5 py-1 rounded-full text-tiny font-bold transition-all duration-200 ease-v2',
+                  !exactColorMode ? 'bg-neon text-primary' : 'bg-surface-1 border border-line text-silver-50 hover:border-line-strong'
                 ]"
             >
               {{ t('collection.filters.colorModeAny') }}
             </button>
             <button
+                type="button"
                 @click="emit('update:exactColorMode', true)"
                 :class="[
-                  'px-2 py-0.5 text-tiny font-bold transition-fast rounded',
-                  exactColorMode
-                    ? 'bg-neon text-primary'
-                    : 'bg-silver-10 border border-silver-30 text-silver-50 hover:border-neon'
+                  'px-2.5 py-1 rounded-full text-tiny font-bold transition-all duration-200 ease-v2',
+                  exactColorMode ? 'bg-neon text-primary' : 'bg-surface-1 border border-line text-silver-50 hover:border-line-strong'
                 ]"
             >
               {{ t('collection.filters.colorModeExact') }}
@@ -476,22 +497,12 @@ const handleReset = () => {
 
         <!-- Todos los tipos -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.types') }}
             <HelpTooltip :text="t('help.tooltips.search.types')" :title="t('help.titles.types')" />
           </span>
-          <div class="flex flex-wrap gap-1">
-            <button
-                v-for="type in typeOptions"
-                :key="type.value"
-                @click="toggleType(type.value)"
-                :class="[
-                  'px-2 py-1 text-tiny font-bold transition-fast',
-                  f.types?.includes(type.value)
-                    ? 'bg-neon text-primary border border-neon'
-                    : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-                ]"
-            >
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="type in typeOptions" :key="type.value" type="button" @click="toggleType(type.value)" :class="chipClasses(!!f.types?.includes(type.value))">
               {{ type.label }}
             </button>
           </div>
@@ -499,26 +510,20 @@ const handleReset = () => {
 
         <!-- Rarezas -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.rarity') || 'Rarity' }}
           </span>
-          <div class="flex gap-1">
+          <div class="flex gap-1.5">
             <button
                 v-for="rarity in rarityOptions"
                 :key="rarity.value"
+                type="button"
                 @click="toggleRarity(rarity.value)"
                 :class="[
-                  'px-2 py-1 text-tiny font-bold transition-fast border',
-                  f.rarity?.includes(rarity.value)
-                    ? rarity.value === 'common' ? 'bg-white text-black border-white'
-                      : rarity.value === 'uncommon' ? 'bg-[#C0C0C0] text-black border-[#C0C0C0]'
-                      : rarity.value === 'rare' ? 'bg-[#FFD700] text-black border-[#FFD700]'
-                      : 'bg-[#CD7F32] text-black border-[#CD7F32]'
-                    : rarity.value === 'common' ? 'bg-silver-10 border-silver-30 text-white hover:border-white'
-                      : rarity.value === 'uncommon' ? 'bg-silver-10 border-silver-30 text-[#C0C0C0] hover:border-[#C0C0C0]'
-                      : rarity.value === 'rare' ? 'bg-silver-10 border-silver-30 text-[#FFD700] hover:border-[#FFD700]'
-                      : 'bg-silver-10 border-silver-30 text-[#CD7F32] hover:border-[#CD7F32]'
+                  'w-9 h-8 rounded-md font-display text-tiny font-bold border transition-all duration-200 ease-v2 flex items-center justify-center',
+                  f.rarity?.includes(rarity.value) ? RARITY_ON_CLASSES[rarity.value] : RARITY_OFF_CLASSES[rarity.value]
                 ]"
+                :title="rarity.label"
             >
               {{ rarity.label.charAt(0) }}
             </button>
@@ -527,107 +532,83 @@ const handleReset = () => {
 
         <!-- Mana Value -->
         <div class="md:col-span-2 lg:col-span-3">
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.manaValue') }}
             <HelpTooltip :text="t('help.tooltips.search.manaValue')" :title="t('help.titles.manaValue')" />
           </span>
-          <div class="flex flex-wrap gap-1 items-center">
+          <div class="flex flex-wrap gap-1.5 items-center">
             <button
                 v-for="mv in manaValueOptions"
                 :key="mv"
+                type="button"
                 @click="toggleManaValue(mv)"
                 :class="[
-                  'w-8 h-8 flex items-center justify-center transition-fast rounded',
-                  isManaValueSelected(mv)
-                    ? 'bg-neon border-2 border-neon'
-                    : 'bg-silver-10 border border-silver-30 hover:border-neon'
+                  'w-9 h-9 rounded-md border flex items-center justify-center transition-all duration-200 ease-v2 font-display text-tiny font-bold',
+                  isManaValueSelected(mv) ? 'text-neon bg-neon-10 border-neon-40' : 'text-silver-50 bg-surface-1 border-line hover:border-line-strong'
                 ]"
                 :title="mv === 10 ? '10+' : String(mv)"
             >
               <ManaIcon v-if="mv < 10" :symbol="String(mv)" size="small" />
-              <span v-else class="text-tiny font-bold" :class="isManaValueSelected(mv) ? 'text-primary' : 'text-silver'">10+</span>
+              <span v-else>10+</span>
             </button>
             <button
                 v-if="f.manaValue?.values?.length"
+                type="button"
                 @click="clearManaValueSelection"
-                class="ml-2 px-2 py-1 text-tiny text-rust hover:bg-rust hover:text-primary transition-fast border border-rust rounded"
+                class="ml-2 px-2.5 py-1.5 rounded-full text-tiny font-bold text-[#C4553F] border border-rust hover:bg-rust hover:text-silver transition-all duration-200 ease-v2"
             >
-              ✕
+              <IconV2 name="x" :size="12" />
             </button>
           </div>
-          <p v-if="f.manaValue?.values?.length" class="text-tiny text-silver-50 mt-1">
+          <p v-if="f.manaValue?.values?.length" class="text-tiny text-silver-50 mt-1.5 font-tnum">
             MV: {{ [...f.manaValue.values].sort((a, b) => a - b).map(v => v === 10 ? '10+' : v).join(', ') }}
           </p>
         </div>
 
         <!-- Precio USD -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.priceUSD') }}
             <HelpTooltip :text="t('help.tooltips.search.priceUSD')" :title="t('help.titles.priceUSD')" />
           </span>
           <div class="flex gap-2">
-            <input
-                v-model.number="f.priceUSD.min"
-                @change="emitUpdate()"
-                type="number" placeholder="Min" step="0.01"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
-            />
-            <input
-                v-model.number="f.priceUSD.max"
-                @change="emitUpdate()"
-                type="number" placeholder="Max" step="0.01"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
-            />
+            <input v-model.number="f.priceUSD.min" @change="emitUpdate()" type="number" placeholder="Min" step="0.01" :class="inputClasses" />
+            <input v-model.number="f.priceUSD.max" @change="emitUpdate()" type="number" placeholder="Max" step="0.01" :class="inputClasses" />
           </div>
         </div>
 
         <!-- Power -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.power') }}
             <HelpTooltip :text="t('help.tooltips.search.power')" :title="t('help.titles.power')" />
           </span>
           <div class="flex gap-2">
-            <input v-model.number="f.power.min" @change="emitUpdate()" type="number" placeholder="Min"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
-            <input v-model.number="f.power.max" @change="emitUpdate()" type="number" placeholder="Max"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
+            <input v-model.number="f.power.min" @change="emitUpdate()" type="number" placeholder="Min" :class="inputClasses" />
+            <input v-model.number="f.power.max" @change="emitUpdate()" type="number" placeholder="Max" :class="inputClasses" />
           </div>
         </div>
 
         <!-- Toughness -->
         <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.toughness') }}
             <HelpTooltip :text="t('help.tooltips.search.toughness')" :title="t('help.titles.toughness')" />
           </span>
           <div class="flex gap-2">
-            <input v-model.number="f.toughness.min" @change="emitUpdate()" type="number" placeholder="Min"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
-            <input v-model.number="f.toughness.max" @change="emitUpdate()" type="number" placeholder="Max"
-                class="w-full bg-primary border border-silver-30 px-2 py-1 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary" />
+            <input v-model.number="f.toughness.min" @change="emitUpdate()" type="number" placeholder="Min" :class="inputClasses" />
+            <input v-model.number="f.toughness.max" @change="emitUpdate()" type="number" placeholder="Max" :class="inputClasses" />
           </div>
         </div>
 
         <!-- Formato Legal -->
-        <div>
-          <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+        <div class="md:col-span-2 lg:col-span-3">
+          <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
             {{ t('search.modal.sections.format') }}
             <HelpTooltip :text="t('help.tooltips.search.format')" :title="t('help.titles.format')" />
           </span>
-          <div class="flex flex-wrap gap-1">
-            <button
-                v-for="format in formatOptions"
-                :key="format.value"
-                @click="toggleFormat(format.value)"
-                :class="[
-                  'px-2 py-1 text-tiny font-bold transition-fast',
-                  f.formatLegal?.includes(format.value)
-                    ? 'bg-neon text-primary border border-neon'
-                    : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
-                ]"
-            >
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="format in formatOptions" :key="format.value" type="button" @click="toggleFormat(format.value)" :class="chipClasses(!!f.formatLegal?.includes(format.value))">
               {{ format.label }}
             </button>
           </div>
@@ -635,54 +616,53 @@ const handleReset = () => {
       </div>
 
       <!-- ========== EDICIONES / SETS ========== -->
-      <div class="border border-silver-30 rounded">
+      <div class="border border-line rounded-lg bg-surface-1 overflow-hidden">
         <button
+            type="button"
             @click="toggleAccordion('sets'); loadSets()"
-            class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+            class="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-surface-2 transition-colors duration-200 ease-v2"
         >
-          <span class="text-small font-bold text-silver flex items-center gap-2">
+          <span class="text-small font-semibold text-silver flex items-center gap-2">
             {{ t('search.accordions.sets') }}
             <HelpTooltip :text="t('help.tooltips.search.sets')" :title="t('help.titles.sets')" />
           </span>
-          <span class="flex items-center gap-2">
-            <span v-if="f.sets?.length" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ f.sets.length }}</span>
-            <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('sets') }">▼</span>
+          <span class="flex items-center gap-2.5 text-silver-50">
+            <span v-if="f.sets?.length" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ f.sets.length }}</span>
+            <IconV2 name="chev-d" :size="16" class="transition-transform duration-200 ease-v2" :class="{ '-rotate-180': isAccordionOpen('sets') }" />
           </span>
         </button>
-        <div v-if="isAccordionOpen('sets')" class="px-3 py-2 bg-silver-10/50">
-          <div class="relative mb-2">
+        <div v-if="isAccordionOpen('sets')" class="px-3.5 py-3 border-t border-line">
+          <div class="relative mb-2.5">
             <input
                 v-model="setSearchQuery"
                 type="text"
                 :placeholder="t('search.filterPanel.setSearchPlaceholder')"
-                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
+                class="w-full min-h-[40px] bg-surface-2 border border-line rounded-md px-3 pr-8 text-small text-silver placeholder:text-silver-30 focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
             />
-            <button v-if="setSearchQuery.length > 0" @click="setSearchQuery = ''"
-                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20" type="button">
-              ✕
+            <button v-if="setSearchQuery.length > 0" type="button" @click="setSearchQuery = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors duration-200 ease-v2 rounded-full hover:bg-surface-2">
+              <IconV2 name="x" :size="12" />
             </button>
           </div>
-          <div v-if="setsLoading" class="text-center py-4 text-silver-50 text-small">{{ t('common.loading') }}...</div>
-          <div v-if="f.sets?.length" class="flex flex-wrap gap-1 mb-2 pb-2 border-b border-silver-30">
-            <button v-for="setCode in f.sets" :key="`selected-${setCode}`" @click="toggleSet(setCode)"
-                class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast rounded">
-              {{ getSetName(setCode) }} <span class="opacity-70">×</span>
+          <div v-if="setsLoading" class="text-center py-4 text-silver-50 text-small">{{ t('common.actions.loading') }}...</div>
+          <div v-if="f.sets?.length" class="flex flex-wrap gap-1.5 mb-2.5 pb-2.5 border-b border-line">
+            <button v-for="setCode in f.sets" :key="`selected-${setCode}`" type="button" @click="toggleSet(setCode)" :class="pillClasses">
+              {{ getSetName(setCode) }} <IconV2 name="x" :size="12" />
             </button>
           </div>
-          <div v-if="!setsLoading" class="max-h-48 overflow-y-auto space-y-1">
+          <div v-if="!setsLoading" class="max-h-48 overflow-y-auto space-y-0.5">
             <button
                 v-for="set in displaySets"
                 :key="set.code"
+                type="button"
                 @click="toggleSet(set.code)"
                 :class="[
-                  'w-full px-2 py-1.5 text-left text-small transition-fast flex items-center gap-2 rounded',
-                  f.sets?.includes(set.code)
-                    ? 'bg-neon text-primary font-bold'
-                    : 'text-silver hover:bg-silver-10'
+                  'w-full px-2.5 py-2 text-left text-small transition-colors duration-200 ease-v2 flex items-center gap-2 rounded-md',
+                  f.sets?.includes(set.code) ? 'bg-neon-10 border border-neon-40 text-neon font-semibold' : 'text-silver hover:bg-surface-2'
                 ]"
             >
               <span class="flex-1 truncate">{{ set.name }}</span>
-              <span class="text-tiny opacity-70">{{ set.code.toUpperCase() }}</span>
+              <span class="font-display text-tiny text-silver-50">{{ set.code.toUpperCase() }}</span>
             </button>
             <p v-if="displaySets.length === 0 && setSearchQuery" class="text-tiny text-silver-50 py-2">
               {{ t('search.filterPanel.noSetsFound') }}
@@ -692,29 +672,27 @@ const handleReset = () => {
       </div>
 
       <!-- ========== ACORDEONES DE KEYWORDS ========== -->
-      <div class="border border-silver-30 rounded">
+      <div class="border border-line rounded-lg bg-surface-1 overflow-hidden divide-y divide-line">
         <!-- 1. COMBAT -->
-        <div class="border-b border-silver-30">
-          <button @click="toggleAccordion('combat')" class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast">
-            <span class="text-small font-bold text-silver flex items-center gap-2">
+        <div>
+          <button type="button" @click="toggleAccordion('combat')" class="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-surface-2 transition-colors duration-200 ease-v2">
+            <span class="text-small font-semibold text-silver flex items-center gap-2">
               {{ t('search.accordions.combat') }}
               <HelpTooltip :text="t('help.tooltips.search.combat')" :title="t('help.titles.combat')" />
             </span>
-            <span class="flex items-center gap-2">
-              <span v-if="countSelectedInCategory(combatAbilities) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ countSelectedInCategory(combatAbilities) }}</span>
-              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('combat') }">▼</span>
+            <span class="flex items-center gap-2.5 text-silver-50">
+              <span v-if="countSelectedInCategory(combatAbilities) > 0" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ countSelectedInCategory(combatAbilities) }}</span>
+              <IconV2 name="chev-d" :size="16" class="transition-transform duration-200 ease-v2" :class="{ '-rotate-180': isAccordionOpen('combat') }" />
             </span>
           </button>
-          <div v-if="isAccordionOpen('combat')" class="px-3 py-2 bg-silver-10/50">
-            <div class="flex flex-wrap gap-1 mb-2">
-              <button v-for="keyword in combatAbilities.slice(0, 6)" :key="keyword.value" @click="toggleKeyword(keyword.value)"
-                  :class="['px-2 py-1 text-tiny font-bold transition-fast', f.keywords?.includes(keyword.value) ? 'bg-neon text-primary border border-neon' : 'bg-primary border border-silver-30 text-silver hover:border-neon']">
+          <div v-if="isAccordionOpen('combat')" class="px-3.5 py-3 border-t border-line space-y-2">
+            <div class="flex flex-wrap gap-1.5">
+              <button v-for="keyword in combatAbilities.slice(0, 6)" :key="keyword.value" type="button" @click="toggleKeyword(keyword.value)" :class="chipClasses(!!f.keywords?.includes(keyword.value))">
                 {{ keyword.label }}
               </button>
             </div>
-            <div class="flex flex-wrap gap-1 pt-2 border-t border-silver-30/50">
-              <button v-for="keyword in combatAbilities.slice(6)" :key="keyword.value" @click="toggleKeyword(keyword.value)"
-                  :class="['px-2 py-1 text-tiny font-bold transition-fast', f.keywords?.includes(keyword.value) ? 'bg-neon text-primary border border-neon' : 'bg-primary border border-silver-30 text-silver hover:border-neon']">
+            <div class="flex flex-wrap gap-1.5 pt-2 border-t border-line/50">
+              <button v-for="keyword in combatAbilities.slice(6)" :key="keyword.value" type="button" @click="toggleKeyword(keyword.value)" :class="chipClasses(!!f.keywords?.includes(keyword.value))">
                 {{ keyword.label }}
               </button>
             </div>
@@ -722,23 +700,22 @@ const handleReset = () => {
         </div>
 
         <!-- 2. EFFECTS -->
-        <div class="border-b border-silver-30">
-          <button @click="toggleAccordion('effects')" class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast">
-            <span class="text-small font-bold text-silver flex items-center gap-2">
+        <div>
+          <button type="button" @click="toggleAccordion('effects')" class="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-surface-2 transition-colors duration-200 ease-v2">
+            <span class="text-small font-semibold text-silver flex items-center gap-2">
               {{ t('search.accordions.effects') }}
               <HelpTooltip :text="t('help.tooltips.search.effects')" :title="t('help.titles.effects')" />
             </span>
-            <span class="flex items-center gap-2">
-              <span v-if="countSelectedInCategory(allCommonEffects) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ countSelectedInCategory(allCommonEffects) }}</span>
-              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('effects') }">▼</span>
+            <span class="flex items-center gap-2.5 text-silver-50">
+              <span v-if="countSelectedInCategory(allCommonEffects) > 0" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ countSelectedInCategory(allCommonEffects) }}</span>
+              <IconV2 name="chev-d" :size="16" class="transition-transform duration-200 ease-v2" :class="{ '-rotate-180': isAccordionOpen('effects') }" />
             </span>
           </button>
-          <div v-if="isAccordionOpen('effects')" class="px-3 py-2 bg-silver-10/50 space-y-3">
+          <div v-if="isAccordionOpen('effects')" class="px-3.5 py-3 border-t border-line space-y-3">
             <div v-for="(keywords, catKey) in commonEffects" :key="catKey">
-              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t(`search.effectCategories.${catKey}`) }}</span>
-              <div class="flex flex-wrap gap-1">
-                <button v-for="keyword in keywords" :key="keyword.value" @click="toggleKeyword(keyword.value)"
-                    :class="['px-2 py-1 text-tiny font-bold transition-fast', f.keywords?.includes(keyword.value) ? 'bg-neon text-primary border border-neon' : 'bg-primary border border-silver-30 text-silver hover:border-neon']">
+              <span class="text-tiny text-silver-50 uppercase tracking-[.08em] block mb-1.5">{{ t(`search.effectCategories.${catKey}`) }}</span>
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="keyword in keywords" :key="keyword.value" type="button" @click="toggleKeyword(keyword.value)" :class="chipClasses(!!f.keywords?.includes(keyword.value))">
                   {{ keyword.label }}
                 </button>
               </div>
@@ -747,21 +724,20 @@ const handleReset = () => {
         </div>
 
         <!-- 3. TRIGGERS -->
-        <div class="border-b border-silver-30">
-          <button @click="toggleAccordion('triggers')" class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast">
-            <span class="text-small font-bold text-silver flex items-center gap-2">
+        <div>
+          <button type="button" @click="toggleAccordion('triggers')" class="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-surface-2 transition-colors duration-200 ease-v2">
+            <span class="text-small font-semibold text-silver flex items-center gap-2">
               {{ t('search.accordions.triggers') }}
               <HelpTooltip :text="t('help.tooltips.search.triggers')" :title="t('help.titles.triggers')" />
             </span>
-            <span class="flex items-center gap-2">
-              <span v-if="countSelectedInCategory(triggerKeywords) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ countSelectedInCategory(triggerKeywords) }}</span>
-              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('triggers') }">▼</span>
+            <span class="flex items-center gap-2.5 text-silver-50">
+              <span v-if="countSelectedInCategory(triggerKeywords) > 0" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ countSelectedInCategory(triggerKeywords) }}</span>
+              <IconV2 name="chev-d" :size="16" class="transition-transform duration-200 ease-v2" :class="{ '-rotate-180': isAccordionOpen('triggers') }" />
             </span>
           </button>
-          <div v-if="isAccordionOpen('triggers')" class="px-3 py-2 bg-silver-10/50">
-            <div class="flex flex-wrap gap-1">
-              <button v-for="keyword in triggerKeywords" :key="keyword.value" @click="toggleKeyword(keyword.value)"
-                  :class="['px-2 py-1 text-tiny font-bold transition-fast', f.keywords?.includes(keyword.value) ? 'bg-neon text-primary border border-neon' : 'bg-primary border border-silver-30 text-silver hover:border-neon']">
+          <div v-if="isAccordionOpen('triggers')" class="px-3.5 py-3 border-t border-line">
+            <div class="flex flex-wrap gap-1.5">
+              <button v-for="keyword in triggerKeywords" :key="keyword.value" type="button" @click="toggleKeyword(keyword.value)" :class="chipClasses(!!f.keywords?.includes(keyword.value))">
                 {{ keyword.label }}
               </button>
             </div>
@@ -770,22 +746,21 @@ const handleReset = () => {
 
         <!-- 4. SET MECHANICS -->
         <div>
-          <button @click="toggleAccordion('setMechanics')" class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast">
-            <span class="text-small font-bold text-silver flex items-center gap-2">
+          <button type="button" @click="toggleAccordion('setMechanics')" class="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-surface-2 transition-colors duration-200 ease-v2">
+            <span class="text-small font-semibold text-silver flex items-center gap-2">
               {{ t('search.accordions.setMechanics') }}
               <HelpTooltip :text="t('help.tooltips.search.setMechanics')" :title="t('help.titles.setMechanics')" />
             </span>
-            <span class="flex items-center gap-2">
-              <span v-if="countSelectedInCategory(allSetMechanics) > 0" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ countSelectedInCategory(allSetMechanics) }}</span>
-              <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('setMechanics') }">▼</span>
+            <span class="flex items-center gap-2.5 text-silver-50">
+              <span v-if="countSelectedInCategory(allSetMechanics) > 0" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ countSelectedInCategory(allSetMechanics) }}</span>
+              <IconV2 name="chev-d" :size="16" class="transition-transform duration-200 ease-v2" :class="{ '-rotate-180': isAccordionOpen('setMechanics') }" />
             </span>
           </button>
-          <div v-if="isAccordionOpen('setMechanics')" class="px-3 py-2 bg-silver-10/50 space-y-3">
+          <div v-if="isAccordionOpen('setMechanics')" class="px-3.5 py-3 border-t border-line space-y-3">
             <div v-for="(keywords, catKey) in setMechanics" :key="catKey">
-              <span class="text-tiny text-silver-50 uppercase block mb-1">{{ t(`search.mechanicCategories.${catKey}`) }}</span>
-              <div class="flex flex-wrap gap-1">
-                <button v-for="keyword in keywords" :key="keyword.value" @click="toggleKeyword(keyword.value)"
-                    :class="['px-2 py-1 text-tiny font-bold transition-fast', f.keywords?.includes(keyword.value) ? 'bg-neon text-primary border border-neon' : 'bg-primary border border-silver-30 text-silver hover:border-neon']">
+              <span class="text-tiny text-silver-50 uppercase tracking-[.08em] block mb-1.5">{{ t(`search.mechanicCategories.${catKey}`) }}</span>
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="keyword in keywords" :key="keyword.value" type="button" @click="toggleKeyword(keyword.value)" :class="chipClasses(!!f.keywords?.includes(keyword.value))">
                   {{ keyword.label }}
                 </button>
               </div>
@@ -795,58 +770,55 @@ const handleReset = () => {
       </div>
 
       <!-- ========== CREATURE TYPES ACCORDION ========== -->
-      <div class="border border-silver-30 rounded">
+      <div class="border border-line rounded-lg bg-surface-1 overflow-hidden">
         <button
+            type="button"
             @click="toggleAccordion('creatureTypes')"
-            class="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-silver-10 transition-fast"
+            class="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-surface-2 transition-colors duration-200 ease-v2"
         >
-          <span class="text-small font-bold text-silver flex items-center gap-2">
+          <span class="text-small font-semibold text-silver flex items-center gap-2">
             {{ t('search.accordions.creatureTypes') }}
             <HelpTooltip :text="t('help.tooltips.search.creatureTypes')" :title="t('help.titles.creatureTypes')" />
           </span>
-          <span class="flex items-center gap-2">
-            <span v-if="f.creatureTypes?.length" class="bg-neon text-primary px-2 py-0.5 text-tiny font-bold">{{ f.creatureTypes.length }}</span>
-            <span class="text-silver-50 transition-transform" :class="{ 'rotate-180': isAccordionOpen('creatureTypes') }">▼</span>
+          <span class="flex items-center gap-2.5 text-silver-50">
+            <span v-if="f.creatureTypes?.length" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ f.creatureTypes.length }}</span>
+            <IconV2 name="chev-d" :size="16" class="transition-transform duration-200 ease-v2" :class="{ '-rotate-180': isAccordionOpen('creatureTypes') }" />
           </span>
         </button>
-        <div v-if="isAccordionOpen('creatureTypes')" class="px-3 py-2 bg-silver-10/50">
-          <div class="relative mb-2">
+        <div v-if="isAccordionOpen('creatureTypes')" class="px-3.5 py-3 border-t border-line">
+          <div class="relative mb-2.5">
             <input
                 v-model="creatureTypeSearchQuery"
                 type="text"
                 :placeholder="t('search.filterPanel.creatureTypeSearchPlaceholder')"
-                class="w-full bg-primary border border-silver-30 px-3 pr-8 py-2 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded"
+                class="w-full min-h-[40px] bg-surface-2 border border-line rounded-md px-3 pr-8 text-small text-silver placeholder:text-silver-30 focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
             />
-            <button v-if="creatureTypeSearchQuery.length > 0" @click="creatureTypeSearchQuery = ''"
-                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20" type="button">
-              ✕
+            <button v-if="creatureTypeSearchQuery.length > 0" type="button" @click="creatureTypeSearchQuery = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors duration-200 ease-v2 rounded-full hover:bg-surface-2">
+              <IconV2 name="x" :size="12" />
             </button>
           </div>
-          <div v-if="f.creatureTypes?.length" class="flex flex-wrap gap-1 mb-2 pb-2 border-b border-silver-30">
-            <button v-for="ct in f.creatureTypes" :key="`selected-ct-${ct}`" @click="toggleCreatureType(ct)"
-                class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast rounded">
-              {{ getCreatureTypeLabel(ct) }} <span class="opacity-70">×</span>
+          <div v-if="f.creatureTypes?.length" class="flex flex-wrap gap-1.5 mb-2.5 pb-2.5 border-b border-line">
+            <button v-for="ct in f.creatureTypes" :key="`selected-ct-${ct}`" type="button" @click="toggleCreatureType(ct)" :class="pillClasses">
+              {{ getCreatureTypeLabel(ct) }} <IconV2 name="x" :size="12" />
             </button>
           </div>
-          <div class="flex flex-wrap gap-1">
+          <div class="flex flex-wrap gap-1.5">
             <button
                 v-for="ct in displayCreatureTypes"
                 :key="ct.value"
+                type="button"
                 @click="toggleCreatureType(ct.value)"
-                :class="[
-                  'px-2 py-1 text-tiny font-bold transition-fast rounded',
-                  f.creatureTypes?.includes(ct.value)
-                    ? 'bg-neon text-primary border border-neon'
-                    : 'bg-primary border border-silver-30 text-silver hover:border-neon'
-                ]"
+                :class="chipClasses(!!f.creatureTypes?.includes(ct.value))"
             >
               {{ ct.label }}<span v-if="ct.count" class="ml-1 opacity-70">({{ ct.count }})</span>
             </button>
           </div>
           <button
               v-if="!creatureTypeSearchQuery && totalCreatureTypeCount > 20"
+              type="button"
               @click="showAllCreatureTypes = !showAllCreatureTypes"
-              class="mt-2 text-tiny text-neon hover:underline"
+              class="mt-2.5 text-tiny text-neon hover:underline"
           >
             {{ showAllCreatureTypes ? t('common.actions.close') : `Show all (${totalCreatureTypeCount})` }}
           </button>
@@ -858,42 +830,48 @@ const handleReset = () => {
 
       <!-- Tipos Especiales -->
       <div>
-        <span class="text-tiny font-bold text-silver-70 uppercase mb-2 flex items-center gap-1">
+        <span class="text-tiny font-bold text-silver-50 uppercase tracking-[.1em] mb-2.5 flex items-center gap-1.5">
           {{ t('search.modal.sections.specialTypes') }}
           <HelpTooltip :text="t('help.tooltips.search.specialTypes')" :title="t('help.titles.specialTypes')" />
         </span>
-        <div class="flex flex-wrap gap-1">
-          <button v-for="keyword in specialTypes" :key="keyword.value" @click="toggleKeyword(keyword.value)"
-              :class="['px-2 py-1 text-tiny font-bold transition-fast', f.keywords?.includes(keyword.value) ? 'bg-neon text-primary border border-neon' : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon']">
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="keyword in specialTypes" :key="keyword.value" type="button" @click="toggleKeyword(keyword.value)" :class="chipClasses(!!f.keywords?.includes(keyword.value))">
             {{ keyword.label }}
           </button>
         </div>
       </div>
 
-      <!-- Opciones especiales -->
-      <div class="flex gap-4 pt-2 border-t border-silver-30 items-center">
-        <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
-          <input v-model="f.isFoil" @change="emitUpdate()" type="checkbox" class="w-4 h-4" />
-          <span>{{ t('search.modal.options.foilOnly') }}</span>
+      <!-- Opciones especiales (switches v2) -->
+      <div class="flex flex-wrap gap-6 pt-4 border-t border-line items-center">
+        <label class="flex items-center gap-3 text-small text-silver cursor-pointer select-none">
+          <span class="relative inline-flex w-11 h-6 rounded-full border transition-all duration-200 ease-v2 flex-shrink-0" :class="f.isFoil ? 'bg-neon-15 border-neon-40' : 'bg-surface-3 border-line-strong'">
+            <input v-model="f.isFoil" @change="emitUpdate()" type="checkbox" class="absolute inset-0 opacity-0 cursor-pointer" />
+            <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-200 ease-v2" :class="f.isFoil ? 'translate-x-[18px] bg-neon' : 'bg-silver-50'"></span>
+          </span>
+          {{ t('search.modal.options.foilOnly') }}
         </label>
-        <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
-          <input v-model="f.isFullArt" @change="emitUpdate()" type="checkbox" class="w-4 h-4" />
-          <span>{{ t('search.modal.options.fullArt') }}</span>
+        <label class="flex items-center gap-3 text-small text-silver cursor-pointer select-none">
+          <span class="relative inline-flex w-11 h-6 rounded-full border transition-all duration-200 ease-v2 flex-shrink-0" :class="f.isFullArt ? 'bg-neon-15 border-neon-40' : 'bg-surface-3 border-line-strong'">
+            <input v-model="f.isFullArt" @change="emitUpdate()" type="checkbox" class="absolute inset-0 opacity-0 cursor-pointer" />
+            <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-200 ease-v2" :class="f.isFullArt ? 'translate-x-[18px] bg-neon' : 'bg-silver-50'"></span>
+          </span>
+          {{ t('search.modal.options.fullArt') }}
         </label>
         <HelpTooltip :text="t('help.tooltips.search.foilFullArt')" :title="t('help.titles.foilFullArt')" />
       </div>
 
       <!-- Footer -->
-      <div class="flex justify-between pt-4 border-t border-silver-30">
-        <button
+      <div class="flex justify-between items-center pt-4 border-t border-line">
+        <BaseButton
             v-if="activeFilterCount > 0"
+            variant="danger"
+            class="uppercase tracking-[.1em] !text-[12px]"
             @click="handleReset"
-            class="px-4 py-2 text-small font-bold text-rust border border-rust hover:bg-rust hover:text-primary transition-fast rounded"
         >
           {{ t('search.filterPanel.clear') }}
-        </button>
+        </BaseButton>
         <div v-else></div>
-        <BaseButton @click="emit('close')">
+        <BaseButton variant="filled" class="uppercase tracking-[.1em] !text-[12px]" @click="emit('close')">
           {{ t('search.modal.apply') }}
         </BaseButton>
       </div>
@@ -906,6 +884,4 @@ const handleReset = () => {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(238, 238, 238, 0.2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(238, 238, 238, 0.4); }
-.rotate-180 { transform: rotate(180deg); }
-.transition-transform { transition: transform 150ms ease-out; }
 </style>

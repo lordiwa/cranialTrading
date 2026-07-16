@@ -1622,11 +1622,14 @@
 
   "search": {
     "view": {
-      "title": "ADVANCED SEARCH",
+      "title": "Search cards",
+      "kicker": "Global catalog",
       "backToCollection": "Back",
       "inCollectionTitle": "In your collection",
       "otherUsersTitle": "Other users sell or trade",
-      "catalogTitle": "Card catalog"
+      "catalogTitle": "Card catalog",
+      "viewInCollection": "View in collection",
+      "addButton": "Add"
     },
     "owned": "x{count} owned",
     "filterPanel": {
@@ -1646,6 +1649,7 @@
     "modal": {
       "title": "ADVANCED FILTERS",
       "apply": "APPLY FILTERS",
+      "activeFilters": "active",
       "sections": {
         "colors": "Colors",
         "rarity": "Rarity",

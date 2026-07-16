@@ -478,7 +478,7 @@
     {
       "key": "TASK-100",
       "title": "Design→app v2 F4b: modales de deck/binder — NewDeck, AddToDeck, NewBinder, EditDeckCard, ManageDecks, Discovery",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

@@ -2,11 +2,11 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "active",
-  "updated_at": "2026-07-14T02:33:55.739Z",
-  "active_task": "TASK-096",
-  "workflow_step": "update",
-  "next_action": "LOOP AUTONOMO ACTIVO (2026-07-13, autorizado por Rafael: autonomia total = unattended + auto_push + auto_version_bump; UAT F0/F1/F1b delegado al orquestador). GOAL keys: TASK-091..107 (backlog design->app v2 completo + chores). Paso actual: tanda 1 — commits separados F0(092)/F1(093)/F1b(096), bump minor 1.40.0, E2E completo, push develop; luego backlog en orden 094,097,098,099,091,095,100,101,102,103,104,105,106,107. Campos legacy del bundle archivados en legacy-freeform.json (mismo dir).",
-  "handoff_summary": "SESION 2026-07-13 PAUSADA (ver pause_note_2026_07_13 — es la fuente al retomar): F0+F1+F1b implementados/aprobados SIN COMMITEAR esperando UAT de Rafael; backlog completo F2-F9+chores materializado (TASK-094..107); al PASS de Rafael: commits+1.40.0+E2E+push. HISTORIA PREVIA: Rafael aprobo plan F0-F4, mantuvo headline actual de landing (NO 'From Trash to Treasures'), y aprobo TASK-091 como F3. Tickets creados: TASK-092 (F0 tokens+tipografia, high, uat-only), TASK-093 (F1 header/tabbar/iconos, tests-after), TASK-094 (F2 matches hub, tdd), TASK-091 actualizado (F3 messages split-pane + unreadCount real, tdd), TASK-095 (F4 resto, tests-after, pre-split requerido). Cadena depends_on 092<-093<-094<-095, 091<-093. GOTCHA NUEVO: el MCP hivemind-tasks de esta sesion apunta a public/ (cwd) NO a la raiz — tickets editados por fallback directo; residuo public/tasks/{TASK-001,index}.json pendiente de borrado por Rafael (clasificador bloqueo el delete). Trabajando TASK-092 con developer spawn.",
+  "updated_at": "2026-07-16T03:05:00.000Z",
+  "active_task": null,
+  "workflow_step": "select",
+  "next_action": "Continuar backlog en orden: TASK-101 (F6 busqueda) -> 102 (F7a landing guest) -> 103 (F7b auth) -> 104 (F8 perfil/settings/tour) -> 105 (F9 estaticas) -> 106 (chore dead code, 10 huerfanos acumulados listados en sus comments) -> 107 (chore sync Design 4 chips). Gate 5 chequeado 2026-07-16 al cerrar TASK-100 (completed=10): 0 drafts en tasks/, OK. Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (autorizacion de Rafael 2026-07-13: autonomia total = unattended + auto_push + auto_version_bump + UAT delegado — session-scoped, RE-CONFIRMAR con el). PENDIENTES DE RAFAEL: UAT visual de v1.40.0-1.46.0 en cranial-trading-dev.web.app; decision registro voseo/tuteo es.json; borrar residuo public/tasks/ a mano; cranial-design/ y .mcp.json siguen untracked.",
+  "handoff_summary": "Sesion reanudada 2026-07-16 en modo harness (manual). TASK-100 (F4b modales deck/binder) CERRADO: E2E local verde (123 passed, unico fallo = flake conocido search-autocomplete, confirmado pasando en aislado), push a develop b4ff272..6ad1d12, CI run 29467500570 verde, v1.46.0 en dev. Con esto 10/17 tickets del goal v2 estan cerrados y desplegados a dev (F0,F1,F1b,F2,F2b,F5a,F5b,F3,F4a,F4b = v1.40.0..1.46.0). Quedan TASK-101..105 (F6-F9) + chores 106/107. Gate 5 (multiplo de 5) chequeado: 0 drafts. Contexto previo: loop autonomo de 2026-07-13/14 pausado por Rafael; incidentes resueltos en esa corrida: server portfolio stale en :4173, 3 fallos de CI por tests E2E a escala de la cuenta 59k — todos test-only.",
   "open_questions": [
     "Working tree sin commitear (RED hub merge): commitear como feature, descartar, o taskear?",
     "Componentes en Figma via design/figma-build-prompt.md: sigue pendiente de la sesion interactiva de Rafael (aunque el MCP de Figma YA carga en background desde 2026-07-02 — se podria hacer desde aca si Rafael lo pide)",
@@ -92,8 +92,8 @@
       "task": "TASK-092 — reviewer (rev-f0-tokens)"
     }
   ],
-  "pending_human_confirmation": "Rafael: (1) validar landing v1.36.0 y TASK-085 v1.37.0 en cranial-trading-dev.web.app; (2) OK explicito para prod de TASK-085 (merge main + reglas + backfill); (3) destino del working tree sin commitear (RED hub merge); (4) revision visual del prototipo cranial-design + tramos A/B/C.",
-  "mode": "loop",
+  "pending_human_confirmation": "Rafael: (1) UAT visual de todo lo shippeado (v1.40.0-1.46.0 en dev); (2) confirmar si seguimos manual con TASK-101 o relanzamos el loop (re-confirmar loop_auth); (3) registro voseo/tuteo en es.json; (4) residuo public/tasks/ borrar a mano.",
+  "mode": "harness",
   "loop_auth": {
     "auto_close_on_green_review": true,
     "uat_delegated_to_orchestrator": true,
@@ -102,10 +102,10 @@
     "auto_version_bump_on_milestone": true
   },
   "loop_state": {
-    "current_ticket": "TASK-095",
-    "phase": "update",
-    "iteration": 7,
-    "completed_this_run": 8,
+    "current_ticket": null,
+    "phase": "select",
+    "iteration": 8,
+    "completed_this_run": 10,
     "run_started_at": "2026-07-13T20:00:00.000Z"
   }
 }

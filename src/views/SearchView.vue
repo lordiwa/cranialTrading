@@ -11,6 +11,8 @@ import { type PublicCardResult, searchPublicCards } from '../services/publicCard
 import { filterCollectionByTerm } from '../utils/searchSections'
 import { buildOwnedCountMap } from '../utils/ownedCount'
 import { getAvatarUrlForUser } from '../utils/avatar'
+import { PER_PAGE_OPTIONS, type SearchPerPage } from '../utils/searchPagination'
+import type { SearchSortOption } from '../utils/searchSort'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -23,7 +25,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const collectionStore = useCollectionStore()
 const searchStore = useSearchStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { sendInterestFromSearch, sendingInterest, sentInterestIds } = useSendInterest()
 
 const selectedScryfallCard = ref<ScryfallCard | undefined>(undefined)
@@ -82,6 +84,24 @@ const handleCardSelected = (card: ScryfallCard) => {
 
 const handleBack = () => {
   void router.push({ path: '/collection' })
+}
+
+// Sort/per-page toolbar (TASK-108, Scryfall catalog only)
+const handleSortChange = (e: Event) => {
+  const value = (e.target as HTMLSelectElement).value
+  searchStore.setSort(value ? (value as SearchSortOption) : undefined)
+}
+
+const handlePerPageChange = (e: Event) => {
+  const value = Number((e.target as HTMLSelectElement).value) as SearchPerPage
+  searchStore.setPerPage(value)
+}
+
+// Same locale-aware thousands-grouping pattern as CollectionView's heroCollectionValue
+const intlLocaleMap: Record<string, string> = { es: 'es-AR', en: 'en-US', pt: 'pt-BR' }
+const formatCount = (n: number): string => {
+  const intlLocale = intlLocaleMap[locale.value] ?? 'es-AR'
+  return new Intl.NumberFormat(intlLocale).format(n)
 }
 </script>
 
@@ -203,24 +223,84 @@ const handleBack = () => {
     <div v-if="searchStore.hasResults" class="mt-8 space-y-4">
       <div class="flex items-baseline gap-2.5">
         <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('search.view.catalogTitle') }}</h2>
-        <span class="text-tiny font-display font-tnum text-silver-30 font-semibold">{{ searchStore.totalResults }} · Scryfall</span>
+        <span class="text-tiny font-display font-tnum text-silver-30 font-semibold">{{ formatCount(searchStore.totalCards) }} · Scryfall</span>
       </div>
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <p class="text-small text-silver-70">
-          {{ t('collection.searchResults.subtitle', { count: searchStore.totalResults }) }}
+
+      <!-- Toolbar: results range (left) + sort/per-page (right) -->
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <p class="text-small text-silver-70 font-tnum">
+          {{ t('search.view.toolbar.resultsRange', {
+            from: formatCount(searchStore.range.from),
+            to: formatCount(searchStore.range.to),
+            total: formatCount(searchStore.range.total),
+          }) }}
         </p>
-        <BaseButton size="small" variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="searchStore.clearSearch()">
-          {{ t('collection.searchResults.back') }}
-        </BaseButton>
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="flex items-center gap-1.5">
+            <span class="text-tiny text-silver-50 uppercase tracking-[.06em]">{{ t('search.view.toolbar.sortLabel') }}</span>
+            <select
+                data-testid="search-sort"
+                :value="searchStore.sort ?? ''"
+                class="appearance-none bg-surface-1 border border-line text-silver text-tiny font-bold px-3 py-2 pr-8 min-h-[36px] rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+                @change="handleSortChange"
+            >
+              <option value="">{{ t('search.view.toolbar.sortDefault') }}</option>
+              <option value="popular">{{ t('search.view.toolbar.sortPopular') }}</option>
+              <option value="name">{{ t('search.view.toolbar.sortName') }}</option>
+              <option value="price-asc">{{ t('search.view.toolbar.sortPriceAsc') }}</option>
+              <option value="price-desc">{{ t('search.view.toolbar.sortPriceDesc') }}</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-1.5">
+            <span class="text-tiny text-silver-50 uppercase tracking-[.06em]">{{ t('search.view.toolbar.perPageLabel') }}</span>
+            <select
+                data-testid="search-per-page"
+                :value="searchStore.perPage"
+                class="appearance-none bg-surface-1 border border-line text-silver text-tiny font-bold px-3 py-2 pr-8 min-h-[36px] rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+                @change="handlePerPageChange"
+            >
+              <option v-for="opt in PER_PAGE_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+          </label>
+          <BaseButton size="small" variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="searchStore.clearSearch()">
+            {{ t('collection.searchResults.back') }}
+          </BaseButton>
+        </div>
       </div>
+
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
         <SearchResultCard
-          v-for="card in searchStore.results"
+          v-for="card in searchStore.pagedResults"
           :key="card.id"
           :card="card"
           :owned-count="getOwnedCount(card)"
           @click="handleCardSelected(card)"
         />
+      </div>
+
+      <!-- Local pagination over the already-loaded Scryfall page -->
+      <div v-if="searchStore.totalPages > 1" class="flex items-center justify-center gap-4 pt-2">
+        <button
+            type="button"
+            :disabled="searchStore.page <= 1"
+            :aria-label="t('search.view.toolbar.prevPage')"
+            class="w-9 h-9 flex items-center justify-center rounded-md border border-line text-silver-70 transition-all duration-200 ease-v2 hover:border-line-strong hover:text-silver disabled:opacity-30 disabled:pointer-events-none"
+            @click="searchStore.prevPage()"
+        >
+          <IconV2 name="chev-l" :size="16" />
+        </button>
+        <span class="text-tiny font-tnum text-silver-50">
+          {{ t('search.view.toolbar.pageIndicator', { page: searchStore.page, totalPages: searchStore.totalPages }) }}
+        </span>
+        <button
+            type="button"
+            :disabled="searchStore.page >= searchStore.totalPages"
+            :aria-label="t('search.view.toolbar.nextPage')"
+            class="w-9 h-9 flex items-center justify-center rounded-md border border-line text-silver-70 transition-all duration-200 ease-v2 hover:border-line-strong hover:text-silver disabled:opacity-30 disabled:pointer-events-none"
+            @click="searchStore.nextPage()"
+        >
+          <IconV2 name="chev-r" :size="16" />
+        </button>
       </div>
     </div>
 

@@ -1629,7 +1629,20 @@
       "otherUsersTitle": "Other users sell or trade",
       "catalogTitle": "Card catalog",
       "viewInCollection": "View in collection",
-      "addButton": "Add"
+      "addButton": "Add",
+      "toolbar": {
+        "sortLabel": "Sort",
+        "sortDefault": "Newest",
+        "sortPopular": "Popular",
+        "sortName": "Name",
+        "sortPriceAsc": "Price: Low to High",
+        "sortPriceDesc": "Price: High to Low",
+        "perPageLabel": "Per page",
+        "resultsRange": "{from}–{to} of {total}",
+        "prevPage": "Previous",
+        "nextPage": "Next",
+        "pageIndicator": "Page {page} of {totalPages}"
+      }
     },
     "owned": "x{count} owned",
     "filterPanel": {

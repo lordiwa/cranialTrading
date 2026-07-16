@@ -1629,7 +1629,20 @@
       "otherUsersTitle": "Otros usuarios venden o cambian",
       "catalogTitle": "Catálogo de cartas",
       "viewInCollection": "Ver en colección",
-      "addButton": "Agregar"
+      "addButton": "Agregar",
+      "toolbar": {
+        "sortLabel": "Ordenar",
+        "sortDefault": "Más reciente",
+        "sortPopular": "Popular",
+        "sortName": "Nombre",
+        "sortPriceAsc": "Precio: menor a mayor",
+        "sortPriceDesc": "Precio: mayor a menor",
+        "perPageLabel": "Por página",
+        "resultsRange": "{from}–{to} de {total}",
+        "prevPage": "Anterior",
+        "nextPage": "Siguiente",
+        "pageIndicator": "Página {page} de {totalPages}"
+      }
     },
     "owned": "x{count} tengo",
     "filterPanel": {

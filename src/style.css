@@ -58,6 +58,17 @@
 
     html {
         @apply bg-primary text-silver font-sans;
+        /* Native form widgets (select popups, scrollbars, pickers) must render in
+           the browser's dark theme — without this Chrome paints the <select> option
+           list with the OS light theme (white bg) under our silver text. */
+        color-scheme: dark;
+    }
+
+    /* Fallback for engines that style <option> directly (Chromium on Windows):
+       explicit dark bg + readable text regardless of color-scheme support. */
+    select option {
+        background-color: #000000;
+        color: #EEEEEE;
     }
 
     body {

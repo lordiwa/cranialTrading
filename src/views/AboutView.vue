@@ -37,7 +37,7 @@ useHead({
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="border-b border-silver-20 py-6">
+    <header class="sticky top-0 z-10 bg-hdr backdrop-blur-md border-b border-line py-5">
       <div class="max-w-4xl mx-auto px-6">
         <RouterLink to="/login" class="flex items-center gap-3 w-fit">
           <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
@@ -50,10 +50,14 @@ useHead({
 
     <!-- Content -->
     <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
-      <h1 class="text-h1 font-bold text-silver mb-8">Sobre Cranial Trading</h1>
+      <div class="rise mb-8">
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">{{ t('pages.kicker.about') }}</p>
+        <h1 class="font-display text-h1 font-bold text-silver">Sobre Cranial Trading</h1>
+      </div>
 
       <!-- Mission Statement -->
-      <section class="mb-12 p-8 border border-neon/30 bg-secondary">
+      <section class="mb-12 p-8 border border-neon-40 bg-surface-1 rounded-lg">
+        <h2 class="font-display text-[18px] font-bold text-neon mb-2">Nuestra misión</h2>
         <p class="text-h3 text-neon font-bold leading-relaxed">
           Nuestra misión es democratizar el intercambio de cartas Magic: The Gathering en Latinoamérica
           y el mundo, conectando jugadores de forma segura y transparente.
@@ -63,10 +67,10 @@ useHead({
       <div class="space-y-12 text-body text-silver-70">
         <!-- Qué Hacemos -->
         <section>
-          <h2 class="text-h1 font-bold text-silver mb-6">Qué Hacemos</h2>
+          <h2 class="font-display text-h1 font-bold text-silver mb-6">Qué Hacemos</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Gestión de Colecciones -->
-            <div class="border border-silver-30 p-6">
+            <div class="border border-line bg-surface-1 rounded-lg p-6 transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 hover:shadow-medium">
               <h3 class="text-h3 font-bold text-silver mb-3">Gestión de Colecciones</h3>
               <p>
                 Registra cada carta con su edición, condición y precios de mercado. Importa desde Moxfield.
@@ -75,7 +79,7 @@ useHead({
             </div>
 
             <!-- Matches Automáticos -->
-            <div class="border border-silver-30 p-6">
+            <div class="border border-line bg-surface-1 rounded-lg p-6 transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 hover:shadow-medium">
               <h3 class="text-h3 font-bold text-silver mb-3">Matches Automáticos</h3>
               <p>
                 Nuestro algoritmo cruza lo que buscas con lo que otros ofrecen, y viceversa.
@@ -84,7 +88,7 @@ useHead({
             </div>
 
             <!-- Mensajería Integrada -->
-            <div class="border border-silver-30 p-6">
+            <div class="border border-line bg-surface-1 rounded-lg p-6 transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 hover:shadow-medium">
               <h3 class="text-h3 font-bold text-silver mb-3">Mensajería Integrada</h3>
               <p>
                 Chatea directamente con traders que coincidan contigo. Negocia condiciones,
@@ -93,7 +97,7 @@ useHead({
             </div>
 
             <!-- Precios de Mercado -->
-            <div class="border border-silver-30 p-6">
+            <div class="border border-line bg-surface-1 rounded-lg p-6 transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong hover:-translate-y-0.5 hover:shadow-medium">
               <h3 class="text-h3 font-bold text-silver mb-3">Precios de Mercado</h3>
               <p>
                 Precios en tiempo real de TCGPlayer a través de Scryfall. Valuación ajustada por condición
@@ -105,7 +109,7 @@ useHead({
 
         <!-- Nuestros Datos -->
         <section>
-          <h2 class="text-h1 font-bold text-silver mb-6">Nuestros Datos</h2>
+          <h2 class="font-display text-h1 font-bold text-silver mb-6">Nuestros Datos</h2>
           <p class="mb-4">
             Cranial Trading utiliza fuentes de datos confiables y reconocidas por la comunidad de Magic: The Gathering:
           </p>
@@ -127,7 +131,7 @@ useHead({
               Información complementaria para análisis y seguimiento.
             </li>
           </ul>
-          <p class="mt-6 p-4 bg-secondary border border-silver-30">
+          <p class="mt-6 p-4 bg-surface-1 border border-line rounded-lg">
             <strong class="text-neon">Privacidad:</strong> No vendemos ni compartimos datos personales.
             Consulta nuestra
             <RouterLink to="/privacy" class="text-neon hover:underline">Política de Privacidad</RouterLink>
@@ -137,7 +141,7 @@ useHead({
 
         <!-- Para la Comunidad -->
         <section>
-          <h2 class="text-h1 font-bold text-silver mb-6">Para la Comunidad</h2>
+          <h2 class="font-display text-h1 font-bold text-silver mb-6">Para la Comunidad</h2>
           <p class="mb-4">
             Cranial Trading nació de una necesidad real: facilitar el intercambio de cartas en regiones donde
             la infraestructura de trading es limitada. Estos son nuestros principios:
@@ -168,7 +172,7 @@ useHead({
 
         <!-- Contáctanos -->
         <section>
-          <h2 class="text-h1 font-bold text-silver mb-4">Contáctanos</h2>
+          <h2 class="font-display text-h1 font-bold text-silver mb-4">Contáctanos</h2>
           <p>
             ¿Tienes preguntas, sugerencias o quieres reportar un problema? Nos encantaría escucharte.
             Visita nuestra página de
@@ -179,7 +183,7 @@ useHead({
       </div>
 
       <!-- Back link -->
-      <div class="mt-12 pt-8 border-t border-silver-20">
+      <div class="mt-12 pt-8 border-t border-line">
         <RouterLink to="/login" class="text-small text-neon hover:underline">
           {{ t('legal.backToHome') }}
         </RouterLink>
@@ -187,9 +191,9 @@ useHead({
     </main>
 
     <!-- Simple Footer -->
-    <footer class="border-t border-silver-20 py-6">
+    <footer class="border-t border-line py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
+        <p class="text-tiny text-silver-30">{{ t('legal.footer.copyright') }}</p>
         <nav class="flex gap-4 text-tiny" aria-label="Legal links">
           <RouterLink to="/terms" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
           <RouterLink to="/privacy" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.privacy') }}</RouterLink>

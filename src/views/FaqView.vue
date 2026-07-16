@@ -105,8 +105,9 @@ onMounted(() => {
   <AppContainer>
     <div class="max-w-3xl mx-auto">
       <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-h1 font-bold text-silver mb-2">{{ t('help.faq.title') }}</h1>
+      <div class="rise mb-8">
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">{{ t('pages.kicker.help') }}</p>
+        <h1 class="font-display text-h1 font-bold text-silver mb-2">{{ t('help.faq.title') }}</h1>
         <p class="text-body text-silver-70">
           Todo lo que necesitas saber sobre Cranial Trading
         </p>
@@ -114,7 +115,7 @@ onMounted(() => {
 
       <!-- Getting Started Guide -->
       <section id="getting-started" class="mb-10">
-        <h2 class="text-h2 font-bold text-neon mb-4 flex items-center gap-2">
+        <h2 class="font-display text-h2 font-bold text-neon mb-4 flex items-center gap-2">
           <SvgIcon name="star" size="small" />
           {{ gettingStarted.title }}
         </h2>
@@ -122,7 +123,7 @@ onMounted(() => {
           <div
               v-for="(step, index) in gettingStarted.steps"
               :key="index"
-              class="bg-primary border border-silver-30 p-4 rounded-md hover:border-neon-40 transition-colors"
+              class="bg-surface-1 border border-line p-4 rounded-lg transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong"
           >
             <h3 class="text-body font-bold text-silver mb-2">{{ step.title }}</h3>
             <p class="text-small text-silver-70">{{ step.description }}</p>
@@ -133,21 +134,21 @@ onMounted(() => {
       <!-- FAQ Section -->
       <section id="trading" class="mb-10">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-h2 font-bold text-neon flex items-center gap-2">
+          <h2 class="font-display text-h2 font-bold text-neon flex items-center gap-2">
             <SvgIcon name="chat" size="small" />
             Preguntas Frecuentes
           </h2>
           <div class="flex gap-2">
             <button
                 @click="expandAll"
-                class="text-tiny text-silver-50 hover:text-neon transition-colors px-2 py-1"
+                class="text-tiny font-semibold text-neon hover:underline transition-colors px-2 py-1 min-h-[44px]"
             >
               Expandir todo
             </button>
             <span class="text-silver-30">|</span>
             <button
                 @click="collapseAll"
-                class="text-tiny text-silver-50 hover:text-neon transition-colors px-2 py-1"
+                class="text-tiny font-semibold text-neon hover:underline transition-colors px-2 py-1 min-h-[44px]"
             >
               Colapsar todo
             </button>
@@ -158,12 +159,12 @@ onMounted(() => {
           <div
               v-for="(item, index) in faqQuestions"
               :key="index"
-              class="border border-silver-30 rounded-md overflow-hidden"
+              class="bg-surface-1 border border-line rounded-lg overflow-hidden transition-colors duration-200 ease-v2 hover:border-line-strong"
           >
             <!-- Question Header -->
             <button
                 @click="toggleQuestion(index)"
-                class="w-full flex items-center justify-between p-4 text-left hover:bg-silver-5 transition-colors"
+                class="w-full flex items-center justify-between p-4 text-left hover:bg-surface-2 transition-colors"
             >
               <span class="text-body font-bold text-silver pr-4">{{ item.q }}</span>
               <SvgIcon
@@ -184,7 +185,7 @@ onMounted(() => {
             >
               <div v-if="isExpanded(index)" class="overflow-hidden">
                 <div class="px-4 pb-4 pt-0">
-                  <div class="border-t border-silver-20 pt-4">
+                  <div class="border-t border-line pt-4">
                     <p class="text-small text-silver-70 leading-relaxed">{{ item.a }}</p>
                   </div>
                 </div>
@@ -196,18 +197,18 @@ onMounted(() => {
 
       <!-- Trading Safety Tips -->
       <section id="safety" class="mb-10">
-        <h2 class="text-h2 font-bold text-neon mb-4 flex items-center gap-2">
+        <h2 class="font-display text-h2 font-bold text-neon mb-4 flex items-center gap-2">
           <SvgIcon name="eye-open" size="small" />
           {{ t('help.guides.tradeSafety.title') }}
         </h2>
-        <div class="bg-primary border border-silver-30 p-6 rounded-md">
+        <div class="bg-surface-1 border border-line p-6 rounded-lg">
           <ul class="space-y-3">
             <li
                 v-for="(tip, index) in tradeSafetyTips"
                 :key="index"
                 class="flex items-start gap-3"
             >
-              <span class="w-6 h-6 rounded-full bg-neon-10 border border-neon text-neon flex items-center justify-center text-tiny font-bold flex-shrink-0 mt-0.5">
+              <span class="w-6 h-6 rounded-full bg-neon-10 border border-neon text-neon flex items-center justify-center text-tiny font-display font-tnum font-bold flex-shrink-0 mt-0.5">
                 {{ index + 1 }}
               </span>
               <span class="text-small text-silver-70">{{ tip }}</span>
@@ -217,7 +218,7 @@ onMounted(() => {
       </section>
 
       <!-- Contact Section -->
-      <section class="border border-silver-30 p-6 rounded-md text-center">
+      <section class="bg-surface-1 border border-line p-6 rounded-lg text-center">
         <h3 class="text-body font-bold text-silver mb-2">¿No encontraste lo que buscas?</h3>
         <p class="text-small text-silver-70 mb-4">
           Si tienes más preguntas o necesitas ayuda, contáctanos.

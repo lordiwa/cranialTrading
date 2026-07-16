@@ -18,7 +18,7 @@ useSeoMeta({
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="border-b border-silver-20 py-6">
+    <header class="sticky top-0 z-10 bg-hdr backdrop-blur-md border-b border-line py-5">
       <div class="max-w-4xl mx-auto px-6">
         <RouterLink to="/login" class="flex items-center gap-3 w-fit">
           <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
@@ -31,8 +31,11 @@ useSeoMeta({
 
     <!-- Content -->
     <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
-      <h1 class="text-h1 font-bold text-silver mb-2">{{ t('legal.terms.title') }}</h1>
-      <p class="text-small text-silver-50 mb-8">{{ t('legal.cookies.lastUpdated') }} {{ lastUpdated }}</p>
+      <div class="rise mb-8">
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">{{ t('pages.kicker.legal') }}</p>
+        <h1 class="font-display text-h1 font-bold text-silver mb-2">{{ t('legal.terms.title') }}</h1>
+        <p class="text-tiny text-silver-30">{{ t('legal.cookies.lastUpdated') }} {{ lastUpdated }}</p>
+      </div>
 
       <div class="space-y-8 text-body text-silver-70">
         <!-- Intro -->
@@ -45,7 +48,7 @@ useSeoMeta({
 
         <!-- 1. Descripción del Servicio -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">1. Descripción del Servicio</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">1. Descripción del Servicio</h2>
           <p class="mb-4">
             Cranial Trading es una plataforma gratuita que facilita el intercambio y comercio de cartas de Magic: The Gathering
             entre usuarios. Nuestros servicios incluyen:
@@ -61,7 +64,7 @@ useSeoMeta({
 
         <!-- 2. Registro y Cuenta -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">2. Registro y Cuenta de Usuario</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">2. Registro y Cuenta de Usuario</h2>
           <p class="mb-4">Para utilizar Cranial Trading debes:</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li>Ser mayor de 18 años o contar con autorización de un tutor legal</li>
@@ -77,7 +80,7 @@ useSeoMeta({
 
         <!-- 3. Uso Aceptable -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">3. Uso Aceptable</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">3. Uso Aceptable</h2>
           <p class="mb-4">Al usar Cranial Trading, te comprometes a NO:</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li>Publicar información falsa o engañosa sobre tus cartas</li>
@@ -93,7 +96,7 @@ useSeoMeta({
 
         <!-- 4. Transacciones -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">4. Transacciones entre Usuarios</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">4. Transacciones entre Usuarios</h2>
           <p class="mb-4">
             Cranial Trading es una plataforma de conexión peer-to-peer (P2P). Esto significa que:
           </p>
@@ -103,7 +106,7 @@ useSeoMeta({
             <li><strong class="text-silver">No garantizamos transacciones:</strong> Cada usuario es responsable de verificar la legitimidad de la contraparte</li>
             <li><strong class="text-silver">No custodiamos cartas:</strong> El envío y recepción es responsabilidad de los usuarios</li>
           </ul>
-          <p class="mt-4 p-4 bg-secondary border border-silver-30">
+          <p class="mt-4 p-4 bg-surface-1 border border-line rounded-lg">
             <strong class="text-neon">Recomendación:</strong> Siempre verifica la reputación del usuario, solicita fotos detalladas
             de las cartas, y utiliza métodos de pago con protección al comprador cuando sea posible.
           </p>
@@ -111,7 +114,7 @@ useSeoMeta({
 
         <!-- 5. Propiedad Intelectual -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">5. Propiedad Intelectual</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">5. Propiedad Intelectual</h2>
           <p class="mb-4">
             Magic: The Gathering, los nombres de cartas, imágenes y símbolos son propiedad de Wizards of the Coast LLC.
             Cranial Trading no está afiliado, patrocinado ni respaldado por Wizards of the Coast.
@@ -124,7 +127,7 @@ useSeoMeta({
 
         <!-- 6. Privacidad -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">6. Privacidad y Datos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">6. Privacidad y Datos</h2>
           <p>
             El tratamiento de tus datos personales se rige por nuestra
             <RouterLink to="/privacy" class="text-neon hover:underline">Política de Privacidad</RouterLink>.
@@ -134,7 +137,7 @@ useSeoMeta({
 
         <!-- 7. Limitación de Responsabilidad -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">7. Limitación de Responsabilidad</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">7. Limitación de Responsabilidad</h2>
           <p class="mb-4">Cranial Trading se proporciona "tal cual" sin garantías de ningún tipo. No nos hacemos responsables de:</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li>Pérdidas económicas derivadas de transacciones entre usuarios</li>
@@ -147,7 +150,7 @@ useSeoMeta({
 
         <!-- 8. Modificaciones -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">8. Modificaciones</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">8. Modificaciones</h2>
           <p>
             Nos reservamos el derecho de modificar estos términos en cualquier momento. Los cambios significativos
             serán notificados a través de la plataforma. El uso continuado del servicio después de las modificaciones
@@ -157,7 +160,7 @@ useSeoMeta({
 
         <!-- 9. Terminación -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">9. Terminación</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">9. Terminación</h2>
           <p>
             Puedes cerrar tu cuenta en cualquier momento desde la configuración. Nos reservamos el derecho de
             suspender o terminar cuentas que violen estos términos, sin previo aviso y sin responsabilidad.
@@ -166,7 +169,7 @@ useSeoMeta({
 
         <!-- 10. Contacto -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">10. Contacto</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">10. Contacto</h2>
           <p>
             Para consultas sobre estos términos, puedes contactarnos a través de la plataforma o enviar un
             mensaje a nuestro equipo de soporte.
@@ -175,7 +178,7 @@ useSeoMeta({
       </div>
 
       <!-- Back link -->
-      <div class="mt-12 pt-8 border-t border-silver-20">
+      <div class="mt-12 pt-8 border-t border-line">
         <RouterLink to="/login" class="text-small text-neon hover:underline">
           {{ t('legal.backToHome') }}
         </RouterLink>
@@ -183,9 +186,9 @@ useSeoMeta({
     </main>
 
     <!-- Simple Footer -->
-    <footer class="border-t border-silver-20 py-6">
+    <footer class="border-t border-line py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
+        <p class="text-tiny text-silver-30">{{ t('legal.footer.copyright') }}</p>
         <nav class="flex gap-4 text-tiny" aria-label="Legal links">
           <RouterLink to="/terms" class="text-neon underline underline-offset-2">{{ t('legal.footer.terms') }}</RouterLink>
           <RouterLink to="/privacy" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.privacy') }}</RouterLink>

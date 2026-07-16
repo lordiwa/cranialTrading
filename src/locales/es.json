@@ -2408,6 +2408,16 @@
     "faqLink": "Ir a Preguntas Frecuentes"
   },
 
+  "pages": {
+    "kicker": {
+      "about": "Sobre nosotros",
+      "contact": "Contacto",
+      "help": "Ayuda",
+      "guide": "Guía",
+      "legal": "Legal"
+    }
+  },
+
   "seo": {
     "defaultDescription": "Plataforma de intercambio de cartas Magic: The Gathering. Gestiona tu coleccion, encuentra matches y conecta con otros jugadores.",
     "pages": {

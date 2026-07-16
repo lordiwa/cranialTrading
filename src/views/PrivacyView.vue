@@ -18,7 +18,7 @@ useSeoMeta({
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="border-b border-silver-20 py-6">
+    <header class="sticky top-0 z-10 bg-hdr backdrop-blur-md border-b border-line py-5">
       <div class="max-w-4xl mx-auto px-6">
         <RouterLink to="/login" class="flex items-center gap-3 w-fit">
           <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
@@ -31,8 +31,11 @@ useSeoMeta({
 
     <!-- Content -->
     <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
-      <h1 class="text-h1 font-bold text-silver mb-2">{{ t('legal.privacy.title') }}</h1>
-      <p class="text-small text-silver-50 mb-8">{{ t('legal.cookies.lastUpdated') }} {{ lastUpdated }}</p>
+      <div class="rise mb-8">
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">{{ t('pages.kicker.legal') }}</p>
+        <h1 class="font-display text-h1 font-bold text-silver mb-2">{{ t('legal.privacy.title') }}</h1>
+        <p class="text-tiny text-silver-30">{{ t('legal.cookies.lastUpdated') }} {{ lastUpdated }}</p>
+      </div>
 
       <div class="space-y-8 text-body text-silver-70">
         <!-- Intro -->
@@ -45,7 +48,7 @@ useSeoMeta({
 
         <!-- 1. Responsable -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">1. Responsable del Tratamiento</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">1. Responsable del Tratamiento</h2>
           <p>
             Cranial Trading es una plataforma operada de forma independiente. Para cualquier consulta sobre
             el tratamiento de tus datos personales, puedes contactarnos a través de la plataforma.
@@ -54,7 +57,7 @@ useSeoMeta({
 
         <!-- 2. Datos que Recopilamos -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">2. Datos que Recopilamos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">2. Datos que Recopilamos</h2>
 
           <h3 class="text-small font-bold text-silver mt-6 mb-3">2.1 Datos de Registro</h3>
           <ul class="list-disc list-inside space-y-2 ml-4">
@@ -84,7 +87,7 @@ useSeoMeta({
 
         <!-- 3. Cómo Usamos los Datos -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">3. Cómo Usamos tus Datos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">3. Cómo Usamos tus Datos</h2>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li><strong class="text-silver">Proveer el servicio:</strong> Gestionar tu cuenta, colección y matches</li>
             <li><strong class="text-silver">Conectarte con traders:</strong> Encontrar coincidencias y facilitar comunicación</li>
@@ -96,7 +99,7 @@ useSeoMeta({
 
         <!-- 4. Datos Públicos -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">4. Información Pública</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">4. Información Pública</h2>
           <p class="mb-4">
             Algunos datos son visibles para otros usuarios de la plataforma:
           </p>
@@ -105,7 +108,7 @@ useSeoMeta({
             <li><strong class="text-silver">Ubicación:</strong> Si decides compartirla</li>
             <li><strong class="text-silver">Cartas públicas:</strong> Las que marques como visibles en tu perfil</li>
           </ul>
-          <p class="mt-4 p-4 bg-secondary border border-silver-30">
+          <p class="mt-4 p-4 bg-surface-1 border border-line rounded-lg">
             <strong class="text-neon">Control:</strong> Puedes controlar qué cartas son públicas usando el toggle
             de visibilidad en cada carta o en la vista de mazo.
           </p>
@@ -113,7 +116,7 @@ useSeoMeta({
 
         <!-- 5. Compartir Datos -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">5. Con Quién Compartimos Datos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">5. Con Quién Compartimos Datos</h2>
 
           <h3 class="text-small font-bold text-silver mt-6 mb-3">5.1 Otros Usuarios</h3>
           <p class="mb-4">
@@ -136,7 +139,7 @@ useSeoMeta({
 
         <!-- 6. Seguridad -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">6. Seguridad de los Datos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">6. Seguridad de los Datos</h2>
           <p class="mb-4">Implementamos medidas de seguridad incluyendo:</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li>Conexiones encriptadas (HTTPS)</li>
@@ -151,7 +154,7 @@ useSeoMeta({
 
         <!-- 7. Retención -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">7. Retención de Datos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">7. Retención de Datos</h2>
           <p>
             Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, borraremos
             tus datos personales en un plazo razonable, excepto cuando debamos retenerlos por
@@ -161,7 +164,7 @@ useSeoMeta({
 
         <!-- 8. Tus Derechos -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">8. Tus Derechos</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">8. Tus Derechos</h2>
           <p class="mb-4">Tienes derecho a:</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li><strong class="text-silver">Acceso:</strong> Solicitar una copia de tus datos</li>
@@ -177,7 +180,7 @@ useSeoMeta({
 
         <!-- 9. Menores -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">9. Menores de Edad</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">9. Menores de Edad</h2>
           <p>
             Cranial Trading está dirigido a mayores de 18 años. No recopilamos intencionalmente
             datos de menores. Si descubrimos que hemos recopilado datos de un menor sin
@@ -187,7 +190,7 @@ useSeoMeta({
 
         <!-- 10. Cambios -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">10. Cambios a esta Política</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">10. Cambios a esta Política</h2>
           <p>
             Podemos actualizar esta política ocasionalmente. Publicaremos los cambios en esta página
             con una nueva fecha de actualización. Te recomendamos revisarla periódicamente.
@@ -196,7 +199,7 @@ useSeoMeta({
 
         <!-- 11. Contacto -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">11. Contacto</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">11. Contacto</h2>
           <p>
             Si tienes preguntas sobre esta política o el tratamiento de tus datos, contáctanos
             a través de la función de mensajes de la plataforma.
@@ -205,7 +208,7 @@ useSeoMeta({
       </div>
 
       <!-- Back link -->
-      <div class="mt-12 pt-8 border-t border-silver-20">
+      <div class="mt-12 pt-8 border-t border-line">
         <RouterLink to="/login" class="text-small text-neon hover:underline">
           {{ t('legal.backToHome') }}
         </RouterLink>
@@ -213,9 +216,9 @@ useSeoMeta({
     </main>
 
     <!-- Simple Footer -->
-    <footer class="border-t border-silver-20 py-6">
+    <footer class="border-t border-line py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
+        <p class="text-tiny text-silver-30">{{ t('legal.footer.copyright') }}</p>
         <nav class="flex gap-4 text-tiny" aria-label="Legal links">
           <RouterLink to="/terms" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
           <RouterLink to="/privacy" class="text-neon underline underline-offset-2">{{ t('legal.footer.privacy') }}</RouterLink>

@@ -215,7 +215,8 @@ async function toggleChart() {
 </script>
 
 <template>
-  <div class="fixed md:!bottom-0 left-0 right-0 z-40 bg-hdr backdrop-blur-md border-t border-neon-40 overflow-x-hidden" :style="{ bottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }">
+  <!-- Mobile offset must clear the v2 tabbar (h-14 = 3.5rem, AppHeader) or it covers the matches badge -->
+  <div class="fixed md:!bottom-0 left-0 right-0 z-40 bg-hdr backdrop-blur-md border-t border-neon-40 overflow-x-hidden" :style="{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }">
     <!-- Loading bar -->
     <div v-if="loading" class="h-1 bg-primary overflow-hidden">
       <div
@@ -384,7 +385,8 @@ async function toggleChart() {
             <span class="text-[11px] text-silver-50">{{ totalCardCount }}<span class="text-silver-30 mx-1">·</span>{{ uniqueCardCount }}u</span>
           </div>
           <!-- Row 2: price breakdowns -->
-          <div class="flex items-center gap-2 text-[11px] font-display font-tnum">
+          <!-- flex-wrap: 5 montos no entran en 390px; sin wrap el Total se recorta (overflow-x-hidden del root) -->
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-display font-tnum">
             <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Col </span><span class="font-bold" :class="sourceColor">{{ fmt(collectionValue) }}</span></span>
             <span class="text-silver-30 flex-shrink-0">|</span>
             <span class="flex-shrink-0"><span class="text-silver-50 font-sans">Wish </span><span class="font-bold text-yellow-400">{{ fmt(wishlistValue) }}</span></span>

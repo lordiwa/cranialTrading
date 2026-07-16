@@ -33,7 +33,7 @@ useHead({
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="border-b border-silver-20 py-6">
+    <header class="sticky top-0 z-10 bg-hdr backdrop-blur-md border-b border-line py-5">
       <div class="max-w-4xl mx-auto px-6">
         <RouterLink to="/login" class="flex items-center gap-3 w-fit">
           <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
@@ -46,23 +46,26 @@ useHead({
 
     <!-- Content -->
     <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
-      <h1 class="text-h1 font-bold text-silver mb-2">Guía de Estado de Cartas Magic: The Gathering</h1>
-      <p class="text-body text-silver-70 mb-10">
-        El estado (condición) de una carta es uno de los factores más importantes en el intercambio y venta de cartas Magic: The Gathering.
-        Una carta en perfecto estado puede valer varias veces más que la misma carta con desgaste significativo. Conocer la escala de condiciones
-        te permite evaluar con precisión el valor real de tus cartas y negociar intercambios justos.
-      </p>
+      <div class="rise mb-10">
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">Guías</p>
+        <h1 class="font-display text-h1 font-bold text-silver mb-2">Guía de Estado de Cartas Magic: The Gathering</h1>
+        <p class="text-body text-silver-70">
+          El estado (condición) de una carta es uno de los factores más importantes en el intercambio y venta de cartas Magic: The Gathering.
+          Una carta en perfecto estado puede valer varias veces más que la misma carta con desgaste significativo. Conocer la escala de condiciones
+          te permite evaluar con precisión el valor real de tus cartas y negociar intercambios justos.
+        </p>
+      </div>
 
       <div class="space-y-8 text-body text-silver-70">
         <!-- Escala de Condiciones -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-6">Escala de Condiciones</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-6">Escala de Condiciones</h2>
           <div class="space-y-4">
             <!-- M -->
-            <div class="border-l-4 p-5 bg-secondary/30 rounded-r-md" style="border-color: #5AC168;">
+            <div class="border-l-4 p-5 bg-surface-1 rounded-r-lg" style="border-color: #5AC168;">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-body font-bold text-silver">M — Mint</h3>
-                <span class="text-neon font-bold text-small">100%</span>
+                <span class="font-display font-tnum text-neon font-bold text-small">100%</span>
               </div>
               <p class="text-small text-silver-70">
                 Perfecto estado de fábrica. Sin marcas, bordes perfectos, superficie impecable en ambas caras.
@@ -71,10 +74,10 @@ useHead({
             </div>
 
             <!-- NM -->
-            <div class="border-l-4 p-5 bg-secondary/30 rounded-r-md" style="border-color: #5AC168;">
+            <div class="border-l-4 p-5 bg-surface-1 rounded-r-lg" style="border-color: #5AC168;">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-body font-bold text-silver">NM — Near Mint</h3>
-                <span class="text-neon font-bold text-small">100%</span>
+                <span class="font-display font-tnum text-neon font-bold text-small">100%</span>
               </div>
               <p class="text-small text-silver-70">
                 Estado casi perfecto. Posible mínimo desgaste en bordes apenas perceptible a simple vista.
@@ -84,10 +87,10 @@ useHead({
             </div>
 
             <!-- LP -->
-            <div class="border-l-4 p-5 bg-secondary/30 rounded-r-md" style="border-color: #D4A843;">
+            <div class="border-l-4 p-5 bg-surface-1 rounded-r-lg" style="border-color: #D4A843;">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-body font-bold text-silver">LP — Lightly Played</h3>
-                <span class="font-bold text-small" style="color: #D4A843;">85%</span>
+                <span class="font-display font-tnum font-bold text-small" style="color: #D4A843;">85%</span>
               </div>
               <p class="text-small text-silver-70">
                 Desgaste menor visible al inspeccionar de cerca. Pequeños rayones en la superficie,
@@ -97,10 +100,10 @@ useHead({
             </div>
 
             <!-- MP -->
-            <div class="border-l-4 p-5 bg-secondary/30 rounded-r-md" style="border-color: #C4862B;">
+            <div class="border-l-4 p-5 bg-surface-1 rounded-r-lg" style="border-color: #C4862B;">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-body font-bold text-silver">MP — Moderately Played</h3>
-                <span class="font-bold text-small" style="color: #C4862B;">70%</span>
+                <span class="font-display font-tnum font-bold text-small" style="color: #C4862B;">70%</span>
               </div>
               <p class="text-small text-silver-70">
                 Desgaste notable a simple vista. Rayones visibles en la superficie, blanqueamiento moderado
@@ -110,10 +113,10 @@ useHead({
             </div>
 
             <!-- HP -->
-            <div class="border-l-4 p-5 bg-secondary/30 rounded-r-md" style="border-color: #8B2E1F;">
+            <div class="border-l-4 p-5 bg-surface-1 rounded-r-lg" style="border-color: #8B2E1F;">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-body font-bold text-silver">HP — Heavily Played</h3>
-                <span class="font-bold text-small" style="color: #8B2E1F;">50%</span>
+                <span class="font-display font-tnum font-bold text-small" style="color: #8B2E1F;">50%</span>
               </div>
               <p class="text-small text-silver-70">
                 Desgaste significativo en múltiples áreas. Rayones importantes, blanqueamiento fuerte de bordes
@@ -123,10 +126,10 @@ useHead({
             </div>
 
             <!-- PO -->
-            <div class="border-l-4 p-5 bg-secondary/30 rounded-r-md" style="border-color: #8B2E1F;">
+            <div class="border-l-4 p-5 bg-surface-1 rounded-r-lg" style="border-color: #8B2E1F;">
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-body font-bold text-silver">PO — Poor / Damaged</h3>
-                <span class="font-bold text-small" style="color: #8B2E1F;">30%</span>
+                <span class="font-display font-tnum font-bold text-small" style="color: #8B2E1F;">30%</span>
               </div>
               <p class="text-small text-silver-70">
                 Daño severo que compromete la integridad de la carta. Roturas, dobleces pronunciados, daño por agua,
@@ -139,7 +142,7 @@ useHead({
 
         <!-- Tabla de Multiplicadores -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Tabla de Multiplicadores de Precio</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Tabla de Multiplicadores de Precio</h2>
           <p class="mb-4">
             Los precios de mercado se cotizan para cartas en estado NM (Near Mint).
             Para otras condiciones, se aplica un multiplicador que ajusta el valor:
@@ -147,19 +150,19 @@ useHead({
           <div class="overflow-x-auto">
             <table class="w-full border-collapse">
               <thead>
-                <tr class="border-b border-silver-30">
+                <tr class="border-b border-line">
                   <th class="text-left text-small font-bold text-silver py-3 px-4">Condición</th>
                   <th class="text-center text-small font-bold text-silver py-3 px-4">Multiplicador</th>
                   <th class="text-right text-small font-bold text-silver py-3 px-4">Ejemplo ($10.00 NM)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr class="border-b border-silver-20"><td class="py-3 px-4 text-small text-silver">M — Mint</td><td class="py-3 px-4 text-small text-neon text-center font-bold">100%</td><td class="py-3 px-4 text-small text-silver text-right">$10.00</td></tr>
-                <tr class="border-b border-silver-20"><td class="py-3 px-4 text-small text-silver">NM — Near Mint</td><td class="py-3 px-4 text-small text-neon text-center font-bold">100%</td><td class="py-3 px-4 text-small text-silver text-right">$10.00</td></tr>
-                <tr class="border-b border-silver-20"><td class="py-3 px-4 text-small text-silver">LP — Lightly Played</td><td class="py-3 px-4 text-small text-center font-bold" style="color: #D4A843;">85%</td><td class="py-3 px-4 text-small text-silver text-right">$8.50</td></tr>
-                <tr class="border-b border-silver-20"><td class="py-3 px-4 text-small text-silver">MP — Moderately Played</td><td class="py-3 px-4 text-small text-center font-bold" style="color: #C4862B;">70%</td><td class="py-3 px-4 text-small text-silver text-right">$7.00</td></tr>
-                <tr class="border-b border-silver-20"><td class="py-3 px-4 text-small text-silver">HP — Heavily Played</td><td class="py-3 px-4 text-small text-center font-bold" style="color: #8B2E1F;">50%</td><td class="py-3 px-4 text-small text-silver text-right">$5.00</td></tr>
-                <tr><td class="py-3 px-4 text-small text-silver">PO — Poor</td><td class="py-3 px-4 text-small text-center font-bold" style="color: #8B2E1F;">30%</td><td class="py-3 px-4 text-small text-silver text-right">$3.00</td></tr>
+                <tr class="border-b border-line"><td class="py-3 px-4 text-small text-silver">M — Mint</td><td class="py-3 px-4 text-small font-display font-tnum text-neon text-center font-bold">100%</td><td class="py-3 px-4 text-small text-silver text-right">$10.00</td></tr>
+                <tr class="border-b border-line"><td class="py-3 px-4 text-small text-silver">NM — Near Mint</td><td class="py-3 px-4 text-small font-display font-tnum text-neon text-center font-bold">100%</td><td class="py-3 px-4 text-small text-silver text-right">$10.00</td></tr>
+                <tr class="border-b border-line"><td class="py-3 px-4 text-small text-silver">LP — Lightly Played</td><td class="py-3 px-4 text-small font-display font-tnum text-center font-bold" style="color: #D4A843;">85%</td><td class="py-3 px-4 text-small text-silver text-right">$8.50</td></tr>
+                <tr class="border-b border-line"><td class="py-3 px-4 text-small text-silver">MP — Moderately Played</td><td class="py-3 px-4 text-small font-display font-tnum text-center font-bold" style="color: #C4862B;">70%</td><td class="py-3 px-4 text-small text-silver text-right">$7.00</td></tr>
+                <tr class="border-b border-line"><td class="py-3 px-4 text-small text-silver">HP — Heavily Played</td><td class="py-3 px-4 text-small font-display font-tnum text-center font-bold" style="color: #8B2E1F;">50%</td><td class="py-3 px-4 text-small text-silver text-right">$5.00</td></tr>
+                <tr><td class="py-3 px-4 text-small text-silver">PO — Poor</td><td class="py-3 px-4 text-small font-display font-tnum text-center font-bold" style="color: #8B2E1F;">30%</td><td class="py-3 px-4 text-small text-silver text-right">$3.00</td></tr>
               </tbody>
             </table>
           </div>
@@ -167,7 +170,7 @@ useHead({
 
         <!-- Cómo Afecta al Valor -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Cómo Afecta la Condición al Valor</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Cómo Afecta la Condición al Valor</h2>
           <p class="mb-4">
             En el mercado de MTG, <strong class="text-silver">Near Mint (NM) es el estándar</strong>. Cuando ves un precio en TCGPlayer,
             CardMarket o cualquier tienda, ese precio corresponde a una carta en estado NM. Cualquier condición inferior reduce el valor proporcionalmente.
@@ -184,7 +187,7 @@ useHead({
 
         <!-- Consejos para Preservar -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Consejos para Preservar tus Cartas</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Consejos para Preservar tus Cartas</h2>
           <ul class="list-disc list-inside space-y-3 ml-4">
             <li><strong class="text-silver">Fundas dobles (double sleeve):</strong> Usa una funda interior (perfect fit) más una funda exterior estándar. Protege contra polvo, humedad y desgaste.</li>
             <li><strong class="text-silver">Carpetas con hojas de bolsillos:</strong> Ideales para colecciones. Usa hojas de carga lateral (side-loading) para evitar que las cartas se salgan.</li>
@@ -197,7 +200,7 @@ useHead({
 
         <!-- Cómo Cranial Trading Usa las Condiciones -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Cómo Cranial Trading Usa las Condiciones</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Cómo Cranial Trading Usa las Condiciones</h2>
           <p class="mb-4">
             Cuando agregas una carta a tu colección en Cranial Trading, seleccionas su condición (M, NM, LP, MP, HP o PO).
             El sistema automáticamente:
@@ -217,7 +220,7 @@ useHead({
       </div>
 
       <!-- Back link -->
-      <div class="mt-12 pt-8 border-t border-silver-20">
+      <div class="mt-12 pt-8 border-t border-line">
         <RouterLink to="/login" class="text-small text-neon hover:underline">
           {{ t('legal.backToHome') }}
         </RouterLink>
@@ -225,9 +228,9 @@ useHead({
     </main>
 
     <!-- Simple Footer -->
-    <footer class="border-t border-silver-20 py-6">
+    <footer class="border-t border-line py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
+        <p class="text-tiny text-silver-30">{{ t('legal.footer.copyright') }}</p>
         <nav class="flex gap-4 text-tiny" aria-label="Legal links">
           <RouterLink to="/terms" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
           <RouterLink to="/privacy" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.privacy') }}</RouterLink>

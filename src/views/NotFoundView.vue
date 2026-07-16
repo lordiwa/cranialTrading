@@ -7,16 +7,19 @@ const { t } = useI18n();
 
 <template>
   <main id="main-content" class="min-h-screen flex flex-col items-center justify-center text-center px-6">
-    <p class="text-[64px] md:text-[96px] font-bold text-rust leading-none tracking-tight">{{ t('notFound.title') }}</p>
-    <h1 class="text-h2 font-bold text-silver mt-5">{{ t('notFound.heading') }}</h1>
-    <p class="text-body text-silver-50 mt-3 max-w-md">
-      {{ t('notFound.message') }}
-    </p>
+    <div class="rise flex flex-col items-center">
+      <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-3">Error {{ t('notFound.title') }}</p>
+      <p class="font-display text-[64px] md:text-[96px] font-bold text-rust leading-none tracking-tight">{{ t('notFound.title') }}</p>
+      <h1 class="font-display text-h2 font-bold text-silver mt-5">{{ t('notFound.heading') }}</h1>
+      <p class="text-body text-silver-50 mt-3 max-w-md">
+        {{ t('notFound.message') }}
+      </p>
 
-    <RouterLink to="/" class="mt-7">
-      <BaseButton variant="filled">
-        {{ t('notFound.backHome') }}
-      </BaseButton>
-    </RouterLink>
+      <RouterLink to="/" class="mt-7">
+        <BaseButton variant="filled">
+          {{ t('notFound.backHome') }}
+        </BaseButton>
+      </RouterLink>
+    </div>
   </main>
 </template>

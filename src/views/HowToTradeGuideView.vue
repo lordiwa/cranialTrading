@@ -38,7 +38,7 @@ useHead({
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="border-b border-silver-20 py-6">
+    <header class="sticky top-0 z-10 bg-hdr backdrop-blur-md border-b border-line py-5">
       <div class="max-w-4xl mx-auto px-6">
         <RouterLink to="/login" class="flex items-center gap-3 w-fit">
           <svg class="w-10 h-10 text-neon" viewBox="0 0 100 100" fill="currentColor">
@@ -51,17 +51,20 @@ useHead({
 
     <!-- Content -->
     <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
-      <h1 class="text-h1 font-bold text-silver mb-2">Cómo Intercambiar Cartas MTG de Forma Segura</h1>
-      <p class="text-body text-silver-70 mb-8">
-        El intercambio de cartas es parte fundamental de la experiencia Magic: The Gathering. Cranial Trading facilita
-        la conexión entre jugadores, pero la seguridad en cada transacción depende de ti. Esta guía te ayudará a
-        intercambiar con confianza.
-      </p>
+      <div class="rise mb-8">
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">Guías</p>
+        <h1 class="font-display text-h1 font-bold text-silver mb-2">Cómo Intercambiar Cartas MTG de Forma Segura</h1>
+        <p class="text-body text-silver-70">
+          El intercambio de cartas es parte fundamental de la experiencia Magic: The Gathering. Cranial Trading facilita
+          la conexión entre jugadores, pero la seguridad en cada transacción depende de ti. Esta guía te ayudará a
+          intercambiar con confianza.
+        </p>
+      </div>
 
       <div class="space-y-10 text-body text-silver-70">
         <!-- Warning Box -->
-        <section class="border-2 border-neon bg-neon/5 p-6 rounded-md">
-          <h2 class="text-body font-bold text-neon mb-3">Importante: Plataforma Peer-to-Peer (P2P)</h2>
+        <section class="border border-neon-40 bg-surface-1 p-6 rounded-lg">
+          <h2 class="font-display text-body font-bold text-neon mb-3">Importante: Plataforma Peer-to-Peer (P2P)</h2>
           <ul class="space-y-2 text-small">
             <li class="flex items-start gap-2">
               <span class="text-neon mt-0.5 flex-shrink-0">&#9888;</span>
@@ -84,7 +87,7 @@ useHead({
 
         <!-- Proceso Paso a Paso -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-6">Proceso Paso a Paso</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-6">Proceso Paso a Paso</h2>
           <div class="space-y-6">
             <!-- Paso 1 -->
             <div class="flex gap-4">
@@ -157,13 +160,13 @@ useHead({
 
         <!-- Verificar Autenticidad -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Cómo Verificar la Autenticidad de una Carta</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Cómo Verificar la Autenticidad de una Carta</h2>
           <p class="mb-4">
             Las cartas falsificadas son un problema real en el mercado de MTG, especialmente en cartas de alto valor.
             Estos son los métodos más confiables para verificar autenticidad:
           </p>
           <div class="space-y-4">
-            <div class="p-4 bg-secondary/30 border border-silver-30 rounded-md">
+            <div class="p-4 bg-surface-1 border border-line rounded-lg transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong">
               <h3 class="text-small font-bold text-silver mb-1">Test de Luz</h3>
               <p class="text-small text-silver-70">
                 Sostén la carta contra una fuente de luz brillante. Las cartas reales de Magic tienen una capa central
@@ -171,14 +174,14 @@ useHead({
                 dejan pasar la luz de manera uniforme.
               </p>
             </div>
-            <div class="p-4 bg-secondary/30 border border-silver-30 rounded-md">
+            <div class="p-4 bg-surface-1 border border-line rounded-lg transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong">
               <h3 class="text-small font-bold text-silver mb-1">Test de Lupa (20x)</h3>
               <p class="text-small text-silver-70">
                 Bajo magnificación de 20x, las cartas reales muestran un patrón de impresión roseta (puntos en forma de roseta).
                 Las falsificaciones suelen tener un patrón diferente, más borroso, o puntos distribuidos de manera irregular.
               </p>
             </div>
-            <div class="p-4 bg-secondary/30 border border-silver-30 rounded-md">
+            <div class="p-4 bg-surface-1 border border-line rounded-lg transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong">
               <h3 class="text-small font-bold text-silver mb-1">Test del Punto Verde</h3>
               <p class="text-small text-silver-70">
                 Bajo magnificación, examina el símbolo de mana verde en la carta. En cartas reales, verás puntos
@@ -186,7 +189,7 @@ useHead({
                 tienden a fusionarse o el patrón es diferente.
               </p>
             </div>
-            <div class="p-4 bg-secondary/30 border border-silver-30 rounded-md">
+            <div class="p-4 bg-surface-1 border border-line rounded-lg transition-all duration-200 ease-v2 hover:bg-surface-2 hover:border-line-strong">
               <h3 class="text-small font-bold text-silver mb-1">Peso y Textura</h3>
               <p class="text-small text-silver-70">
                 Una carta real de MTG pesa aproximadamente 1.8 gramos y tiene una textura tipo lino (linen finish)
@@ -199,7 +202,7 @@ useHead({
 
         <!-- Mejores Prácticas de Envío -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Mejores Prácticas de Envío</h2>
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Mejores Prácticas de Envío</h2>
           <p class="mb-4">
             Un envío mal preparado puede arruinar cartas valiosas. Sigue estas recomendaciones para proteger
             tus cartas durante el transporte:
@@ -216,8 +219,8 @@ useHead({
 
         <!-- Banderas Rojas -->
         <section>
-          <h2 class="text-h3 font-bold text-silver mb-4">Banderas Rojas: Señales de Alerta</h2>
-          <div class="border-2 border-rust bg-rust/5 p-6 rounded-md">
+          <h2 class="font-display text-h3 font-bold text-silver mb-4">Banderas Rojas: Señales de Alerta</h2>
+          <div class="border border-rust bg-rust-10 p-6 rounded-lg">
             <p class="text-small text-silver-70 mb-4">
               Si detectas alguna de estas señales, procede con extrema precaución o cancela la negociación:
             </p>
@@ -251,7 +254,7 @@ useHead({
         </section>
 
         <!-- CTA -->
-        <section class="border border-silver-30 p-6 rounded-md text-center">
+        <section class="bg-surface-1 border border-line p-6 rounded-lg text-center">
           <h3 class="text-body font-bold text-silver mb-2">¿Listo para intercambiar?</h3>
           <p class="text-small text-silver-70 mb-4">
             Crea tu cuenta gratuita y comienza a encontrar matches con otros jugadores de MTG.
@@ -269,7 +272,7 @@ useHead({
       </div>
 
       <!-- Back link -->
-      <div class="mt-12 pt-8 border-t border-silver-20">
+      <div class="mt-12 pt-8 border-t border-line">
         <RouterLink to="/login" class="text-small text-neon hover:underline">
           {{ t('legal.backToHome') }}
         </RouterLink>
@@ -277,9 +280,9 @@ useHead({
     </main>
 
     <!-- Simple Footer -->
-    <footer class="border-t border-silver-20 py-6">
+    <footer class="border-t border-line py-6">
       <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p class="text-tiny text-silver-50">{{ t('legal.footer.copyright') }}</p>
+        <p class="text-tiny text-silver-30">{{ t('legal.footer.copyright') }}</p>
         <nav class="flex gap-4 text-tiny" aria-label="Legal links">
           <RouterLink to="/terms" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.terms') }}</RouterLink>
           <RouterLink to="/privacy" class="text-silver-50 hover:text-silver hover:underline transition-fast">{{ t('legal.footer.privacy') }}</RouterLink>

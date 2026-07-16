@@ -354,4 +354,83 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       }
     })
   })
+
+  describe('stale in-flight persist must not consume a newer refresh (reviewer HIGH, PEDIDO #2)', () => {
+    /** Minimal IndexCard-shaped record satisfying indexToCard's field access. */
+    const indexRecordFor = (id: string): Record<string, unknown> => ({
+      i: id, s: 'scryfall-x', n: 'Test Card', st: 'collection', q: 1, p: 1,
+      cm: 0, co: [], r: 'c', t: '', f: false, sc: 'M21', e: 'Magic 2021',
+      pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true, df: false,
+    })
+
+    it('a slow persist-1 (in flight when persist-2 starts) must not fire the deferred refresh with its own stale snapshot', async () => {
+      vi.useFakeTimers()
+      try {
+        // --- Seed cardIndexRaw with two cards via addCard, then flush their own persist ---
+        mockAddDoc
+          .mockResolvedValueOnce({ id: 'card-A' })
+          .mockResolvedValueOnce({ id: 'card-B' })
+        const { id: _idA, updatedAt: _uA, ...cardAData } = makeCard({ id: 'ignored-a', name: 'Card A' })
+        const { id: _idB, updatedAt: _uB, ...cardBData } = makeCard({ id: 'ignored-b', name: 'Card B' })
+        const store = useCollectionStore()
+        await store.addCard(cardAData as any)
+        await store.addCard(cardBData as any)
+        await vi.advanceTimersByTimeAsync(2100) // flush the seeding persist + its own deferred refresh
+        mockSetDoc.mockClear()
+        mockQueryCardIndex.mockClear()
+
+        // --- Simulate the "server" as whatever the LAST-RESOLVED setDoc call wrote ---
+        let serverChunk: Array<{ i: string }> = [indexRecordFor('card-A'), indexRecordFor('card-B')]
+        let resolveFirstSetDoc!: () => void
+        let resolveSecondSetDoc!: () => void
+        const firstSetDocGate = new Promise<void>((res) => { resolveFirstSetDoc = res })
+        const secondSetDocGate = new Promise<void>((res) => { resolveSecondSetDoc = res })
+        mockSetDoc
+          .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+            await firstSetDocGate
+            serverChunk = data.cards // persist-1's write commits (STALE — still has card-B)
+          })
+          .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+            await secondSetDocGate
+            serverChunk = data.cards // persist-2's write commits (correct — empty)
+          })
+        mockQueryCardIndex.mockImplementation(async () => ({
+          cards: serverChunk,
+          total: serverChunk.length,
+          page: 0,
+          pageSize: 50,
+          hasMore: false,
+        }))
+
+        // persist-1: delete card-A schedules its debounced persist
+        await store.deleteCard('card-A')
+        await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, snapshot still has card-B, blocks on setDoc
+
+        // While persist-1 is still in flight (blocked on its setDoc), delete card-B —
+        // this is the ~30-sequential-setDoc multi-second window from the real 59k-card
+        // case: a mutation lands and re-schedules the debounce WHILE persist-1 hasn't
+        // finished writing yet.
+        await store.deleteCard('card-B')
+        expect(store.paginatedCards).toEqual([]) // optimistic removal already correct locally
+
+        await vi.advanceTimersByTimeAsync(2100) // timer-2 fires — persist-2 starts, blocks on its own setDoc
+
+        // Let persist-1 (the STALE one) finish now — its finally must NOT consume the
+        // deferred-refresh flag using its own (stale) server read.
+        resolveFirstSetDoc()
+        await vi.advanceTimersByTimeAsync(0)
+        expect(store.paginatedCards).toEqual([]) // must NOT have reverted to include card-B
+
+        // Let persist-2 (the CURRENT one) finish — it must be the one to consume the
+        // flag and issue the corrective, now-accurate re-query.
+        resolveSecondSetDoc()
+        await vi.advanceTimersByTimeAsync(0)
+
+        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
+        expect(store.paginatedCards).toEqual([])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
 })

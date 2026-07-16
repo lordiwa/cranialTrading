@@ -610,14 +610,32 @@ export const useCollectionStore = defineStore('collection', () => {
      */
     let _pendingMembershipRefresh = false
 
+    /**
+     * Generation counter for _doPersistIndex (TASK-116 follow-up, reviewer HIGH
+     * PEDIDO #2). At 59k cards a persist is ~30 sequential setDoc calls — a
+     * multi-second window. If a second mutation reschedules and its own persist
+     * STARTS (enters _doPersistIndex) before the first one's writes finish, the
+     * first (now-stale) persist's finally must not be the one to consume
+     * _pendingMembershipRefresh: it would call refreshCurrentPage() reading back
+     * its own stale snapshot (still containing whatever the second mutation just
+     * removed/changed), and since the flag is already consumed, the second
+     * (correct) persist's finally never issues the corrective re-query —
+     * the wrong state then persists indefinitely. Each _doPersistIndex call
+     * captures the post-increment counter; only the invocation whose captured
+     * value still matches the live counter at finally-time is allowed to consume
+     * the flag, guaranteeing it's always the MOST RECENTLY STARTED persist.
+     */
+    let _persistGen = 0
+
     function persistIndexToFirestore() {
         if (_indexPersistTimer) clearTimeout(_indexPersistTimer)
         _indexPersistTimer = setTimeout(() => { _doPersistIndex() }, 2000)
     }
 
     function _doPersistIndex() {
+        const gen = ++_persistGen
         if (!authStore.user) {
-            _pendingMembershipRefresh = false
+            if (gen === _persistGen) _pendingMembershipRefresh = false
             return
         }
         const userId = authStore.user.id
@@ -648,8 +666,9 @@ export const useCollectionStore = defineStore('collection', () => {
                 console.warn('[IndexSync] Failed to persist index:', err)
             } finally {
                 // TASK-116: run the deferred grid re-query only now that the
-                // write above has settled (success or failure), never immediately.
-                if (_pendingMembershipRefresh) {
+                // write above has settled (success or failure), never immediately,
+                // and only if THIS persist is still the latest one (gen-token above).
+                if (gen === _persistGen && _pendingMembershipRefresh) {
                     _pendingMembershipRefresh = false
                     refreshCurrentPage().catch(() => {})
                 }

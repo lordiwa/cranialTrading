@@ -556,7 +556,7 @@
     {
       "key": "TASK-113",
       "title": "Bug colección: toggles de status/pública (individual y bulk) no se reflejan en la grilla — paginatedCards desacoplado de cards.value",
-      "status": "in_progress",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -568,7 +568,7 @@
     {
       "key": "TASK-115",
       "title": "Bug UI mobile: panel de totales de Colección tapa el badge de matches del tabbar + Total recortado horizontalmente",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {

@@ -8,7 +8,7 @@
     "Tests unit de regresión: patch optimista a paginatedCards en updateCard y batchUpdateCards; sync de índice en batch",
     "Sin regresión en paginación server-side, virtual scroll ni delete bulk (que ya funciona); E2E collection verdes; gates verdes"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "high",
   "labels": [
     "bug",
@@ -19,9 +19,18 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "3265c92",
+    "722aee0"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-16 CERRADO: fix en store (patch optimista a paginatedCards + rollback simétrico, refreshCurrentPage eliminado de updateCard con justificación verificada por review, batch sincroniza índice en pasada única O(n+k)). TDD real (RED 4/6 → GREEN 6/6, tests extendidos con caso batch 2 cartas + preservación de no-tocadas). Review FULL rev-113-toggles: REQUEST-CHANGES (H1 perf O(kxn) del sync por-carta — freeze garantizado a 59k con select-all) → fix review-driven → APPROVE confirmado con relectura + tests re-corridos por el reviewer. E2E completo 124 passed. v1.48.1 CI run 29526018199 verde. Colateral: TASK-116 creado (misma race en add/delete, preexistente). Edge conocido no cubierto por AC: filter-dropout (card fuera del filtro activo queda visible hasta reload — preexistente).",
+      "at": "2026-07-16T19:20:00.000Z"
+    }
+  ],
   "created_at": "2026-07-16T18:05:00.000Z",
   "updated_at": "2026-07-16T18:05:00.000Z",
   "jira_key": null,

@@ -6,6 +6,7 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useI18n } from '../../composables/useI18n'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import IconV2 from '../ui/IconV2.vue'
 import type { Card } from '../../types/card'
 
 const props = defineProps<{
@@ -187,35 +188,35 @@ const cardImage = computed(() => {
 
 <template>
   <BaseModal :show="show" @close="emit('close')" :close-on-click-outside="false">
-    <div class="space-y-6 w-full max-w-lg">
+    <div class="space-y-5 w-full max-w-lg">
       <!-- Header -->
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.manageModal.title') }}</h2>
-        <p class="text-small text-silver-70">{{ t('decks.manageModal.subtitle') }}</p>
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('decks.manageModal.title') }}</h2>
+        <p class="text-small text-silver-70 mt-1">{{ t('decks.manageModal.subtitle') }}</p>
       </div>
 
       <!-- Card info -->
-      <div v-if="card" class="flex gap-4 p-4 bg-secondary border border-silver-30">
+      <div v-if="card" class="flex gap-4 p-4 bg-surface-1 border border-line rounded-lg">
         <img
           v-if="cardImage"
           :src="cardImage"
           :alt="card.name"
-          class="w-20 h-28 object-cover border border-silver-30"
+          class="w-20 h-28 object-cover border border-line rounded-md"
         />
         <div class="flex-1">
-          <p class="font-bold text-silver text-h3">{{ card.name }}</p>
+          <p class="font-display font-bold text-silver text-h3">{{ card.name }}</p>
           <p class="text-small text-silver-70">{{ card.edition }} - {{ card.condition }}</p>
-          <p class="text-small text-neon font-bold mt-2">
+          <p class="text-small text-neon font-display font-tnum font-bold mt-2">
             {{ t('decks.manageModal.totalCopies', { qty: totalQty }) }}
           </p>
-          <p class="text-tiny mt-1" :class="remainingQty > 0 ? 'text-silver-70' : 'text-rust'">
+          <p class="text-tiny mt-1" :class="remainingQty > 0 ? 'text-silver-70' : 'text-[#C4553F]'">
             {{ t('decks.manageModal.unassigned', { qty: remainingQty }) }}
           </p>
         </div>
       </div>
 
       <!-- Decks list -->
-      <div class="space-y-3 max-h-[40vh] overflow-y-auto">
+      <div class="space-y-2 max-h-[40vh] overflow-y-auto">
         <div v-if="decksStore.decks.length === 0" class="text-center py-8">
           <p class="text-small text-silver-70">{{ t('decks.manageModal.noDecks') }}</p>
         </div>
@@ -223,67 +224,64 @@ const cardImage = computed(() => {
         <div
           v-for="deck in decksStore.decks"
           :key="deck.id"
-          class="p-3 border transition-150"
-          :class="getDeckAllocation(deck.id) > 0 ? 'border-neon bg-neon-5' : 'border-silver-30'"
+          class="flex items-center justify-between gap-3 p-2.5 border rounded-md transition-all duration-200 ease-v2"
+          :class="getDeckAllocation(deck.id) > 0 ? 'border-neon-40 bg-neon-5' : 'border-line bg-surface-2'"
         >
-          <div class="flex items-center justify-between gap-3">
-            <!-- Deck info -->
-            <div class="flex-1 min-w-0">
-              <p class="font-bold text-silver truncate">{{ deck.name }}</p>
-              <p class="text-tiny text-silver-50">{{ deck.format.toUpperCase() }}</p>
-            </div>
+          <!-- Deck info -->
+          <div class="flex-1 min-w-0">
+            <p class="text-small font-bold text-silver truncate">{{ deck.name }}</p>
+            <p class="text-tiny text-silver-50 uppercase tracking-wide">{{ deck.format }}</p>
+          </div>
 
-            <!-- Quantity controls -->
-            <div class="flex items-center gap-2">
-              <button
-                @click="decrement(deck.id)"
-                :disabled="getDeckAllocation(deck.id) === 0"
-                class="w-8 h-8 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                -
-              </button>
+          <!-- Sideboard toggle -->
+          <button
+            v-if="getDeckAllocation(deck.id) > 0"
+            type="button"
+            class="px-2.5 py-1 text-tiny font-bold rounded-full border transition-all duration-200 ease-v2"
+            :class="isInSideboard(deck.id) ? 'border-gold text-gold bg-[rgba(212,168,67,.12)]' : 'border-line-strong text-silver-50 hover:text-silver'"
+            @click="toggleSideboard(deck.id)"
+          >
+            {{ isInSideboard(deck.id) ? t('decks.manageModal.sideToggle.side') : t('decks.manageModal.sideToggle.main') }}
+          </button>
 
-              <span class="w-8 text-center font-bold" :class="getDeckAllocation(deck.id) > 0 ? 'text-neon' : 'text-silver-50'">
-                {{ getDeckAllocation(deck.id) }}
-              </span>
-
-              <button
-                @click="increment(deck.id)"
-                :disabled="remainingQty <= 0"
-                class="w-8 h-8 flex items-center justify-center border border-silver-30 text-silver hover:border-neon hover:text-neon transition-150 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                +
-              </button>
-            </div>
-
-            <!-- Sideboard toggle -->
+          <!-- Quantity controls -->
+          <div class="flex items-center gap-1.5 flex-shrink-0">
             <button
-              v-if="getDeckAllocation(deck.id) > 0"
-              @click="toggleSideboard(deck.id)"
-              class="px-2 py-1 text-tiny border transition-150"
-              :class="isInSideboard(deck.id) ? 'border-amber text-amber' : 'border-silver-30 text-silver-50 hover:border-silver'"
+              type="button"
+              :disabled="getDeckAllocation(deck.id) === 0"
+              class="w-[26px] h-[26px] flex items-center justify-center border border-line-strong text-silver rounded disabled:opacity-30 disabled:cursor-not-allowed"
+              :aria-label="t('cards.addModal.decreaseQty')"
+              @click="decrement(deck.id)"
             >
-              {{ isInSideboard(deck.id) ? t('decks.manageModal.sideToggle.side') : t('decks.manageModal.sideToggle.main') }}
+              <IconV2 name="minus" :size="12" />
+            </button>
+
+            <span class="w-5 text-center font-display font-tnum font-bold text-small" :class="getDeckAllocation(deck.id) > 0 ? 'text-neon' : 'text-silver-50'">
+              {{ getDeckAllocation(deck.id) }}
+            </span>
+
+            <button
+              type="button"
+              :disabled="remainingQty <= 0"
+              class="w-[26px] h-[26px] flex items-center justify-center bg-neon text-primary border border-neon rounded font-bold disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-silver-50 disabled:border-line"
+              :aria-label="t('cards.addModal.increaseQty')"
+              @click="increment(deck.id)"
+            >
+              <IconV2 name="plus" :size="12" />
             </button>
           </div>
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="flex gap-3 pt-4 border-t border-silver-20">
-        <BaseButton class="flex-1" @click="handleSave" :disabled="saving">
-          {{ saving ? t('common.actions.saving') : t('common.actions.save') }}
-        </BaseButton>
-        <BaseButton variant="secondary" class="flex-1" @click="emit('close')">
+      <div class="flex gap-2 justify-end pt-4 border-t border-line">
+        <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="emit('close')">
           {{ t('common.actions.cancel') }}
+        </BaseButton>
+        <BaseButton variant="filled" class="uppercase tracking-[.1em] !text-[12px]" :disabled="saving" @click="handleSave">
+          {{ saving ? t('common.actions.saving') : t('common.actions.save') }}
         </BaseButton>
       </div>
     </div>
   </BaseModal>
 </template>
-
-<style scoped>
-.bg-neon-5 {
-  background-color: rgba(90, 193, 104, 0.05);
-}
-</style>

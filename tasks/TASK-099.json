@@ -1,0 +1,42 @@
+{
+  "key": "TASK-099",
+  "title": "Design→app v2 F5b: detalle y estado de carta — CardDetail, CardStatus, Confirm/Prompt",
+  "description": "Fuente de verdad: cards 71-card-detail (editor real de carta), 66-card-status, 78-confirm-prompt (d+m) + DESIGN-DIRECTION.md §5. Superficie: CardDetailModal.vue, CardStatusModal.vue, ConfirmModal.vue + PromptModal.vue (genéricos de TODA la app — blast radius alto, verificar visual en varios flujos). Estilo v2 sin tocar lógica. OJO: el confirm store usa pendingResult + onAfterLeave (Anti-Loop Rule 4) — NO tocar el flujo de resolución, solo estilos. closeOnClickOutside=false se mantiene. Split cards: mantener toggle ↔️ de caras (reemplazar glyph por icono SVG si aplica fuera de grid virtualizado). Fondo modal #0d0d0f.",
+  "acceptance_criteria": [
+    "Los 3 flujos fieles a sus cards v2 (desktop y mobile)",
+    "Confirm/Prompt v2 verificados en al menos 3 flujos distintos que los usan (blast radius)",
+    "Sin regresión en edición de carta, cambio de estado y confirms secuenciales; E2E verdes",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F5b",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-098"
+  ],
+  "linked_commits": [
+    "ad26019",
+    "86cf5b7"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-14 CERRADO por loop autonomo. Review FULL APPROVE-WITH-NOTES (0 HIGH; 2 MEDIUM fixeados: text-rust-txt inexistente, key huerfana statusModal.prices; 2 LOW fixeados: foilCheckbox stale, cursor not-allowed; deuda: radiogroup aria, badge collection neutro). Anti-Loop Rule 4 verificada byte-identica por reviewer. Gotcha nuevo documentado inline: colision de clases border-neon+text-neon con locator de toast E2E en modales v-show post-teleport. E2E completo 123 passed/0 failed. v1.43.0.",
+      "at": "2026-07-14T00:50:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-14T00:50:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

@@ -375,6 +375,9 @@ Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json
 |-------|-------------|------|
 | deploy-dev | Run tests, bump version, commit, and push to develop branch for dev deployment | `.claude/skills/deploy-dev/SKILL.md` |
 | deploy-prod | Production deployment checklist — verify, merge develop to main, and push | `.claude/skills/deploy-prod/SKILL.md` |
+| design-pull | Figma → Design → ticket: bring designer's Figma frame changes into the prototype HTML cards and open a tasks/ ticket for the Vue work (never touches Vue) | `.claude/skills/design-pull/SKILL.md` |
+| design-push | Code → Design + Figma: regenerate prototype cards from shipped .vue and rebuild the matching Figma frames after a UI change | `.claude/skills/design-push/SKILL.md` |
+| design-status | Read-only diff of app routes ↔ Claude Design cards ↔ Figma frames via mapping.json — reports gaps, drift, known deprecated/orphan, and nodeId discrepancies | `.claude/skills/design-status/SKILL.md` |
 | frontend-design | Design thinking process and aesthetic guidelines for building visually distinctive frontend interfaces | `.claude/skills/frontend-design/SKILL.md` |
 | i18n-check | Verify all i18n keys exist in en.json, es.json, and pt.json locale files | `.claude/skills/i18n-check/SKILL.md` |
 | jira-pm | LEGACY — Jira backlog was migrated to `tasks/` on 2026-06-12; only use for closing out the old Jira board | `.claude/skills/jira-pm/SKILL.md` |

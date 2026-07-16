@@ -164,6 +164,47 @@ export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
     }
 }
 
+export interface SearchAdvancedOptions {
+    unique?: 'cards' | 'prints' | 'art'
+    order?: 'name' | 'set' | 'released' | 'rarity' | 'color' | 'usd' | 'tix' | 'eur' | 'power' | 'toughness' | 'edhrec' | 'penny' | 'artist'
+    dir?: 'asc' | 'desc'
+    include_extras?: boolean
+    include_multilingual?: boolean
+    page?: number
+}
+
+export interface ScryfallSearchMeta {
+    results: ScryfallCard[]
+    totalCards: number
+    hasMore: boolean
+}
+
+function buildSearchParams(query: string, options?: SearchAdvancedOptions): URLSearchParams {
+    const params = new URLSearchParams()
+    params.append('q', query.trim())
+    params.append('unique', options?.unique ?? 'prints')
+    if (options?.order) params.append('order', options.order)
+    if (options?.dir) params.append('dir', options.dir)
+    if (options?.page) params.append('page', options.page.toString())
+    return params
+}
+
+async function fetchSearch(params: URLSearchParams): Promise<ScryfallSearchMeta> {
+    const response = await rateLimitedFetch(`${SCRYFALL_API}/cards/search?${params.toString()}`)
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            console.warn('No se encontraron cartas con estos filtros')
+            return { results: [], totalCards: 0, hasMore: false }
+        }
+        throw new Error(`Scryfall API error: ${response.status}`)
+    }
+
+    const data = await response.json() as ScryfallListResponse
+    const results = data.data ?? []
+    return { results, totalCards: data.total_cards ?? results.length, hasMore: data.has_more ?? false }
+}
+
 /**
  * Búsqueda avanzada con query string de Scryfall
  * Ejemplo: searchAdvanced('type:creature color:blue')
@@ -171,14 +212,7 @@ export const getCardById = async (id: string): Promise<ScryfallCard | null> => {
  */
 export const searchAdvanced = async (
     query: string,
-    options?: {
-        unique?: 'cards' | 'prints' | 'art'
-        order?: 'name' | 'set' | 'released' | 'rarity' | 'color' | 'usd' | 'tix' | 'eur' | 'power' | 'toughness' | 'edhrec' | 'penny' | 'artist'
-        dir?: 'asc' | 'desc'
-        include_extras?: boolean
-        include_multilingual?: boolean
-        page?: number
-    }
+    options?: SearchAdvancedOptions
 ): Promise<ScryfallCard[]> => {
     try {
         // Validar query no vacía
@@ -187,32 +221,41 @@ export const searchAdvanced = async (
             return []
         }
 
-        const params = new URLSearchParams()
-        params.append('q', query.trim())
-        params.append('unique', options?.unique ?? 'prints')
-        if (options?.order) params.append('order', options.order)
-        if (options?.dir) params.append('dir', options.dir)
-        if (options?.page) params.append('page', options.page.toString())
-
         console.info(`Buscando con query: ${query}`)
 
-        const response = await rateLimitedFetch(`${SCRYFALL_API}/cards/search?${params.toString()}`)
-
-        if (!response.ok) {
-            if (response.status === 404) {
-                console.warn('No se encontraron cartas con estos filtros')
-                return []
-            }
-            throw new Error(`Scryfall API error: ${response.status}`)
-        }
-
-        const data = await response.json() as ScryfallListResponse
-        const results = data.data ?? []
+        const { results } = await fetchSearch(buildSearchParams(query, options))
         console.info(`${results.length} cartas encontradas`)
         return results
     } catch (error) {
         console.error('Error en searchAdvanced:', error)
         return []
+    }
+}
+
+/**
+ * ✅ NUEVO (TASK-108): Igual que searchAdvanced, pero también devuelve el
+ * total_cards/has_more de Scryfall — usado por el store de /search para el
+ * conteo real "1–25 de N" (Scryfall pagina fijo a 175/página, el total puede
+ * superar lo que se trajo en esta request).
+ */
+export const searchAdvancedWithMeta = async (
+    query: string,
+    options?: SearchAdvancedOptions
+): Promise<ScryfallSearchMeta> => {
+    try {
+        if (!query || query.trim().length === 0) {
+            console.warn('⚠️ Query vacía')
+            return { results: [], totalCards: 0, hasMore: false }
+        }
+
+        console.info(`Buscando con query: ${query}`)
+
+        const meta = await fetchSearch(buildSearchParams(query, options))
+        console.info(`${meta.results.length} cartas encontradas`)
+        return meta
+    } catch (error) {
+        console.error('Error en searchAdvancedWithMeta:', error)
+        return { results: [], totalCards: 0, hasMore: false }
     }
 }
 

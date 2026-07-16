@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { type SimpleMatch, useMatchesStore } from '../../stores/matches'
 import { useI18n } from '../../composables/useI18n'
 import SvgIcon from '../ui/SvgIcon.vue'
+import IconV2 from '../ui/IconV2.vue'
 import { getMatchAlertDescription } from '../../utils/matchNotification'
 
 defineProps<{
@@ -88,26 +89,21 @@ const timeAgo = (date: Date | string | number): string => {
 
 <template>
   <div ref="dropdownRef" class="relative">
-    <!-- Matches nav button (styled like other nav links) -->
+    <!-- Matches nav button (styled like other v2 nav-row links) -->
     <button
         @click.stop="toggleDropdown"
+        :aria-label="t('header.nav.matches')"
         :class="[
-          'px-4 py-2 text-small font-bold transition-fast rounded-sm flex items-center gap-2 relative uppercase',
+          'px-3.5 min-h-[44px] text-[12px] font-bold uppercase tracking-[.12em] transition-colors duration-200 ease-v2 flex items-center gap-2 relative border-b-2 focus-visible:outline-none focus-visible:shadow-glow-neon',
           active
-            ? 'bg-neon-10 border-b-2 border-neon text-neon'
-            : 'text-silver-70 hover:text-silver hover:border-b-2 hover:border-silver'
+            ? 'border-neon text-neon [text-shadow:0_0_12px_rgba(90,193,104,.4)]'
+            : 'border-transparent text-silver-50 hover:text-silver'
         ]"
     >
-      <span class="relative">
-        <SvgIcon name="handshake" size="small" />
-        <span
-            v-if="badgeCount > 0"
-            class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rust text-primary text-[10px] font-bold rounded-full flex items-center justify-center px-1"
-        >
-          {{ badgeCount > 9 ? '9+' : badgeCount }}
-        </span>
-      </span>
+      <IconV2 name="swap" :size="18" />
       {{ t('header.nav.matches') }}
+      <span v-if="badgeCount > 0" class="w-1.5 h-1.5 rounded-full bg-neon shadow-[0_0_6px_rgba(90,193,104,.4)]"></span>
+      <span v-if="badgeCount > 0" class="font-display font-tnum text-[13px] font-semibold text-silver-50">{{ badgeCount > 9 ? '9+' : badgeCount }}</span>
     </button>
 
     <!-- Dropdown panel -->

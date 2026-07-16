@@ -3,8 +3,7 @@
 import { computed, ref, watch } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
-import BaseInput from '../ui/BaseInput.vue'
+import IconV2 from '../ui/IconV2.vue'
 import { useI18n } from '../../composables/useI18n'
 import { type CardCondition, type CardStatus } from '../../types/card'
 import { type DeckFormat } from '../../types/deck'
@@ -237,50 +236,68 @@ const handleCsvFile = async (event: Event) => {
   <BaseModal :show="show" :close-on-click-outside="false" :aria-label="isBinder ? t('binders.importModal.title') : t('decks.importModal.title')" @close="handleClose">
     <div class="space-y-md">
       <div>
-        <h2 class="text-h2 font-bold text-silver mb-1">{{ isBinder ? t('binders.importModal.title') : t('decks.importModal.title') }}</h2>
-        <label for="import-deck-input" class="text-small text-silver-70">{{ isBinder ? t('binders.importModal.inputLabel') : t('decks.importModal.inputLabel') }}</label>
+        <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em] mb-1">{{ isBinder ? t('binders.importModal.title') : t('decks.importModal.title') }}</h2>
+      </div>
+
+      <!-- Dropzone (click-to-browse; matches proto's visual treatment) -->
+      <input
+          ref="csvFileInput"
+          type="file"
+          accept=".csv"
+          :aria-label="t('decks.importModal.csvUpload')"
+          class="hidden"
+          @change="handleCsvFile"
+      />
+      <button
+          type="button"
+          class="w-full flex flex-col items-center gap-2.5 text-center px-6 py-7 bg-surface-1 border border-dashed border-line-strong rounded-lg transition-all duration-200 ease-v2 hover:border-neon-40 hover:bg-neon-10"
+          @click="csvFileInput?.click()"
+      >
+        <IconV2 name="import" :size="36" class="text-silver-30" />
+        <span class="text-small font-semibold text-silver">
+          <span class="text-neon font-bold">{{ t('decks.importModal.csvUpload') }}</span>
+        </span>
+        <span class="flex flex-wrap gap-1.5 justify-center mt-0.5">
+          <span class="text-[11px] font-semibold text-silver-50 bg-surface-2 border border-line rounded-full px-2.5 py-1">Moxfield</span>
+          <span class="text-[11px] font-semibold text-silver-50 bg-surface-2 border border-line rounded-full px-2.5 py-1">ManaBox</span>
+          <span class="text-[11px] font-semibold text-silver-50 bg-surface-2 border border-line rounded-full px-2.5 py-1">Urza's Gatherer</span>
+          <span class="text-[11px] font-semibold text-silver-50 bg-surface-2 border border-line rounded-full px-2.5 py-1">CSV</span>
+        </span>
+      </button>
+
+      <div class="flex items-center gap-3 text-silver-30 text-[12px] uppercase tracking-[.12em]">
+        <span class="flex-1 h-px bg-line"></span>
+        {{ t('decks.importModal.pasteDivider') }}
+        <span class="flex-1 h-px bg-line"></span>
       </div>
 
       <div>
+        <label for="import-deck-input" class="text-small font-semibold text-silver-70 block mb-1.5">{{ isBinder ? t('binders.importModal.inputLabel') : t('decks.importModal.inputLabel') }}</label>
         <textarea
             id="import-deck-input"
             v-model="inputText"
             placeholder="https://moxfield.com/decks/...&#10;o&#10;3 Arid Mesa (MH2) 244&#10;2 Artist's Talent (BLB) 124&#10;...&#10;o&#10;CSV (ManaBox / Moxfield / Urza's Gatherer)"
-            class="w-full bg-primary border border-silver px-4 py-md text-small text-silver placeholder:text-silver-50 transition-fast focus:outline-none focus:border-2 focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary font-sans"
-            rows="8"
+            class="w-full bg-surface-1 border border-line rounded-md px-3.5 py-3 text-small text-silver placeholder:text-silver-30 transition-all duration-200 ease-v2 focus:outline-none focus:border-neon focus:shadow-glow-neon"
+            rows="4"
             @input="preview = null; deckNameInput = ''"
         />
-        <input
-            ref="csvFileInput"
-            type="file"
-            accept=".csv"
-            :aria-label="t('decks.importModal.csvUpload')"
-            class="hidden"
-            @change="handleCsvFile"
-        />
-        <BaseButton
-            variant="secondary"
-            size="small"
-            class="mt-2"
-            @click="csvFileInput?.click()"
-        >
-          {{ t('decks.importModal.csvUpload') }}
-        </BaseButton>
       </div>
 
-      <div class="flex justify-end pt-3 border-t border-silver-20">
+      <div class="flex items-center justify-between gap-3">
+        <span class="text-tiny text-silver-50">{{ t('decks.importModal.autoDetectHint') }}</span>
         <BaseButton
-            variant="filled"
+            variant="primary"
             @click="handleParse"
             :disabled="!inputText.trim() || parsing"
-            class="w-full sm:w-auto"
+            class="uppercase tracking-[.1em] !text-[12px] gap-2 flex-shrink-0"
         >
+          <IconV2 v-if="!parsing" name="search" :size="16" />
           {{ parsing ? t('decks.importModal.analyzing') : t('decks.importModal.analyze') }}
         </BaseButton>
       </div>
 
       <!-- Instrucciones para Moxfield -->
-      <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="border border-neon bg-neon/10 p-md space-y-2">
+      <div v-if="errorMsg === 'MOXFIELD_LINK_DETECTED'" class="bg-neon-10 border border-neon-40 rounded-lg p-md space-y-2">
         <p class="text-small text-neon font-bold">{{ t('decks.importModal.moxfieldDetected.title') }}</p>
         <p class="text-small text-silver">{{ t('decks.importModal.moxfieldDetected.instruction') }}</p>
         <ol class="text-small text-silver-70 list-decimal list-inside space-y-1">
@@ -292,86 +309,120 @@ const handleCsvFile = async (event: Event) => {
       </div>
 
       <!-- Error message -->
-      <div v-else-if="errorMsg" role="alert" class="border border-rust bg-rust/10 p-md">
+      <div v-else-if="errorMsg" role="alert" class="border border-rust bg-rust-10 rounded-lg p-md">
         <p class="text-small text-rust">{{ errorMsg }}</p>
       </div>
 
       <!-- CSV detected indicator -->
-      <div v-if="preview && isCsv" class="border border-neon bg-neon/10 p-md">
-        <p class="text-small text-neon font-bold">{{ csvIsUG ? t('decks.importModal.csvDetectedUG') : t('decks.importModal.csvDetected') }}</p>
-        <p class="text-small text-silver mt-1">{{ t('decks.importModal.csvCards', { count: csvParsedCards.length }) }}</p>
+      <div v-if="preview && isCsv" class="flex items-center gap-2 bg-neon-10 border border-neon-40 rounded-md px-3.5 py-2.5 text-neon font-bold text-small">
+        <IconV2 name="check" :size="18" />
+        <span>{{ csvIsUG ? t('decks.importModal.csvDetectedUG') : t('decks.importModal.csvDetected') }}</span>
+        <span class="text-silver font-normal ml-auto">{{ t('decks.importModal.csvCards', { count: csvParsedCards.length }) }}</span>
       </div>
 
-      <div v-if="preview" aria-live="polite" class="border border-silver-30 p-md space-y-xs">
-        <p v-if="preview.name" class="text-body font-bold text-neon mb-3">
-          {{ preview.name }}
-        </p>
-        <p class="text-small text-silver">
-          {{ t('decks.importModal.preview.total', { total: preview.total }) }}
-        </p>
-        <p class="text-small text-silver-70">
-          {{ t('decks.importModal.preview.detail', { mainboard: preview.mainboard, sideboard: preview.sideboard }) }}
-        </p>
+      <div v-if="preview" aria-live="polite" class="flex items-center justify-between gap-3 bg-surface-2 border border-line rounded-lg px-4 py-3.5">
+        <div class="min-w-0">
+          <p v-if="preview.name" class="font-display font-bold text-neon truncate">{{ preview.name }}</p>
+          <p class="text-tiny text-silver-50 mt-0.5">
+            {{ t('decks.importModal.preview.detail', { mainboard: preview.mainboard, sideboard: preview.sideboard }) }}
+          </p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="font-display font-tnum text-neon text-[20px] font-bold leading-none">{{ preview.total }}</div>
+          <div class="text-[11px] uppercase tracking-[.08em] text-silver-30 font-semibold mt-1">{{ t('decks.importModal.preview.cardsLabel') }}</div>
+        </div>
       </div>
 
       <!-- Condition selector (not shown for CSV — conditions come from CSV) -->
       <div v-if="preview && !isCsv">
-        <label for="import-deck-condition" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.conditionLabel') }}</label>
-        <BaseSelect
-            id="import-deck-condition"
-            v-model="condition"
-            :options="conditionOptions"
-        />
+        <label for="import-deck-condition" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.importModal.options.conditionLabel') }}</label>
+        <div class="relative">
+          <select
+              id="import-deck-condition"
+              v-model="condition"
+              class="w-full appearance-none px-3.5 py-2.5 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+          >
+            <option v-for="opt in conditionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <IconV2 name="chev-d" :size="14" class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+        </div>
       </div>
       <div v-if="preview && isCsv">
         <p class="text-tiny text-silver-50">{{ t('decks.importModal.csvConditionNote') }}</p>
       </div>
 
-      <div v-if="preview && preview.sideboard > 0">
-        <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
-          <input
-              v-model="includeSideboard"
-              type="checkbox"
-              class="w-4 h-4"
-          />
-          <span>{{ t('decks.importModal.options.includeSideboard') }}</span>
-        </label>
-      </div>
+      <button
+          v-if="preview && preview.sideboard > 0"
+          type="button"
+          role="switch"
+          :aria-checked="includeSideboard"
+          class="w-full flex items-center justify-between gap-3.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md"
+          @click="includeSideboard = !includeSideboard"
+      >
+        <span class="text-[14px] font-semibold text-silver">{{ t('decks.importModal.options.includeSideboard') }}</span>
+        <span
+            class="relative w-[44px] h-[26px] rounded-full border flex-shrink-0 transition-colors duration-200 ease-v2"
+            :class="includeSideboard ? 'bg-neon border-neon' : 'bg-surface-3 border-line'"
+        >
+          <span
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2"
+              :class="includeSideboard ? 'right-0.5' : 'left-0.5'"
+          ></span>
+        </span>
+      </button>
 
       <!-- Deck/Binder name input (optional) -->
       <div v-if="preview">
-        <label for="import-deck-name" class="text-small text-silver-70 block mb-2">{{ isBinder ? t('binders.importModal.binderNameLabel') : t('decks.importModal.options.deckNameLabel') }}</label>
-        <BaseInput id="import-deck-name" v-model="deckNameInput" :placeholder="isBinder ? t('binders.importModal.binderNamePlaceholder') : t('decks.importModal.options.deckNamePlaceholder')" />
+        <label for="import-deck-name" class="text-small font-semibold text-silver-70 block mb-1.5">{{ isBinder ? t('binders.importModal.binderNameLabel') : t('decks.importModal.options.deckNameLabel') }}</label>
+        <input
+            id="import-deck-name"
+            v-model="deckNameInput"
+            type="text"
+            :placeholder="isBinder ? t('binders.importModal.binderNamePlaceholder') : t('decks.importModal.options.deckNamePlaceholder')"
+            class="w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver text-small placeholder:text-silver-30 transition-all duration-200 ease-v2 focus:outline-none focus:border-neon focus:shadow-glow-neon"
+        />
       </div>
 
       <!-- Formato del deck (hidden for binders) -->
       <div v-if="preview && !isBinder">
-        <label for="import-deck-format" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.formatLabel') }}</label>
-        <BaseSelect
-            id="import-deck-format"
-            v-model="deckFormat"
-            :options="formatOptions"
-        />
+        <label for="import-deck-format" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.importModal.options.formatLabel') }}</label>
+        <div class="relative">
+          <select
+              id="import-deck-format"
+              v-model="deckFormat"
+              class="w-full appearance-none px-3.5 py-2.5 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+          >
+            <option v-for="opt in formatOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <IconV2 name="chev-d" :size="14" class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+        </div>
       </div>
 
       <!-- Import status selector -->
       <div v-if="preview">
-        <label for="import-deck-status" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.statusLabel') }}</label>
-        <BaseSelect
-            id="import-deck-status"
-            v-model="importStatus"
-            :options="statusOptions"
-        />
+        <label for="import-deck-status" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.importModal.options.statusLabel') }}</label>
+        <div class="relative">
+          <select
+              id="import-deck-status"
+              v-model="importStatus"
+              class="w-full appearance-none px-3.5 py-2.5 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+          >
+            <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <IconV2 name="chev-d" :size="14" class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+        </div>
       </div>
 
       <!-- Commander (solo si es Commander, hidden for binders) -->
       <div v-if="preview && isCommander && !isBinder">
-        <label for="import-deck-commander" class="text-small text-silver-70 block mb-2">{{ t('decks.importModal.options.commanderLabel') }}</label>
-        <BaseInput
+        <label for="import-deck-commander" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.importModal.options.commanderLabel') }}</label>
+        <input
             id="import-deck-commander"
             v-model="commanderName"
+            type="text"
             :placeholder="t('decks.importModal.options.commanderPlaceholder')"
             list="commander-suggestions"
+            class="w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver text-small placeholder:text-silver-30 transition-all duration-200 ease-v2 focus:outline-none focus:border-neon focus:shadow-glow-neon"
         />
         <!-- Sugerencias de cartas del deck -->
         <datalist id="commander-suggestions">
@@ -383,20 +434,39 @@ const handleCsvFile = async (event: Event) => {
       </div>
 
       <!-- Make all imported cards public? -->
-      <div v-if="preview" class="pt-2">
-        <label class="flex items-center gap-2 text-small text-silver cursor-pointer">
-          <input v-model="makeAllPublic" type="checkbox" class="w-4 h-4" />
-          <span>{{ t('decks.importModal.options.makePublic') }}</span>
-        </label>
-      </div>
-
-      <BaseButton
+      <button
           v-if="preview"
-          @click="handleImport"
-          class="w-full"
+          type="button"
+          role="switch"
+          :aria-checked="makeAllPublic"
+          class="w-full flex items-center justify-between gap-3.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md"
+          @click="makeAllPublic = !makeAllPublic"
       >
-        {{ t('decks.importModal.submit', { count: includeSideboard ? preview.total : preview.mainboard }) }}
-      </BaseButton>
+        <span class="text-[14px] font-semibold text-silver">{{ t('decks.importModal.options.makePublic') }}</span>
+        <span
+            class="relative w-[44px] h-[26px] rounded-full border flex-shrink-0 transition-colors duration-200 ease-v2"
+            :class="makeAllPublic ? 'bg-neon border-neon' : 'bg-surface-3 border-line'"
+        >
+          <span
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2"
+              :class="makeAllPublic ? 'right-0.5' : 'left-0.5'"
+          ></span>
+        </span>
+      </button>
+
+      <div v-if="preview" class="flex gap-2 justify-end pt-2 border-t border-line">
+        <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="handleClose">
+          {{ t('common.actions.cancel') }}
+        </BaseButton>
+        <BaseButton
+            variant="filled"
+            class="flex-1 uppercase tracking-[.1em] !text-[12px] gap-2"
+            @click="handleImport"
+        >
+          <IconV2 name="import" :size="16" />
+          {{ t('decks.importModal.submit', { count: includeSideboard ? preview.total : preview.mainboard }) }}
+        </BaseButton>
+      </div>
     </div>
   </BaseModal>
 </template>

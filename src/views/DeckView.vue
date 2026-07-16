@@ -443,10 +443,10 @@ const handleDeckGridRemove = async (displayCard: DisplayDeckCard) => {
   const cardId = displayCard.cardId
   const isWishlist = displayCard.isWishlist
   const confirmed = await confirmStore.show({
-    title: `Eliminar del deck`,
-    message: `¿Eliminar "${cardName}" del deck?`,
-    confirmText: 'ELIMINAR',
-    cancelText: 'CANCELAR',
+    title: t('decks.header.confirmRemoveCardTitle'),
+    message: t('decks.header.confirmRemoveCardMessage', { name: cardName }),
+    confirmText: t('common.actions.delete'),
+    cancelText: t('common.actions.cancel'),
     confirmVariant: 'danger'
   })
 
@@ -950,10 +950,21 @@ onUnmounted(() => {
 
 <template>
   <AppContainer>
-    <!-- ========== HEADER ========== -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <!-- ========== HERO ========== -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-h1 font-bold text-silver">{{ t('collection.title') }}</h1>
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-1">
+          {{ selectedDeck ? t('decks.hero.kicker') : t('collection.hero.kicker') }}
+        </p>
+        <div class="flex items-center gap-3 flex-wrap mt-1">
+          <h1 class="font-display text-h1 font-bold text-silver">{{ selectedDeck ? selectedDeck.name : t('collection.title') }}</h1>
+          <span
+              v-if="selectedDeck && selectedDeck.format"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase bg-surface-2 text-silver-70 border border-line"
+          >
+            {{ selectedDeck.format?.toUpperCase() }}
+          </span>
+        </div>
       </div>
       <div class="flex gap-2" data-tour="add-card-btn">
         <BaseButton size="small" variant="secondary" @click="showImportDeckModal = true">
@@ -971,46 +982,46 @@ onUnmounted(() => {
 
     <div :class="['mt-6', selectedDeck ? 'pb-24 sm:pb-20' : '']">
       <div>
-        <!-- ========== MAIN TABS ========== -->
+        <!-- ========== SEGMENTED CONTROL: COLECCIÓN / MAZOS / BINDERS ========== -->
         <div class="mb-6">
-          <div class="flex gap-1 mb-4">
+          <div class="inline-flex bg-surface-1 border border-line rounded-lg p-[3px] gap-0.5 mb-4">
             <RouterLink
                 to="/collection"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-silver-50 transition-all duration-200 ease-v2 hover:text-silver focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.collection') }}
             </RouterLink>
             <RouterLink
                 data-tour="deck-tab"
                 to="/decks"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center bg-neon text-primary"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-neon bg-surface-3 transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.decks') }}
-              <span class="ml-1 opacity-70">({{ decksList.length }})</span>
+              <span class="font-display font-tnum text-tiny" style="color:inherit">{{ decksList.length }}</span>
             </RouterLink>
             <RouterLink
                 to="/binders"
-                class="flex-1 min-w-0 px-2 md:px-6 py-2 md:py-3 text-small md:text-body font-bold transition-150 rounded text-center border border-silver-10 text-silver-70 hover:text-silver hover:border-silver-30"
+                class="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 rounded-md text-small font-semibold text-silver-50 transition-all duration-200 ease-v2 hover:text-silver focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               {{ t('collection.tabs.binders') }}
             </RouterLink>
           </div>
 
-          <!-- ========== DECK SUB-TABS ========== -->
+          <!-- ========== DECK SUB-TABS (switcher) ========== -->
           <div v-if="decksList.length > 0" class="flex gap-2 overflow-x-auto pb-2 pl-4 border-l-4 border-neon min-w-0 max-w-full">
             <button
                 v-for="deck in decksList"
                 :key="deck.id"
                 @click="deckFilter = deck.id"
-                class="relative overflow-hidden px-4 py-3 min-h-[44px] md:min-h-0 md:py-2 text-small font-bold whitespace-nowrap transition-150 border-2"
+                class="relative overflow-hidden px-4 py-3 min-h-[44px] md:min-h-0 md:py-2 rounded-full text-small font-semibold whitespace-nowrap transition-all duration-200 ease-v2 border"
                 :class="[
                   deckFilter === deck.id
                     ? isDeckImporting(deck.id)
-                      ? 'bg-primary border-neon text-silver'
-                      : 'bg-neon text-primary border-neon'
+                      ? 'bg-surface-2 border-neon text-silver'
+                      : 'text-neon bg-neon-10 border-neon-40'
                     : isDeckImporting(deck.id)
-                      ? 'bg-primary border-neon text-silver'
-                      : 'bg-primary border-silver-30 text-silver-70 hover:border-neon/70'
+                      ? 'bg-surface-2 border-neon text-silver'
+                      : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'
                 ]"
             >
               <div
@@ -1023,7 +1034,7 @@ onUnmounted(() => {
                 <span v-if="isDeckImporting(deck.id)" class="ml-1 text-neon font-bold">
                   {{ importProgress?.currentCard ?? 0 }}/{{ importProgress?.totalCards ?? 0 }}
                 </span>
-                <span v-else class="ml-1 opacity-70">{{ deck.stats?.ownedCards ?? 0 }}</span>
+                <span v-else class="font-display font-tnum ml-1" style="color:inherit">{{ deck.stats?.ownedCards ?? 0 }}</span>
               </span>
             </button>
             <BaseButton size="small" variant="filled" @click="showCreateDeckModal = true">
@@ -1040,46 +1051,39 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- ========== DECK HEADER ========== -->
-        <div v-if="selectedDeck" class="bg-neon/10 border-2 border-neon p-3 md:p-4 mb-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 class="text-body md:text-h3 font-bold text-silver">{{ selectedDeck.name }}</h2>
-              <p class="text-tiny text-silver-50">{{ selectedDeck.format?.toUpperCase() }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="flex items-center gap-1">
-                <BaseButton
-                    size="small"
-                    variant="secondary"
-                    @click="handleToggleDeckPublic"
-                    :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
-                    class="flex items-center gap-1 md:gap-2"
-                >
-                  <SvgIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
-                  <span class="hidden sm:inline">{{ isDeckPublic ? t('collection.visibility.public') : t('collection.visibility.private') }}</span>
-                </BaseButton>
-                <HelpTooltip :text="isDeckPublic ? t('help.tooltips.collection.deckPublic') : t('help.tooltips.collection.deckPrivate')" :title="t('help.titles.deckVisibility')" />
-              </div>
-              <BaseButton size="small" variant="secondary" @click="handleExportDeck">
-                <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
-                <span class="sm:hidden">📋</span>
-              </BaseButton>
-              <BaseButton size="small" variant="secondary" @click="handleExportDeckCsv">
-                <span class="hidden sm:inline">CSV</span>
-                <span class="sm:hidden">CSV</span>
-              </BaseButton>
-              <BaseButton size="small" variant="secondary" @click="handleDeleteDeck()" :disabled="isDeletingDeck">
-                <template v-if="isDeletingDeck">
-                  <span class="animate-spin inline-block">⏳</span>
-                </template>
-                <template v-else>
-                  <span class="hidden sm:inline">ELIMINAR</span>
-                  <span class="sm:hidden">🗑️</span>
-                </template>
-              </BaseButton>
-            </div>
+        <!-- ========== DECK TOOLBAR (visibility toggle + export/delete actions) ========== -->
+        <div v-if="selectedDeck" class="flex flex-wrap items-center gap-2 pb-4 mb-6 border-b border-line">
+          <div class="flex items-center gap-1">
+            <BaseButton
+                size="small"
+                variant="secondary"
+                @click="handleToggleDeckPublic"
+                :class="isDeckPublic ? 'border-neon text-neon' : 'border-silver-50 text-silver-50'"
+                class="flex items-center gap-1 md:gap-2"
+            >
+              <SvgIcon :name="isDeckPublic ? 'eye-open' : 'eye-closed'" size="tiny" />
+              <span class="hidden sm:inline">{{ isDeckPublic ? t('collection.visibility.public') : t('collection.visibility.private') }}</span>
+            </BaseButton>
+            <HelpTooltip :text="isDeckPublic ? t('help.tooltips.collection.deckPublic') : t('help.tooltips.collection.deckPrivate')" :title="t('help.titles.deckVisibility')" />
           </div>
+          <span class="flex-1"></span>
+          <BaseButton size="small" variant="secondary" @click="handleExportDeck">
+            <span class="hidden sm:inline">{{ t('decks.detail.export') }}</span>
+            <span class="sm:hidden">📋</span>
+          </BaseButton>
+          <BaseButton size="small" variant="secondary" @click="handleExportDeckCsv">
+            <span class="hidden sm:inline">CSV</span>
+            <span class="sm:hidden">CSV</span>
+          </BaseButton>
+          <BaseButton size="small" variant="secondary" @click="handleDeleteDeck()" :disabled="isDeletingDeck">
+            <template v-if="isDeletingDeck">
+              <span class="animate-spin inline-block">⏳</span>
+            </template>
+            <template v-else>
+              <span class="hidden sm:inline">ELIMINAR</span>
+              <span class="sm:hidden">🗑️</span>
+            </template>
+          </BaseButton>
           <div v-if="isDeletingDeck" class="w-full">
             <div class="flex items-center justify-between mb-1">
               <span class="text-tiny text-silver-50">{{ t('decks.messages.deletingDeck') }}</span>
@@ -1100,6 +1104,7 @@ onUnmounted(() => {
             v-model:sort-by="sortBy"
             v-model:group-by="deckGroupBy"
             view-mode="decks"
+            :v2="true"
             :show-bulk-select="false"
             :show-view-type="false"
             :show-mobile-discover="true"

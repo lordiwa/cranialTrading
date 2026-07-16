@@ -1,0 +1,35 @@
+{
+  "key": "TASK-115",
+  "title": "Bug UI mobile: panel de totales de Colección tapa el badge de matches del tabbar + Total recortado horizontalmente",
+  "description": "Reportado por Rafael 2026-07-16 (dos síntomas, mismo componente CollectionTotalsPanel.vue). SÍNTOMA 1: el panel fijo tapa el número/badge de matches del tabbar inferior. CAUSA: línea 218 ancla el panel a bottom: calc(3rem + safe-area) = 48px, pero el tabbar v2 del reskin F1 mide h-14 = 56px (AppHeader.vue:449, z-50) → 8px de solape sobre la zona del badge; regresión de F1 (el offset quedó del tabbar viejo de 48px). FIX: 3rem → 3.5rem. SÍNTOMA 2: el número del Total se corta horizontalmente en el footer de precios. CAUSA: Row 2 del panel expandido (líneas 387-397) — 5 montos flex-shrink-0 en fila sin wrap dentro del root con overflow-x-hidden; con valores reales supera los 390px y recorta el último segmento (Total). FIX: flex-wrap en Row 2 (los montos envuelven a segunda línea en vez de recortarse). Ambos CSS/template-only — sin tests por regla CLAUDE.md (UI/styling only); verificación visual de Rafael en dev. NOTA de ejecución: aplicar DESPUÉS del veredicto del review de TASK-113 (su brief verifica que ningún componente fue tocado).",
+  "acceptance_criteria": [
+    "El badge de matches del tabbar mobile queda completamente visible con el panel de totales presente (offset 3.5rem)",
+    "El Total (y los 5 montos) del panel expandido se ven completos en 390px — sin recorte horizontal",
+    "Desktop sin cambios; npx vite build verde",
+    "Verificación visual de Rafael en dev"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "ui",
+    "mobile",
+    "collection",
+    "reported-by-rafael"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-113"
+  ],
+  "linked_commits": [
+    "6fa906f",
+    "722aee0"
+  ],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T18:30:00.000Z",
+  "updated_at": "2026-07-16T18:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

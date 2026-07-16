@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
-  "lifecycle_state": "active",
-  "updated_at": "2026-07-03T18:45:00.000Z",
-  "active_task": "TASK-085",
-  "workflow_step": "task-085-pushed-to-develop-awaiting-ci-and-dev-verify",
-  "next_action": "TASK-085 COMMITEADO Y PUSHEADO a develop (v1.37.0) tras OK de Rafael ('ya comprobe solo deploya' 2026-07-03). Gates pre-push: unit 1200/1200, vite build OK, E2E completo 123 passed / 8 skipped / 0 failed. AL RETOMAR: (1) verificar CI verde y deploy a cranial-trading-dev.web.app; (2) verificar en dev la seccion 'Quien la vende' anonima (reglas+backfill YA aplicados en dev); (3) para PROD solo con OK explicito de Rafael: merge develop->main + `firebase deploy --only firestore:rules --project cranial-trading` + `node scripts/backfill-cardnamelower.cjs --project cranial-trading --apply` (CI NO despliega reglas ni corre backfill); (4) TASK-087 (priority high, reglas users/{uid}/cards allow read:if true) sigue en todo. RED hub merge sigue SIN commitear en working tree.",
-  "handoff_summary": "TASK-085 (busqueda anonima 'quien la vende' en login) implementado, revisado, verificado en vivo, y 2026-07-03 pusheado a develop como v1.37.0 con OK de Rafael. Reglas y backfill de cardNameLower ya aplicados en dev (3791 fixed, 9 wishlist legacy borrados). Working tree conserva el RED hub merge (Contactos->tab de /saved-matches) sin commitear — destino a decidir por Rafael. Landing v1.36.0 sigue pendiente de validacion de Rafael en dev.",
+  "lifecycle_state": "paused",
+  "updated_at": "2026-07-16T19:25:00.000Z",
+  "active_task": null,
+  "workflow_step": "select",
+  "next_action": "AL RETOMAR (orden): (1) NADA pendiente de v1.48.1 — CI run 29526018199 VERDE confirmado antes de pausar, TASK-113 y TASK-115 cerradas (done, linked). (2) TASK-111 (bug URL sync search, HIGH, TDD — diagnostico completo en el ticket, toca SearchView/search store, ya sin conflicto porque 108 mergeo) y TASK-118 (restaurar Google login, HIGH — forense de que commit lo quito + restaurar en 3 puntos de entrada + cards de Design). (3) TASK-114 (precios CK agregados — REFINAMIENTO primero: inventariar agregados + fuente CK por carta). (4) TASK-117 (loader al filtrar), TASK-116 (race add/delete), TASK-115 ya commiteado. (5) Backlog v2 restante: 102 (F7a) -> 103 (F7b) -> 104 (F8) -> 105 (F9) -> 106 -> 107. Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (RE-CONFIRMAR con Rafael). PENDIENTES DE RAFAEL: UAT visual v1.40.0-1.48.1 en dev (dropdowns 112, search v2.1 108, toggles 113, panel totales 115); decision voseo/tuteo es.json; borrar public/tasks/ a mano; cranial-design/ y .mcp.json untracked.",
+  "handoff_summary": "SESION PAUSADA por Rafael 2026-07-16 ~19:00Z (borrar contexto). Dia completo en modo harness: 5 tickets SHIPPED a dev — TASK-100 (v1.46.0), TASK-101 F6 search reskin (v1.47.0), TASK-108 search v2.1 sort/count/per-page ref Card Kingdom (v1.48.0, design-push parcial del card 12-search HECHO conservando el sidebar para TASK-110), TASK-112 dropdowns nativos color-scheme (v1.48.0), TASK-113 toggles coleccion + TASK-115 panel totales mobile (v1.48.1, CI 29526018199 VERDE, ambos CERRADOS). design-status corrido: inventario completo app<->Claude Design, 0 gaps. Bugs de Rafael del dia diagnosticados con causa raiz y ticketeados: 111 (URL sync, pendiente), 113/115 (fixeados), 114 (precios CK, pendiente), 117 (loader filtros, nuevo). 116 = hallazgo colateral del review (race add/delete). Patron del dia: TODOS los HIGH salieron de reviews/E2E propios (locator autocomplete, loading colgado cache-hit, perf O(kxn) del indice bulk) y se resolvieron review-driven con RED-checks. Cola de mensajes con devs se cruza — usar protocolo PEDIDO #n numerado.",
   "open_questions": [
     "Working tree sin commitear (RED hub merge): commitear como feature, descartar, o taskear?",
     "Componentes en Figma via design/figma-build-prompt.md: sigue pendiente de la sesion interactiva de Rafael (aunque el MCP de Figma YA carga en background desde 2026-07-02 — se podria hacer desde aca si Rafael lo pide)",
@@ -14,11 +14,98 @@
   ],
   "blockers": [],
   "decisions": [
-    "TASK-084+086 cerrados y desplegados a dev (CI verde 2026-07-01). NADA a main sin OK explicito.",
-    "TASK-085: research-first obligatorio antes de tocar codigo (definido en el ticket).",
-    "TASK-085 pusheado a develop 2026-07-03 (v1.37.0) con OK de Rafael; prod (reglas+backfill+merge main) requiere OK explicito aparte.",
-    "Frente cranial-design cerrado 2026-07-03; trabajo de disenio pausado hasta feedback de Rafael."
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "2026-07-13 Rafael (plan completo): (1) Market NO se reskinea por ahora ('no la tenemos'); (2) dead code se limpia en chore aparte = TASK-106; (3) chips de Coleccion quedan 4 y el proto de Design se sincroniza a 4 = TASK-107. Backlog completo materializado: F2b=097, F5a=098, F5b=099, F4a=095(re-scope), F4b=100, F6=101, F7a=102, F7b=103, F8=104, F9=105. Orden: F2,F2b,F5a,F5b,F3,F4a,F4b,F6,F7a,F7b,F8,F9. Deploy a dev por TANDA, no por ticket.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "2026-07-13 Rafael (mid-UAT F1): Coleccion NO puede quedar ultima — se adelanta como TASK-096 (F1b) inmediatamente despues del shell; Matches (TASK-094) pasa detras; TASK-095 (F4) pierde el alcance de Coleccion. Ademas aclaro que Design ES la fuente de verdad (la app debe verse como el proto).",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "2026-07-13 Rafael: plan design->app v2 por fases F0-F4 APROBADO, arrancar por F0; un ticket por fase con deploy dev + verificacion visual entre fases.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "2026-07-13 Rafael: headline de landing se MANTIENE el actual de la app — 'From Trash to Treasures' del proto NO se adopta.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "2026-07-13 Rafael: TASK-091 (Messages split-pane) APROBADO como F3 — se quita needs-approval, alcance ampliado con unreadCount real.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "TASK-084+086 cerrados y desplegados a dev (CI verde 2026-07-01). NADA a main sin OK explicito.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "TASK-085: research-first obligatorio antes de tocar codigo (definido en el ticket).",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "TASK-085 pusheado a develop 2026-07-03 (v1.37.0) con OK de Rafael; prod (reglas+backfill+merge main) requiere OK explicito aparte.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    },
+    {
+      "at": "2026-07-13T00:00:00.000Z",
+      "decision": "Frente cranial-design cerrado 2026-07-03; trabajo de disenio pausado hasta feedback de Rafael.",
+      "rationale": "migrado de formato string legacy 2026-07-13"
+    }
   ],
-  "subagent_results": [],
-  "pending_human_confirmation": "Rafael: (1) validar landing v1.36.0 y TASK-085 v1.37.0 en cranial-trading-dev.web.app; (2) OK explicito para prod de TASK-085 (merge main + reglas + backfill); (3) destino del working tree sin commitear (RED hub merge); (4) revision visual del prototipo cranial-design + tramos A/B/C."
+  "subagent_results": [
+    {
+      "agent": "developer",
+      "at": "2026-07-13T18:30:00.000Z",
+      "summary": "F1b Coleccion v2 implementado (8 archivos: CollectionView hero/segmented/chips, CardFilterBar prop opt-in v2, GridCardFull+Compact badges dot CSS puro + placas xN + precios tabulares, TotalsPanel v2, FAB prop size, locales x3). Gates verdes. Review FULL: APPROVE, 1 MEDIUM ($NaN en hero si card sin price — fix pedido al dev en batch) + 4 LOW (qty duplicada plate+Row3, v2 visible en UserProfileView publico, tab activo sin aria-current, tints hardcodeados par Compact/Full). Pase visual del orquestador en Chrome encontro ademas: badge ilegible sobre escaneos reales (tinte 14% del proto no funciona sobre arte — fix con base opaca pedido), titulo ALL CAPS vs Title Case proto, valor sin separador de miles. 4 fixes APLICADOS y verificados (badge base opaca visible en Chrome OK, titulo Title Case OK, $16.983 con separador OK, guard NaN aplicado — gates verdes 3 corridas). AMBIGUEDAD para Rafael: proto tiene 5 chips de filtro (separa En venta/En cambio), app tiene 4 (Disponible fusiona) — cambio de UX de filtros, requiere su decision como follow-up. E2E collection pendiente antes de push.",
+      "task": "TASK-096 — developer+reviewer (dev-f1b-collection / rev-f1b-collection)"
+    },
+    {
+      "agent": "reviewer",
+      "at": "2026-07-13T17:20:00.000Z",
+      "summary": "Review FULL (rubrica: >150 lineas, 8 archivos): APPROVE, 0 HIGH/MEDIUM. Gates re-corridos verdes (unit 1208, build 13.96s, type-check exit 0). Iconos byte-identicos al shell-reference (21 symbols, sin refs colgantes), 55 keys i18n verificadas en 3 locales, data-testid/data-tour preservados, funcionalidad intacta (rutas, help, guest). 4 LOW como deuda para F-fases: flechas '→' en footers de search dropdowns (usar i-arrow-r), avatar edit/upload comparten icono 'import' (falta camera/pencil en sprite), clear-search sub-44px (mobile 20px), SvgIcon legacy en interiores de popovers + nav icons 18px vs 17px proto. PENDIENTE: UAT visual F0+F1 de Rafael contra el prototipo, luego commit+E2E+push. [nota: siguiente entrada abajo es el developer del mismo ticket]",
+      "task": "TASK-093 — reviewer (rev-f1-shell)"
+    },
+    {
+      "agent": "developer",
+      "at": "2026-07-13T17:05:00.000Z",
+      "summary": "F1 shell v2 implementado sin commitear sobre F0: IconSpriteV2.vue (20 symbols del shell-reference) + IconV2.vue (svg use), AppHeader.vue reskin completo (72/44 desktop bg-hdr+blur, wordmark Space Grotesk, mobile 56px, tabbar 56px+safe-area con dot activo, icon-btn Mensajes con badge unreadMessagesCount desktop+mobile), MatchNotificationsDropdown trigger reskineado, UserPopover/GlobalSearch/MobileSearchOverlay sin emojis + aria-labels. Sin keys i18n nuevas (reuso header.nav.messages, common.actions.close). data-testid preservados via campo testid explicito. Desviaciones: 📍 quitado sin reemplazo (no hay icono en set canonico), Help mobile se mantiene (no dropear funcionalidad). Gates: unit 1208 verde, build 12.75s, type-check limpio. Sin locks nuevos (reskin markup-only). Rafael aclaro mid-F0: Design ES la fuente de verdad, la app debe verse como el proto — UAT visual F0+F1 juntos contra el prototipo.",
+      "task": "TASK-093 — developer (dev-f1-shell)"
+    },
+    {
+      "agent": "developer",
+      "at": "2026-07-13T16:26:00.000Z",
+      "summary": "F0 implementado sin commitear en develop: Space Grotesk variable woff2 self-hosted (public/Fonts/Space-Grotesk/, 22KB, wght 500-700 + OFL + README), @font-face + preload en index.html, tokens aditivos en tailwind.config.js (font-display, surface-1/2/3, line/line-strong, gold, hdr->bg-hdr, shadow-glow-neon, ease-v2), utilidades .rise/.sk/.font-tnum en src/style.css. Gates: unit 89/1208 verde, vite build 17.4s OK. Cero componentes tocados.",
+      "task": "TASK-092 — developer (dev-f0-tokens)"
+    },
+    {
+      "agent": "reviewer",
+      "at": "2026-07-13T16:35:00.000Z",
+      "summary": "Review LIGHT (rubrica: <150 lineas, sin superficies FULL, uat-only): APPROVE. 0 HIGH, 0 MEDIUM. Re-corrio gates (unit 1208 verde, build 12.5s). Verifico woff2 con fontTools (wght 300-700 real, latin completo con acentos), parity preload<->archivo OK, diff 100% aditivo, grep confirma utilidades nuevas sin uso en templates existentes. 2 LOW informativos: (1) token AC 'hdr-bg' se consume como bg-hdr — avisar a F1-F4; (2) .rise hardcodea el mismo cubic-bezier que ease-v2, mantener en sync. Nota: reviewer quedo idle sin reportar (patron conocido), respondio al ping.",
+      "task": "TASK-092 — reviewer (rev-f0-tokens)"
+    }
+  ],
+  "pending_human_confirmation": "Rafael: (1) UAT visual v1.40.0-1.48.1 en dev — en particular: dropdowns legibles (112), search v2.1 sort/count/per-page (108), toggles de coleccion reflejandose (113), badge de matches visible + Total sin recorte en mobile (115); (2) manual con TASK-111 o relanzar loop (re-confirmar loop_auth); (3) voseo/tuteo es.json; (4) public/tasks/ borrar a mano.",
+  "mode": "harness",
+  "loop_auth": {
+    "auto_close_on_green_review": true,
+    "uat_delegated_to_orchestrator": true,
+    "auto_consolidate": true,
+    "auto_push_after_close": true,
+    "auto_version_bump_on_milestone": true
+  },
+  "loop_state": {
+    "current_ticket": null,
+    "phase": "select",
+    "iteration": 8,
+    "completed_this_run": 10,
+    "run_started_at": "2026-07-13T20:00:00.000Z"
+  }
 }

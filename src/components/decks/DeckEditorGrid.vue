@@ -413,7 +413,7 @@ const handleDeckContextMenuSelect = (itemId: string) => {
     <div class="hidden md:block w-[110px] lg:w-[140px] xl:w-[180px] 2xl:w-[250px] flex-shrink-0 sticky top-[88px] self-start">
       <div v-if="previewCard" class="space-y-3">
         <!-- Card Image -->
-        <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden">
+        <div class="aspect-[3/4] bg-surface-1 border border-line rounded-lg overflow-hidden">
           <img
             v-if="getCardImage(previewCard)"
             :src="getCardImage(previewCard)"
@@ -428,27 +428,27 @@ const handleDeckContextMenuSelect = (itemId: string) => {
 
         <!-- Card Info -->
         <div class="space-y-2 text-small">
-          <p class="font-bold text-silver text-body">{{ previewCard.name }}</p>
+          <p class="font-display font-bold text-silver text-body">{{ previewCard.name }}</p>
           <p class="text-silver-70">{{ previewCard.edition }} - {{ previewCard.condition }}</p>
           <p v-if="previewCard.foil" class="text-neon">FOIL</p>
           <p v-if="previewCard.type_line" class="text-silver-50 text-tiny">{{ previewCard.type_line }}</p>
 
-          <div class="border-t border-silver-20 pt-2 mt-2 space-y-1">
+          <div class="border-t border-line pt-2 mt-2 space-y-1">
             <div class="flex justify-between">
               <span class="text-silver-70">{{ t('decks.editorGrid.ck') }}</span>
-              <span class="text-neon font-bold">{{ previewCKRetail != null ? formatPrice(previewCKRetail) : `$${previewCard.price?.toFixed(2) || 'N/A'}` }}</span>
+              <span class="font-display font-tnum text-neon font-bold">{{ previewCKRetail != null ? formatPrice(previewCKRetail) : `$${previewCard.price?.toFixed(2) || 'N/A'}` }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-silver-70">{{ t('decks.editorGrid.tcg') }}</span>
-              <span class="text-silver">${{ previewCard.price?.toFixed(2) || 'N/A' }}</span>
+              <span class="font-display font-tnum text-silver">${{ previewCard.price?.toFixed(2) || 'N/A' }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-silver-70">{{ t('decks.editorGrid.bl') }}</span>
-              <span class="text-silver">{{ previewCKBuylist != null ? formatPrice(previewCKBuylist) : '-' }}</span>
+              <span class="font-display font-tnum text-silver">{{ previewCKBuylist != null ? formatPrice(previewCKBuylist) : '-' }}</span>
             </div>
-            <div class="flex justify-between border-t border-silver-20 pt-1 mt-1">
+            <div class="flex justify-between border-t border-line pt-1 mt-1">
               <span class="text-silver-70">{{ t('decks.editorGrid.total') }}</span>
-              <span class="text-neon font-bold">{{ formatPrice((previewCKRetail ?? previewCard.price ?? 0) * getQuantity(previewCard)) }}</span>
+              <span class="font-display font-tnum text-neon font-bold">{{ formatPrice((previewCKRetail ?? previewCard.price ?? 0) * getQuantity(previewCard)) }}</span>
             </div>
           </div>
 
@@ -468,7 +468,7 @@ const handleDeckContextMenuSelect = (itemId: string) => {
         </div>
       </div>
 
-      <div v-else class="aspect-[3/4] bg-secondary border border-silver-30 flex items-center justify-center">
+      <div v-else class="aspect-[3/4] bg-surface-1 border border-line rounded-lg flex items-center justify-center">
         <p class="text-tiny text-silver-50">{{ t('decks.editorGrid.noCards') }}</p>
       </div>
     </div>
@@ -476,13 +476,13 @@ const handleDeckContextMenuSelect = (itemId: string) => {
     <!-- Right Panel: Cards Grid -->
     <div class="flex-1 space-y-4 md:space-y-6 min-w-0">
       <!-- Empty state -->
-      <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center space-y-4">
+      <div v-if="cards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center space-y-4">
         <p class="text-body text-silver-70">{{ t('decks.editorGrid.emptyBoard') }}</p>
         <div
           class="inline-block cursor-pointer group"
           @click="emit('addCard')"
         >
-          <div class="w-[100px] md:w-[130px] aspect-[3/4] border-2 border-dashed border-silver-30 hover:border-neon flex items-center justify-center transition-all duration-150 mx-auto">
+          <div class="w-[100px] md:w-[130px] aspect-[3/4] border-2 border-dashed border-line-strong hover:border-neon rounded-lg flex items-center justify-center transition-all duration-150 mx-auto">
             <span class="text-h1 font-light text-silver-30 group-hover:text-neon transition-colors">+</span>
           </div>
         </div>

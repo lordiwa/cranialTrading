@@ -1,0 +1,40 @@
+{
+  "key": "TASK-092",
+  "title": "Design→app v2 F0: tokens + tipografía base (Space Grotesk display, capas surface, tokens v2)",
+  "description": "Fase 0 del rediseño v2 \"La vitrina del coleccionista\" (spec: cranial-design/prototype/DESIGN-DIRECTION.md §2-3, shell canónico: _shell-reference.html). Fundación ADITIVA para F1-F4 — no cambia layouts todavía.\n\nAlcance:\n1. Fuente display Space Grotesk (pesos 500/600/700) self-hosted en public/Fonts/ siguiendo el patrón existente de Open Sans (@font-face + preload en index.html; NO usar el <link> de Google Fonts del proto — la app self-hostea).\n2. tailwind.config.js extender (sin romper tokens v1): fontFamily.display ['Space Grotesk'], colors surface-1 rgba(255,255,255,.04) / surface-2 .07 / surface-3 .10, line rgba(255,255,255,.10) / line-strong .18, gold #D4A843, hdr-bg rgba(0,0,0,.78), boxShadow glow-neon (0 0 0 1px rgba(90,193,104,.35),0 0 18px rgba(90,193,104,.18)), transitionTimingFunction ease-v2 cubic-bezier(.2,.7,.3,1).\n3. Utilidades CSS base globales si hace falta (números tabulares font-feature-settings 'tnum' para la display; keyframes rise + skeleton .sk como utilidades disponibles, respetando prefers-reduced-motion).\n4. Documentar el mapa de tokens en un comentario del ticket para que F1-F4 los consuman.\n\nNO incluye: aplicar la tipografía/capas a pantallas (eso es F1-F4). Cambio visual esperado ≈ cero.\n\nDecisiones de Rafael 2026-07-13: plan F0-F4 aprobado; headline de landing se MANTIENE el actual de la app (\"From Trash to Treasures\" del proto NO se adopta); F3/TASK-091 aprobado.",
+  "acceptance_criteria": [
+    "Space Grotesk 500/600/700 self-hosted (woff2 en public/Fonts/) con @font-face y preload, patrón idéntico al de Open Sans existente",
+    "tailwind.config.js expone font-display, surface-1/2/3, line/line-strong, gold, hdr-bg, shadow glow-neon y ease v2 — todos los tokens v1 intactos",
+    "Utilidades rise (con prefers-reduced-motion) y skeleton .sk disponibles para fases siguientes",
+    "Sin regresión visual ni funcional: npm run test:unit verde, npx vite build verde, E2E verde antes de push",
+    "Version bump y deploy a dev para verificación de Rafael"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F0"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "2e993f8",
+    "4f5342e"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-13 CERRADO por loop autonomo (autorizacion Rafael: autonomia total). UAT (tier uat-only): PASS — verified by Orchestrator at the human's request (pase visual en Chrome desktop: tokens/tipografia aplicados, app fiel al proto; fixes de F1b verificados). Review light APPROVE previo. Gates: unit 1208, build, type-check, E2E completo 123 passed/0 failed. Commits: 2e993f8 (feat F0) + 4f5342e (bump 1.40.0).",
+      "at": "2026-07-13T20:55:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-13T16:16:47.000Z",
+  "updated_at": "2026-07-13T20:55:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

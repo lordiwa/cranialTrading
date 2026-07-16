@@ -1,16 +1,22 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { type Conversation, type Message } from '../types/message';
 import { t } from '../composables/useI18n';
+import { countUnreadMessages } from '../utils/messageUnread';
+import { chunkArray } from '../utils/chunkArray';
+
+// Límite de operaciones por writeBatch de Firestore.
+const FIRESTORE_BATCH_LIMIT = 500;
 
 export const useMessagesStore = defineStore('messages', () => {
     const conversations = ref<Conversation[]>([]);
     const currentMessages = ref<Message[]>([]);
     const loading = ref(false);
+    const loadError = ref(false);
     const authStore = useAuthStore();
     const toastStore = useToastStore();
     let unsubscribe: (() => void) | null = null;
@@ -122,7 +128,20 @@ export const useMessagesStore = defineStore('messages', () => {
     };
 
     /**
-     * Cargar todas las conversaciones del usuario autenticado
+     * Contar mensajes no leídos dirigidos al usuario autenticado dentro de una conversación.
+     * Best-effort: si falla, se asume 0 (no bloquea la carga del resto de la lista).
+     */
+    const fetchUnreadCountForConversation = async (conversationId: string): Promise<number> => {
+        if (!authStore.user?.id) return 0;
+        const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+        const q = query(messagesRef, where('read', '==', false));
+        const snapshot = await getDocs(q);
+        const messages = snapshot.docs.map(d => d.data() as { recipientId: string; read: boolean });
+        return countUnreadMessages(messages, authStore.user.id);
+    };
+
+    /**
+     * Cargar todas las conversaciones del usuario autenticado, con unreadCount real.
      */
     const loadConversations = async () => {
         if (!authStore.user?.id) {
@@ -131,6 +150,7 @@ export const useMessagesStore = defineStore('messages', () => {
         }
 
         loading.value = true;
+        loadError.value = false;
         try {
             const conversationsRef = collection(db, 'conversations');
             const q = query(conversationsRef, where('participantIds', 'array-contains', authStore.user.id));
@@ -144,7 +164,7 @@ export const useMessagesStore = defineStore('messages', () => {
                 lastMessage?: string;
                 lastMessageTime?: { toDate: () => Date };
             }
-            conversations.value = snapshot.docs
+            const baseConversations = snapshot.docs
                 .map(d => {
                     const data = d.data() as FirestoreConversationData;
                     return {
@@ -154,17 +174,59 @@ export const useMessagesStore = defineStore('messages', () => {
                         participantAvatars: data.participantAvatars ?? {},
                         lastMessage: data.lastMessage ?? '',
                         lastMessageTime: data.lastMessageTime?.toDate() ?? new Date(),
-                        unreadCount: 0, // TODO: implementar contador de no leídos
+                        unreadCount: 0,
                     } as unknown as Conversation;
                 })
                 .sort((a, b) => (b.lastMessageTime?.getTime() ?? 0) - (a.lastMessageTime?.getTime() ?? 0));
 
+            // unreadCount real por conversación (best-effort, no bloquea la lista si una falla)
+            conversations.value = await Promise.all(
+                baseConversations.map(async (conv) => {
+                    try {
+                        const unreadCount = await fetchUnreadCountForConversation(conv.id);
+                        return { ...conv, unreadCount };
+                    } catch (error) {
+                        console.error(`❌ Error contando no leídos de ${conv.id}:`, error);
+                        return conv;
+                    }
+                })
+            );
+
             console.info(`${conversations.value.length} conversaciones cargadas`);
         } catch (error) {
             console.error('❌ Error cargando conversaciones:', error);
+            loadError.value = true;
             toastStore.show(t('messages.errors.loadError'), 'error');
         } finally {
             loading.value = false;
+        }
+    };
+
+    /**
+     * Marcar como leídos los mensajes no leídos dirigidos al usuario autenticado
+     * dentro de una conversación (se llama al abrir el hilo). Best-effort: un
+     * fallo acá no debe impedir mostrar los mensajes.
+     */
+    const markConversationRead = async (conversationId: string): Promise<void> => {
+        if (!authStore.user?.id) return;
+        try {
+            const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+            const q = query(messagesRef, where('recipientId', '==', authStore.user.id), where('read', '==', false));
+            const snapshot = await getDocs(q);
+            if (snapshot.docs.length === 0) return;
+
+            // writeBatch tiene un límite de 500 operaciones: particionar y commitear
+            // secuencialmente evita el throw (y que el badge nunca se limpie) en hilos largos.
+            for (const chunk of chunkArray(snapshot.docs, FIRESTORE_BATCH_LIMIT)) {
+                const batch = writeBatch(db);
+                chunk.forEach(d => batch.update(d.ref, { read: true }));
+                await batch.commit();
+            }
+
+            const conv = conversations.value.find(c => c.id === conversationId);
+            if (conv) conv.unreadCount = 0;
+        } catch (error) {
+            console.error(`❌ Error marcando como leída la conversación ${conversationId}:`, error);
         }
     };
 
@@ -186,6 +248,11 @@ export const useMessagesStore = defineStore('messages', () => {
         }
 
         loading.value = true;
+
+        // Al abrir el hilo, marcar como leídos los mensajes pendientes (fire-and-forget:
+        // no bloquea el listener de mensajes, ni onMounted lo espera con await).
+        void markConversationRead(conversationId);
+
         const messagesRef = collection(db, 'conversations', conversationId, 'messages');
 
         unsubscribe = onSnapshot(
@@ -216,6 +283,14 @@ export const useMessagesStore = defineStore('messages', () => {
 
                 console.info(`${currentMessages.value.length} mensajes cargados`);
                 loading.value = false;
+
+                // Mensajes que llegan mientras el hilo está abierto (p.ej. la otra persona
+                // responde en vivo): re-marcar como leídos. Guard: solo si hay al menos 1
+                // no leído dirigido a mí — evita loop, porque marcar como leído dispara este
+                // mismo listener de nuevo con read:true y la condición deja de cumplirse.
+                if (authStore.user?.id && countUnreadMessages(currentMessages.value, authStore.user.id) > 0) {
+                    void markConversationRead(conversationId);
+                }
             },
             (error) => {
                 console.error('❌ Error en listener de mensajes:', error);
@@ -242,10 +317,12 @@ export const useMessagesStore = defineStore('messages', () => {
         conversations,
         currentMessages,
         loading,
+        loadError,
         createConversation,
         sendMessage,
         loadConversations,
         loadConversationMessages,
+        markConversationRead,
         stopListeningMessages,
     };
 });

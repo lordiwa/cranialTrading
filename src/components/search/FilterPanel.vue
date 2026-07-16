@@ -7,7 +7,7 @@ import { getCardSuggestions } from '../../services/scryfall'
 import { formatOptions, getKeywordLabel } from '../../utils/filterKeywords'
 import AdvancedFilterModal, { type AdvancedFilters } from './AdvancedFilterModal.vue'
 import BaseButton from '../ui/BaseButton.vue'
-import SvgIcon from '../ui/SvgIcon.vue'
+import IconV2 from '../ui/IconV2.vue'
 import ManaIcon from '../ui/ManaIcon.vue'
 import HelpTooltip from '../ui/HelpTooltip.vue'
 
@@ -317,12 +317,27 @@ const removeFilter = (type: string, value?: string) => {
 
 // Get set name (for pills - uses search store or just code)
 const getSetName = (code: string): string => code.toUpperCase()
+
+// v2 redesign — rarity square badge palette (design→app v2 F6, cranial-design/prototype/73-advanced-filters-*.html)
+const RARITY_ON_CLASSES: Record<string, string> = {
+  common: 'bg-white border-white text-black',
+  uncommon: 'bg-[#C0C0C0] border-[#C0C0C0] text-black',
+  rare: 'bg-gold border-gold text-black',
+  mythic: 'bg-[#CD7F32] border-[#CD7F32] text-black',
+}
+const RARITY_OFF_CLASSES: Record<string, string> = {
+  common: 'bg-surface-1 border-line text-silver hover:border-line-strong',
+  uncommon: 'bg-surface-1 border-line text-[#C0C0C0] hover:border-line-strong',
+  rare: 'bg-surface-1 border-line text-gold hover:border-line-strong',
+  mythic: 'bg-surface-1 border-line text-[#CD7F32] hover:border-line-strong',
+}
+const pillClasses = 'inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-neon-10 border border-neon-40 text-neon text-tiny font-semibold hover:bg-rust-10 hover:border-rust hover:text-[#C4553F] transition-all duration-200 ease-v2'
 </script>
 
 <template>
   <div class="space-y-4">
     <!-- ========== BARRA DE BÚSQUEDA HORIZONTAL ========== -->
-    <div class="bg-primary border border-silver-30 p-4 rounded-md">
+    <div class="bg-surface-1 border border-line rounded-lg p-4">
       <!-- Fila 1: Input + Botón Buscar (oculto en modo embebido si hideNameInput) -->
       <div v-if="!hideNameInput" class="flex gap-3 mb-4">
         <div ref="nameInputContainer" class="relative flex-1">
@@ -332,36 +347,39 @@ const getSetName = (code: string): string => code.toUpperCase()
               @keydown.enter="handleSearch"
               :placeholder="t('search.filterPanel.placeholder')"
               type="text"
-              class="w-full bg-primary border border-silver-30 px-4 pr-10 py-3 text-body text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-fast rounded"
+              class="w-full min-h-[44px] bg-surface-1 border border-line rounded-md px-4 pr-10 text-body text-silver placeholder:text-silver-30 focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
           />
           <button
               v-if="filters.name && filters.name.length > 0"
               @click="filters.name = ''; showSuggestions = false; suggestions = []"
-              class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20"
+              :aria-label="t('common.actions.clear')"
+              class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-30 hover:text-silver transition-colors duration-200 ease-v2 rounded-full hover:bg-surface-2"
               type="button"
           >
-            ✕
+            <IconV2 name="x" :size="14" />
           </button>
           <div
               v-if="showSuggestions && suggestions.length > 0"
-              class="absolute top-full left-0 right-0 bg-primary border border-neon mt-1 max-h-48 overflow-y-auto z-20 rounded"
+              class="absolute top-full left-0 right-0 mt-1 bg-[#0d0d0f] border border-line-strong rounded-md max-h-48 overflow-y-auto z-20 shadow-strong"
           >
-            <div
+            <button
                 v-for="suggestion in suggestions"
                 :key="suggestion"
+                type="button"
                 @click="selectSuggestion(suggestion)"
-                class="px-4 py-2 hover:bg-neon-10 cursor-pointer text-small text-silver border-b border-silver-30 transition-fast"
+                class="w-full px-4 py-2 text-left hover:bg-neon-10 cursor-pointer text-small text-silver border-b border-line last:border-b-0 transition-colors duration-200 ease-v2"
             >
               {{ suggestion }}
-            </div>
+            </button>
           </div>
         </div>
         <BaseButton
+            variant="filled"
             @click="handleSearch"
             :disabled="searchStore.loading"
-            class="px-6 flex items-center gap-2"
+            class="px-6 flex items-center gap-2 uppercase tracking-[.1em] !text-[12px]"
         >
-          <SvgIcon :name="searchStore.loading ? 'loading' : 'search'" size="tiny" />
+          <IconV2 v-if="searchStore.loading" name="sync" :size="16" class="animate-spin" />
           {{ searchStore.loading ? '' : t('search.filterPanel.searchButton') }}
         </BaseButton>
       </div>
@@ -369,158 +387,147 @@ const getSetName = (code: string): string => code.toUpperCase()
       <!-- Fila 2: Filtros rápidos horizontales -->
       <div class="flex flex-wrap gap-2 items-center">
         <!-- Colores -->
-        <div class="flex gap-1">
+        <div class="flex gap-1.5" role="group" :aria-label="t('search.modal.sections.colors')">
           <button
               v-for="color in colorOptions"
               :key="color.value"
+              type="button"
               @click="toggleColor(color.value)"
               :class="[
-                'w-8 h-8 text-sm font-bold transition-fast flex items-center justify-center rounded',
+                'w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ease-v2',
                 filters.colors?.includes(color.value)
-                  ? 'bg-neon text-primary border-2 border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
+                  ? 'border-neon shadow-glow-neon'
+                  : 'border-line-strong hover:border-silver-30'
               ]"
               :title="color.label"
+              :aria-pressed="filters.colors?.includes(color.value)"
           >
             <ManaIcon :symbol="color.value.toUpperCase()" size="small" />
           </button>
         </div>
 
-        <span class="text-silver-30">|</span>
+        <span class="hidden sm:block w-px h-6 bg-line" aria-hidden="true"></span>
 
         <!-- Tipos rápidos -->
-        <div class="flex flex-wrap gap-1">
+        <div class="flex flex-wrap gap-1.5">
           <button
               v-for="type in typeOptions.slice(0, 4)"
               :key="type.value"
+              type="button"
               @click="toggleType(type.value)"
               :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast',
+                'min-h-[32px] px-3 rounded-full text-tiny font-semibold border transition-all duration-200 ease-v2',
                 filters.types?.includes(type.value)
-                  ? 'bg-neon text-primary border border-neon'
-                  : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
+                  ? 'text-neon bg-neon-10 border-neon-40'
+                  : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'
               ]"
           >
             {{ type.label }}
           </button>
         </div>
 
-        <span class="text-silver-30">|</span>
+        <span class="hidden sm:block w-px h-6 bg-line" aria-hidden="true"></span>
 
         <!-- Rarezas -->
-        <div class="flex gap-1">
+        <div class="flex gap-1.5">
           <button
               v-for="rarity in rarityOptions"
               :key="rarity.value"
+              type="button"
               @click="toggleRarity(rarity.value)"
               :class="[
-                'px-2 py-1 text-tiny font-bold transition-fast border',
-                filters.rarity?.includes(rarity.value)
-                  ? rarity.value === 'common' ? 'bg-white text-black border-white'
-                    : rarity.value === 'uncommon' ? 'bg-[#C0C0C0] text-black border-[#C0C0C0]'
-                    : rarity.value === 'rare' ? 'bg-[#FFD700] text-black border-[#FFD700]'
-                    : 'bg-[#CD7F32] text-black border-[#CD7F32]'
-                  : rarity.value === 'common' ? 'bg-silver-10 border-silver-30 text-white hover:border-white'
-                    : rarity.value === 'uncommon' ? 'bg-silver-10 border-silver-30 text-[#C0C0C0] hover:border-[#C0C0C0]'
-                    : rarity.value === 'rare' ? 'bg-silver-10 border-silver-30 text-[#FFD700] hover:border-[#FFD700]'
-                    : 'bg-silver-10 border-silver-30 text-[#CD7F32] hover:border-[#CD7F32]'
+                'w-8 h-7 rounded-md font-display text-tiny font-bold border transition-all duration-200 ease-v2 flex items-center justify-center',
+                filters.rarity?.includes(rarity.value) ? RARITY_ON_CLASSES[rarity.value] : RARITY_OFF_CLASSES[rarity.value]
               ]"
+              :title="rarity.label"
           >
             {{ rarity.label.charAt(0) }}
           </button>
         </div>
 
-        <span v-if="!hideNameInput" class="text-silver-30">|</span>
+        <span v-if="!hideNameInput" class="hidden sm:block w-px h-6 bg-line" aria-hidden="true"></span>
 
         <!-- Only Released checkbox (hidden when embedded to keep UI lean) -->
-        <label v-if="!hideNameInput" class="flex items-center gap-1 cursor-pointer">
-          <input v-model="filters.onlyReleased" type="checkbox" class="w-4 h-4 accent-neon" />
+        <label v-if="!hideNameInput" class="flex items-center gap-2 cursor-pointer">
+          <input v-model="filters.onlyReleased" type="checkbox" class="w-4 h-4 accent-neon rounded" />
           <span class="text-tiny text-silver-70">{{ t('search.filterPanel.onlyReleased') }}</span>
           <HelpTooltip :text="t('help.tooltips.search.onlyReleased')" :title="t('help.titles.onlyReleased')" />
         </label>
 
-        <span class="text-silver-30">|</span>
+        <span class="hidden sm:block w-px h-6 bg-line" aria-hidden="true"></span>
 
         <!-- Toggle Filtros Avanzados -->
         <button
+            type="button"
             @click="showAdvancedFilters = !showAdvancedFilters"
             :class="[
-              'px-3 py-1 text-tiny font-bold transition-fast flex items-center gap-2',
+              'min-h-[34px] px-3.5 rounded-full text-tiny font-bold uppercase tracking-[.06em] flex items-center gap-2 border transition-all duration-200 ease-v2',
               showAdvancedFilters || activeFilterCount() > 3
-                ? 'bg-neon-10 border border-neon text-neon'
-                : 'bg-silver-10 border border-silver-30 text-silver hover:border-neon'
+                ? 'text-neon bg-neon-10 border-neon-40'
+                : 'text-silver-50 bg-surface-1 border-line hover:text-silver hover:border-line-strong'
             ]"
         >
-          <SvgIcon name="settings" size="tiny" />
+          <IconV2 name="filter" :size="15" />
           {{ t('search.filterPanel.moreFilters') }}
-          <span v-if="activeFilterCount() > 0" class="bg-neon text-primary px-1 rounded text-tiny">{{ activeFilterCount() }}</span>
+          <span v-if="activeFilterCount() > 0" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-neon text-primary font-display text-[11px] font-bold">{{ activeFilterCount() }}</span>
         </button>
 
         <!-- Limpiar -->
         <button
             v-if="activeFilterCount() > 0"
+            type="button"
             @click="handleClear"
-            class="px-3 py-1 text-tiny font-bold text-rust border border-rust hover:bg-rust hover:text-primary transition-fast"
+            class="min-h-[34px] px-3.5 rounded-full text-tiny font-bold uppercase tracking-[.06em] text-[#C4553F] border border-rust hover:bg-rust hover:text-silver transition-all duration-200 ease-v2"
         >
           {{ t('search.filterPanel.clear') }}
         </button>
       </div>
 
       <!-- Pills de filtros seleccionados -->
-      <div v-if="activeFilterCount() > 0" class="flex flex-wrap gap-1 mt-3 pt-3 border-t border-silver-20">
-        <button v-for="color in filters.colors" :key="`color-${color}`" @click="removeFilter('color', color)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getColorLabel(color) }} <span class="opacity-70">×</span>
+      <div v-if="activeFilterCount() > 0" class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-line">
+        <button v-for="color in filters.colors" :key="`color-${color}`" type="button" @click="removeFilter('color', color)" :class="pillClasses">
+          {{ getColorLabel(color) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="type in filters.types" :key="`type-${type}`" @click="removeFilter('type', type)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getTypeLabel(type) }} <span class="opacity-70">×</span>
+        <button v-for="type in filters.types" :key="`type-${type}`" type="button" @click="removeFilter('type', type)" :class="pillClasses">
+          {{ getTypeLabel(type) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="rarity in filters.rarity" :key="`rarity-${rarity}`" @click="removeFilter('rarity', rarity)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getRarityLabel(rarity) }} <span class="opacity-70">×</span>
+        <button v-for="rarity in filters.rarity" :key="`rarity-${rarity}`" type="button" @click="removeFilter('rarity', rarity)" :class="pillClasses">
+          {{ getRarityLabel(rarity) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="format in filters.formatLegal" :key="`format-${format}`" @click="removeFilter('format', format)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getFormatLabel(format) }} <span class="opacity-70">×</span>
+        <button v-for="format in filters.formatLegal" :key="`format-${format}`" type="button" @click="removeFilter('format', format)" :class="pillClasses">
+          {{ getFormatLabel(format) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="setCode in filters.sets" :key="`set-${setCode}`" @click="removeFilter('set', setCode)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getSetName(setCode) }} <span class="opacity-70">×</span>
+        <button v-for="setCode in filters.sets" :key="`set-${setCode}`" type="button" @click="removeFilter('set', setCode)" :class="pillClasses">
+          {{ getSetName(setCode) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-for="keyword in filters.keywords" :key="`keyword-${keyword}`" @click="removeFilter('keyword', keyword)"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          {{ getKeywordLabel(keyword) }} <span class="opacity-70">×</span>
+        <button v-for="keyword in filters.keywords" :key="`keyword-${keyword}`" type="button" @click="removeFilter('keyword', keyword)" :class="pillClasses">
+          {{ getKeywordLabel(keyword) }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="filters.manaValue?.values?.length || filters.manaValue?.min !== undefined || filters.manaValue?.max !== undefined"
-            @click="removeFilter('manaValue')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          MV: {{ filters.manaValue?.values?.length ? filters.manaValue.values.map(v => v === 10 ? '10+' : v).join(', ') : `${filters.manaValue?.min ?? '?'}-${filters.manaValue?.max ?? '?'}` }} <span class="opacity-70">×</span>
+        <button
+            v-if="filters.manaValue?.values?.length || filters.manaValue?.min !== undefined || filters.manaValue?.max !== undefined"
+            type="button" @click="removeFilter('manaValue')" :class="pillClasses"
+        >
+          MV: {{ filters.manaValue?.values?.length ? filters.manaValue.values.map(v => v === 10 ? '10+' : v).join(', ') : `${filters.manaValue?.min ?? '?'}-${filters.manaValue?.max ?? '?'}` }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="filters.power?.min !== undefined || filters.power?.max !== undefined" @click="removeFilter('power')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          POW: {{ filters.power?.min ?? '?' }}-{{ filters.power?.max ?? '?' }} <span class="opacity-70">×</span>
+        <button v-if="filters.power?.min !== undefined || filters.power?.max !== undefined" type="button" @click="removeFilter('power')" :class="pillClasses">
+          POW: {{ filters.power?.min ?? '?' }}-{{ filters.power?.max ?? '?' }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="filters.toughness?.min !== undefined || filters.toughness?.max !== undefined" @click="removeFilter('toughness')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          TOU: {{ filters.toughness?.min ?? '?' }}-{{ filters.toughness?.max ?? '?' }} <span class="opacity-70">×</span>
+        <button v-if="filters.toughness?.min !== undefined || filters.toughness?.max !== undefined" type="button" @click="removeFilter('toughness')" :class="pillClasses">
+          TOU: {{ filters.toughness?.min ?? '?' }}-{{ filters.toughness?.max ?? '?' }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="filters.priceUSD?.min !== undefined || filters.priceUSD?.max !== undefined" @click="removeFilter('priceUSD')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          ${{ filters.priceUSD?.min ?? '?' }}-${{ filters.priceUSD?.max ?? '?' }} <span class="opacity-70">×</span>
+        <button v-if="filters.priceUSD?.min !== undefined || filters.priceUSD?.max !== undefined" type="button" @click="removeFilter('priceUSD')" :class="pillClasses">
+          ${{ filters.priceUSD?.min ?? '?' }}-${{ filters.priceUSD?.max ?? '?' }} <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="filters.isFoil" @click="removeFilter('isFoil')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          Foil <span class="opacity-70">×</span>
+        <button v-if="filters.isFoil" type="button" @click="removeFilter('isFoil')" :class="pillClasses">
+          Foil <IconV2 name="x" :size="12" />
         </button>
-        <button v-if="filters.isFullArt" @click="removeFilter('isFullArt')"
-            class="px-2 py-1 text-tiny font-bold bg-neon text-primary flex items-center gap-1 hover:bg-rust transition-fast">
-          Full Art <span class="opacity-70">×</span>
+        <button v-if="filters.isFullArt" type="button" @click="removeFilter('isFullArt')" :class="pillClasses">
+          Full Art <IconV2 name="x" :size="12" />
         </button>
       </div>
 
       <!-- Indicador de auto-búsqueda -->
-      <div v-if="activeFilterCount() > 0" class="mt-2 text-tiny text-silver-50">
+      <div v-if="activeFilterCount() > 0" class="mt-2 text-tiny text-silver-30">
         {{ t('search.filterPanel.autoSearch') }}
       </div>
     </div>

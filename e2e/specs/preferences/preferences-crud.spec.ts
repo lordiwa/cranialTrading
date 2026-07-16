@@ -24,10 +24,10 @@ test.describe('Preferences (Wishlist) CRUD', () => {
     if (resultCount > 0) {
       await preferencesPage.addModal.resultCards.first().click({ force: true });
       await page.waitForTimeout(500);
-      // Set status to wishlist if select is visible
-      if (await preferencesPage.addModal.statusSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await preferencesPage.addModal.statusSelect.selectOption('wishlist');
-      }
+      // Set status to wishlist via the status chip group (v2 redesign — see AddCardModal.vue)
+      await preferencesPage.addModal.statusChipWishlist.waitFor({ state: 'visible', timeout: 5000 });
+      await preferencesPage.addModal.statusChipWishlist.click();
+      await expect(preferencesPage.addModal.statusChipWishlist).toHaveAttribute('aria-pressed', 'true');
       await preferencesPage.addModal.saveButton.click();
       await commonPage.waitForToast('success');
     }

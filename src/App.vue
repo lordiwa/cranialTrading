@@ -10,6 +10,7 @@ import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
 import PromptModal from './components/ui/PromptModal.vue';
 import AppFooter from './components/layout/AppFooter.vue';
+import IconSpriteV2 from './components/layout/IconSpriteV2.vue';
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -62,6 +63,8 @@ onMounted(() => {
 </script>
 
 <template>
+  <IconSpriteV2 />
+
   <a
     href="#main-content"
     class="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-[9999] focus-visible:px-4 focus-visible:py-2 focus-visible:bg-neon focus-visible:text-primary focus-visible:font-bold focus-visible:rounded focus-visible:outline-none"

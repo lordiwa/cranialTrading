@@ -6,10 +6,9 @@ import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import BaseButton from '../ui/BaseButton.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
 import BaseModal from '../ui/BaseModal.vue'
-import BaseInput from '../ui/BaseInput.vue'
 import BaseLoader from '../ui/BaseLoader.vue'
+import IconV2 from '../ui/IconV2.vue'
 import type { CardCondition, CardWithAllocation } from '../../types/card'
 
 const props = defineProps<{
@@ -274,26 +273,30 @@ watch(() => props.show, (newVal) => {
 
 <template>
   <BaseModal :show="show" @close="emit('close')">
-    <div class="space-y-6 w-full max-h-[80vh] flex flex-col">
+    <div class="space-y-4 w-full max-h-[80vh] flex flex-col">
       <!-- Search View -->
       <template v-if="!showForm">
         <div class="space-y-4">
           <!-- Header -->
           <div>
-            <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.addToDeck.title') }}</h2>
-            <p class="text-small text-silver-70">{{ t('decks.addToDeck.subtitle') }}</p>
+            <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('decks.addToDeck.title') }}</h2>
+            <p class="text-small text-silver-70 mt-1">{{ t('decks.addToDeck.subtitle') }}</p>
           </div>
 
           <!-- Search Input -->
           <div>
-            <label for="add-deck-search" class="text-small text-silver-70 block mb-2">{{ t('decks.addToDeck.searchLabel') }}</label>
-            <BaseInput
-                id="add-deck-search"
-                :model-value="searchQuery"
-                @update:model-value="(v) => handleSearchInput(String(v))"
-                :placeholder="t('decks.addToDeck.searchPlaceholder')"
-                type="text"
-            />
+            <label for="add-deck-search" class="text-small font-semibold text-silver-70 block mb-1.5">{{ t('decks.addToDeck.searchLabel') }}</label>
+            <label class="flex items-center gap-2.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md transition-all duration-200 ease-v2 focus-within:border-neon focus-within:shadow-glow-neon">
+              <IconV2 name="search" :size="18" class="text-silver-30 flex-shrink-0" />
+              <input
+                  id="add-deck-search"
+                  :value="searchQuery"
+                  type="text"
+                  :placeholder="t('decks.addToDeck.searchPlaceholder')"
+                  class="flex-1 min-w-0 bg-transparent border-none outline-none text-silver placeholder:text-silver-30 text-small"
+                  @input="handleSearchInput(($event.target as HTMLInputElement).value)"
+              />
+            </label>
           </div>
 
           <!-- Loading -->
@@ -303,7 +306,7 @@ watch(() => props.show, (newVal) => {
 
           <!-- Error -->
           <div v-else-if="searchError" class="text-center py-8">
-            <p class="text-small text-rust">{{ searchError }}</p>
+            <p class="text-small text-[#C4553F]">{{ searchError }}</p>
           </div>
 
           <!-- No results -->
@@ -313,30 +316,33 @@ watch(() => props.show, (newVal) => {
 
           <!-- Results Grid -->
           <div v-else-if="searchResults.length > 0" class="space-y-2">
-            <p class="text-tiny text-silver-70">{{ t('decks.addToDeck.resultsCount', { count: searchResults.length }) }}</p>
+            <p class="text-tiny text-silver-50">{{ t('decks.addToDeck.resultsCount', { count: searchResults.length }) }}</p>
 
-            <div class="grid grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto">
-              <div
+            <div class="grid grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[50vh] overflow-y-auto">
+              <button
                   v-for="card in searchResults.slice(0, 12)"
                   :key="card.id"
+                  type="button"
+                  class="relative group cursor-pointer text-left rounded-md overflow-hidden border border-line hover:border-neon transition-colors duration-200 ease-v2"
                   @click="handleCardSelected(card)"
-                  class="cursor-pointer group"
               >
-                <div class="aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-150">
+                <div class="aspect-[3/4] bg-surface-1 overflow-hidden">
                   <img
                       v-if="getCardImageSmall(card)"
                       :src="getCardImageSmall(card)"
                       :alt="card.name"
                       loading="lazy"
-                      class="w-full h-full object-cover group-hover:scale-105 transition-300"
+                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-v2"
                   />
-                  <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50">
+                  <div v-else class="w-full h-full flex items-center justify-center text-tiny text-silver-50 px-2 text-center">
                     {{ t('decks.addToDeck.noImage') }}
                   </div>
                 </div>
-                <p class="text-tiny text-silver mt-1 truncate group-hover:text-neon">{{ card.name }}</p>
-                <p class="text-tiny text-silver-50">${{ card.prices?.usd ?? 'N/A' }}</p>
-              </div>
+                <div class="absolute bottom-0 left-0 right-0 bg-black/55 px-1.5 py-1">
+                  <p class="text-tiny text-silver truncate">{{ card.name }}</p>
+                  <p class="text-tiny text-silver-50">${{ card.prices?.usd ?? 'N/A' }}</p>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -346,7 +352,7 @@ watch(() => props.show, (newVal) => {
           </div>
 
           <!-- Close button -->
-          <BaseButton class="w-full" variant="secondary" @click="emit('close')">
+          <BaseButton class="w-full uppercase tracking-[.1em] !text-[12px]" variant="secondary" @click="emit('close')">
             {{ t('common.actions.close') }}
           </BaseButton>
         </div>
@@ -354,150 +360,152 @@ watch(() => props.show, (newVal) => {
 
       <!-- Selected Card Form -->
       <template v-else-if="selectedCard">
-        <div class="space-y-6 flex flex-col h-full">
+        <div class="space-y-4 flex flex-col h-full">
           <div>
-            <h2 class="text-h2 font-bold text-silver mb-1">{{ t('decks.addToDeck.addTo', { section: isSideboard ? 'SIDEBOARD' : 'MAINBOARD' }) }}</h2>
-            <p class="text-small text-silver-70">{{ t('decks.addToDeck.configureAdd') }}</p>
+            <h2 class="font-display text-h2 font-bold text-silver tracking-[-0.01em]">{{ t('decks.addToDeck.addTo', { section: isSideboard ? 'SIDEBOARD' : 'MAINBOARD' }) }}</h2>
+            <p class="text-small text-silver-70 mt-1">{{ t('decks.addToDeck.configureAdd') }}</p>
           </div>
 
           <div class="flex-1 overflow-y-auto">
-            <div class="bg-secondary border border-silver-30 p-4 space-y-4 rounded">
-              <div class="flex gap-4">
-                <div class="flex-shrink-0">
+            <div class="bg-surface-1 border border-line rounded-lg p-4 space-y-4">
+              <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-shrink-0 flex justify-center">
                   <img
                       v-if="getCardImage(selectedCard)"
                       :src="getCardImage(selectedCard)"
                       :alt="selectedCard.name"
                       loading="lazy"
-                      class="w-32 h-44 object-cover border border-silver-30"
+                      class="w-32 aspect-[2/3] object-cover border border-line rounded-lg"
                   />
-                  <div v-else class="w-32 h-44 bg-primary border border-silver-30 flex items-center justify-center">
+                  <div v-else class="w-32 aspect-[2/3] bg-surface-2 border border-line rounded-lg flex items-center justify-center">
                     <span class="text-tiny text-silver-50">{{ t('decks.addToDeck.noImage') }}</span>
                   </div>
                 </div>
 
                 <div class="flex-1 space-y-4">
                   <div>
-                    <p class="font-bold text-silver mb-1 text-h3">{{ selectedCard.name }}</p>
+                    <p class="font-display font-bold text-silver mb-1 text-h3">{{ selectedCard.name }}</p>
                     <!-- Multi-source prices -->
                     <div class="mb-3 space-y-1">
-                      <div class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-70">CK:</span>
-                        <span v-if="hasCardKingdomPrices" class="text-body font-bold text-neon">{{ formatPrice(cardKingdomRetail) }}</span>
-                        <span v-else-if="loadingCKPrices" class="text-small text-silver-50">...</span>
-                        <span v-else class="text-small text-silver-50">-</span>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-silver-50">CK:</span>
+                        <span v-if="hasCardKingdomPrices" class="font-display font-tnum text-neon font-bold">{{ formatPrice(cardKingdomRetail) }}</span>
+                        <span v-else-if="loadingCKPrices" class="text-silver-50">...</span>
+                        <span v-else class="text-silver-50">-</span>
                       </div>
-                      <div class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-70">TCG:</span>
-                        <span class="text-body text-silver">
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-silver-50">TCG:</span>
+                        <span class="font-display font-tnum text-silver-50">
                           ${{ selectedCard.prices?.usd ? Number.parseFloat(selectedCard.prices.usd).toFixed(2) : 'N/A' }}
                         </span>
                       </div>
-                      <div class="flex justify-between items-center">
-                        <span class="text-tiny text-silver-70">BL:</span>
-                        <span v-if="cardKingdomBuylist" class="text-body font-bold text-silver">{{ formatPrice(cardKingdomBuylist) }}</span>
-                        <span v-else class="text-small text-silver-50">-</span>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-silver-50">BL:</span>
+                        <span v-if="cardKingdomBuylist" class="font-display font-tnum text-silver font-bold">{{ formatPrice(cardKingdomBuylist) }}</span>
+                        <span v-else class="text-silver-50">-</span>
                       </div>
                     </div>
 
                     <div v-if="availablePrints.length > 1">
-                      <label for="add-deck-print-select" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.editionPrint') }}</label>
-                      <select
-                          id="add-deck-print-select"
-                          :value="selectedCard.id"
-                          @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
-                          class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150"
-                      >
-                        <option v-for="print in availablePrints" :key="print.id" :value="print.id">
-                          {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
-                        </option>
-                      </select>
-                      <p class="text-tiny text-silver-50 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>
+                      <label for="add-deck-print-select" class="text-xs text-silver-70 font-semibold block mb-1.5">{{ t('decks.editDeckCard.editionPrint') }}</label>
+                      <div class="relative">
+                        <select
+                            id="add-deck-print-select"
+                            :value="selectedCard.id"
+                            class="w-full appearance-none px-3 py-2 pr-8 bg-surface-1 border border-line text-silver text-xs rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+                            @change="handlePrintChange(($event.target as HTMLSelectElement).value)"
+                        >
+                          <option v-for="print in availablePrints" :key="print.id" :value="print.id">
+                            {{ print.set_name }} ({{ print.set.toUpperCase() }}) - ${{ print.prices?.usd ?? 'N/A' }}
+                          </option>
+                        </select>
+                        <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+                      </div>
+                      <p class="text-xs text-silver-30 mt-1">{{ t('decks.editDeckCard.printsAvailable', { count: availablePrints.length }) }}</p>
                     </div>
-                    <p v-else-if="loadingPrints" class="text-tiny text-silver-50">{{ t('decks.editDeckCard.loadingPrints') }}</p>
-                    <p v-else class="text-small text-silver-70">{{ selectedCard.set_name }} ({{ selectedCard.set.toUpperCase() }})</p>
+                    <p v-else-if="loadingPrints" class="text-xs text-silver-50 mt-2">{{ t('decks.editDeckCard.loadingPrints') }}</p>
+                    <p v-else class="text-xs text-silver-70 mt-2">{{ selectedCard.set_name }} ({{ selectedCard.set.toUpperCase() }})</p>
                   </div>
 
-                  <div class="border-t border-silver-20 pt-4">
-                    <p class="text-tiny text-silver-70 mb-2">{{ t('decks.addToDeck.cardSource') }}</p>
+                  <div class="border-t border-line pt-4">
+                    <p class="text-[11px] font-bold uppercase tracking-[.08em] text-silver-30 mb-2">{{ t('decks.addToDeck.cardSource') }}</p>
 
                     <div v-if="hasInCollection" class="space-y-2">
-                      <div
+                      <button
                           v-for="card in matchingCollectionCards"
                           :key="card.id"
-                          @click="selectCollectionCard(card)"
-                          class="p-2 border cursor-pointer transition-150"
+                          type="button"
+                          class="w-full flex justify-between items-center gap-2 p-2.5 border rounded-md text-left transition-all duration-200 ease-v2"
                           :class="[
                             selectedCollectionCard?.id === card.id
-                              ? 'border-neon bg-neon-10'
-                              : 'border-silver-30 hover:border-silver-50'
+                              ? 'border-neon-40 bg-neon-10'
+                              : 'border-line bg-surface-2 hover:border-line-strong'
                           ]"
+                          @click="selectCollectionCard(card)"
                       >
-                        <div class="flex justify-between items-center">
-                          <div>
-                            <span class="text-small text-silver">
-                              {{ card.edition }} - {{ card.condition }}
-                              <span v-if="card.foil" class="text-neon ml-1">FOIL</span>
-                            </span>
-                          </div>
-                          <div class="text-right">
-                            <span class="text-tiny" :class="card.availableQuantity > 0 ? 'text-neon' : 'text-ruby'">
-                              {{ t('decks.addToDeck.availableDisp', { available: card.availableQuantity, total: card.quantity }) }}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                        <span class="text-small text-silver">
+                          {{ card.edition }} - {{ card.condition }}
+                          <span v-if="card.foil" class="text-neon ml-1 font-bold">FOIL</span>
+                        </span>
+                        <span class="text-tiny font-display font-tnum" :class="card.availableQuantity > 0 ? 'text-neon' : 'text-[#C4553F]'">
+                          {{ t('decks.addToDeck.availableDisp', { available: card.availableQuantity, total: card.quantity }) }}
+                        </span>
+                      </button>
 
-                      <div
-                          @click="addMode = 'wishlist'; selectedCollectionCard = null"
-                          class="p-2 border cursor-pointer transition-150"
+                      <button
+                          type="button"
+                          class="w-full p-2.5 border rounded-md text-left transition-all duration-200 ease-v2"
                           :class="[
                             addMode === 'wishlist' && !selectedCollectionCard
-                              ? 'border-amber bg-amber-5'
-                              : 'border-silver-30 hover:border-silver-50'
+                              ? 'border-gold bg-[rgba(212,168,67,.08)]'
+                              : 'border-line bg-surface-2 hover:border-line-strong'
                           ]"
+                          @click="addMode = 'wishlist'; selectedCollectionCard = null"
                       >
-                        <span class="text-small text-amber">{{ t('decks.addToDeck.addToWishlist') }}</span>
-                      </div>
+                        <span class="text-small text-gold font-semibold">{{ t('decks.addToDeck.addToWishlist') }}</span>
+                      </button>
 
-                      <div
-                          @click="addMode = 'new'; selectedCollectionCard = null"
-                          class="p-2 border cursor-pointer transition-150"
+                      <button
+                          type="button"
+                          class="w-full p-2.5 border rounded-md text-left transition-all duration-200 ease-v2"
                           :class="[
                             addMode === 'new' && !selectedCollectionCard
-                              ? 'border-neon bg-neon-10'
-                              : 'border-silver-30 hover:border-silver-50'
+                              ? 'border-neon-40 bg-neon-10'
+                              : 'border-line bg-surface-2 hover:border-line-strong'
                           ]"
+                          @click="addMode = 'new'; selectedCollectionCard = null"
                       >
-                        <span class="text-small text-silver">{{ t('decks.addToDeck.addToCollectionFirst') }}</span>
-                      </div>
+                        <span class="text-small text-silver font-semibold">{{ t('decks.addToDeck.addToCollectionFirst') }}</span>
+                      </button>
                     </div>
 
                     <div v-else class="space-y-2">
-                      <div class="p-2 bg-secondary border border-silver-30">
+                      <div class="p-2.5 bg-surface-2 border border-line rounded-md">
                         <p class="text-small text-silver-50">{{ t('decks.addToDeck.noCardInCollection') }}</p>
                       </div>
 
                       <div class="flex gap-2">
                         <button
-                            @click="addMode = 'wishlist'"
-                            class="flex-1 p-2 border text-small transition-150"
+                            type="button"
+                            class="flex-1 p-2.5 border rounded-md text-small font-semibold transition-all duration-200 ease-v2"
                             :class="[
                               addMode === 'wishlist'
-                                ? 'border-amber text-amber bg-amber-5'
-                                : 'border-silver-30 text-silver-70 hover:border-silver-50'
+                                ? 'border-gold text-gold bg-[rgba(212,168,67,.08)]'
+                                : 'border-line text-silver-70 hover:border-line-strong'
                             ]"
+                            @click="addMode = 'wishlist'"
                         >
                           {{ t('decks.addToDeck.wishlistOption') }}
                         </button>
                         <button
-                            @click="addMode = 'new'"
-                            class="flex-1 p-2 border text-small transition-150"
+                            type="button"
+                            class="flex-1 p-2.5 border rounded-md text-small font-semibold transition-all duration-200 ease-v2"
                             :class="[
                               addMode === 'new'
-                                ? 'border-neon text-neon bg-neon-10'
-                                : 'border-silver-30 text-silver-70 hover:border-silver-50'
+                                ? 'border-neon-40 text-neon bg-neon-10'
+                                : 'border-line text-silver-70 hover:border-line-strong'
                             ]"
+                            @click="addMode = 'new'"
                         >
                           {{ t('decks.addToDeck.addToCollection') }}
                         </button>
@@ -505,10 +513,10 @@ watch(() => props.show, (newVal) => {
                     </div>
                   </div>
 
-                  <div class="space-y-3 border-t border-silver-20 pt-4">
+                  <div class="space-y-4 border-t border-line pt-4">
                     <div class="grid grid-cols-2 gap-3">
                       <div>
-                        <label for="add-deck-quantity" class="text-tiny text-silver-70 block mb-1">
+                        <label for="add-deck-quantity" class="text-xs text-silver-70 font-semibold block mb-1.5">
                           {{ t('decks.addToDeck.quantityLabel') }}
                           <span v-if="addMode === 'collection' && selectedCollectionCard" class="text-neon">
                             {{ t('decks.editDeckCard.maxQty', { max: selectedCollectionCard.availableQuantity }) }}
@@ -520,50 +528,74 @@ watch(() => props.show, (newVal) => {
                             type="number"
                             min="1"
                             :max="maxQuantity"
-                            class="w-full px-3 py-2 bg-primary border border-silver-30 text-silver font-sans text-small focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary transition-150"
+                            class="no-spinner w-full min-h-[44px] px-3.5 bg-surface-1 border border-line rounded-md text-silver font-display font-tnum text-small focus:outline-none focus:border-neon focus:shadow-glow-neon transition-all duration-200 ease-v2"
                         />
                       </div>
 
                       <div v-if="addMode !== 'collection' || !selectedCollectionCard">
-                        <label for="add-deck-condition" class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.conditionLabel') }}</label>
-                        <BaseSelect id="add-deck-condition" v-model="form.condition" :options="conditionOptions" />
+                        <label for="add-deck-condition" class="text-xs text-silver-70 font-semibold block mb-1.5">{{ t('decks.editDeckCard.conditionLabel') }}</label>
+                        <div class="relative">
+                          <select
+                              id="add-deck-condition"
+                              v-model="form.condition"
+                              class="w-full appearance-none px-3 py-2 pr-8 bg-surface-1 border border-line text-silver text-small rounded-md cursor-pointer transition-all duration-200 ease-v2 hover:border-line-strong focus:outline-none focus:border-neon focus:shadow-glow-neon"
+                          >
+                            <option v-for="opt in conditionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                          </select>
+                          <IconV2 name="chev-d" :size="14" class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-silver-50" />
+                        </div>
                       </div>
                       <div v-else>
-                        <span class="text-tiny text-silver-70 block mb-1">{{ t('decks.editDeckCard.conditionLabel') }}</span>
-                        <div class="px-3 py-2 bg-secondary border border-silver-30 text-silver-70 text-small">
+                        <span class="text-xs text-silver-70 font-semibold block mb-1.5">{{ t('decks.editDeckCard.conditionLabel') }}</span>
+                        <div class="min-h-[44px] flex items-center px-3.5 bg-surface-2 border border-line rounded-md text-silver-70 text-small">
                           {{ selectedCollectionCard.condition }}
                         </div>
                       </div>
                     </div>
 
-                    <div v-if="addMode !== 'collection' || !selectedCollectionCard" class="space-y-2">
-                      <label class="flex items-center gap-2 cursor-pointer hover:text-neon transition-colors">
-                        <input v-model="form.foil" type="checkbox" class="w-4 h-4" />
-                        <span class="text-small text-silver">{{ t('decks.editDeckCard.foilLabel') }}</span>
-                      </label>
-                    </div>
-                    <div v-else class="text-small text-silver-50">
-                      <span v-if="selectedCollectionCard.foil" class="text-neon">FOIL</span>
+                    <button
+                        v-if="addMode !== 'collection' || !selectedCollectionCard"
+                        type="button"
+                        role="switch"
+                        :aria-checked="form.foil"
+                        class="w-full flex items-center justify-between gap-3.5 min-h-[46px] px-3.5 bg-surface-1 border border-line rounded-md"
+                        @click="form.foil = !form.foil"
+                    >
+                      <span class="text-[14px] font-semibold text-silver">{{ t('decks.editDeckCard.foilLabel') }}</span>
+                      <span
+                          class="relative w-[44px] h-[26px] rounded-full border flex-shrink-0 transition-colors duration-200 ease-v2"
+                          :class="form.foil ? 'bg-neon border-neon' : 'bg-surface-3 border-line'"
+                      >
+                        <span
+                            class="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ease-v2"
+                            :class="form.foil ? 'right-0.5' : 'left-0.5'"
+                        ></span>
+                      </span>
+                    </button>
+                    <p v-else class="text-small text-silver-50">
+                      <span v-if="selectedCollectionCard.foil" class="text-neon font-bold">FOIL</span>
                       <span v-else>{{ t('decks.addToDeck.noFoil') }}</span>
-                    </div>
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="flex gap-3 pt-4 border-t border-silver-20">
+          <div class="flex gap-2 justify-end pt-4 border-t border-line">
+            <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="deselectCard">
+              {{ t('decks.addToDeck.goBack') }}
+            </BaseButton>
             <BaseButton
-                class="flex-1"
-                @click="handleAdd"
+                variant="filled"
+                class="uppercase tracking-[.1em] !text-[12px] gap-2"
                 :class="{ 'opacity-50': addMode === 'collection' && !selectedCollectionCard }"
+                @click="handleAdd"
             >
+              <IconV2 name="plus" :size="14" />
               <template v-if="addMode === 'collection'">{{ t('decks.addToDeck.assignFromCollection') }}</template>
               <template v-else-if="addMode === 'new'">{{ t('decks.addToDeck.addToCollectionAndDeck') }}</template>
               <template v-else>{{ t('decks.addToDeck.addToWishlistBtn') }}</template>
-            </BaseButton>
-            <BaseButton variant="secondary" class="flex-1" @click="deselectCard">
-              {{ t('decks.addToDeck.goBack') }}
             </BaseButton>
           </div>
         </div>
@@ -571,12 +603,3 @@ watch(() => props.show, (newVal) => {
     </div>
   </BaseModal>
 </template>
-
-<style scoped>
-.bg-amber-5 {
-  background-color: rgba(245, 158, 11, 0.05);
-}
-.bg-neon-10 {
-  background-color: rgba(0, 255, 136, 0.1);
-}
-</style>

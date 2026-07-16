@@ -1,0 +1,31 @@
+{
+  "key": "TASK-112",
+  "title": "Bug UI: dropdowns nativos con fondo blanco e ilegibles (Recientes/Tipo/Visual y todos los <select>)",
+  "description": "Reportado por Rafael 2026-07-16 en dev: los popups de los <select> nativos (Recientes/Tipo/Visual en Collection, y en general los 51 selects de 10 archivos) renderizan con fondo blanco del tema claro del sistema y las letras silver quedan ilegibles. CAUSA RAÍZ: no existía color-scheme en ninguna hoja del src — Chrome pinta los widgets nativos (popup de select, scrollbars, pickers) con el tema claro del OS. FIX (global, CSS-only, aplicado por el orquestador con autorización explícita de Rafael 'hazlo tu rapido'): color-scheme: dark en html (src/style.css @layer base) + fallback select option { background #000, color #EEE } para Chromium/Windows. Sin tests por regla de CLAUDE.md (UI/styling only). Verificación visual final en dev a cargo de Rafael (los popups nativos del OS no son capturables por automation).",
+  "acceptance_criteria": [
+    "Popups de todos los <select> legibles en tema oscuro (fondo oscuro, texto silver)",
+    "Sin regresión visual en inputs/scrollbars (color-scheme dark es coherente con el theme negro)",
+    "npx vite build verde; CSS presente en el bundle"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "ui",
+    "css",
+    "reported-by-rafael"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "8b84fa0",
+    "97267f4"
+  ],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T17:55:00.000Z",
+  "updated_at": "2026-07-16T17:55:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

@@ -1,0 +1,31 @@
+{
+  "key": "TASK-116",
+  "title": "Bug latente colección: refreshCurrentPage tras addCard/deleteCard corre contra el índice stale (misma race que TASK-113)",
+  "description": "Hallazgo del reviewer de TASK-113 (2026-07-16), preexistente y fuera del scope de ese fix: addCard (stores/collection.ts:659) y deleteCard (:908) conservan refreshCurrentPage() inmediato, que re-consulta el índice server card_index ANTES de que el persist debounced 2s haya escrito — misma clase de race que TASK-113. Síntoma esperable: tras borrar una carta, puede REAPARECER transitoriamente en la grilla (el re-query lee el chunk que aún la contiene); tras agregar, puede no aparecer hasta el siguiente refresh. A diferencia de TASK-113, acá el re-query SÍ es conceptualmente necesario (cambia membership/orden de página) — el fix probablemente sea patch optimista de membership a paginatedCards + refresh diferido post-persist, no eliminar el refresh. Evaluar en refinamiento junto al patrón que quedó establecido en TASK-113.",
+  "acceptance_criteria": [
+    "Borrar una carta no la hace reaparecer transitoriamente en la grilla",
+    "Agregar una carta la muestra en la página actual sin esperar un refresh manual (si corresponde a la página/filtros)",
+    "Tests unit de regresión del timing (patrón collection.paginatedSync.test.ts); gates y E2E collection verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "collection",
+    "pagination",
+    "card-index",
+    "found-by-review"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-113"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T18:40:00.000Z",
+  "updated_at": "2026-07-16T18:40:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

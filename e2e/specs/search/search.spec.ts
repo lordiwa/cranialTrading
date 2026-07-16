@@ -77,8 +77,8 @@ test.describe('Search', () => {
     await searchPage.search(SEARCH_TERMS.common);
     await searchPage.page.waitForTimeout(3000);
 
-    // Owned badges use bg-neon absolute positioning on result cards
-    const ownedBadges = searchPage.page.locator('.bg-neon.absolute');
+    // Owned badges carry a dedicated data-testid (design→app v2 F6 reskin)
+    const ownedBadges = searchPage.page.locator('[data-testid="owned-badge"]');
     const count = await ownedBadges.count();
     // May or may not have owned cards — just verify no errors
     expect(count).toBeGreaterThanOrEqual(0);

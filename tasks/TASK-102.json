@@ -1,0 +1,32 @@
+{
+  "key": "TASK-102",
+  "title": "Design→app v2 F7a: landing guest — Login search-first, resultados, dropdown login, register prompt",
+  "description": "Fuente de verdad: cards 01-login, 01b-login-results, 80-login-dropdown, 83-register-prompt (d+m) + DESIGN-DIRECTION.md. DECISIÓN VIGENTE de Rafael 2026-07-13: el headline/copy ACTUAL de la app se mantiene — NO adoptar 'From Trash to Treasures' del proto v2. Superficie: LoginView.vue + loginCardSearch.ts (solo presentación), LandingHeader.vue, HeaderLoginDropdown.vue, RegisterPromptModal.vue. Estilo v2 sin tocar la lógica del buscador anónimo ni 'quién la vende' (TASK-085, prod).",
+  "acceptance_criteria": [
+    "Landing idle + resultados + dropdown + register prompt fieles a sus cards v2 (desktop y mobile) con el copy actual de la app",
+    "Sin regresión en búsqueda anónima, 'quién la vende' y flujo de registro desde guest; E2E de landing verdes",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "design-sync",
+    "design-to-app",
+    "ui",
+    "v2-redesign",
+    "F7a",
+    "landing"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-093"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-13T19:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

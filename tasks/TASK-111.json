@@ -8,7 +8,7 @@
     "Regresión E2E que reproduce el escenario de Rafael: header-search carta A → local-search carta B → las 3 secciones y la URL muestran B",
     "Sin regresión en price filter ni en sort/paginación de TASK-108; gates verdes; i18n si aplica"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "labels": [
     "bug",
@@ -20,11 +20,19 @@
   "depends_on": [
     "TASK-108"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "e737c72"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-16T22:17:05.719Z",
+      "body": "CERRADO con review verde (loop autónomo 2026-07-16, auto_close_on_green_review). Review depth: FULL — rubric inputs: 108 líneas cambiadas (<150) pero ticket tdd-tier = superficie core tdd obligatoria FULL. Veredicto rev-111-urlsync: APPROVE, 0 HIGH/MEDIUM, 4 LOW anotados: (1) E2E asserta URL+catálogo pero no las 2 secciones (defensible, derivan del mismo computed); (2) back/forward sin test; (3) handleClear no emite search → ?q= stale al limpiar (clase pre-existente); (4) carrera teórica de router.replace con búsquedas rápidas (clase pre-existente del store). Verificaciones del reviewer: DiscoveryPanel (único otro consumer de FilterPanel) no afectado; sin double-fetch en ningún sentido; params TASK-108 en store, no URL — intactos; sensores no-vacuos. Gates re-corridos: unit 99/1287, vue-tsc limpio. E2E search 10/10 (corrido por el dev, incluye la regresión nueva del escenario de Rafael). Fix: buildSearchQueryUpdate puro + FilterPanel emit-always + handleLocalSearch con router.replace. Pendiente de tanda: push a develop + verificación visual en dev."
+    }
+  ],
   "created_at": "2026-07-16T17:10:00.000Z",
-  "updated_at": "2026-07-16T17:10:00.000Z",
+  "updated_at": "2026-07-16T22:17:05.719Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

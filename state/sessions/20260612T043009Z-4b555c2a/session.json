@@ -2,10 +2,10 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "paused",
-  "updated_at": "2026-07-16T19:25:00.000Z",
+  "updated_at": "2026-07-16T22:07:29.481Z",
   "active_task": null,
-  "workflow_step": "select",
-  "next_action": "AL RETOMAR (orden): (1) NADA pendiente de v1.48.1 — CI run 29526018199 VERDE confirmado antes de pausar, TASK-113 y TASK-115 cerradas (done, linked). (2) TASK-111 (bug URL sync search, HIGH, TDD — diagnostico completo en el ticket, toca SearchView/search store, ya sin conflicto porque 108 mergeo) y TASK-118 (restaurar Google login, HIGH — forense de que commit lo quito + restaurar en 3 puntos de entrada + cards de Design). (3) TASK-114 (precios CK agregados — REFINAMIENTO primero: inventariar agregados + fuente CK por carta). (4) TASK-117 (loader al filtrar), TASK-116 (race add/delete), TASK-115 ya commiteado. (5) Backlog v2 restante: 102 (F7a) -> 103 (F7b) -> 104 (F8) -> 105 (F9) -> 106 -> 107. Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (RE-CONFIRMAR con Rafael). PENDIENTES DE RAFAEL: UAT visual v1.40.0-1.48.1 en dev (dropdowns 112, search v2.1 108, toggles 113, panel totales 115); decision voseo/tuteo es.json; borrar public/tasks/ a mano; cranial-design/ y .mcp.json untracked.",
+  "workflow_step": "review",
+  "next_action": "LOOP MAX-PARALELO ACTIVO 2026-07-16 ~21:10Z (Rafael pidio maximo paralelismo + las 5 loop_auth): 8 agentes — TASK-111 dev (checkout principal), TASK-118 dev (worktree, luego 102->103 secuencial por mismos archivos), TASK-116 dev (worktree), TASK-117 dev (worktree, WARNING solape stores/collection.ts con 116 — merge en orden 116 luego 117, conflictos los resuelve el orquestador), TASK-105 dev (worktree), TASK-104 dev (worktree), TASK-107 dev (checkout principal, SOLO cranial-design/ untracked — upload DesignSync lo hace el orquestador), TASK-114 researcher read-only (refinamiento; el dev de 114 espera a que mergeen 116+117). Al retornar cada dev: renew lock -> reviewer contexto fresco -> merge serializado a develop (orden colision: 116 antes que 117; 118 antes que 102) -> E2E serializado al mergear -> close_task. 106 al final (post-todo). Deploy dev por tanda + bump version autorizado. Si crash: los worktrees de los agentes pueden tener commits sin mergear — buscarlos con git worktree list antes de resetear tickets. HANDOFF PREVIO (orden): (1) NADA pendiente de v1.48.1 — CI run 29526018199 VERDE confirmado antes de pausar, TASK-113 y TASK-115 cerradas (done, linked). (2) TASK-111 (bug URL sync search, HIGH, TDD — diagnostico completo en el ticket, toca SearchView/search store, ya sin conflicto porque 108 mergeo) y TASK-118 (restaurar Google login, HIGH — forense de que commit lo quito + restaurar en 3 puntos de entrada + cards de Design). (3) TASK-114 (precios CK agregados — REFINAMIENTO primero: inventariar agregados + fuente CK por carta). (4) TASK-117 (loader al filtrar), TASK-116 (race add/delete), TASK-115 ya commiteado. (5) Backlog v2 restante: 102 (F7a) -> 103 (F7b) -> 104 (F8) -> 105 (F9) -> 106 -> 107. Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (RE-CONFIRMAR con Rafael). PENDIENTES DE RAFAEL: UAT visual v1.40.0-1.48.1 en dev (dropdowns 112, search v2.1 108, toggles 113, panel totales 115); decision voseo/tuteo es.json; borrar public/tasks/ a mano; cranial-design/ y .mcp.json untracked.",
   "handoff_summary": "SESION PAUSADA por Rafael 2026-07-16 ~19:00Z (borrar contexto). Dia completo en modo harness: 5 tickets SHIPPED a dev — TASK-100 (v1.46.0), TASK-101 F6 search reskin (v1.47.0), TASK-108 search v2.1 sort/count/per-page ref Card Kingdom (v1.48.0, design-push parcial del card 12-search HECHO conservando el sidebar para TASK-110), TASK-112 dropdowns nativos color-scheme (v1.48.0), TASK-113 toggles coleccion + TASK-115 panel totales mobile (v1.48.1, CI 29526018199 VERDE, ambos CERRADOS). design-status corrido: inventario completo app<->Claude Design, 0 gaps. Bugs de Rafael del dia diagnosticados con causa raiz y ticketeados: 111 (URL sync, pendiente), 113/115 (fixeados), 114 (precios CK, pendiente), 117 (loader filtros, nuevo). 116 = hallazgo colateral del review (race add/delete). Patron del dia: TODOS los HIGH salieron de reviews/E2E propios (locator autocomplete, loading colgado cache-hit, perf O(kxn) del indice bulk) y se resolvieron review-driven con RED-checks. Cola de mensajes con devs se cruza — usar protocolo PEDIDO #n numerado.",
   "open_questions": [
     "Working tree sin commitear (RED hub merge): commitear como feature, descartar, o taskear?",
@@ -93,7 +93,7 @@
     }
   ],
   "pending_human_confirmation": "Rafael: (1) UAT visual v1.40.0-1.48.1 en dev — en particular: dropdowns legibles (112), search v2.1 sort/count/per-page (108), toggles de coleccion reflejandose (113), badge de matches visible + Total sin recorte en mobile (115); (2) manual con TASK-111 o relanzar loop (re-confirmar loop_auth); (3) voseo/tuteo es.json; (4) public/tasks/ borrar a mano.",
-  "mode": "harness",
+  "mode": "loop",
   "loop_auth": {
     "auto_close_on_green_review": true,
     "uat_delegated_to_orchestrator": true,
@@ -102,9 +102,9 @@
     "auto_version_bump_on_milestone": true
   },
   "loop_state": {
-    "current_ticket": null,
-    "phase": "select",
-    "iteration": 8,
+    "current_ticket": "TASK-118",
+    "phase": "review",
+    "iteration": 9,
     "completed_this_run": 10,
     "run_started_at": "2026-07-13T20:00:00.000Z"
   }

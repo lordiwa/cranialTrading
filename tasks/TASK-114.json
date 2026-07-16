@@ -8,7 +8,7 @@
     "Sin degradación de performance a escala 59k (sin N llamadas de red por render)",
     "Tests unit del cálculo agregado CK-first + fallback; gates y E2E collection verdes"
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "medium",
   "labels": [
     "bug",
@@ -23,9 +23,15 @@
   ],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "researcher",
+      "at": "2026-07-16T21:15:55.657Z",
+      "body": "REFINAMIENTO COMPLETO (res-114-ckprices, 2026-07-16). INVENTARIO de agregados TCG-only: (1) hero Colección CollectionView.vue:160-169 ← collectionSummary/totalValue stores/collection.ts:239-246,1294-1295; (2) footer Binder BinderView.vue:856 ← stores/binders.ts:87 (GAP real: Deck SÍ tiene override CK vía deckPriceSource, Binder nunca lo recibió); (3) cart de intercambio stores/exchangeCart.ts:120-124 (item.price capturado al agregar — follow-up aparte, no este ticket). YA CK-first (no tocar): CollectionTotalsPanel/useCollectionTotals (footer), DeckView.vue:254-284 (override CK sobre stats TCG del store), MatchCard/BuyRequestCard (por carta). Market portfolio = pipeline de precios separado (movers/trend), fuera de scope. DÓNDE VIVE CK: no hay campo CK en doc ni card_index (IndexCard.p = TCG); services/mtgjson.ts getCardPrices cachea por SET en IndexedDB; useCollectionTotals agrupa por setCode único y llena sharedCardPrices (asíncrono, con loading/progress). VIABILIDAD 59k: loadFromIndex ya carga los 59k IndexCards client-side (~25 doc reads); useCollectionTotals ya calcula ckTotal sobre eso en el footer HOY — reusar ese mecanismo es viable SIN cambios de index/CF. RECOMENDACIÓN: regla ckPrice ?? card.price; fix client-only en 2 puntos: (a) hero Colección deriva de totals.ckTotal compartiendo UN solo fetch/sharedCardPrices con el footer (no duplicar fetch); (b) BinderView recibe el mismo override estilo deckPriceSource que DeckView. Blast radius chico/mediano, sin CF ni bump de EXPECTED_INDEX_VERSION. Cart CK = ticket follow-up separado (prioridad baja)."
+    }
+  ],
   "created_at": "2026-07-16T18:20:00.000Z",
-  "updated_at": "2026-07-16T18:20:00.000Z",
+  "updated_at": "2026-07-16T21:15:55.657Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

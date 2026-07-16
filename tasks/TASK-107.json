@@ -7,7 +7,7 @@
     "Ambos cards re-subidos a Claude Design y verificados visualmente",
     "mapping.json/notas coherentes con la decisión"
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "low",
   "labels": [
     "design-sync",
@@ -21,7 +21,7 @@
   "linked_prs": [],
   "comments": [],
   "created_at": "2026-07-13T19:00:00.000Z",
-  "updated_at": "2026-07-13T19:00:00.000Z",
+  "updated_at": "2026-07-16T21:06:54.211Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

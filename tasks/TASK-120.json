@@ -1,0 +1,33 @@
+{
+  "key": "TASK-120",
+  "title": "Bug colección: batchDeleteCards (bulk/select-all) no sincroniza paginatedCards — misma clase que TASK-113/116 en el camino bulk",
+  "description": "Hallazgo del developer de TASK-116 (2026-07-16, punch list del hand-off): batchDeleteCards en stores/collection.ts nunca toca paginatedCards — las cartas borradas en bulk (select-all / borrado masivo) pueden seguir visibles en la grilla hasta el próximo refresh, misma clase de bug que TASK-113 (toggles) y TASK-116 (add/delete individual) pero en el camino bulk. Gap PRE-existente, no regresión de 116. Fix esperable: aplicar el mismo patrón de patch optimista + refresh diferido post-persist que quedó establecido en 113/116 (snapshot/rollback simétrico, _pendingMembershipRefresh) al camino batch. Verificar también batchUpdateCards por paridad (el dev de 116 lo leyó y lo reportó como no-afectado para SU scope, pero conviene re-verificar membership/orden al cambiar status en bulk).",
+  "acceptance_criteria": [
+    "Borrado bulk (select-all y selección parcial) remueve las cartas de paginatedCards inmediatamente, sin reaparición transitoria",
+    "Refresh correctivo diferido post-persist (patrón 113/116), con rollback simétrico si el batch de Firestore falla",
+    "Tests unit de regresión del timing en collection.paginatedSync.test.ts (patrón existente); gates y E2E collection-crud verdes",
+    "batchUpdateCards verificado por paridad (membership al cambiar status en bulk) — fix o descarte documentado"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "collection",
+    "pagination",
+    "card-index",
+    "bulk",
+    "found-by-dev"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-116"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T22:01:18.456Z",
+  "updated_at": "2026-07-16T22:01:18.456Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

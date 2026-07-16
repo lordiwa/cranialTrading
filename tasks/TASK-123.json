@@ -1,0 +1,32 @@
+{
+  "key": "TASK-123",
+  "title": "Bug latente colección: dos _doPersistIndex en vuelo pueden intercalar writes de chunks (data vieja pisando chunks nuevos) — serializar el persist del card_index",
+  "description": "Hallazgo MEDIUM pre-existente del reviewer de TASK-116 (2026-07-16): _doPersistIndex (stores/collection.ts) es un IIFE async fire-and-forget que snapshotea cardIndexRaw a la entrada y escribe ~30 chunks secuenciales a 59k; dos invocaciones solapadas pueden intercalar writes, con chunks del snapshot viejo pisando chunks del snapshot nuevo → card_index inconsistente en Firestore. No introducido por 116 (el mecanismo nuevo se apoya en ese lifecycle pero no lo empeora). Fix esperable: serializar el persist (cola/mutex — un persist en vuelo hace que el siguiente espere o se coalescee con el snapshot más nuevo), o versionado de chunk. Coordinar con el gen-token que 116 introduce en su retry (misma zona). Relacionado: TASK-113 (patrón sync), TASK-116 (gen-token), TASK-120 (bulk path).",
+  "acceptance_criteria": [
+    "Dos persists disparados en ráfaga no intercalan chunks: el estado final en Firestore corresponde al snapshot MÁS NUEVO, siempre",
+    "Test unit de regresión con fake timers + setDoc mock demorado (patrón del retry de 116) que falle con el código actual",
+    "Sin degradación de latencia perceptible del persist debounced; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "collection",
+    "card-index",
+    "persist",
+    "race",
+    "found-by-review"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-116"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T22:14:19.897Z",
+  "updated_at": "2026-07-16T22:14:19.897Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

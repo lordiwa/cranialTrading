@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-14T03:00:00.000Z",
+  "generated_at": "2026-07-16T22:17:05.719Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -502,13 +502,13 @@
     {
       "key": "TASK-104",
       "title": "Design→app v2 F8: perfil público + Settings (pase v2) + welcome tour",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
       "key": "TASK-105",
       "title": "Design→app v2 F9: páginas estáticas — about, contact, faq, guías, terms, privacy, cookies, 404",
-      "status": "todo",
+      "status": "in_review",
       "priority": "low"
     },
     {
@@ -520,7 +520,7 @@
     {
       "key": "TASK-107",
       "title": "Design-sync: actualizar cards 11-collection en Claude Design a 4 chips de filtro (paridad con la app)",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "low"
     },
     {
@@ -544,7 +544,7 @@
     {
       "key": "TASK-111",
       "title": "Bug search: URL ?q= y búsqueda local desincronizadas — secciones muestran términos distintos",
-      "status": "todo",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -562,7 +562,7 @@
     {
       "key": "TASK-114",
       "title": "Bug precios: header de Colección (y otros agregados) suman card.price (TCG) — deben usar CK como fuente primaria siempre",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "medium"
     },
     {
@@ -574,20 +574,50 @@
     {
       "key": "TASK-116",
       "title": "Bug latente colección: refreshCurrentPage tras addCard/deleteCard corre contra el índice stale (misma race que TASK-113)",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "medium"
     },
     {
       "key": "TASK-117",
       "title": "UX: loader al filtrar la colección — feedback visual mientras la query paginada está en vuelo (mobile/conexión lenta)",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
       "key": "TASK-118",
       "title": "Auth: restaurar login con Google — existía en la app y se quitó con el rediseño",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
+    },
+    {
+      "key": "TASK-119",
+      "title": "Precios: cart de intercambio captura card.price (TCG) al agregar — evaluar lookup CK-first del item",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-120",
+      "title": "Bug colección: batchDeleteCards (bulk/select-all) no sincroniza paginatedCards — misma clase que TASK-113/116 en el camino bulk",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-121",
+      "title": "Chore test-infra: vitest crashea al montar componentes con <use href=\"/icons.svg#...\"> en Windows — bloquea tests component-mount de RegisterView/LandingHeader",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-122",
+      "title": "Chore seguridad: auth.ts loggea el objeto de error crudo de Firebase en el flujo Google — puede contener credential en customData",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-123",
+      "title": "Bug latente colección: dos _doPersistIndex en vuelo pueden intercalar writes de chunks (data vieja pisando chunks nuevos) — serializar el persist del card_index",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

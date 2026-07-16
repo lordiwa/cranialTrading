@@ -1,0 +1,29 @@
+{
+  "key": "TASK-121",
+  "title": "Chore test-infra: vitest crashea al montar componentes con <use href=\"/icons.svg#...\"> en Windows — bloquea tests component-mount de RegisterView/LandingHeader",
+  "description": "Hallazgo de dev+reviewer de TASK-118 (2026-07-16): cualquier test unit que haga mount() de un componente que renderice <svg><use href=\"/icons.svg#cranial-logo\"></use></svg> crashea con TypeError \"The argument 'filename' must be a file URL object... Received 'file:///icons.svg'\" — defecto del pipeline de transform de vitest/Vite en Windows, NO afecta npx vite build ni runtime. Confirmado con test probe: componentes sin ese <use> montan bien. Impacto: imposible escribir tests component-level para RegisterView, LandingHeader y cualquier componente que use el logo sprite. Fix candidato: mock/stub del transform de assets svg en vitest.config, o alias de /icons.svg en el entorno de test.",
+  "acceptance_criteria": [
+    "Causa raíz documentada (qué plugin/transform convierte el href en file URL inválida)",
+    "mount() de RegisterView/LandingHeader funciona en vitest en Windows (fix o stub documentado en tests/unit/helpers)",
+    "Suite completa sigue verde; sin cambios en build de producción"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "chore",
+    "test-infra",
+    "vitest",
+    "windows",
+    "found-by-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T22:11:05.091Z",
+  "updated_at": "2026-07-16T22:11:05.091Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

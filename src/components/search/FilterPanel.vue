@@ -257,9 +257,12 @@ const handleSearch = async () => {
   showSuggestions.value = false
   if (props.autoSearch) {
     await searchStore.search(filters)
-  } else {
-    emit('search', { ...filters })
   }
+  // Emitted regardless of autoSearch (TASK-111): consumers that own a ?q= URL
+  // param (e.g. SearchView) need to hear about every committed search — not
+  // just the non-autoSearch ones — so the URL and any term-driven sections
+  // stay in sync with whatever was actually searched.
+  emit('search', { ...filters })
 }
 
 const handleClear = () => {

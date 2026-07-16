@@ -31,9 +31,11 @@ export class SearchPage {
     this.backButton = page.getByRole('button', { name: /back|volver/i });
   }
 
-  async goto() {
-    await this.page.goto('/search');
-    await ensureLoggedIn(this.page, '/search');
+  async goto(query?: string) {
+    // TASK-111: optional query simulates the header search deep-link (/search?q=...)
+    const dest = query ? `/search?q=${encodeURIComponent(query)}` : '/search';
+    await this.page.goto(dest);
+    await ensureLoggedIn(this.page, dest);
     await this.page.waitForLoadState('domcontentloaded');
   }
 

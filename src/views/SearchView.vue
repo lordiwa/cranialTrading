@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useCollectionStore } from '../stores/collection'
-import { useSearchStore } from '../stores/search'
+import { type FilterOptions, useSearchStore } from '../stores/search'
 import { useI18n } from '../composables/useI18n'
 import { useSendInterest } from '../composables/useSendInterest'
 import type { ScryfallCard } from '../services/scryfall'
@@ -13,6 +13,7 @@ import { buildOwnedCountMap } from '../utils/ownedCount'
 import { getAvatarUrlForUser } from '../utils/avatar'
 import { PER_PAGE_OPTIONS, type SearchPerPage } from '../utils/searchPagination'
 import type { SearchSortOption } from '../utils/searchSort'
+import { buildSearchQueryUpdate } from '../utils/searchUrlSync'
 import AddCardModal from '../components/collection/AddCardModal.vue'
 import AppContainer from '../components/layout/AppContainer.vue'
 import BaseButton from '../components/ui/BaseButton.vue'
@@ -86,6 +87,15 @@ const handleBack = () => {
   void router.push({ path: '/collection' })
 }
 
+// FilterPanel's own name input/button/suggestion (TASK-111): a locally-committed
+// search must update ?q= so the URL and the collection/other-users sections react
+// to the latest term too — not just the Scryfall catalog. router.replace (not push)
+// keeps the header→/search?q= deep-link and browser back/forward behavior intact.
+const handleLocalSearch = (filters: FilterOptions) => {
+  const update = buildSearchQueryUpdate(route.query, filters.name ?? '')
+  if (update) void router.replace({ query: update })
+}
+
 // Sort/per-page toolbar (TASK-108, Scryfall catalog only)
 const handleSortChange = (e: Event) => {
   const value = (e.target as HTMLSelectElement).value
@@ -124,7 +134,7 @@ const formatCount = (n: number): string => {
     <!-- syncWithRouter off: SearchView owns the ?q= param and feeds it reactively
          via externalName, so in-place navigations (header search while already on
          /search) re-trigger the catalog search — onMounted alone misses them. -->
-    <FilterPanel :sync-with-router="false" :external-name="searchTerm" />
+    <FilterPanel :sync-with-router="false" :external-name="searchTerm" @search="handleLocalSearch" />
 
     <!-- In your collection -->
     <section v-if="collectionMatches.length > 0" class="mt-8">

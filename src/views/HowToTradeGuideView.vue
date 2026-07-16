@@ -52,7 +52,7 @@ useHead({
     <!-- Content -->
     <main id="main-content" class="max-w-4xl mx-auto px-6 py-12">
       <div class="rise mb-8">
-        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">Guías</p>
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">{{ t('pages.kicker.guide') }}</p>
         <h1 class="font-display text-h1 font-bold text-silver mb-2">Cómo Intercambiar Cartas MTG de Forma Segura</h1>
         <p class="text-body text-silver-70">
           El intercambio de cartas es parte fundamental de la experiencia Magic: The Gathering. Cranial Trading facilita

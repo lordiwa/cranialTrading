@@ -2386,6 +2386,16 @@
     "faqLink": "Go to FAQ"
   },
 
+  "pages": {
+    "kicker": {
+      "about": "About us",
+      "contact": "Contact",
+      "help": "Help",
+      "guide": "Guide",
+      "legal": "Legal"
+    }
+  },
+
   "seo": {
     "defaultDescription": "Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players.",
     "pages": {

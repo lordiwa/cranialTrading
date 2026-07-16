@@ -106,7 +106,7 @@ onMounted(() => {
     <div class="max-w-3xl mx-auto">
       <!-- Header -->
       <div class="rise mb-8">
-        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">Ayuda</p>
+        <p class="font-display text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-2">{{ t('pages.kicker.help') }}</p>
         <h1 class="font-display text-h1 font-bold text-silver mb-2">{{ t('help.faq.title') }}</h1>
         <p class="text-body text-silver-70">
           Todo lo que necesitas saber sobre Cranial Trading

@@ -432,5 +432,77 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         vi.useRealTimers()
       }
     })
+
+    it('a second mutation landing in the last <2s of persist-1 (timer-2 SCHEDULED but not yet FIRED) must also block persist-1 from consuming the flag (reviewer HIGH, PEDIDO #3 — latest-STARTED is not latest-SCHEDULED)', async () => {
+      // GOTCHA (reviewer): prime the dynamic import refreshCurrentPage()/queryPage()
+      // use internally BEFORE enabling fake timers — otherwise its resolution can
+      // straddle real vs fake timers and land after this test's assertions run,
+      // making the test pass for the wrong reason.
+      await import('@/services/cloudFunctions')
+
+      vi.useFakeTimers()
+      try {
+        // --- Seed cardIndexRaw with two cards via addCard, then flush their own persist ---
+        mockAddDoc
+          .mockResolvedValueOnce({ id: 'card-A' })
+          .mockResolvedValueOnce({ id: 'card-B' })
+        const { id: _idA, updatedAt: _uA, ...cardAData } = makeCard({ id: 'ignored-a', name: 'Card A' })
+        const { id: _idB, updatedAt: _uB, ...cardBData } = makeCard({ id: 'ignored-b', name: 'Card B' })
+        const store = useCollectionStore()
+        await store.addCard(cardAData as any)
+        await store.addCard(cardBData as any)
+        await vi.advanceTimersByTimeAsync(2100)
+        mockSetDoc.mockClear()
+        mockQueryCardIndex.mockClear()
+
+        let serverChunk: Array<{ i: string }> = [indexRecordFor('card-A'), indexRecordFor('card-B')]
+        let resolveFirstSetDoc!: () => void
+        const firstSetDocGate = new Promise<void>((res) => { resolveFirstSetDoc = res })
+        mockSetDoc
+          .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+            await firstSetDocGate
+            serverChunk = data.cards // persist-1's write commits (STALE — still has card-B)
+          })
+          .mockImplementation(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+            serverChunk = data.cards // persist-2+ resolve immediately with correct data
+          })
+        mockQueryCardIndex.mockImplementation(async () => ({
+          cards: serverChunk,
+          total: serverChunk.length,
+          page: 0,
+          pageSize: 50,
+          hasMore: false,
+        }))
+
+        await store.deleteCard('card-A')
+        await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, blocks on setDoc
+
+        // Second mutation lands DURING persist-1's writes — this SCHEDULES timer-2
+        // but does NOT fire it (matches PEDIDO #3's exact gap: the mutation falls
+        // in the last <2s of persist-1's writes, so timer-2 is still pending).
+        await store.deleteCard('card-B')
+        expect(store.paginatedCards).toEqual([])
+
+        // Resolve persist-1's setDoc gate NOW — BEFORE advancing past timer-2's
+        // debounce window. gen still matches _persistGen (persist-2 hasn't STARTED
+        // yet, only scheduled) — the gen-token alone would wrongly let this consume
+        // the flag using persist-1's own stale server read.
+        resolveFirstSetDoc()
+        await vi.advanceTimersByTimeAsync(0)
+
+        // Must NOT have refreshed/reverted: a timer is still PENDING (_indexPersistTimer
+        // !== null), which must also supersede a stale persist.
+        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+        expect(store.paginatedCards).toEqual([])
+
+        // Now let timer-2 actually fire and persist-2 run to completion.
+        await vi.advanceTimersByTimeAsync(2100)
+
+        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
+        expect(store.paginatedCards).toEqual([])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

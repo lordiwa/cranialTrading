@@ -612,7 +612,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
     /**
      * Generation counter for _doPersistIndex (TASK-116 follow-up, reviewer HIGH
-     * PEDIDO #2). At 59k cards a persist is ~30 sequential setDoc calls — a
+     * PEDIDO #2/#3). At 59k cards a persist is ~30 sequential setDoc calls — a
      * multi-second window. If a second mutation reschedules and its own persist
      * STARTS (enters _doPersistIndex) before the first one's writes finish, the
      * first (now-stale) persist's finally must not be the one to consume
@@ -624,18 +624,33 @@ export const useCollectionStore = defineStore('collection', () => {
      * captures the post-increment counter; only the invocation whose captured
      * value still matches the live counter at finally-time is allowed to consume
      * the flag, guaranteeing it's always the MOST RECENTLY STARTED persist.
+     *
+     * That alone isn't sufficient (PEDIDO #3): "latest STARTED" isn't "latest
+     * SCHEDULED" — _persistGen only increments when _doPersistIndex is actually
+     * ENTERED (the timer firing), not when a newer mutation merely RESCHEDULES
+     * the debounce timer. If the second mutation lands in the last <2s of
+     * persist-1's writes, timer-2 is pending but hasn't fired yet when
+     * persist-1's finally runs — gen still matches, so persist-1 would
+     * incorrectly consume the flag. _indexPersistTimer !== null therefore also
+     * supersedes a stale persist: a PENDING (not yet fired) timer means a newer
+     * mutation is waiting, so no in-flight persist may consume the flag until
+     * that timer has fired (see the timeout callback below, which nulls the
+     * timer immediately before entering _doPersistIndex).
      */
     let _persistGen = 0
 
     function persistIndexToFirestore() {
         if (_indexPersistTimer) clearTimeout(_indexPersistTimer)
-        _indexPersistTimer = setTimeout(() => { _doPersistIndex() }, 2000)
+        _indexPersistTimer = setTimeout(() => {
+            _indexPersistTimer = null
+            _doPersistIndex()
+        }, 2000)
     }
 
     function _doPersistIndex() {
         const gen = ++_persistGen
         if (!authStore.user) {
-            if (gen === _persistGen) _pendingMembershipRefresh = false
+            if (gen === _persistGen && _indexPersistTimer === null) _pendingMembershipRefresh = false
             return
         }
         const userId = authStore.user.id
@@ -667,8 +682,10 @@ export const useCollectionStore = defineStore('collection', () => {
             } finally {
                 // TASK-116: run the deferred grid re-query only now that the
                 // write above has settled (success or failure), never immediately,
-                // and only if THIS persist is still the latest one (gen-token above).
-                if (gen === _persistGen && _pendingMembershipRefresh) {
+                // and only if THIS persist is still the latest STARTED one (gen)
+                // AND no newer mutation has a persist SCHEDULED-but-not-yet-fired
+                // (_indexPersistTimer === null) — see PEDIDO #3 above.
+                if (gen === _persistGen && _indexPersistTimer === null && _pendingMembershipRefresh) {
                     _pendingMembershipRefresh = false
                     refreshCurrentPage().catch(() => {})
                 }

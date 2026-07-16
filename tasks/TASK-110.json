@@ -1,0 +1,40 @@
+{
+  "key": "TASK-110",
+  "title": "Search v2.1 (ref Card Kingdom): filtros persistentes en sidebar desktop — DESIGN-FIRST",
+  "description": "Card Kingdom mantiene su Advanced Search como panel persistente a la izquierda, refinable sin reabrir nada; nuestro AdvancedFilterModal obliga a abrir/cerrar el modal por cada ajuste. DESIGN ES LA FUENTE DE VERDAD: este ticket es en dos pasos y NO se toca Vue hasta que el paso 1 esté aprobado. PASO 1 (design): rediseñar los cards 73-advanced-filters-desktop y 12-search-desktop en cranial-design/prototype/ + subir a Claude Design (sidebar persistente desktop; mobile MANTIENE el modal/bottom-sheet actual del card 73-mobile) → UAT visual de Rafael sobre los cards. PASO 2 (app): implementar el sidebar en SearchView/AdvancedFilterModal→FilterSidebar preservando toda la lógica de filtros existente. Es el más caro de los 4 de la tanda CK — evaluar split en refinamiento si el paso 2 supera ~4 archivos.",
+  "acceptance_criteria": [
+    "PASO 1: cards 73-desktop y 12-desktop rediseñados con sidebar, subidos a Claude Design y aprobados visualmente por Rafael ANTES de tocar Vue",
+    "PASO 2: sidebar persistente en desktop fiel a los cards nuevos; mobile conserva el flujo modal actual",
+    "Filtros existentes (set, color, rareza, precio, power/toughness, tipos) sin pérdida funcional ni regresión; E2E de search verdes",
+    "mapping.json actualizado si cambia el inventario de cards",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "search",
+    "ux",
+    "v2.1-search",
+    "card-kingdom-ref",
+    "design-first"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-101",
+    "TASK-108"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-16 (hallazgo del dev de TASK-101): el card 12-search-desktop del proto YA incluye un sidebar de filtros en desktop — F6 lo difirió a propósito porque implementarlo exige mover estado de filtros de FilterPanel.vue a SearchView.vue (lógica, prohibida en F6). El PASO 1 de este ticket puede estar parcialmente cubierto: en refinamiento, verificar si el sidebar del card 12 alcanza como spec o si el card 73 igualmente necesita rediseño para el detalle de los filtros avanzados.",
+      "at": "2026-07-16T16:30:00.000Z"
+    }
+  ],
+  "created_at": "2026-07-16T04:00:00.000Z",
+  "updated_at": "2026-07-16T04:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

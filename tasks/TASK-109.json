@@ -1,0 +1,31 @@
+{
+  "key": "TASK-109",
+  "title": "Search v2.1 (ref Card Kingdom): sintaxis avanzada Scryfall — verificar pass-through + hint de ayuda",
+  "description": "Card Kingdom expone búsqueda booleana (negación con -, comillas para match exacto, búsqueda en texto de reglas). Nuestro query viaja crudo a Scryfall (scryfall.ts:123 encodeURIComponent(finalQuery)) así que su sintaxis (-term, \"exact\", o:texto, t:tipo) probablemente YA funciona — pero no está verificado ni documentado para el usuario. (1) Verificar con tests que la sintaxis pasa intacta por la construcción de finalQuery (incluida la combinación con filtros del AdvancedFilterModal — que un filtro activo no rompa un query con comillas o negación). (2) Hint de ayuda de sintaxis en la UI del search (popover o línea de ayuda bajo el input, estilo v2). Al cerrar: /design-push si el hint cambia el layout del card 12-search.",
+  "acceptance_criteria": [
+    "Tests unitarios que fijan el pass-through de -negación, \"comillas\" y o:texto en finalQuery, solo y combinado con filtros avanzados",
+    "Hint/ayuda de sintaxis visible y accesible en SearchView (desktop y mobile), estilo v2",
+    "Sin regresión en las 3 fuentes ni en el price filter; E2E de search verdes",
+    "i18n en/es/pt; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "search",
+    "ux",
+    "v2.1-search",
+    "card-kingdom-ref"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-101"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T04:00:00.000Z",
+  "updated_at": "2026-07-16T04:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

@@ -1,0 +1,32 @@
+{
+  "key": "TASK-108",
+  "title": "Search v2.1 (ref Card Kingdom): sort de resultados + count total + per-page",
+  "description": "Mejoras de UX del search inspiradas en Card Kingdom (aprobadas por Rafael 2026-07-16). (1) Selector de orden: Popular (order=edhrec), Nombre (order=name), Precio asc/desc (order=usd&dir=) — hoy scryfall.ts:128 hardcodea order=released&dir=desc. (2) Count total visible '1–25 de N' usando total_cards de la respuesta de Scryfall. (3) Selector de resultados por página (25/50/100). RESTRICCIÓN API: Scryfall pagina fijo a 175 cartas/página sin parámetro de page-size — el per-page se resuelve client-side sobre las páginas ya traídas. ALCANCE 3 FUENTES: el sort aplica a la fuente Scryfall; definir en refinamiento si colección/usuarios se ordenan client-side con el mismo criterio o quedan fuera (documentar la decisión en comment). No tocar la lógica del price filter. Al cerrar: /design-push para regenerar cards 12-search (d+m) con el toolbar nuevo.",
+  "acceptance_criteria": [
+    "Selector de sort (Popular/Nombre/Precio ↑↓) funcional sobre resultados Scryfall; default actual (released desc) se mantiene si no se elige nada",
+    "Count total visible con formato '1–25 de N' (separador de miles) y per-page 25/50/100",
+    "Price filter y 3 fuentes sin regresión; E2E de search verdes (flake conocido de autocomplete: descartar en aislado)",
+    "Unit tests de la construcción de params order/dir (tests-after)",
+    "i18n en/es/pt; gates verdes; design-push de 12-search al cerrar"
+  ],
+  "status": "in_progress",
+  "priority": "medium",
+  "labels": [
+    "search",
+    "ux",
+    "v2.1-search",
+    "card-kingdom-ref"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-101"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T04:00:00.000Z",
+  "updated_at": "2026-07-16T04:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

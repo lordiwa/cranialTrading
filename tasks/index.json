@@ -484,7 +484,7 @@
     {
       "key": "TASK-101",
       "title": "Design→app v2 F6: búsqueda — SearchView + filtros avanzados",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -522,6 +522,30 @@
       "title": "Design-sync: actualizar cards 11-collection en Claude Design a 4 chips de filtro (paridad con la app)",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-108",
+      "title": "Search v2.1 (ref Card Kingdom): sort de resultados + count total + per-page",
+      "status": "in_progress",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-109",
+      "title": "Search v2.1 (ref Card Kingdom): sintaxis avanzada Scryfall — verificar pass-through + hint de ayuda",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-110",
+      "title": "Search v2.1 (ref Card Kingdom): filtros persistentes en sidebar desktop — DESIGN-FIRST",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-111",
+      "title": "Bug search: URL ?q= y búsqueda local desincronizadas — secciones muestran términos distintos",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

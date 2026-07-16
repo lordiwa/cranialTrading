@@ -1,0 +1,31 @@
+{
+  "key": "TASK-111",
+  "title": "Bug search: URL ?q= y búsqueda local desincronizadas — secciones muestran términos distintos",
+  "description": "Reportado por Rafael 2026-07-16 en dev (v1.47.0): llegando a /search?q=Chandra,+Torch+of+Defiance desde el buscador del header y buscando después otra carta en la barra local, la primera búsqueda persiste junto a la segunda. CAUSA RAÍZ (confirmada en código): SearchView.vue:34-39 — searchTerm (que alimenta las secciones 'En tu colección' y 'Otros usuarios') se computa SOLO desde route.query.q; la búsqueda local del FilterPanel dispara el catálogo Scryfall pero no hace router.replace del ?q=, así que URL + secciones colección/usuarios quedan clavadas en el término viejo. Es preexistente (no regresión de F6 — comentario en código lo declara intencional: 'FilterPanel refinements only affect the Scryfall catalog section'). FIX: sincronizar — la búsqueda local actualiza ?q= (router.replace, sin apilar history) y las 3 secciones + URL reaccionan siempre al último término; el flujo header→/search?q= se mantiene. OJO: mismos archivos que TASK-108 (SearchView/store search) — ejecutar DESPUÉS de que 108 mergee.",
+  "acceptance_criteria": [
+    "Buscar en la barra local actualiza ?q= en la URL (replace, sin ensuciar el history) y las secciones colección/usuarios reflejan el término nuevo",
+    "Flujo header → /search?q= sigue funcionando idéntico (deep-link, back/forward del browser coherentes)",
+    "Regresión E2E que reproduce el escenario de Rafael: header-search carta A → local-search carta B → las 3 secciones y la URL muestran B",
+    "Sin regresión en price filter ni en sort/paginación de TASK-108; gates verdes; i18n si aplica"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "search",
+    "url-sync",
+    "reported-by-rafael"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-108"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T17:10:00.000Z",
+  "updated_at": "2026-07-16T17:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

@@ -526,7 +526,7 @@
     {
       "key": "TASK-108",
       "title": "Search v2.1 (ref Card Kingdom): sort de resultados + count total + per-page",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -546,6 +546,24 @@
       "title": "Bug search: URL ?q= y búsqueda local desincronizadas — secciones muestran términos distintos",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-112",
+      "title": "Bug UI: dropdowns nativos con fondo blanco e ilegibles (Recientes/Tipo/Visual y todos los <select>)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-113",
+      "title": "Bug colección: toggles de status/pública (individual y bulk) no se reflejan en la grilla — paginatedCards desacoplado de cards.value",
+      "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-114",
+      "title": "Bug precios: header de Colección (y otros agregados) suman card.price (TCG) — deben usar CK como fuente primaria siempre",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

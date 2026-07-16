@@ -1,0 +1,30 @@
+{
+  "key": "TASK-113",
+  "title": "Bug colección: toggles de status/pública (individual y bulk) no se reflejan en la grilla — paginatedCards desacoplado de cards.value",
+  "description": "Reportado por Rafael 2026-07-16. DIAGNÓSTICO (investigación read-only completa, agente explore-toggle-bug): la grilla renderiza paginatedCards (CollectionView.vue:365-372, alimentado por el índice server-side card_index vía CF queryCardIndex) pero TODOS los toggles mutan cards.value: updateCard (stores/collection.ts:675-740) hace update optimista a cards.value y después refreshCurrentPage() re-consulta el índice que aún no se persistió (debounce 2s, :583-586) → el badge revierte al estado viejo; batchUpdateCards (:746-801) escribe docs y cards.value pero NUNCA sincroniza índice ni refresca página → stale indefinido. Los writes a Firestore SÍ funcionan — es solo display. NO es regresión del reskin v2 (handlers verificados bien cableados; bug preexistente de la capa de paginación, commits 6944676/de33108). Solo se manifiesta con card_index construido (cuenta de Rafael, CI 59k) — cuentas frescas caen a filteredCards y 'funciona'. FIX (en el store, no en componentes): (1) updateCard y batchUpdateCards aplican el patch optimista TAMBIÉN a paginatedCards; (2) batchUpdateCards sincroniza índice (syncIndexLocal + persistIndexToFirestore) como updateCard; (3) evitar la stale-overwrite: refreshCurrentPage no debe correr contra el índice server antes de que el persist debounced haya escrito (o eliminarse en favor del patch optimista a paginatedCards). Regresión unit para ambos caminos.",
+  "acceptance_criteria": [
+    "Toggle individual (menú contextual, swipe, CardDetailModal) refleja el cambio en la grilla inmediatamente y NO revierte tras el refresh",
+    "Bulk (BulkSelectionActionBar: status y pública/privada) refleja el cambio inmediato y sincroniza card_index (visible tras recarga)",
+    "Tests unit de regresión: patch optimista a paginatedCards en updateCard y batchUpdateCards; sync de índice en batch",
+    "Sin regresión en paginación server-side, virtual scroll ni delete bulk (que ya funciona); E2E collection verdes; gates verdes"
+  ],
+  "status": "in_progress",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "collection",
+    "pagination",
+    "card-index",
+    "reported-by-rafael"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T18:05:00.000Z",
+  "updated_at": "2026-07-16T18:05:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

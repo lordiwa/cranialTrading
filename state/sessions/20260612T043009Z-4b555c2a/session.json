@@ -2,10 +2,10 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "active",
-  "updated_at": "2026-07-16T16:52:00.000Z",
-  "active_task": "TASK-108",
+  "updated_at": "2026-07-16T18:45:00.000Z",
+  "active_task": "TASK-113",
   "workflow_step": "implement",
-  "next_action": "Continuar backlog en orden: TASK-101 (F6 busqueda) -> 102 (F7a landing guest) -> 103 (F7b auth) -> 104 (F8 perfil/settings/tour) -> 105 (F9 estaticas) -> 106 (chore dead code, 10 huerfanos acumulados listados en sus comments) -> 107 (chore sync Design 4 chips). Gate 5 chequeado 2026-07-16 al cerrar TASK-100 (completed=10): 0 drafts en tasks/, OK. Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (autorizacion de Rafael 2026-07-13: autonomia total = unattended + auto_push + auto_version_bump + UAT delegado — session-scoped, RE-CONFIRMAR con el). PENDIENTES DE RAFAEL: UAT visual de v1.40.0-1.46.0 en cranial-trading-dev.web.app; decision registro voseo/tuteo es.json; borrar residuo public/tasks/ a mano; cranial-design/ y .mcp.json siguen untracked.",
+  "next_action": "EN CURSO: TASK-113 (dev-113-toggles, TDD fix paginatedCards/indice). Despues: design-push card 12-search (AC pendiente de TASK-108, orquestador), TASK-111 (bug URL sync search, high), TASK-114 (precios CK agregados, refinamiento primero). Backlog v2 restante: 102 (F7a) -> 103 (F7b) -> 104 (F8) -> 105 (F9) -> 106 (chore dead code) -> 107 (chore Design 4 chips). Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (RE-CONFIRMAR con Rafael). PENDIENTES DE RAFAEL: UAT visual v1.40.0-1.48.0 en dev (incl. dropdowns TASK-112 y search v2.1); decision voseo/tuteo es.json; borrar public/tasks/ a mano; cranial-design/ y .mcp.json untracked.",
   "handoff_summary": "Sesion 2026-07-16 modo harness. TASK-100 cerrado (v1.46.0, CI verde). design-status manual corrido a pedido de Rafael: inventario COMPLETO app<->Claude Design (101 cards 1:1, 22 rutas mapeadas, 0 gaps; higiene pendiente de mapping.json: 01b ya tiene cards pero figura gap, nota 20-messages stale post-split-pane). Rafael pidio mejorar el search con referencia Card Kingdom → gap analysis hecho, 3 tickets creados y aprobados por el (TASK-108 sort+count+per-page, TASK-109 sintaxis avanzada+hint, TASK-110 sidebar filtros DESIGN-FIRST), secuencia elegida: F6 primero. TASK-101 (F6 reskin search) CERRADO mismo dia: review FULL APPROVE-WITH-NOTES (H1 locator E2E fixeado+verificado, L1/L2 aplicados), E2E completo 124 passed, v1.47.0 CI verde run 29516502745. 11/17 del goal v2 cerrados (v1.40.0-1.47.0). TASK-108 EN CURSO: developer dev-108-sort implementando.",
   "open_questions": [
     "Working tree sin commitear (RED hub merge): commitear como feature, descartar, o taskear?",

@@ -9,7 +9,7 @@
     "Unit tests de la construcción de params order/dir (tests-after)",
     "i18n en/es/pt; gates verdes; design-push de 12-search al cerrar"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "search",
@@ -21,9 +21,23 @@
   "depends_on": [
     "TASK-101"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "19e5ea5",
+    "97267f4"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "body": "2026-07-16 decisiones de Rafael sobre los flags del dev: (1) SORT ESTRICTO — con sort explícito elegido NO corre sortPricedFirst (queda solo para el default, que sigue byte-idéntico); (2) PAGINACIÓN — se acepta el límite client-side de lo cargado (máx 175 de Scryfall), Next deshabilitado al agotar; auto-fetch de páginas siguientes = follow-up si hace falta. Además: sort aplica solo a fuente Scryfall (colección/usuarios fuera de scope, documentado por el dev).",
+      "at": "2026-07-16T17:30:00.000Z"
+    },
+    {
+      "author": "orchestrator",
+      "body": "2026-07-16 CERRADO: sort/count/per-page shipped v1.48.0 (feat 19e5ea5), CI run 29521891563 verde. Review FULL rev-108-sort: APPROVE final tras 2 rondas review-driven (MEDIUM race setSort → fix reqId; HIGH loading colgado via cache-hit introducido por ese fix → fix + test red-vs-cache; ambos con RED verificado). 27 unit tests nuevos. E2E completo 124 passed. PENDIENTE del AC: design-push del card 12-search (en curso por el orquestador). Follow-up aceptado por Rafael: auto-fetch de páginas >175 si el límite molesta. LOW constatados: rango '1-25 de N' con Next deshabilitado al agotar lo cargado sin explicación UI; toast noResults en error de red (preexistente); totalResults sin consumidores.",
+      "at": "2026-07-16T18:40:00.000Z"
+    }
+  ],
   "created_at": "2026-07-16T04:00:00.000Z",
   "updated_at": "2026-07-16T04:00:00.000Z",
   "jira_key": null,

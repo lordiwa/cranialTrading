@@ -19,6 +19,7 @@ import { shareCart } from '../utils/exchangeCartShare';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
+import IconV2 from '../components/ui/IconV2.vue';
 import CartFab from '../components/cart/CartFab.vue';
 import CollectionGrid from '../components/collection/CollectionGrid.vue';
 import CardFilterBar from '../components/ui/CardFilterBar.vue';
@@ -58,6 +59,11 @@ const isOwnProfile = computed(() => {
 const canShowInterest = computed(() => {
   return !!(authStore.user && !isOwnProfile.value);
 });
+
+// v2 redesign — profile header stat chips (design→app v2 F8, cranial-design/prototype/22-user-profile-*.html).
+// Pure display counts over the already-loaded public cards; no new data fetching.
+const saleCount = computed(() => cards.value.filter(c => c.status === 'sale').length);
+const tradeCount = computed(() => cards.value.filter(c => c.status === 'trade').length);
 
 // Cart mode: show cart buttons for anonymous users (not logged in, not own profile)
 const showCartMode = computed(() => !authStore.user);
@@ -556,29 +562,38 @@ onMounted(() => {
       <!-- Profile loaded -->
       <template v-else>
       <!-- Profile header -->
-      <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-8 border-b border-silver-20">
-        <div class="flex items-center gap-4">
-          <img
-              :src="profileAvatarUrl"
-              alt=""
-              class="w-16 h-16 rounded-full object-cover"
-          />
-          <div>
-            <h1 class="text-h2 md:text-h1 font-bold text-silver mb-2">
-              @{{ userInfo?.username }}
-            </h1>
-            <p class="text-body text-silver-70 flex items-center gap-2">
-              📍 {{ userInfo?.location || 'Ubicación no disponida' }}
-            </p>
+      <div class="flex flex-col md:flex-row md:items-start gap-5 mb-6 pb-6 border-b border-line">
+        <img
+            :src="profileAvatarUrl"
+            alt=""
+            class="w-16 h-16 md:w-[72px] md:h-[72px] rounded-full object-cover border-2 border-neon-40 shadow-glow-neon flex-shrink-0"
+        />
+        <div class="min-w-0 flex-1">
+          <h1 class="font-display text-h2 md:text-h1 font-bold text-silver">
+            @{{ userInfo?.username }}
+          </h1>
+          <p v-if="userInfo?.location" data-testid="profile-location" class="text-small text-silver-50 mt-1.5">
+            {{ userInfo.location }}
+          </p>
+          <div class="flex gap-2.5 mt-4 flex-wrap">
+            <div class="flex flex-col gap-0.5 px-4 py-2 bg-surface-1 border border-line rounded-lg">
+              <span class="font-display font-tnum text-h3 font-bold leading-none text-silver">{{ saleCount }}</span>
+              <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('profile.stats.sale') }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5 px-4 py-2 bg-surface-1 border border-line rounded-lg">
+              <span class="font-display font-tnum text-h3 font-bold leading-none text-silver">{{ tradeCount }}</span>
+              <span class="text-[11px] tracking-[.08em] uppercase text-silver-30 font-semibold">{{ t('profile.stats.trade') }}</span>
+            </div>
           </div>
         </div>
 
         <!-- Actions: Contact (for others) or Wishlist (for own profile) -->
-        <div class="flex gap-3">
+        <div class="flex gap-3 md:ml-auto flex-shrink-0">
           <!-- Own profile: link to wishlist -->
           <RouterLink v-if="isOwnProfile" to="/collection?filter=wishlist">
             <BaseButton size="small" variant="secondary">
-              ⭐ {{ t('profile.viewWishlist') }}
+              <IconV2 name="star" :size="16" class="inline-block mr-1.5 align-[-3px]" />
+              {{ t('profile.viewWishlist') }}
             </BaseButton>
           </RouterLink>
 
@@ -588,13 +603,14 @@ onMounted(() => {
               size="small"
               @click="userId && handleContact(userId, userInfo?.username ?? '')"
           >
+            <IconV2 name="chat" :size="16" class="inline-block mr-1.5 align-[-3px]" />
             {{ t('profile.contact') }}
           </BaseButton>
         </div>
       </div>
 
       <!-- Empty state -->
-      <div v-if="cards.length === 0" class="border border-silver-30 p-8 text-center">
+      <div v-if="cards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
         <p class="text-body text-silver-70">
           {{ t('profile.noPublicCards') }}
         </p>
@@ -602,16 +618,20 @@ onMounted(() => {
 
       <!-- Public collection -->
       <div v-else>
-        <h2 class="text-h3 font-bold text-silver mb-6">
-          {{ t('profile.publicCollection') }}
-          <span class="text-small text-silver-70 font-normal ml-2">({{ filteredCards.length }} {{ t('profile.cards') }})</span>
-        </h2>
+        <div class="flex items-end justify-between gap-4 flex-wrap mb-4">
+          <h2 class="font-display text-h2 font-bold text-silver">
+            {{ t('profile.publicCollection') }}
+            <span class="font-display font-tnum text-h3 font-normal text-silver-50 ml-2">{{ filteredCards.length }}</span>
+          </h2>
+          <span class="text-tiny text-silver-30">{{ t('profile.publicPricesUsd') }}</span>
+        </div>
 
         <!-- Search & filter bar -->
         <CardFilterBar
             v-model:filter-query="filterQuery"
             v-model:sort-by="sortBy"
             v-model:group-by="groupBy"
+            :v2="true"
             :show-advanced-filters="true"
             :active-filter-count="activeChipFilterCount"
             :show-suggestions="false"
@@ -632,7 +652,7 @@ onMounted(() => {
         />
 
         <!-- No results after filtering -->
-        <div v-if="filteredCards.length === 0" class="border border-silver-30 p-8 text-center">
+        <div v-if="filteredCards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
           <p class="text-body text-silver-70">
             {{ t('profile.noPublicCards') }}
           </p>
@@ -642,8 +662,8 @@ onMounted(() => {
           <!-- Grouped view -->
           <div v-for="group in groupedCards" :key="group.type" class="mb-6">
             <!-- Category Header (hidden when no grouping) -->
-            <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-silver-20">
-              <h4 class="text-tiny font-bold text-neon uppercase">{{ translateCategory(group.type) }}</h4>
+            <div v-if="group.type !== 'all'" class="flex items-center gap-2 mb-3 pb-2 border-b border-line">
+              <h4 class="font-display text-tiny font-bold text-neon uppercase tracking-wide">{{ translateCategory(group.type) }}</h4>
               <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
             </div>
             <CollectionGrid

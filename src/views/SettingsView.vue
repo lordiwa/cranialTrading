@@ -409,11 +409,14 @@ const handleRestartTour = () => {
 <template>
   <AppContainer>
     <div class="max-w-2xl">
-      <h1 class="text-h2 md:text-h1 font-bold text-silver mb-8">{{ t('settings.title') }}</h1>
+      <div class="mb-8">
+        <p class="text-[11px] font-bold tracking-[.18em] uppercase text-neon mb-1">{{ t('settings.kicker') }}</p>
+        <h1 class="font-display text-h2 md:text-h1 font-bold text-silver">{{ t('settings.title') }}</h1>
+      </div>
 
       <!-- Email verification -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
-        <h2 class="text-body font-bold text-silver mb-4 flex items-center gap-2">
+      <div class="bg-surface-1 border border-line rounded-lg p-6 md:p-8 mb-6">
+        <h2 class="font-display text-h3 font-bold text-silver mb-4 flex items-center gap-2">
           {{ t('settings.sections.emailVerification.title') }}
           <HelpTooltip
               :text="t('help.tooltips.settings.emailVerification')"
@@ -460,9 +463,9 @@ const handleRestartTour = () => {
       </div>
 
       <!-- Change password -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
+      <div class="bg-surface-1 border border-line rounded-lg p-6 md:p-8 mb-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-body font-bold text-silver flex items-center gap-2">
+          <h2 class="font-display text-h3 font-bold text-silver flex items-center gap-2">
             {{ t('settings.sections.changePassword.title') }}
             <HelpTooltip
                 :text="t('help.tooltips.settings.password')"
@@ -528,8 +531,8 @@ const handleRestartTour = () => {
       </div>
 
       <!-- User info -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
-        <h2 class="text-body font-bold text-silver mb-4">{{ t('settings.sections.accountInfo.title') }}</h2>
+      <div class="bg-surface-1 border border-line rounded-lg p-6 md:p-8 mb-6">
+        <h2 class="font-display text-h3 font-bold text-silver mb-4">{{ t('settings.sections.accountInfo.title') }}</h2>
 
         <div class="space-y-4 text-small">
           <!-- Avatar -->
@@ -557,7 +560,7 @@ const handleRestartTour = () => {
               <img
                   :src="authStore.getAvatarUrl(64)"
                   alt="Avatar"
-                  class="w-16 h-16 rounded-full bg-silver-10"
+                  class="w-16 h-16 rounded-full bg-silver-10 border-2 border-neon-40 shadow-glow-neon"
               />
               <p class="text-tiny text-silver-50">
                 {{ authStore.user?.avatarUrl ? t('settings.changeAvatar.custom') : t('settings.changeAvatar.generated') }}
@@ -838,20 +841,20 @@ const handleRestartTour = () => {
       </div>
 
       <!-- Language selector -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
+      <div class="bg-surface-1 border border-line rounded-lg p-6 md:p-8 mb-6">
         <div class="flex items-center justify-between">
           <p class="text-small font-bold text-silver">{{ t('settings.language.title') }}</p>
-          <div class="inline-flex border border-silver-30 rounded overflow-hidden">
+          <div class="inline-flex bg-surface-2 border border-line rounded-lg p-[3px] gap-0.5">
             <button
                 v-for="lang in languageOptions"
                 :key="lang"
                 type="button"
                 @click="setLocale(lang)"
                 :class="[
-                  'px-3 py-1.5 text-tiny font-bold transition-colors',
+                  'inline-flex items-center justify-center min-h-[34px] px-4 rounded-md text-small font-semibold transition-all duration-200 ease-v2',
                   locale === lang
-                    ? 'bg-neon text-primary'
-                    : 'text-silver-50 hover:text-neon'
+                    ? 'text-neon bg-surface-3'
+                    : 'text-silver-50 hover:text-silver'
                 ]"
             >
               {{ languageLabels[lang] }}
@@ -861,7 +864,7 @@ const handleRestartTour = () => {
       </div>
 
       <!-- Restart Tour -->
-      <div class="bg-primary border border-silver-30 p-6 md:p-8 mb-6 rounded-md">
+      <div class="bg-surface-1 border border-line rounded-lg p-6 md:p-8 mb-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-small font-bold text-silver">{{ t('settings.restartTour.label') }}</p>
@@ -874,8 +877,8 @@ const handleRestartTour = () => {
       </div>
 
       <!-- Danger Zone -->
-      <div class="bg-primary border border-rust p-6 md:p-8 mb-6 rounded-md">
-        <h2 class="text-body font-bold text-rust mb-2 flex items-center gap-2">
+      <div class="bg-surface-1 border border-rust rounded-lg p-6 md:p-8 mb-6">
+        <h2 class="font-display text-h3 font-bold text-[#C4553F] mb-2 flex items-center gap-2">
           <SvgIcon name="warning" size="small" />
           {{ t('settings.dangerZone.title') }}
         </h2>
@@ -885,9 +888,9 @@ const handleRestartTour = () => {
 
         <div class="space-y-3">
           <!-- Delete all data -->
-          <div class="flex items-center justify-between p-3 bg-rust-5 border border-rust-10 rounded">
+          <div class="flex items-center justify-between p-3.5 bg-rust-10 border border-rust/30 rounded-md">
             <div>
-              <p class="text-small font-bold text-silver">{{ t('settings.dangerZone.deleteData.label') }}</p>
+              <p class="text-small font-bold text-[#C4553F]">{{ t('settings.dangerZone.deleteData.label') }}</p>
               <p class="text-tiny text-silver-50">{{ t('settings.dangerZone.deleteData.hint') }}</p>
             </div>
             <BaseButton
@@ -901,7 +904,7 @@ const handleRestartTour = () => {
           </div>
 
           <!-- Logout -->
-          <div class="flex items-center justify-between p-3 bg-silver-5 border border-silver-20 rounded">
+          <div class="flex items-center justify-between p-3.5 bg-surface-1 border border-line rounded-md">
             <div>
               <p class="text-small font-bold text-silver">{{ t('settings.dangerZone.logout.label') }}</p>
               <p class="text-tiny text-silver-50">{{ t('settings.dangerZone.logout.hint') }}</p>

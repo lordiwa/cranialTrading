@@ -32,6 +32,7 @@ import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCat
 import { cancelPriceFetch } from '../composables/useCollectionTotals'
 import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
 import { useCollectionPagination } from '../composables/useCollectionPagination'
+import { useDelayedFlag } from '../composables/useDelayedFlag'
 
 const route = useRoute()
 const router = useRouter()
@@ -342,6 +343,11 @@ const { triggerQuery: triggerPaginationQuery } = useCollectionPagination({
   },
   collectionStore,
 })
+
+// TASK-117: anti-flicker loader for server-side re-query while filters/search/chips change.
+// Shows only if the queryPage round-trip is still in flight after 200ms, so fast
+// connections never see it flash.
+const showFilterLoader = useDelayedFlag(() => collectionStore.paginationMeta.loading, 200)
 
 const clearAllFilters = () => {
   filterQuery.value = ''
@@ -1107,7 +1113,20 @@ onUnmounted(() => {
         </div>
 
         <!-- ========== CARDS GRID ========== -->
-        <div v-if="(collectionDisplayCards.length > 0 || collectionStore.paginationMeta.loading) && statusFilter !== 'wishlist'">
+        <div v-if="(collectionDisplayCards.length > 0 || collectionStore.paginationMeta.loading) && statusFilter !== 'wishlist'" class="relative">
+          <!-- TASK-117: delayed (200ms) anti-flicker overlay for server-side re-query
+               (status chip / search / filter change). CSS-only .sk shimmer per placeholder,
+               no svg-use — Mali-safe. Absolutely positioned so there's no layout shift. -->
+          <div
+              v-if="showFilterLoader"
+              class="absolute inset-0 z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 bg-primary/85 backdrop-blur-[1px] rounded-lg p-1"
+              data-testid="collection-filter-loader"
+              aria-live="polite"
+          >
+            <span class="sr-only">{{ t('collection.pagination.filtering') }}</span>
+            <div v-for="n in 10" :key="n" class="sk rounded-lg aspect-[3/4]" />
+          </div>
+
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-body font-bold text-silver">{{ t('collection.sections.myCards') }}</h3>
             <span class="text-small text-silver-50">

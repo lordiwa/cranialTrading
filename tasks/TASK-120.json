@@ -8,7 +8,7 @@
     "Tests unit de regresión del timing en collection.paginatedSync.test.ts (patrón existente); gates y E2E collection-crud verdes",
     "batchUpdateCards verificado por paridad (membership al cambiar status en bulk) — fix o descarte documentado"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "bug",
@@ -22,11 +22,19 @@
   "depends_on": [
     "TASK-116"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "ec12877"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T02:15:17.105Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17). Commit ec12877 en develop (sin push aún — push llega con el deploy-dev del run). review_depth=FULL (rubro: 195 líneas cambiadas ≥150 + core tdd-tier logic en src/stores/collection.ts). Verdict APPROVE, 0 HIGH/MEDIUM. Red-run verificado genuino por el reviewer (revert de implementación → 5/5 rojos exactos → restore byte-idéntico). AC1/AC2/AC4 MET; AC3 unit+type-check verdes re-corridos por reviewer, E2E collection-crud 8/8 verde corrido por el developer (condición pre-push satisfecha; se re-corre en deploy). Hallazgo extra del fix: el camino viejo borraba TODOS los chunks del card_index incluso en delete parcial (forzaba full-load al recargar) — el nuevo persiste índice correcto. LOWs anotados: orden de restore al final de página (cosmético, se auto-corrige en 2s), ventana de 2s del debounce (tradeoff aceptado 113/116), asimetría public_cards en fallo parcial (→ ticket follow-up), membership bajo filtro activo en bulk update (precedente deliberado 113)."
+    }
+  ],
   "created_at": "2026-07-16T22:01:18.456Z",
-  "updated_at": "2026-07-16T22:01:18.456Z",
+  "updated_at": "2026-07-17T02:15:17.105Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

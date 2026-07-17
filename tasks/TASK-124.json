@@ -7,7 +7,7 @@
     "El camino cambiar-email → re-registro con el mismo username deseado funciona o está bloqueado con mensaje útil (no 'username taken' engañoso)",
     "Sin reservas huérfanas nuevas; tests del flujo; gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "auth",
@@ -20,11 +20,25 @@
   "depends_on": [
     "TASK-103"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "24ff2e2",
+    "1b927b1"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T02:56:27.093Z",
+      "body": "Grooming resuelto con Rafael 2026-07-17 (AC1): opción (e) — \"cambiar email\" actualiza el email de la MISMA cuenta recién creada (verifyBeforeUpdateEmail + reenvío de verificación), en vez de resetear el form y crear una segunda cuenta. No se toca reserveUsername ni las reglas de /usernames (SCRUM-73). Si Firebase exige re-login u otra falla, mostrar mensaje útil (no \"username taken\"). Opción (d) TTL server-side queda como posible follow-up aparte, no en este ticket."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T03:26:51.902Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17) tras 1 ciclo REQUEST-CHANGES. Commits 24ff2e2 (fix principal) + 1b927b1 (follow-up de review) en develop. review_depth=FULL (rubro: 314 y 227 líneas; superficie de seguridad auth + tdd-tier). Grooming AC1: Rafael eligió opción (e) — cambiar-email actualiza la MISMA cuenta vía verifyBeforeUpdateEmail; sin segunda cuenta, sin tocar reserveUsername/reglas /usernames. RC loop: HIGH-1 (doc /users con email stale → senderEmail viejo en trades) cerrado con sync en loadUserData (choke point de los 4 entry points, best-effort no fatal); MEDIUM-2 mapping auth/user-token-expired→emailChangedReauth; LOW voseo→tuteo en keys nuevas; LOW guard email-sin-cambio. Red-runs verificados genuinos ambas pasadas (revert + mutation checks). Gates finales: unit 1342/1342, type-check limpio, build OK, E2E register 6/6 (primera pasada; follow-up store-internal validado sin superficie E2E). PENDIENTE HUMANO (no bloqueante, anotado para pre-prod): UAT manual en dev del round-trip completo click-de-link → revocación → toast de re-login — el timing real de revocación de Firebase no es observable en unit. Follow-up creado: TASK-126 (remount de /register con cuenta unverified muestra form en blanco — camino residual al síntoma original)."
+    }
+  ],
   "created_at": "2026-07-16T23:57:56.128Z",
-  "updated_at": "2026-07-16T23:57:56.128Z",
+  "updated_at": "2026-07-17T03:26:51.902Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

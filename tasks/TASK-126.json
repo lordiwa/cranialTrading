@@ -1,0 +1,30 @@
+{
+  "key": "TASK-126",
+  "title": "Auth: remount de /register con cuenta unverified logueada muestra el form en blanco — re-submit puede re-disparar register() y el \"username taken\" propio",
+  "description": "Hallazgo MEDIUM del reviewer de TASK-124 (2026-07-17): `registered` es un ref local del componente (RegisterView.vue:40) y onMounted solo redirige cuando authStore.user && emailVerified. Reload o navegar-y-volver durante pending-verification remonta la vista mostrando el form de registro en blanco; un re-submit con otro email + mismo username re-corre register() → reserveUsername colisiona con la reserva propia → \"username taken\" engañoso (el síntoma original de TASK-124 por el camino residual). Pre-existente, no introducido por 124. Fix sugerido: en onMounted, si auth.currentUser && !emailVerified, mostrar la pantalla de pending (registered = true) en vez del form. Recordar regla: NO async onMounted con await.",
+  "acceptance_criteria": [
+    "Remontar /register con cuenta unverified logueada muestra el estado pending-verification (con el flujo cambiar-email de TASK-124 disponible), no el form en blanco",
+    "No hay camino UI que dispare un segundo register() con auth.currentUser existente",
+    "Tests del flujo; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "auth",
+    "username-reservation",
+    "ux",
+    "found-by-review"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-124"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-17T03:14:01.864Z",
+  "updated_at": "2026-07-17T03:14:01.864Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

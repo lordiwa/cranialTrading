@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-17T00:33:26.690Z",
+  "generated_at": "2026-07-17T06:25:14.832Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -532,7 +532,7 @@
     {
       "key": "TASK-109",
       "title": "Search v2.1 (ref Card Kingdom): sintaxis avanzada Scryfall — verificar pass-through + hint de ayuda",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
     },
     {
@@ -592,38 +592,56 @@
     {
       "key": "TASK-119",
       "title": "Precios: cart de intercambio captura card.price (TCG) al agregar — evaluar lookup CK-first del item",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
     },
     {
       "key": "TASK-120",
       "title": "Bug colección: batchDeleteCards (bulk/select-all) no sincroniza paginatedCards — misma clase que TASK-113/116 en el camino bulk",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-121",
       "title": "Chore test-infra: vitest crashea al montar componentes con <use href=\"/icons.svg#...\"> en Windows — bloquea tests component-mount de RegisterView/LandingHeader",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
     },
     {
       "key": "TASK-122",
       "title": "Chore seguridad: auth.ts loggea el objeto de error crudo de Firebase en el flujo Google — puede contener credential en customData",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
     },
     {
       "key": "TASK-123",
       "title": "Bug latente colección: dos _doPersistIndex en vuelo pueden intercalar writes de chunks (data vieja pisando chunks nuevos) — serializar el persist del card_index",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-124",
       "title": "Auth: \"cambiar email\" post-registro deja la reserva de username huérfana — el re-registro falla con \"username taken\" del propio usuario",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-125",
+      "title": "Bug latente colección: batchDeleteCards fase 2 borra public_cards de ids cuyo delete de fase 1 falló — carta restaurada queda sin listing público",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-126",
+      "title": "Auth: remount de /register con cuenta unverified logueada muestra el form en blanco — re-submit puede re-disparar register() y el \"username taken\" propio",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-127",
+      "title": "Chore seguridad: extender la sanitización de error-logging (patrón logAuthError) a los 11 stores restantes + mover helper a utils",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

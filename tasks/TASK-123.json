@@ -7,7 +7,7 @@
     "Test unit de regresión con fake timers + setDoc mock demorado (patrón del retry de 116) que falle con el código actual",
     "Sin degradación de latencia perceptible del persist debounced; gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "bug",
@@ -21,11 +21,19 @@
   "depends_on": [
     "TASK-116"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "5fd9c97"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T02:40:11.476Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17). Commit 5fd9c97 en develop (push llega con el deploy-dev del run). review_depth=FULL (rubro: 241 líneas cambiadas ≥150 + core tdd-tier logic en src/stores/collection.ts). Verdict APPROVE, 0 HIGH/MEDIUM. Red-run verificado independientemente (git apply -R de los hunks de src → rojo exacto en persistIndex.test.ts:183 → restore byte-idéntico). Diseño: coalescing con _persistRunning + _persistRerunRequested (un solo rerun coalescido, re-snapshot fresco al arrancar — newest wins); reviewer trazó todas las interleavings (ventana del finally imposible por sincronía JS, recursión acotada, refresh-flag preservado, error path limpio, interacción con bulk de TASK-120 intacta). Gen-token de 116 queda como defensa-en-profundidad redundante-inofensiva. Gates re-corridos por reviewer: unit 1329/1329, type-check limpio; E2E collection-crud 8/8 por el developer. 2 LOWs no bloqueantes anotados (flag defensivo redundante; torn multi-chunk write pre-existente que este fix achica y se auto-corrige)."
+    }
+  ],
   "created_at": "2026-07-16T22:14:19.897Z",
-  "updated_at": "2026-07-16T22:14:19.897Z",
+  "updated_at": "2026-07-17T02:40:11.476Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

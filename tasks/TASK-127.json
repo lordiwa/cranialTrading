@@ -1,0 +1,38 @@
+{
+  "key": "TASK-127",
+  "title": "Chore seguridad: extender la sanitización de error-logging (patrón logAuthError) a los 11 stores restantes + mover helper a utils",
+  "description": "Follow-up de TASK-122 (2026-07-17): el mismo patrón de console.error/warn con objetos de error crudos existe fuera de auth.ts — binders.ts (9 sitios), buyRequests.ts (5), collection.ts (~15), contacts.ts (5), decks.ts (~15), market.ts (2), matches.ts (7), messages.ts (~9), preferences.ts (4), priceMatchingHelper.ts (1), search.ts (1). Plan: mover logAuthError de stores/auth.ts a src/utils/ (renombrado, p.ej. logSanitizedError) con la versión endurecida (null-safe via error ?? {}, acepta code string|number — hardening del review de 122), reemplazar todos los sitios, mantener niveles (error/warn) y context strings. Sin cambio de toasts. Considerar también el LOW pre-existente de register() que toastea error.message crudo (decisión aparte, es user-facing).",
+  "acceptance_criteria": [
+    "Helper sanitizador único en src/utils/ (null-safe, code string|number), auth.ts migrado a él sin duplicado",
+    "Ningún store loggea objetos de error crudos (grep limpio de console.*(.*, error) en src/stores/)",
+    "Niveles de log y context strings preservados; toasts sin cambios",
+    "Tests de regresión del helper; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "chore",
+    "security",
+    "logging",
+    "stores",
+    "found-by-review"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-122"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T06:23:30.744Z",
+      "body": "Alcance adicional detectado por dev-122 al cerrar TASK-122 (2026-07-17): el patrón `const firebaseError = error as { code?: string }; if (firebaseError.code === ...)` que corre DESPUÉS de logAuthError en los catches de loginWithGoogle, login, changeRegistrationEmail, sendResetPasswordEmail, resetPassword, changePassword y checkEmailVerification NO es null-safe (un reject(null) tira TypeError en el acceso .code y escapa el catch sin toast). Al migrar al helper de utils, normalizar también ese acceso (p.ej. extraer el code una sola vez de forma null-safe y reusar en el branching)."
+    }
+  ],
+  "created_at": "2026-07-17T06:18:11.077Z",
+  "updated_at": "2026-07-17T06:23:30.744Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

@@ -2,7 +2,7 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "paused",
-  "updated_at": "2026-07-17T00:44:02.668Z",
+  "updated_at": "2026-07-17T06:25:28.927Z",
   "active_task": null,
   "workflow_step": "update",
   "next_action": "MODO HARNESS (loop terminado limpio: lock liberado, mode=harness, stop-reason en artifacts/). PENDIENTES DE RAFAEL, en orden: (1) TASK-107 — decidir subida DesignSync de 11-collection d+m (trabajo local listo; opciones: subir corrigiendo conteo 1.472≠1.284 pre-existente / subir tal cual / no subir; al subir tambien conviene actualizar cards 01-login/80-login-dropdown/02-register con el boton Google para AC3 de 118). (2) TASK-118 — click real de 'Continuar con Google' en cranial-trading-dev.web.app/register con su cuenta (+ opcional chequeo provider en Firebase Console); con su PASS se cierra con comment uat. (3) TASK-104 — UAT visual logueado: /settings, perfil propio, welcome tour + pase mobile en su telefono; con su PASS se cierra. (4) DECISION producto TASK-114 (ya cerrado): hero excluye wishlist — confirmar o pedir reversion trivial. (5) Grooming de 119-124 cuando quiera. (6) UAT visual v1.40-1.50 acumulado en dev sigue pendiente de sesiones previas. Worktrees de agentes: mergeados todos — se pueden limpiar con git worktree remove (cuidado gotcha node_modules). public/tasks/ sigue para borrar a mano; cranial-design/ y .mcp.json siguen untracked (mapping.json actualizado localmente por TASK-106). Si crash: los worktrees de los agentes pueden tener commits sin mergear — buscarlos con git worktree list antes de resetear tickets. HANDOFF PREVIO (orden): (1) NADA pendiente de v1.48.1 — CI run 29526018199 VERDE confirmado antes de pausar, TASK-113 y TASK-115 cerradas (done, linked). (2) TASK-111 (bug URL sync search, HIGH, TDD — diagnostico completo en el ticket, toca SearchView/search store, ya sin conflicto porque 108 mergeo) y TASK-118 (restaurar Google login, HIGH — forense de que commit lo quito + restaurar en 3 puntos de entrada + cards de Design). (3) TASK-114 (precios CK agregados — REFINAMIENTO primero: inventariar agregados + fuente CK por carta). (4) TASK-117 (loader al filtrar), TASK-116 (race add/delete), TASK-115 ya commiteado. (5) Backlog v2 restante: 102 (F7a) -> 103 (F7b) -> 104 (F8) -> 105 (F9) -> 106 -> 107. Si se relanza el loop: re-acquire lock + set-mode loop + re-grant loop_auth (RE-CONFIRMAR con Rafael). PENDIENTES DE RAFAEL: UAT visual v1.40.0-1.48.1 en dev (dropdowns 112, search v2.1 108, toggles 113, panel totales 115); decision voseo/tuteo es.json; borrar public/tasks/ a mano; cranial-design/ y .mcp.json untracked.",
@@ -93,7 +93,7 @@
     }
   ],
   "pending_human_confirmation": "Rafael: (1) UAT visual v1.40.0-1.48.1 en dev — en particular: dropdowns legibles (112), search v2.1 sort/count/per-page (108), toggles de coleccion reflejandose (113), badge de matches visible + Total sin recorte en mobile (115); (2) manual con TASK-111 o relanzar loop (re-confirmar loop_auth); (3) voseo/tuteo es.json; (4) public/tasks/ borrar a mano.",
-  "mode": "harness",
+  "mode": "loop",
   "loop_auth": {
     "auto_close_on_green_review": true,
     "uat_delegated_to_orchestrator": true,
@@ -102,10 +102,10 @@
     "auto_version_bump_on_milestone": true
   },
   "loop_state": {
-    "current_ticket": "TASK-107",
+    "current_ticket": "TASK-122",
     "phase": "update",
-    "iteration": 19,
-    "completed_this_run": 18,
-    "run_started_at": "2026-07-13T20:00:00.000Z"
+    "iteration": 7,
+    "completed_this_run": 7,
+    "run_started_at": "2026-07-17T01:56:52.000Z"
   }
 }

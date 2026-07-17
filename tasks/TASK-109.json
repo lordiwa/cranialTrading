@@ -8,7 +8,7 @@
     "Sin regresión en las 3 fuentes ni en el price filter; E2E de search verdes",
     "i18n en/es/pt; gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "search",
@@ -20,11 +20,19 @@
   "depends_on": [
     "TASK-101"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "5669d40"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T03:51:50.762Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17). Commit 5669d40 en develop. review_depth=FULL (rubro: 98 líneas <150 PERO core tdd-tier logic en src/utils/scryfallQuery.ts → FULL obligatorio). Verdict APPROVE, 0 HIGH/MEDIUM. Hallazgo real más allá del alcance esperado: buildQuery quoteaba incondicionalmente filters.name, así que la sintaxis avanzada tipeada (-t:land, o:flying, t:instant, \"exacto\") se mangleaba y NUNCA llegaba bien a Scryfall — fix con heurística isAdvancedScryfallSyntax que salta el quoting. Red-run verificado (9 rojos / 2 locks de caracterización, revert+restore sha-verificado). Riesgo de nombres-con-colon evaluado empíricamente por el reviewer contra la API real: los 88 nombres reales con ':' usan ': ' con espacio que Scryfall parsea literal — ninguna búsqueda que antes funcionaba se rompe. Hint de sintaxis agregado en FilterPanel (patrón HelpTooltip reutilizado, accesible, desktop+mobile), 3 keys i18n en/es/pt. Gates: unit 1353/1353, type-check limpio, build OK, E2E search 10/10 (incluyó detectar y corregir una colisión de locator E2E vía error-context.md, no a ciegas). NOTA DESIGN: el hint agrega una línea al card 12-search — drift menor anotado para foldear en la decisión pendiente de design-sync de TASK-107 (Rafael), no se corrió design-push autónomo. LOWs: comentario impreciso sobre nombres-con-colon; consolidación futura con isComplexQuery de services/scryfall.ts."
+    }
+  ],
   "created_at": "2026-07-16T04:00:00.000Z",
-  "updated_at": "2026-07-16T04:00:00.000Z",
+  "updated_at": "2026-07-17T03:51:50.762Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

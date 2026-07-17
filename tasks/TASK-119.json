@@ -7,7 +7,7 @@
     "Si se implementa: total del cart CK-first con fallback, sin latencia perceptible al agregar; tests unit del cálculo",
     "Gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "pricing",
@@ -20,11 +20,25 @@
   "depends_on": [
     "TASK-114"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "b43016f",
+    "0d272bb"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T05:20:01.351Z",
+      "body": "Grooming resuelto con Rafael 2026-07-17 (AC1): SÍ se implementa CK-first async — al agregar al cart se captura card.price (TCG) inmediatamente y un lookup CK en background (getCardPrices de services/mtgjson.ts, patrón getCKRetail de MatchCard) upgradea el precio del item cuando resuelve; fallback explícito a card.price si CK no tiene el set/carta. Cero latencia percibida al agregar; el total puede ser transitoriamente mixto CK/TCG mientras resuelven los lookups (aceptado)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T05:40:57.494Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17). Commits b43016f (feature) + 0d272bb (ajuste por decisión de owner) en develop. review_depth=FULL (rubro: 151 líneas ≥150). Verdict APPROVE + delta-check APPROVE, 0 HIGH. Grooming AC1: Rafael decidió implementar CK-first async — addItem captura card.price (TCG) síncrono y un lookup getCardPrices(scryfallId, setCode) fire-and-forget upgradea el precio al resolver, fallback TCG en miss/fail. setCode verificado sin inversión edition/setCode (único call site UserProfileView:449). Segunda decisión de owner (MEDIUM del reviewer): foil sin retailFoil en CK CONSERVA el TCG capturado (no cae al retail no-foil) — evita subvaluar foils; + guard retail<=0. Races trazadas: persist tardío no clobberea quantity nueva (re-fetch del item vivo al resolver); item borrado antes del resolve no resucita. 10 regression locks (38/38 en exchangeCart.test.ts). Gates: unit 1363/1363, type-check limpio, build OK; sin E2E de cart existente (verificado por grep). LOW pre-existente anotado: fixture makeItem usa edition:'M21' (código) contra el canon edition=set_name — fuera de scope."
+    }
+  ],
   "created_at": "2026-07-16T21:16:15.905Z",
-  "updated_at": "2026-07-16T21:16:15.905Z",
+  "updated_at": "2026-07-17T05:40:57.494Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[INFERRED:strong]"

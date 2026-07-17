@@ -1,0 +1,31 @@
+{
+  "key": "TASK-125",
+  "title": "Bug latente colección: batchDeleteCards fase 2 borra public_cards de ids cuyo delete de fase 1 falló — carta restaurada queda sin listing público",
+  "description": "Hallazgo del developer+reviewer de TASK-120 (2026-07-17): en batchDeleteCards, la fase 2 (cleanup de public_cards) corre contra TODOS los ids sale/trade del batch sin filtrar por los que realmente se borraron en fase 1. Si el delete del doc de colección de una carta falla (y el rollback de TASK-120 la restaura localmente), su doc en public_cards igual se borró — la carta restaurada queda sin listing público hasta el próximo sync de status. Pre-existente (antes del fix la carta desaparecía entera de la UI, ahora al menos la UI es veraz). Fix esperable: excluir failedIds del set de fase 2, o re-crear el public_card en el rollback.",
+  "acceptance_criteria": [
+    "Fase 2 de batchDeleteCards no borra public_cards de ids presentes en failedIds de fase 1 (o el rollback restaura el doc público)",
+    "Test unit de regresión del escenario fallo-parcial con carta sale/trade",
+    "Gates verdes (unit + build)"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "bug",
+    "collection",
+    "bulk",
+    "public-cards",
+    "found-by-dev"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-120"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-17T02:15:29.165Z",
+  "updated_at": "2026-07-17T02:15:29.165Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

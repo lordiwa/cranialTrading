@@ -7,7 +7,7 @@
     "mount() de RegisterView/LandingHeader funciona en vitest en Windows (fix o stub documentado en tests/unit/helpers)",
     "Suite completa sigue verde; sin cambios en build de producción"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "chore",
@@ -18,11 +18,19 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "51df63b"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T06:04:00.701Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17). Commit 51df63b en develop. review_depth=FULL (rubro: 156 líneas + superficie test-infra vitest.config.ts). Verdict APPROVE, 0 HIGH/MEDIUM. Causa raíz probada (no adivinada): transformAssetUrls default de @vue/compiler-sfc incluye use:[xlink:href,href] → reescribe <use href=\"/icons.svg#x\"> estático a import ES → el evaluador SSR de vitest lo resuelve con createRequire('file:///icons.svg'), URL malformada que Node rechaza SOLO en win32. Fix test-env only: vitest.config.ts pasa el tag map default MENOS use (img/video/source/image intactos, verificado contra el source instalado de compiler-sfc). Lock: svgSpriteMount.test.ts monta RegisterView+LandingHeader (reviewer reprodujo el RED con config pre-fix). Prod build sin cambios (doble build diff -rq 143 archivos idénticos + estructuralmente vite build nunca lee vitest.config). Gates: unit 1365/1365, type-check limpio. Nota útil futura: componentes nuevos con <use href> literal ya montan en vitest sin workaround; solo :href dinámico y #fragment eran seguros antes."
+    }
+  ],
   "created_at": "2026-07-16T22:11:05.091Z",
-  "updated_at": "2026-07-16T22:11:05.091Z",
+  "updated_at": "2026-07-17T06:04:00.701Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

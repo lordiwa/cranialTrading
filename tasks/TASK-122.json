@@ -7,7 +7,7 @@
     "Sin cambio de comportamiento para el usuario (toasts iguales)",
     "Gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "chore",
@@ -18,11 +18,20 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "7895cb9",
+    "8b11a5d"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T06:25:14.832Z",
+      "body": "Cerrado en loop autónomo (run 2026-07-17). Commits 7895cb9 (sanitización) + 8b11a5d (hardening null-safe + code numérico) en develop. review_depth=FULL (rubro: 160 líneas ≥150 + superficie de seguridad auth). Verdict APPROVE + delta-check APPROVE, 0 HIGH. 9 sitios de console con error crudo reemplazados por logAuthError (solo code/message, nunca customData — test asserta que un credential sintético jamás llega a console); niveles y context strings preservados; toasts byte-idénticos (AC2). Interacción con TASK-124 verificada: sus catches nuevos no loggean crudo. Gates: unit 1370/1370, type-check limpio, build OK. Follow-ups en TASK-127: mismo patrón en 11 stores (~73 sitios), mover helper a src/utils/, y null-safety del acceso .code post-catch en 7 flujos de auth (pre-existente)."
+    }
+  ],
   "created_at": "2026-07-16T22:11:11.416Z",
-  "updated_at": "2026-07-16T22:11:11.416Z",
+  "updated_at": "2026-07-17T06:25:14.832Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

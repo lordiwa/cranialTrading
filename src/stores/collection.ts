@@ -639,6 +639,26 @@ export const useCollectionStore = defineStore('collection', () => {
      */
     let _persistGen = 0
 
+    /**
+     * TASK-123 (reviewer MEDIUM from TASK-116): _doPersistIndex writes ~30
+     * sequential chunks at 59k cards — a multi-second window. If the debounce
+     * timer fires again and calls _doPersistIndex a SECOND time before the
+     * first invocation's writes have settled, two write loops run
+     * concurrently and their setDoc calls can resolve out of order on the
+     * wire — a stale (older-snapshot) write landing AFTER a newer one would
+     * silently clobber it, corrupting the persisted card_index.
+     * _persistRunning + _persistRerunRequested serialize this: at most one
+     * write loop is ever in flight. A call that arrives while one is running
+     * is coalesced into a single rerun, which only re-snapshots cardIndexRaw
+     * (and starts writing) once the in-flight loop has fully settled — so the
+     * chunk writes are never concurrent, and the last loop to run always
+     * reflects the newest state. The existing gen-token/_pendingMembershipRefresh
+     * dance (TASK-116, PEDIDO #2/#3) is unchanged: it still only fires the
+     * deferred grid re-query off the FINAL loop's completion.
+     */
+    let _persistRunning = false
+    let _persistRerunRequested = false
+
     function persistIndexToFirestore() {
         if (_indexPersistTimer) clearTimeout(_indexPersistTimer)
         _indexPersistTimer = setTimeout(() => {
@@ -648,8 +668,21 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     function _doPersistIndex() {
+        if (_persistRunning) {
+            // A write loop is already in flight — do not start a second one
+            // (that's the interleaving race). Coalesce into a single rerun.
+            _persistRerunRequested = true
+            return
+        }
+        _runPersistLoop()
+    }
+
+    function _runPersistLoop() {
         const gen = ++_persistGen
+        _persistRunning = true
         if (!authStore.user) {
+            _persistRunning = false
+            _persistRerunRequested = false
             if (gen === _persistGen && _indexPersistTimer === null) _pendingMembershipRefresh = false
             return
         }
@@ -680,12 +713,20 @@ export const useCollectionStore = defineStore('collection', () => {
             } catch (err) {
                 console.warn('[IndexSync] Failed to persist index:', err)
             } finally {
-                // TASK-116: run the deferred grid re-query only now that the
-                // write above has settled (success or failure), never immediately,
-                // and only if THIS persist is still the latest STARTED one (gen)
-                // AND no newer mutation has a persist SCHEDULED-but-not-yet-fired
-                // (_indexPersistTimer === null) — see PEDIDO #3 above.
-                if (gen === _persistGen && _indexPersistTimer === null && _pendingMembershipRefresh) {
+                _persistRunning = false
+                if (_persistRerunRequested) {
+                    // A newer mutation arrived mid-write — rerun immediately with
+                    // a fresh cardIndexRaw snapshot instead of consuming the
+                    // deferred-refresh flag here; the rerun (which reflects the
+                    // truly newest state) is the one whose completion should.
+                    _persistRerunRequested = false
+                    _runPersistLoop()
+                } else if (gen === _persistGen && _indexPersistTimer === null && _pendingMembershipRefresh) {
+                    // TASK-116: run the deferred grid re-query only now that the
+                    // write above has settled (success or failure), never immediately,
+                    // and only if THIS persist is still the latest STARTED one (gen)
+                    // AND no newer mutation has a persist SCHEDULED-but-not-yet-fired
+                    // (_indexPersistTimer === null) — see PEDIDO #3 above.
                     _pendingMembershipRefresh = false
                     refreshCurrentPage().catch(() => {})
                 }

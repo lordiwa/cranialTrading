@@ -1,0 +1,35 @@
+{
+  "key": "TASK-132",
+  "title": "Perf F4: diferir el chunk de Firebase fuera del camino crítico guest — la palanca real de APPRENDER (486KB/115KB gz eager en toda ruta)",
+  "description": "Surgido del cierre de TASK-129 (2026-07-17): el destrabe del auth gate fue correcto pero APPRENDER FAST3G no se movió (2549→2545ms, ruido). DIAGNÓSTICO VERIFICADO por dev-129: dist/index.html modulepreloada firebase-*.js (486KB / 114.86KB gzip — el chunk más grande del build; el siguiente es ~32KB gz) en TODA ruta, porque App.vue llama useAuthStore() a nivel setup y stores/auth.ts importa firebase/auth estáticamente → el SDK está en el critical path de CADA primer paint, guest o no, antes de montar #app. Bajo FAST3G (1.6Mbps ≈ 200KB/s), los ~213KB gz de JS crítico (index+vendor+firebase+AppContainer) ≈ 2000-2400ms — la espera del auth round-trip que atacó TASK-129 estaba ESCONDIDA detrás de esta descarga, nunca fue el costo dominante. FIX: cargar firebase/auth (y firestore si viaja en el mismo chunk) vía import() dinámico — ej. dentro de initAuth — de modo que el chunk salga del modulepreload/critical path y arranque post-first-paint; puede requerir manualChunks en vite.config y verificar que Vite no re-inyecte el modulepreload. CUIDADO: initAuth debe seguir resolviendo el estado auth al arrancar (solo se difiere el INICIO de la descarga, no se elimina); el guard de TASK-129 (last-known + wait para requiresAuth) compone con esto y cubre el gap más largo de loading. No degradar flujos logueados ni logout. Componer con el splash de TASK-128 (cubre el gap visual).",
+  "acceptance_criteria": [
+    "El HTML de entrada ya no modulepreloada ni descarga eager el chunk de Firebase para rutas guest — firebase se carga con import() dinámico fuera del camino crítico del primer paint (verificable en dist/index.html y en el waterfall de red)",
+    "initAuth sigue resolviendo el estado de auth al arrancar (import diferido post-first-paint); login, register, logout y navegación logueada intactos — suite E2E completa verde",
+    "APPRENDER FAST3G (harness scripts/perf-measure.mjs, preview local, mediana de 5, cero TIMEOUTs) ≤ 1400ms — target transferido de TASK-129 AC4; referencia same-environment pre-fix: 2545ms",
+    "FCP no regresa (se mantiene ≤1092ms same-environment); LOAD/DCL no empeoran",
+    "Gates verdes (unit, type-check, npx vite build)"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "guest-load",
+    "bundle",
+    "firebase",
+    "v1.52"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-129"
+  ],
+  "linked_commits": ["7962483", "3bc66f4"],
+  "linked_prs": [],
+  "comments": [
+    "2026-07-17 orquestador: CERRADO tras ciclo review FULL (rev-132: REQUEST_CHANGES → fix → APPROVE). Implementado: loadFirebaseDeps() dinámico memoizado + ensureSubscription() + dos triggers (initAuth diferido a first-paint/3s; firebaseNeededNow() eager desde los 2 caminos BLOQUEANTES del guard — diseño post-deadlock que cazó la E2E: rutas auth-gated no pueden esperar el paint). SEGUNDO camino eager descubierto y cortado: publicCardSearch.ts estático desde LoginView (widget de búsqueda guest) horneaba firebase en el chunk de /login. HIGH del review arreglado en 3bc66f4: memos se limpian en fallo (FirebaseDepsLoadError tipado), loading se destranca, toast auth.messages.connectionError (3 locales), listener vite:preloadError reusando chunkReload — sin esto, un import fallido en red flaky dejaba auth muerto para siempre con login mintiendo 'credenciales inválidas'. MEDIUM (onMounted bypasseaba el deferral) arreglado con initAuthPromise propio; guard authUnsubscribe eliminado como dead state (re-review verificó: doble suscripción imposible — intento fallido nunca suscribe, exitoso nunca limpia memo). RESULTADO MEDIDO (FAST3G preview, mediana de 5, verificado independiente por orquestador): APPRENDER 2545→1709-1712ms (-33%), FCP 836, DCL 1099. AC3 (≤1400) NO CUMPLIDO — miss ~310ms, transferido a alcance de tanda (TASK-130 modulepreload LoginView; reserva: split es.json 27.6KB gz awaiteado pre-mount). LOAD 4416-4430 = artefacto contable del fetch diferido (bytes totales iguales, percepción intacta) — NO es regresión. Unit 1419 (11 nuevos: 5 contrato del guard + 6 fallo de carga con técnica getter+resetModules validada por review). E2E: completa verde post-deadlock-fix; fix batch verificado con targeted (20/20) — SUITE COMPLETA PENDIENTE AL CIERRE DE TANDA pre-push. Drift firebase/functions (486→709KB por arista estática matches.ts) ticketeado en TASK-135. Observaciones no bloqueantes del review: toast pre-mount puede perderse (cosmético, /login lo hace recuperable); flag de preloadError sin clearing en éxito (asimetría deliberada anti-loop de reloads)."
+  ],
+  "created_at": "2026-07-17T14:55:00.000Z",
+  "updated_at": "2026-07-17T14:55:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

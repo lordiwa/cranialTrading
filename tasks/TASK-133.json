@@ -1,0 +1,30 @@
+{
+  "key": "TASK-133",
+  "title": "Process: E2E en tres niveles — tags @smoke, subsets targeted por área, suite completa solo pre-push",
+  "description": "Rafael 2026-07-17 (mid-loop-perf): la suite E2E completa (133 tests, ~13 min, 1 worker) corrió 3 veces en una tanda — es el drag principal del ciclo por ticket. Nueva política de 3 niveles SIN perder la garantía existente: (1) SMOKE por ticket (~2 min): subset curado con tag @smoke de Playwright — navegación, login, y ~1 flujo crítico por área (total ~8-12 tests); script npm run e2e:smoke. (2) TARGETED por ticket (~3-5 min): mapeo área-tocada→specs (auth/router → auth+login+register specs; collection → collection specs; etc.) documentado en CLAUDE.md con scripts npm run e2e:<area>. (3) SUITE COMPLETA una sola vez por tanda, ANTES del push a develop — la regla 'E2E before push' (feedback memoria) queda INTACTA, solo se muda del nivel ticket al nivel push, que es donde gatea el deploy. NO subir workers de Playwright en este ticket (la cuenta CI de 59k cartas comparte estado mutable — shardear cuentas es ticket futuro aparte). Los devs del loop reciben en su briefing qué nivel corresponde a su ticket.",
+  "acceptance_criteria": [
+    "Subset @smoke taggeado (~8-12 tests cubriendo navegación, login/auth básico y un flujo por área principal) + script npm run e2e:smoke que corre en ~2 min",
+    "Mapeo carpeta/área→specs documentado en CLAUDE.md + scripts npm targeted por área (mínimo: auth, collection, decks, matches, search)",
+    "Política de 3 niveles documentada en CLAUDE.md (sección testing): ticket=smoke+targeted, push a develop=suite completa obligatoria — regla E2E-before-push explícitamente preservada",
+    "La suite completa sigue verde después del tagging (los tags no alteran comportamiento de ningún spec)",
+    "Gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "e2e",
+    "dx",
+    "process",
+    "v1.52"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-17T17:35:00.000Z",
+  "updated_at": "2026-07-17T17:35:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

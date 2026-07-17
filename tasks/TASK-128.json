@@ -8,7 +8,7 @@
     "FCP FAST3G medido con el harness contra preview local o dev ≤ 1092ms (50% del baseline 2184)",
     "Sin regresión de APPRENDER/LOAD; E2E smoke verde (el splash no rompe locators); gates verdes"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "perf",
@@ -18,11 +18,13 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": ["5716121", "0b0beca", "28d9274"],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    "2026-07-17 orquestador: CERRADO con review FULL APPROVE (rev-128, 0 HIGH). Splash instantáneo en index.html (CSS inline, cero requests — @font-face reusa el preload crossorigin; remoción atómica verificada en Vue 3.5 mount) + harness scripts/perf-measure.mjs + test de regresión (4 tests, extracción intencional de todo el static content de #app). MEDIUM del review arreglado en 28d9274: waitForFunction para APPRENDER con TIMEOUT explícito excluido de la mediana + exit non-zero si mayoría timeout; + prefers-reduced-motion en spinner. MEDIDO (preview local, before/after mismo entorno, FAST3G mediana de 5): FCP 2464→884ms (AC ≤1092 PASS), APPRENDER 2554→2553 sin regresión, zero TIMEOUTs con la lógica nueva. Gates: 1374 unit, type-check limpio, build OK, E2E smoke 5/5. DEUDA anotada (LOW del review, no bloqueante): (1) @font-face de Space Grotesk duplicado entre index.html y style.css — pueden driftear; el test lockea parity de URL pero no el attr crossorigin del preload (si se quita, vuelve la doble descarga sin que ningún test lo pesque); (2) el test 'zero requests' solo escanea url() del style block, no src/href del markup del splash. Colisión de agentes al inicio (dev duplicado por re-spawn del orquestador) resuelta sin pérdida de datos — lección en memoria."
+  ],
   "created_at": "2026-07-17T13:42:00.286Z",
-  "updated_at": "2026-07-17T13:43:07.526Z",
+  "updated_at": "2026-07-17T14:15:00.000Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

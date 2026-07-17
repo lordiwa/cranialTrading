@@ -646,26 +646,50 @@
     {
       "key": "TASK-128",
       "title": "Perf F1: splash instantáneo en index.html + harness de medición commiteado (baseline FAST3G: APPRENDER 2132ms)",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-129",
       "title": "Perf F2: destrabar el gate de auth del router para rutas guest — pintar sin esperar el round-trip de Firebase Auth",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-130",
       "title": "Perf F3: fuentes a woff2 subset + font-display swap, preconnect a Google APIs, modulepreload de LoginView",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-131",
       "title": "Chore: limpiar 26MB de peso muerto en public/ + borrar SpriteIcon huérfano",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
+    },
+    {
+      "key": "TASK-132",
+      "title": "Perf F4: diferir el chunk de Firebase fuera del camino crítico guest — la palanca real de APPRENDER (486KB/115KB gz eager en toda ruta)",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-133",
+      "title": "Process: E2E en tres niveles — tags @smoke, subsets targeted por área, suite completa solo pre-push",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-134",
+      "title": "CI: cron E2E nocturna contra dev + manejo de flakes (historial para distinguir flake de regresión)",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-135",
+      "title": "Perf: cortar el import estático de cloudFunctions en matches.ts — saca firebase/functions (~220KB raw) del chunk compartido de Firebase",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

@@ -7,7 +7,7 @@
     "SpriteIcon.vue borrado; grep sin referencias colgantes en src/ ni e2e/",
     "npx vite build OK y dist/ baja de ~30MB a <5MB; suite unit verde"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "chore",
@@ -19,9 +19,11 @@
   "depends_on": [
     "TASK-130"
   ],
-  "linked_commits": [],
+  "linked_commits": ["bf4d0c0"],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    "2026-07-17 orquestador: CERRADO (uat-only — verificado por orquestador: git show stat, apple-touch-icon 23KB presente y linkeado con sizes, grep cero referencias colgantes a SpriteIcon/icons.png/ugs.csv). dist/ 30MB→2.9MB. Borrado: ugs.csv 11MB, icons.png 6.8MB, SpriteIcon.vue huérfano, 34 TTFs Open Sans sin referencia (quedan los 4 woff2 + OFL + README), logo 1.3MB reemplazado por apple-touch-icon.png 180x180 de 23KB (Pillow). GOTCHA descubierto: los screenshots de debug (Mi-Coleccion-*.png, float.png, etc.) estaban GITIGNORADOS (public/*.png en .gitignore:54-55) — nunca se shippearon por CI, solo inflaban el disco local; borrados de disco directo (no aparecen en el diff). Gates: 1419 unit, type-check, build OK, smoke 5/5."
+  ],
   "created_at": "2026-07-17T13:42:51.547Z",
   "updated_at": "2026-07-17T13:42:51.547Z",
   "jira_key": null,

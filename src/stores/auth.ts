@@ -25,6 +25,26 @@ import { isValidUsername, normalizeUsername } from '../utils/username';
 
 let authUnsubscribe: (() => void) | null = null;
 
+/**
+ * TASK-122: log auth-flow failures without ever emitting the raw error
+ * object. Some Firebase Auth error shapes carry a `customData.credential`
+ * (e.g. account-exists-with-different-credential) — logging the object
+ * itself to the console is poor hygiene in production. Only the safe,
+ * string-typed `code`/`message` fields are ever passed to console.
+ */
+const logAuthError = (context: string, error: unknown, level: 'error' | 'warn' = 'error'): void => {
+    const { code, message } = error as { code?: unknown; message?: unknown };
+    const sanitized = {
+        code: typeof code === 'string' ? code : undefined,
+        message: typeof message === 'string' ? message : undefined,
+    };
+    if (level === 'warn') {
+        console.warn(`${context}:`, sanitized);
+    } else {
+        console.error(`${context}:`, sanitized);
+    }
+};
+
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
@@ -300,7 +320,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.loginSuccess'), 'success');
             return true;
         } catch (error: unknown) {
-            console.error('Google login error:', error);
+            logAuthError('Google login error', error);
             const firebaseError = error as { code?: string };
             if (firebaseError.code === 'auth/popup-closed-by-user') {
                 // User closed popup, no error message needed
@@ -321,7 +341,7 @@ export const useAuthStore = defineStore('auth', () => {
             globalThis.location.reload();
             return true;
         } catch (error: unknown) {
-            console.error('Logout error:', error);
+            logAuthError('Logout error', error);
             toastStore.show(t('auth.messages.logoutError'), 'error');
             isLoggingOut.value = false;
             return false;
@@ -477,7 +497,7 @@ export const useAuthStore = defineStore('auth', () => {
             const snapshot = await getDocs(qLegacy);
             return snapshot.empty;
         } catch (error) {
-            console.error('Error checking username:', error);
+            logAuthError('Error checking username', error);
             return false;
         }
     };
@@ -582,7 +602,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeUsername.success'), 'success');
             return { success: true };
         } catch (error) {
-            console.error('Error changing username:', error);
+            logAuthError('Error changing username', error);
             // D-08 step 5: roll back the new reservation to avoid a dangling entry.
             await releaseUsername(newNorm);
             toastStore.show(t('settings.changeUsername.error'), 'error');
@@ -608,7 +628,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeLocation.success'), 'success');
             return true;
         } catch (error) {
-            console.error('Error changing location:', error);
+            logAuthError('Error changing location', error);
             toastStore.show(t('settings.changeLocation.error'), 'error');
             return false;
         }
@@ -646,7 +666,7 @@ export const useAuthStore = defineStore('auth', () => {
                 const location = api.parse(data);
                 if (location) return location;
             } catch (error) {
-                console.warn(`Failed to fetch from ${api.url}:`, error);
+                logAuthError(`Failed to fetch from ${api.url}`, error, 'warn');
                 continue;
             }
         }
@@ -698,7 +718,7 @@ export const useAuthStore = defineStore('auth', () => {
                 }
             }
         } catch (error) {
-            console.warn('Browser geolocation failed, trying IP-based:', error);
+            logAuthError('Browser geolocation failed, trying IP-based', error, 'warn');
         }
 
         // Fallback to IP-based detection
@@ -736,7 +756,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeAvatar.success'), 'success');
             return true;
         } catch (error) {
-            console.error('Error changing avatar:', error);
+            logAuthError('Error changing avatar', error);
             toastStore.show(t('settings.changeAvatar.error'), 'error');
             return false;
         }
@@ -770,7 +790,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeAvatar.success'), 'success');
             return true;
         } catch (error) {
-            console.error('Error uploading avatar:', error);
+            logAuthError('Error uploading avatar', error);
             toastStore.show(t('settings.changeAvatar.error'), 'error');
             return false;
         }

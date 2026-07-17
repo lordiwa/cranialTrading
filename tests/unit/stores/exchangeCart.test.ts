@@ -2,8 +2,20 @@ import { createPinia, setActivePinia } from 'pinia'
 import { vi } from 'vitest'
 import { useExchangeCartStore } from '@/stores/exchangeCart'
 import type { ExchangeCartItem } from '@/types/exchangeCart'
+import { getCardPrices } from '@/services/mtgjson'
+
+vi.mock('@/services/mtgjson', () => ({
+  getCardPrices: vi.fn(),
+}))
+
+const mockGetCardPrices = vi.mocked(getCardPrices)
 
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+
+// Flush the fire-and-forget CK lookup promise chain (addItem does not await it).
+async function flushCKLookup() {
+  await new Promise(resolve => setTimeout(resolve, 0))
+}
 
 function makeItem(overrides: Partial<ExchangeCartItem> = {}): ExchangeCartItem {
   return {
@@ -35,6 +47,9 @@ beforeEach(() => {
     key: vi.fn(() => null),
   })
   setActivePinia(createPinia())
+  // Default: no CK data — keeps non-CK tests deterministic on the captured TCG price.
+  mockGetCardPrices.mockReset()
+  mockGetCardPrices.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -309,6 +324,106 @@ describe('exchangeCart store', () => {
       setActivePinia(createPinia())
       const store = useExchangeCartStore()
       // Should not throw, should start with empty carts
+      expect(store.getCart('alice')).toBeNull()
+    })
+  })
+
+  // ─── CK-first price upgrade (TASK-119) ──────────────────────────────
+
+  describe('CK-first price upgrade', () => {
+    it('captures the TCG price immediately, before the CK lookup resolves', () => {
+      // Never-resolving lookup — proves addItem does not await it.
+      mockGetCardPrices.mockReturnValue(new Promise(() => {}))
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
+
+      const cart = store.getCart('alice')
+      expect(cart!.items[0].price).toBe(3.5)
+    })
+
+    it('upgrades the item price (and total) once the CK lookup resolves', async () => {
+      mockGetCardPrices.mockResolvedValue({
+        cardKingdom: { retail: 9.99, retailFoil: null, buylist: null, buylistFoil: null },
+      })
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5, quantity: 2, maxQuantity: 5 }))
+      await flushCKLookup()
+
+      const cart = store.getCart('alice')
+      expect(cart!.items[0].price).toBe(9.99)
+      expect(store.getCartTotalValue('alice')).toBe(19.98)
+    })
+
+    it('passes setCode through to getCardPrices for the CK lookup', async () => {
+      mockGetCardPrices.mockResolvedValue(null)
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ scryfallId: 'scry-9' }), 'MH2')
+      await flushCKLookup()
+
+      expect(mockGetCardPrices).toHaveBeenCalledWith('scry-9', 'MH2')
+    })
+
+    it('keeps the TCG price when CK has no data for the card (returns null)', async () => {
+      mockGetCardPrices.mockResolvedValue(null)
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
+      await flushCKLookup()
+
+      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+    })
+
+    it('keeps the TCG price when the CK lookup rejects', async () => {
+      mockGetCardPrices.mockRejectedValue(new Error('network down'))
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
+      await flushCKLookup()
+
+      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+    })
+
+    it('keeps the TCG price when CK retail is null for that print', async () => {
+      mockGetCardPrices.mockResolvedValue({
+        cardKingdom: { retail: null, retailFoil: null, buylist: null, buylistFoil: null },
+      })
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
+      await flushCKLookup()
+
+      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+    })
+
+    it('prefers CK retailFoil for foil items', async () => {
+      mockGetCardPrices.mockResolvedValue({
+        cardKingdom: { retail: 5, retailFoil: 12.5, buylist: null, buylistFoil: null },
+      })
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ foil: true, price: 3.5 }))
+      await flushCKLookup()
+
+      expect(store.getCart('alice')!.items[0].price).toBe(12.5)
+    })
+
+    it('falls back to CK retail for foil items when retailFoil is unavailable', async () => {
+      mockGetCardPrices.mockResolvedValue({
+        cardKingdom: { retail: 5, retailFoil: null, buylist: null, buylistFoil: null },
+      })
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ foil: true, price: 3.5 }))
+      await flushCKLookup()
+
+      expect(store.getCart('alice')!.items[0].price).toBe(5)
+    })
+
+    it('does not resurrect an item removed from the cart before the lookup resolves', async () => {
+      let resolveLookup: (value: unknown) => void = () => {}
+      mockGetCardPrices.mockReturnValue(new Promise((resolve) => { resolveLookup = resolve }))
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
+      store.removeItem('alice', 'scry-1', 'card-1')
+
+      resolveLookup({ cardKingdom: { retail: 9.99, retailFoil: null, buylist: null, buylistFoil: null } })
+      await flushCKLookup()
+
       expect(store.getCart('alice')).toBeNull()
     })
   })

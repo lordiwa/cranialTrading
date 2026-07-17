@@ -458,7 +458,7 @@ const handleAddToCart = (card: Card) => {
     price: card.price || 0,
     image: card.image || '',
     status: card.status || 'collection',
-  });
+  }, card.setCode);
   toastStore.show(t('cart.inCart'), 'success');
 };
 

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
+import { getCardPrices } from '@/services/mtgjson'
 import type { ExchangeCart, ExchangeCartItem, ExchangeCartStorage } from '@/types/exchangeCart'
 
 const STORAGE_KEY = 'cranial_exchange_carts'
@@ -39,9 +40,37 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     return cart.items.find(i => i.scryfallId === scryfallId && i.cardId === cardId) ?? null
   }
 
+  // Background CK-first price upgrade (TASK-119). addItem captures card.price
+  // (TCG) synchronously for zero perceived latency; this fires-and-forget from
+  // addItem and upgrades the item's price in place once the CK lookup resolves.
+  // Explicit fallback: if CK has no data for the set/card, or the lookup fails,
+  // the captured TCG price is left untouched. Foil-aware: prefers retailFoil
+  // for foil items (falling back to retail if CK has no foil price), retail
+  // for non-foil items — same CardPrices shape TASK-114 used for hero/binder.
+  async function _upgradePriceFromCK(username: string, scryfallId: string, cardId: string, setCode?: string) {
+    try {
+      const prices = await getCardPrices(scryfallId, setCode)
+      const ck = prices?.cardKingdom
+      if (!ck) return
+
+      // Re-fetch the item: it may have been removed, or its foil status
+      // changed, while the lookup was in flight.
+      const item = _findItem(username, scryfallId, cardId)
+      if (!item) return
+
+      const ckRetail = item.foil ? (ck.retailFoil ?? ck.retail) : ck.retail
+      if (ckRetail == null) return
+
+      item.price = ckRetail
+      _persist()
+    } catch {
+      // Network/parse failure — keep the captured TCG price, no toast spam.
+    }
+  }
+
   // ─── Public API ──────────────────────────────────────────────────────
 
-  function addItem(username: string, item: ExchangeCartItem) {
+  function addItem(username: string, item: ExchangeCartItem, setCode?: string) {
     // eslint-disable-next-line security/detect-object-injection
     if (!state.carts[username]) {
       const now = Date.now()
@@ -63,6 +92,9 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     }
 
     _persist()
+
+    // Fire-and-forget — addItem stays synchronous, price upgrades in the background.
+    void _upgradePriceFromCK(username, item.scryfallId, item.cardId, setCode)
   }
 
   function removeItem(username: string, scryfallId: string, cardId: string) {

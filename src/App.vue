@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router';
 import { useHead } from '@unhead/vue';
 import { useAuthStore } from './stores/auth';
 import { useI18n } from './composables/useI18n';
+import { shouldBlockOnAuthLoading } from './router/authGuard';
+import { getLastKnownAuthState } from './utils/authLastKnown';
 import { preloadPriceData } from './services/mtgjson';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
@@ -27,6 +29,12 @@ const pageDescription = computed(() => {
 
 const pageRobots = computed(() => {
   return route.meta.robots ?? 'index, follow';
+});
+
+// TASK-129 (perf F2): the full-screen auth loader must not cover a route the
+// router guard already decided not to block on (see router/authGuard.ts).
+const shouldShowAuthLoader = computed(() => {
+  return shouldBlockOnAuthLoading(route.meta, authStore.loading, getLastKnownAuthState());
 });
 
 const canonicalUrl = computed(() => {
@@ -72,7 +80,7 @@ onMounted(() => {
     {{ t('common.actions.skipToContent') }}
   </a>
 
-  <div v-if="authStore.loading" class="min-h-screen flex items-center justify-center">
+  <div v-if="shouldShowAuthLoader" class="min-h-screen flex items-center justify-center">
     <BaseLoader size="large" />
   </div>
 

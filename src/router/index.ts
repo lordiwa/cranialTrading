@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { createAuthGuard } from './authGuard';
 import { useAuthStore } from '../stores/auth';
 import { clearChunkReloadFlag, handleChunkLoadError } from '../utils/chunkReload';
 
@@ -163,38 +164,13 @@ const router = createRouter({
     ],
 });
 
+// TASK-129 (perf F2): guard logic lives in ./authGuard so it can be unit
+// tested with a fake auth store — no waiting on the Firebase Auth round-trip
+// for routes that don't need it (see authGuard.ts for the (a)/(b)/(c) rules).
 router.beforeEach(async (to, _from, next) => {
     const authStore = useAuthStore();
-
-    while (authStore.loading) {
-        await new Promise<void>((resolve) => {
-            const unwatch = authStore.$subscribe(() => {
-                if (!authStore.loading) {
-                    unwatch();
-                    resolve();
-                }
-            });
-            setTimeout(() => {
-                try { unwatch(); } catch { /* ignore */ }
-                resolve();
-            }, 2000);
-        });
-        if (!authStore.loading) break;
-    }
-
-    const isAuthenticated = !!authStore.user;
-    const requiresAuth = to.meta.requiresAuth;
-    const requiresGuest = to.meta.requiresGuest;
-
-    if (requiresAuth && !isAuthenticated) {
-        next({ path: '/login', query: { returnUrl: to.fullPath } }); return;
-    }
-
-    if (requiresGuest && isAuthenticated) {
-        next('/saved-matches'); return;
-    }
-
-    next();
+    const guard = createAuthGuard(authStore, (path) => { void router.push(path); });
+    await guard(to, _from, next);
 });
 
 // Clear chunk-reload flag after successful navigation

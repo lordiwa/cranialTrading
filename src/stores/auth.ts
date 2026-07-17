@@ -20,6 +20,7 @@ import { auth, db } from '../services/firebase';
 import { type User } from '../types/user';
 import { useToastStore } from './toast';
 import { t, useI18n } from '../composables/useI18n';
+import { setLastKnownAuthState } from '../utils/authLastKnown';
 import { formatDate } from '../utils/formatDate';
 import { isValidUsername, normalizeUsername } from '../utils/username';
 
@@ -64,11 +65,16 @@ export const useAuthStore = defineStore('auth', () => {
 
             if (firebaseUser) {
                 emailVerified.value = firebaseUser.emailVerified;
+                // TASK-129: last-known cache written synchronously, before the
+                // async loadUserData round-trip, so the NEXT app load's router
+                // guard / App.vue loader gate can decide optimistically.
+                setLastKnownAuthState('authenticated');
                 void loadUserData(firebaseUser.uid);
             } else {
                 user.value = null;
                 emailVerified.value = false;
                 loading.value = false;
+                setLastKnownAuthState('guest');
             }
         });
     };

@@ -1102,10 +1102,20 @@ export const useCollectionStore = defineStore('collection', () => {
         cards.value = cards.value.filter(card => !idsToDelete.has(card.id))
         rebuildCardIndex()
 
+        // Also patch the paginated grid (TASK-120, same class as TASK-113/116) —
+        // CollectionView renders paginatedCards, not cards.value. Remember which
+        // of the deleted ids were actually on the current page so a failed-delete
+        // rollback (below) only restores entries that were visible to begin with.
+        const paginatedIdsBeforeDelete = new Set(
+            paginatedCards.value.filter(c => idsToDelete.has(c.id)).map(c => c.id)
+        )
+        paginatedCards.value = paginatedCards.value.filter(c => !idsToDelete.has(c.id))
+
         const BATCH_SIZE = 200
         const userId = authStore.user.id
         let totalDeleted = 0
         let totalFailed = 0
+        const failedIds = new Set<string>()
 
         // Only sale/trade cards exist in public_cards
         const publicCardIds = deletedCards
@@ -1129,6 +1139,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 totalDeleted += chunk.length
             } else {
                 totalFailed += chunk.length
+                chunk.forEach(cardId => failedIds.add(cardId))
             }
 
             completedBatches++
@@ -1143,30 +1154,38 @@ export const useCollectionStore = defineStore('collection', () => {
         const progress = { completed: completedBatches, total: totalBatches, onProgress }
         await deletePublicCardBatches(publicCardIds, userId, BATCH_SIZE, progress)
 
+        // Symmetric rollback (TASK-120) — restore cards whose Firestore delete
+        // permanently failed into BOTH cards.value and paginatedCards. Previously
+        // a failed batch was only reported via totalFailed; the optimistic removal
+        // at the top of this function was never undone, so the UI showed cards as
+        // gone even though they still existed in Firestore.
+        if (failedIds.size > 0) {
+            const toRestore = deletedCards.filter(card => failedIds.has(card.id))
+            cards.value = [...cards.value, ...toRestore]
+            rebuildCardIndex()
+            const paginatedToRestore = toRestore.filter(card => paginatedIdsBeforeDelete.has(card.id))
+            if (paginatedToRestore.length > 0) {
+                paginatedCards.value = [...paginatedCards.value, ...paginatedToRestore]
+            }
+        }
+
         if (totalFailed > 0) {
             console.warn(`Batch delete: ${totalDeleted} deleted, ${totalFailed} failed`)
         }
 
-        // Delete ALL card_index chunks so deleted cards don't reappear on reload.
-        // Use batches of 10 to avoid "Transaction too big" (each chunk is ~400KB).
+        // Sync index via the same debounced persist + deferred-refresh pattern
+        // established by addCard/deleteCard (TASK-113/116) — replaces the prior
+        // ad-hoc "delete every card_index chunk without rewriting" logic, which
+        // left surviving cards missing from the persisted index. persistIndexToFirestore
+        // writes fresh chunks reflecting the current cardIndexRaw AND deletes any
+        // now-orphaned trailing chunks (see _doPersistIndex).
         cardIndexRaw.value = cards.value.map(cardToIndex)
-        try {
-            const indexCol = collection(db, 'users', userId, 'card_index')
-            const indexSnap = await getDocs(indexCol)
-            if (!indexSnap.empty) {
-                const IDX_BATCH = 10
-                for (let idx = 0; idx < indexSnap.docs.length; idx += IDX_BATCH) {
-                    const chunk = indexSnap.docs.slice(idx, idx + IDX_BATCH)
-                    const batch = writeBatch(db)
-                    for (const idxDoc of chunk) {
-                        batch.delete(idxDoc.ref)
-                    }
-                    await batch.commit()
-                }
-            }
-        } catch (err) {
-            console.warn('[batchDelete] Failed to clean card_index:', err)
-        }
+        persistIndexToFirestore()
+
+        // Re-query the server card_index for the definitive membership/order,
+        // deferred until the debounced persist above has actually written (same
+        // race TASK-113 fixed for updateCard, TASK-116 for addCard/deleteCard).
+        _pendingMembershipRefresh = true
 
         return { success: totalFailed === 0, deleted: totalDeleted, failed: totalFailed }
     }

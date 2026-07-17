@@ -355,6 +355,144 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
     })
   })
 
+  describe('batchDeleteCards (TASK-120 regression)', () => {
+    it('removes the deleted cards from paginatedCards immediately for a select-all bulk delete, without an immediate server re-query', async () => {
+      const store = useCollectionStore()
+      const card1 = makeCard({ id: 'card-1' })
+      const card2 = makeCard({ id: 'card-2' })
+      const card3 = makeCard({ id: 'card-3' })
+      store.cards = [card1, card2, card3] as any
+      store.paginatedCards = [card1, card2, card3] as any
+
+      const result = await store.batchDeleteCards(['card-1', 'card-2', 'card-3'])
+
+      expect(result.success).toBe(true)
+      expect(result.deleted).toBe(3)
+      // Optimistic membership patch — gone from the grid right away, not just cards.value.
+      expect(store.paginatedCards).toEqual([])
+      // No immediate re-query: hitting the server card_index now would read the
+      // still-stale (pre-debounce-persist) chunk and could bring the cards back —
+      // the same TASK-113/116 race, now fixed for the bulk path too.
+      expect(mockQueryCardIndex).not.toHaveBeenCalled()
+    })
+
+    it('removes only the selected subset from paginatedCards for a partial-selection bulk delete', async () => {
+      const store = useCollectionStore()
+      const card1 = makeCard({ id: 'card-1' })
+      const card2 = makeCard({ id: 'card-2' })
+      const card3 = makeCard({ id: 'card-3' })
+      store.cards = [card1, card2, card3] as any
+      store.paginatedCards = [card1, card2, card3] as any
+
+      await store.batchDeleteCards(['card-1', 'card-3'])
+
+      expect(store.paginatedCards.map((c: any) => c.id)).toEqual(['card-2'])
+    })
+
+    it('defers a correcting re-query until AFTER the debounced index persist flushes (bulk delete)', async () => {
+      vi.useFakeTimers()
+      try {
+        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+        const store = useCollectionStore()
+        const card1 = makeCard({ id: 'card-1' })
+        const card2 = makeCard({ id: 'card-2' })
+        store.cards = [card1, card2] as any
+        store.paginatedCards = [card1, card2] as any
+
+        await store.batchDeleteCards(['card-1', 'card-2'])
+        // Flush any dangling un-awaited microtasks WITHOUT crossing the 2s
+        // persist debounce — an immediate (un-deferred) re-query would be
+        // observable here rather than by scheduling luck.
+        await vi.advanceTimersByTimeAsync(0)
+        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+
+        // Persist debounce (2s) fires and flushes — only THEN is the deferred
+        // re-query allowed to run.
+        await vi.advanceTimersByTimeAsync(2100)
+        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('restores the paginatedCards AND cards.value entries for cards whose Firestore delete permanently fails (symmetric rollback)', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const card1 = makeCard({ id: 'card-1' })
+        const card2 = makeCard({ id: 'card-2' })
+        store.cards = [card1, card2] as any
+        store.paginatedCards = [card1, card2] as any
+
+        // Every writeBatch.commit() attempt fails — commitBatchWithRetry
+        // exhausts its retries (2 retries, 500ms backgroundSafeDelay between)
+        // and reports the chunk as failed.
+        mockCommit.mockRejectedValue(new Error('write failed'))
+
+        const resultPromise = store.batchDeleteCards(['card-1', 'card-2'])
+        await vi.advanceTimersByTimeAsync(1500) // flush the 2 internal retry delays
+        const result = await resultPromise
+
+        expect(result.success).toBe(false)
+        expect(result.failed).toBe(2)
+        // Symmetric rollback — both the raw collection AND the paginated grid
+        // must restore the cards that were never actually deleted.
+        expect(store.cards.map((c: any) => c.id).sort()).toEqual(['card-1', 'card-2'])
+        expect(store.paginatedCards.map((c: any) => c.id).sort()).toEqual(['card-1', 'card-2'])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('only restores paginatedCards entries that were on the current page before the failed delete (no-op for ids never displayed)', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const card1 = makeCard({ id: 'card-1' })
+        const card2 = makeCard({ id: 'card-2' }) // not on the currently displayed page
+        store.cards = [card1, card2] as any
+        store.paginatedCards = [card1] as any // only card-1 is visible on this page
+
+        mockCommit.mockRejectedValue(new Error('write failed'))
+
+        const resultPromise = store.batchDeleteCards(['card-1', 'card-2'])
+        await vi.advanceTimersByTimeAsync(1500)
+        const result = await resultPromise
+
+        expect(result.failed).toBe(2)
+        expect(store.cards.map((c: any) => c.id).sort()).toEqual(['card-1', 'card-2'])
+        // card-2 was never in paginatedCards to begin with — restoring must not introduce it.
+        expect(store.paginatedCards.map((c: any) => c.id)).toEqual(['card-1'])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('batchUpdateCards membership parity (TASK-120 AC4)', () => {
+    it('does NOT trigger a deferred re-query — status changes patch paginatedCards in place like updateCard, matching established precedent', async () => {
+      vi.useFakeTimers()
+      try {
+        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+        const store = useCollectionStore()
+        const card1 = makeCard({ id: 'card-1', status: 'collection' })
+        store.cards = [card1] as any
+        store.paginatedCards = [card1] as any
+
+        await store.batchUpdateCards(['card-1'], { status: 'sale' })
+        await vi.advanceTimersByTimeAsync(2100) // flush the debounced index persist too
+
+        // Same as updateCard (TASK-113): the optimistic in-place patch is
+        // considered sufficient; batchUpdateCards never schedules a membership
+        // re-query, so a stale server card_index can never revert the patch.
+        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+        expect(store.paginatedCards[0].status).toBe('sale')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   describe('stale in-flight persist must not consume a newer refresh (reviewer HIGH, PEDIDO #2)', () => {
     /** Minimal IndexCard-shaped record satisfying indexToCard's field access. */
     const indexRecordFor = (id: string): Record<string, unknown> => ({

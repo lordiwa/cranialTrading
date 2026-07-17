@@ -31,6 +31,7 @@ const asRoute = (meta: RouteLocationNormalized['meta'], fullPath = '/x'): RouteL
  */
 const createFakeAuthStore = (initialLoading: boolean, initialUser: unknown = null) => {
   const listeners = new Set<() => void>()
+  const firebaseNeededNow = vi.fn()
   const store: AuthGuardStore = {
     loading: initialLoading,
     user: initialUser,
@@ -38,13 +39,14 @@ const createFakeAuthStore = (initialLoading: boolean, initialUser: unknown = nul
       listeners.add(callback)
       return () => listeners.delete(callback)
     },
+    firebaseNeededNow,
   }
   const resolve = (nextUser: unknown) => {
     store.user = nextUser
     store.loading = false
     listeners.forEach((cb) => { cb() })
   }
-  return { store, resolve }
+  return { store, resolve, firebaseNeededNow }
 }
 
 beforeEach(() => {
@@ -261,6 +263,87 @@ describe('createAuthGuard — (b) requiresGuest optimistic redirect respects isS
     await pending
 
     expect(redirect).toHaveBeenCalledWith('/saved-matches')
+  })
+})
+
+describe('createAuthGuard — firebaseNeededNow eager-load trigger (TASK-132 review fix)', () => {
+  // Regression lock for a real E2E deadlock: stores/auth.ts's initAuth()
+  // defers the Firebase SDK fetch behind a "wait for paint" signal. On
+  // routes whose view can't paint until auth resolves (requiresAuth, or
+  // requiresGuest with a stale last-known="authenticated"), that signal can
+  // never fire first — the guard must call firebaseNeededNow() itself,
+  // synchronously, before entering any wait path that blocks the pending
+  // navigation, so the SDK starts downloading immediately instead of behind
+  // its own result.
+  it('requiresAuth: calls firebaseNeededNow() before waiting on auth', async () => {
+    const { store, resolve, firebaseNeededNow } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresAuth: true }, '/collection'), asRoute({}), next)
+    await Promise.resolve()
+    expect(firebaseNeededNow).toHaveBeenCalledTimes(1)
+
+    resolve({ id: 'u1' })
+    await pending
+  })
+
+  it('requiresGuest with last-known="authenticated": calls firebaseNeededNow() before waiting on auth', async () => {
+    setLastKnownAuthState('authenticated')
+    const { store, resolve, firebaseNeededNow } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+    await Promise.resolve()
+    expect(firebaseNeededNow).toHaveBeenCalledTimes(1)
+
+    resolve(null)
+    await pending
+  })
+
+  it('requiresGuest with last-known guest/null: does NOT call firebaseNeededNow() (view already painted, nothing to unblock)', async () => {
+    const { store, resolve, firebaseNeededNow } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+    resolve(null)
+    await pending
+
+    expect(firebaseNeededNow).not.toHaveBeenCalled()
+  })
+
+  it('route requiring neither guard: does NOT call firebaseNeededNow()', async () => {
+    const { store, firebaseNeededNow } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    await guard(asRoute({}), asRoute({}), next)
+
+    expect(firebaseNeededNow).not.toHaveBeenCalled()
+  })
+
+  it('tolerates a fake store that omits firebaseNeededNow (optional, backward compatible)', async () => {
+    const listeners = new Set<() => void>()
+    const store: AuthGuardStore = {
+      loading: true,
+      user: null,
+      $subscribe: (callback: () => void) => {
+        listeners.add(callback)
+        return () => listeners.delete(callback)
+      },
+    }
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresAuth: true }, '/collection'), asRoute({}), next)
+    store.user = { id: 'u1' }
+    store.loading = false
+    listeners.forEach((cb) => { cb() })
+    await pending
+
+    expect(next).toHaveBeenCalledWith()
   })
 })
 

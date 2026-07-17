@@ -14,6 +14,16 @@ export interface AuthGuardStore {
     // (mutation, state) args, while callers here only ever pass a 0-arg
     // callback; both must be assignable to this interface.
     $subscribe(callback: () => void): () => void;
+    // TASK-132 review fix: optional eager Firebase-load trigger. The guard
+    // is the one place that knows, synchronously, whether the PENDING
+    // navigation is itself gated on auth resolving — call it right before
+    // any wait path that blocks the current navigation, so the SDK starts
+    // downloading immediately instead of behind stores/auth.ts's deferred
+    // "wait for paint" trigger (which can never fire first on these routes,
+    // since their view can't paint until auth resolves — that circularity
+    // deadlocked a logged-in E2E navigation before this fix). Optional so
+    // existing fake-store tests that don't care about this keep working.
+    firebaseNeededNow?: () => void;
 }
 
 /** Narrow meta shape needed by the auth-loading decisions below. */
@@ -91,6 +101,11 @@ export const createAuthGuard = (
 
         if (requiresGuest) {
             if (getLastKnownAuthState() === 'authenticated') {
+                // TASK-132 review fix: this branch WAITS on auth before deciding
+                // (last-known says the user is probably logged in) — nothing
+                // paints until it resolves, so there is no first-paint window to
+                // protect by deferring; start the SDK download now.
+                authStore.firebaseNeededNow?.();
                 await waitForAuthReady(authStore);
                 if (authStore.user) {
                     next('/saved-matches');
@@ -112,7 +127,12 @@ export const createAuthGuard = (
             return;
         }
 
-        // requiresAuth: unchanged wait-then-decide behavior.
+        // requiresAuth: unchanged wait-then-decide behavior. The view is
+        // gated on the loader until auth resolves (see App.vue's
+        // shouldShowAuthLoader), so — same as above — start the SDK
+        // download now rather than behind a "wait for paint" signal that
+        // paint itself is blocked on (TASK-132 review fix).
+        authStore.firebaseNeededNow?.();
         await waitForAuthReady(authStore);
 
         if (!authStore.user) {

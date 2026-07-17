@@ -7,9 +7,6 @@
  * downloads the whole collection: on failure we log and return [].
  */
 
-import { collection, getDocs, limit, query, where } from 'firebase/firestore'
-import { db } from './firebase'
-
 export interface PublicCardResult {
   id: string
   cardId?: string
@@ -38,6 +35,15 @@ export async function searchPublicCards(
   if (normalized.length < 2) return []
 
   try {
+    // TASK-132: dynamic import instead of a static top-of-file import — this
+    // module is statically reachable from LoginView.vue's route chunk
+    // (guest-critical, no auth required to search), so a static Firebase
+    // import here put the ~165KB gz SDK on the /login critical path even
+    // after stores/auth.ts's own static imports were removed.
+    const [{ collection, getDocs, limit, query, where }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('./firebase'),
+    ])
     const publicCardsRef = collection(db, 'public_cards')
     const publicCardsQuery = query(
       publicCardsRef,

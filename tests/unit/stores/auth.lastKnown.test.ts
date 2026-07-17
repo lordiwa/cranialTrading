@@ -68,7 +68,7 @@ describe('auth store — last-known auth state cache (TASK-129)', () => {
   // initAuth() call and ONE captured onAuthStateChanged callback, same as a
   // real Firebase subscription observing the user sign out then sign back
   // in, rather than splitting into two separate `it()` blocks.
-  it('writes "guest" then "authenticated" synchronously as onAuthStateChanged transitions, before loadUserData settles', () => {
+  it('writes "guest" then "authenticated" synchronously as onAuthStateChanged transitions, before loadUserData settles', async () => {
     let capturedCallback: ((user: unknown) => void) | undefined
     onAuthStateChangedMock.mockImplementation((_auth: unknown, cb: (user: unknown) => void) => {
       capturedCallback = cb
@@ -79,7 +79,13 @@ describe('auth store — last-known auth state cache (TASK-129)', () => {
     getDocMock.mockImplementation(() => new Promise(() => {}))
 
     const store = useAuthStore()
-    store.initAuth()
+    // TASK-132: initAuth() now defers the actual subscription behind a
+    // "wait for paint" signal (up to 3s), which never resolves in this jsdom
+    // environment — use firebaseNeededNow() instead, the same eager trigger
+    // the router guard calls for auth-blocking routes, to reach the SAME
+    // underlying subscription (dynamically imports firebase/auth +
+    // services/firebase internally) without the real-time wait.
+    await store.firebaseNeededNow()
 
     capturedCallback?.(null)
     expect(getLastKnownAuthState()).toBe('guest')

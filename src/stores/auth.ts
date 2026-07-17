@@ -1,22 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import {
-    confirmPasswordReset,
-    createUserWithEmailAndPassword,
-    deleteUser,
-    type User as FirebaseUser,
-    GoogleAuthProvider,
-    onAuthStateChanged,
-    sendEmailVerification,
-    sendPasswordResetEmail,
-    signInWithEmailAndPassword,
-    signInWithPopup,
-    signOut,
-    updatePassword,
-    verifyBeforeUpdateEmail
-} from 'firebase/auth';
-import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
+import type * as FirebaseAuthNS from 'firebase/auth';
+import type * as FirebaseFirestoreNS from 'firebase/firestore';
+import type * as FirebaseServicesNS from '../services/firebase';
 import { type User } from '../types/user';
 import { useToastStore } from './toast';
 import { t, useI18n } from '../composables/useI18n';
@@ -25,6 +12,89 @@ import { formatDate } from '../utils/formatDate';
 import { isValidUsername, normalizeUsername } from '../utils/username';
 
 let authUnsubscribe: (() => void) | null = null;
+
+/**
+ * TASK-132 (perf F4): this store used to statically import firebase/auth,
+ * firebase/firestore, and services/firebase at the top of the file. Because
+ * this store is itself statically reachable from main.ts and App.vue (via
+ * useAuthStore), that put the ~115KB gz Firebase chunk on EVERY guest's
+ * critical rendering path — Vite modulepreloaded it in index.html and the
+ * browser had to fetch+parse+link it before main.ts could execute a single
+ * line, regardless of whether the visitor ever logs in.
+ *
+ * Every Firebase access in this store now goes through this single cached
+ * dynamic import instead. The SDK still starts downloading at app boot (via
+ * initAuth, called synchronously from main.ts) but as a background fetch
+ * that does NOT block module evaluation or first paint — main.ts's mount()
+ * call no longer waits on it. Once resolved, the promise is cached so
+ * every other method in this store (login, register, etc.) reuses the same
+ * loaded SDK instance without re-fetching.
+ */
+type FirebaseAuthModule = typeof FirebaseAuthNS;
+type FirebaseFirestoreModule = typeof FirebaseFirestoreNS;
+type FirebaseServicesModule = typeof FirebaseServicesNS;
+
+interface FirebaseDeps {
+    authFns: FirebaseAuthModule;
+    firestoreFns: FirebaseFirestoreModule;
+    auth: FirebaseServicesModule['auth'];
+    db: FirebaseServicesModule['db'];
+}
+
+let firebaseDepsPromise: Promise<FirebaseDeps> | null = null;
+
+/**
+ * TASK-132: waits until the app has painted real content (the same DOM
+ * signal the perf harness itself polls for — scripts/perf-measure.mjs) so
+ * the caller can start the Firebase fetch AFTER the current route's own
+ * critical chunk has had a chance to render, instead of racing it on a
+ * bandwidth-capped connection. Capped by `timeoutMs` so requiresAuth routes
+ * — whose content is itself gated on auth resolving, see
+ * router/authGuard.ts — can't deadlock waiting on a paint that depends on
+ * this same call finishing; they simply fall through to the timeout and
+ * start the fetch anyway (unchanged from firing immediately, just with a
+ * short deterministic cap).
+ */
+const waitForFirstPaintOrTimeout = (timeoutMs: number): Promise<void> => {
+    return new Promise((resolve) => {
+        if (typeof document === 'undefined' || typeof requestAnimationFrame !== 'function') {
+            resolve();
+            return;
+        }
+        let done = false;
+        const finish = (): void => {
+            if (done) return;
+            done = true;
+            resolve();
+        };
+        const check = (): void => {
+            if (done) return;
+            if (document.querySelector('#app header, #app main, #app input, #app button')) {
+                finish();
+                return;
+            }
+            requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+        setTimeout(finish, timeoutMs);
+    });
+};
+
+const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
+    if (!firebaseDepsPromise) {
+        firebaseDepsPromise = Promise.all([
+            import('firebase/auth'),
+            import('firebase/firestore'),
+            import('../services/firebase'),
+        ]).then(([authFns, firestoreFns, services]) => ({
+            authFns,
+            firestoreFns,
+            auth: services.auth,
+            db: services.db,
+        }));
+    }
+    return firebaseDepsPromise;
+};
 
 /**
  * TASK-122: log auth-flow failures without ever emitting the raw error
@@ -58,30 +128,87 @@ export const useAuthStore = defineStore('auth', () => {
     const isLoggingOut = ref(false);
     const toastStore = useToastStore();
 
-    const initAuth = () => {
-        if (authUnsubscribe) return; // Already initialized
-        authUnsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
-            if (isLoggingOut.value) return;
+    // TASK-132 review fix: the ACTUAL download+subscribe work, factored out
+    // of initAuth() and memoized on its own (independent of initAuth's
+    // re-entrancy guard) so it can be triggered from two different places —
+    // initAuth()'s deferred wait (guest paths) and firebaseNeededNow()'s
+    // eager call (auth-blocking paths, see below) — without double-firing.
+    // Whichever caller reaches this first wins; the other gets the same
+    // cached promise.
+    let subscriptionPromise: Promise<void> | null = null;
+    const ensureSubscription = (): Promise<void> => {
+        if (!subscriptionPromise) {
+            subscriptionPromise = loadFirebaseDeps().then(({ authFns, auth }) => {
+                authUnsubscribe = authFns.onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+                    if (isLoggingOut.value) return;
 
-            if (firebaseUser) {
-                emailVerified.value = firebaseUser.emailVerified;
-                // TASK-129: last-known cache written synchronously, before the
-                // async loadUserData round-trip, so the NEXT app load's router
-                // guard / App.vue loader gate can decide optimistically.
-                setLastKnownAuthState('authenticated');
-                void loadUserData(firebaseUser.uid);
-            } else {
-                user.value = null;
-                emailVerified.value = false;
-                loading.value = false;
-                setLastKnownAuthState('guest');
-            }
-        });
+                    if (firebaseUser) {
+                        emailVerified.value = firebaseUser.emailVerified;
+                        // TASK-129: last-known cache written synchronously, before the
+                        // async loadUserData round-trip, so the NEXT app load's router
+                        // guard / App.vue loader gate can decide optimistically.
+                        setLastKnownAuthState('authenticated');
+                        void loadUserData(firebaseUser.uid);
+                    } else {
+                        user.value = null;
+                        emailVerified.value = false;
+                        loading.value = false;
+                        setLastKnownAuthState('guest');
+                    }
+                });
+            });
+        }
+        return subscriptionPromise;
+    };
+
+    /**
+     * TASK-132 review fix: eager escape hatch for the router guard
+     * (router/authGuard.ts) — call the moment createAuthGuard determines the
+     * CURRENT navigation is itself gated on auth resolving (requiresAuth, or
+     * requiresGuest with a stale last-known="authenticated"). On those
+     * routes the view cannot paint until auth resolves anyway, so deferring
+     * the SDK fetch behind a "wait for paint" signal is not just useless —
+     * it's actively worse than loading immediately, since paint can never
+     * happen first (view is BaseLoader until authStore.loading flips false),
+     * so the deferred trigger always falls through to its timeout AND ONLY
+     * THEN starts the download — a real deadlock that timed out a logged-in
+     * E2E navigation (/contacts → /saved-matches) during this ticket.
+     * Idempotent/safe to call from anywhere, any number of times.
+     */
+    const firebaseNeededNow = (): Promise<void> => ensureSubscription();
+
+    const initAuth = (): Promise<void> => {
+        if (authUnsubscribe) return ensureSubscription(); // Already scheduled/running
+
+        // TASK-132: synchronous re-entrancy guard, set BEFORE the dynamic
+        // import resolves. main.ts and App.vue's onMounted both call
+        // initAuth() (idempotent wiring from TASK-129); without this the two
+        // calls would race and each start their own deferred-wait poller.
+        authUnsubscribe = () => { /* replaced once the real subscription exists */ };
+
+        // TASK-132: making the import() dynamic only kept it out of the
+        // static module graph (no modulepreload) — the fetch itself was
+        // still ISSUED synchronously at boot, so under FAST3G it competed
+        // on the wire (a single throughput-capped connection pool) with
+        // the current route's own critical chunks (JS/CSS/locale/fonts,
+        // all requested in the same burst once the router resolves) and
+        // made first paint SLOWER, not faster. waitForFirstPaintOrTimeout
+        // gives the route's own chunk a real head start on GUEST routes
+        // (the only routes that reach this deferred path in practice —
+        // anything auth-gated is instead unblocked immediately via
+        // firebaseNeededNow() from the guard, above). 3000ms fallback:
+        // measurement showed the real paint signal lands ~1.7s in under
+        // FAST3G once the route's own chunk is unblocked (see
+        // services/publicCardSearch.ts fix, same ticket) — a short cap
+        // risked the timeout branch winning the race and reintroducing the
+        // exact bandwidth contention this is meant to avoid.
+        return waitForFirstPaintOrTimeout(3000).then(ensureSubscription);
     };
 
     const loadUserData = async (userId: string) => {
         try {
-            const userDoc = await getDoc(doc(db, 'users', userId));
+            const { firestoreFns, auth, db } = await loadFirebaseDeps();
+            const userDoc = await firestoreFns.getDoc(firestoreFns.doc(db, 'users', userId));
             if (userDoc.exists()) {
                 const data = userDoc.data() as {
                     email: string;
@@ -113,7 +240,7 @@ export const useAuthStore = defineStore('auth', () => {
                 if (currentAuthEmail && currentAuthEmail !== data.email) {
                     user.value.email = currentAuthEmail;
                     try {
-                        await updateDoc(doc(db, 'users', userId), { email: currentAuthEmail });
+                        await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', userId), { email: currentAuthEmail });
                     } catch {
                         // best-effort: doc stays stale until the next successful sync, non-fatal
                     }
@@ -139,7 +266,7 @@ export const useAuthStore = defineStore('auth', () => {
                     };
 
                     try {
-                        await setDoc(doc(db, 'users', userId), {
+                        await firestoreFns.setDoc(firestoreFns.doc(db, 'users', userId), {
                             email: user.value.email,
                             username: reservedUsername,
                             location: user.value.location,
@@ -152,6 +279,7 @@ export const useAuthStore = defineStore('auth', () => {
             }
         } catch {
             toastStore.show(t('auth.messages.loadUserError'), 'error');
+            const { auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
                 user.value = {
@@ -176,8 +304,10 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
+            const { authFns, firestoreFns, auth, db } = await loadFirebaseDeps();
+
             // D-06 step 2: create the auth user.
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await authFns.createUserWithEmailAndPassword(auth, email, password);
             const userId = userCredential.user.uid;
             const norm = normalizeUsername(username);
 
@@ -186,20 +316,20 @@ export const useAuthStore = defineStore('auth', () => {
             if (!reserved) {
                 // D-06 step 4: rollback — delete the just-created auth user
                 // (allowed: it is the freshly-authenticated current user).
-                await deleteUser(userCredential.user);
+                await authFns.deleteUser(userCredential.user);
                 toastStore.show(t('auth.messages.usernameTaken'), 'error');
                 return false;
             }
 
             // D-06 step 5: persist the user doc with the NORMALIZED username (D-05).
-            await setDoc(doc(db, 'users', userId), {
+            await firestoreFns.setDoc(firestoreFns.doc(db, 'users', userId), {
                 email,
                 username: norm,
                 location,
                 createdAt: new Date(),
             });
 
-            await sendEmailVerification(userCredential.user);
+            await authFns.sendEmailVerification(userCredential.user);
             await loadUserData(userId);
             toastStore.show(t('auth.messages.accountCreated'), 'success');
             return true;
@@ -223,6 +353,7 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const changeRegistrationEmail = async (newEmail: string): Promise<boolean> => {
         try {
+            const { authFns, auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
@@ -237,7 +368,7 @@ export const useAuthStore = defineStore('auth', () => {
                 return false;
             }
 
-            await verifyBeforeUpdateEmail(firebaseUser, newEmail);
+            await authFns.verifyBeforeUpdateEmail(firebaseUser, newEmail);
             toastStore.show(t('auth.messages.changeEmailSent'), 'success');
             return true;
         } catch (error: unknown) {
@@ -257,7 +388,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     const login = async (email: string, password: string) => {
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const { authFns, auth } = await loadFirebaseDeps();
+            const userCredential = await authFns.signInWithEmailAndPassword(auth, email, password);
             await loadUserData(userCredential.user.uid);
             emailVerified.value = userCredential.user.emailVerified;
 
@@ -301,12 +433,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     const loginWithGoogle = async () => {
         try {
-            const provider = new GoogleAuthProvider();
-            const userCredential = await signInWithPopup(auth, provider);
+            const { authFns, firestoreFns, auth, db } = await loadFirebaseDeps();
+            const provider = new authFns.GoogleAuthProvider();
+            const userCredential = await authFns.signInWithPopup(auth, provider);
             const firebaseUser = userCredential.user;
 
             // Check if user document exists
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            const userDoc = await firestoreFns.getDoc(firestoreFns.doc(db, 'users', firebaseUser.uid));
 
             if (!userDoc.exists()) {
                 // D-07: derive a base, then reserve a unique username (shared helper).
@@ -317,7 +450,7 @@ export const useAuthStore = defineStore('auth', () => {
                 /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
                 const finalUsername = await reserveUniqueUsername(firebaseUser.uid, rawBase);
 
-                await setDoc(doc(db, 'users', firebaseUser.uid), {
+                await firestoreFns.setDoc(firestoreFns.doc(db, 'users', firebaseUser.uid), {
                     email: firebaseUser.email,
                     username: finalUsername,
                     location: '',
@@ -345,7 +478,8 @@ export const useAuthStore = defineStore('auth', () => {
     const logout = async () => {
         try {
             isLoggingOut.value = true;
-            await signOut(auth);
+            const { authFns, auth } = await loadFirebaseDeps();
+            await authFns.signOut(auth);
             user.value = null;
             emailVerified.value = false;
             // Review fix batch LOW-1: onAuthStateChanged(null) early-returns
@@ -366,7 +500,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     const sendResetPasswordEmail = async (email: string) => {
         try {
-            await sendPasswordResetEmail(auth, email);
+            const { authFns, auth } = await loadFirebaseDeps();
+            await authFns.sendPasswordResetEmail(auth, email);
             toastStore.show(t('auth.messages.recoveryEmailSent'), 'success');
             return true;
         } catch (error: unknown) {
@@ -382,7 +517,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     const resetPassword = async (code: string, newPassword: string) => {
         try {
-            await confirmPasswordReset(auth, code, newPassword);
+            const { authFns, auth } = await loadFirebaseDeps();
+            await authFns.confirmPasswordReset(auth, code, newPassword);
             toastStore.show(t('auth.messages.passwordReset'), 'success');
             return true;
         } catch (error: unknown) {
@@ -400,15 +536,15 @@ export const useAuthStore = defineStore('auth', () => {
 
     const changePassword = async (currentPassword: string, newPassword: string) => {
         try {
+            const { authFns, auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser?.email) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
                 return false;
             }
 
-            const { signInWithEmailAndPassword } = await import('firebase/auth');
-            await signInWithEmailAndPassword(auth, firebaseUser.email, currentPassword);
-            await updatePassword(firebaseUser, newPassword);
+            await authFns.signInWithEmailAndPassword(auth, firebaseUser.email, currentPassword);
+            await authFns.updatePassword(firebaseUser, newPassword);
             toastStore.show(t('auth.messages.passwordUpdated'), 'success');
             return true;
         } catch (error: unknown) {
@@ -426,13 +562,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     const sendVerificationEmail = async () => {
         try {
+            const { authFns, auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
                 return false;
             }
 
-            await sendEmailVerification(firebaseUser);
+            await authFns.sendEmailVerification(firebaseUser);
             toastStore.show(t('auth.messages.verificationEmailSent'), 'success');
             return true;
         } catch {
@@ -443,6 +580,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const checkEmailVerification = async () => {
         try {
+            const { auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) return false;
 
@@ -474,7 +612,8 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const reserveUsername = async (uid: string, norm: string): Promise<boolean> => {
         try {
-            await setDoc(doc(db, 'usernames', norm), { uid, createdAt: new Date() });
+            const { firestoreFns, db } = await loadFirebaseDeps();
+            await firestoreFns.setDoc(firestoreFns.doc(db, 'usernames', norm), { uid, createdAt: new Date() });
             return true;
         } catch {
             return false;
@@ -487,7 +626,8 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const releaseUsername = async (norm: string): Promise<void> => {
         try {
-            await deleteDoc(doc(db, 'usernames', norm));
+            const { firestoreFns, db } = await loadFirebaseDeps();
+            await firestoreFns.deleteDoc(firestoreFns.doc(db, 'usernames', norm));
         } catch {
             // best-effort: a dangling reservation is acceptable, swallow.
         }
@@ -499,18 +639,19 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const checkUsernameAvailable = async (username: string): Promise<boolean> => {
         try {
+            const { firestoreFns, db } = await loadFirebaseDeps();
             const norm = normalizeUsername(username);
 
             // D-13: index-first. If a reservation exists, it's taken.
-            const indexDoc = await getDoc(doc(db, 'usernames', norm));
+            const indexDoc = await firestoreFns.getDoc(firestoreFns.doc(db, 'usernames', norm));
             if (indexDoc.exists()) {
                 return false;
             }
 
             // Legacy fallback for users not yet backfilled into the index.
-            const usersRef = collection(db, 'users');
-            const qLegacy = query(usersRef, where('username', '==', norm));
-            const snapshot = await getDocs(qLegacy);
+            const usersRef = firestoreFns.collection(db, 'users');
+            const qLegacy = firestoreFns.query(usersRef, firestoreFns.where('username', '==', norm));
+            const snapshot = await firestoreFns.getDocs(qLegacy);
             return snapshot.empty;
         } catch (error) {
             logAuthError('Error checking username', error);
@@ -602,7 +743,8 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            await updateDoc(doc(db, 'users', user.value.id), {
+            const { firestoreFns, db } = await loadFirebaseDeps();
+            await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 username: newNorm,
                 lastUsernameChange: new Date()
             });
@@ -636,7 +778,8 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            await updateDoc(doc(db, 'users', user.value.id), {
+            const { firestoreFns, db } = await loadFirebaseDeps();
+            await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 location: newLocation
             });
 
@@ -764,7 +907,8 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            await updateDoc(doc(db, 'users', user.value.id), {
+            const { firestoreFns, db } = await loadFirebaseDeps();
+            await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 avatarUrl
             });
 
@@ -798,7 +942,8 @@ export const useAuthStore = defineStore('auth', () => {
                 return false;
             }
 
-            await updateDoc(doc(db, 'users', user.value.id), {
+            const { firestoreFns, db } = await loadFirebaseDeps();
+            await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 avatarUrl: base64
             });
 
@@ -866,6 +1011,7 @@ export const useAuthStore = defineStore('auth', () => {
         loading,
         emailVerified,
         initAuth,
+        firebaseNeededNow,
         register,
         changeRegistrationEmail,
         login,

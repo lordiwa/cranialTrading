@@ -29,9 +29,12 @@ void (async () => {
   app.use(pinia);
   app.use(router);
 
-  // Initialize auth AFTER router is set up
+  // Initialize auth AFTER router is set up. TASK-132: initAuth() now
+  // dynamically imports the Firebase SDK internally, so this fires the
+  // background fetch without blocking module evaluation / first paint —
+  // intentionally not awaited (same as before).
   const authStore = useAuthStore();
-  authStore.initAuth();
+  void authStore.initAuth();
 
   // Load locale before mounting so translations are ready
   await initI18n();

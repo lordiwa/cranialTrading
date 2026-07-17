@@ -69,7 +69,7 @@ const showFooter = computed(() => {
 });
 
 onMounted(() => {
-  authStore.initAuth();
+  void authStore.initAuth(); // TASK-132: initAuth() is now async internally (see stores/auth.ts)
   void preloadPriceData(); // fire-and-forget: download AllPricesToday.json.gz in background
 });
 </script>

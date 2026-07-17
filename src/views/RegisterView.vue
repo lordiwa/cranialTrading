@@ -40,6 +40,9 @@ const loading = ref(false);
 const registered = ref(false);
 const checkingVerification = ref(false);
 const googleLoading = ref(false);
+const showChangeEmailForm = ref(false);
+const newEmail = ref('');
+const changingEmail = ref(false);
 
 // Presentation-only advisory meter (TASK-103) — never gates submission.
 const passwordScore = computed(() => getPasswordStrengthScore(password.value));
@@ -92,12 +95,35 @@ const handleCheckVerification = async () => {
   }
 };
 
-// Local-state-only reset (no store/auth call) — lets the user go back and
-// fix the email they registered with, per cranial-design/prototype/81-email-verification-*.html
-// "Cambiar email" link. Same route, so this can't be a RouterLink (no-op on
-// same-route nav) — it just re-shows the form.
+// TASK-124: "cambiar email" updates the email of the SAME just-created
+// account via authStore.changeRegistrationEmail (verifyBeforeUpdateEmail) —
+// it must NEVER re-submit the register form, since that would call
+// authStore.register again and collide with the username this account
+// already reserved (D-06), rolling back into an orphaned account +
+// reservation with a misleading "username taken" toast. Reveals an inline
+// input on the verification-pending screen instead of resetting `registered`.
 const handleChangeEmail = () => {
-  registered.value = false;
+  newEmail.value = email.value;
+  showChangeEmailForm.value = true;
+};
+
+const handleCancelChangeEmail = () => {
+  showChangeEmailForm.value = false;
+  newEmail.value = '';
+};
+
+const submitChangeEmail = async () => {
+  if (!newEmail.value) return;
+
+  changingEmail.value = true;
+  const success = await authStore.changeRegistrationEmail(newEmail.value);
+  changingEmail.value = false;
+
+  if (success) {
+    email.value = newEmail.value;
+    showChangeEmailForm.value = false;
+    newEmail.value = '';
+  }
 };
 
 onMounted(() => {
@@ -152,12 +178,43 @@ onMounted(() => {
             </button>
 
             <button
+                v-if="!showChangeEmailForm"
                 type="button"
                 class="min-h-[36px] text-silver-50 text-tiny hover:text-silver transition-colors duration-200 ease-v2"
                 @click="handleChangeEmail"
             >
               {{ t('auth.verify.changeEmail') }}
             </button>
+
+            <form v-else class="flex flex-col gap-2 text-left mt-1" @submit.prevent="submitChangeEmail">
+              <label for="register-new-email" class="text-tiny font-semibold text-silver-70">{{ t('auth.verify.changeEmailPrompt') }}</label>
+              <input
+                  id="register-new-email"
+                  v-model="newEmail"
+                  type="email"
+                  required
+                  autocomplete="email"
+                  :placeholder="t('auth.login.emailPlaceholder')"
+                  class="w-full min-h-[40px] px-3 bg-[rgba(0,0,0,.28)] border border-line rounded-md text-silver placeholder-silver-30 text-small outline-none transition-all duration-200 ease-v2 focus:border-neon focus:shadow-glow-neon"
+              />
+              <div class="flex gap-2">
+                <button
+                    type="submit"
+                    :disabled="changingEmail"
+                    class="flex-1 min-h-[40px] bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-md hover:bg-[#6FD07C] transition-all duration-200 ease-v2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {{ changingEmail ? t('auth.verify.changeEmailSubmitting') : t('auth.verify.changeEmailSubmit') }}
+                </button>
+                <button
+                    type="button"
+                    :disabled="changingEmail"
+                    class="min-h-[40px] px-3 text-silver-50 text-tiny hover:text-silver transition-colors duration-200 ease-v2"
+                    @click="handleCancelChangeEmail"
+                >
+                  {{ t('auth.verify.changeEmailCancel') }}
+                </button>
+              </div>
+            </form>
           </div>
 
           <RouterLink

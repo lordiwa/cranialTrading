@@ -170,7 +170,11 @@
       "checkButton": "I VERIFIED",
       "checking": "VERIFYING…",
       "resend": "RESEND EMAIL",
-      "changeEmail": "Change email"
+      "changeEmail": "Change email",
+      "changeEmailPrompt": "New email address",
+      "changeEmailSubmit": "SEND VERIFICATION",
+      "changeEmailSubmitting": "SENDING…",
+      "changeEmailCancel": "Cancel"
     },
     "passwordStrength": {
       "label": "Strength",
@@ -230,7 +234,12 @@
       "loadUserError": "Error loading user data",
       "passwordUpdated": "Password updated",
       "usernameTaken": "This username is already taken. Please choose another.",
-      "usernameInvalidFormat": "Username must be 3-20 letters, numbers, or underscores"
+      "usernameInvalidFormat": "Username must be 3-20 letters, numbers, or underscores",
+      "changeEmailSent": "Verification email sent to your new address. Click the link to confirm it.",
+      "changeEmailRequiresRecentLogin": "For security, please sign in again before changing your email.",
+      "changeEmailInvalid": "Enter a valid email address.",
+      "changeEmailInUse": "That email is already in use by another account.",
+      "changeEmailError": "Error changing email"
     }
   },
 

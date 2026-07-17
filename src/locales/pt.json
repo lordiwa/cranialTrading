@@ -170,7 +170,11 @@
       "checkButton": "JÁ VERIFIQUEI",
       "checking": "VERIFICANDO…",
       "resend": "REENVIAR EMAIL",
-      "changeEmail": "Alterar email"
+      "changeEmail": "Alterar email",
+      "changeEmailPrompt": "Novo email",
+      "changeEmailSubmit": "ENVIAR VERIFICAÇÃO",
+      "changeEmailSubmitting": "ENVIANDO…",
+      "changeEmailCancel": "Cancelar"
     },
     "passwordStrength": {
       "label": "Força",
@@ -230,7 +234,12 @@
       "loadUserError": "Erro ao carregar dados do usuário",
       "passwordUpdated": "Senha atualizada",
       "usernameTaken": "Este username já está em uso. Escolha outro.",
-      "usernameInvalidFormat": "O nome de usuário deve ter 3-20 letras, números ou sublinhados"
+      "usernameInvalidFormat": "O nome de usuário deve ter 3-20 letras, números ou sublinhados",
+      "changeEmailSent": "Email de verificação enviado para seu novo endereço. Clique no link para confirmá-lo.",
+      "changeEmailRequiresRecentLogin": "Por segurança, entre novamente antes de alterar seu email.",
+      "changeEmailInvalid": "Digite um email válido.",
+      "changeEmailInUse": "Esse email já está em uso por outra conta.",
+      "changeEmailError": "Erro ao alterar o email"
     }
   },
 

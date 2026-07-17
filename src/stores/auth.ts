@@ -12,7 +12,8 @@ import {
     signInWithEmailAndPassword,
     signInWithPopup,
     signOut,
-    updatePassword
+    updatePassword,
+    verifyBeforeUpdateEmail
 } from 'firebase/auth';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
@@ -158,6 +159,43 @@ export const useAuthStore = defineStore('auth', () => {
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : t('auth.messages.registerError');
             toastStore.show(errMsg, 'error');
+            return false;
+        }
+    };
+
+    /**
+     * TASK-124: update the email of the CURRENT (just-created, unverified)
+     * account via Firebase's verifyBeforeUpdateEmail — never creates a
+     * second account. Grooming decision (2026-07-17) option (e): this
+     * replaces the old "change email" flow's local-only reset, which let a
+     * re-submitted register() collide with the user's OWN already-reserved
+     * username (register's reserveUsername step, D-06) and roll back into an
+     * orphaned account + reservation with a misleading "username taken"
+     * toast. Deliberately does not touch reserveUsername/releaseUsername or
+     * the /usernames rules (SCRUM-73 territory) — no username changes here.
+     */
+    const changeRegistrationEmail = async (newEmail: string): Promise<boolean> => {
+        try {
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) {
+                toastStore.show(t('auth.messages.notAuthenticated'), 'error');
+                return false;
+            }
+
+            await verifyBeforeUpdateEmail(firebaseUser, newEmail);
+            toastStore.show(t('auth.messages.changeEmailSent'), 'success');
+            return true;
+        } catch (error: unknown) {
+            const firebaseError = error as { code?: string };
+            if (firebaseError.code === 'auth/requires-recent-login') {
+                toastStore.show(t('auth.messages.changeEmailRequiresRecentLogin'), 'error');
+            } else if (firebaseError.code === 'auth/invalid-email') {
+                toastStore.show(t('auth.messages.changeEmailInvalid'), 'error');
+            } else if (firebaseError.code === 'auth/email-already-in-use') {
+                toastStore.show(t('auth.messages.changeEmailInUse'), 'error');
+            } else {
+                toastStore.show(t('auth.messages.changeEmailError'), 'error');
+            }
             return false;
         }
     };
@@ -759,6 +797,7 @@ export const useAuthStore = defineStore('auth', () => {
         emailVerified,
         initAuth,
         register,
+        changeRegistrationEmail,
         login,
         loginWithGoogle,
         logout,

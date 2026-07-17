@@ -119,4 +119,45 @@ describe('auth store error logging sanitization (TASK-122)', () => {
     expect(result).toBe(false)
     expect(showSpy).not.toHaveBeenCalled()
   })
+
+  // MEDIUM-1 (reviewer follow-up): logAuthError used to destructure `error`
+  // directly, which throws on `Promise.reject(null)`/`undefined` and would
+  // let that exception escape the catch block before any toast fires.
+  it('does not throw when the rejected error is null, and logs a safe {code: undefined, message: undefined} shape', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getDocMock.mockRejectedValueOnce(null)
+
+    const store = useAuthStore()
+    const result = await store.checkUsernameAvailable('somebody')
+
+    expect(result).toBe(false)
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error checking username:', { code: undefined, message: undefined })
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  // LOW-1 (reviewer follow-up): GeolocationPositionError.code is numeric
+  // (1/2/3) — logAuthError used to only accept string codes and silently
+  // dropped it.
+  it('preserves a numeric error code (e.g. GeolocationPositionError) instead of dropping it', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (_success: PositionCallback, error: PositionErrorCallback) => {
+          error({ code: 1, message: 'User denied Geolocation' } as GeolocationPositionError)
+        },
+      },
+    })
+
+    const store = useAuthStore()
+    const result = await store.detectLocation()
+
+    expect(result).toBeNull()
+    const geoWarnCall = consoleWarnSpy.mock.calls.find((call) => call[0] === 'Browser geolocation failed, trying IP-based:')
+    expect(geoWarnCall?.[1]).toEqual({ code: 1, message: 'User denied Geolocation' })
+
+    consoleWarnSpy.mockRestore()
+    vi.unstubAllGlobals()
+  })
 })

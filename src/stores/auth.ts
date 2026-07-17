@@ -33,9 +33,14 @@ let authUnsubscribe: (() => void) | null = null;
  * string-typed `code`/`message` fields are ever passed to console.
  */
 const logAuthError = (context: string, error: unknown, level: 'error' | 'warn' = 'error'): void => {
-    const { code, message } = error as { code?: unknown; message?: unknown };
+    // MEDIUM-1 (TASK-122 review): error can be null/undefined (e.g. a
+    // Promise.reject(null)) — destructuring that directly would throw and
+    // let the failure escape the catch block before the toast fires.
+    const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
     const sanitized = {
-        code: typeof code === 'string' ? code : undefined,
+        // LOW-1: GeolocationPositionError.code is numeric (1/2/3) — accept
+        // it alongside Firebase's string codes instead of dropping it.
+        code: typeof code === 'string' || typeof code === 'number' ? code : undefined,
         message: typeof message === 'string' ? message : undefined,
     };
     if (level === 'warn') {

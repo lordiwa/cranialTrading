@@ -169,7 +169,16 @@
       "instruction": "Haz click en el enlace para verificar tu cuenta. Si no lo ves, revisa spam.",
       "checkButton": "YA VERIFIQUÉ",
       "checking": "VERIFICANDO…",
-      "resend": "REENVIAR EMAIL"
+      "resend": "REENVIAR EMAIL",
+      "changeEmail": "Cambiar email"
+    },
+    "passwordStrength": {
+      "label": "Fortaleza",
+      "empty": "Ninguna",
+      "weak": "Débil",
+      "fair": "Aceptable",
+      "strong": "Fuerte",
+      "veryStrong": "Muy fuerte"
     },
     "forgotPassword": {
       "title": "RECUPERAR CONTRASEÑA",
@@ -192,7 +201,8 @@
       "invalidLink": "Enlace inválido",
       "invalidLinkMessage": "El enlace de recuperación es inválido o expiró.",
       "requestNewLink": "Solicitar nuevo enlace",
-      "backToLogin": "Volver al login"
+      "backToLogin": "Volver al login",
+      "successMessage": "Tu contraseña se guardó correctamente. Ya podés iniciar sesión con la nueva."
     },
     "messages": {
       "accountCreated": "Cuenta creada. Verifica tu email",

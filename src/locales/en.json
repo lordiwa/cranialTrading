@@ -169,7 +169,16 @@
       "instruction": "Click the link to verify your account. If you don't see it, check spam.",
       "checkButton": "I VERIFIED",
       "checking": "VERIFYING…",
-      "resend": "RESEND EMAIL"
+      "resend": "RESEND EMAIL",
+      "changeEmail": "Change email"
+    },
+    "passwordStrength": {
+      "label": "Strength",
+      "empty": "None",
+      "weak": "Weak",
+      "fair": "Fair",
+      "strong": "Strong",
+      "veryStrong": "Very strong"
     },
     "forgotPassword": {
       "title": "RECOVER PASSWORD",
@@ -192,7 +201,8 @@
       "invalidLink": "Invalid link",
       "invalidLinkMessage": "The recovery link is invalid or expired.",
       "requestNewLink": "Request new link",
-      "backToLogin": "Back to login"
+      "backToLogin": "Back to login",
+      "successMessage": "Your password was saved. You can now sign in with your new one."
     },
     "messages": {
       "accountCreated": "Account created. Verify your email",

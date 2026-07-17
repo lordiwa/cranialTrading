@@ -56,8 +56,16 @@ async function measure(browser, throttle) {
     });
   }
   await page.goto(url, { waitUntil: 'load', timeout: 90000 });
-  // esperar FCP disponible + settle corto
-  await page.waitForTimeout(1500);
+  // Wait for the real APPRENDER paint explicitly instead of a fixed settle —
+  // under FAST3G the render can land well after `load`. A fixed timeout would
+  // silently record null (mapped to -1) and mix a bogus low value into the
+  // median with no warning. Bounded wait + explicit TIMEOUT marker instead.
+  let appRenderTimedOut = false;
+  try {
+    await page.waitForFunction(() => window.__appRenderTime !== null, { timeout: 30000 });
+  } catch {
+    appRenderTimedOut = true;
+  }
   const m = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
     const fcp = performance.getEntriesByType('paint').find(p => p.name === 'first-contentful-paint');
@@ -69,7 +77,7 @@ async function measure(browser, throttle) {
     };
   });
   await ctx.close();
-  return m;
+  return { ...m, appRenderTimedOut };
 }
 
 const browser = await chromium.launch();
@@ -81,6 +89,17 @@ for (const throttle of [false, true]) {
   console.log(`  FCP  median=${median(rs.map(r => r.fcp ?? -1))}ms  all=[${rs.map(r => r.fcp).join(',')}]`);
   console.log(`  DCL  median=${median(rs.map(r => r.dcl))}ms  all=[${rs.map(r => r.dcl).join(',')}]`);
   console.log(`  LOAD median=${median(rs.map(r => r.load))}ms  all=[${rs.map(r => r.load).join(',')}]`);
-  console.log(`  APPRENDER median=${median(rs.map(r => r.appRender ?? -1))}ms  all=[${rs.map(r => r.appRender).join(',')}]`);
+
+  const timedOut = rs.filter(r => r.appRenderTimedOut).length;
+  const validAppRender = rs.filter(r => !r.appRenderTimedOut).map(r => r.appRender);
+  const appRenderDisplay = rs.map(r => r.appRenderTimedOut ? 'TIMEOUT' : r.appRender).join(',');
+  const appRenderMedian = validAppRender.length ? `${median(validAppRender)}ms` : 'N/A (all runs timed out)';
+  const timeoutNote = timedOut ? `  (${timedOut}/${runs} TIMEOUT — excluded from median)` : '';
+  console.log(`  APPRENDER median=${appRenderMedian}  all=[${appRenderDisplay}]${timeoutNote}`);
+
+  if (timedOut > runs / 2) {
+    console.error(`FATAL: ${label} — majority of runs (${timedOut}/${runs}) timed out waiting for APPRENDER. These numbers are not trustworthy.`);
+    process.exitCode = 1;
+  }
 }
 await browser.close();

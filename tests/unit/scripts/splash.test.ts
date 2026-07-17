@@ -7,13 +7,31 @@ import { resolve } from 'path';
 // measurements would report false-positive early paints.
 const indexHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf-8');
 
-function extractSplashMarkup(html: string): string {
-  const start = html.indexOf('class="app-splash"');
-  if (start === -1) throw new Error('app-splash element not found in index.html');
-  const divOpen = html.lastIndexOf('<div', start);
-  const closeTagIndex = html.indexOf('</div>', start);
-  const secondCloseTagIndex = html.indexOf('</div>', closeTagIndex + 1);
-  return html.slice(divOpen, secondCloseTagIndex + '</div>'.length);
+// Extracts everything Vue's app.mount('#app') will wipe out on mount: the
+// splash AND the hidden SEO pre-render block that follows it inside
+// `<div id="app">`. Deliberately covers BOTH, not just the splash — the SEO
+// block would equally false-match the perf harness's APPRENDER selector
+// (`#app header, #app main, #app input, #app button`) if it ever gained an
+// input/button, so the header/main/input/button assertion below intentionally
+// stays stricter than "just the splash".
+function extractAppStaticContent(html: string): string {
+  const appOpenTag = '<div id="app">';
+  const openIdx = html.indexOf(appOpenTag);
+  if (openIdx === -1) throw new Error('<div id="app"> not found in index.html');
+  const contentStart = openIdx + appOpenTag.length;
+  const tagRe = /<div[\s>]|<\/div>/gi;
+  tagRe.lastIndex = contentStart;
+  let depth = 1;
+  let match: RegExpExecArray | null;
+  while ((match = tagRe.exec(html))) {
+    if (match[0].toLowerCase().startsWith('</div')) {
+      depth--;
+      if (depth === 0) return html.slice(contentStart, match.index);
+    } else {
+      depth++;
+    }
+  }
+  throw new Error('Could not find matching </div> for <div id="app">');
 }
 
 describe('index.html splash markup', () => {
@@ -25,17 +43,17 @@ describe('index.html splash markup', () => {
   });
 
   it('contains the wordmark and a spinner', () => {
-    const splash = extractSplashMarkup(indexHtml);
-    expect(splash).toContain('CRANIAL TRADING');
-    expect(splash).toContain('app-splash__spinner');
+    const appContent = extractAppStaticContent(indexHtml);
+    expect(appContent).toContain('CRANIAL TRADING');
+    expect(appContent).toContain('app-splash__spinner');
   });
 
-  it('never contains header/main/input/button tags (would false-match the perf harness APPRENDER selector)', () => {
-    const splash = extractSplashMarkup(indexHtml);
-    expect(splash).not.toMatch(/<header[\s>]/i);
-    expect(splash).not.toMatch(/<main[\s>]/i);
-    expect(splash).not.toMatch(/<input[\s>]/i);
-    expect(splash).not.toMatch(/<button[\s>]/i);
+  it('never contains header/main/input/button tags anywhere in #app (splash or SEO block) — would false-match the perf harness APPRENDER selector', () => {
+    const appContent = extractAppStaticContent(indexHtml);
+    expect(appContent).not.toMatch(/<header[\s>]/i);
+    expect(appContent).not.toMatch(/<main[\s>]/i);
+    expect(appContent).not.toMatch(/<input[\s>]/i);
+    expect(appContent).not.toMatch(/<button[\s>]/i);
   });
 
   it('adds zero extra network requests (no external font/image/script refs inside the splash style or markup)', () => {

@@ -1,0 +1,16 @@
+LOOP STOP 2026-07-17 ~00:30Z — razón: goal-stuck en pasos exclusivamente humanos (no es error).
+
+Goal original (Rafael 2026-07-16): keys TASK-111,118,114,116,117,102,103,104,105,106,107 — "hasta que se acaben las tareas, orden a criterio del orquestador", máximo paralelismo aprobado, las 5 loop_auth otorgadas.
+
+RESULTADO: 8/11 CERRADOS (111, 116, 117, 105 en v1.49.0; 102, 103, 114, 106 en v1.50.0 — ambas con CI verde y deploy a dev confirmado).
+
+TICKETS NO CERRADOS y por qué:
+- TASK-104 (mergeado v1.49.0, review APPROVE): falta UAT visual logueado de Rafael (settings/perfil/tour) — el orquestador no puede loguearse (regla: no ingresar contraseñas).
+- TASK-118 (mergeado v1.49.0, review APPROVE): falta el click real de "Continuar con Google" en dev — OAuth requiere acción explícita del humano (regla dura, no la levanta uat_delegated). Cards de Design del botón Google también pendientes (bloqueados por la misma pausa de DesignSync que 107).
+- TASK-107 (trabajo local completo): Rafael INTERRUMPIÓ la subida DesignSync (finalize_plan rechazado) — esperando su decisión: (a) subir corrigiendo el conteo pre-existente 1.472≠1.284, (b) subir tal cual, (c) no subir.
+
+PREGUNTA DE PRODUCTO ABIERTA: hero de Colección ahora EXCLUYE wishlist del total (TASK-114, deliberado) — confirmar o revertir.
+
+Tickets nuevos de hallazgos (grooming): TASK-119 (cart CK), 120 (bulk delete race — usar patrón memoria card-index-persist-race-pattern), 121 (vitest <use> Windows), 122 (logging auth), 123 (persist interleave server-side), 124 (cambiar-email vs reserva username).
+
+Ningún ticket saltado silenciosamente. Contadores finales: iteration 19, completed_this_run 18 (10 de la corrida 07-13/14 + 8 de hoy).

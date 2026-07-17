@@ -74,7 +74,7 @@ const handleSendReset = async () => {
           </div>
 
           <div class="text-left mb-5">
-            <label for="forgot-email" class="block text-small font-semibold text-silver-70 mb-1.5">{{ t('auth.login.emailPlaceholder') }}</label>
+            <label for="forgot-email" class="block text-small font-semibold text-silver-70 mb-1.5">{{ t('auth.register.emailLabel') }}</label>
             <input
                 id="forgot-email"
                 v-model="email"

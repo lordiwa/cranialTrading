@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-17T06:25:14.832Z",
+  "generated_at": "2026-07-17T13:43:07.526Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -640,6 +640,30 @@
     {
       "key": "TASK-127",
       "title": "Chore seguridad: extender la sanitización de error-logging (patrón logAuthError) a los 11 stores restantes + mover helper a utils",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-128",
+      "title": "Perf F1: splash instantáneo en index.html + harness de medición commiteado (baseline FAST3G: APPRENDER 2132ms)",
+      "status": "in_progress",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-129",
+      "title": "Perf F2: destrabar el gate de auth del router para rutas guest — pintar sin esperar el round-trip de Firebase Auth",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-130",
+      "title": "Perf F3: fuentes a woff2 subset + font-display swap, preconnect a Google APIs, modulepreload de LoginView",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-131",
+      "title": "Chore: limpiar 26MB de peso muerto en public/ + borrar SpriteIcon huérfano",
       "status": "todo",
       "priority": "low"
     }

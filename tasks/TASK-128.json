@@ -1,0 +1,29 @@
+{
+  "key": "TASK-128",
+  "title": "Perf F1: splash instantáneo en index.html + harness de medición commiteado (baseline FAST3G: APPRENDER 2132ms)",
+  "description": "Rafael 2026-07-17: el sitio se siente pesado incluso sin login; goal del loop = duplicar velocidad de carga guest fría. Diagnóstico: #app queda vacío (pantalla negra) hasta que Vue+Firebase montan. Este ticket: (1) splash/loader instantáneo DENTRO de #app en index.html — logo wordmark + spinner en CSS puro inline (tema negro/neon v2, sin requests extra, sin JS), reemplazado naturalmente al montar Vue; (2) commitear el harness de medición (adaptar scratchpad perf-measure.mjs de la sesión) a scripts/perf-measure.mjs con doc de uso — mide FCP/DCL/LOAD/APPRENDER (rAF hasta selector de vista real) con caché fría y throttle FAST3G (1.6Mbps/150ms RTT), 5 corridas, mediana. BASELINE prod v1.51.0 FAST3G: FCP 2184 / DCL 1675 / LOAD 1909 / APPRENDER 2132. Goal global del loop: FCP ≤1092 y APPRENDER ≤1066 (≤50%). Este ticket ataca FCP (el splash pinta en el primer frame post-HTML); APPRENDER lo atacan F2/F3.",
+  "acceptance_criteria": [
+    "index.html pinta splash (logo + spinner CSS puro, tema v2) antes de cualquier JS — sin requests adicionales; desaparece al montar Vue sin flash",
+    "scripts/perf-measure.mjs commiteado y documentado (README corto o header), corre con node contra cualquier URL",
+    "FCP FAST3G medido con el harness contra preview local o dev ≤ 1092ms (50% del baseline 2184)",
+    "Sin regresión de APPRENDER/LOAD; E2E smoke verde (el splash no rompe locators); gates verdes"
+  ],
+  "status": "in_progress",
+  "priority": "medium",
+  "labels": [
+    "perf",
+    "guest-load",
+    "ux",
+    "v1.52"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-17T13:42:00.286Z",
+  "updated_at": "2026-07-17T13:43:07.526Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

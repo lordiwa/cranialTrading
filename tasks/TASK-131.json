@@ -1,0 +1,30 @@
+{
+  "key": "TASK-131",
+  "title": "Chore: limpiar 26MB de peso muerto en public/ + borrar SpriteIcon huérfano",
+  "description": "Hallazgo del diagnóstico perf 2026-07-17 (no afecta velocidad de carga — es higiene de deploy): public/ arrastra ~26MB que el navegador nunca pide: ugs.csv (11MB), icons.png (6.8MB — solo referenciado por SpriteIcon.vue, componente huérfano sin imports), ~43 TTFs estáticos de Open-Sans sin @font-face que los use (verificar contra style.css POST TASK-130), screenshots de debug (Mi-Coleccion-*.png, float.png, cranialBugColl.jpeg, PopUp-DetalleCarta.png), cranial-trading-logo-color.png 1.3MB (SÍ referenciado como apple-touch-icon — NO borrar, pero considerar versión 180x180 liviana). Borrar también src/components/ui/SpriteIcon.vue (huérfano; patrón validado en TASK-106). Regla atomic-feature-removal: grep E2E/pages por referencias antes de borrar. NO tocar public/tasks/ (Rafael lo borra a mano) ni icons.svg (sprite SVG activo).",
+  "acceptance_criteria": [
+    "ugs.csv, icons.png, screenshots de debug y TTFs sin referencia fuera del repo y del deploy; apple-touch-icon sigue funcionando (liviano si es fácil)",
+    "SpriteIcon.vue borrado; grep sin referencias colgantes en src/ ni e2e/",
+    "npx vite build OK y dist/ baja de ~30MB a <5MB; suite unit verde"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "chore",
+    "deploy-hygiene",
+    "dead-code",
+    "v1.52"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-130"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-17T13:42:51.547Z",
+  "updated_at": "2026-07-17T13:42:51.547Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

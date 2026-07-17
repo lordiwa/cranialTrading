@@ -1,0 +1,33 @@
+{
+  "key": "TASK-129",
+  "title": "Perf F2: destrabar el gate de auth del router para rutas guest — pintar sin esperar el round-trip de Firebase Auth",
+  "description": "Parte del loop perf 2026-07-17 (goal: APPRENDER FAST3G ≤1066ms, baseline 2132). Causa raíz principal: router.beforeEach (src/router/index.ts:166-183) bloquea TODA primera navegación esperando authStore.loading en un while con re-esperas de 2s — incluso rutas guest (/login, estáticas) esperan el round-trip a identitytoolkit antes del primer render. Fix: (a) para rutas SIN requiresAuth ni requiresGuest, resolver la navegación sin esperar auth; (b) para requiresGuest (/login), render optimista con último-estado-conocido cacheado en localStorage (si el last-known dice logueado, esperar auth o redirigir optimista a /saved-matches; si dice guest o no hay dato, pintar /login ya y redirigir DESPUÉS si auth resuelve logueado — sin flicker para el caso común); (c) requiresAuth mantiene la espera actual (no degradar seguridad de UX — la data igual está protegida por reglas Firestore). CUIDADO: no romper returnUrl, no crear loops de redirect, no tocar initAuth (Regla: cambio mínimo). Tests del guard con auth lenta/rápida/error.",
+  "acceptance_criteria": [
+    "Rutas guest (login y estáticas) renderizan sin esperar la resolución de Firebase Auth (test con auth artificialmente lenta: la vista aparece antes del resolve)",
+    "Usuario logueado que entra a /login sigue terminando en /saved-matches (redirect post-resolve u optimista por last-known), returnUrl intacto, sin loops",
+    "requiresAuth se comporta igual que hoy; suite E2E completa verde",
+    "APPRENDER FAST3G medido con el harness ≤ 1400ms tras este ticket (aporte parcial al goal ≤10 66)",
+    "Gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "perf",
+    "router",
+    "auth",
+    "guest-load",
+    "v1.52"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-128"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-17T13:42:17.833Z",
+  "updated_at": "2026-07-17T13:42:17.833Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

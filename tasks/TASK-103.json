@@ -7,7 +7,7 @@
     "Sin regresión en registro, verificación, forgot/reset; E2E de register/login verdes (flake conocido descartado en aislado)",
     "i18n en/es/pt; gates verdes"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "design-sync",
@@ -21,11 +21,21 @@
   "depends_on": [
     "TASK-102"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "4c4e8bb",
+    "bed90ce",
+    "e791504"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T00:32:57.011Z",
+      "body": "CERRADO con review verde (loop autónomo 2026-07-17, auto_close_on_green_review). Review depth: FULL — rubric inputs: 664 líneas cambiadas (>150) + superficie auth (security). Historia: 1 REQUEST-CHANGES con MEDIUM trivial (label de Forgot mostraba el placeholder 'tu@email.com' como etiqueta — fix: reuso de auth.register.emailLabel) + LOW preventivo (key passwordStrength.empty x3) — delta re-aprobado por el mismo reviewer. Verificaciones clave: strength meter puramente advisory (no gatea submit); success card de Reset inalcanzable con código inválido y redirect de 1.5s preservado; mutua exclusividad de a[href=/login] verificada rama por rama (strict mode de Playwright a salvo); botón Google de 118 byte-idéntico; 8 keys i18n nuevas x3 con paridad verificada. MEDIUM non-blocking ticketeado: TASK-124 (dead-end de cambiar-email vs reserva de username — mecánica pre-existente, el link nuevo la invita). Deviaciones documentadas: sin header guest del proto (justificado por locators E2E), sin checkbox de terms (lógica nueva fuera de scope — grooming), sin copy de marketing del proto. Pre-existente flageado: pt resetPassword.submit='REDEFINIR' no matchea el regex E2E /reset|restablecer/i (gap dormido, no introducido acá). Shippeado en v1.50.0 con E2E completo 97/97 (auth specs incluidos)."
+    }
+  ],
   "created_at": "2026-07-13T19:00:00.000Z",
-  "updated_at": "2026-07-16T23:49:54.616Z",
+  "updated_at": "2026-07-17T00:32:57.011Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

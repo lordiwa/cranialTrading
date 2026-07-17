@@ -8,7 +8,7 @@
     "gates verdes (unit + build + type-check + E2E completo)",
     "mapping.json actualizado"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "low",
   "labels": [
     "chore",
@@ -17,7 +17,10 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "4b54ddaa",
+    "e791504"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -39,10 +42,15 @@
       "author": "developer",
       "at": "2026-07-17T00:10:35.673Z",
       "body": "EVIDENCIA GREP (AC1, dev-106-deadcode 2026-07-17, base 368c1f3 con todos los merges del día): 10/10 candidatos confirmados huérfanos y BORRADOS, cero exclusiones. Por archivo (grep -rn en src/ tests/ e2e/, variantes de nombre + path + router + dynamic imports): EditCardModal.vue → 0 refs código (solo tasks/*.json, CLAUDE.md lista doc, skill tdd); DecksView.vue → 0 refs; NewPreferenceModal.vue → 0 refs; ImportPreferencesModal.vue → 0 refs (solo su propio comment de path); SavedContactsView.vue → 0 refs; MatchDetailModal.vue → 0 refs (solo comment en AddCardModal:214 que referencia su vocabulario de badges — comment, no import); ImportProgressToast.vue → 0 refs; ImportResultModal.vue → 0 refs; AddCardToDeckModal.vue → 0 refs; EditDeckCardModal.vue → 0 refs. Ningún test dedicado existía (find en tests/ y e2e/ vacío para los 10); ningún page-object/spec E2E tocado porque nada los referenciaba. Gates: unit 103 files/1322 pass, vite build 15.26s, vue-tsc 0 errores, hook 0 errores/106 warnings baseline. Commit 4b54ddaa. PENDIENTE del orquestador: mapping.json de cranial-design (orphan-code → removed) + E2E completo al merge."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T00:33:26.690Z",
+      "body": "CERRADO con review verde (loop autónomo 2026-07-17, auto_close_on_green_review). Review depth: FULL — rubric inputs: 3366 líneas (deleciones puras, 10 archivos). Veredicto rev-106-deadcode: APPROVE; verificación INDEPENDIENTE de cero-referencias para los 10 (grep propio del reviewer + build como sensor de imports ocultos + chequeo de dynamic imports/router), orphanhood de los 2 riesgosos confirmada (router /decks → DeckView singular; /contacts → redirect al hub). 1 LOW nit (comment stale en AddCardModal:214 que referencia MatchDetailModal — inofensivo). AC1: evidencia grep por archivo persistida en comment del developer. AC4: mapping.json actualizado por el orquestador post-merge (9 entradas orphan-code/ok → removed + limpieza de la entrada 23-saved-contacts; JSON validado). AC3: gates verdes + suite E2E completa 97/97 post-merge. 10 componentes huérfanos eliminados: EditCardModal, DecksView, NewPreferenceModal, ImportPreferencesModal, SavedContactsView, MatchDetailModal, ImportProgressToast, ImportResultModal, AddCardToDeckModal, EditDeckCardModal. Shippeado en v1.50.0."
     }
   ],
   "created_at": "2026-07-13T19:00:00.000Z",
-  "updated_at": "2026-07-17T00:10:45.083Z",
+  "updated_at": "2026-07-17T00:33:26.690Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

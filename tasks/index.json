@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-17T00:10:45.083Z",
+  "generated_at": "2026-07-17T00:33:26.690Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -490,13 +490,13 @@
     {
       "key": "TASK-102",
       "title": "Design→app v2 F7a: landing guest — Login search-first, resultados, dropdown login, register prompt",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-103",
       "title": "Design→app v2 F7b: auth — Register, verificación de email, Forgot/Reset password",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -514,7 +514,7 @@
     {
       "key": "TASK-106",
       "title": "Chore: limpiar dead code de vistas/modales huérfanos (EditCardModal, DecksView, NewPreferenceModal, ImportPreferencesModal, SavedContactsView)",
-      "status": "in_review",
+      "status": "done",
       "priority": "low"
     },
     {
@@ -562,7 +562,7 @@
     {
       "key": "TASK-114",
       "title": "Bug precios: header de Colección (y otros agregados) suman card.price (TCG) — deben usar CK como fuente primaria siempre",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {

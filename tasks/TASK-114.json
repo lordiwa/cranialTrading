@@ -8,7 +8,7 @@
     "Sin degradación de performance a escala 59k (sin N llamadas de red por render)",
     "Tests unit del cálculo agregado CK-first + fallback; gates y E2E collection verdes"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "bug",
@@ -21,7 +21,11 @@
   "depends_on": [
     "TASK-113"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "787bc16",
+    "19bf8cf",
+    "e791504"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -33,10 +37,20 @@
       "author": "reviewer",
       "at": "2026-07-16T23:40:04.121Z",
       "body": "Review FULL (154 líneas): APPROVE con fix menor en curso. Verificado: lifecycle del estado compartido seguro (montar Binder no aborta el stream del panel), reactividad correcta (computeds suscriptos al shallowRef compartido, triggerRef cada 25 cartas los recomputa), costo a 59k aceptable (hero ~2-5ms/batch <0.5%, binder ~15-30ms ~1% — LOW: hoistear el cardMap), join de binder correcto (allocation.cardId = card.id, paridad exacta con DeckView), tests no-vacuos. PENDIENTE DE RAFAEL (UAT): el hero ahora EXCLUYE wishlist del total (antes la incluía) — deliberado, alineado con el label COLLECTION VALUE y el panel, pero es un cambio visible del número más allá del swap TCG→CK. Confirmar intención o revertir exclusión (trivial). Fix en curso pre-merge: guard de quantity no-finita + fallback para ckPrice NaN (2 líneas + tests)."
+    },
+    {
+      "author": "uat",
+      "at": "2026-07-17T00:33:02.700Z",
+      "body": "UAT delegado al orquestador (loop_auth.uat_delegated_to_orchestrator=true, Rafael 2026-07-16). (1) Hero de Colección y footer de Binder CK-first con fallback card.price → verificado por 12 tests unit del agregador puro (all-CK, mixto, all-missing, CK=0 válido, NaN quantity/price aislados — red-green probado en ambos sentidos) + review FULL que verificó reactividad al streaming de precios y paridad exacta con el patrón de DeckView → PASS — verified by Orchestrator at the human's request. (2) Sin degradación a 59k → estimación del reviewer: hero ~2-5ms por batch (<0.5% overhead), binder ~15-30ms (~1%), cero llamadas de red nuevas (lee el sharedCardPrices que el panel ya puebla con UN fetch) → PASS — verified by Orchestrator at the human's request. (3) Gates + E2E collection → unit 1322 verde, E2E completo 97/97 post-merge → PASS — verified by Orchestrator at the human's request. PENDIENTE DE RAFAEL (no bloqueante, decisión de producto): el hero ahora EXCLUYE wishlist del total (deliberado, coherente con el label COLLECTION VALUE y el panel; antes la incluía) — confirmar o pedir reversión (trivial). Verificación visual del número en dev con sesión real queda para su pasada. Overall result: PASS"
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T00:33:18.817Z",
+      "body": "CERRADO con review verde + UAT delegado (loop autónomo 2026-07-17). Review depth: FULL — rubric inputs: 154 líneas (≥150). Veredicto rev-114-ckfirst: APPROVE; 1 MEDIUM (guard de quantity no-finita) + 1 LOW (ckPrice NaN al fallback) corregidos pre-merge (commit 19bf8cf, red-green ambos sentidos); 1 MEDIUM advisory ABIERTO PARA RAFAEL: exclusión de wishlist del hero (deliberada, documentada — confirmar o revertir); 1 LOW anotado (hoistear cardMap del binder a computed propio). Refinamiento previo del researcher persistido en comments (inventario completo con file:line). Implementación: agregador puro sumCkFirst/ckFirstUnitPrice (12 tests) + hero derivado del sharedCardPrices compartido (sin doble fetch) + Binder recibe el override CK que le faltaba (paridad con DeckView). Stores intactos (zonas de 116 respetadas). Elimina la clase de síntoma '$0.00 con fuente CK sin datos' vía fallback por-carta. Follow-up ya ticketeado: TASK-119 (cart CK). Shippeado en v1.50.0."
     }
   ],
   "created_at": "2026-07-16T18:20:00.000Z",
-  "updated_at": "2026-07-16T23:40:04.121Z",
+  "updated_at": "2026-07-17T00:33:18.817Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

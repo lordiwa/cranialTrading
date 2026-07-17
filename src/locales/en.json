@@ -239,7 +239,9 @@
       "changeEmailRequiresRecentLogin": "For security, please sign in again before changing your email.",
       "changeEmailInvalid": "Enter a valid email address.",
       "changeEmailInUse": "That email is already in use by another account.",
-      "changeEmailError": "Error changing email"
+      "changeEmailError": "Error changing email",
+      "changeEmailSameAsCurrent": "That's already your current email.",
+      "emailChangedReauth": "Your email changed. Please sign in again with your new email."
     }
   },
 

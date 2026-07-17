@@ -151,6 +151,18 @@ describe('changeRegistrationEmail', () => {
     expect(toastStore.toasts.at(-1)?.message).toBe('auth.messages.notAuthenticated')
   })
 
+  it('LOW-2 guard: does not call verifyBeforeUpdateEmail when newEmail matches the current email', async () => {
+    authMock.currentUser = { uid: 'uid1', email: 'same@example.com' } as never
+
+    const store = useAuthStore()
+    const toastStore = useToastStore()
+    const result = await store.changeRegistrationEmail('same@example.com')
+
+    expect(result).toBe(false)
+    expect(verifyBeforeUpdateEmailMock).not.toHaveBeenCalled()
+    expect(toastStore.toasts.at(-1)?.message).toBe('auth.messages.changeEmailSameAsCurrent')
+  })
+
   it('regression: the plain register() flow is untouched by this addition', async () => {
     createUserWithEmailAndPasswordMock.mockResolvedValueOnce({ user: { uid: 'uidX' } })
     setDocMock.mockResolvedValue(undefined) // reserveUsername + user doc

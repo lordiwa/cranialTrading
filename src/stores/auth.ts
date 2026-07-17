@@ -71,6 +71,22 @@ export const useAuthStore = defineStore('auth', () => {
                     avatarUrl: data.avatarUrl ?? null,
                     tourCompleted: data.tourCompleted ?? false,
                 };
+
+                // TASK-124 review follow-up (HIGH-1): Firebase Auth is the source of
+                // truth for email. changeRegistrationEmail's verifyBeforeUpdateEmail
+                // changes it out-of-band (only takes effect once the user clicks the
+                // confirmation link), so the /users doc would go stale forever
+                // otherwise — every auth-state load passes through here, so sync it
+                // here rather than at the call site.
+                const currentAuthEmail = auth.currentUser?.email;
+                if (currentAuthEmail && currentAuthEmail !== data.email) {
+                    user.value.email = currentAuthEmail;
+                    try {
+                        await updateDoc(doc(db, 'users', userId), { email: currentAuthEmail });
+                    } catch {
+                        // best-effort: doc stays stale until the next successful sync, non-fatal
+                    }
+                }
             } else {
                 const firebaseUser = auth.currentUser;
                 if (firebaseUser) {
@@ -179,6 +195,14 @@ export const useAuthStore = defineStore('auth', () => {
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
+                return false;
+            }
+
+            // LOW-2: skip the no-op Firebase call and give a clear message
+            // instead of silently no-oping (or, worse, letting Firebase
+            // reject it with a confusing code).
+            if (firebaseUser.email === newEmail) {
+                toastStore.show(t('auth.messages.changeEmailSameAsCurrent'), 'error');
                 return false;
             }
 
@@ -389,8 +413,18 @@ export const useAuthStore = defineStore('auth', () => {
             await firebaseUser.reload();
             emailVerified.value = firebaseUser.emailVerified;
             return firebaseUser.emailVerified;
-        } catch {
-            toastStore.show(t('auth.messages.verifyEmailError'), 'error');
+        } catch (error: unknown) {
+            // MEDIUM-2 (TASK-124 review follow-up): verifyBeforeUpdateEmail
+            // revokes refresh tokens once the confirmation link is clicked, so
+            // reload() right after an email change is expected to throw one of
+            // these codes — surface a message that tells the user to sign in
+            // again with their NEW email, not the generic "error verifying".
+            const firebaseError = error as { code?: string };
+            if (firebaseError.code === 'auth/user-token-expired' || firebaseError.code === 'auth/user-disabled') {
+                toastStore.show(t('auth.messages.emailChangedReauth'), 'error');
+            } else {
+                toastStore.show(t('auth.messages.verifyEmailError'), 'error');
+            }
             return false;
         }
     };

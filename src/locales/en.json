@@ -1685,7 +1685,8 @@
       "setSearchPlaceholder": "Search edition… (e.g., Dominaria, MH3)",
       "noSetsFound": "No editions found",
       "creatureTypeSearchPlaceholder": "Search creature type… (e.g., Human, Dragon)",
-      "noCreatureTypesFound": "No creature types found"
+      "noCreatureTypesFound": "No creature types found",
+      "syntaxHintLabel": "Syntax help"
     },
     "modal": {
       "title": "ADVANCED FILTERS",
@@ -1910,6 +1911,7 @@
       "sets": "Editions",
       "manaValue": "Mana Value",
       "onlyReleased": "Only Released",
+      "advancedSyntax": "Search Syntax",
       "types": "Card Types",
       "priceUSD": "Price USD",
       "power": "Power",
@@ -1979,6 +1981,7 @@
         "sets": "Filter by Magic edition/set. You can select multiple editions. Sets are sorted by release date.",
         "manaValue": "Converted mana cost. Select one or more values. 10+ includes cards with mana 10 or higher.",
         "onlyReleased": "Excludes cards from sets that haven't been released yet (previews/spoilers).",
+        "advancedSyntax": "This box also accepts Scryfall's advanced syntax: -word excludes a term (e.g. -banding), \"exact phrase\" matches a name exactly, o:text searches the card's rules text (e.g. o:flying), t:type filters by card type (e.g. t:instant).",
         "types": "Card type: Creature, Instant, Sorcery, Enchantment, Artifact, Planeswalker or Land.",
         "priceUSD": "Price range in dollars according to TCGPlayer. Useful for finding cards within your budget.",
         "power": "Creature power. Numeric values (0-15+). Some cards have variable (*) or undefined power.",

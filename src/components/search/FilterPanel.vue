@@ -387,6 +387,15 @@ const pillClasses = 'inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-ful
         </BaseButton>
       </div>
 
+      <!-- Advanced syntax hint (TASK-109): -word / "exact" / o:text / t:type -->
+      <div v-if="!hideNameInput" class="flex items-center gap-1.5 -mt-2.5 mb-4 ml-0.5">
+        <span class="text-tiny text-silver-30">{{ t('search.filterPanel.syntaxHintLabel') }}</span>
+        <HelpTooltip
+            :text="t('help.tooltips.search.advancedSyntax')"
+            :title="t('help.titles.advancedSyntax')"
+        />
+      </div>
+
       <!-- Fila 2: Filtros rápidos horizontales -->
       <div class="flex flex-wrap gap-2 items-center">
         <!-- Colores -->

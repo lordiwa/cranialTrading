@@ -62,10 +62,27 @@ export const buildKeywordsQuery = (keywords: string[] | undefined): string[] => 
   return keywords.map(kw => (kw.includes(' ') ? `o:"${kw}"` : `o:${kw}`))
 }
 
+/**
+ * TASK-109: detects whether a free-text `name` value is already raw Scryfall
+ * query syntax (as opposed to a plain card name) so buildQuery can pass it
+ * through verbatim instead of wrapping it in quotes. Card names never start
+ * with `-`/`!`/`"` or contain `:` or a literal ` OR `, so this is safe —
+ * mirrors the isComplexQuery heuristic in services/scryfall.ts.
+ */
+const isAdvancedScryfallSyntax = (value: string): boolean =>
+  value.includes(':') ||
+  value.includes(' OR ') ||
+  value.startsWith('-') ||
+  value.startsWith('!') ||
+  value.startsWith('"')
+
 export const buildQuery = (filters: FilterOptions): string => {
   const parts: string[] = []
 
-  if (filters.name?.trim()) parts.push(`"${filters.name.trim()}"`)
+  const trimmedName = filters.name?.trim()
+  if (trimmedName) {
+    parts.push(isAdvancedScryfallSyntax(trimmedName) ? trimmedName : `"${trimmedName}"`)
+  }
 
   if (filters.colors && filters.colors.length > 0) {
     parts.push(`id<=${filters.colors.join('')}`)

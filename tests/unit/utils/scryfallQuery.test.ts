@@ -199,4 +199,59 @@ describe('buildQuery', () => {
       '"bolt" id<=R t:instant mv=1 r:common e:mh3 o:flying is:foil -is:preview'
     )
   })
+
+  // ─── TASK-109: advanced Scryfall syntax pass-through in the name field ───
+  // The `name` input is the only free-text field a user can type raw Scryfall
+  // syntax into (-negation, "exact", o:text, t:type, key:value comparisons).
+  // Regression lock: this syntax must survive buildQuery() verbatim instead of
+  // being wrapped in quotes (which would turn `-t:land` into the literal name
+  // search `"-t:land"`, silently breaking every advanced query).
+
+  it('passes -negation through unquoted (solo)', () => {
+    expect(buildQuery({ name: '-t:land' })).toBe('-t:land')
+  })
+
+  it('passes -negation through unquoted (combined with an active filter)', () => {
+    expect(buildQuery({ name: '-t:land', colors: ['W', 'U'] })).toBe('-t:land id<=WU')
+  })
+
+  it('passes a bare "exact match" quoted name through without re-quoting (solo)', () => {
+    expect(buildQuery({ name: '"Lightning Bolt"' })).toBe('"Lightning Bolt"')
+  })
+
+  it('passes a bare "exact match" quoted name through without re-quoting (combined)', () => {
+    expect(buildQuery({ name: '"Lightning Bolt"', rarity: ['common'] })).toBe(
+      '"Lightning Bolt" r:common'
+    )
+  })
+
+  it('passes o:text (rules text search) through unquoted (solo)', () => {
+    expect(buildQuery({ name: 'o:flying' })).toBe('o:flying')
+  })
+
+  it('passes o:text through unquoted (combined with an active filter)', () => {
+    expect(buildQuery({ name: 'o:flying', types: ['creature'] })).toBe('o:flying t:creature')
+  })
+
+  it('passes t:type through unquoted (solo)', () => {
+    expect(buildQuery({ name: 't:instant' })).toBe('t:instant')
+  })
+
+  it('passes t:type through unquoted (combined with an active filter)', () => {
+    expect(buildQuery({ name: 't:instant', colors: ['R'] })).toBe('t:instant id<=R')
+  })
+
+  it('trims advanced syntax before pass-through', () => {
+    expect(buildQuery({ name: '  o:flying  ' })).toBe('o:flying')
+  })
+
+  // Regression: a plain card name (no advanced syntax) must still be quoted —
+  // the fix must not turn every free-text search into a raw Scryfall query.
+  it('still quotes a plain card name with no advanced syntax (solo)', () => {
+    expect(buildQuery({ name: 'Lightning Bolt' })).toBe('"Lightning Bolt"')
+  })
+
+  it('still quotes a plain card name when combined with an active filter', () => {
+    expect(buildQuery({ name: 'Bolt', colors: ['R'] })).toBe('"Bolt" id<=R')
+  })
 })

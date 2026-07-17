@@ -1685,7 +1685,8 @@
       "setSearchPlaceholder": "Buscar edição… (ex: Dominaria, MH3)",
       "noSetsFound": "Nenhuma edição encontrada",
       "creatureTypeSearchPlaceholder": "Buscar tipo de criatura… (ex: Humano, Dragão)",
-      "noCreatureTypesFound": "Nenhum tipo de criatura encontrado"
+      "noCreatureTypesFound": "Nenhum tipo de criatura encontrado",
+      "syntaxHintLabel": "Ajuda de sintaxe"
     },
     "modal": {
       "title": "FILTROS AVANÇADOS",
@@ -1910,6 +1911,7 @@
       "sets": "Edições",
       "manaValue": "Mana Value",
       "onlyReleased": "Apenas Lançadas",
+      "advancedSyntax": "Sintaxe de Busca",
       "types": "Tipos de Carta",
       "priceUSD": "Preço USD",
       "power": "Poder",
@@ -1979,6 +1981,7 @@
         "sets": "Filtre por edição/set de Magic. Pode selecionar múltiplas edições. Os sets estão ordenados por data de lançamento.",
         "manaValue": "Custo de mana convertido. Selecione um ou mais valores. O 10+ inclui cartas de mana 10 ou superior.",
         "onlyReleased": "Exclui cartas de sets que ainda não foram lançados (previews/spoilers).",
+        "advancedSyntax": "Este campo também aceita a sintaxe avançada do Scryfall: -palavra exclui um termo (ex: -banding), \"frase exata\" busca um nome exato, o:texto busca no texto de regras (ex: o:flying), t:tipo filtra por tipo de carta (ex: t:instant).",
         "types": "Tipo de carta: Criatura, Instantâneo, Feitiço, Encantamento, Artefato, Planeswalker ou Terreno.",
         "priceUSD": "Faixa de preço em dólares segundo TCGPlayer. Útil para buscar cartas dentro do seu orçamento.",
         "power": "Poder de criaturas. Valores numéricos (0-15+). Algumas cartas têm poder variável (*) ou indefinido.",

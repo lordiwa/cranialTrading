@@ -12,7 +12,9 @@
 //   node scripts/perf-measure.mjs http://localhost:4173/login 5
 //   node scripts/perf-measure.mjs https://cranial-trading-dev.web.app/login
 //
-// Requires playwright-core (already a devDependency) — run from the repo root.
+// Requires playwright-core, resolved transitively via the @playwright/test
+// devDependency already used for E2E (see package-lock.json) — run from the
+// repo root so that resolution works.
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import path from 'path';

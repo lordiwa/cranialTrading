@@ -2,6 +2,14 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { createAuthGuard } from './authGuard';
 import { useAuthStore } from '../stores/auth';
 import { clearChunkReloadFlag, handleChunkLoadError } from '../utils/chunkReload';
+// TASK-130 (perf F3): LoginView is the guest landing page — lazy-loading it
+// only buys a sequential round-trip (router resolves, THEN the chunk starts
+// downloading) inside the APPRENDER window. Static import rides the entry
+// chunk instead. Safe because LoginView's whole import graph (stores/auth,
+// services/publicCardSearch) keeps Firebase out of the static graph already
+// (type-only imports / dynamic import('firebase/...') respectively — see
+// TASK-132) so this does NOT re-eager Firebase into the entry bundle.
+import LoginView from '../views/LoginView.vue';
 
 const router = createRouter({
     history: createWebHistory(),
@@ -18,7 +26,7 @@ const router = createRouter({
         {
             path: '/login',
             name: 'login',
-            component: () => import('../views/LoginView.vue'),
+            component: LoginView,
             meta: { requiresGuest: true, title: 'seo.pages.login.title', description: 'seo.pages.login.description' },
         },
         {

@@ -7,7 +7,7 @@
     "SEO intacto: headings semánticos, meta/unhead sin cambios",
     "i18n en/es/pt; gates verdes; E2E de páginas estáticas (si existen) verdes"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "low",
   "labels": [
     "design-sync",
@@ -21,11 +21,26 @@
   "depends_on": [
     "TASK-093"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "1312e56",
+    "9d8e219",
+    "35f9955"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "uat",
+      "at": "2026-07-16T23:48:41.355Z",
+      "body": "UAT delegado al orquestador (loop_auth.uat_delegated_to_orchestrator=true, Rafael 2026-07-16). Script y veredictos: (1) Las 9 páginas fieles a sus cards v2 en desktop → esperado: kicker+display headings, paneles surface, botones v2 → observado: verificado visualmente por el orquestador en cranial-trading-dev.web.app (v1.49.0 deployada, confirmada por marcador en bundle) las 9/9: about, contact, faq, guide/card-conditions (kicker GUÍA singular ✓), guide/how-to-trade, terms, privacy, cookies, 404 → PASS — verified by Orchestrator at the human's request. Mobile: verificado estructuralmente por el reviewer (clases responsive, paridad d/m); pase visual en dispositivo queda anotado para la próxima pasada de Rafael en su teléfono (no bloqueante — misma plantilla, cero lógica) → PASS — verified by Orchestrator at the human's request (estructural). (2) SEO intacto → esperado: headings semánticos, unhead sin cambios, landmark único → observado: verificado por review FULL (h1/h2 intactos, useHead byte-idéntico, main#main-content 8/8 + FaqView hereda de AppContainer como en base) → PASS — verified by Orchestrator at the human's request. (3) i18n x3 + gates + E2E → observado: pages.kicker.* en en/es/pt con paridad programática; gates verdes (unit 1304+, build, type-check); E2E help-legal.spec verde en suite completa 97/97 → PASS — verified by Orchestrator at the human's request. Overall result: PASS"
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-16T23:48:57.057Z",
+      "body": "CERRADO con review verde + UAT delegado (loop autónomo 2026-07-16). Review depth: FULL — rubric inputs: 390 líneas cambiadas (>150). Veredicto rev-105-static: APPROVE; 1 MEDIUM (kickers hardcodeados en español) corregido pre-merge por el dev (commit 9d8e219: pages.kicker.* x3 locales + fix Guía singular, paridad verificada programáticamente); 2 LOW anotados (rounded en <table> de Cookies inconsistente entre browsers — chequear en UAT visual futuro; jump-index del proto omitido, documentado como punch-list). Shippeado en v1.49.0, verificado visualmente en dev por el orquestador (9/9 páginas desktop). Pase visual mobile en dispositivo real anotado para Rafael (no bloqueante)."
+    }
+  ],
   "created_at": "2026-07-13T19:00:00.000Z",
-  "updated_at": "2026-07-16T22:08:14.474Z",
+  "updated_at": "2026-07-16T23:48:57.057Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

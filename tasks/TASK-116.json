@@ -7,7 +7,7 @@
     "Agregar una carta la muestra en la página actual sin esperar un refresh manual (si corresponde a la página/filtros)",
     "Tests unit de regresión del timing (patrón collection.paginatedSync.test.ts); gates y E2E collection verdes"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "bug",
@@ -20,11 +20,23 @@
   "depends_on": [
     "TASK-113"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "8a320fb",
+    "f83d269",
+    "eae68c8",
+    "9c0d99b",
+    "35f9955"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-16T23:49:06.529Z",
+      "body": "CERRADO con review verde (loop autónomo 2026-07-16, auto_close_on_green_review). Review depth: FULL — rubric inputs: 211 líneas iniciales + store core de ticket tdd (superficie obligatoria FULL). Historia del review: 2 REQUEST-CHANGES con 1 HIGH cada uno, ambos del mismo eje y ambos resueltos con red-green verificado por el reviewer: HIGH#1 persist stale en vuelo consume el flag de refresh (fix: gen-token _persistGen); HIGH#2 variante latest-started≠latest-scheduled, demostrada empíricamente por el reviewer (fix: timer pendiente también supersede — consumo solo si gen===_persistGen && _indexPersistTimer===null). Veredicto final: APPROVE con invariante formal (todo setter del flag agenda timer sincrónicamente → el último persist de un período quieto siempre consume; eventual consistency para N reschedules). Mecanismo: patch optimista a paginatedCards (delete inmediato con snapshot/rollback; add en página 0 sin filtros vía hasNoActiveFilters) + refresh correctivo diferido post-persist. 14 tests de regresión nuevos en collection.paginatedSync.test.ts. VALIDACIÓN E2E: collection-crud delete test fallaba ANTES del merge (síntoma exacto del ticket: contadores 204 vs hero 203, re-query stale) y pasa DESPUÉS — 16/16 colección + 97/97 suite completa. Residuales ticketeados: TASK-120 (bulk path), TASK-123 (interleave de chunks server-side). Shippeado en v1.49.0. Los 3 LOW del review #1 quedan anotados en el ticket para grooming."
+    }
+  ],
   "created_at": "2026-07-16T18:40:00.000Z",
-  "updated_at": "2026-07-16T22:14:21.271Z",
+  "updated_at": "2026-07-16T23:49:06.529Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

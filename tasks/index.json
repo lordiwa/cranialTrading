@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T22:17:05.719Z",
+  "generated_at": "2026-07-17T00:10:45.083Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -490,13 +490,13 @@
     {
       "key": "TASK-102",
       "title": "Design→app v2 F7a: landing guest — Login search-first, resultados, dropdown login, register prompt",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
       "key": "TASK-103",
       "title": "Design→app v2 F7b: auth — Register, verificación de email, Forgot/Reset password",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
@@ -508,13 +508,13 @@
     {
       "key": "TASK-105",
       "title": "Design→app v2 F9: páginas estáticas — about, contact, faq, guías, terms, privacy, cookies, 404",
-      "status": "in_review",
+      "status": "done",
       "priority": "low"
     },
     {
       "key": "TASK-106",
       "title": "Chore: limpiar dead code de vistas/modales huérfanos (EditCardModal, DecksView, NewPreferenceModal, ImportPreferencesModal, SavedContactsView)",
-      "status": "todo",
+      "status": "in_review",
       "priority": "low"
     },
     {
@@ -562,7 +562,7 @@
     {
       "key": "TASK-114",
       "title": "Bug precios: header de Colección (y otros agregados) suman card.price (TCG) — deben usar CK como fuente primaria siempre",
-      "status": "in_progress",
+      "status": "in_review",
       "priority": "medium"
     },
     {
@@ -574,13 +574,13 @@
     {
       "key": "TASK-116",
       "title": "Bug latente colección: refreshCurrentPage tras addCard/deleteCard corre contra el índice stale (misma race que TASK-113)",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-117",
       "title": "UX: loader al filtrar la colección — feedback visual mientras la query paginada está en vuelo (mobile/conexión lenta)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -616,6 +616,12 @@
     {
       "key": "TASK-123",
       "title": "Bug latente colección: dos _doPersistIndex en vuelo pueden intercalar writes de chunks (data vieja pisando chunks nuevos) — serializar el persist del card_index",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-124",
+      "title": "Auth: \"cambiar email\" post-registro deja la reserva de username huérfana — el re-registro falla con \"username taken\" del propio usuario",
       "status": "todo",
       "priority": "medium"
     }

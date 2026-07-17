@@ -8,7 +8,7 @@
     "Estilo v2 (skeleton .sk o spinner coherente con el tema); regla Mali respetada si es por-card",
     "i18n en/es/pt si lleva texto; gates verdes; E2E collection verdes (los specs asertan intención — el loader no debe romper waits existentes)"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "ux",
@@ -21,11 +21,26 @@
   "depends_on": [
     "TASK-113"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "faf4a67",
+    "713df0f",
+    "35f9955"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "uat",
+      "at": "2026-07-16T23:49:19.372Z",
+      "body": "UAT delegado al orquestador (loop_auth.uat_delegated_to_orchestrator=true, Rafael 2026-07-16). (1) Loader aparece tras ~200ms con query en vuelo y desaparece al llegar resultados → verificado por 6 tests unit del composable useDelayedFlag (boundaries 199/200ms, hide inmediato, cleanup en unmount) + evidencia E2E indirecta: el snapshot del run de colección PRE-116 capturó el overlay \"Updating results…\" visible durante una query en vuelo real — el loader funciona en el DOM desplegado → PASS — verified by Orchestrator at the human's request. (2) Sin layout shift ni parpadeo → overlay absolute inset-0 con fondo, anti-flicker por timer verificado en tests; review FULL confirmó estructura → PASS — verified by Orchestrator at the human's request. (3) Estilo v2 skeleton .sk CSS-only, regla Mali (cero svg-use por placeholder) → verificado por review → PASS — verified by Orchestrator at the human's request. (4) i18n x3 (collection.pagination.filtering) verificado; gates verdes; E2E colección 16/16 post-merge (los waits existentes no se rompieron) → PASS — verified by Orchestrator at the human's request. Nota no bloqueante para Rafael: percepción real del loader en mobile con conexión lenta (el escenario que reportó) queda para su prueba en dispositivo. Overall result: PASS"
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-16T23:49:37.530Z",
+      "body": "CERRADO con review verde + UAT delegado (loop autónomo 2026-07-16). Review depth: FULL — rubric inputs: 152 líneas cambiadas (≥150, borderline). Veredicto rev-117-loader: APPROVE, 0 HIGH/MEDIUM, 3 LOW anotados (skeleton con forma de card en modo lista texto; overlay cubre el header de sección; nota sobre force-click de Playwright — mitigada por la corrida E2E de merge, 16/16 verde). Verificaciones clave del review: cero hunks en stores/collection.ts (merge limpio con 116), cobertura completa de triggers (chips/búsqueda/filtros funnelean por queryPage → paginationMeta.loading con guard generacional), wishlist chip sin loader es coherente (computed client-side sin round-trip). Implementación: composable puro useDelayedFlag (200ms anti-flicker, 6 tests) + overlay .sk CSS-only Mali-safe + aria-live. Shippeado en v1.49.0. Nota para Rafael: percepción en mobile/conexión lenta (su escenario original) pendiente de su prueba en dispositivo — no bloqueante."
+    }
+  ],
   "created_at": "2026-07-16T19:00:00.000Z",
-  "updated_at": "2026-07-16T22:05:48.602Z",
+  "updated_at": "2026-07-16T23:49:37.530Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

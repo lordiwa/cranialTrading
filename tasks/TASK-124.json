@@ -1,0 +1,31 @@
+{
+  "key": "TASK-124",
+  "title": "Auth: \"cambiar email\" post-registro deja la reserva de username huérfana — el re-registro falla con \"username taken\" del propio usuario",
+  "description": "Hallazgo MEDIUM (non-blocking) del reviewer de TASK-103 (2026-07-16): el flujo mecánico es PRE-existente pero TASK-103 agregó el link \"cambiar email\" en el estado de verificación que ahora INVITA a pisarlo. Secuencia: usuario se registra (cuenta auth creada + username reservado en /usernames) → en el estado de verificación toca \"cambiar email\" (RegisterView.vue:99 handleChangeEmail, solo resetea estado local) → re-submitea el form con otro email → authStore.register (auth.ts:137-143) intenta reserveUsername con SU PROPIO username ya reservado → falla → rollback borra la cuenta auth NUEVA → toast \"username taken\" → la cuenta original sin verificar + su reserva quedan huérfanas y el usuario trabado. Opciones a groomear: (a) liberar/transferir la reserva si el owner es la cuenta unverified del mismo flujo; (b) detectar en register que el username pertenece a una cuenta unverified con el mismo session-state y reusar; (c) quitar el link \"cambiar email\" y guiar a soporte; (d) cleanup server-side de reservas de cuentas nunca verificadas (TTL). Tocar con cuidado: reserveUsername es SCRUM-73, reglas Firestore /usernames involucradas.",
+  "acceptance_criteria": [
+    "Decisión de grooming documentada (a/b/c/d u otra) con Rafael",
+    "El camino cambiar-email → re-registro con el mismo username deseado funciona o está bloqueado con mensaje útil (no 'username taken' engañoso)",
+    "Sin reservas huérfanas nuevas; tests del flujo; gates verdes"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "auth",
+    "username-reservation",
+    "ux",
+    "found-by-review",
+    "needs-grooming"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-103"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-16T23:57:56.128Z",
+  "updated_at": "2026-07-16T23:57:56.128Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

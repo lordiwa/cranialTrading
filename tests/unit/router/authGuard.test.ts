@@ -220,6 +220,50 @@ describe('createAuthGuard — (c) requiresAuth keeps today\'s exact wait-then-de
   })
 })
 
+describe('createAuthGuard — (b) requiresGuest optimistic redirect respects isStillCurrent (review HIGH/MEDIUM fix batch, MEDIUM-1)', () => {
+  it('does NOT fire the deferred redirect when the user already navigated away from /login before auth resolved (stale hijack)', async () => {
+    const { store, resolve } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const redirect = vi.fn()
+    // Simulates: by the time auth resolves, the app is on /about, not /login anymore.
+    const isStillCurrent = vi.fn(() => false)
+    const guard = createAuthGuard(store, redirect, isStillCurrent)
+
+    const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+    resolve({ id: 'u1' })
+    await pending
+
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('still fires the deferred redirect when the user is still on /login once auth resolves', async () => {
+    const { store, resolve } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const redirect = vi.fn()
+    const isStillCurrent = vi.fn(() => true)
+    const guard = createAuthGuard(store, redirect, isStillCurrent)
+
+    const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+    resolve({ id: 'u1' })
+    await pending
+
+    expect(redirect).toHaveBeenCalledWith('/saved-matches')
+  })
+
+  it('defaults isStillCurrent to "always current" when the caller omits it (backward compatible)', async () => {
+    const { store, resolve } = createFakeAuthStore(true)
+    const next = vi.fn()
+    const redirect = vi.fn()
+    const guard = createAuthGuard(store, redirect) // no 3rd arg
+
+    const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+    resolve({ id: 'u1' })
+    await pending
+
+    expect(redirect).toHaveBeenCalledWith('/saved-matches')
+  })
+})
+
 describe('shouldBlockOnAuthLoading — pure decision reused by App.vue\'s full-screen loader gate', () => {
   it('never blocks once auth has resolved, regardless of meta', () => {
     expect(shouldBlockOnAuthLoading({ requiresAuth: true }, false, null)).toBe(false)
@@ -238,5 +282,35 @@ describe('shouldBlockOnAuthLoading — pure decision reused by App.vue\'s full-s
     expect(shouldBlockOnAuthLoading({ requiresGuest: true }, true, 'authenticated')).toBe(true)
     expect(shouldBlockOnAuthLoading({ requiresGuest: true }, true, 'guest')).toBe(false)
     expect(shouldBlockOnAuthLoading({ requiresGuest: true }, true, null)).toBe(false)
+  })
+
+  // Review fix batch HIGH-1: App.vue feeds this the CURRENT route's meta,
+  // which during the app's very first (still-pending) navigation is Vue
+  // Router's START_LOCATION sentinel — meta: {}, matched: []. Without a
+  // signal for "route not confirmed yet", a requiresAuth deep-link (or the
+  // '/' → /saved-matches redirect) would read as meta={} and this function
+  // would return false, letting App.vue render a blank RouterView + footer
+  // shell for the whole auth round-trip instead of the loader.
+  describe('routeConfirmed (4th param) — initial-navigation-pending case', () => {
+    it('blocks while loading and the route has not been confirmed yet, even with empty meta (START_LOCATION)', () => {
+      expect(shouldBlockOnAuthLoading({}, true, null, false)).toBe(true)
+    })
+
+    it('does not block once the route is confirmed, for a route needing neither guard', () => {
+      expect(shouldBlockOnAuthLoading({}, true, null, true)).toBe(false)
+    })
+
+    it('does not block an unconfirmed route once auth has already resolved', () => {
+      expect(shouldBlockOnAuthLoading({}, false, null, false)).toBe(false)
+    })
+
+    it('still does not block a CONFIRMED guest route with last-known=guest (AC1 preserved: early paint)', () => {
+      expect(shouldBlockOnAuthLoading({ requiresGuest: true }, true, 'guest', true)).toBe(false)
+    })
+
+    it('defaults routeConfirmed to true when omitted (backward compatible with existing 3-arg call sites)', () => {
+      expect(shouldBlockOnAuthLoading({ requiresAuth: true }, true, null)).toBe(true)
+      expect(shouldBlockOnAuthLoading({}, true, null)).toBe(false)
+    })
   })
 })

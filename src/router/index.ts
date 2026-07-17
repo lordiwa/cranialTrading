@@ -169,7 +169,11 @@ const router = createRouter({
 // for routes that don't need it (see authGuard.ts for the (a)/(b)/(c) rules).
 router.beforeEach(async (to, _from, next) => {
     const authStore = useAuthStore();
-    const guard = createAuthGuard(authStore, (path) => { void router.push(path); });
+    // Review fix batch MEDIUM-1: guards the deferred /login → /saved-matches
+    // redirect against firing after the app has already navigated elsewhere
+    // while auth was still resolving in the background.
+    const isStillCurrent = () => router.currentRoute.value.fullPath === to.fullPath;
+    const guard = createAuthGuard(authStore, (path) => { void router.push(path); }, isStillCurrent);
     await guard(to, _from, next);
 });
 

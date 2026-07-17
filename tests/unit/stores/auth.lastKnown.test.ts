@@ -26,12 +26,14 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('@/services/firebase', () => ({ db: {}, auth: { currentUser: null } }))
 
+const signOutMock = vi.fn()
+
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: (...args: unknown[]) => onAuthStateChangedMock(...args),
   createUserWithEmailAndPassword: vi.fn(),
   signInWithEmailAndPassword: vi.fn(),
   signInWithPopup: vi.fn(),
-  signOut: vi.fn(),
+  signOut: (...args: unknown[]) => signOutMock(...args),
   GoogleAuthProvider: vi.fn(),
   sendEmailVerification: vi.fn(),
   sendPasswordResetEmail: vi.fn(),
@@ -51,12 +53,13 @@ beforeEach(() => {
   localStorage.clear()
   getDocMock.mockReset()
   onAuthStateChangedMock.mockReset()
+  signOutMock.mockReset()
 })
 
 // eslint-disable-next-line import/first
 import { useAuthStore } from '@/stores/auth'
 // eslint-disable-next-line import/first
-import { getLastKnownAuthState } from '@/utils/authLastKnown'
+import { getLastKnownAuthState, setLastKnownAuthState } from '@/utils/authLastKnown'
 
 describe('auth store — last-known auth state cache (TASK-129)', () => {
   // NOTE: initAuth() guards on a module-level `authUnsubscribe` singleton
@@ -84,5 +87,21 @@ describe('auth store — last-known auth state cache (TASK-129)', () => {
 
     capturedCallback?.({ uid: 'u1', emailVerified: true })
     expect(getLastKnownAuthState()).toBe('authenticated')
+  })
+})
+
+describe('auth store — logout writes last-known "guest" explicitly (review fix batch LOW-1)', () => {
+  it('writes "guest" before reloading, without relying on onAuthStateChanged(null) (which early-returns while isLoggingOut is true)', async () => {
+    const reloadSpy = vi.spyOn(globalThis.location, 'reload').mockImplementation(() => {})
+    setLastKnownAuthState('authenticated')
+    signOutMock.mockResolvedValueOnce(undefined)
+
+    const store = useAuthStore()
+    await store.logout()
+
+    expect(getLastKnownAuthState()).toBe('guest')
+    expect(reloadSpy).toHaveBeenCalledTimes(1)
+
+    reloadSpy.mockRestore()
   })
 })

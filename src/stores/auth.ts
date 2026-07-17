@@ -348,6 +348,11 @@ export const useAuthStore = defineStore('auth', () => {
             await signOut(auth);
             user.value = null;
             emailVerified.value = false;
+            // Review fix batch LOW-1: onAuthStateChanged(null) early-returns
+            // while isLoggingOut is true, so it never writes 'guest' itself
+            // here — today's self-heal-via-reload masks that, but writing it
+            // explicitly removes the hidden dependency on the reload path.
+            setLastKnownAuthState('guest');
             toastStore.show(t('auth.messages.logoutSuccess'), 'success');
             globalThis.location.reload();
             return true;

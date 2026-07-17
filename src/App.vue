@@ -33,8 +33,12 @@ const pageRobots = computed(() => {
 
 // TASK-129 (perf F2): the full-screen auth loader must not cover a route the
 // router guard already decided not to block on (see router/authGuard.ts).
+// Review fix batch HIGH-1: route.matched.length === 0 while the initial
+// navigation is still pending (Vue Router's START_LOCATION has empty meta),
+// so that window must block optimistically rather than read as "route needs
+// no guard" and fall through to a blank RouterView + footer shell.
 const shouldShowAuthLoader = computed(() => {
-  return shouldBlockOnAuthLoading(route.meta, authStore.loading, getLastKnownAuthState());
+  return shouldBlockOnAuthLoading(route.meta, authStore.loading, getLastKnownAuthState(), route.matched.length > 0);
 });
 
 const canonicalUrl = computed(() => {

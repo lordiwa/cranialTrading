@@ -29,6 +29,9 @@ export interface AuthGuardMeta {
  * "authenticated" state) still wait exactly like this.
  */
 const waitForAuthReady = async (authStore: AuthGuardStore): Promise<void> => {
+    // Assumes authStore.loading eventually resolves. If it never does, this
+    // re-arms the 2s fallback forever (dangling detached promise) — unchanged
+    // from the pre-TASK-129 behavior, not something this ticket restructures.
     while (authStore.loading) {
         await new Promise<void>((resolve) => {
             const unwatch = authStore.$subscribe(() => {
@@ -60,10 +63,22 @@ const waitForAuthReady = async (authStore: AuthGuardStore): Promise<void> => {
  *
  * `redirect` is called for the "already painted /login, auth resolved
  * authenticated after the fact" case — in production this is router.push.
+ *
+ * `isStillCurrent` guards that same deferred redirect (review fix batch,
+ * MEDIUM-1): the app may have navigated away from the guarded route (e.g.
+ * user clicked to /about) while auth was still resolving in the background.
+ * Without this check the redirect would fire unconditionally once auth
+ * resolves authenticated, yanking the user back to /saved-matches and
+ * cancelling whatever navigation they made in the meantime — a real risk on
+ * every first deploy, since every already-logged-in user has no stored
+ * last-known yet and always takes this optimistic-paint path once. Defaults
+ * to "always current" so existing callers/tests that don't care about this
+ * are unaffected; production wiring (router/index.ts) passes the real check.
  */
 export const createAuthGuard = (
     authStore: AuthGuardStore,
-    redirect: (path: string) => void
+    redirect: (path: string) => void,
+    isStillCurrent: () => boolean = () => true
 ) => {
     return async (to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext): Promise<void> => {
         const requiresAuth = to.meta.requiresAuth;
@@ -91,7 +106,7 @@ export const createAuthGuard = (
             if (authStore.loading) {
                 await waitForAuthReady(authStore);
             }
-            if (authStore.user) {
+            if (authStore.user && isStillCurrent()) {
                 redirect('/saved-matches');
             }
             return;
@@ -114,13 +129,28 @@ export const createAuthGuard = (
  * createAuthGuard's own call on which routes are allowed to paint before
  * Firebase Auth resolves, so the loader never covers a route the router
  * already decided not to block on.
+ *
+ * `routeConfirmed` (review fix batch, HIGH-1): App.vue feeds this the
+ * CURRENT route's meta via useRoute(), which during the app's very first
+ * (still-pending) navigation is Vue Router's START_LOCATION sentinel — an
+ * empty meta ({}) with matched:[]. Read at face value that looks exactly
+ * like "route requiring neither guard" and would return false, letting
+ * App.vue render a blank RouterView + footer shell for the ENTIRE auth
+ * round-trip on any requiresAuth deep-link (or the '/' → /saved-matches
+ * redirect) instead of the loader. Pass `false` while the route hasn't been
+ * confirmed yet so this blocks optimistically in that window; defaults to
+ * `true` so every existing 3-arg call site is unaffected. Once a guest route
+ * IS confirmed (e.g. /login, guard already called next() synchronously) this
+ * still returns false for it — AC1's early paint is preserved.
  */
 export const shouldBlockOnAuthLoading = (
     meta: AuthGuardMeta,
     authLoading: boolean,
-    lastKnown: LastKnownAuthState | null
+    lastKnown: LastKnownAuthState | null,
+    routeConfirmed = true
 ): boolean => {
     if (!authLoading) return false;
+    if (!routeConfirmed) return true;
     if (!meta.requiresAuth && !meta.requiresGuest) return false;
     if (meta.requiresGuest) return lastKnown === 'authenticated';
     return true;

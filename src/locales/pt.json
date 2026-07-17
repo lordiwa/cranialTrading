@@ -225,6 +225,7 @@
       "weakPassword": "Senha fraca",
       "resetError": "Erro ao redefinir",
       "notAuthenticated": "Usuário não autenticado",
+      "connectionError": "Não foi possível conectar. Verifique sua conexão e tente novamente.",
       "wrongCurrentPassword": "Senha atual incorreta",
       "weakNewPassword": "Nova senha fraca",
       "changePasswordError": "Erro ao alterar senha",

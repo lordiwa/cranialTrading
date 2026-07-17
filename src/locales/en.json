@@ -225,6 +225,7 @@
       "weakPassword": "Weak password",
       "resetError": "Reset error",
       "notAuthenticated": "User not authenticated",
+      "connectionError": "Couldn't connect. Please check your connection and try again.",
       "wrongCurrentPassword": "Wrong current password",
       "weakNewPassword": "Weak new password",
       "changePasswordError": "Error changing password",

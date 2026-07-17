@@ -225,6 +225,7 @@
       "weakPassword": "Contraseña débil",
       "resetError": "Error al restablecer",
       "notAuthenticated": "Usuario no autenticado",
+      "connectionError": "No se pudo conectar. Verifica tu conexión e intenta de nuevo.",
       "wrongCurrentPassword": "Contraseña actual incorrecta",
       "weakNewPassword": "Contraseña nueva débil",
       "changePasswordError": "Error al cambiar contraseña",

@@ -38,6 +38,13 @@ async function measure(browser, throttle) {
     window.__appRenderTime = null;
     const check = () => {
       if (window.__appRenderTime === null) {
+        // TASK-132 review fix (LOW-2): keep in sync with
+        // PAINTED_CONTENT_SELECTOR in src/utils/paintSignal.ts — this
+        // standalone Node script can't import app TS source, so it carries
+        // its own copy of the same literal. stores/auth.ts's
+        // waitForFirstPaintOrTimeout defers the Firebase SDK fetch until
+        // this same condition is true; this script measures how long it
+        // takes.
         const el = document.querySelector('#app header, #app main, #app input, #app button');
         if (el) { window.__appRenderTime = Math.round(performance.now()); return; }
         requestAnimationFrame(check);

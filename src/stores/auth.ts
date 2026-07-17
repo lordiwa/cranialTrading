@@ -9,9 +9,8 @@ import { useToastStore } from './toast';
 import { t, useI18n } from '../composables/useI18n';
 import { setLastKnownAuthState } from '../utils/authLastKnown';
 import { formatDate } from '../utils/formatDate';
+import { PAINTED_CONTENT_SELECTOR } from '../utils/paintSignal';
 import { isValidUsername, normalizeUsername } from '../utils/username';
-
-let authUnsubscribe: (() => void) | null = null;
 
 /**
  * TASK-132 (perf F4): this store used to statically import firebase/auth,
@@ -39,6 +38,22 @@ interface FirebaseDeps {
     firestoreFns: FirebaseFirestoreModule;
     auth: FirebaseServicesModule['auth'];
     db: FirebaseServicesModule['db'];
+}
+
+/**
+ * TASK-132 review fix (HIGH-1, LOW-1): tags any failure that originates from
+ * loadFirebaseDeps()'s dynamic import() as distinct from a genuine Firebase
+ * Auth/Firestore error (wrong password, permission-denied, etc.), so
+ * catch blocks downstream (login, register, ensureSubscription) can show a
+ * "check your connection" message instead of misclassifying a network/chunk
+ * failure as invalid credentials or a generic save error.
+ */
+class FirebaseDepsLoadError extends Error {
+    constructor(cause: unknown) {
+        super('Failed to load the Firebase SDK');
+        this.name = 'FirebaseDepsLoadError';
+        this.cause = cause;
+    }
 }
 
 let firebaseDepsPromise: Promise<FirebaseDeps> | null = null;
@@ -69,7 +84,7 @@ const waitForFirstPaintOrTimeout = (timeoutMs: number): Promise<void> => {
         };
         const check = (): void => {
             if (done) return;
-            if (document.querySelector('#app header, #app main, #app input, #app button')) {
+            if (document.querySelector(PAINTED_CONTENT_SELECTOR)) {
                 finish();
                 return;
             }
@@ -91,7 +106,18 @@ const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
             firestoreFns,
             auth: services.auth,
             db: services.db,
-        }));
+        })).catch((error: unknown) => {
+            // TASK-132 review fix (HIGH-1): a failed dynamic import (network
+            // blip, or a stale deployment whose chunk hash no longer exists)
+            // used to memoize the REJECTED promise forever — every future
+            // caller (login, register, initAuth's subscription, ...) would
+            // replay the same dead rejection with no way to recover short of
+            // a full page reload. Clear the memo so the NEXT call attempts a
+            // fresh import(), then re-throw (tagged) so this specific
+            // caller's own catch still runs.
+            firebaseDepsPromise = null;
+            throw new FirebaseDepsLoadError(error);
+        });
     }
     return firebaseDepsPromise;
 };
@@ -130,7 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // TASK-132 review fix: the ACTUAL download+subscribe work, factored out
     // of initAuth() and memoized on its own (independent of initAuth's
-    // re-entrancy guard) so it can be triggered from two different places —
+    // re-entrancy) so it can be triggered from two different places —
     // initAuth()'s deferred wait (guest paths) and firebaseNeededNow()'s
     // eager call (auth-blocking paths, see below) — without double-firing.
     // Whichever caller reaches this first wins; the other gets the same
@@ -139,7 +165,14 @@ export const useAuthStore = defineStore('auth', () => {
     const ensureSubscription = (): Promise<void> => {
         if (!subscriptionPromise) {
             subscriptionPromise = loadFirebaseDeps().then(({ authFns, auth }) => {
-                authUnsubscribe = authFns.onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+                // Return value (the real unsubscribe fn) is intentionally
+                // not retained — nothing in this store ever tears the
+                // subscription down (logout() reloads the page instead,
+                // which naturally discards it), and TASK-132's review fix
+                // repurposed the old module-level authUnsubscribe variable
+                // as a re-entrancy guard for initAuth(), a role now filled
+                // by subscriptionPromise/initAuthPromise below instead.
+                authFns.onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
                     if (isLoggingOut.value) return;
 
                     if (firebaseUser) {
@@ -156,6 +189,26 @@ export const useAuthStore = defineStore('auth', () => {
                         setLastKnownAuthState('guest');
                     }
                 });
+            }).catch((error: unknown) => {
+                // TASK-132 review fix (HIGH-1): a failed SDK load must not
+                // leave the app stuck on the auth loader forever — with no
+                // catch here, `loading` had no writer left reachable (only
+                // the subscription callback above and loadUserData's finally
+                // ever flip it false, and neither runs if we never even got
+                // a subscription). Resolve the auth question as "unknown, not
+                // logged in" — flips the loader off — WITHOUT writing
+                // last-known (an unresolved failure is not the same
+                // confirmed signal as a real "guest" from Firebase, and must
+                // not be cached as one for the next app load's optimistic
+                // paint). Reset every memo (this one and initAuth's) so the
+                // next trigger — a retried action, a new navigation —
+                // attempts a fresh load instead of replaying the same dead
+                // promise.
+                subscriptionPromise = null;
+                initAuthPromise = null;
+                loading.value = false;
+                logAuthError('Failed to initialize Firebase Auth', error);
+                toastStore.show(t('auth.messages.connectionError'), 'error');
             });
         }
         return subscriptionPromise;
@@ -177,14 +230,23 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const firebaseNeededNow = (): Promise<void> => ensureSubscription();
 
-    const initAuth = (): Promise<void> => {
-        if (authUnsubscribe) return ensureSubscription(); // Already scheduled/running
+    // TASK-132 review fix (MEDIUM-1): initAuth's own memo, SEPARATE from
+    // subscriptionPromise. main.ts's call and App.vue's onMounted call both
+    // reach initAuth() — the first call's `??=` wins and every later call
+    // (including that App.vue re-call, which fires AFTER app.mount(), i.e.
+    // well before first paint) reuses the SAME deferred promise instead of
+    // starting its own paint-poller or — the actual bug this fixes —
+    // re-triggering ensureSubscription() immediately and defeating the
+    // deferral outright.
+    let initAuthPromise: Promise<void> | null = null;
 
-        // TASK-132: synchronous re-entrancy guard, set BEFORE the dynamic
-        // import resolves. main.ts and App.vue's onMounted both call
-        // initAuth() (idempotent wiring from TASK-129); without this the two
-        // calls would race and each start their own deferred-wait poller.
-        authUnsubscribe = () => { /* replaced once the real subscription exists */ };
+    const initAuth = (): Promise<void> => {
+        // If firebaseNeededNow() already kicked off (or finished) the real
+        // subscription — the router guard decided THIS navigation is itself
+        // gated on auth — reuse that instead of ALSO deferring behind the
+        // paint signal, which is only useful pre-emptively on the common
+        // guest path.
+        if (subscriptionPromise) return subscriptionPromise;
 
         // TASK-132: making the import() dynamic only kept it out of the
         // static module graph (no modulepreload) — the fetch itself was
@@ -202,7 +264,8 @@ export const useAuthStore = defineStore('auth', () => {
         // services/publicCardSearch.ts fix, same ticket) — a short cap
         // risked the timeout branch winning the race and reintroducing the
         // exact bandwidth contention this is meant to avoid.
-        return waitForFirstPaintOrTimeout(3000).then(ensureSubscription);
+        initAuthPromise ??= waitForFirstPaintOrTimeout(3000).then(ensureSubscription);
+        return initAuthPromise;
     };
 
     const loadUserData = async (userId: string) => {
@@ -334,8 +397,17 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.accountCreated'), 'success');
             return true;
         } catch (error: unknown) {
-            const errMsg = error instanceof Error ? error.message : t('auth.messages.registerError');
-            toastStore.show(errMsg, 'error');
+            // TASK-132 review fix (LOW-1): classify a failed dynamic import
+            // (network blip, stale deployment) separately — it would
+            // otherwise surface as this catch's raw error.message (an
+            // un-localized, user-unfriendly "Failed to load the Firebase
+            // SDK") instead of a proper retry-able toast.
+            if (error instanceof FirebaseDepsLoadError) {
+                toastStore.show(t('auth.messages.connectionError'), 'error');
+            } else {
+                const errMsg = error instanceof Error ? error.message : t('auth.messages.registerError');
+                toastStore.show(errMsg, 'error');
+            }
             return false;
         }
     };
@@ -399,8 +471,16 @@ export const useAuthStore = defineStore('auth', () => {
                 toastStore.show(t('auth.messages.verifyEmail'), 'info');
             }
             return true;
-        } catch {
-            toastStore.show(t('auth.messages.invalidCredentials'), 'error');
+        } catch (error: unknown) {
+            // TASK-132 review fix (LOW-1): a failed dynamic import (network
+            // blip, stale deployment) must not be reported to the user as
+            // "invalid credentials" — that sends them chasing a password
+            // reset for a problem a page refresh would fix.
+            if (error instanceof FirebaseDepsLoadError) {
+                toastStore.show(t('auth.messages.connectionError'), 'error');
+            } else {
+                toastStore.show(t('auth.messages.invalidCredentials'), 'error');
+            }
             return false;
         }
     };

@@ -44,9 +44,11 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
   // (TCG) synchronously for zero perceived latency; this fires-and-forget from
   // addItem and upgrades the item's price in place once the CK lookup resolves.
   // Explicit fallback: if CK has no data for the set/card, or the lookup fails,
-  // the captured TCG price is left untouched. Foil-aware: prefers retailFoil
-  // for foil items (falling back to retail if CK has no foil price), retail
-  // for non-foil items — same CardPrices shape TASK-114 used for hero/binder.
+  // the captured TCG price is left untouched. Foil-aware: foil items only
+  // upgrade when CK publishes an actual retailFoil price — a missing
+  // retailFoil does NOT fall back to the non-foil retail (that would
+  // misrepresent a foil card's price), so the captured TCG price wins
+  // instead (owner decision). Non-foil items use retail as before.
   async function _upgradePriceFromCK(username: string, scryfallId: string, cardId: string, setCode?: string) {
     try {
       const prices = await getCardPrices(scryfallId, setCode)
@@ -58,8 +60,9 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
       const item = _findItem(username, scryfallId, cardId)
       if (!item) return
 
-      const ckRetail = item.foil ? (ck.retailFoil ?? ck.retail) : ck.retail
-      if (ckRetail == null) return
+      const ckRetail = item.foil ? ck.retailFoil : ck.retail
+      // Guard against a 0/null CK price clobbering a real captured TCG price.
+      if (ckRetail == null || ckRetail <= 0) return
 
       item.price = ckRetail
       _persist()

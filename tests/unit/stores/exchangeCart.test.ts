@@ -403,7 +403,7 @@ describe('exchangeCart store', () => {
       expect(store.getCart('alice')!.items[0].price).toBe(12.5)
     })
 
-    it('falls back to CK retail for foil items when retailFoil is unavailable', async () => {
+    it('keeps the captured TCG price for foil items when retailFoil is unavailable (does not fall back to non-foil retail)', async () => {
       mockGetCardPrices.mockResolvedValue({
         cardKingdom: { retail: 5, retailFoil: null, buylist: null, buylistFoil: null },
       })
@@ -411,7 +411,18 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem({ foil: true, price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(5)
+      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+    })
+
+    it('keeps the captured TCG price when CK retail resolves to 0', async () => {
+      mockGetCardPrices.mockResolvedValue({
+        cardKingdom: { retail: 0, retailFoil: null, buylist: null, buylistFoil: null },
+      })
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
+      await flushCKLookup()
+
+      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
     })
 
     it('does not resurrect an item removed from the cart before the lookup resolves', async () => {

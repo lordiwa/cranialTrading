@@ -6,7 +6,7 @@ test.describe('Collection CRUD', () => {
     await collectionPage.goto();
   });
 
-  test('collection page loads with card grid visible', async ({ collectionPage, page }) => {
+  test('collection page loads with card grid visible @smoke', async ({ collectionPage, page }) => {
     await expect(page).toHaveURL(/\/collection/);
     await expect(collectionPage.statusFilters).toBeVisible();
   });

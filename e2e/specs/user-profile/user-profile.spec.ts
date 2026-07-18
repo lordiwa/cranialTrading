@@ -1,7 +1,7 @@
 import { test, expect } from '../../fixtures/test';
 
 test.describe('User Profile', () => {
-  test('view public user profile: username, location, avatar visible', async ({ userProfilePage }) => {
+  test('view public user profile: username, location, avatar visible @smoke', async ({ userProfilePage }) => {
     await userProfilePage.goto('rafael');
     await expect(userProfilePage.username).toBeVisible({ timeout: 10_000 });
   });

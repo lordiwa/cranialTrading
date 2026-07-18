@@ -153,6 +153,35 @@ npm run e2e                # Playwright E2E tests
 - New pure functions should be TDD'd: write failing test first
 - Run `npm run test:unit` before committing
 
+### E2E: Three-Level Policy (MANDATORY)
+
+**The full E2E suite (`npm run e2e`, 133 tests, ~13 min, 1 worker) is expensive — running it on every ticket is the main drag on a loop. Instead, E2E runs at three levels, scoped to when each is actually needed:**
+
+| Level | When | Command | Est. duration |
+|-------|------|---------|----------------|
+| Smoke | Every ticket | `npm run e2e:smoke` | ~2 min |
+| Targeted | Every ticket (area(s) touched) | `npm run e2e:<area>` | ~3-5 min |
+| Full suite | **Once per tanda, before push to `develop`** | `npm run e2e` | ~13 min |
+
+**The push-to-develop gate is unchanged: the full suite is still mandatory before every push to `develop` (see the Deployment Flow above). This policy only moves the full-suite run from "every ticket" to "once per tanda, right before the push" — it does not weaken the gate.**
+
+Smoke tests are tagged `@smoke` in their title (e.g. `test('successful login redirects to saved-matches @smoke', ...)`) and run across whatever project(s) Playwright routes them to (`chromium` / `no-auth-tests`) — no separate config needed.
+
+Area → specs mapping (targeted scripts run only that folder, still through the full Playwright project/auth setup):
+
+| Area | Folder | Script |
+|------|--------|--------|
+| Auth | `e2e/specs/auth/` | `npm run e2e:auth` |
+| Collection | `e2e/specs/collection/` | `npm run e2e:collection` |
+| Decks | `e2e/specs/decks/` | `npm run e2e:decks` |
+| Matches | `e2e/specs/matches/` | `npm run e2e:matches` |
+| Search | `e2e/specs/search/` | `npm run e2e:search` |
+| Profile | `e2e/specs/user-profile/` | `npm run e2e:profile` |
+
+For areas without a dedicated script (binders, market, messages, settings, etc.), run `npx playwright test e2e/specs/<folder>` directly with the same flags as `npm run e2e`.
+
+Known flaky specs — never rely on these for smoke/targeted signal, and don't tag them `@smoke`: `auth/register.spec.ts` ("successful registration" — Firebase rate-limit on `sendEmailVerification`) and `search/search.spec.ts` ("selecting autocomplete suggestion" — depends on a live Scryfall suggestion having a price). Both pass in isolation; they are not code regressions.
+
 ## Architecture
 
 ### Tech Stack

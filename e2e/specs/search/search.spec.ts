@@ -6,7 +6,7 @@ test.describe('Search', () => {
     await searchPage.goto();
   });
 
-  test('search by card name returns results grid', async ({ searchPage }) => {
+  test('search by card name returns results grid @smoke', async ({ searchPage }) => {
     await searchPage.search(SEARCH_TERMS.common);
 
     const count = await searchPage.getResultCount();

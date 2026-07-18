@@ -6,7 +6,7 @@ test.describe('Login', () => {
     await loginPage.goto();
   });
 
-  test('successful login redirects to saved-matches', async ({ loginPage, page }) => {
+  test('successful login redirects to saved-matches @smoke', async ({ loginPage, page }) => {
     const email = process.env.TEST_USER_A_EMAIL!;
     const password = process.env.TEST_USER_A_PASSWORD!;
 

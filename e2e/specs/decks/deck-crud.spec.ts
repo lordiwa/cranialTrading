@@ -5,7 +5,7 @@ test.describe('Deck CRUD', () => {
     await decksPage.goto();
   });
 
-  test('create new deck → appears in deck list', async ({ decksPage, commonPage }) => {
+  test('create new deck → appears in deck list @smoke', async ({ decksPage, commonPage }) => {
     const deckName = `E2E Deck ${Date.now()}`;
     await decksPage.createDeck(deckName, 'modern');
 

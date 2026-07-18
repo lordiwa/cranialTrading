@@ -5,7 +5,7 @@ test.describe('Match Management', () => {
     await matchesPage.goto();
   });
 
-  test('matches page loads with tab navigation', async ({ matchesPage }) => {
+  test('matches page loads with tab navigation @smoke', async ({ matchesPage }) => {
     await expect(matchesPage.tabs.new).toBeVisible();
     await expect(matchesPage.tabs.sent).toBeVisible();
     await expect(matchesPage.tabs.saved).toBeVisible();

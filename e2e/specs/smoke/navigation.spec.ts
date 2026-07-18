@@ -8,7 +8,7 @@ test.describe('Navigation Smoke Tests', () => {
     await ensureLoggedIn(page, '/collection');
   });
 
-  test('nav: Collection link navigates to /collection', async ({ navigationPage, page }) => {
+  test('nav: Collection link navigates to /collection @smoke', async ({ navigationPage, page }) => {
     await navigationPage.navigateTo('collection');
     await expect(page).toHaveURL(/\/collection/);
   });
@@ -33,7 +33,7 @@ test.describe('Navigation Smoke Tests', () => {
     }
   });
 
-  test('tab switching renders correct content', async ({ page }) => {
+  test('tab switching renders correct content @smoke', async ({ page }) => {
     // Phase 03: tabs are now RouterLinks (separate views), not internal state toggles.
     // Use ensureLoggedIn to guarantee auth + mounted CollectionView before asserting.
     await ensureLoggedIn(page, ROUTES.collection);

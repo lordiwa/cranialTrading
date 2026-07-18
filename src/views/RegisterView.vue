@@ -48,6 +48,12 @@ const changingEmail = ref(false);
 const passwordScore = computed(() => getPasswordStrengthScore(password.value));
 const passwordStrengthKey = computed(() => getPasswordStrengthLabel(passwordScore.value));
 
+// TASK-126 round 3 (review MEDIUM-2): `email` is a local ref, empty on a
+// fresh mount — falls back to the already-created account's own email from
+// the store so the remounted pending screen doesn't show "we sent an email
+// to " blank.
+const displayEmail = computed(() => email.value || authStore.user?.email || '');
+
 const handleRegister = async () => {
   if (!email.value || !password.value || !username.value || !location.value) return;
 
@@ -178,7 +184,7 @@ watch(
 
           <div class="bg-surface-2 border border-line rounded-md p-4 text-left mb-5">
             <p class="text-small text-silver-70">
-              {{ t('auth.verify.message') }} <span class="text-neon font-bold">{{ email }}</span>
+              {{ t('auth.verify.message') }} <span class="text-neon font-bold">{{ displayEmail }}</span>
             </p>
             <p class="text-tiny text-silver-50 mt-1.5">
               {{ t('auth.verify.instruction') }}

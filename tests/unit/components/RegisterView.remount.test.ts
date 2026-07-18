@@ -146,6 +146,10 @@ describe('RegisterView remount with an existing session (TASK-126)', () => {
 
     expect(wrapper.find('[data-testid="register-submit"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('auth.verify.title')
+    // Review MEDIUM-2 (round 3): `email` is a local ref, empty on a fresh
+    // mount — the pending screen must fall back to the account's own email
+    // from the store, not show "We've sent an email to " blank.
+    expect(wrapper.text()).toContain('pending@example.com')
   })
 
   it('never re-triggers register() on remount with an unverified logged-in user (no submit path exists)', async () => {

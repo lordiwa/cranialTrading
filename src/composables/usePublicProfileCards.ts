@@ -82,6 +82,11 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
   let cursor: QueryDocumentSnapshot | null = null
   let generation = 0
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  // True only once a search has actually EXECUTED (set inside runSearch, not
+  // when a debounce is merely scheduled) — a below-threshold term must only
+  // restore pagination when a search actually displaced it (review addendum
+  // M2). Reset alongside the other per-load flags in loadFirstPage.
+  let searchActive = false
 
   const clearSearchDebounce = (): void => {
     if (searchDebounceTimer !== null) {
@@ -118,6 +123,7 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
     // — so a fresh loadFirstPage must clear them.
     loadingMore.value = false
     searching.value = false
+    searchActive = false
     clearSearchDebounce()
 
     // Fire-and-forget — decoupled from the page fetch so it never blocks the
@@ -165,6 +171,13 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
     const myGeneration = ++generation
     cursor = null
     hasMore.value = false // search is a single capped page — never further paginated
+    // Review addendum M1: a loadMore() left in flight sees its generation go
+    // stale (via ++generation above) and skips resetting loadingMore itself
+    // (same reasoning loadFirstPage documents) — without this, entering
+    // search mode mid-loadMore left loadingMore stuck true, showing a
+    // perpetual "loading more" spinner under every group in search mode.
+    loadingMore.value = false
+    searchActive = true // review addendum M2 — this search actually executed
     searching.value = true
     try {
       const page = await searchUserPublicCards(userId, term, SEARCH_PAGE_SIZE)
@@ -186,10 +199,16 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
     clearSearchDebounce()
     const trimmed = term.trim()
     if (trimmed.length < MIN_SEARCH_LEN) {
-      // Below threshold (including empty) — no server-side search to debounce.
-      // Restores normal pagination from page 1 (see file-level doc comment
-      // for why this resets to page 1 instead of caching pre-search state).
-      void loadFirstPage(userId)
+      // Below threshold (including empty) — no server-side search to
+      // debounce. Only restore pagination if a search actually executed and
+      // displaced it (review addendum M2) — otherwise this is a no-op: the
+      // very first keystroke of any search (or a debounce cleared before it
+      // fired) never touched `cards`, so there is nothing to restore, and
+      // unconditionally refetching page 1 here used to blank the grid on
+      // every first keystroke before the real search results arrived.
+      if (searchActive) {
+        void loadFirstPage(userId)
+      }
       return
     }
     searchDebounceTimer = setTimeout(() => {

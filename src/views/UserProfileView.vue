@@ -281,7 +281,11 @@ const {
 // 2 chars, the composable falls back to normal pagination on its own.
 // Advanced/chip filters and groupBy stay local to whatever `cards` currently
 // holds (search results OR paginated cards) — they never reach past what's
-// loaded, a documented limit of this approach.
+// loaded, a documented limit of this approach. LOW (review addendum): the
+// server search is a cardNameLower PREFIX match only — a card that used to
+// surface via useCardFilter's local substring-on-name-or-edition check
+// (mid-word match, or a match on `edition`) will not be found once search
+// mode kicks in; only whole-profile prefix-on-name reach is in scope here.
 watch(filterQuery, (term) => {
   if (!userId.value) return;
   setPublicCardsSearchTerm(userId.value, term);

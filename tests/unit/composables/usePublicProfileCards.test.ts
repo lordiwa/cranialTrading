@@ -351,31 +351,118 @@ describe('usePublicProfileCards', () => {
       expect(searching.value).toBe(false)
     })
 
-    it('a term shorter than 2 characters cancels any pending debounce and restores normal pagination via loadFirstPage', async () => {
+    // TASK-138 review addendum M2: a term shorter than MIN_SEARCH_LEN used to
+    // call loadFirstPage() UNCONDITIONALLY, even when no search had actually
+    // executed yet — so the very first keystroke of any search blanked the
+    // grid, refetched page 1 + counts, then ~300ms later got replaced by the
+    // real search results (a visible flash + wasted reads). Below-threshold
+    // terms must only restore pagination when a search was ACTUALLY applied.
+    it('a first keystroke below MIN_SEARCH_LEN is a no-op when no search was ever active (M2 regression)', async () => {
       mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'page-1' })], null, false))
       const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
       await loadFirstPage('user-1')
       mockGetPage.mockClear()
-      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
 
-      setSearchTerm('user-1', 'b') // 1 char — below MIN_SEARCH_LEN
+      setSearchTerm('user-1', 'b') // 1 char — below MIN_SEARCH_LEN, first keystroke
       await vi.advanceTimersByTimeAsync(300)
 
       expect(mockSearch).not.toHaveBeenCalled()
-      expect(mockGetPage).toHaveBeenCalledWith('user-1', expect.any(Number), null)
+      expect(mockGetPage).not.toHaveBeenCalled() // no blank-and-refetch flash
     })
 
-    it('an empty term restores normal pagination', async () => {
+    it('an empty term is a no-op when no search was ever active (M2 regression)', async () => {
       mockGetPage.mockResolvedValueOnce(makePage([], null, false))
       const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
       await loadFirstPage('user-1')
       mockGetPage.mockClear()
-      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
 
       setSearchTerm('user-1', '')
       await vi.advanceTimersByTimeAsync(300)
 
-      expect(mockGetPage).toHaveBeenCalledTimes(1)
+      expect(mockGetPage).not.toHaveBeenCalled()
+    })
+
+    it('a term shorter than MIN_SEARCH_LEN restores pagination once a search was actually applied (M2)', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      mockSearch.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'found-1' })], null, false))
+      const { cards, loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300) // search actually executes
+      expect(cards.value.map(c => c.id)).toEqual(['found-1'])
+
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'restored-1' })], null, false))
+      setSearchTerm('user-1', 'b') // deleted back down below MIN_SEARCH_LEN
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockGetPage).toHaveBeenCalledWith('user-1', expect.any(Number), null)
+      expect(cards.value.map(c => c.id)).toEqual(['restored-1'])
+    })
+
+    it('an empty term restores pagination once a search was actually applied (M2)', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      mockSearch.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'found-1' })], null, false))
+      const { cards, loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300) // search actually executes
+      expect(cards.value.map(c => c.id)).toEqual(['found-1'])
+
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'restored-1' })], null, false))
+      setSearchTerm('user-1', '')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockGetPage).toHaveBeenCalledWith('user-1', expect.any(Number), null)
+      expect(cards.value.map(c => c.id)).toEqual(['restored-1'])
+    })
+
+    // TASK-138 review addendum M2 (secondary bug): a debounced search that
+    // was scheduled but never actually EXECUTED (cleared before the 300ms
+    // window elapsed) must not count as "a search was applied" either — no
+    // pagination was ever displaced, so there's nothing to restore.
+    it('a debounce that gets cleared before it fires does not count as an applied search (M2)', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+      mockGetPage.mockClear()
+
+      setSearchTerm('user-1', 'bo') // schedules a debounce — never fires
+      vi.advanceTimersByTime(100)
+      setSearchTerm('user-1', 'b') // dropped below threshold before the debounce elapsed
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockSearch).not.toHaveBeenCalled()
+      expect(mockGetPage).not.toHaveBeenCalled()
+    })
+
+    // TASK-138 review addendum M1: runSearch's finally only reset `searching`
+    // — a loadMore() left in flight when a search starts sees its generation
+    // go stale (via runSearch's ++generation) and skips resetting
+    // `loadingMore` itself (same reasoning loadFirstPage already documents),
+    // so entering search mode while a loadMore was in flight left
+    // loadingMore stuck true — a perpetual "loading more" spinner under
+    // every group for as long as search mode was active.
+    it('resets loadingMore when a search starts while a loadMore is in flight (M1)', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], { id: 'x' }, true))
+      const { loadFirstPage, loadingMore, loadMore, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      let resolveLoadMore: (v: PublicCardsPage) => void = () => {}
+      const loadMorePending = new Promise<PublicCardsPage>((resolve) => { resolveLoadMore = resolve })
+      mockGetPage.mockReturnValueOnce(loadMorePending)
+      const loadMoreCall = loadMore('user-1')
+      expect(loadingMore.value).toBe(true) // loadMore in flight
+
+      mockSearch.mockResolvedValueOnce(makePage([], null, false))
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(loadingMore.value).toBe(false)
+
+      resolveLoadMore(makePage([], null, false)) // let the stale loadMore settle
+      await loadMoreCall
     })
 
     it('clearing the term cancels a pending debounced search — it never fires after the term is cleared', async () => {

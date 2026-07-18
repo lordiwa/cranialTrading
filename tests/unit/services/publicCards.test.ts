@@ -54,7 +54,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { batchSyncCardsToPublic, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 
 beforeEach(() => {
   setDocMock.mockClear()
@@ -389,5 +389,86 @@ describe('getUserPublicCardsCount', () => {
     const count = await getUserPublicCardsCount('user-1')
 
     expect(count).toBe(42)
+  })
+})
+
+/**
+ * TASK-138 AC1: server-side prefix search over a single user's public cards,
+ * so text search on a public profile can find cards NOT yet loaded into the
+ * grid (the pre-fix bug: text search only filtered whatever ~60-card page(s)
+ * had already been scrolled into view).
+ *
+ * Filters on the SAME composite index as getUserPublicCardsPage's userId
+ * equality, but ranges on cardNameLower instead of ordering by cardName —
+ * requires the NEW composite index `public_cards: userId ASC, cardNameLower
+ * ASC` added to firestore.indexes.json in this same commit (deploy is manual,
+ * done by the team lead after this commit lands).
+ *
+ * Deliberately capped at a single page (no cursor/hasMore pagination of
+ * search results themselves, unlike getUserPublicCardsPage) — see
+ * usePublicProfileCards.ts for why.
+ */
+describe('searchUserPublicCards', () => {
+  const makeDoc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data })
+
+  it('queries public_cards filtered by userId with a cardNameLower prefix range, ordered by cardNameLower', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+
+    await searchUserPublicCards('user-1', 'Light', 50)
+
+    expect(collectionMock).toHaveBeenCalledWith({}, 'public_cards')
+    expect(whereMock).toHaveBeenCalledWith('userId', '==', 'user-1')
+    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '>=', 'light')
+    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '<=', 'light')
+    expect(orderByMock).toHaveBeenCalledWith('cardNameLower')
+  })
+
+  it('normalizes the search term to lowercase before querying (regression: uppercase input must still match lowercased cardNameLower)', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+
+    await searchUserPublicCards('user-1', 'LIGHTNING', 50)
+
+    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '>=', 'lightning')
+    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '<=', 'lightning')
+  })
+
+  it('requests pageSize+1 docs and trims to pageSize with hasMore=true when the cap is exceeded', async () => {
+    const docs = [
+      makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' }),
+      makeDoc('c1', { cardId: 'c1', userId: 'user-1', cardName: 'Card 1', status: 'trade' }),
+      makeDoc('c2', { cardId: 'c2', userId: 'user-1', cardName: 'Card 2', status: 'sale' }),
+    ]
+    getDocsMock.mockResolvedValueOnce({ docs })
+
+    const page = await searchUserPublicCards('user-1', 'car', 2)
+
+    expect(limitMock).toHaveBeenCalledWith(3)
+    expect(page.cards).toHaveLength(2)
+    expect(page.hasMore).toBe(true)
+  })
+
+  it('reports hasMore=false when results are fewer than pageSize', async () => {
+    const docs = [makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' })]
+    getDocsMock.mockResolvedValueOnce({ docs })
+
+    const page = await searchUserPublicCards('user-1', 'car', 50)
+
+    expect(page.cards).toHaveLength(1)
+    expect(page.hasMore).toBe(false)
+  })
+
+  it('returns an empty page without querying when the term is shorter than 2 characters', async () => {
+    const page = await searchUserPublicCards('user-1', 'a', 50)
+
+    expect(page.cards).toEqual([])
+    expect(page.hasMore).toBe(false)
+    expect(getDocsMock).not.toHaveBeenCalled()
+  })
+
+  it('returns an empty page without querying for a blank/whitespace-only term', async () => {
+    const page = await searchUserPublicCards('user-1', '   ', 50)
+
+    expect(page.cards).toEqual([])
+    expect(getDocsMock).not.toHaveBeenCalled()
   })
 })

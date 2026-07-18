@@ -518,6 +518,54 @@ export async function getUserPublicCardsPage(
   }
 }
 
+/**
+ * Server-side prefix search over a single user's public cards (TASK-138 AC1).
+ *
+ * Text search on the public profile used to filter only whatever page(s)
+ * getUserPublicCardsPage had already loaded (~60 of potentially 5000+ cards)
+ * — finding a specific card in a large profile was effectively impossible
+ * from the UI. This queries `cardNameLower` directly against Firestore,
+ * scoped to `userId`, so it reaches cards regardless of pagination state.
+ *
+ * Requires the composite index `public_cards: userId ASC, cardNameLower ASC`
+ * (firestore.indexes.json) — deploy is manual, done by the team lead.
+ *
+ * Deliberately NOT cursor-paginated like getUserPublicCardsPage: this is a
+ * single capped page (default 50). A "find this card" search returning 50
+ * name-prefix matches within one user's profile covers the realistic case;
+ * paginating search results themselves would double the gen-token/debounce
+ * surface in usePublicProfileCards for a scenario (>50 same-prefix cards for
+ * one seller) rare enough not to justify it here.
+ */
+export async function searchUserPublicCards(
+  userId: string,
+  term: string,
+  pageSize = 50
+): Promise<PublicCardsPage> {
+  const termLower = term.trim().toLowerCase()
+  if (termLower.length < 2) {
+    return { cards: [], cursor: null, hasMore: false }
+  }
+
+  const constraints = [
+    where('userId', '==', userId),
+    where('cardNameLower', '>=', termLower),
+    where('cardNameLower', '<=', termLower + ''),
+    orderBy('cardNameLower'),
+    limit(pageSize + 1),
+  ]
+  const snapshot = await getDocs(query(collection(db, 'public_cards'), ...constraints))
+
+  const hasMore = snapshot.docs.length > pageSize
+  const pageDocs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
+
+  return {
+    cards: pageDocs.map(d => ({ ...d.data(), docId: d.id }) as PublicCard),
+    cursor: pageDocs.length > 0 ? (pageDocs[pageDocs.length - 1] ?? null) : null,
+    hasMore,
+  }
+}
+
 export interface PublicCardStatusCounts {
   sale: number
   trade: number

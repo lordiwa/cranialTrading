@@ -13,15 +13,17 @@
 vi.mock('@/services/publicCards', () => ({
   getUserPublicCardsPage: vi.fn(),
   getUserPublicCardStatusCounts: vi.fn(),
+  searchUserPublicCards: vi.fn(),
 }))
 
 // eslint-disable-next-line import/first
-import { getUserPublicCardsPage, getUserPublicCardStatusCounts, type PublicCard, type PublicCardsPage } from '@/services/publicCards'
+import { getUserPublicCardsPage, getUserPublicCardStatusCounts, type PublicCard, type PublicCardsPage, searchUserPublicCards } from '@/services/publicCards'
 // eslint-disable-next-line import/first
 import { usePublicProfileCards } from '@/composables/usePublicProfileCards'
 
 const mockGetPage = vi.mocked(getUserPublicCardsPage)
 const mockGetCounts = vi.mocked(getUserPublicCardStatusCounts)
+const mockSearch = vi.mocked(searchUserPublicCards)
 
 function makePublicCard(overrides: Partial<PublicCard> = {}): PublicCard {
   return {
@@ -52,6 +54,7 @@ function makePage(cards: PublicCard[], cursor: unknown, hasMore: boolean): Publi
 beforeEach(() => {
   mockGetPage.mockReset()
   mockGetCounts.mockReset()
+  mockSearch.mockReset()
   mockGetCounts.mockResolvedValue({ sale: 0, trade: 0 })
 })
 
@@ -247,6 +250,206 @@ describe('usePublicProfileCards', () => {
 
       expect(saleCount.value).toBe(3)
       expect(tradeCount.value).toBe(1)
+    })
+  })
+
+  /**
+   * TASK-138 AC1: setSearchTerm wires the public profile's text search to
+   * the server-side prefix query (searchUserPublicCards) instead of only
+   * filtering whatever page(s) had already loaded. Debounced ~300ms, guarded
+   * by the SAME generation token loadFirstPage/loadMore already share — a
+   * search or pagination response resolving after a newer call (new term,
+   * cleared term, or profile switch) must never win.
+   */
+  describe('setSearchTerm', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('does not query before the debounce window elapses', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      vi.advanceTimersByTime(299)
+
+      expect(mockSearch).not.toHaveBeenCalled()
+    })
+
+    it('queries searchUserPublicCards with the trimmed term after the debounce window', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      mockSearch.mockResolvedValueOnce(makePage([], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockSearch).toHaveBeenCalledTimes(1)
+      expect(mockSearch).toHaveBeenCalledWith('user-1', 'bolt', expect.any(Number))
+    })
+
+    it('coalesces rapid successive calls into a single search using the last term', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      mockSearch.mockResolvedValueOnce(makePage([], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bo')
+      vi.advanceTimersByTime(100)
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockSearch).toHaveBeenCalledTimes(1)
+      expect(mockSearch).toHaveBeenCalledWith('user-1', 'bolt', expect.any(Number))
+    })
+
+    it('populates cards from the search results, replacing whatever was paginated in', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'paged-1' })], { id: 'x' }, true))
+      mockSearch.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'found-1' })], null, false))
+      const { cards, loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+      expect(cards.value.map(c => c.id)).toEqual(['paged-1'])
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(cards.value.map(c => c.id)).toEqual(['found-1'])
+    })
+
+    it('sets hasMore=false for search results — search is a single capped page, not further paginated', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], { id: 'x' }, true))
+      mockSearch.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'found-1' })], null, false))
+      const { hasMore, loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+      expect(hasMore.value).toBe(true)
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(hasMore.value).toBe(false)
+    })
+
+    it('toggles searching true while the query is in flight, false after it resolves', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      let resolveSearch: (v: PublicCardsPage) => void = () => {}
+      const pending = new Promise<PublicCardsPage>((resolve) => { resolveSearch = resolve })
+      mockSearch.mockReturnValueOnce(pending)
+      const { loadFirstPage, searching, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+      expect(searching.value).toBe(true)
+
+      resolveSearch(makePage([], null, false))
+      await pending
+      expect(searching.value).toBe(false)
+    })
+
+    it('a term shorter than 2 characters cancels any pending debounce and restores normal pagination via loadFirstPage', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'page-1' })], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+      mockGetPage.mockClear()
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+
+      setSearchTerm('user-1', 'b') // 1 char — below MIN_SEARCH_LEN
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockSearch).not.toHaveBeenCalled()
+      expect(mockGetPage).toHaveBeenCalledWith('user-1', expect.any(Number), null)
+    })
+
+    it('an empty term restores normal pagination', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+      mockGetPage.mockClear()
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+
+      setSearchTerm('user-1', '')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockGetPage).toHaveBeenCalledTimes(1)
+    })
+
+    it('clearing the term cancels a pending debounced search — it never fires after the term is cleared', async () => {
+      mockGetPage.mockResolvedValue(makePage([], null, false))
+      const { loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      vi.advanceTimersByTime(100) // still within the debounce window
+      setSearchTerm('user-1', '') // cleared before the debounced search fired
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(mockSearch).not.toHaveBeenCalled()
+    })
+
+    it('gen-token: a stale search resolving after loadFirstPage(B) never overwrites B\'s cards', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      const { cards, loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-A')
+
+      let resolveSearch: (v: PublicCardsPage) => void = () => {}
+      const pending = new Promise<PublicCardsPage>((resolve) => { resolveSearch = resolve })
+      mockSearch.mockReturnValueOnce(pending)
+      setSearchTerm('user-A', 'bolt')
+      await vi.advanceTimersByTimeAsync(300) // search for A is now in flight
+
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'b1' })], null, false))
+      await loadFirstPage('user-B') // visitor navigates away before A's search resolves
+
+      resolveSearch(makePage([makePublicCard({ cardId: 'stale-search-result' })], null, false))
+      await pending
+      await Promise.resolve()
+
+      expect(cards.value.map(c => c.id)).toEqual(['b1']) // not poisoned by A's stale search
+    })
+
+    it('gen-token: a stale search resolving after a newer search term supersedes it is discarded', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      const { cards, loadFirstPage, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      let resolveFirstSearch: (v: PublicCardsPage) => void = () => {}
+      const firstPending = new Promise<PublicCardsPage>((resolve) => { resolveFirstSearch = resolve })
+      mockSearch.mockReturnValueOnce(firstPending)
+      setSearchTerm('user-1', 'bo')
+      await vi.advanceTimersByTimeAsync(300) // "bo" search in flight
+
+      mockSearch.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'bolt-result' })], null, false))
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300) // "bolt" search resolves first
+
+      expect(cards.value.map(c => c.id)).toEqual(['bolt-result'])
+
+      // The stale "bo" search now resolves — must be discarded
+      resolveFirstSearch(makePage([makePublicCard({ cardId: 'stale-bo-result' })], null, false))
+      await firstPending
+      await Promise.resolve()
+
+      expect(cards.value.map(c => c.id)).toEqual(['bolt-result'])
+    })
+
+    it('calls onError and does not throw when the search query rejects', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([], null, false))
+      mockSearch.mockRejectedValueOnce(new Error('boom'))
+      const onError = vi.fn()
+      const { loadFirstPage, searching, setSearchTerm } = usePublicProfileCards({ onError })
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+      await Promise.resolve()
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(searching.value).toBe(false)
     })
   })
 })

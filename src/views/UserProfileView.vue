@@ -75,6 +75,7 @@ const {
   tradeCount,
   loadFirstPage: loadFirstPublicCardsPage,
   loadMore: loadMorePublicCardsRaw,
+  setSearchTerm: setPublicCardsSearchTerm,
 } = usePublicProfileCards({
   onError: () => toastStore.show(t('profile.messages.loadCardsError'), 'error'),
   onPageLoaded: () => void enrichPublicCardsInMemory(),
@@ -168,6 +169,15 @@ const loadProfile = async () => {
 
     if (userId.value) {
       await loadFirstPublicCardsPage(userId.value);
+      // TASK-138 AC1: a search term left over from a previously viewed
+      // profile (filterQuery persists across route changes — same
+      // component instance) must be re-applied to the NEW profile's
+      // userId, since setSearchTerm is scoped per-call, not reactive to
+      // userId on its own. loadFirstPublicCardsPage above already reset
+      // to page 1; this re-triggers the debounced server search on top.
+      if (filterQuery.value.trim()) {
+        setPublicCardsSearchTerm(userId.value, filterQuery.value);
+      }
     }
   } catch (err) {
     console.error('Error loading profile:', err);
@@ -260,6 +270,22 @@ const {
   collectionCreatureTypes,
   resetAdvancedFilters,
 } = useCardFilter(cards);
+
+// TASK-138 AC1: wire the filter bar's text search to the server-side prefix
+// query (usePublicProfileCards.setSearchTerm) instead of only filtering
+// whatever page(s) had already loaded — a term ≥2 chars replaces `cards`
+// with the matching results from the WHOLE profile (debounced, gen-token
+// guarded inside the composable). useCardFilter's own local text filter
+// (filteredCards) still runs on top of the result but is a no-op there,
+// since every server-matched card's name already contains the term. Below
+// 2 chars, the composable falls back to normal pagination on its own.
+// Advanced/chip filters and groupBy stay local to whatever `cards` currently
+// holds (search results OR paginated cards) — they never reach past what's
+// loaded, a documented limit of this approach.
+watch(filterQuery, (term) => {
+  if (!userId.value) return;
+  setPublicCardsSearchTerm(userId.value, term);
+});
 
 // Bridge: individual refs <-> AdvancedFilters for the modal
 const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' };

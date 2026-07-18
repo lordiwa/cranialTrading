@@ -14,6 +14,7 @@ import {
   deleteDoc,
   doc,
   type DocumentData,
+  getCountFromServer,
   getDocs,
   limit,
   orderBy,
@@ -511,6 +512,31 @@ export async function getUserPublicCardsPage(
     cursor: pageDocs.length > 0 ? (pageDocs[pageDocs.length - 1] ?? null) : null,
     hasMore,
   }
+}
+
+export interface PublicCardStatusCounts {
+  sale: number
+  trade: number
+}
+
+/**
+ * Exact sale/trade totals for a user's public profile header (TASK-136 M4,
+ * round 2). Decoupled from getUserPublicCardsPage's pagination so the header
+ * chips always show the profile's true totals, not just however many cards
+ * have been scrolled into view so far.
+ *
+ * Deliberately two equality-only queries (userId== + status==) rather than
+ * one query with an orderBy — equality-only compound filters use Firestore's
+ * automatic single-field indexes, so this never needs a new composite index
+ * (verified against the deployed index set; see firestore.indexes.json).
+ */
+export async function getUserPublicCardStatusCounts(userId: string): Promise<PublicCardStatusCounts> {
+  const baseCol = collection(db, 'public_cards')
+  const [saleSnap, tradeSnap] = await Promise.all([
+    getCountFromServer(query(baseCol, where('userId', '==', userId), where('status', '==', 'sale'))),
+    getCountFromServer(query(baseCol, where('userId', '==', userId), where('status', '==', 'trade'))),
+  ])
+  return { sale: saleSnap.data().count, trade: tradeSnap.data().count }
 }
 
 /**

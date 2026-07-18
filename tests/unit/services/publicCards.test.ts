@@ -25,6 +25,7 @@ const whereMock = vi.fn((...args: unknown[]) => ({ __type: 'where', args }))
 const orderByMock = vi.fn((...args: unknown[]) => ({ __type: 'orderBy', args }))
 const limitMock = vi.fn((...args: unknown[]) => ({ __type: 'limit', args }))
 const startAfterMock = vi.fn((...args: unknown[]) => ({ __type: 'startAfter', args }))
+const getCountFromServerMock = vi.fn()
 
 const batchSetMock = vi.fn()
 const batchDeleteMock = vi.fn()
@@ -39,6 +40,7 @@ vi.mock('firebase/firestore', () => ({
   collection: (...args: unknown[]) => collectionMock(...(args as [unknown, string])),
   deleteDoc: (...args: unknown[]) => deleteDocMock(...args),
   doc: (...args: unknown[]) => docMock(...(args as [unknown, string, string])),
+  getCountFromServer: (...args: unknown[]) => getCountFromServerMock(...args),
   getDocs: (...args: unknown[]) => getDocsMock(...args),
   limit: (...args: unknown[]) => limitMock(...args),
   orderBy: (...args: unknown[]) => orderByMock(...args),
@@ -52,7 +54,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, getUserPublicCardsPage, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { batchSyncCardsToPublic, getUserPublicCardsPage, getUserPublicCardStatusCounts, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 
 beforeEach(() => {
   setDocMock.mockClear()
@@ -65,6 +67,7 @@ beforeEach(() => {
   orderByMock.mockClear()
   limitMock.mockClear()
   startAfterMock.mockClear()
+  getCountFromServerMock.mockClear()
   batchSetMock.mockClear()
   batchDeleteMock.mockClear()
   batchCommitMock.mockClear()
@@ -263,5 +266,43 @@ describe('getUserPublicCardsPage', () => {
     expect(page.cards).toEqual([])
     expect(page.cursor).toBeNull()
     expect(page.hasMore).toBe(false)
+  })
+})
+
+/**
+ * TASK-136 M4 (round 2): exact sale/trade totals for the profile header chips,
+ * decoupled from pagination. Uses two equality-only getCountFromServer
+ * aggregate queries (userId== + status==) — deliberately NOT a single query
+ * with an orderBy, so it never needs a new composite index beyond the
+ * single-field automatic indexes Firestore already maintains.
+ */
+describe('getUserPublicCardStatusCounts', () => {
+  it('queries public_cards filtered by userId AND status=sale, and separately userId AND status=trade', async () => {
+    getCountFromServerMock.mockResolvedValue({ data: () => ({ count: 0 }) })
+
+    await getUserPublicCardStatusCounts('user-1')
+
+    expect(collectionMock).toHaveBeenCalledWith({}, 'public_cards')
+    expect(whereMock).toHaveBeenCalledWith('userId', '==', 'user-1')
+    expect(whereMock).toHaveBeenCalledWith('status', '==', 'sale')
+    expect(whereMock).toHaveBeenCalledWith('status', '==', 'trade')
+  })
+
+  it('runs exactly two aggregate count queries (sale + trade), in parallel', async () => {
+    getCountFromServerMock.mockResolvedValue({ data: () => ({ count: 0 }) })
+
+    await getUserPublicCardStatusCounts('user-1')
+
+    expect(getCountFromServerMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns the sale and trade counts read from the two aggregate snapshots', async () => {
+    getCountFromServerMock
+      .mockResolvedValueOnce({ data: () => ({ count: 12 }) })
+      .mockResolvedValueOnce({ data: () => ({ count: 7 }) })
+
+    const counts = await getUserPublicCardStatusCounts('user-1')
+
+    expect(counts).toEqual({ sale: 12, trade: 7 })
   })
 })

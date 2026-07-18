@@ -540,6 +540,31 @@ export async function getUserPublicCardStatusCounts(userId: string): Promise<Pub
 }
 
 /**
+ * Total public-card count for a user (TASK-139). Used by UserProfileHoverCard —
+ * previously the hover card downloaded the visited user's ENTIRE
+ * users/{uid}/cards subcollection via getDocs(where('public','==',true)) just
+ * to read snapshot.size, the last residual reader of that ajena subcollection
+ * in src/ (blocking TASK-087's firestore.rules tightening). A single
+ * equality-only aggregate query gives the same total in one billed read: every
+ * doc in /public_cards is already sale or trade by construction (see
+ * syncCardToPublic above), so userId== alone equals sale+trade summed —
+ * no need for getUserPublicCardStatusCounts' two-query split here.
+ *
+ * KNOWN DIVERGENCE from the old subcollection count: the old query counted
+ * ANY status with public===true (including a 'collection' or 'wishlist' card
+ * a user marked public), while /public_cards only ever contains sale/trade
+ * (TASK-085 whitelist). Profiles with public wishlist/collection cards will
+ * show a lower number here than before — same product-decision gap already
+ * flagged as M3 on TASK-136 (pending Rafael).
+ */
+export async function getUserPublicCardsCount(userId: string): Promise<number> {
+  const snap = await getCountFromServer(
+    query(collection(db, 'public_cards'), where('userId', '==', userId))
+  )
+  return snap.data().count
+}
+
+/**
  * Get all public preferences for a specific user (for bidirectional matching)
  */
 export async function getUserPublicPreferences(userId: string): Promise<PublicPreference[]> {

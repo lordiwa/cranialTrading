@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { getUserPublicCardsCount } from '../../services/publicCards';
 import { resolveUsernameToUid } from '../../services/userLookup';
 import BaseLoader from '../ui/BaseLoader.vue';
 import { getAvatarUrlForUser } from '../../utils/avatar';
@@ -30,11 +29,10 @@ const loadUserInfo = async () => {
       const userId = result.id;
       userInfo.value = result.data as { username: string; location?: string; avatarUrl?: string | null };
 
-      // Count public cards
-      const cardsCol = collection(db, 'users', userId, 'cards');
-      const cardsQuery = query(cardsCol, where('public', '==', true));
-      const cardsSnapshot = await getDocs(cardsQuery);
-      cardCount.value = cardsSnapshot.size;
+      // Count public cards via the denormalized /public_cards aggregate
+      // count (TASK-139) — never reads the visited user's private
+      // users/{uid}/cards subcollection.
+      cardCount.value = await getUserPublicCardsCount(userId);
     }
   } catch {
     // silent fail

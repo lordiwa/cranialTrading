@@ -54,7 +54,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, getUserPublicCardsPage, getUserPublicCardStatusCounts, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { batchSyncCardsToPublic, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 
 beforeEach(() => {
   setDocMock.mockClear()
@@ -304,5 +304,42 @@ describe('getUserPublicCardStatusCounts', () => {
     const counts = await getUserPublicCardStatusCounts('user-1')
 
     expect(counts).toEqual({ sale: 12, trade: 7 })
+  })
+})
+
+/**
+ * TASK-139: UserProfileHoverCard's total-count query. Regression lock —
+ * the hover card MUST count via this single equality-only aggregate query
+ * against /public_cards, and MUST NEVER fall back to downloading the
+ * visited user's private users/{uid}/cards subcollection (the pre-fix bug:
+ * a full getDocs(where('public','==',true)) scan of that subcollection just
+ * to read snapshot.size — the last residual reader blocking TASK-087's
+ * firestore.rules tightening).
+ */
+describe('getUserPublicCardsCount', () => {
+  it('queries public_cards filtered by userId only — never users/{uid}/cards', async () => {
+    getCountFromServerMock.mockResolvedValue({ data: () => ({ count: 0 }) })
+
+    await getUserPublicCardsCount('user-1')
+
+    expect(collectionMock).toHaveBeenCalledWith({}, 'public_cards')
+    expect(collectionMock).not.toHaveBeenCalledWith(expect.anything(), 'users')
+    expect(whereMock).toHaveBeenCalledWith('userId', '==', 'user-1')
+  })
+
+  it('runs exactly one aggregate count query', async () => {
+    getCountFromServerMock.mockResolvedValue({ data: () => ({ count: 0 }) })
+
+    await getUserPublicCardsCount('user-1')
+
+    expect(getCountFromServerMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the count read from the aggregate snapshot', async () => {
+    getCountFromServerMock.mockResolvedValueOnce({ data: () => ({ count: 42 }) })
+
+    const count = await getUserPublicCardsCount('user-1')
+
+    expect(count).toBe(42)
   })
 })

@@ -225,7 +225,14 @@ async function toggleChart() {
         <span>{{ t('collection.totals.loading', { progress }) }}</span>
         <span class="font-display font-tnum">{{ processedCards }}/{{ totalCardsBeingPriced }}</span>
       </div>
-      <div class="h-1 bg-primary overflow-hidden">
+      <div
+          class="h-1 bg-primary overflow-hidden"
+          role="progressbar"
+          :aria-valuenow="progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-label="t('collection.totals.loading', { progress })"
+      >
         <div
             class="h-full bg-neon transition-all duration-300"
             :style="{ width: `${progress}%` }"

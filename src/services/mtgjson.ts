@@ -131,8 +131,25 @@ export function openDatabase(): Promise<IDBDatabase> {
       reject(new Error(String(request.error)))
     }
 
+    // TASK-137 review H1: a version bump (v1->v2) blocks indefinitely if
+    // another tab still has an older-version connection open and never
+    // closes it — without this handler the Promise never settles and every
+    // caller (hydrate/getFromDB/saveToDB) hangs forever instead of falling
+    // back to the existing no-cache behavior.
+    request.onblocked = () => {
+      console.warn('IndexedDB open blocked by another open connection (older tab?)')
+      reject(new Error('IndexedDB open blocked'))
+    }
+
     request.onsuccess = () => {
       dbInstance = request.result
+      // If another tab/window later needs a newer version, this connection
+      // must close itself (and drop the cached instance) instead of
+      // blocking that upgrade forever — mirrors the onblocked handling above.
+      dbInstance.onversionchange = () => {
+        dbInstance?.close()
+        dbInstance = null
+      }
       resolve(request.result)
     }
 

@@ -19,7 +19,10 @@ const fixAttemptedCache = new Set<string>()
 // TASK-137: hydrate the persistent (IndexedDB) price cache into pricesCache
 // at most once per session — subsequent fetchAllPrices calls (re-navigation,
 // re-mount) reuse what's already in memory instead of re-reading IndexedDB.
-let hasHydratedFromPersistentCache = false
+// review L4: this is the in-flight Promise itself (not a boolean flag set
+// before the await), so two fetchAllPrices calls racing at session start
+// both await the SAME hydration instead of the second one skipping it.
+let hydrationPromise: Promise<void> | null = null
 
 // Abort controller for cancelling in-progress fetches
 let fetchAbortController: AbortController | null = null
@@ -170,12 +173,20 @@ export function useCollectionTotals(cards: () => Card[]) {
     try {
       const prices = await getCardPrices(scryfallId, setCode)
       pricesCache.set(scryfallId, prices)
-      newlyResolved?.set(scryfallId, prices)
+      // TASK-137 review M1: getCardPrices never throws on a lookup miss —
+      // it resolves null (no MTGJSON UUID, transient network/CDN failure,
+      // etc.) — so a null here is NOT necessarily a stable "no price"
+      // result. Only persist confirmed non-null prices to the 24h-TTL
+      // IndexedDB cache; nulls stay session-only (pricesCache), same as
+      // pre-ticket behavior, so a transient failure gets retried next
+      // session instead of pinning CK totals to ~$0 for a full day.
+      if (prices !== null) {
+        newlyResolved?.set(scryfallId, prices)
+      }
       return prices
     } catch {
       console.warn('Error fetching prices for', card.name)
       pricesCache.set(scryfallId, null)
-      newlyResolved?.set(scryfallId, null)
       return null
     }
   }
@@ -201,9 +212,11 @@ export function useCollectionTotals(cards: () => Card[]) {
     // session so a warm reload skips network fetches for still-fresh prices.
     // Never overwrites an entry already in pricesCache (e.g. from an earlier
     // fetch this session) and never throws — hydrateCardPricesCache is
-    // best-effort by contract.
-    if (!hasHydratedFromPersistentCache) {
-      hasHydratedFromPersistentCache = true
+    // best-effort by contract. review L4: share the in-flight Promise (not a
+    // boolean flag flipped before the await) so a second fetchAllPrices
+    // racing in at session start awaits the same hydration instead of
+    // skipping it outright.
+    hydrationPromise ??= (async () => {
       try {
         const cached = await hydrateCardPricesCache()
         for (const [scryfallId, prices] of cached) {
@@ -215,7 +228,8 @@ export function useCollectionTotals(cards: () => Card[]) {
         // hydrateCardPricesCache never throws, but stay defensive — a cold
         // fetch is always a safe fallback.
       }
-    }
+    })()
+    await hydrationPromise
 
     // O(1) lookup instead of O(N) .find() per card
     const cardIdSet = new Set(cardList.map(c => c.id))

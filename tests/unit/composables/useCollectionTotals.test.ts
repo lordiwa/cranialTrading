@@ -160,4 +160,54 @@ describe('useCollectionTotals — persistent price cache (TASK-137)', () => {
     expect(loading.value).toBe(false)
     expect(cardPrices.value.get('card-1')).toEqual(ckPrices(2))
   })
+
+  // TASK-137 review M1: getCardPrices never throws on a genuine network
+  // failure (it catches internally and resolves null) — so a transient
+  // failure (offline, CDN down) must not get persisted with the full 24h
+  // TTL, or CK totals would sit at ~$0 for a day with no recovery path.
+  // Nulls stay session-only in memory (pricesCache), same as pre-ticket
+  // behavior — only successfully-resolved (non-null) prices get persisted.
+  it('does not persist a null result caused by a network/lookup failure — it stays session-only so it retries next session', async () => {
+    mockGetCardPrices.mockResolvedValue(null)
+    const { useCollectionTotals } = await loadFresh()
+    const cards = [makeCard({ id: 'card-1', scryfallId: 'scry-1', setCode: 'M21' })]
+    const { fetchAllPrices, cardPrices } = useCollectionTotals(() => cards)
+
+    await fetchAllPrices()
+
+    // Still resolves in-session (existing behavior for cards with no CK match).
+    expect(cardPrices.value.get('card-1')).toBeNull()
+    // But never written to the persistent cache with a 24h TTL.
+    expect(mockPersist).not.toHaveBeenCalled()
+  })
+
+  it('does not persist a null result when getCardPrices itself rejects (caught by fetchCardPrice)', async () => {
+    mockGetCardPrices.mockRejectedValue(new Error('network down'))
+    const { useCollectionTotals } = await loadFresh()
+    const cards = [makeCard({ id: 'card-1', scryfallId: 'scry-1', setCode: 'M21' })]
+    const { fetchAllPrices, cardPrices } = useCollectionTotals(() => cards)
+
+    await fetchAllPrices()
+
+    expect(cardPrices.value.get('card-1')).toBeNull()
+    expect(mockPersist).not.toHaveBeenCalled()
+  })
+
+  it('persists successful (non-null) results alongside a null result in the same batch — only the non-null one is written', async () => {
+    mockGetCardPrices.mockImplementation(async (scryfallId: string) =>
+      scryfallId === 'scry-null' ? null : ckPrices(5)
+    )
+    const { useCollectionTotals } = await loadFresh()
+    const cards = [
+      makeCard({ id: 'card-null', scryfallId: 'scry-null', setCode: 'M21' }),
+      makeCard({ id: 'card-priced', scryfallId: 'scry-priced', setCode: 'M21' }),
+    ]
+    const { fetchAllPrices } = useCollectionTotals(() => cards)
+
+    await fetchAllPrices()
+
+    expect(mockPersist).toHaveBeenCalledTimes(1)
+    const [batch] = mockPersist.mock.calls[0]
+    expect(Array.from((batch as Map<string, unknown>).keys())).toEqual(['scry-priced'])
+  })
 })

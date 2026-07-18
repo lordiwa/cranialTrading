@@ -126,9 +126,20 @@ const submitChangeEmail = async () => {
   }
 };
 
+// TASK-126: a remount (reload, or navigate-away-and-back) with an already
+// logged-in but UNVERIFIED account used to fall through both branches here,
+// showing the blank registration form instead of the pending-verification
+// screen — a re-submit from there re-runs authStore.register() and collides
+// with this SAME account's own already-reserved username (D-06), producing
+// a misleading "username taken" toast. `registered.value = true` shows the
+// pending screen (with the TASK-124 change-email flow) instead, and since
+// the form itself is gone from the DOM in that branch (v-else in the
+// template), no UI path is left that could dispatch a second register().
 onMounted(() => {
   if (authStore.user && authStore.emailVerified) {
     void router.push(route.query.returnUrl as string || '/dashboard');
+  } else if (authStore.user && !authStore.emailVerified) {
+    registered.value = true;
   }
 });
 </script>

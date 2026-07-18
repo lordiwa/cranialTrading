@@ -21,28 +21,36 @@ import type { RouteLocationNormalized } from 'vue-router'
 import { createAuthGuard, shouldBlockOnAuthLoading, type AuthGuardStore } from '@/router/authGuard'
 import { setLastKnownAuthState } from '@/utils/authLastKnown'
 
-const asRoute = (meta: RouteLocationNormalized['meta'], fullPath = '/x'): RouteLocationNormalized =>
-  ({ meta, fullPath } as RouteLocationNormalized)
+// `path` defaults to `fullPath` (query-free in every existing call site, so
+// this is a no-op for pre-TASK-126 tests) — TASK-126 round 2 needs a real
+// `path` to scope the /register unverified-session exception, and the guard
+// reads `to.path`, not `to.fullPath`.
+const asRoute = (meta: RouteLocationNormalized['meta'], fullPath = '/x', path = fullPath): RouteLocationNormalized =>
+  ({ meta, fullPath, path } as RouteLocationNormalized)
 
 /**
  * Fake Pinia-shaped auth store with full manual control over when `loading`
  * flips false — lets tests prove the guard does/doesn't wait without any
- * real Firebase round-trip.
+ * real Firebase round-trip. `initialEmailVerified` (TASK-126 round 2)
+ * defaults to false so every existing call site (which never resolves to a
+ * /register target) is unaffected.
  */
-const createFakeAuthStore = (initialLoading: boolean, initialUser: unknown = null) => {
+const createFakeAuthStore = (initialLoading: boolean, initialUser: unknown = null, initialEmailVerified = false) => {
   const listeners = new Set<() => void>()
   const firebaseNeededNow = vi.fn()
   const store: AuthGuardStore = {
     loading: initialLoading,
     user: initialUser,
+    emailVerified: initialEmailVerified,
     $subscribe: (callback: () => void) => {
       listeners.add(callback)
       return () => listeners.delete(callback)
     },
     firebaseNeededNow,
   }
-  const resolve = (nextUser: unknown) => {
+  const resolve = (nextUser: unknown, emailVerified = false) => {
     store.user = nextUser
+    store.emailVerified = emailVerified
     store.loading = false
     listeners.forEach((cb) => { cb() })
   }
@@ -150,6 +158,112 @@ describe('createAuthGuard — (b) requiresGuest, last-known = authenticated', ()
   })
 })
 
+describe('createAuthGuard — (b) requiresGuest /register unverified-session exception (TASK-126 round 2)', () => {
+  // TASK-126 reviewer finding (HIGH): the guard used to redirect ANY
+  // authenticated user away from every requiresGuest route, including
+  // /register, without checking emailVerified — so an unverified
+  // logged-in user could never actually reach RegisterView's own
+  // pending-screen fix (round 1, commit 7d391e1), making it dead code in
+  // production. Scoped strictly to to.path === '/register' — /login and
+  // every other requiresGuest route must redirect exactly as before.
+  describe('sync path (last-known = authenticated)', () => {
+    it('lets an unverified logged-in user through to /register (does NOT redirect to /saved-matches)', async () => {
+      setLastKnownAuthState('authenticated')
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const redirect = vi.fn()
+      const guard = createAuthGuard(store, redirect)
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/register'), asRoute({}), next)
+      resolve({ id: 'u1' }, false) // logged in, unverified
+      await pending
+
+      expect(next).toHaveBeenCalledWith()
+      expect(redirect).not.toHaveBeenCalled()
+    })
+
+    it('still redirects a VERIFIED logged-in user away from /register (regression, unchanged)', async () => {
+      setLastKnownAuthState('authenticated')
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const guard = createAuthGuard(store, vi.fn())
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/register'), asRoute({}), next)
+      resolve({ id: 'u1' }, true) // logged in, verified
+      await pending
+
+      expect(next).toHaveBeenCalledWith('/saved-matches')
+    })
+
+    it('still redirects an unverified logged-in user away from /login (unchanged — exception is /register-only)', async () => {
+      setLastKnownAuthState('authenticated')
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const guard = createAuthGuard(store, vi.fn())
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+      resolve({ id: 'u1' }, false)
+      await pending
+
+      expect(next).toHaveBeenCalledWith('/saved-matches')
+    })
+
+    it('lets a guest (no session at all) through to /register as before', async () => {
+      setLastKnownAuthState('authenticated') // stale value, resolves logged-out
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const guard = createAuthGuard(store, vi.fn())
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/register'), asRoute({}), next)
+      resolve(null)
+      await pending
+
+      expect(next).toHaveBeenCalledWith()
+    })
+  })
+
+  describe('deferred optimistic-paint path (last-known = guest/unknown)', () => {
+    it('does NOT fire the deferred redirect for an unverified logged-in user who lands on /register', async () => {
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const redirect = vi.fn()
+      const guard = createAuthGuard(store, redirect)
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/register'), asRoute({}), next)
+      resolve({ id: 'u1' }, false)
+      await pending
+
+      expect(redirect).not.toHaveBeenCalled()
+    })
+
+    it('still fires the deferred redirect for a VERIFIED logged-in user who lands on /register (regression, unchanged)', async () => {
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const redirect = vi.fn()
+      const guard = createAuthGuard(store, redirect)
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/register'), asRoute({}), next)
+      resolve({ id: 'u1' }, true)
+      await pending
+
+      expect(redirect).toHaveBeenCalledWith('/saved-matches')
+    })
+
+    it('still fires the deferred redirect for an unverified logged-in user who lands on /login (unchanged — exception is /register-only)', async () => {
+      const { store, resolve } = createFakeAuthStore(true)
+      const next = vi.fn()
+      const redirect = vi.fn()
+      const guard = createAuthGuard(store, redirect)
+
+      const pending = guard(asRoute({ requiresGuest: true }, '/login'), asRoute({}), next)
+      resolve({ id: 'u1' }, false)
+      await pending
+
+      expect(redirect).toHaveBeenCalledWith('/saved-matches')
+    })
+  })
+})
+
 describe('createAuthGuard — (c) requiresAuth keeps today\'s exact wait-then-decide behavior', () => {
   it('waits for auth (does not resolve navigation before auth settles)', async () => {
     const { store, resolve } = createFakeAuthStore(true)
@@ -204,6 +318,7 @@ describe('createAuthGuard — (c) requiresAuth keeps today\'s exact wait-then-de
     const store: AuthGuardStore = {
       loading: true,
       user: null,
+      emailVerified: false,
       $subscribe: () => () => { /* never invokes the callback */ },
     }
     const next = vi.fn()
@@ -329,6 +444,7 @@ describe('createAuthGuard — firebaseNeededNow eager-load trigger (TASK-132 rev
     const store: AuthGuardStore = {
       loading: true,
       user: null,
+      emailVerified: false,
       $subscribe: (callback: () => void) => {
         listeners.add(callback)
         return () => listeners.delete(callback)

@@ -11,16 +11,38 @@
  * misleading "username taken" toast (the original TASK-124 symptom via this
  * residual path).
  *
- * Fix under test: onMounted also recognizes authStore.user && !emailVerified
- * and shows the pending screen (registered.value = true) instead of the
- * form, so no UI path can re-trigger register() while a session already
- * exists. Mirrors the mock shape from svgSpriteMount.test.ts (TASK-121,
- * which fixed the Windows-only vitest crash on literal
- * <use href="/icons.svg#..."> so RegisterView can be mount()-ed at all) but
- * makes authStore.user/emailVerified mutable per test via getters.
+ * Fix under test (round 1, commit 7d391e1): onMounted also recognizes
+ * authStore.user && !emailVerified and shows the pending screen
+ * (registered.value = true) instead of the form, so no UI path can
+ * re-trigger register() while a session already exists.
+ *
+ * Round 2 (reviewer HIGH on 7d391e1): the router guard (authGuard.ts) was
+ * redirecting EVERY authenticated user away from /register before
+ * RegisterView could even mount, making the round-1 onMounted fix
+ * unreachable in production — see authGuard.test.ts for that half. This
+ * file's round-2 addition covers the component's own remaining gap
+ * (reviewer MEDIUM-1): onMounted only reads authStore.user/emailVerified
+ * SYNCHRONOUSLY at mount time. Once the guard now lets an unverified
+ * session's navigation through, there's still a real window (last-known
+ * guest/null, optimistic paint) where RegisterView mounts BEFORE the SDK's
+ * onAuthStateChanged callback has resolved — the store's `user` arrives
+ * asynchronously, after mount. A plain onMounted check would miss that and
+ * leave the blank form live (with a real submit path) until the user
+ * manually reloads. Fixed by replacing the onMounted check with a `watch`
+ * (immediate: true, no async callback — see CLAUDE.md's onMounted rule)
+ * over authStore.user/emailVerified, so a later-arriving session flips
+ * registered.value reactively.
+ *
+ * Mirrors the mock shape from svgSpriteMount.test.ts (TASK-121, which fixed
+ * the Windows-only vitest crash on literal <use href="/icons.svg#..."> so
+ * RegisterView can be mount()-ed at all) but makes authStore.user/
+ * emailVerified a real Vue `reactive()` object — a plain-object mock with
+ * getters (round 1) can't exercise a `watch`, since Vue's reactivity system
+ * never sees the mutation.
  */
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick, reactive } from 'vue'
 
 const routerPushMock = vi.fn()
 
@@ -68,25 +90,32 @@ vi.mock('../../../src/composables/useI18n', () => ({
 
 const registerMock = vi.fn()
 
-// Mutable per-test auth session state, read through getters so the mocked
-// store reflects whatever the test set BEFORE mount() — same singleton
-// object reused across mounts, mirroring how the real Pinia store instance
-// survives an in-SPA remount (only a hard reload creates a fresh one).
-const authState: { user: { id: string; email: string } | null; emailVerified: boolean } = {
+// Mutable per-test auth session state as a real Vue reactive() object — the
+// same singleton object/proxy is returned by every useAuthStore() call,
+// mirroring how the real Pinia store instance survives an in-SPA remount
+// (only a hard reload creates a fresh one) AND how it survives an
+// async-resolves-after-mount session arrival (round 2: needs to be
+// reactive so the component's watch can observe the later mutation).
+const authState = reactive<{
+  user: { id: string; email: string } | null
+  emailVerified: boolean
+  register: typeof registerMock
+  loginWithGoogle: ReturnType<typeof vi.fn>
+  sendVerificationEmail: ReturnType<typeof vi.fn>
+  checkEmailVerification: ReturnType<typeof vi.fn>
+  changeRegistrationEmail: ReturnType<typeof vi.fn>
+}>({
   user: null,
   emailVerified: false,
-}
+  register: registerMock,
+  loginWithGoogle: vi.fn(),
+  sendVerificationEmail: vi.fn(),
+  checkEmailVerification: vi.fn(),
+  changeRegistrationEmail: vi.fn(),
+})
 
 vi.mock('../../../src/stores/auth', () => ({
-  useAuthStore: () => ({
-    get user() { return authState.user },
-    get emailVerified() { return authState.emailVerified },
-    register: registerMock,
-    loginWithGoogle: vi.fn(),
-    sendVerificationEmail: vi.fn(),
-    checkEmailVerification: vi.fn(),
-    changeRegistrationEmail: vi.fn(),
-  }),
+  useAuthStore: () => authState,
 }))
 
 vi.mock('../../../src/stores/toast', () => ({
@@ -123,12 +152,38 @@ describe('RegisterView remount with an existing session (TASK-126)', () => {
     authState.user = { id: 'u1', email: 'pending@example.com' }
     authState.emailVerified = false
 
-    await mountView()
+    const wrapper = await mountView()
 
-    // The registration <form> (and its submit button) is not in the DOM at
-    // all when a session already exists, so there is no UI path left that
-    // could dispatch a second handleRegister -> authStore.register() call.
+    // Review LOW-1 (round 2): this assertion alone is trivially true even
+    // pre-fix (nothing in the test ever clicks submit), so it does not by
+    // itself lock the regression. The REAL lock is the absence of the
+    // <form> element entirely — asserted here directly, not just via the
+    // submit-button-only check in the sibling test above — which is what
+    // actually removes every UI path that could dispatch a second
+    // handleRegister -> authStore.register() call.
+    expect(wrapper.findAll('form')).toHaveLength(0)
     expect(registerMock).not.toHaveBeenCalled()
+  })
+
+  it('shows the pending screen when an unverified session arrives AFTER mount (async SDK restore, review MEDIUM-1)', async () => {
+    // Simulates the real-world race the guard's optimistic-paint path
+    // allows through: RegisterView mounts with no session yet known
+    // (authStore.user still null — onAuthStateChanged hasn't resolved),
+    // so the normal form renders first...
+    authState.user = null
+    authState.emailVerified = false
+
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-testid="register-submit"]').exists()).toBe(true)
+
+    // ...then the SDK resolves an existing unverified session shortly after.
+    authState.user = { id: 'u1', email: 'pending@example.com' }
+    authState.emailVerified = false
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="register-submit"]').exists()).toBe(false)
+    expect(wrapper.findAll('form')).toHaveLength(0)
+    expect(wrapper.text()).toContain('auth.verify.title')
   })
 
   it('keeps the TASK-124 change-email flow available on the remounted pending screen', async () => {

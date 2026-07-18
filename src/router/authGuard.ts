@@ -9,6 +9,13 @@ import { getLastKnownAuthState, type LastKnownAuthState } from '../utils/authLas
 export interface AuthGuardStore {
     loading: boolean;
     user: unknown;
+    // TASK-126 round 2: needed so the requiresGuest branch can special-case
+    // /register for an authenticated-but-unverified session (see below) —
+    // without it the guard could not distinguish that case from a fully
+    // logged-in user and would redirect it away before RegisterView (whose
+    // own TASK-126 round-1 fix depends on actually reaching /register) ever
+    // mounted.
+    emailVerified: boolean;
     // Method shorthand (not an arrow-typed property) so TS checks this
     // bivariantly — the real Pinia store's $subscribe callback takes
     // (mutation, state) args, while callers here only ever pass a 0-arg
@@ -100,6 +107,18 @@ export const createAuthGuard = (
         }
 
         if (requiresGuest) {
+            // TASK-126 round 2 (reviewer HIGH on 7d391e1): this guard used to
+            // redirect ANY authenticated user away from every requiresGuest
+            // route — including /register — without checking emailVerified.
+            // That made RegisterView's own round-1 fix (show the
+            // pending-verification screen instead of a blank form on remount)
+            // unreachable in production: an unverified logged-in user was
+            // bounced to /saved-matches before RegisterView ever mounted.
+            // Scoped strictly to /register — every other requiresGuest route
+            // (starting with /login) keeps redirecting exactly as before.
+            const isUnverifiedSessionOnRegister = (): boolean =>
+                to.path === '/register' && Boolean(authStore.user) && !authStore.emailVerified;
+
             if (getLastKnownAuthState() === 'authenticated') {
                 // TASK-132 review fix: this branch WAITS on auth before deciding
                 // (last-known says the user is probably logged in) — nothing
@@ -107,7 +126,7 @@ export const createAuthGuard = (
                 // protect by deferring; start the SDK download now.
                 authStore.firebaseNeededNow?.();
                 await waitForAuthReady(authStore);
-                if (authStore.user) {
+                if (authStore.user && !isUnverifiedSessionOnRegister()) {
                     next('/saved-matches');
                 } else {
                     next();
@@ -121,7 +140,7 @@ export const createAuthGuard = (
             if (authStore.loading) {
                 await waitForAuthReady(authStore);
             }
-            if (authStore.user && isStillCurrent()) {
+            if (authStore.user && isStillCurrent() && !isUnverifiedSessionOnRegister()) {
                 redirect('/saved-matches');
             }
             return;

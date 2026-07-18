@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSeoMeta } from '@unhead/vue';
 import { useAuthStore } from '../stores/auth';
@@ -131,17 +131,32 @@ const submitChangeEmail = async () => {
 // showing the blank registration form instead of the pending-verification
 // screen — a re-submit from there re-runs authStore.register() and collides
 // with this SAME account's own already-reserved username (D-06), producing
-// a misleading "username taken" toast. `registered.value = true` shows the
-// pending screen (with the TASK-124 change-email flow) instead, and since
-// the form itself is gone from the DOM in that branch (v-else in the
-// template), no UI path is left that could dispatch a second register().
-onMounted(() => {
-  if (authStore.user && authStore.emailVerified) {
-    void router.push(route.query.returnUrl as string || '/dashboard');
-  } else if (authStore.user && !authStore.emailVerified) {
-    registered.value = true;
-  }
-});
+// a misleading "username taken" toast. Showing the pending screen (with the
+// TASK-124 change-email flow) instead removes the form itself from the DOM
+// (v-else in the template), so no UI path is left that could dispatch a
+// second register().
+//
+// Round 2 (reviewer MEDIUM-1): a plain onMounted only reads authStore.user/
+// emailVerified SYNCHRONOUSLY at mount time. On the router guard's
+// optimistic-paint path (authGuard.ts, last-known guest/null) this view can
+// mount BEFORE Firebase's onAuthStateChanged callback has resolved an
+// existing unverified session — the store's `user` arrives asynchronously,
+// after mount, and a one-shot onMounted check would miss it entirely,
+// leaving the blank form (and its real register() submit path) live. A
+// `watch` with `immediate: true` covers both the original synchronous case
+// AND this later-arrival case reactively, without an async onMounted (see
+// CLAUDE.md's onMounted rule — this is a watch callback, not onMounted).
+watch(
+    () => [authStore.user, authStore.emailVerified] as const,
+    ([user, verified]) => {
+      if (user && verified) {
+        void router.push(route.query.returnUrl as string || '/dashboard');
+      } else if (user && !verified) {
+        registered.value = true;
+      }
+    },
+    { immediate: true }
+);
 </script>
 
 <template>

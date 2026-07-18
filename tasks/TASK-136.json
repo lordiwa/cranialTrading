@@ -1,0 +1,32 @@
+{
+  "key": "TASK-136",
+  "title": "Perf+privacidad: perfil público paginado vía /public_cards — no descargar la subcolección entera ni exponer cartas privadas al cliente",
+  "description": "Reportado por Rafael 2026-07-17 ('mi perfil se sigue demorando muchísimo', carga fría, pre-existente a v1.52). DIAGNÓSTICO VERIFICADO en código: UserProfileView.vue:172-173 hace getDocs(query(collection(db,'users',userId,'cards'))) — descarga la subcolección COMPLETA (5654 docs en el caso de Rafael, varios MB) bloqueando el render, y filtra 'solo públicas' EN EL CLIENTE (comment línea 149 lo dice literal). Tres problemas: (1) LENTITUD: cada visita baja ~5654 docs antes de pintar; (2) COSTO: ~5654 lecturas Firestore facturadas por visita; (3) PRIVACIDAD: las cartas privadas (status 'collection' o public:false) viajan por la red a cualquier visitante — visibles en Network tab. La ironía: services/publicCards.ts mantiene la colección denormalizada /public_cards EXACTAMENTE para esto y la vista la bypassea. FIX: consultar /public_cards con where userId + paginación server-side (patrón ya existente: useCollectionPagination de CollectionView), primera página al render, resto por demanda. Evaluar además endurecer reglas Firestore para negar lectura de users/{uid}/cards a terceros — ANTES de tocar reglas: trazar TODOS los consumidores de subcolecciones ajenas (matches, carrito, SavedMatches, stats) para no romper nada; y recordar que CI NO deploya reglas (deploy manual firebase deploy --only firestore:rules, gotcha documentado en memoria — rompió el registro en SCRUM-73). CUIDADO: el enriquecimiento Scryfall in-memory (SCRUM-67, línea 189+) y el flujo carrito→matches desde el perfil deben seguir funcionando sobre las cartas paginadas.",
+  "acceptance_criteria": [
+    "Perfil público consulta /public_cards filtrada por userId con paginación server-side (primera página ~50-100 cartas, más por demanda) — cero getDocs de la subcolección users/{uid}/cards ajena desde esta vista",
+    "Cartas privadas (status collection o public:false) NO viajan al cliente de un visitante — verificable en Network tab (test de regresión sobre la query + verificación manual)",
+    "Evaluación de reglas Firestore documentada en comment del ticket: o bien se endurecen (con traza previa de todos los consumidores y deploy manual de reglas coordinado), o se documenta por qué no todavía",
+    "Filtros avanzados/enriquecimiento Scryfall y flujo de carrito/compra desde el perfil intactos (E2E user-profile targeted verde)",
+    "Carga fría del perfil de Rafael (5392 públicas) rápida: primera página visible <2s FAST3G (medible con scripts/perf-measure.mjs apuntando a /users/<username> en dev)",
+    "TDD: tests de query/paginación/filtrado primero; gates verdes; suite E2E completa al cierre de tanda"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "privacy",
+    "firestore",
+    "profile",
+    "v1.53"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-18T00:15:00.000Z",
+  "updated_at": "2026-07-18T00:15:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

@@ -690,6 +690,12 @@
       "title": "Perf: cortar el import estático de cloudFunctions en matches.ts — saca firebase/functions (~220KB raw) del chunk compartido de Firebase",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-136",
+      "title": "Perf+privacidad: perfil público paginado vía /public_cards — no descargar la subcolección entera ni exponer cartas privadas al cliente",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
-  "lifecycle_state": "active",
-  "updated_at": "2026-07-17T14:00:00.000Z",
-  "active_task": "TASK-131",
+  "lifecycle_state": "paused",
+  "updated_at": "2026-07-18T00:20:00.000Z",
+  "active_task": null,
   "workflow_step": "batch_closed",
-  "next_action": "TANDA PERF CERRADA Y EN DEV (v1.52.0, push b3c7da3, CI verde, deploy verificado). VEREDICTO vs goal contra dev FAST3G: FCP 804 CUMPLIDO (goal 1092, -63% vs prod baseline 2184); APPRENDER 1314 NO cumplido (goal 1066, -38% vs baseline 2132, faltan 248ms); DCL/LOAD 994. DECISION PENDIENTE DE RAFAEL: (a) aceptar y cerrar loop, (b) seguir con siguiente palanca: split de es.json (~27.6KB gz awaiteado pre-mount en initI18n, estimo -100/200ms) y/o prerender estatico de /login (mataria el gap entero, APPRENDER~FCP, y de paso sirve al SEO pendiente — ticket mas grande), (c) deploy a PROD (solo con OK explicito + su UAT visual en dev de v1.52.0: splash negro/neon al cargar, login pinta rapido, navegacion logueada intacta). PENDIENTE ADICIONAL de la sesion: bug reportado por Rafael del hero de coleccion mostrando valor TCG — diagnostico completo hecho (es CK-first pero el fetch secuencial de 5654 cartas tarda minutos y el cache es solo memoria — no regresion, gap de escala); esperando su confirmacion (barra de progreso del footer se mueve? valor cambia si espera?) para crear ticket(s): cache IndexedDB TTL 24h (barato) y/o snapshot server-side cron (fix real). PENDIENTES HUMANOS previos sin cambios: TASK-107 DesignSync, TASK-118 Google, TASK-104 UAT, email 124, hero-wishlist 114, UAT visual v1.40-1.51. Backlog nuevo: 133 (E2E 3 niveles), 134 (cron E2E nocturna), 135 (firebase/functions drift matches.ts). RETRO acumulada de la sesion: colision dev-128 duplicado (lección en memoria: ping antes de re-spawn), idle silencioso de mailbox agents persistio 5+ veces pese a briefings (mitigacion real: verificacion directa de disco + background tasks propios del orquestador), politica E2E 3 niveles estrenada con exito en fixes de 132/130.",
+  "next_action": "PAUSADO post-tanda-perf por pedido de Rafael (limpiar contexto). AL RESUMIR: (0) v1.52.0 esta EN DEV (push b3c7da3+40b3f3f, CI verde, deploy verificado por harness contra dev: FCP 804 / APPRENDER 1314 / DCL-LOAD 994 FAST3G). Tanda 128/129/130/131/132 toda done con reviews verdes. (1) PROXIMO TRABAJO ACORDADO: TASK-136 (tdd, high) — perfil publico paginado via /public_cards; diagnostico completo en el ticket (getDocs de subcoleccion entera + filtro cliente + privacidad); arrancar con developer spawneado en el arbol principal (UN solo writer; ping antes de re-spawn si hay dudas de agente vivo — leccion memoria). Politica E2E: targeted por ticket, suite completa solo pre-push (TASK-133 la formaliza, aun todo). (2) PENDIENTE RAFAEL — decision loop perf: goal FCP CUMPLIDO (-63%), APPRENDER 1314 vs goal 1066 (-38%, faltan 248ms); tras su UAT visual de v1.52.0 en dev decide: aceptar / prerender login (mata el gap, sirve SEO) / split es.json (~100-200ms). PROD solo con OK explicito. (3) PENDIENTE RAFAEL — hero CK: diagnostico hecho (fetch secuencial minutos + cache solo memoria, no regresion); confirmar comportamiento (barra progreso footer) para ticketear cache IndexedDB y/o snapshot server-side. (4) loop_auth de este bundle: re-confirmar verbalmente si se relanza loop. (5) Pendientes humanos previos: TASK-107 DesignSync, 118 Google, 104 UAT, email 124, hero-wishlist 114, UAT visual v1.40-1.52. Backlog: 125/126/127, 133 (E2E 3 niveles), 134 (cron E2E), 135 (firebase/functions matches.ts). public/tasks/ borrar a mano; cranial-design/ y .mcp.json untracked. Dev server local :5173 apagado al pausar. RETRO de la sesion (revisar con Rafael cuando quiera): colision dev duplicado resuelta sin perdida (leccion persistida en memoria), idle silencioso de mailbox agents 5+ veces pese a briefings — mitigacion efectiva fue verificacion directa de disco + background tasks propios del orquestador; E2E cazo 1 deadlock real que unit tests no podian ver; 2 HIGH cazados por reviewers en codigo ya 'verde'.",
   "handoff_summary": "SESION 2026-07-17 PARTE 3 (14:00-22:15Z): LOOP PERF COMPLETO — tanda 128/129/132/130/131 cerrada con ciclos review (2 HIGH cazados y arreglados: loader inalcanzable por START_LOCATION en 129, memoizacion de rechazo = auth muerto en 132; +deadlock circular paint/auth cazado por E2E en 132), TASK-132 creado mid-loop al descubrir que el chunk firebase eager era el costo dominante (la espera de auth lo escondia). v1.52.0 pusheada a develop (b3c7da3), CI verde, DEV verificado. Numeros contra dev FAST3G: FCP 2184->804 (-63%, goal CUMPLIDO), APPRENDER 2132->1314 (-38%, goal 1066 NO cumplido por 248ms), DCL/LOAD ~994, dist deploy 30MB->2.9MB. Decision de Rafael pendiente: aceptar vs seguir (split es.json / prerender login) vs prod. Tickets nuevos: 133/134/135. Bug hero CK diagnosticado (escala del fetch secuencial, no regresion) — esperando confirmacion de Rafael para ticketear. [handoff anterior:] SESION 2026-07-17 EN DOS PARTES. PARTE 1 (01:56-07:20Z): loop 7/7 cerrado (120,123,124,109,119,121,122) + release v1.51.0 (36fa524) verificada en DEV y PROD — detalle en decisions/comments de cada ticket. PARTE 2 (13:00Z-): Rafael reporto 'sitio pesado, demora mucho'; DIAGNOSTICO COMPLETO HECHO: el sitio es liviano (426KB gz guest) — la causa es la secuencia de boot: router.beforeEach (src/router/index.ts:166-183) bloquea TODA primera navegacion (incluso guest) esperando el round-trip de Firebase Auth, con #app vacio = pantalla negra; secundarios: 3 Open Sans en TTF (~200KB), 26MB peso muerto en public/ (ugs.csv 11MB, icons.png 6.8MB solo referenciado por SpriteIcon huerfano, 43 TTFs sin uso, screenshots). Rafael: 'loop hasta que se mejore al doble la velocidad'. BASELINE prod v1.51.0 con harness Playwright (FAST3G 1.6Mbps/150ms, mediana de 5, caché fria): FCP 2184 / DCL 1675 / LOAD 1909 / APPRENDER(vista real via rAF) 2132; sin throttle ~250ms warm. GOAL: FCP<=1092 y APPRENDER<=1066 contra dev. Tickets creados: 128 (splash instantaneo en index.html + commitear harness a scripts/perf-measure.mjs, tests-after) -> 129 (destrabar auth gate para rutas guest con last-known en localStorage, tdd, EL fix principal) -> 130 (woff2+swap, preconnect identitytoolkit/firestore, LoginView import estatico o modulepreload, tests-after) -> 131 (limpieza public/, uat-only). PAUSA pedida por Rafael con dev-128 EN VUELO — puede haber commit de task-128 sin review; ver next_action para el protocolo de deteccion. Harness de sesion en scratchpad 0e97c788/perf-measure.mjs (copia perf-measure-for-dev.mjs para el dev).",
   "open_questions": [
     "Working tree sin commitear (RED hub merge): commitear como feature, descartar, o taskear?",
@@ -93,7 +93,7 @@
     }
   ],
   "pending_human_confirmation": "Rafael: (1) UAT visual v1.40.0-1.48.1 en dev — en particular: dropdowns legibles (112), search v2.1 sort/count/per-page (108), toggles de coleccion reflejandose (113), badge de matches visible + Total sin recorte en mobile (115); (2) manual con TASK-111 o relanzar loop (re-confirmar loop_auth); (3) voseo/tuteo es.json; (4) public/tasks/ borrar a mano.",
-  "mode": "loop",
+  "mode": "harness",
   "loop_auth": {
     "auto_close_on_green_review": true,
     "uat_delegated_to_orchestrator": true,
@@ -102,10 +102,10 @@
     "auto_version_bump_on_milestone": true
   },
   "loop_state": {
-    "current_ticket": "TASK-131",
-    "phase": "impl",
+    "current_ticket": null,
+    "phase": "batch_closed",
     "iteration": 5,
-    "completed_this_run": 4,
+    "completed_this_run": 5,
     "run_started_at": "2026-07-17T13:43:03.000Z"
   }
 }

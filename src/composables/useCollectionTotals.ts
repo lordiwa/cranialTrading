@@ -2,6 +2,7 @@
  * Composable for calculating collection totals with multi-source prices
  */
 import { computed, ref, shallowRef, triggerRef } from 'vue'
+import { hydrateCardPricesCache, persistCardPricesBatch } from '../services/cardPricesCache'
 import { type CardPrices, formatPrice, getCardPrices, preloadSetMappings } from '../services/mtgjson'
 import { getCardById, searchCards } from '../services/scryfallCache'
 import { useCollectionStore } from '../stores/collection'
@@ -14,6 +15,11 @@ const setCodeCache = new Map<string, string>()
 
 // Track cards we've already tried to fix (to avoid repeated attempts)
 const fixAttemptedCache = new Set<string>()
+
+// TASK-137: hydrate the persistent (IndexedDB) price cache into pricesCache
+// at most once per session — subsequent fetchAllPrices calls (re-navigation,
+// re-mount) reuse what's already in memory instead of re-reading IndexedDB.
+let hasHydratedFromPersistentCache = false
 
 // Abort controller for cancelling in-progress fetches
 let fetchAbortController: AbortController | null = null
@@ -119,8 +125,14 @@ export function useCollectionTotals(cards: () => Card[]) {
     return null
   }
 
-  // Fetch price for a single card
-  const fetchCardPrice = async (card: Card): Promise<CardPrices | null> => {
+  // Fetch price for a single card. `newlyResolved`, when passed, collects
+  // scryfallId -> CardPrices for cards actually resolved this call (i.e. NOT
+  // already in pricesCache) so the caller can persist just the new results
+  // to the IndexedDB cache (TASK-137) without re-writing cache hits.
+  const fetchCardPrice = async (
+    card: Card,
+    newlyResolved?: Map<string, CardPrices | null>
+  ): Promise<CardPrices | null> => {
     let scryfallId = card.scryfallId
 
     // If no scryfallId, try to auto-fix the card
@@ -131,7 +143,7 @@ export function useCollectionTotals(cards: () => Card[]) {
       }
     }
 
-    // Check cache first
+    // Check cache first (may already be populated from the persistent cache)
     if (pricesCache.has(scryfallId)) {
       return pricesCache.get(scryfallId) ?? null
     }
@@ -158,10 +170,12 @@ export function useCollectionTotals(cards: () => Card[]) {
     try {
       const prices = await getCardPrices(scryfallId, setCode)
       pricesCache.set(scryfallId, prices)
+      newlyResolved?.set(scryfallId, prices)
       return prices
     } catch {
       console.warn('Error fetching prices for', card.name)
       pricesCache.set(scryfallId, null)
+      newlyResolved?.set(scryfallId, null)
       return null
     }
   }
@@ -183,6 +197,26 @@ export function useCollectionTotals(cards: () => Card[]) {
     processedCards.value = 0
     progress.value = 0
 
+    // TASK-137: hydrate the persistent (IndexedDB) price cache once per
+    // session so a warm reload skips network fetches for still-fresh prices.
+    // Never overwrites an entry already in pricesCache (e.g. from an earlier
+    // fetch this session) and never throws — hydrateCardPricesCache is
+    // best-effort by contract.
+    if (!hasHydratedFromPersistentCache) {
+      hasHydratedFromPersistentCache = true
+      try {
+        const cached = await hydrateCardPricesCache()
+        for (const [scryfallId, prices] of cached) {
+          if (!pricesCache.has(scryfallId)) {
+            pricesCache.set(scryfallId, prices)
+          }
+        }
+      } catch {
+        // hydrateCardPricesCache never throws, but stay defensive — a cold
+        // fetch is always a safe fallback.
+      }
+    }
+
     // O(1) lookup instead of O(N) .find() per card
     const cardIdSet = new Set(cardList.map(c => c.id))
 
@@ -197,6 +231,14 @@ export function useCollectionTotals(cards: () => Card[]) {
     // instead of on every single price update (avoids O(N²) re-computation)
     const BATCH_TRIGGER_SIZE = 25
     let batchCount = 0
+
+    // TASK-137: newly-resolved prices (scryfallId -> CardPrices), flushed to
+    // IndexedDB in the same batch size. Only entries fetchCardPrice actually
+    // resolved this call land here — cache hits (hydrated or same-session)
+    // are never re-persisted. Cards still mid-fetch when an abort happens
+    // never enter this buffer, so a cancelled pass only persists fully
+    // resolved cards.
+    let pendingPersist = new Map<string, CardPrices | null>()
 
     for (const card of cardList) {
       if (signal.aborted) break
@@ -214,7 +256,7 @@ export function useCollectionTotals(cards: () => Card[]) {
         continue
       }
 
-      const prices = await fetchCardPrice(card)
+      const prices = await fetchCardPrice(card, pendingPersist)
       cardPrices.value.set(card.id, prices) // Raw Map mutation — no reactivity (shallowRef)
       processedCards.value++
       progress.value = Math.round((processedCards.value / totalCards.value) * 100)
@@ -224,11 +266,20 @@ export function useCollectionTotals(cards: () => Card[]) {
         triggerRef(cardPrices) // Notify Vue → totals recalculate
         batchCount = 0
       }
+
+      if (pendingPersist.size >= BATCH_TRIGGER_SIZE) {
+        const toPersist = pendingPersist
+        pendingPersist = new Map()
+        await persistCardPricesBatch(toPersist)
+      }
     }
 
     // Final trigger for remaining cards in the last incomplete batch
     if (batchCount > 0) {
       triggerRef(cardPrices)
+    }
+    if (pendingPersist.size > 0) {
+      await persistCardPricesBatch(pendingPersist)
     }
 
     loading.value = false

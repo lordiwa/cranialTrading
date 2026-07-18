@@ -14,6 +14,8 @@ const { saveSnapshot, loadHistory, saveCardPrices } = usePriceHistory()
 const {
   loading,
   progress,
+  processedCards,
+  totalCards: totalCardsBeingPriced,
   totals,
   cardPrices,
   fetchAllPrices,
@@ -217,12 +219,18 @@ async function toggleChart() {
 <template>
   <!-- Mobile offset must clear the v2 tabbar (h-14 = 3.5rem, AppHeader) or it covers the matches badge -->
   <div class="fixed md:!bottom-0 left-0 right-0 z-40 bg-hdr backdrop-blur-md border-t border-neon-40 overflow-x-hidden" :style="{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }">
-    <!-- Loading bar -->
-    <div v-if="loading" class="h-1 bg-primary overflow-hidden">
-      <div
-          class="h-full bg-neon transition-all duration-300"
-          :style="{ width: `${progress}%` }"
-      ></div>
+    <!-- Cold-pass progress bar (TASK-137): visible while fetchAllPrices runs, gone once it finishes -->
+    <div v-if="loading && totalCardsBeingPriced > 0" class="border-b border-neon-40">
+      <div class="flex items-center justify-between px-4 pt-1 text-[11px] text-silver-50">
+        <span>{{ t('collection.totals.loading', { progress }) }}</span>
+        <span class="font-display font-tnum">{{ processedCards }}/{{ totalCardsBeingPriced }}</span>
+      </div>
+      <div class="h-1 bg-primary overflow-hidden">
+        <div
+            class="h-full bg-neon transition-all duration-300"
+            :style="{ width: `${progress}%` }"
+        ></div>
+      </div>
     </div>
 
     <!-- Chart panel (slides above the footer, only when expanded) -->

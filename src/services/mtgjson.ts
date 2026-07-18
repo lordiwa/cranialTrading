@@ -54,9 +54,17 @@ import { isKnownMtgjsonSet, parseSetListCodes } from './mtgjsonSetList'
 
 // IndexedDB configuration
 const DB_NAME = 'mtgjson_cache'
-const DB_VERSION = 1
+// v2 (TASK-137): adds RESOLVED_PRICES_STORE for the per-card resolved-price
+// cache (scryfallId -> CardPrices). Additive migration — existing PRICE_STORE
+// / MAPPING_STORE data is untouched.
+const DB_VERSION = 2
 const PRICE_STORE = 'prices'
 const MAPPING_STORE = 'mappings'
+// Resolved per-card CK/TCG/Cardmarket prices, keyed by scryfallId. Populated
+// by services/cardPricesCache.ts — kept in this same physical database
+// (rather than a second IndexedDB connection) since openDatabase() already
+// owns the connection lifecycle.
+export const RESOLVED_PRICES_STORE = 'resolvedPrices'
 
 // SetList cache: how long before we refresh the list of valid MTGJSON set codes
 const SET_LIST_REFRESH_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
@@ -105,9 +113,11 @@ let setListLoadPromise: Promise<void> | null = null
 // ========== IndexedDB Helpers ==========
 
 /**
- * Open/create the IndexedDB database
+ * Open/create the IndexedDB database. Exported so services/cardPricesCache.ts
+ * can reuse this connection/schema instead of opening a second IndexedDB
+ * database for the resolved per-card price cache (TASK-137).
  */
-function openDatabase(): Promise<IDBDatabase> {
+export function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (dbInstance) {
       resolve(dbInstance)
@@ -137,6 +147,11 @@ function openDatabase(): Promise<IDBDatabase> {
       // Store for scryfall -> uuid mappings
       if (!db.objectStoreNames.contains(MAPPING_STORE)) {
         db.createObjectStore(MAPPING_STORE)
+      }
+
+      // Store for resolved per-card prices (TASK-137)
+      if (!db.objectStoreNames.contains(RESOLVED_PRICES_STORE)) {
+        db.createObjectStore(RESOLVED_PRICES_STORE)
       }
     }
   })

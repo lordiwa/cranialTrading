@@ -8,6 +8,12 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
+// E2E_BASE_URL override (nightly cron target: a deployed environment like
+// cranial-trading-dev.web.app). When set, Playwright hits that URL directly
+// and does NOT spin up a local webServer. Unset = default local-preview
+// behavior, unchanged for local runs and the push/deploy CI.
+const remoteBaseURL = process.env.E2E_BASE_URL;
+
 export default defineConfig({
   testDir: './e2e/specs',
   fullyParallel: false,
@@ -21,7 +27,7 @@ export default defineConfig({
   outputDir: 'e2e/test-results',
   timeout: 45_000,
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: remoteBaseURL || 'http://localhost:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -54,12 +60,14 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: process.env.CI
-      ? 'npx vite preview --port 4173'
-      : `npx vite build --mode ${process.env.VITE_MODE || 'production'} && npx vite preview --port 4173`,
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: remoteBaseURL
+    ? undefined
+    : {
+        command: process.env.CI
+          ? 'npx vite preview --port 4173'
+          : `npx vite build --mode ${process.env.VITE_MODE || 'production'} && npx vite preview --port 4173`,
+        port: 4173,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });

@@ -23,7 +23,12 @@ test.describe('Search', () => {
     expect(typeof visible).toBe('boolean');
   });
 
-  test('selecting autocomplete suggestion populates search and shows results', async ({ searchPage }) => {
+  // Tagged @nightly-skip: known flake, depends on a live Scryfall suggestion
+  // having a price (see CLAUDE.md). Playwright retries (CI=2) already absorb
+  // this most nights; excluding it from the nightly cron makes that
+  // deterministic instead of probabilistic, per the "known flake never reds
+  // out the run" requirement.
+  test('selecting autocomplete suggestion populates search and shows results @nightly-skip', async ({ searchPage }) => {
     await searchPage.typeForAutocomplete('Lightning B');
     await searchPage.page.waitForTimeout(2000);
 

@@ -5,7 +5,11 @@ test.describe('Registration', () => {
     await registerPage.goto();
   });
 
-  test('successful registration shows email verification screen', async ({ registerPage }) => {
+  // Tagged @nightly-skip: creates a real Firebase Auth account + Firestore user
+  // doc with no cleanup path (account deletion isn't exposed via UI). Excluded
+  // from the nightly cron (grep-invert) so the CI account doesn't accumulate
+  // orphaned accounts every night. Still runs on every push-to-develop full suite.
+  test('successful registration shows email verification screen @nightly-skip', async ({ registerPage }) => {
     const unique = Date.now();
     await registerPage.fillForm({
       email: `test_${unique}@e2etest.com`,

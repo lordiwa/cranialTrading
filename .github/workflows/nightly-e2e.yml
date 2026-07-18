@@ -1,0 +1,112 @@
+name: Nightly E2E (dev)
+
+# Independent from the push/deploy CI (test.yml) — does not gate deploys and
+# is not triggered by push/PR. Runs the E2E suite against the deployed dev
+# environment (cranial-trading-dev.web.app) to catch environmental drift and
+# build a run history that distinguishes real regressions from known flakes.
+# See CLAUDE.md "E2E: Three-Level Policy" for the mutator/flake decisions.
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # ~06:00 UTC nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-e2e
+  cancel-in-progress: false
+
+jobs:
+  nightly-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: true
+      E2E_BASE_URL: https://cranial-trading-dev.web.app
+      TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
+      TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
+      PLAYWRIGHT_JSON_OUTPUT_NAME: nightly-results.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Validate test credentials
+        run: |
+          if [ -z "$TEST_USER_A_EMAIL" ] || [ -z "$TEST_USER_A_PASSWORD" ]; then
+            echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
+            exit 1
+          fi
+
+      # E2E_BASE_URL makes playwright.config.ts point at the deployed dev site
+      # and skip the local webServer entirely (see playwright.config.ts).
+      # --grep-invert @nightly-skip excludes known-unsafe-for-nightly specs:
+      # register.spec.ts "successful registration" (creates a real, uncleaned
+      # Firebase Auth account) and search.spec.ts "selecting autocomplete
+      # suggestion" (known Scryfall-data flake) — both documented in CLAUDE.md.
+      - name: Run E2E against dev
+        id: e2e
+        run: npx playwright test --grep-invert @nightly-skip --reporter=list,html,json
+
+      - name: Build step summary
+        if: always()
+        run: node e2e/nightly-summary.mjs nightly-results.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-results-json
+          path: nightly-results.json
+          retention-days: 14
+
+      # Lightweight failure notification: open (or comment on) a single
+      # tracking issue rather than spamming a new issue every night.
+      - name: Open/update failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Nightly E2E failing on dev';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Nightly E2E run against cranial-trading-dev.web.app failed.\n\nRun: ${runUrl}\n\nSee the run's Job Summary and the \`nightly-playwright-report\` artifact for details.`;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'nightly-e2e',
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['nightly-e2e'],
+              });
+            }

@@ -162,6 +162,7 @@ npm run e2e                # Playwright E2E tests
 | Smoke | Every ticket | `npm run e2e:smoke` | ~2 min |
 | Targeted | Every ticket (area(s) touched) | `npm run e2e:<area>` | ~3-5 min |
 | Full suite | **Once per tanda, before push to `develop`** | `npm run e2e` | ~13 min |
+| Nightly (cron) | Automatic, nightly, against deployed dev | `npm run e2e:nightly` (CI: `.github/workflows/nightly-e2e.yml`) | ~13 min |
 
 **The push-to-develop gate is unchanged: the full suite is still mandatory before every push to `develop` (see the Deployment Flow above). This policy only moves the full-suite run from "every ticket" to "once per tanda, right before the push" — it does not weaken the gate.**
 
@@ -183,6 +184,15 @@ Area → specs mapping (targeted scripts run only that folder, still through the
 For areas without a dedicated script (market, settings, contacts, i18n, preferences, notifications, help, etc.), run `npx playwright test e2e/specs/<folder>` directly with the same flags as `npm run e2e`.
 
 Known flaky specs — never rely on these for smoke/targeted signal, and don't tag them `@smoke`: `auth/register.spec.ts` ("successful registration" — Firebase rate-limit on `sendEmailVerification`) and `search/search.spec.ts` ("selecting autocomplete suggestion" — depends on a live Scryfall suggestion having a price). Both pass in isolation; they are not code regressions.
+
+#### Nightly cron (`.github/workflows/nightly-e2e.yml`)
+
+A separate scheduled workflow (`schedule` ~06:00 UTC + `workflow_dispatch` for manual runs) runs the E2E suite against the deployed dev environment (`https://cranial-trading-dev.web.app`) instead of a local preview build. It's a detection tool, not a deploy gate — it doesn't touch or block `test.yml` (push/deploy CI). Trigger a manual run with `gh workflow run nightly-e2e.yml`.
+
+- **Remote target:** `playwright.config.ts` reads `E2E_BASE_URL` — when set, it becomes the Playwright `baseURL` and the local `webServer` is skipped entirely (unset = current local-preview behavior, unchanged). Local repro: `E2E_BASE_URL=https://cranial-trading-dev.web.app npm run e2e:smoke`.
+- **Mutators:** `auth/register.spec.ts` "successful registration" creates a real, un-cleaned-up Firebase Auth account + Firestore user doc (account deletion isn't exposed via UI) — excluded from nightly via a `@nightly-skip` tag on that one test (`--grep-invert @nightly-skip`, wired as `npm run e2e:nightly`). Every other CRUD spec (collection, decks, binders, contacts) creates and deletes within the same test, so no cleanup step was needed for those. The rest of `register.spec.ts` (validation/duplicate checks that don't create accounts) still runs nightly.
+- **Known flakes:** both flakes above are `@nightly-skip`-tagged and excluded from the nightly run (in addition to Playwright's existing `retries: 2` under `CI`), so neither ever reds out a nightly run on its own. They still run on every push-to-develop full suite.
+- **Result visibility:** the JSON reporter output is summarized to the run's Job Summary (pass/flaky/fail/skipped table + failed test titles) via `e2e/nightly-summary.mjs`; the full HTML report is uploaded as the `nightly-playwright-report` artifact. On failure, a single tracking GitHub issue (label `nightly-e2e`) is opened or commented on — no spam of a new issue every night.
 
 ## Architecture
 

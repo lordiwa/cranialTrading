@@ -1,0 +1,35 @@
+{
+  "key": "TASK-140",
+  "title": "Investigar el crecimiento real del chunk de Firebase (486KB→~696KB): la premisa de TASK-135 era incorrecta — firebase/functions solo pesaba ~14KB",
+  "description": "Hallazgo de TASK-135 (2026-07-18, dev-135): el diagnóstico de TASK-132 atribuía ~223KB de crecimiento del chunk compartido de Firebase (486→709KB raw) al paquete firebase/functions arrastrado por el import estático de matches.ts. La medición real tras cortar esa arista (88e3c97) muestra que el código propio de @firebase/functions minificado es ~14KB: el chunk bajó solo 708.87→696.45KB y el total combinado de chunks quedó ~idéntico. El gap de ~200KB entre el baseline histórico de 486KB y los ~696KB actuales tiene OTRA causa sin diagnosticar (¿versión del SDK bumpeada? ¿baseline 486 medido con otra composición de manualChunks? ¿tree-shaking perdido en firestore/auth?). TAREA (investigación, no fix): comparar la composición del chunk firebase entre el commit del baseline 486KB (buscar la medición en el histórico de TASK-132) y HEAD, con npx vite-bundle-visualizer o rollup-plugin-visualizer o sourcemap-explorer; identificar qué módulos explican el delta; documentar en comment si hay palanca real de perf o si el 486 era una medición no comparable. Salida: diagnóstico documentado + tickets de fix si aparece palanca real. Nota: el chunk es lazy para guests desde TASK-132, así que no afecta primer paint anónimo — afecta el primer load de usuarios logueados (163KB gz, cacheado después).",
+  "acceptance_criteria": [
+    "Comment en el ticket con la composición del chunk firebase actual (módulos y KB) y la explicación del delta vs el baseline 486KB (o la demostración de que el baseline no era comparable)",
+    "Decisión documentada: hay palanca real de perf (→ tickets de fix concretos) o no la hay (→ cerrar sin acción)"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "perf",
+    "bundle",
+    "firebase",
+    "research"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-135"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T18:00:37.043Z",
+      "body": "Pista del reviewer de TASK-135 para arrancar la investigación: comparar la versión de firebase en package-lock.json entre el commit donde se midió el baseline de 486KB (buscar en el histórico de TASK-132, 2026-07-17) y HEAD — un bump del SDK entre mediciones es el candidato #1 del gap ~200KB; candidato #2: features de firestore/auth incorporadas después de esa medición. Dato ya verificado: @firebase/functions minificado ≈ 14KB (chunk cloudFunctions-*.js), no hay más functions que extraer del chunk grande."
+    }
+  ],
+  "created_at": "2026-07-18T17:57:45.045Z",
+  "updated_at": "2026-07-18T18:00:37.043Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

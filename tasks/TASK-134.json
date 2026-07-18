@@ -9,7 +9,7 @@
     "Decisión documentada (en el workflow o CLAUDE.md) sobre specs mutadores: excluidos, con cuenta dedicada, o con cleanup — sin acumulación de datos basura en la cuenta CI",
     "Al menos una corrida manual (workflow_dispatch) verificada verde antes de confiar en el schedule"
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "medium",
   "labels": [
     "ci",
@@ -23,9 +23,15 @@
   ],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T20:45:01.620Z",
+      "body": "Round 2 (d0b79b5, sobre f4649dc) APROBADO por review FULL — los 5 hallazgos del round 1 resueltos y verificados: ref:develop en checkout (la suite agendada siempre ejecuta el spec-set de develop, que es lo desplegado en dev), cleanup real de fixtures en deck-crud/binders, net-zero acotado en collection (compromiso documentado: el fixture exacto no es identificable por el race de card_index + 25 Lightning Bolt pre-existentes; rotación de composición registrada como LOW para retro — mitigación futura: reseed periódico o delete por más-reciente), PLAYWRIGHT_HTML_OUTPUT_DIR para el artifact, workflow invoca npm run e2e:nightly (sin drift), summary con títulos completos. review_depth: FULL en ambos rounds (playwright.config.ts = test infra mandatory-FULL; 224+96 líneas). QUEDA in_review — AC5 (workflow_dispatch verde) es IMPOSIBLE hasta que nightly-e2e.yml exista en main: GitHub solo registra schedule/dispatch desde el default branch. Se activa con la próxima promoción develop→main (deploy a prod, requiere OK de Rafael). Al ocurrir: gh workflow run nightly-e2e.yml, verificar Actions verde, y recién entonces cerrar este ticket con UAT. Commits: f4649dc08c3e7f1d3768d2f54648aa7926c279be, d0b79b578a503952e21f92aed190944cd1c64a60."
+    }
+  ],
   "created_at": "2026-07-17T17:35:00.000Z",
-  "updated_at": "2026-07-17T17:35:00.000Z",
+  "updated_at": "2026-07-18T20:45:01.620Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

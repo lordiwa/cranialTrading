@@ -1,0 +1,41 @@
+{
+  "key": "TASK-138",
+  "title": "Perfil público v2: búsqueda y filtros server-side sobre /public_cards + load-more en vistas agrupadas",
+  "description": "Follow-up de TASK-136 (hallazgo M2 del review FULL de 793c1ba). Con la paginación server-side del perfil público, la búsqueda de texto y los filtros del perfil operan SOLO sobre las páginas ya cargadas (~60 de potencialmente 5000+): si los resultados filtrados no llenan el viewport no se dispara el infinite scroll y nunca cargan más páginas — encontrar una carta específica en un perfil grande es efectivamente imposible desde la UI. Peor: con groupBy activo, :on-load-more se pasa undefined (UserProfileView.vue:~710) — las vistas agrupadas quedan truncadas permanentemente en lo ya cargado. FIX propuesto: (1) cablear la búsqueda de texto del perfil a la query prefix server-side ya existente (services/publicCardSearch.ts, campo cardNameLower) filtrada por userId — verificar índice necesario ANTES (equality userId + range cardNameLower probablemente requiere compuesto; chequear firestore.indexes.json y consola, deploy de índices es manual); (2) definir estrategia para groupBy paginado: o load-more también en agrupado, o botón explícito \"cargar todas\" con warning de costo, o deshabilitar groupBy hasta cargar todo — decisión de diseño chica a documentar; (3) L2 de la misma review: PublicCard no lleva setCode → hasta que el enrichment Scryfall lo parchea, agregar al carrito degrada el upgrade CK al fallback TCG (exchangeCart.ts:52,76) — evaluar escribir setCode en /public_cards al publicar (write path publicCards.ts) y backfill barato. NOTA producto pendiente (M3, decisión Rafael): cartas wishlist ya no aparecen en perfil ajeno (whitelist sale/trade de TASK-085); si Rafael quiere restaurar la sección \\\"busco\\\", eso es OTRO ticket (modelo+reglas), no este.",
+  "acceptance_criteria": [
+    "Búsqueda de texto en perfil público ajeno encuentra cartas NO cargadas aún en el grid (query server-side prefix por cardNameLower + userId), con índice verificado/desplegado antes del merge",
+    "Vistas agrupadas (groupBy) del perfil público no quedan truncadas: o paginan, o cargan-todo explícito documentado — decisión registrada en comment",
+    "setCode presente en /public_cards para docs nuevos (write path) o decisión documentada de por qué no — ventana de fallback TCG del carrito cerrada o aceptada explícitamente",
+    "Tests de la query de búsqueda primero (tdd del módulo de query); gates verdes; E2E user-profile targeted verde"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "perf",
+    "profile",
+    "search",
+    "v1.53"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-136"
+  ],
+  "linked_commits": [
+    "8845ca0473d8c07163640388c9080db325169929",
+    "8a2ad9c4d00db1be6a28828751d5cb95718c3fa0",
+    "3c9da001e712a0980567b261cdaede879319f79d"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T22:16:45.450Z",
+      "body": "CERRADO con review verde tras 3 commits. review_depth: FULL (rúbrica: 548+ líneas ≥150, lógica core tdd de publicCards/usePublicProfileCards + firestore.indexes.json). Round 1 (8845ca0): AC3 setCode en los 3 write paths de /public_cards (fallback '' — Firestore rechaza undefined; claim de enrichment para docs viejos VERIFICADO en código por el reviewer: needsEnrichment dispara por type_line faltante y el patch incluye setCode) + AC2 groupBy sin truncar (on-load-more en TODOS los grupos; sin runaway — useVirtualGrid latchea por scroll event). Round 2 (8a2ad9c): AC1 búsqueda server-side searchUserPublicCards (prefijo cardNameLower + userId, sentinel U+F8FF verificado por bytes, cap 50 documentado) integrada al composable con debounce 300ms y gen-token COMPARTIDO (12 tests de carreras cruzadas no-vacuos); ÍNDICE COMPUESTO public_cards userId+cardNameLower agregado al JSON y DESPLEGADO POR EL ORQUESTADOR a cranial-trading-dev (verificado READY; e2e:profile 6/6 contra el índice vivo, incluido el test que tipea y dispara la query nueva). Addendum (3c9da00): M1 spinner perpetuo (loadingMore reset síncrono) + M2 primer-keystroke blanquea grid (flag searchActive solo-síncrono, sin carreras nuevas — 4 escenarios cruzados verificados) + LOW-1 documentado (prefix-only vs substring/edition). Gates finales: unit 1530/1530, build, type-check, e2e:smoke 11/11, e2e:profile 6/6. PREREQUISITO DEL PRÓXIMO MERGE A MAIN: desplegar el índice a prod (firebase deploy --only firestore:indexes --project cranial-trading) ANTES del merge — sin eso la búsqueda de perfil falla failed-precondition en prod. LOWs restantes anotados: chips flicker al limpiar búsqueda, doble debounce transitorio. M3 (wishlist en perfil ajeno) sigue pendiente de decisión de producto de Rafael."
+    }
+  ],
+  "created_at": "2026-07-18T17:24:36.076Z",
+  "updated_at": "2026-07-18T22:16:45.450Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

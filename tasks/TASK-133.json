@@ -9,7 +9,7 @@
     "La suite completa sigue verde después del tagging (los tags no alteran comportamiento de ningún spec)",
     "Gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "e2e",
@@ -19,11 +19,25 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "5733ca01e02fe17d5e3fa290363b646285c6eaef",
+    "139d4bc26c29a0a69d12669027c8c7db9fd97c86"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "uat",
+      "at": "2026-07-18T19:59:50.949Z",
+      "body": "UAT TASK-133 (tier uat-only; uat_delegated_to_orchestrator concedido por Rafael en loop_auth — cada paso verificado por el orquestador a pedido del humano). Paso 1 (AC1): correr npm run e2e:smoke y verificar subset taggeado 8-12 tests cubriendo navegación/login/un flujo por área — esperado ~2min todo verde; observado: 10 tests taggeados (navegación x2, login, collection, decks, matches, search, profile, binders, messages) + setup = 11 passed en 1m38.6s (corrida del developer post-addendum, salida completa en hand-off) — PASS, verificado por el Orquestador a pedido del humano. Paso 2 (AC2): verificar tabla área→carpeta→script en CLAUDE.md + scripts npm mínimos auth/collection/decks/matches/search — observado: tabla presente con 8 áreas (mínimo cumplido + profile/binders/messages), scripts en package.json con el patrón por carpeta, script e2e original intacto (verificado hunk por hunk por reviewer independiente) — PASS, verificado por el Orquestador a pedido del humano. Paso 3 (AC3): leer la sección nueva de CLAUDE.md y confirmar que la regla E2E-before-push queda explícitamente preservada — observado: texto en negrita 'The push-to-develop gate is unchanged: the full suite is still mandatory before every push to develop' con referencia cruzada al Deployment Flow (leído verbatim por el reviewer, líneas 156-184) — PASS, verificado por el Orquestador a pedido del humano. Paso 4 (AC4): correr la suite E2E completa post-tagging — esperado: verde sin cambios de comportamiento; observado: npm run e2e ejecutado DIRECTAMENTE por el orquestador → 125 passed, 8 skipped (condicionales documentados pre-existentes), 0 failed, 12.1m, exit 0 — PASS, verificado por el Orquestador directamente. Paso 5 (AC5): gates — observado: unit 1485/1485, type-check limpio vía pre-commit hook, package.json parsea, 111 warnings lint pre-existentes sin errores — PASS, verificado por el Orquestador a pedido del humano. Overall result: PASS."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T20:00:07.091Z",
+      "body": "CERRADO con review verde + UAT delegada PASS (comment uat previo). review_depth: LIGHT (rúbrica: 52 líneas <150, sin superficies mandatory-FULL — tagging títulos-only + scripts npm + docs; chequeo extra de integridad del gate ejecutado). Commits 5733ca0 + addendum 139d4bc: política E2E de 3 niveles operativa — @smoke (10 tests, 1m39s, flakes conocidos excluidos), scripts targeted por área (auth/collection/decks/matches/search/profile/binders/messages), suite completa obligatoria una vez por tanda ANTES del push a develop (regla E2E-before-push explicitamente preservada en CLAUDE.md en negrita, verificada verbatim por reviewer). Review: 'APPROVE — 8 tags títulos-only verificados hunk por hunk, gate E2E-before-push explícitamente preservado, script e2e intacto, setup de auth corre bajo --grep (dependency project)'; MEDIUM de curaduría (binders/messages sin smoke) resuelto en el addendum. AC4 verificado por corrida directa del orquestador: suite completa 125 passed / 8 skipped / 0 failed en 12.1m post-tagging — que además valida los 6 tickets de la tanda (136/135/137/126/139/133) contra la app real a mitad de corrida. NOTA para futuros briefings de devs: nivel por ticket = e2e:smoke + e2e:<area> tocada; la suite completa la corre el orquestador pre-push."
+    }
+  ],
   "created_at": "2026-07-17T17:35:00.000Z",
-  "updated_at": "2026-07-17T17:35:00.000Z",
+  "updated_at": "2026-07-18T20:00:07.091Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

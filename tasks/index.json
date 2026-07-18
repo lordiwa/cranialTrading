@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-17T13:43:07.526Z",
+  "generated_at": "2026-07-18T22:16:45.450Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -628,19 +628,19 @@
     {
       "key": "TASK-125",
       "title": "Bug latente colección: batchDeleteCards fase 2 borra public_cards de ids cuyo delete de fase 1 falló — carta restaurada queda sin listing público",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
     },
     {
       "key": "TASK-126",
       "title": "Auth: remount de /register con cuenta unverified logueada muestra el form en blanco — re-submit puede re-disparar register() y el \"username taken\" propio",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-127",
       "title": "Chore seguridad: extender la sanitización de error-logging (patrón logAuthError) a los 11 stores restantes + mover helper a utils",
-      "status": "todo",
+      "status": "done",
       "priority": "low"
     },
     {
@@ -676,26 +676,56 @@
     {
       "key": "TASK-133",
       "title": "Process: E2E en tres niveles — tags @smoke, subsets targeted por área, suite completa solo pre-push",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-134",
       "title": "CI: cron E2E nocturna contra dev + manejo de flakes (historial para distinguir flake de regresión)",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
       "key": "TASK-135",
       "title": "Perf: cortar el import estático de cloudFunctions en matches.ts — saca firebase/functions (~220KB raw) del chunk compartido de Firebase",
-      "status": "todo",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-136",
       "title": "Perf+privacidad: perfil público paginado vía /public_cards — no descargar la subcolección entera ni exponer cartas privadas al cliente",
-      "status": "todo",
+      "status": "done",
       "priority": "high"
+    },
+    {
+      "key": "TASK-137",
+      "title": "Perf: totales CK del hero de Colección — persistir precios por carta en IndexedDB (TTL) + barra de progreso en el footer",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-138",
+      "title": "Perfil público v2: búsqueda y filtros server-side sobre /public_cards + load-more en vistas agrupadas",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-139",
+      "title": "UserProfileHoverCard: contar cartas públicas vía aggregate count sobre /public_cards — dejar de bajar la subcolección ajena (prereq de TASK-087)",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-140",
+      "title": "Investigar el crecimiento real del chunk de Firebase (486KB→~696KB): la premisa de TASK-135 era incorrecta — firebase/functions solo pesaba ~14KB",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-141",
+      "title": "Bug latente colección: batchUpdateCards multi-chunk sin atomicidad — un throw en chunk N+1 deja los chunks previos commiteados en Firestore pero cero estado local/public sync",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

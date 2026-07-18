@@ -8,7 +8,7 @@
     "Niveles de log y context strings preservados; toasts sin cambios",
     "Tests de regresión del helper; gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "chore",
@@ -21,17 +21,24 @@
   "depends_on": [
     "TASK-122"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "9b0e228a1d0035f5e601a8f10a298188a5b6d2b7"
+  ],
   "linked_prs": [],
   "comments": [
     {
       "author": "orchestrator",
       "at": "2026-07-17T06:23:30.744Z",
       "body": "Alcance adicional detectado por dev-122 al cerrar TASK-122 (2026-07-17): el patrón `const firebaseError = error as { code?: string }; if (firebaseError.code === ...)` que corre DESPUÉS de logAuthError en los catches de loginWithGoogle, login, changeRegistrationEmail, sendResetPasswordEmail, resetPassword, changePassword y checkEmailVerification NO es null-safe (un reject(null) tira TypeError en el acceso .code y escapa el catch sin toast). Al migrar al helper de utils, normalizar también ese acceso (p.ej. extraer el code una sola vez de forma null-safe y reusar en el branching)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T21:23:42.684Z",
+      "body": "CERRADO con review verde. review_depth: FULL (rúbrica: 405 líneas ≥150 + superficie auth mandatory-FULL + transversal a 12 stores). Commit 9b0e228: utils/logSanitizedError.ts (cuerpo endurecido de TASK-122 + getErrorCode null-safe), auth.ts migrado sin duplicado (10 call sites; logAuthError eliminado del repo), 6 catches endurecidos con getErrorCode (reject(null) ya no escapa el catch sin toast — mejora estricta verificada rama por rama por el reviewer; login() no tenía el patrón, corrección honesta del dev al ticket), ~66 sitios migrados en 11 stores con output de consola byte-idéntico (':' final movido al helper; verificado por el test pre-existente de TASK-122 que pasó SIN cambios espiando console directo). Review: 'APPROVE — migración con output byte-idéntico verificada en los 12 stores, los 6 catches endurecidos son mejora estricta sin cambio de toast, gates re-corridos verdes (unit 1502/1502, type-check limpio)'. 16 tests nuevos del helper (incluye lock de que customData.credential nunca llega a consola). e2e:smoke 11/11. LOWs anotados sin bloquear: decks.ts:1139/:1230 loggean array de PromiseRejectedResult (FirebaseError de Firestore, sin superficie de credencial — follow-up opcional con getErrorCode(f.reason)), hardening de los 6 catches sin test directo (getErrorCode(null) sí testeado), comentario desactualizado en matches.ts:603. LOW de register() toasteando error.message crudo CONFIRMADO intacto — decisión de producto pendiente (user-facing)."
     }
   ],
   "created_at": "2026-07-17T06:18:11.077Z",
-  "updated_at": "2026-07-17T06:23:30.744Z",
+  "updated_at": "2026-07-18T21:23:42.684Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

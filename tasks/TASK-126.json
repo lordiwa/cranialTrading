@@ -7,7 +7,7 @@
     "No hay camino UI que dispare un segundo register() con auth.currentUser existente",
     "Tests del flujo; gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "auth",
@@ -19,11 +19,21 @@
   "depends_on": [
     "TASK-124"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "7d391e12d074b100774d8078a4fb9547a37c51aa",
+    "24da6632473074866ed2d61c50fa0e7b988d7e88",
+    "031cfa4e184f2fc55e74217443764cb2da7ce859"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T19:18:25.749Z",
+      "body": "CERRADO con review verde tras 3 commits. review_depth: FULL (rúbrica: superficie auth mandatory-FULL; round 1 177 líneas, round 2 295, addendum 12). Round 1 (7d391e1): else-if en onMounted mostrando pending en remount — review lo probó INALCANZABLE en producción (HIGH-1: authGuard requiresGuest expulsaba al unverified de /register antes del mount; lastKnown='authenticated' se escribe sin mirar emailVerified). Round 2 (24da663): decisión del orquestador — completar el guard: helper isUnverifiedSessionOnRegister() (solo /register) aplicado en el chequeo síncrono Y el redirect diferido, sin tocar la rama guest perf-crítica de TASK-129 (26 tests pre-existentes intactos); onMounted→watch immediate cierra la ventana optimistic-paint (MEDIUM-1). Addendum (031cfa4): displayEmail computed con fallback al email de la cuenta — la pending remontada ya no muestra email en blanco (MEDIUM-2); prioridad correcta tras cambiar-email (ref local gana). Veredicto final: 'pantalla pending alcanzable en runtime real por ambos caminos del guard, sin camino UI a segundo register(), email de cuenta visible en remount; APPROVED, 0 HIGH, gates verdes (unit 1482/1482, type-check limpio).' E2E register 6/6 sin flake (2 corridas). LOWs anotados sin bloquear: trailing-slash /register/ cae al comportamiento viejo (benigno), prefill de cambiar-email vacío en remount (conveniencia). Flujo cambiar-email de TASK-124 verificado operativo en la pending remontada."
+    }
+  ],
   "created_at": "2026-07-17T03:14:01.864Z",
-  "updated_at": "2026-07-17T03:14:01.864Z",
+  "updated_at": "2026-07-18T19:18:25.749Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

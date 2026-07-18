@@ -1,0 +1,31 @@
+{
+  "key": "TASK-141",
+  "title": "Bug latente colección: batchUpdateCards multi-chunk sin atomicidad — un throw en chunk N+1 deja los chunks previos commiteados en Firestore pero cero estado local/public sync",
+  "description": "Hallazgo del developer de TASK-125 (2026-07-18, chequeo de paralelos): batchUpdateCards (src/stores/collection.ts:~900) tiene forma fase1(writeBatch.update por chunks de 500)/fase2(public sync), pero fase 1 NO tiene try/catch ni retry por chunk: cualquier batch.commit() que lance propaga directo al catch exterior (~:969) y devuelve false ANTES de actualizar estado local o sincronizar public_cards. Con >500 ids (multi-chunk), los chunks ya commiteados quedaron escritos en Firestore pero: el estado local no se actualizó (UI muestra los valores viejos hasta un reload), el public sync no corrió (docs de public_cards desincronizados de su estado real para las cartas de los chunks exitosos), y el card_index tampoco se re-persiste. Clase DISTINTA del bug de TASK-125 (allá se sobre-borraba; acá es desync parcial remoto/local). Impacto real: bulk status change de >500 cartas con fallo a mitad — raro pero la cuenta CI tiene 59k cartas y Rafael 5654, escenario posible en select-all. Fix esperable: per-chunk try/catch con acumulación de succeededIds/failedIds al estilo batchDeleteCards (TASK-120) + aplicar estado local/public sync/card_index SOLO de los chunks exitosos + reportar parcial al usuario. Patrón canónico gen-token/persist de TASK-113/116/123 aplica a la fase de persist.",
+  "acceptance_criteria": [
+    "Fallo parcial multi-chunk en batchUpdateCards deja estado local, public_cards y card_index consistentes con lo que realmente quedó en Firestore (chunks exitosos aplicados, fallidos no)",
+    "El usuario recibe indicación de éxito parcial (toast con conteo), no un false sil encioso",
+    "TDD: test de regresión del escenario multi-chunk con fallo en chunk intermedio — rojo primero",
+    "Gates verdes + e2e:collection targeted"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "bug",
+    "collection",
+    "bulk",
+    "found-by-dev"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-125"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-07-18T20:57:49.567Z",
+  "updated_at": "2026-07-18T20:57:49.567Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

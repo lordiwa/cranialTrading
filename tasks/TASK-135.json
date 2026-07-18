@@ -9,7 +9,7 @@
     "Flujo de notificación de matches intacto (unit tests de matches verdes; E2E targeted de matches verde)",
     "Gates verdes"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "perf",
@@ -21,11 +21,19 @@
   "depends_on": [
     "TASK-132"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "88e3c97e291904bcf7a19da27a8f3d42e7ee90d8"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T18:00:31.524Z",
+      "body": "CERRADO con review verde. review_depth: FULL (rúbrica: 4 líneas cambiadas <150 PERO toca vite.config.ts = superficie build/packaging mandatory-FULL). Commit 88e3c97: import estático de cloudFunctions eliminado de matches.ts → import() dinámico en punto de uso dentro del try/catch no-bloqueante existente (patrón collection.ts), y 'firebase/functions' removido de manualChunks.firebase. Review: 'Review FULL aprobado: import dinámico de notifyMatchUser en punto de uso con fallo no-bloqueante (patrón collection.ts), firebase/functions fuera del manualChunk compartido, warning de build eliminado (AC2), chunk propio lazy de 13.95KB; AC3 cerrado como premisa-incorrecta (functions solo pesa ~14KB, caída real 709→696KB) con follow-up TASK-140 para diagnosticar el gap ~200KB; gates re-verificados por reviewer (unit 1448, build, type-check).' AC1 ✓ AC2 ✓ AC4 ✓ (E2E matches 11/11) AC5 ✓; AC3 documentado como no-cumplible-por-premisa-incorrecta — el diagnóstico de TASK-132 que atribuía ~223KB a firebase/functions era matemáticamente imposible; investigación del gap real en TASK-140 (backlog)."
+    }
+  ],
   "created_at": "2026-07-17T20:10:00.000Z",
-  "updated_at": "2026-07-17T20:10:00.000Z",
+  "updated_at": "2026-07-18T18:00:31.524Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

@@ -7,7 +7,7 @@
     "Test unit de regresión del escenario fallo-parcial con carta sale/trade",
     "Gates verdes (unit + build)"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "low",
   "labels": [
     "bug",
@@ -20,11 +20,19 @@
   "depends_on": [
     "TASK-120"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "f90a23997c4bb84a03e8af8f543a4997fc9381a9"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T21:01:50.340Z",
+      "body": "CERRADO con review verde sin condiciones. review_depth: FULL (rúbrica: 57 líneas <150 pero toca stores/collection.ts, lógica core tdd 113/116/120). Commit f90a239: fase 2 de batchDeleteCards filtra failedIds antes de deletePublicCardBatches — una carta cuyo delete de colección falló (y el rollback de TASK-120 restauró) conserva su listing público. Test de regresión no-vacuo con 201 cartas forzando el chunking real (BATCH_SIZE=200, chunk intermedio falla post-retries), red-run capturado. Review verificó por sí mismo: id-space consistente (failedIds y publicCardIds ambos card.id crudo; el compuesto userId_cardId se arma dentro de deletePublicCardBatches), interacción rollback+card_index coherente (restauración post-fase-2, índice reconstruido desde cards.value), paralelos limpios (deleteCard seguro por construcción, deletePublicCardBatches con único call site, batchUpdateCards = clase distinta → TASK-141 creado), gates reproducidos (unit 1486/1486, build, type-check). E2E per política nueva: e2e:smoke 11/11 + e2e:collection 16/16. LOWs anotados: totalBatches de progreso calculado pre-filtro (cosmético solo en camino de fallo), huérfanos de public_cards si falla la fase 2 misma (pre-existente, fuera de scope)."
+    }
+  ],
   "created_at": "2026-07-17T02:15:29.165Z",
-  "updated_at": "2026-07-17T02:15:29.165Z",
+  "updated_at": "2026-07-18T21:01:50.340Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

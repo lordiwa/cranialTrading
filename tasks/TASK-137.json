@@ -1,0 +1,39 @@
+{
+  "key": "TASK-137",
+  "title": "Perf: totales CK del hero de Colección — persistir precios por carta en IndexedDB (TTL) + barra de progreso en el footer",
+  "description": "Reportado por Rafael 2026-07-17, comportamiento confirmado 2026-07-18 (quiere barra de progreso en el footer; cache persistente para no esperar minutos). DIAGNÓSTICO VERIFICADO en código (sesión 2026-07-17 + re-verificado hoy): useCollectionTotals.ts hace un pase SECUENCIAL por toda la colección (5654 cartas en el caso de Rafael) al ritmo del rate-limiter de Scryfall — minutos de espera para ver los totales CK del hero — y los resultados por carta viven SOLO en memoria (pricesCache/setCodeCache Maps módulo-level + sharedCardPrices shallowRef): cada recarga de página repite el pase completo desde cero. La capa de datos mtgjson (services/mtgjson.ts) YA persiste los archivos de precios por set en IndexedDB — lo que NO se persiste es el resultado resuelto por carta (scryfallId → CardPrices). NO es regresión: siempre fue así; escala de la colección lo volvió doloroso. FIX acordado: (1) persistir el cache por carta (scryfallId → CardPrices + timestamp) en IndexedDB con TTL ~24h (alineado con la cadencia diaria de datos MTGJSON), hidratando sharedCardPrices al arrancar el fetch para que un load caliente muestre totales CK casi instantáneos y solo re-fetchee lo vencido/faltante; (2) UI: barra de progreso en el footer (CollectionTotalsPanel.vue) durante el pase frío — el composable ya expone loading/progress/processedCards/totalCards, es cablear la UI según el comportamiento que confirmó Rafael. CUIDADO: sharedCardPrices lo consumen también DeckView/BinderView/DeckEditorGrid/DeckCardsList/SettingsView/useCollectionImport/useDeckDeletion — no romper esos consumidores (Anti-Loop Rule 1: trazar paralelos). Respetar abort (cancelPriceFetch) y el corte por collectionStore.importing. Política CK-first (TASK-114) intacta. FUERA DE ALCANCE (follow-up futuro ya anotado en memoria): snapshot server-side vía cron.",
+  "acceptance_criteria": [
+    "Cache por carta (scryfallId → CardPrices) persistido en IndexedDB con TTL ~24h: tras un pase completo y una recarga de página, los totales CK del hero de Colección aparecen sin re-fetch de red de cartas vigentes (solo se re-fetchean vencidas/faltantes)",
+    "TDD del módulo de cache: hidratación, TTL vencido, entrada faltante, corrupción/IndexedDB no disponible (fallback a comportamiento actual sin romper), y escritura durante abort — tests primero, red run capturado",
+    "Barra de progreso visible en el footer (CollectionTotalsPanel) durante el pase frío, alimentada por progress/processedCards/totalCards del composable; desaparece al terminar",
+    "Consumidores paralelos de sharedCardPrices (DeckView, BinderView, DeckEditorGrid, DeckCardsList, SettingsView, useCollectionImport, useDeckDeletion) intactos — grep de consumidores citado en el hand-off y gates verdes",
+    "Sin cambios a la política CK-first (TASK-114); npm run test:unit + npx vite build verdes; E2E collection targeted verde"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "perf",
+    "prices",
+    "collection",
+    "v1.53"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "43495f2ffffd57414849ecdfa6548e0031ede80d",
+    "69e779802f555e8f671cbc95febb3fb90d0a4dad"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T18:42:57.720Z",
+      "body": "CERRADO con review verde en round 2. review_depth: FULL (rúbrica: 567 líneas round 1 + 203 round 2, ≥150; lógica core tdd — cache TTL + migración schema IndexedDB). Round 1 (43495f2): cardPricesCache.ts nuevo (scryfallId→CardPrices en IndexedDB, TTL 24h, best-effort nunca-throw), object store resolvedPrices vía DB_VERSION 1→2 aditivo en mtgjson.ts, hidratación una-vez-por-sesión + persistencia en lotes de 25 en useCollectionTotals, barra de progreso en CollectionTotalsPanel con key i18n existente; 15 tests tdd con red-run capturado. Review FULL: REQUEST-CHANGES — H1 openDatabase sin onblocked/onversionchange (bump v1→2 colgaba TODO el pipeline de precios con una pestaña vieja abierta), M1 nulls de error persistidos 24h, L1 aria, L4 race de hidratación. Round 2 (69e7798): los 4 resueltos — onblocked→reject con fallback + onversionchange→close (test de regresión multi-tab cuyo RED fue un timeout real demostrando el hang), nulls session-only (no se persisten), hydrationPromise compartida never-reject, role=progressbar+aria. Review round 2: APPROVE — '21/21 tests del ticket, suite 1469/1469 verde sin timers reales ni enlentecimiento, type-check limpio.' E2E collection 16/16 en round 1; round 2 sin re-correr E2E (fixes internos a mtgjson/cache/composable, decisión orquestador). DEUDA ANOTADA (no bloqueante): L2 purga de entradas vencidas/huérfanas del store, L3 open no memoizado (doble open concurrente posible), + informational onversionchange cierra dbInstance módulo-level. PENDIENTE tanda: verificación manual de Rafael en dev de la sensación frío→caliente con su colección real (5654 cartas)."
+    }
+  ],
+  "created_at": "2026-07-18T16:48:29.956Z",
+  "updated_at": "2026-07-18T18:42:57.720Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

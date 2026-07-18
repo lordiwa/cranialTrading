@@ -10,7 +10,7 @@
     "Carga fría del perfil de Rafael (5392 públicas) rápida: primera página visible <2s FAST3G (medible con scripts/perf-measure.mjs apuntando a /users/<username> en dev)",
     "TDD: tests de query/paginación/filtrado primero; gates verdes; suite E2E completa al cierre de tanda"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "labels": [
     "perf",
@@ -21,11 +21,25 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "793c1ba3462d412b38664c9dd996f594c62d519a",
+    "b75ebab5bed8ded56c717ec2a842c7cf87432935"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T17:24:15.879Z",
+      "body": "AC3 — EVALUACIÓN DE REGLAS FIRESTORE (traza + decisión). TRAZA de consumidores de users/{uid}/cards AJENA en src/ (grep global, verificado por developer y re-verificado por reviewer FULL): (1) UserProfileView.vue — eliminado en este ticket (793c1ba), la vista ya solo consulta /public_cards y shared_matches; (2) UserProfileHoverCard.vue:34 — ÚNICO lector residual: baja todos los docs public==true del usuario visitado solo para contar (snapshot.size). Todos los demás accesos a users/{uid}/cards (stores/collection.ts x6) usan authStore.user.id — siempre self. DECISIÓN: NO endurecer firestore.rules:21-23 todavía. Endurecer ahora rompería el hover-card para visitantes (incluidos anónimos, intención de TASK-085). SECUENCIA ACORDADA: (a) TASK-139 migra el hover-card a aggregate count sobre /public_cards; (b) recién entonces TASK-087 cambia la regla a allow read: if request.auth.uid == userId; (c) deploy de reglas SIEMPRE manual (firebase deploy --only firestore:rules --project dev|prod — CI no deploya reglas, gotcha SCRUM-73) y coordinado con Rafael para prod. VERIFICACIÓN H2 DEL REVIEW: índice compuesto public_cards (userId ASC, cardName ASC) confirmado DESPLEGADO vía firebase firestore:indexes en AMBOS proyectos (cranial-trading-dev y cranial-trading) 2026-07-18 — la query nueva no depende de un deploy de índices pendiente. Chequeo manual Network tab (AC2) programado para la verificación en dev al cierre de tanda. DECISIONES sobre hallazgos M del review FULL: M1 (race cross-perfil en loadMore) + M4 (chips de stats parciales) → se fijan en ESTE ticket (round 2 del developer: guard gen-token patrón TASK-113/116 + getCountFromServer sale/trade equality-only sobre /public_cards). M2 (búsqueda/filtros solo sobre páginas cargadas; groupBy sin load-more) → follow-up TASK-138 (server-side search vía cardNameLower ya existente en publicCardSearch.ts). M3 (cartas wishlist públicas ya no visibles en perfil ajeno — /public_cards whitelistea solo sale/trade por diseño de TASK-085) → DECISIÓN DE PRODUCTO PENDIENTE DE RAFAEL, documentada en el reporte de tanda; restaurarla requeriría publicar wishlist en /public_cards (cambio de modelo+reglas). L2 (setCode ausente en PublicCard hasta enrichment → ventana de fallback TCG en carrito) → anotado en TASK-138."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T17:43:10.328Z",
+      "body": "CERRADO con review verde. review_depth: FULL (rúbrica: round1 313 líneas + round2 550 líneas cambiadas, ambos ≥150; toca lógica core tdd services/publicCards.ts). Round 1 (793c1ba): perfil público migrado a /public_cards con paginación server-side (60/página, infinite scroll reusando on-load-more de CollectionGrid), mapping puro publicCardToCard, 14 tests tdd con red-run capturado. Review FULL round 1: REQUEST-CHANGES (H1 AC3 sin documentar → comment escrito por orquestador; H2 índice compuesto sin verificar → confirmado desplegado en dev Y prod vía firebase firestore:indexes; M1/M4 → round 2; M2→TASK-138; M3→decisión Rafael pendiente (wishlist ya no visible en perfil ajeno); L4→TASK-139). Round 2 (b75ebab): race cross-perfil resuelta con gen-token (patrón TASK-113/116) extraída a usePublicProfileCards + chips restaurados a totales exactos vía 2 aggregate counts equality-only sin índice nuevo. Review FULL round 2: APPROVE — 'race cross-perfil resuelta con gen-token extraída a usePublicProfileCards con 12 tests no-vacuos (incluye regresión del loadingMore atascado), chips a totales exactos vía aggregate counts, AC3 documentado con traza y secuencia de endurecimiento (TASK-139→TASK-087); gates re-verificados por reviewer: unit 1448/1448, type-check limpio.' PENDIENTE AL CIERRE DE TANDA (no de este ticket): Network-tab manual AC2 en dev, AC5 perf FAST3G <2s vía scripts/perf-measure.mjs contra dev, suite E2E completa pre-push, bump v1.53.0. LOWs anotados: toast engañoso si falla solo el count query (cosmético), hasMore exportado sin consumir."
+    }
+  ],
   "created_at": "2026-07-18T00:15:00.000Z",
-  "updated_at": "2026-07-18T00:15:00.000Z",
+  "updated_at": "2026-07-18T17:43:10.328Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

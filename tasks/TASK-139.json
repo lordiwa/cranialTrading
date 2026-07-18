@@ -1,0 +1,39 @@
+{
+  "key": "TASK-139",
+  "title": "UserProfileHoverCard: contar cartas públicas vía aggregate count sobre /public_cards — dejar de bajar la subcolección ajena (prereq de TASK-087)",
+  "description": "Follow-up de TASK-136 (hallazgo L4 del review FULL de 793c1ba; también en la traza AC3). UserProfileHoverCard.vue:34-37 hace getDocs(query(collection(db,'users',userId,'cards'), where('public','==',true))) solo para usar snapshot.size — baja TODOS los docs públicos del usuario visitado por la red para un número del tooltip. Mismo anti-patrón que TASK-136 arregló en la vista de perfil, a menor escala, y es el ÚNICO lector residual de users/{uid}/cards ajena en src/ — BLOQUEA endurecer firestore.rules:21-23 (TASK-087). FIX: getCountFromServer(query(collection(db,'public_cards'), where('userId','==',userId))) — aggregate count, 1 lectura facturada, solo filtros de igualdad (no necesita índice compuesto nuevo). Al cerrar este ticket, TASK-087 queda desbloqueado (regla allow read: if request.auth.uid == userId; deploy manual de reglas coordinado con Rafael — CI no deploya reglas). CUIDADO: verificar qué cuenta hoy el hover (public==true en subcolección = sale/trade con public) vs qué contaría /public_cards (sale/trade públicos) — deberían coincidir por el whitelist de TASK-085; verificar con un perfil real en dev.",
+  "acceptance_criteria": [
+    "UserProfileHoverCard no consulta users/{uid}/cards ajena — usa getCountFromServer sobre /public_cards where userId (grep de regresión en el commit)",
+    "El número mostrado coincide con el conteo previo para un perfil real de dev (verificación manual o E2E targeted)",
+    "Test unit de la función de conteo (mock Firebase) — regression lock; gates verdes",
+    "Comment final documenta que TASK-087 queda desbloqueado y el plan de deploy manual de reglas"
+  ],
+  "status": "done",
+  "priority": "medium",
+  "labels": [
+    "privacy",
+    "firestore",
+    "profile",
+    "v1.53"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-136"
+  ],
+  "linked_commits": [
+    "97126c77b64bbdaa695b9b9d3f04d661927d5b31"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-07-18T19:32:04.084Z",
+      "body": "CERRADO con review verde. review_depth: FULL (rúbrica: 76 líneas <150 pero toca publicCards.ts, superficie core de tickets tdd 136/137). Commit 97126c7: getUserPublicCardsCount(userId) — 1 getCountFromServer equality-only sobre /public_cards (elegida sobre reusar los 2 counts de TASK-136: 1 lectura < 2 para un tooltip) — y UserProfileHoverCard.vue deja de bajar la subcolección ajena. Review: 'hover-card ahora cuenta vía 1 aggregate query equality-only sobre /public_cards; grep independiente confirma cero lectores de users/{uid}/cards ajena en src/ → TASK-087 desbloqueado; gates verificados verdes por el reviewer (unit 1485/1485, type-check limpio); 2 LOW no bloqueantes'. AC4 — DESBLOQUEO DE TASK-087 DOCUMENTADO: con este cierre NO queda ningún lector de users/{uid}/cards ajena en src/ (verificado por grep independiente del reviewer: los 8 accesos restantes en stores/collection.ts son todos self via authStore.user.id). PLAN DE REGLAS: TASK-087 puede cambiar firestore.rules:21-23 a allow read: if request.auth.uid == userId; el deploy de reglas es SIEMPRE manual (firebase deploy --only firestore:rules --project dev|prod — CI no deploya reglas, gotcha SCRUM-73) y el push a prod se coordina con Rafael. AC2 (número del tooltip vs perfil real en dev) queda para la verificación de tanda — NOTA: por la divergencia documentada (viejo contaba cualquier public:true; nuevo solo whitelist sale/trade de TASK-085), el número puede legítimamente diferir en perfiles con wishlist/collection públicas — mismo gap M3 de TASK-136 pendiente de decisión de Rafael. LOWs anotados: aserción negativa débil por aridad (convención heredada, lock real son las positivas), typo pre-existente 'disponida' + strings es hardcodeados en el hover (candidato a ticket menor de i18n)."
+    }
+  ],
+  "created_at": "2026-07-18T17:24:47.712Z",
+  "updated_at": "2026-07-18T19:32:04.084Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

@@ -29,8 +29,21 @@ jobs:
       TEST_USER_A_EMAIL: ${{ secrets.TEST_USER_A_EMAIL }}
       TEST_USER_A_PASSWORD: ${{ secrets.TEST_USER_A_PASSWORD }}
       PLAYWRIGHT_JSON_OUTPUT_NAME: nightly-results.json
+      # e2e:nightly's --reporter=list,html,json CLI flag replaces the config's
+      # reporter array entirely, so the html reporter's outputFolder
+      # (e2e/playwright-report, set in playwright.config.ts) is lost too —
+      # this env restores it and keeps it in sync with the upload-artifact
+      # path below.
+      PLAYWRIGHT_HTML_OUTPUT_DIR: e2e/playwright-report
     steps:
+      # ref: develop — this workflow's schedule fires on whatever branch it
+      # lives on by default (main, once this file is merged there via the
+      # next develop→main promotion). The dev site it targets is built from
+      # develop, so the checkout — and therefore the spec/tag/config set the
+      # run actually executes — must track develop, not main.
       - uses: actions/checkout@v4
+        with:
+          ref: develop
 
       - uses: actions/setup-node@v4
         with:
@@ -50,13 +63,13 @@ jobs:
 
       # E2E_BASE_URL makes playwright.config.ts point at the deployed dev site
       # and skip the local webServer entirely (see playwright.config.ts).
-      # --grep-invert @nightly-skip excludes known-unsafe-for-nightly specs:
-      # register.spec.ts "successful registration" (creates a real, uncleaned
-      # Firebase Auth account) and search.spec.ts "selecting autocomplete
-      # suggestion" (known Scryfall-data flake) — both documented in CLAUDE.md.
+      # npm run e2e:nightly (package.json) owns the actual flags — see it for
+      # the --grep-invert @nightly-skip exclusion (register.spec.ts account
+      # creation + search.spec.ts autocomplete flake, both in CLAUDE.md) so
+      # this workflow can't drift from a locally-runnable command.
       - name: Run E2E against dev
         id: e2e
-        run: npx playwright test --grep-invert @nightly-skip --reporter=list,html,json
+        run: npm run e2e:nightly
 
       - name: Build step summary
         if: always()

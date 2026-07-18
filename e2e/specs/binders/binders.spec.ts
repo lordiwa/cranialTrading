@@ -5,7 +5,7 @@ test.describe('Binders', () => {
     await bindersPage.goto();
   });
 
-  test('create new binder → appears in binder list @smoke', async ({ bindersPage, page }) => {
+  test('create new binder → appears in binder list @smoke', async ({ bindersPage, commonPage, page }) => {
     const binderName = `E2E Binder ${Date.now()}`;
     await bindersPage.createBinder(binderName, 'Test description');
 
@@ -15,6 +15,17 @@ test.describe('Binders', () => {
     // Binder name should appear in the sub-tabs or the details section
     const binderText = page.locator(`text=${binderName}`);
     await expect(binderText.first()).toBeVisible({ timeout: 10_000 });
+
+    // Cleanup: delete the binder we just created, via the same delete flow
+    // the "delete binder" test below uses. Without this, every push/nightly
+    // run leaves a new binder in the shared CI account — unbounded
+    // accumulation, not a churn.
+    const deleteBtn = page.getByRole('button', { name: /delete|eliminar/i });
+    if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await deleteBtn.click();
+      await commonPage.confirmAction();
+      await page.waitForTimeout(2000);
+    }
   });
 
   test('create binder validation: empty name prevents saving', async ({ bindersPage }) => {

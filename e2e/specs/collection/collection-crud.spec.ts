@@ -29,6 +29,33 @@ test.describe('Collection CRUD', () => {
     await collectionPage.addModal.saveButton.click();
 
     await commonPage.waitForToast('success');
+
+    // Cleanup — net-zero doc count, not literal-fixture deletion: the shared
+    // CI collection already has 25+ pre-existing "Lightning Bolt" entries
+    // (different printings), and card_index writes are eventually consistent
+    // (optimistic patch + deferred refresh — see the card_index persist race
+    // pattern), so there's no reliable UI signal within a single test to pick
+    // out exactly the doc we just created; a name-filtered search can't tell
+    // it apart from the pre-existing duplicates either. Deleting whatever
+    // card is at grid index 0 — the exact same delete path the "delete card"
+    // test below uses — keeps the doc count net-zero for this run instead:
+    // the collection composition rotates by one card per run rather than
+    // growing without bound, which is the failure mode actually being
+    // guarded against.
+    await commonPage.waitForToastDismiss().catch(() => {});
+    await collectionPage.page.waitForTimeout(1000);
+    const cardCount = await collectionPage.getCardCount();
+    if (cardCount > 0) {
+      await collectionPage.clickCardInGrid(0);
+      const modal = collectionPage.page.locator('.fixed.inset-0.z-50');
+      await modal.waitFor({ state: 'visible', timeout: 5_000 });
+      const deleteBtn = collectionPage.editModal.deleteButton;
+      if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await deleteBtn.click();
+        await commonPage.confirmAction();
+        await commonPage.waitForToast('success');
+      }
+    }
   });
 
   test('edit card: open detail modal → edit → save → changes persist', async ({ collectionPage, commonPage, page }) => {

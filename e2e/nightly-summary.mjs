@@ -21,8 +21,13 @@ let skipped = 0;
 const failedTitles = [];
 
 function walkSuite(suite, titlePath) {
+  // Fold this suite's own title (file name or describe block) into the path
+  // BEFORE using it for specs at this level — otherwise a spec's fullTitle
+  // skips its enclosing file/describe and only shows the bare test title.
+  const path = suite.title ? [...titlePath, suite.title] : titlePath;
+
   for (const spec of suite.specs || []) {
-    const fullTitle = [...titlePath, spec.title].join(' › ');
+    const fullTitle = [...path, spec.title].join(' › ');
     for (const test of spec.tests || []) {
       const status = test.status; // 'expected' | 'unexpected' | 'flaky' | 'skipped'
       if (status === 'expected') passed++;
@@ -34,7 +39,7 @@ function walkSuite(suite, titlePath) {
     }
   }
   for (const child of suite.suites || []) {
-    walkSuite(child, [...titlePath, suite.title].filter(Boolean));
+    walkSuite(child, path);
   }
 }
 

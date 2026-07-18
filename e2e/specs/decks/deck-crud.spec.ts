@@ -14,6 +14,17 @@ test.describe('Deck CRUD', () => {
     // Deck should appear in the list or detail area
     const deckText = decksPage.page.locator(`text=${deckName}`).first();
     await expect(deckText).toBeVisible({ timeout: 5_000 });
+
+    // Cleanup: delete the deck we just created via the same page-object
+    // method + confirm-dialog flow the "delete deck" test below uses.
+    // Without this, every push/nightly run leaves a new deck in the shared
+    // CI account — this was an unbounded accumulation, not a churn.
+    await commonPage.waitForToastDismiss().catch(() => {});
+    await decksPage.deleteDeck(deckName);
+    const confirmDialog = decksPage.page.locator('.fixed.inset-0.z-\\[60\\]');
+    await confirmDialog.first().waitFor({ state: 'visible', timeout: 5000 });
+    await confirmDialog.first().locator('button').last().click();
+    await decksPage.page.waitForTimeout(1000);
   });
 
   test('create deck validation: empty name prevents saving', async ({ decksPage }) => {

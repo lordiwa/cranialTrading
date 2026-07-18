@@ -25,6 +25,7 @@ import type {
     DeckWishlistItem,
 } from '../types/deck'
 import { t } from '../composables/useI18n'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 // Helper to remove undefined values from objects (Firebase doesn't accept undefined)
 const removeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
@@ -244,7 +245,7 @@ export const useDecksStore = defineStore('decks', () => {
         try {
             scryfallCards = await getCardsByIds(identifiers)
         } catch (e) {
-            console.warn('[migrateWishlistMetadata] Batch fetch failed:', e)
+            logSanitizedError('[migrateWishlistMetadata] Batch fetch failed', e, 'warn')
             return wishlist
         }
 
@@ -287,7 +288,7 @@ export const useDecksStore = defineStore('decks', () => {
                     updatedAt: Timestamp.now(),
                 })
             } catch (e) {
-                console.error('[migrateWishlistMetadata] Failed to save:', e)
+                logSanitizedError('[migrateWishlistMetadata] Failed to save', e)
             }
         }
 
@@ -348,7 +349,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             decks.value = migratedDecks
         } catch (error) {
-            console.error('Error loading decks:', error)
+            logSanitizedError('Error loading decks', error)
             toastStore.show(t('decks.messages.loadError'), 'error')
         } finally {
             loading.value = false
@@ -406,7 +407,7 @@ export const useDecksStore = defineStore('decks', () => {
             currentDeck.value = snapshotDeck(deck)
             return deck
         } catch (error) {
-            console.error('Error loading deck:', error)
+            logSanitizedError('Error loading deck', error)
             toastStore.show(t('decks.messages.loadDeckError'), 'error')
             return null
         }
@@ -464,7 +465,7 @@ export const useDecksStore = defineStore('decks', () => {
             toastStore.show(t('decks.messages.created', { name: input.name }), 'success')
             return docRef.id
         } catch (error) {
-            console.error('Error creating deck:', error)
+            logSanitizedError('Error creating deck', error)
             toastStore.show(t('decks.messages.createError'), 'error')
             return null
         } finally {
@@ -497,7 +498,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error updating deck:', error)
+            logSanitizedError('Error updating deck', error)
             toastStore.show(t('decks.messages.updateError'), 'error')
             return false
         }
@@ -551,7 +552,7 @@ export const useDecksStore = defineStore('decks', () => {
             )
             return true
         } catch (error) {
-            console.error('Error toggling commander:', error)
+            logSanitizedError('Error toggling commander', error)
             toastStore.show(t('decks.messages.commanderError'), 'error')
             return false
         }
@@ -577,7 +578,7 @@ export const useDecksStore = defineStore('decks', () => {
             if (!silent) toastStore.show(t('decks.messages.deleted'), 'success')
             return true
         } catch (error) {
-            console.error('Error deleting deck:', error)
+            logSanitizedError('Error deleting deck', error)
             toastStore.show(t('decks.messages.deleteError'), 'error')
             return false
         }
@@ -689,7 +690,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return { allocated: toAllocate, wishlisted: toWishlist }
         } catch (error) {
-            console.error('Error allocating card:', error)
+            logSanitizedError('Error allocating card', error)
             toastStore.show(t('decks.messages.allocateError'), 'error')
             return { allocated: 0, wishlisted: 0 }
         }
@@ -791,7 +792,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return { allocated: totalAllocated, wishlisted: totalWishlisted }
         } catch (error) {
-            console.error('Error bulk allocating cards:', error)
+            logSanitizedError('Error bulk allocating cards', error)
             toastStore.show(t('decks.messages.allocateError'), 'error')
             return { allocated: 0, wishlisted: 0 }
         }
@@ -879,7 +880,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error adding to wishlist:', error)
+            logSanitizedError('Error adding to wishlist', error)
             toastStore.show(t('decks.messages.addWishlistError'), 'error')
             return false
         }
@@ -933,7 +934,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error deallocating card:', error)
+            logSanitizedError('Error deallocating card', error)
             toastStore.show(t('decks.messages.deallocateError'), 'error')
             return false
         }
@@ -984,7 +985,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error removing from wishlist:', error)
+            logSanitizedError('Error removing from wishlist', error)
             toastStore.show(t('decks.messages.removeWishlistError'), 'error')
             return false
         }
@@ -1049,7 +1050,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error updating allocation:', error)
+            logSanitizedError('Error updating allocation', error)
             toastStore.show(t('decks.messages.updateQuantityError'), 'error')
             return false
         }
@@ -1269,7 +1270,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error deleting all decks:', error)
+            logSanitizedError('Error deleting all decks', error)
             return false
         }
     }
@@ -1344,7 +1345,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error moving card between boards:', error)
+            logSanitizedError('Error moving card between boards', error)
             toastStore.show(t('decks.messages.moveBoardError'), 'error')
             return false
         }
@@ -1435,7 +1436,7 @@ export const useDecksStore = defineStore('decks', () => {
 
             return true
         } catch (error) {
-            console.error('Error adding extra allocation:', error)
+            logSanitizedError('Error adding extra allocation', error)
             return false
         }
     }

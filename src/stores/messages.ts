@@ -8,6 +8,7 @@ import { type Conversation, type Message } from '../types/message';
 import { t } from '../composables/useI18n';
 import { countUnreadMessages } from '../utils/messageUnread';
 import { chunkArray } from '../utils/chunkArray';
+import { logSanitizedError } from '../utils/logSanitizedError';
 
 // Límite de operaciones por writeBatch de Firestore.
 const FIRESTORE_BATCH_LIMIT = 500;
@@ -76,7 +77,7 @@ export const useMessagesStore = defineStore('messages', () => {
 
             return conversationId;
         } catch (error) {
-            console.error('❌ Error creando conversación:', error);
+            logSanitizedError('❌ Error creando conversación', error);
             toastStore.show(t('messages.errors.createError'), 'error');
             return '';
         }
@@ -121,7 +122,7 @@ export const useMessagesStore = defineStore('messages', () => {
             console.info(`Mensaje enviado`);
             return true;
         } catch (error) {
-            console.error('❌ Error enviando mensaje:', error);
+            logSanitizedError('❌ Error enviando mensaje', error);
             toastStore.show(t('messages.errors.sendError'), 'error');
             return false;
         }
@@ -186,7 +187,7 @@ export const useMessagesStore = defineStore('messages', () => {
                         const unreadCount = await fetchUnreadCountForConversation(conv.id);
                         return { ...conv, unreadCount };
                     } catch (error) {
-                        console.error(`❌ Error contando no leídos de ${conv.id}:`, error);
+                        logSanitizedError(`❌ Error contando no leídos de ${conv.id}`, error);
                         return conv;
                     }
                 })
@@ -194,7 +195,7 @@ export const useMessagesStore = defineStore('messages', () => {
 
             console.info(`${conversations.value.length} conversaciones cargadas`);
         } catch (error) {
-            console.error('❌ Error cargando conversaciones:', error);
+            logSanitizedError('❌ Error cargando conversaciones', error);
             loadError.value = true;
             toastStore.show(t('messages.errors.loadError'), 'error');
         } finally {
@@ -226,7 +227,7 @@ export const useMessagesStore = defineStore('messages', () => {
             const conv = conversations.value.find(c => c.id === conversationId);
             if (conv) conv.unreadCount = 0;
         } catch (error) {
-            console.error(`❌ Error marcando como leída la conversación ${conversationId}:`, error);
+            logSanitizedError(`❌ Error marcando como leída la conversación ${conversationId}`, error);
         }
     };
 
@@ -293,7 +294,7 @@ export const useMessagesStore = defineStore('messages', () => {
                 }
             },
             (error) => {
-                console.error('❌ Error en listener de mensajes:', error);
+                logSanitizedError('❌ Error en listener de mensajes', error);
                 toastStore.show(t('messages.errors.listenError'), 'error');
                 loading.value = false;
             }

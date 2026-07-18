@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { type Card } from '../types/card'
 import { type Preference } from '../types/preferences'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 interface MatchCalculation {
     myCardIds: string[]
@@ -230,7 +231,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 matchType: 'unidirectional',
             }
         } catch (error) {
-            console.error('Error en calculateUnidirectionalMatch:', error)
+            logSanitizedError('Error en calculateUnidirectionalMatch', error)
             return null
         }
     }

@@ -15,6 +15,7 @@ import { useAuthStore } from './auth'
 import { useCollectionStore } from './collection'
 import { useDecksStore } from './decks'
 import { useToastStore } from './toast'
+import { logSanitizedError } from '../utils/logSanitizedError'
 import type { Card } from '../types/card'
 import type {
     Binder,
@@ -216,7 +217,7 @@ export const useBindersStore = defineStore('binders', () => {
                 } as Binder
             })
         } catch (error) {
-            console.error('Error loading binders:', error)
+            logSanitizedError('Error loading binders', error)
             toastStore.show(t('binders.errors.load'), 'error')
         } finally {
             loading.value = false
@@ -265,7 +266,7 @@ export const useBindersStore = defineStore('binders', () => {
             toastStore.show(t('binders.created', { name: input.name }), 'success')
             return docRef.id
         } catch (error) {
-            console.error('Error creating binder:', error)
+            logSanitizedError('Error creating binder', error)
             toastStore.show(t('binders.errors.create'), 'error')
             return null
         } finally {
@@ -291,7 +292,7 @@ export const useBindersStore = defineStore('binders', () => {
 
             return true
         } catch (error) {
-            console.error('Error updating binder:', error)
+            logSanitizedError('Error updating binder', error)
             return false
         }
     }
@@ -307,7 +308,7 @@ export const useBindersStore = defineStore('binders', () => {
             toastStore.show(t('binders.deleted'), 'success')
             return true
         } catch (error) {
-            console.error('Error deleting binder:', error)
+            logSanitizedError('Error deleting binder', error)
             toastStore.show(t('binders.errors.delete'), 'error')
             return false
         }
@@ -381,7 +382,7 @@ export const useBindersStore = defineStore('binders', () => {
 
             return toAllocate
         } catch (error) {
-            console.error('Error allocating card to binder:', error)
+            logSanitizedError('Error allocating card to binder', error)
             toastStore.show(t('binders.errors.create'), 'error')
             return 0
         }
@@ -456,7 +457,7 @@ export const useBindersStore = defineStore('binders', () => {
 
             return totalAllocated
         } catch (error) {
-            console.error('Error bulk allocating cards to binder:', error)
+            logSanitizedError('Error bulk allocating cards to binder', error)
             toastStore.show(t('binders.errors.create'), 'error')
             return 0
         }
@@ -498,7 +499,7 @@ export const useBindersStore = defineStore('binders', () => {
             }
             return removed
         } catch (error) {
-            console.error('Error bulk deallocating cards from binder:', error)
+            logSanitizedError('Error bulk deallocating cards from binder', error)
             return 0
         }
     }
@@ -533,7 +534,7 @@ export const useBindersStore = defineStore('binders', () => {
 
             return true
         } catch (error) {
-            console.error('Error deallocating card from binder:', error)
+            logSanitizedError('Error deallocating card from binder', error)
             return false
         }
     }
@@ -595,7 +596,7 @@ export const useBindersStore = defineStore('binders', () => {
 
             return true
         } catch (error) {
-            console.error('Error updating binder allocation:', error)
+            logSanitizedError('Error updating binder allocation', error)
             return false
         }
     }

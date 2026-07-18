@@ -17,6 +17,7 @@ import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
 import { getMatchExpirationDate } from '../utils/matchExpiry';
 import { dedupeMatchesByIdentity, matchIdentityKey } from '../utils/matchDedup';
+import { logSanitizedError } from '../utils/logSanitizedError';
 
 export interface MatchCard {
     scryfallId: string;
@@ -333,7 +334,7 @@ export const useMatchesStore = defineStore('matches', () => {
             deletedMatches.value = deletedDocs.docs.map(d => parseFirestoreMatch(d.id, d.data() as Record<string, unknown>));
             sharedMatches.value = parsedShared;
         } catch (error: unknown) {
-            console.error('loadAllMatches error:', error);
+            logSanitizedError('loadAllMatches error', error);
             toastStore.show(t('matches.messages.loadError'), 'error');
         } finally {
             loading.value = false;
@@ -440,7 +441,7 @@ export const useMatchesStore = defineStore('matches', () => {
             return true;
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : String(error);
-            console.error('saveMatch error:', error);
+            logSanitizedError('saveMatch error', error);
             toastStore.show(t('matches.messages.saveError') + ': ' + errMsg, 'error');
             return false;
         }
@@ -510,7 +511,7 @@ export const useMatchesStore = defineStore('matches', () => {
             return true;
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : String(error);
-            console.error('discardMatch error:', error);
+            logSanitizedError('discardMatch error', error);
             toastStore.show(t('matches.messages.deleteError') + ': ' + errMsg, 'error');
             return false;
         }
@@ -590,7 +591,7 @@ export const useMatchesStore = defineStore('matches', () => {
 
             return true;
         } catch (error) {
-            console.error('Error deleting all matches:', error);
+            logSanitizedError('Error deleting all matches', error);
             return false;
         }
     };
@@ -613,7 +614,7 @@ export const useMatchesStore = defineStore('matches', () => {
             }
             return ids;
         } catch (err) {
-            console.error('Error loading discarded matches:', err);
+            logSanitizedError('Error loading discarded matches', err);
             return new Set();
         }
     };
@@ -636,7 +637,7 @@ export const useMatchesStore = defineStore('matches', () => {
             }
             return ids;
         } catch (err) {
-            console.error('Error loading blocked users:', err);
+            logSanitizedError('Error loading blocked users', err);
             return new Set();
         }
     };
@@ -663,7 +664,7 @@ export const useMatchesStore = defineStore('matches', () => {
             }
             return keys;
         } catch (err) {
-            console.error('Error loading discarded match keys:', err);
+            logSanitizedError('Error loading discarded match keys', err);
             return new Set();
         }
     };
@@ -801,13 +802,13 @@ export const useMatchesStore = defineStore('matches', () => {
                     console.info(`Notified ${match.otherUsername} about match`);
                 } catch (notifyErr) {
                     // Log but don't fail the whole operation if notification fails
-                    console.warn(`Could not notify ${match.otherUsername}:`, notifyErr);
+                    logSanitizedError(`Could not notify ${match.otherUsername}`, notifyErr, 'warn');
                 }
             }
 
             console.info(`${matches.length} matches guardados en Firestore (${existingSnapshot.docs.length} anteriores eliminados)`);
         } catch (err) {
-            console.error('Error guardando matches:', err);
+            logSanitizedError('Error guardando matches', err);
         }
     };
 

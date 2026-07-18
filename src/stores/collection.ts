@@ -26,6 +26,7 @@ import {
 import { t } from '../composables/useI18n'
 import { getCardsByIds } from '../services/scryfallCache'
 import { buildEnrichmentPatch } from '../utils/cardEnrichment'
+import { logSanitizedError } from '../utils/logSanitizedError'
 import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
 import type { QueryCardIndexRequest } from '../services/cloudFunctions'
 
@@ -39,7 +40,7 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
             await batch.commit()
             return true
         } catch (error: unknown) {
-            console.warn(`Batch commit failed (attempt ${attempt + 1}/${maxRetries + 1}):`, error)
+            logSanitizedError(`Batch commit failed (attempt ${attempt + 1}/${maxRetries + 1})`, error, 'warn')
             const msg = error instanceof Error ? error.message : String(error)
             if (msg.includes('permission') || msg.includes('Permission')) {
                 return false
@@ -320,12 +321,12 @@ export const useCollectionStore = defineStore('collection', () => {
                     buildCardIndex().then(result => {
                         console.info(`[loadCollection] Index built: ${result.totalCards} cards → ${result.chunks} chunks`)
                     }).catch((err: unknown) => {
-                        console.warn('[loadCollection] Background index build failed:', err)
+                        logSanitizedError('[loadCollection] Background index build failed', err, 'warn')
                     })
                 }).catch(() => {})
             }
         } catch (error) {
-            console.error('Error loading collection:', error)
+            logSanitizedError('Error loading collection', error)
             toastStore.show(t('collection.messages.loadError'), 'error')
         } finally {
             loading.value = false
@@ -368,14 +369,14 @@ export const useCollectionStore = defineStore('collection', () => {
                     rebuildIndex().then(result => {
                         console.info(`[loadCollection] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
                     }).catch((err: unknown) => {
-                        console.warn('[loadCollection] Background index rebuild failed:', err)
+                        logSanitizedError('[loadCollection] Background index rebuild failed', err, 'warn')
                     })
                 }).catch(() => {})
             }
 
             return true
         } catch (error) {
-            console.warn('[loadFromIndex] card_index read failed, falling back to full load:', error)
+            logSanitizedError('[loadFromIndex] card_index read failed, falling back to full load', error, 'warn')
             return false
         }
     }
@@ -423,7 +424,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
         if (!importing.value) {
             enrichCardsWithMissingMetadata().catch((err: unknown) => {
-                console.warn('[Enrichment] Background enrichment failed:', err)
+                logSanitizedError('[Enrichment] Background enrichment failed', err, 'warn')
             })
         }
     }
@@ -465,7 +466,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 return card
             }
         } catch (err) {
-            console.warn('[getFullCard] Failed to fetch full card:', err)
+            logSanitizedError('[getFullCard] Failed to fetch full card', err, 'warn')
         }
         return cardsById.get(cardId) ?? null
     }
@@ -528,7 +529,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 if (hasUserWrites) commits.push(userBatch.commit())
                 await Promise.all(commits)
             } catch (err) {
-                console.warn(`[Enrichment] Batch ${i / BATCH_SIZE + 1} failed, skipping:`, err)
+                logSanitizedError(`[Enrichment] Batch ${i / BATCH_SIZE + 1} failed, skipping`, err, 'warn')
             }
         }
     }
@@ -711,7 +712,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     }
                 }
             } catch (err) {
-                console.warn('[IndexSync] Failed to persist index:', err)
+                logSanitizedError('[IndexSync] Failed to persist index', err, 'warn')
             } finally {
                 _persistRunning = false
                 if (_persistRerunRequested) {
@@ -768,7 +769,7 @@ export const useCollectionStore = defineStore('collection', () => {
             if (userInfo) {
                 syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                     .catch((err: unknown) => {
-                        console.error('[PublicSync] Error syncing card:', err)
+                        logSanitizedError('[PublicSync] Error syncing card', err)
                     })
             }
 
@@ -791,7 +792,7 @@ export const useCollectionStore = defineStore('collection', () => {
 
             return docRef.id
         } catch (error) {
-            console.error('Error adding card:', error)
+            logSanitizedError('Error adding card', error)
             toastStore.show(t('collection.messages.addError'), 'error')
             return null
         } finally {
@@ -860,7 +861,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 if (userInfo) {
                     syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                         .catch((err: unknown) => {
-                            console.error('[PublicSync] Error syncing card update:', err)
+                            logSanitizedError('[PublicSync] Error syncing card update', err)
                         })
                 }
             }
@@ -887,7 +888,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 rollbackPaginated[paginatedIndex] = paginatedSnapshot
                 paginatedCards.value = rollbackPaginated
             }
-            console.error('Error updating card:', error)
+            logSanitizedError('Error updating card', error)
             toastStore.show(t('collection.messages.updateError'), 'error')
             return false
         }
@@ -962,12 +963,12 @@ export const useCollectionStore = defineStore('collection', () => {
                     ? (completed: number) => { onProgress(Math.round(((firestoreChunkCount + completed) / totalSteps) * 100)) }
                     : undefined
                 batchSyncCardsToPublic(cardsToSync, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, progressCb)
-                    .catch((err: unknown) => { console.error('[PublicSync] Batch sync failed (non-fatal):', err) })
+                    .catch((err: unknown) => { logSanitizedError('[PublicSync] Batch sync failed (non-fatal)', err) })
             }
 
             return true
         } catch (error) {
-            console.error('Error batch updating cards:', error)
+            logSanitizedError('Error batch updating cards', error)
             toastStore.show(t('collection.messages.batchUpdateError'), 'error')
             return false
         }
@@ -1044,7 +1045,7 @@ export const useCollectionStore = defineStore('collection', () => {
             // Remove from public collection (non-blocking, log-only on failure)
             removeCardFromPublic(cardId, authStore.user.id)
                 .catch((err: unknown) => {
-                    console.error('[PublicSync] Error removing card:', err)
+                    logSanitizedError('[PublicSync] Error removing card', err)
                 })
 
             // Re-query the server card_index for the definitive membership/order
@@ -1058,7 +1059,7 @@ export const useCollectionStore = defineStore('collection', () => {
             return true
         } catch (error) {
             // Restore card on failure
-            console.error('Error deleting card:', error)
+            logSanitizedError('Error deleting card', error)
             const restored = [...cards.value]
             restored.splice(cardIndex, 0, deletedCard)
             cards.value = restored
@@ -1121,7 +1122,7 @@ export const useCollectionStore = defineStore('collection', () => {
             toastStore.show(t('collection.messages.allDeleted'), 'success')
             return true
         } catch (error) {
-            console.error('Error deleting all cards:', error)
+            logSanitizedError('Error deleting all cards', error)
             await loadCollection()
             toastStore.show(t('collection.messages.deleteAllError'), 'error')
             return false
@@ -1335,7 +1336,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     const result = await bulkImportCards(cleanChunk)
                     createdIds.push(...result.cardIds)
                 } catch (chunkError) {
-                    console.error(`[Import] Chunk ${i} failed:`, chunkError)
+                    logSanitizedError(`[Import] Chunk ${i} failed`, chunkError)
                 }
 
                 onProgress?.(Math.min(i + CHUNK_SIZE, cardsToSave.length), cardsToSave.length)
@@ -1360,7 +1361,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 buildCardIndex().then(result => {
                     console.info(`[Import] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
                 }).catch((err: unknown) => {
-                    console.warn('[Import] Index rebuild failed:', err)
+                    logSanitizedError('[Import] Index rebuild failed', err, 'warn')
                 })
             }).catch(() => {})
 
@@ -1369,7 +1370,7 @@ export const useCollectionStore = defineStore('collection', () => {
             }
             return createdIds
         } catch (error) {
-            console.error('Error importing cards:', error)
+            logSanitizedError('Error importing cards', error)
             toastStore.show(t('collection.messages.importError'), 'error')
             return []
         }
@@ -1425,7 +1426,7 @@ export const useCollectionStore = defineStore('collection', () => {
             lastSyncAt.value = new Date()
             toastStore.show(t('collection.messages.synced'), 'success')
         } catch (error) {
-            console.error('[PublicSync] Error bulk syncing cards:', error)
+            logSanitizedError('[PublicSync] Error bulk syncing cards', error)
             toastStore.show(t('collection.messages.syncError'), 'error')
         }
     }
@@ -1549,7 +1550,7 @@ export const useCollectionStore = defineStore('collection', () => {
             paginationMeta.value.pageSize = response.pageSize
             paginationMeta.value.hasMore = response.hasMore
         } catch (error) {
-            console.error('[queryPage] Error querying card index:', error)
+            logSanitizedError('[queryPage] Error querying card index', error)
         } finally {
             // Only clear loading if this is still the latest generation
             if (generation === _queryGeneration) {
@@ -1589,7 +1590,7 @@ export const useCollectionStore = defineStore('collection', () => {
             paginationMeta.value.pageSize = response.pageSize
             paginationMeta.value.hasMore = response.hasMore
         } catch (error) {
-            console.error('[loadNextPage] Error loading next page:', error)
+            logSanitizedError('[loadNextPage] Error loading next page', error)
         } finally {
             paginationMeta.value.loadingMore = false
         }

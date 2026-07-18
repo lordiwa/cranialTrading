@@ -9,6 +9,7 @@ import { useToastStore } from './toast';
 import { t, useI18n } from '../composables/useI18n';
 import { setLastKnownAuthState } from '../utils/authLastKnown';
 import { formatDate } from '../utils/formatDate';
+import { getErrorCode, logSanitizedError } from '../utils/logSanitizedError';
 import { PAINTED_CONTENT_SELECTOR } from '../utils/paintSignal';
 import { isValidUsername, normalizeUsername } from '../utils/username';
 
@@ -122,31 +123,6 @@ const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
     return firebaseDepsPromise;
 };
 
-/**
- * TASK-122: log auth-flow failures without ever emitting the raw error
- * object. Some Firebase Auth error shapes carry a `customData.credential`
- * (e.g. account-exists-with-different-credential) — logging the object
- * itself to the console is poor hygiene in production. Only the safe,
- * string-typed `code`/`message` fields are ever passed to console.
- */
-const logAuthError = (context: string, error: unknown, level: 'error' | 'warn' = 'error'): void => {
-    // MEDIUM-1 (TASK-122 review): error can be null/undefined (e.g. a
-    // Promise.reject(null)) — destructuring that directly would throw and
-    // let the failure escape the catch block before the toast fires.
-    const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
-    const sanitized = {
-        // LOW-1: GeolocationPositionError.code is numeric (1/2/3) — accept
-        // it alongside Firebase's string codes instead of dropping it.
-        code: typeof code === 'string' || typeof code === 'number' ? code : undefined,
-        message: typeof message === 'string' ? message : undefined,
-    };
-    if (level === 'warn') {
-        console.warn(`${context}:`, sanitized);
-    } else {
-        console.error(`${context}:`, sanitized);
-    }
-};
-
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
@@ -207,7 +183,7 @@ export const useAuthStore = defineStore('auth', () => {
                 subscriptionPromise = null;
                 initAuthPromise = null;
                 loading.value = false;
-                logAuthError('Failed to initialize Firebase Auth', error);
+                logSanitizedError('Failed to initialize Firebase Auth', error);
                 toastStore.show(t('auth.messages.connectionError'), 'error');
             });
         }
@@ -444,12 +420,12 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.changeEmailSent'), 'success');
             return true;
         } catch (error: unknown) {
-            const firebaseError = error as { code?: string };
-            if (firebaseError.code === 'auth/requires-recent-login') {
+            const errorCode = getErrorCode(error);
+            if (errorCode === 'auth/requires-recent-login') {
                 toastStore.show(t('auth.messages.changeEmailRequiresRecentLogin'), 'error');
-            } else if (firebaseError.code === 'auth/invalid-email') {
+            } else if (errorCode === 'auth/invalid-email') {
                 toastStore.show(t('auth.messages.changeEmailInvalid'), 'error');
-            } else if (firebaseError.code === 'auth/email-already-in-use') {
+            } else if (errorCode === 'auth/email-already-in-use') {
                 toastStore.show(t('auth.messages.changeEmailInUse'), 'error');
             } else {
                 toastStore.show(t('auth.messages.changeEmailError'), 'error');
@@ -544,9 +520,9 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.loginSuccess'), 'success');
             return true;
         } catch (error: unknown) {
-            logAuthError('Google login error', error);
-            const firebaseError = error as { code?: string };
-            if (firebaseError.code === 'auth/popup-closed-by-user') {
+            logSanitizedError('Google login error', error);
+            const errorCode = getErrorCode(error);
+            if (errorCode === 'auth/popup-closed-by-user') {
                 // User closed popup, no error message needed
                 return false;
             }
@@ -571,7 +547,7 @@ export const useAuthStore = defineStore('auth', () => {
             globalThis.location.reload();
             return true;
         } catch (error: unknown) {
-            logAuthError('Logout error', error);
+            logSanitizedError('Logout error', error);
             toastStore.show(t('auth.messages.logoutError'), 'error');
             isLoggingOut.value = false;
             return false;
@@ -585,8 +561,8 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.recoveryEmailSent'), 'success');
             return true;
         } catch (error: unknown) {
-            const firebaseError = error as { code?: string };
-            if (firebaseError.code === 'auth/user-not-found') {
+            const errorCode = getErrorCode(error);
+            if (errorCode === 'auth/user-not-found') {
                 toastStore.show(t('auth.messages.emailNotRegistered'), 'error');
             } else {
                 toastStore.show(t('auth.messages.sendEmailError'), 'error');
@@ -602,10 +578,10 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.passwordReset'), 'success');
             return true;
         } catch (error: unknown) {
-            const firebaseError = error as { code?: string };
-            if (firebaseError.code === 'auth/invalid-action-code') {
+            const errorCode = getErrorCode(error);
+            if (errorCode === 'auth/invalid-action-code') {
                 toastStore.show(t('auth.messages.linkExpired'), 'error');
-            } else if (firebaseError.code === 'auth/weak-password') {
+            } else if (errorCode === 'auth/weak-password') {
                 toastStore.show(t('auth.messages.weakPassword'), 'error');
             } else {
                 toastStore.show(t('auth.messages.resetError'), 'error');
@@ -628,10 +604,10 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('auth.messages.passwordUpdated'), 'success');
             return true;
         } catch (error: unknown) {
-            const firebaseError = error as { code?: string };
-            if (firebaseError.code === 'auth/wrong-password') {
+            const errorCode = getErrorCode(error);
+            if (errorCode === 'auth/wrong-password') {
                 toastStore.show(t('auth.messages.wrongCurrentPassword'), 'error');
-            } else if (firebaseError.code === 'auth/weak-password') {
+            } else if (errorCode === 'auth/weak-password') {
                 toastStore.show(t('auth.messages.weakNewPassword'), 'error');
             } else {
                 toastStore.show(t('auth.messages.changePasswordError'), 'error');
@@ -673,8 +649,8 @@ export const useAuthStore = defineStore('auth', () => {
             // reload() right after an email change is expected to throw one of
             // these codes — surface a message that tells the user to sign in
             // again with their NEW email, not the generic "error verifying".
-            const firebaseError = error as { code?: string };
-            if (firebaseError.code === 'auth/user-token-expired' || firebaseError.code === 'auth/user-disabled') {
+            const errorCode = getErrorCode(error);
+            if (errorCode === 'auth/user-token-expired' || errorCode === 'auth/user-disabled') {
                 toastStore.show(t('auth.messages.emailChangedReauth'), 'error');
             } else {
                 toastStore.show(t('auth.messages.verifyEmailError'), 'error');
@@ -734,7 +710,7 @@ export const useAuthStore = defineStore('auth', () => {
             const snapshot = await firestoreFns.getDocs(qLegacy);
             return snapshot.empty;
         } catch (error) {
-            logAuthError('Error checking username', error);
+            logSanitizedError('Error checking username', error);
             return false;
         }
     };
@@ -840,7 +816,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeUsername.success'), 'success');
             return { success: true };
         } catch (error) {
-            logAuthError('Error changing username', error);
+            logSanitizedError('Error changing username', error);
             // D-08 step 5: roll back the new reservation to avoid a dangling entry.
             await releaseUsername(newNorm);
             toastStore.show(t('settings.changeUsername.error'), 'error');
@@ -867,7 +843,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeLocation.success'), 'success');
             return true;
         } catch (error) {
-            logAuthError('Error changing location', error);
+            logSanitizedError('Error changing location', error);
             toastStore.show(t('settings.changeLocation.error'), 'error');
             return false;
         }
@@ -905,7 +881,7 @@ export const useAuthStore = defineStore('auth', () => {
                 const location = api.parse(data);
                 if (location) return location;
             } catch (error) {
-                logAuthError(`Failed to fetch from ${api.url}`, error, 'warn');
+                logSanitizedError(`Failed to fetch from ${api.url}`, error, 'warn');
                 continue;
             }
         }
@@ -957,7 +933,7 @@ export const useAuthStore = defineStore('auth', () => {
                 }
             }
         } catch (error) {
-            logAuthError('Browser geolocation failed, trying IP-based', error, 'warn');
+            logSanitizedError('Browser geolocation failed, trying IP-based', error, 'warn');
         }
 
         // Fallback to IP-based detection
@@ -996,7 +972,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeAvatar.success'), 'success');
             return true;
         } catch (error) {
-            logAuthError('Error changing avatar', error);
+            logSanitizedError('Error changing avatar', error);
             toastStore.show(t('settings.changeAvatar.error'), 'error');
             return false;
         }
@@ -1031,7 +1007,7 @@ export const useAuthStore = defineStore('auth', () => {
             toastStore.show(t('settings.changeAvatar.success'), 'success');
             return true;
         } catch (error) {
-            logAuthError('Error uploading avatar', error);
+            logSanitizedError('Error uploading avatar', error);
             toastStore.show(t('settings.changeAvatar.error'), 'error');
             return false;
         }

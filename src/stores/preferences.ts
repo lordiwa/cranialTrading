@@ -9,6 +9,7 @@ import {
     syncAllUserPreferences,
     syncPreferenceToPublic,
 } from '../services/publicCards'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 export const usePreferencesStore = defineStore('preferences', () => {
     const authStore = useAuthStore()
@@ -53,7 +54,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             console.info(`Loaded ${_preferences.value.length} preferences for user ${authStore.user.id}`)
 
         } catch (error) {
-            console.error('❌ Error loading preferences:', error)
+            logSanitizedError('❌ Error loading preferences', error)
             _preferences.value = []
         } finally {
             loading.value = false
@@ -89,7 +90,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             if (userInfo) {
                 syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
                     .catch((err: unknown) => {
-                        console.error('[PublicSync] Error syncing preference:', err)
+                        logSanitizedError('[PublicSync] Error syncing preference', err)
                         toastStore.show('Error sincronizando preferencia', 'error')
                     })
             }
@@ -97,7 +98,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             console.info('Preference added:', prefData.name)
             return newPref
         } catch (error) {
-            console.error('❌ Error adding preference:', error)
+            logSanitizedError('❌ Error adding preference', error)
             throw error
         }
     }
@@ -121,7 +122,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             )
             console.info('Preferences synced to public')
         } catch (error) {
-            console.error('[PublicSync] Error bulk syncing preferences:', error)
+            logSanitizedError('[PublicSync] Error bulk syncing preferences', error)
         }
     }
 

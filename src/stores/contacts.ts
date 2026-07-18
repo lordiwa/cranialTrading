@@ -14,6 +14,7 @@ import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { type Contact } from '../types/contact'
 import { t } from '../composables/useI18n'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 export const useContactsStore = defineStore('contacts', () => {
     const contacts = ref<Contact[]>([])
@@ -41,7 +42,7 @@ export const useContactsStore = defineStore('contacts', () => {
             toastStore.show(t('contacts.messages.saved'), 'success')
             return true
         } catch (error) {
-            console.error('Error saving contact:', error)
+            logSanitizedError('Error saving contact', error)
             toastStore.show(t('contacts.messages.saveError'), 'error')
             return false
         }
@@ -58,7 +59,7 @@ export const useContactsStore = defineStore('contacts', () => {
             toastStore.show(t('contacts.messages.deleted'), 'success')
             return true
         } catch (error) {
-            console.error('Error deleting contact:', error)
+            logSanitizedError('Error deleting contact', error)
             toastStore.show(t('contacts.messages.deleteError'), 'error')
             return false
         }
@@ -88,13 +89,13 @@ export const useContactsStore = defineStore('contacts', () => {
                     loading.value = false
                 },
                 (error) => {
-                    console.error('Error loading contacts:', error)
+                    logSanitizedError('Error loading contacts', error)
                     toastStore.show(t('contacts.messages.loadError'), 'error')
                     loading.value = false
                 }
             )
         } catch (error) {
-            console.error('Error setting up listener:', error)
+            logSanitizedError('Error setting up listener', error)
             loading.value = false
         }
     }
@@ -122,7 +123,7 @@ export const useContactsStore = defineStore('contacts', () => {
             contacts.value = []
             return true
         } catch (error) {
-            console.error('Error deleting all contacts:', error)
+            logSanitizedError('Error deleting all contacts', error)
             return false
         }
     }

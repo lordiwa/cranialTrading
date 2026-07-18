@@ -5,6 +5,7 @@ import { db } from '../services/firebase'
 import { useAuthStore } from './auth'
 import { useCollectionStore } from './collection'
 import { computeTotalValue, planFulfillment } from '../utils/buyRequest'
+import { logSanitizedError } from '../utils/logSanitizedError'
 import type { ExchangeCartItem } from '../types/exchangeCart'
 import type { BuyerContact, BuyRequest, BuyRequestStatus } from '../types/buyRequest'
 
@@ -46,7 +47,7 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
       return { ok: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error('submitBuyRequest error:', err)
+      logSanitizedError('submitBuyRequest error', err)
       return { ok: false, error: msg }
     }
   }
@@ -73,7 +74,7 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
         })
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     } catch (err) {
-      console.error('loadBuyRequests error:', err)
+      logSanitizedError('loadBuyRequests error', err)
       buyRequests.value = []
     } finally {
       loading.value = false
@@ -88,7 +89,7 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
       await updateDoc(doc(db, 'users', authStore.user.id, 'buyRequests', requestId), { status: 'seen' })
       target.status = 'seen'
     } catch (err) {
-      console.error('markSeen error:', err)
+      logSanitizedError('markSeen error', err)
     }
   }
 
@@ -99,7 +100,7 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
       buyRequests.value = buyRequests.value.filter(r => r.id !== requestId)
       return true
     } catch (err) {
-      console.error('deleteRequest error:', err)
+      logSanitizedError('deleteRequest error', err)
       return false
     }
   }
@@ -133,7 +134,7 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
       target.status = 'fulfilled'
       return { ok: true, missing }
     } catch (err) {
-      console.error('fulfillRequest error:', err)
+      logSanitizedError('fulfillRequest error', err)
       return { ok: false, missing }
     }
   }

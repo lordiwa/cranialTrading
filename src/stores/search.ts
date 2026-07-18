@@ -14,6 +14,7 @@ import {
     totalLoadedPages,
 } from '../utils/searchPagination'
 import { sortPricedFirst } from '../utils/searchSections'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 // Cache para búsquedas (5 minutos) — la key incluye el sort porque order/dir
 // cambian el resultado devuelto por Scryfall (TASK-108)
@@ -140,7 +141,7 @@ export const useSearchStore = defineStore('search', () => {
             }
         } catch (err) {
             if (reqId !== lastReqId) return
-            console.error('Error en búsqueda:', err)
+            logSanitizedError('Error en búsqueda', err)
             toastStore.show(t('search.messages.searchError'), 'error')
         } finally {
             if (reqId === lastReqId) loading.value = false

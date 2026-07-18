@@ -5,6 +5,7 @@ import { useToastStore } from './toast'
 import { useCollectionStore } from './collection'
 import { t } from '../composables/useI18n'
 import { getConditionAdjustedPrice } from '../utils/conditionMultiplier'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 // Cache with 10min TTL
 const staplesCache = new Map<string, { data: FormatStaples; timestamp: number }>()
@@ -342,7 +343,7 @@ export const useMarketStore = defineStore('market', () => {
                 staples.value = null
             }
         } catch (err) {
-            console.error('Failed to load staples:', err)
+            logSanitizedError('Failed to load staples', err)
             toastStore.show(t('market.errors.loadStaples'), 'error')
         } finally {
             staplesLoading.value = false
@@ -370,7 +371,7 @@ export const useMarketStore = defineStore('market', () => {
                 movers.value = null
             }
         } catch (err) {
-            console.error('Failed to load movers:', err)
+            logSanitizedError('Failed to load movers', err)
             toastStore.show(t('market.errors.loadMovers'), 'error')
         } finally {
             moversLoading.value = false

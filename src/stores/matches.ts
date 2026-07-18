@@ -12,7 +12,6 @@ import {
     writeBatch,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { notifyMatchUser } from '../services/cloudFunctions';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';
@@ -783,6 +782,7 @@ export const useMatchesStore = defineStore('matches', () => {
                 // Per-match try/catch keeps this non-blocking — one failed notification
                 // does not abort the batch.
                 try {
+                    const { notifyMatchUser } = await import('../services/cloudFunctions');
                     await notifyMatchUser({
                         targetUserId: match.otherUserId,
                         matchId: match.id,

@@ -75,4 +75,18 @@ describe('publicCardToCard', () => {
     const card = publicCardToCard(makePublicCard({ updatedAt: undefined as unknown as PublicCard['updatedAt'] }))
     expect(card.updatedAt).toBeInstanceOf(Date)
   })
+
+  // TASK-138 AC3: PublicCard now carries setCode (write path fix) — the
+  // mapping must pass it through so exchangeCart's CK price upgrade
+  // (exchangeCart.ts:52,76) gets a real set code instead of always falling
+  // back to the TCG-sourced price.
+  it('preserves setCode when present on the PublicCard doc', () => {
+    const card = publicCardToCard(makePublicCard({ setCode: 'lea' }))
+    expect(card.setCode).toBe('lea')
+  })
+
+  it('leaves setCode undefined when absent (older docs written before AC3) — enrichment fills it in-memory', () => {
+    const card = publicCardToCard(makePublicCard({ setCode: undefined }))
+    expect(card.setCode).toBeUndefined()
+  })
 })

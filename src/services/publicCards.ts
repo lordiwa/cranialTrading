@@ -38,6 +38,7 @@ export interface PublicCard {
   cardName: string
   cardNameLower: string // lowercased cardName — matches the prefix query in publicCardSearch.ts
   scryfallId: string
+  setCode: string // TASK-138 AC3: Scryfall set code, NOT card.edition (human-readable set_name — see cardEnrichment.ts canonical rule). '' when the source card had no setCode yet; docs written before this field existed are patched in-memory by UserProfileView's enrichPublicCardsInMemory (needsEnrichment/buildEnrichmentPatch already backfill setCode for display — no separate backfill script needed).
   status: 'trade' | 'sale'
   price: number
   edition: string
@@ -103,6 +104,7 @@ export async function syncCardToPublic(
       cardName: card.name,
       cardNameLower: card.name.toLowerCase(),
       scryfallId: card.scryfallId,
+      setCode: card.setCode ?? '',
       status: card.status as 'trade' | 'sale',
       price: card.price || 0,
       edition: card.edition || '',
@@ -159,6 +161,7 @@ export async function batchSyncCardsToPublic(
           cardName: card.name,
           cardNameLower: card.name.toLowerCase(),
           scryfallId: card.scryfallId,
+          setCode: card.setCode ?? '',
           status: card.status as 'trade' | 'sale',
           price: card.price || 0,
           edition: card.edition || '',
@@ -277,6 +280,7 @@ export async function syncAllUserCards(
         cardName: card.name,
         cardNameLower: card.name.toLowerCase(),
         scryfallId: card.scryfallId,
+        setCode: card.setCode ?? '',
         status: card.status,
         price: card.price || 0,
         edition: card.edition || '',

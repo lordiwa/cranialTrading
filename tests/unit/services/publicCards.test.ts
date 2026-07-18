@@ -124,6 +124,29 @@ describe('syncCardToPublic', () => {
     expect(setDocMock).not.toHaveBeenCalled()
     expect(deleteDocMock).toHaveBeenCalledTimes(1)
   })
+
+  // TASK-138 AC3: PublicCard never carried setCode, so exchangeCart's CK price
+  // upgrade (exchangeCart.ts:52,76) always fell back to the TCG price for
+  // cards added from a public profile. Write path fix — additive, existing
+  // docs without setCode still work via the in-memory Scryfall enrichment
+  // already wired in UserProfileView.enrichPublicCardsInMemory.
+  it('writes setCode alongside cardName for an eligible card', async () => {
+    const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true, setCode: 'lea' })
+
+    await syncCardToPublic(card, 'user-1', 'alice')
+
+    const [, payload] = setDocMock.mock.calls[0] as [unknown, Record<string, unknown>]
+    expect(payload.setCode).toBe('lea')
+  })
+
+  it('falls back to an empty string when the card has no setCode (Firestore rejects undefined)', async () => {
+    const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true, setCode: undefined })
+
+    await syncCardToPublic(card, 'user-1', 'alice')
+
+    const [, payload] = setDocMock.mock.calls[0] as [unknown, Record<string, unknown>]
+    expect(payload.setCode).toBe('')
+  })
 })
 
 describe('batchSyncCardsToPublic', () => {
@@ -138,6 +161,19 @@ describe('batchSyncCardsToPublic', () => {
     expect(batchSetMock).toHaveBeenCalledTimes(2)
     const payloads = batchSetMock.mock.calls.map(call => call[1] as Record<string, unknown>)
     expect(payloads.map(p => p.cardNameLower)).toEqual(['black lotus', 'mox ruby'])
+  })
+
+  // TASK-138 AC3 (Rule 6 — parallel write-path point alongside syncCardToPublic)
+  it('writes setCode for every eligible card in the batch', async () => {
+    const cards = [
+      makeCard({ id: 'c1', name: 'Black Lotus', status: 'sale', public: true, setCode: 'lea' }),
+      makeCard({ id: 'c2', name: 'Mox Ruby', status: 'trade', public: true, setCode: undefined }),
+    ]
+
+    await batchSyncCardsToPublic(cards, 'user-1', 'alice')
+
+    const payloads = batchSetMock.mock.calls.map(call => call[1] as Record<string, unknown>)
+    expect(payloads.map(p => p.setCode)).toEqual(['lea', ''])
   })
 
   it('regression lock: batches collection/wishlist cards as deletes, never as sets', async () => {
@@ -164,6 +200,18 @@ describe('syncAllUserCards', () => {
     expect(batchSetMock).toHaveBeenCalledTimes(1)
     const [, payload] = batchSetMock.mock.calls[0] as [unknown, Record<string, unknown>]
     expect(payload.cardNameLower).toBe('time walk')
+  })
+
+  // TASK-138 AC3 (Rule 6 — third parallel write-path point)
+  it('writes setCode for every eligible card', async () => {
+    const cards = [
+      makeCard({ id: 'c1', name: 'Time Walk', status: 'sale', public: true, setCode: 'lea' }),
+    ]
+
+    await syncAllUserCards(cards, 'user-1', 'alice')
+
+    const [, payload] = batchSetMock.mock.calls[0] as [unknown, Record<string, unknown>]
+    expect(payload.setCode).toBe('lea')
   })
 
   it('regression lock: never includes a collection/wishlist card in the synced batch', async () => {

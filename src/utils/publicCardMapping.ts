@@ -14,6 +14,12 @@ export const publicCardToCard = (pc: PublicCard): Card => ({
   scryfallId: pc.scryfallId,
   name: pc.cardName,
   edition: pc.edition,
+  // TASK-138 AC3: setCode wasn't mapped at all, so exchangeCart's CK price
+  // upgrade (exchangeCart.ts:52,76) always fell back to the TCG price for
+  // cards added to cart from a public profile. '' (old docs pre-AC3, or a
+  // card published with no setCode) maps to undefined so needsEnrichment
+  // (cardEnrichment.ts) still treats it as missing and patches it in-memory.
+  setCode: pc.setCode || undefined,
   quantity: pc.quantity,
   condition: pc.condition as Card['condition'],
   foil: pc.foil,

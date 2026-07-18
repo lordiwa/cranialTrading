@@ -658,6 +658,19 @@ onMounted(() => {
               <h4 class="font-display text-tiny font-bold text-neon uppercase tracking-wide">{{ translateCategory(group.type) }}</h4>
               <span class="text-tiny text-silver-50">({{ getGroupCardCount(group.cards) }})</span>
             </div>
+            <!-- TASK-138 AC2: previously on-load-more was only wired for the
+                 ungrouped ('all') grid, so any groupBy left the view
+                 permanently truncated at whatever page(s) had already
+                 loaded — infinite scroll never fired for a grouped grid.
+                 CollectionGrid's onLoadMore is a per-instance window-scroll
+                 listener (useVirtualGrid.ts) guarded by usePublicProfileCards'
+                 own loadingMore/hasMore flags, so wiring it to every group
+                 (not just 'all') is safe: multiple groups near the bottom of
+                 the page may each fire loadMorePublicCards() in the same
+                 scroll tick, but the composable's synchronous loadingMore
+                 guard (set before the first await) collapses them into a
+                 single in-flight request. Chosen over a "load all" button —
+                 no extra UI needed, CollectionGrid already supported it. -->
             <CollectionGrid
                 :cards="group.cards"
                 :readonly="true"
@@ -665,7 +678,7 @@ onMounted(() => {
                 :interested-cards="interestedCards"
                 :show-cart="showCartMode"
                 :cart-item-ids="cartItemIds"
-                :on-load-more="group.type === 'all' ? loadMorePublicCards : undefined"
+                :on-load-more="loadMorePublicCards"
                 :loading-more="loadingMorePublicCards"
                 @interest="handleInterest"
                 @add-to-cart="handleAddToCart"

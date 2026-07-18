@@ -42,19 +42,34 @@ test.describe('Collection CRUD', () => {
     // the collection composition rotates by one card per run rather than
     // growing without bound, which is the failure mode actually being
     // guarded against.
-    await commonPage.waitForToastDismiss().catch(() => {});
-    await collectionPage.page.waitForTimeout(1000);
-    const cardCount = await collectionPage.getCardCount();
-    if (cardCount > 0) {
-      await collectionPage.clickCardInGrid(0);
-      const modal = collectionPage.page.locator('.fixed.inset-0.z-50');
-      await modal.waitFor({ state: 'visible', timeout: 5_000 });
-      const deleteBtn = collectionPage.editModal.deleteButton;
-      if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await deleteBtn.click();
-        await commonPage.confirmAction();
-        await commonPage.waitForToast('success');
+    //
+    // Best-effort by design ("leak, don't redden"): the whole block is
+    // wrapped in try/catch so a stuck toast overlay or CI-only timing hiccup
+    // here never fails the test above it, which already passed its real
+    // assertions. At worst this leaves one extra card in the shared CI
+    // collection for a later run's cleanup to rotate back out.
+    try {
+      // Toasts use v-show (display:none, not DOM removal) and the
+      // success-toast locator is a known CI flake source (matches stale,
+      // already-hidden toasts — see CLAUDE.md's E2E flake notes), so don't
+      // wait on that locator here. Just wait out the documented ~4s
+      // auto-dismiss window so the toast isn't still overlaying the grid
+      // when clickCardInGrid(0) runs below.
+      await collectionPage.page.waitForTimeout(4500);
+      const cardCount = await collectionPage.getCardCount();
+      if (cardCount > 0) {
+        await collectionPage.clickCardInGrid(0);
+        const modal = collectionPage.page.locator('.fixed.inset-0.z-50');
+        await modal.waitFor({ state: 'visible', timeout: 5_000 });
+        const deleteBtn = collectionPage.editModal.deleteButton;
+        if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await deleteBtn.click();
+          await commonPage.confirmAction();
+          await commonPage.waitForToast('success');
+        }
       }
+    } catch {
+      // Swallow — accepted leak of at most one card this run.
     }
   });
 

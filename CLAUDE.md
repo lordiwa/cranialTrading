@@ -177,8 +177,10 @@ Area → specs mapping (targeted scripts run only that folder, still through the
 | Matches | `e2e/specs/matches/` | `npm run e2e:matches` |
 | Search | `e2e/specs/search/` | `npm run e2e:search` |
 | Profile | `e2e/specs/user-profile/` | `npm run e2e:profile` |
+| Binders | `e2e/specs/binders/` | `npm run e2e:binders` |
+| Messages | `e2e/specs/messages/` | `npm run e2e:messages` |
 
-For areas without a dedicated script (binders, market, messages, settings, etc.), run `npx playwright test e2e/specs/<folder>` directly with the same flags as `npm run e2e`.
+For areas without a dedicated script (market, settings, contacts, i18n, preferences, notifications, help, etc.), run `npx playwright test e2e/specs/<folder>` directly with the same flags as `npm run e2e`.
 
 Known flaky specs — never rely on these for smoke/targeted signal, and don't tag them `@smoke`: `auth/register.spec.ts` ("successful registration" — Firebase rate-limit on `sendEmailVerification`) and `search/search.spec.ts` ("selecting autocomplete suggestion" — depends on a live Scryfall suggestion having a price). Both pass in isolation; they are not code regressions.
 

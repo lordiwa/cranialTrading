@@ -5,7 +5,7 @@ test.describe('Binders', () => {
     await bindersPage.goto();
   });
 
-  test('create new binder → appears in binder list', async ({ bindersPage, page }) => {
+  test('create new binder → appears in binder list @smoke', async ({ bindersPage, page }) => {
     const binderName = `E2E Binder ${Date.now()}`;
     await bindersPage.createBinder(binderName, 'Test description');
 

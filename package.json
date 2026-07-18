@@ -35,6 +35,8 @@
     "e2e:matches": "npx playwright test e2e/specs/matches",
     "e2e:search": "npx playwright test e2e/specs/search",
     "e2e:profile": "npx playwright test e2e/specs/user-profile",
+    "e2e:binders": "npx playwright test e2e/specs/binders",
+    "e2e:messages": "npx playwright test e2e/specs/messages",
     "build:dev": "vue-tsc --noEmit && vite build --mode development",
     "deploy:dev": "firebase deploy --only hosting -P dev",
     "deploy:prod": "firebase deploy --only hosting -P prod",

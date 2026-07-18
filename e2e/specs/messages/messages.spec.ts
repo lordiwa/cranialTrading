@@ -8,7 +8,7 @@ test.describe('Messages', () => {
     await messagesPage.goto();
   });
 
-  test('messages page loads conversation list', async ({ messagesPage, page }) => {
+  test('messages page loads conversation list @smoke', async ({ messagesPage, page }) => {
     await expect(page).toHaveURL(/\/messages/);
     await page.waitForTimeout(2000);
     // Page should show messages heading or conversations or empty state

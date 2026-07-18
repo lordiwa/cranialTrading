@@ -2,11 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead, useSeoMeta } from '@unhead/vue';
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, type QueryDocumentSnapshot, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { resolveUsernameToUid } from '../services/userLookup';
 import { getCardsByIds } from '../services/scryfallCache';
+import { getUserPublicCardsPage } from '../services/publicCards';
 import { buildEnrichmentPatch, needsEnrichment } from '../utils/cardEnrichment';
+import { publicCardToCard } from '../utils/publicCardMapping';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -51,6 +53,14 @@ const selectedUserId = ref('');
 const selectedUsername = ref('');
 const showFilters = ref(false);
 
+// TASK-136: /public_cards server-side pagination state. First page loads on
+// profile mount; further pages load on demand (CollectionGrid's onLoadMore /
+// infinite scroll — same pattern as CollectionView.vue's loadNextPage).
+const PUBLIC_CARDS_PAGE_SIZE = 60;
+let publicCardsCursor: QueryDocumentSnapshot | null = null;
+const loadingMorePublicCards = ref(false);
+const hasMorePublicCards = ref(false);
+
 // Computed properties
 const isOwnProfile = computed(() => {
   return authStore.user?.id === userId.value;
@@ -62,6 +72,9 @@ const canShowInterest = computed(() => {
 
 // v2 redesign — profile header stat chips (design→app v2 F8, cranial-design/prototype/22-user-profile-*.html).
 // Pure display counts over the already-loaded public cards; no new data fetching.
+// TASK-136: since /public_cards now loads page-by-page, these only reflect
+// cards loaded so far — not the profile's grand total — until every page has
+// been fetched via scroll. Known trade-off of the perf/privacy fix; see hand-off.
 const saleCount = computed(() => cards.value.filter(c => c.status === 'sale').length);
 const tradeCount = computed(() => cards.value.filter(c => c.status === 'trade').length);
 
@@ -146,9 +159,8 @@ const loadProfile = async () => {
       userInfo.value = result.data as { username?: string; location?: string; avatarUrl?: string | null };
     }
 
-    // Load all cards at once, then filter for public ones client-side
     cards.value = [];
-    await loadAllPublicCards();
+    await loadFirstPublicCardsPage();
   } catch (err) {
     console.error('Error loading profile:', err);
     // Show error toast with actual error detail for debugging
@@ -165,19 +177,20 @@ const loadProfile = async () => {
   }
 };
 
-const loadAllPublicCards = async () => {
+// TASK-136: first page of the visited user's public cards, from the
+// denormalized /public_cards collection (server-side filtered — never the
+// owner's private users/{uid}/cards subcollection; see services/publicCards.ts).
+const loadFirstPublicCardsPage = async () => {
   if (!userId.value) return;
 
-  try {
-    const cardsCol = collection(db, 'users', userId.value, 'cards');
-    const snapshot = await getDocs(query(cardsCol));
+  publicCardsCursor = null;
+  hasMorePublicCards.value = false;
 
-    // Filter: show public cards (sale/trade/wishlist only, never collection)
-    cards.value = snapshot.docs
-      .map(d => ({ id: d.id, ...d.data() }) as Card)
-      .filter((card: Card) =>
-        card.status !== 'collection' && card.public !== false
-      );
+  try {
+    const page = await getUserPublicCardsPage(userId.value, PUBLIC_CARDS_PAGE_SIZE, null);
+    cards.value = page.cards.map(publicCardToCard);
+    publicCardsCursor = page.cursor;
+    hasMorePublicCards.value = page.hasMore;
 
     // SCRUM-67: public-profile cards come straight from Firestore with no
     // Scryfall metadata (type_line, colors, cmc, setCode, ...). The advanced
@@ -190,6 +203,27 @@ const loadAllPublicCards = async () => {
   } catch (err) {
     console.error('Error loading cards:', err);
     toastStore.show(t('profile.messages.loadCardsError'), 'error');
+  }
+};
+
+// TASK-136: appends the next /public_cards page on demand — wired to
+// CollectionGrid's onLoadMore (infinite scroll), same pattern as
+// CollectionView.vue + collectionStore.loadNextPage.
+const loadMorePublicCards = async () => {
+  if (!userId.value || loadingMorePublicCards.value || !hasMorePublicCards.value) return;
+
+  loadingMorePublicCards.value = true;
+  try {
+    const page = await getUserPublicCardsPage(userId.value, PUBLIC_CARDS_PAGE_SIZE, publicCardsCursor);
+    cards.value = [...cards.value, ...page.cards.map(publicCardToCard)];
+    publicCardsCursor = page.cursor;
+    hasMorePublicCards.value = page.hasMore;
+    void enrichPublicCardsInMemory();
+  } catch (err) {
+    console.error('Error loading more cards:', err);
+    toastStore.show(t('profile.messages.loadCardsError'), 'error');
+  } finally {
+    loadingMorePublicCards.value = false;
   }
 };
 
@@ -673,6 +707,8 @@ onMounted(() => {
                 :interested-cards="interestedCards"
                 :show-cart="showCartMode"
                 :cart-item-ids="cartItemIds"
+                :on-load-more="group.type === 'all' ? loadMorePublicCards : undefined"
+                :loading-more="loadingMorePublicCards"
                 @interest="handleInterest"
                 @add-to-cart="handleAddToCart"
             />

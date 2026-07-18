@@ -22,6 +22,9 @@ const getDocsMock = vi.fn().mockResolvedValue({ docs: [] })
 const queryMock = vi.fn((...args: unknown[]) => ({ __type: 'query', args }))
 const collectionMock = vi.fn((_db: unknown, name: string) => ({ __type: 'collection', name }))
 const whereMock = vi.fn((...args: unknown[]) => ({ __type: 'where', args }))
+const orderByMock = vi.fn((...args: unknown[]) => ({ __type: 'orderBy', args }))
+const limitMock = vi.fn((...args: unknown[]) => ({ __type: 'limit', args }))
+const startAfterMock = vi.fn((...args: unknown[]) => ({ __type: 'startAfter', args }))
 
 const batchSetMock = vi.fn()
 const batchDeleteMock = vi.fn()
@@ -37,8 +40,11 @@ vi.mock('firebase/firestore', () => ({
   deleteDoc: (...args: unknown[]) => deleteDocMock(...args),
   doc: (...args: unknown[]) => docMock(...(args as [unknown, string, string])),
   getDocs: (...args: unknown[]) => getDocsMock(...args),
+  limit: (...args: unknown[]) => limitMock(...args),
+  orderBy: (...args: unknown[]) => orderByMock(...args),
   query: (...args: unknown[]) => queryMock(...args),
   setDoc: (...args: unknown[]) => setDocMock(...args),
+  startAfter: (...args: unknown[]) => startAfterMock(...args),
   Timestamp: { now: () => 'FIXED_TIMESTAMP' },
   where: (...args: unknown[]) => whereMock(...args),
   writeBatch: () => writeBatchMock(),
@@ -46,7 +52,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { batchSyncCardsToPublic, getUserPublicCardsPage, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 
 beforeEach(() => {
   setDocMock.mockClear()
@@ -56,6 +62,9 @@ beforeEach(() => {
   queryMock.mockClear()
   collectionMock.mockClear()
   whereMock.mockClear()
+  orderByMock.mockClear()
+  limitMock.mockClear()
+  startAfterMock.mockClear()
   batchSetMock.mockClear()
   batchDeleteMock.mockClear()
   batchCommitMock.mockClear()
@@ -166,5 +175,93 @@ describe('syncAllUserCards', () => {
     expect(batchSetMock).toHaveBeenCalledTimes(1)
     const [, payload] = batchSetMock.mock.calls[0] as [unknown, Record<string, unknown>]
     expect(payload.cardName).toBe('Timetwister')
+  })
+})
+
+/**
+ * TASK-136: perfil público paginado vía /public_cards.
+ *
+ * Regression lock — the public profile MUST fetch cards through this
+ * server-side-paginated query against the denormalized /public_cards
+ * collection, and MUST NEVER fall back to a full getDocs() scan of the
+ * private users/{uid}/cards subcollection (the pre-fix bug: 5654 docs
+ * downloaded per profile visit, including private ones, filtered
+ * client-side).
+ */
+describe('getUserPublicCardsPage', () => {
+  const makeDoc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data })
+
+  it('queries the public_cards collection filtered by userId — never users/{uid}/cards', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+
+    await getUserPublicCardsPage('user-1', 60, null)
+
+    expect(collectionMock).toHaveBeenCalledWith({}, 'public_cards')
+    expect(collectionMock).not.toHaveBeenCalledWith(expect.anything(), 'users')
+    expect(whereMock).toHaveBeenCalledWith('userId', '==', 'user-1')
+  })
+
+  it('orders by cardName (matches the deployed composite index) and requests pageSize+1 docs to detect hasMore without a count query', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+
+    await getUserPublicCardsPage('user-1', 60, null)
+
+    expect(orderByMock).toHaveBeenCalledWith('cardName')
+    expect(limitMock).toHaveBeenCalledWith(61)
+  })
+
+  it('does not call startAfter on the first page (cursor null)', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+
+    await getUserPublicCardsPage('user-1', 60, null)
+
+    expect(startAfterMock).not.toHaveBeenCalled()
+  })
+
+  it('passes startAfter(cursor) when paging past the first page', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+    const cursor = makeDoc('prev-last-doc', { cardName: 'Zzz' })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await getUserPublicCardsPage('user-1', 60, cursor as any)
+
+    expect(startAfterMock).toHaveBeenCalledWith(cursor)
+  })
+
+  it('trims to pageSize and reports hasMore=true when more docs than pageSize come back', async () => {
+    const docs = [
+      makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' }),
+      makeDoc('c1', { cardId: 'c1', userId: 'user-1', cardName: 'Card 1', status: 'trade' }),
+      makeDoc('c2', { cardId: 'c2', userId: 'user-1', cardName: 'Card 2', status: 'sale' }),
+    ]
+    getDocsMock.mockResolvedValueOnce({ docs })
+
+    const page = await getUserPublicCardsPage('user-1', 2, null)
+
+    expect(page.cards).toHaveLength(2)
+    expect(page.cards.map(c => c.docId)).toEqual(['c0', 'c1'])
+    expect(page.hasMore).toBe(true)
+    expect(page.cursor).toBe(docs[1])
+  })
+
+  it('reports hasMore=false and keeps all docs when fewer than pageSize+1 come back', async () => {
+    const docs = [makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' })]
+    getDocsMock.mockResolvedValueOnce({ docs })
+
+    const page = await getUserPublicCardsPage('user-1', 2, null)
+
+    expect(page.cards).toHaveLength(1)
+    expect(page.hasMore).toBe(false)
+    expect(page.cursor).toBe(docs[0])
+  })
+
+  it('returns an empty page with a null cursor and hasMore=false when the user has no public cards', async () => {
+    getDocsMock.mockResolvedValueOnce({ docs: [] })
+
+    const page = await getUserPublicCardsPage('user-1', 60, null)
+
+    expect(page.cards).toEqual([])
+    expect(page.cursor).toBeNull()
+    expect(page.hasMore).toBe(false)
   })
 })

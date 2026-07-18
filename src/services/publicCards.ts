@@ -15,8 +15,12 @@ import {
   doc,
   type DocumentData,
   getDocs,
+  limit,
+  orderBy,
   query,
+  type QueryDocumentSnapshot,
   setDoc,
+  startAfter,
   Timestamp,
   where,
   writeBatch,
@@ -462,6 +466,51 @@ export async function getUserPublicCards(userId: string): Promise<PublicCard[]> 
   )
   const snapshot = await getDocs(q)
   return snapshot.docs.map(d => ({ ...d.data(), docId: d.id } as PublicCard))
+}
+
+export interface PublicCardsPage {
+  cards: PublicCard[]
+  /** Last doc of this page — pass back in as `cursor` to fetch the next page. Null once exhausted. */
+  cursor: QueryDocumentSnapshot | null
+  hasMore: boolean
+}
+
+/**
+ * Server-side-paginated query for a single user's public cards (TASK-136).
+ *
+ * Used by the public profile view instead of reading the owner's private
+ * users/{uid}/cards subcollection — that subcollection is readable by
+ * anyone (see firestore.rules comment) and the view used to download it in
+ * full (thousands of docs, including private ones) and filter client-side.
+ * /public_cards is safe-by-construction: writers here only ever publish
+ * sale/trade cards with public===true (see syncCardToPublic above).
+ *
+ * Orders by `cardName` to reuse the existing `userId ASC, cardName ASC`
+ * composite index (firestore.indexes.json) — no new index deploy needed.
+ * Fetches `pageSize + 1` docs to detect `hasMore` without a separate count
+ * query; the extra doc is trimmed before returning.
+ */
+export async function getUserPublicCardsPage(
+  userId: string,
+  pageSize: number,
+  cursor: QueryDocumentSnapshot | null = null
+): Promise<PublicCardsPage> {
+  const constraints = [
+    where('userId', '==', userId),
+    orderBy('cardName'),
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize + 1),
+  ]
+  const snapshot = await getDocs(query(collection(db, 'public_cards'), ...constraints))
+
+  const hasMore = snapshot.docs.length > pageSize
+  const pageDocs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
+
+  return {
+    cards: pageDocs.map(d => ({ ...d.data(), docId: d.id }) as PublicCard),
+    cursor: pageDocs.length > 0 ? (pageDocs[pageDocs.length - 1] ?? null) : null,
+    hasMore,
+  }
 }
 
 /**

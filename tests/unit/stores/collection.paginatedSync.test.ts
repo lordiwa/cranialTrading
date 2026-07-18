@@ -469,6 +469,53 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
     })
   })
 
+  describe('batchDeleteCards public_cards cleanup on partial failure (TASK-125 regression)', () => {
+    it('does not delete the public_cards doc for a sale/trade card whose Phase 1 collection delete permanently failed', async () => {
+      vi.useFakeTimers()
+      try {
+        const { doc } = await import('firebase/firestore')
+        const mockDoc = vi.mocked(doc)
+        const store = useCollectionStore()
+
+        // 201 cards forces the internal BATCH_SIZE=200 chunking into two Phase 1
+        // chunks: chunk0 = card-0..card-199 (succeeds), chunk1 = card-200 (fails
+        // permanently after exhausting retries). card-0 and card-200 are both
+        // sale-status so both are candidates for the public_cards Phase 2 cleanup.
+        const allCards = Array.from({ length: 201 }, (_, i) =>
+          makeCard({ id: `card-${i}`, status: i === 0 || i === 200 ? 'sale' : 'collection' })
+        )
+        store.cards = allCards as any
+        store.paginatedCards = [] as any
+
+        mockCommit
+          .mockResolvedValueOnce(undefined) // chunk0 (200 ids) — succeeds first try
+          .mockRejectedValueOnce(new Error('write failed')) // chunk1 (card-200) attempt 1
+          .mockRejectedValueOnce(new Error('write failed')) // chunk1 attempt 2
+          .mockRejectedValueOnce(new Error('write failed')) // chunk1 attempt 3 — exhausted
+          .mockResolvedValue(undefined) // Phase 2 public_cards batch(es)
+
+        const cardIds = allCards.map(c => c.id)
+        const resultPromise = store.batchDeleteCards(cardIds)
+        await vi.advanceTimersByTimeAsync(3000) // flush inter-chunk delay + retry backoffs
+        const result = await resultPromise
+
+        expect(result.failed).toBe(1)
+        // card-200's collection delete failed permanently — it must be restored
+        // locally, and its public_cards listing must survive (still exists in
+        // Firestore since Phase 1 never removed the collection doc).
+        expect(store.cards.some((c: any) => c.id === 'card-200')).toBe(true)
+
+        const publicCardsDeletes = mockDoc.mock.calls
+          .filter(args => args[1] === 'public_cards')
+          .map(args => args[2])
+        expect(publicCardsDeletes).toContain('test-user-id_card-0')
+        expect(publicCardsDeletes).not.toContain('test-user-id_card-200')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   describe('batchUpdateCards membership parity (TASK-120 AC4)', () => {
     it('does NOT trigger a deferred re-query — status changes patch paginatedCards in place like updateCard, matching established precedent', async () => {
       vi.useFakeTimers()

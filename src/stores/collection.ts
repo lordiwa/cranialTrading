@@ -1191,9 +1191,15 @@ export const useCollectionStore = defineStore('collection', () => {
             }
         }
 
-        // Phase 2: Delete from public_cards using writeBatch (only sale/trade)
+        // Phase 2: Delete from public_cards using writeBatch (only sale/trade).
+        // Exclude ids whose Phase 1 collection delete permanently failed (TASK-125) —
+        // the card was restored above, so its collection doc still exists in
+        // Firestore and its public listing must not be torn down under it.
+        const publicCardIdsToDelete = failedIds.size > 0
+            ? publicCardIds.filter(id => !failedIds.has(id))
+            : publicCardIds
         const progress = { completed: completedBatches, total: totalBatches, onProgress }
-        await deletePublicCardBatches(publicCardIds, userId, BATCH_SIZE, progress)
+        await deletePublicCardBatches(publicCardIdsToDelete, userId, BATCH_SIZE, progress)
 
         // Symmetric rollback (TASK-120) — restore cards whose Firestore delete
         // permanently failed into BOTH cards.value and paginatedCards. Previously

@@ -9,7 +9,7 @@
     "Decisión documentada (en el workflow o CLAUDE.md) sobre specs mutadores: excluidos, con cuenta dedicada, o con cleanup — sin acumulación de datos basura en la cuenta CI",
     "Al menos una corrida manual (workflow_dispatch) verificada verde antes de confiar en el schedule"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "ci",
@@ -21,17 +21,31 @@
   "depends_on": [
     "TASK-133"
   ],
-  "linked_commits": [],
+  "linked_commits": [
+    "f4649dc08c3e7f1d3768d2f54648aa7926c279be",
+    "d0b79b578a503952e21f92aed190944cd1c64a60",
+    "a1f474c4a7d5d63236366e76bb5e957fb50e26ff"
+  ],
   "linked_prs": [],
   "comments": [
     {
       "author": "orchestrator",
       "at": "2026-07-18T20:45:01.620Z",
       "body": "Round 2 (d0b79b5, sobre f4649dc) APROBADO por review FULL — los 5 hallazgos del round 1 resueltos y verificados: ref:develop en checkout (la suite agendada siempre ejecuta el spec-set de develop, que es lo desplegado en dev), cleanup real de fixtures en deck-crud/binders, net-zero acotado en collection (compromiso documentado: el fixture exacto no es identificable por el race de card_index + 25 Lightning Bolt pre-existentes; rotación de composición registrada como LOW para retro — mitigación futura: reseed periódico o delete por más-reciente), PLAYWRIGHT_HTML_OUTPUT_DIR para el artifact, workflow invoca npm run e2e:nightly (sin drift), summary con títulos completos. review_depth: FULL en ambos rounds (playwright.config.ts = test infra mandatory-FULL; 224+96 líneas). QUEDA in_review — AC5 (workflow_dispatch verde) es IMPOSIBLE hasta que nightly-e2e.yml exista en main: GitHub solo registra schedule/dispatch desde el default branch. Se activa con la próxima promoción develop→main (deploy a prod, requiere OK de Rafael). Al ocurrir: gh workflow run nightly-e2e.yml, verificar Actions verde, y recién entonces cerrar este ticket con UAT. Commits: f4649dc08c3e7f1d3768d2f54648aa7926c279be, d0b79b578a503952e21f92aed190944cd1c64a60."
+    },
+    {
+      "author": "uat",
+      "at": "2026-07-19T00:29:08.942Z",
+      "body": "UAT TASK-134 (delegado al orquestador por Rafael via loop_auth.uat_delegated_to_orchestrator; ejecutado en harness tras el 'deploy todo a prod' de 2026-07-18):\n\n1. AC1 — Workflow con schedule nocturno contra dev, job independiente del CI push/deploy. Esperado: .github/workflows/nightly-e2e.yml con cron + workflow_dispatch, checkout de develop, E2E_BASE_URL=https://cranial-trading-dev.web.app, sin tocar test.yml. Observado: archivo en main (llego con la promocion db243a4), run 29666744920 corrio como workflow 'Nightly E2E (dev)' separado; test.yml intacto. PASS — verified by Orchestrator at the human's request.\n2. AC2 — Resultado visible sin entrar al log + notificacion en fallo. Esperado: Job Summary con tabla pass/flaky/fail via e2e/nightly-summary.mjs, artifact nightly-playwright-report, issue tracking (label nightly-e2e) en fallo. Observado: run verde con summary generado y artifact subido; camino de issue-on-failure revisado en el workflow (round 2 de review FULL), no ejercitado en esta corrida por ser verde. PASS — verified by Orchestrator at the human's request.\n3. AC3 — Flakes conocidos no reddean la corrida. Esperado: retries:2 bajo CI + tag @nightly-skip con --grep-invert para register.spec 'successful registration' y search.spec 'selecting autocomplete suggestion'. Observado: npm run e2e:nightly aplica el grep-invert; corrida manual verde sin ruido de esos specs. PASS — verified by Orchestrator at the human's request.\n4. AC4 — Decision documentada sobre specs mutadores, sin acumulacion. Esperado: cleanup real o exclusion documentada. Observado: deck-crud/binders borran su fixture; collection-crud 'add card' hace net-zero borrando grid index 0 (compromiso y racional documentados en CLAUDE.md seccion nightly; endurecido con soft-guard a1f474c: cleanup en try/catch — leak acotado, nunca build rojo); register 'successful registration' excluido via @nightly-skip por no tener camino de borrado en UI. PASS — verified by Orchestrator at the human's request.\n5. AC5 — Al menos una corrida manual workflow_dispatch verde. Esperado: gh workflow run nightly-e2e.yml verde. Observado: run 29666744920 (workflow_dispatch, 2026-07-19) VERDE en 8m58s contra el dev desplegado. PASS — verified by Orchestrator at the human's request.\n\nOverall result: PASS"
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-07-19T00:29:23.349Z",
+      "body": "CERRADO tras promocion a prod 2026-07-18/19. Historial: round 1 f4649dc + round 2 d0b79b5 (review FULL APPROVE — playwright.config.ts es test-infra mandatory-FULL, 224+96 lineas), fix post-release a1f474c (cleanup soft-guard: el modal.waitFor del cleanup de collection timeouteo 3/3 solo en CI — leak, not red). AC5 destrabado por la promocion develop→main (db243a4): primera corrida workflow_dispatch de nightly-e2e.yml VERDE (run 29666744920, 8m58s, contra cranial-trading-dev.web.app). UAT delegado registrado con los 5 ACs PASS. review_depth: FULL en ambos rounds; rubric inputs: superficie test-infra (playwright.config.ts, workflow CI) + >150 lineas. Nota operativa: en la promocion, el E2E de main flakeo una vez en collection-crud 'cancel deletion' (click sin modal, 3/3 en ese run, no reproducido en re-run — sospecha: composicion rotada de la cuenta CI compartida; trace archivado en el run 29665874209). El schedule nocturno (~06:00 UTC) queda activo desde main a partir de ahora."
     }
   ],
   "created_at": "2026-07-17T17:35:00.000Z",
-  "updated_at": "2026-07-18T20:45:01.620Z",
+  "updated_at": "2026-07-19T00:29:23.349Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

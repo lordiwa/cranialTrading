@@ -2539,5 +2539,12 @@
         "description": "La pagina que buscas no existe en Cranial Trading."
       }
     }
+  },
+  "home": {
+    "title": "¿Qué carta buscás?",
+    "subtitle": "Buscá en todo el mercado, o entrá directo a tu colección.",
+    "placeholder": "Buscar cartas, sets o usuarios…",
+    "popularLabel": "Búsquedas populares:",
+    "quickLinks": "O andá directo a"
   }
 }

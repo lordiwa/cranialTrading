@@ -6,7 +6,9 @@ test.describe('Login', () => {
     await loginPage.goto();
   });
 
-  test('successful login redirects to saved-matches @smoke', async ({ loginPage, page }) => {
+  // The authenticated landing moved off the matches hub (2026-08-07): /inicio reads
+  // nothing from Firestore, so login no longer pays the match recalculation up front.
+  test('successful login redirects to the /inicio landing @smoke', async ({ loginPage, page }) => {
     const email = process.env.TEST_USER_A_EMAIL!;
     const password = process.env.TEST_USER_A_PASSWORD!;
 
@@ -14,6 +16,7 @@ test.describe('Login', () => {
     await loginPage.waitForRedirect();
 
     await expect(page).not.toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/inicio/);
   });
 
   test('invalid credentials show error toast', async ({ loginPage, commonPage }) => {

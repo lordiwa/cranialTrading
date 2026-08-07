@@ -2539,5 +2539,12 @@
         "description": "The page you are looking for does not exist on Cranial Trading."
       }
     }
+  },
+  "home": {
+    "title": "What card are you looking for?",
+    "subtitle": "Search the whole marketplace, then jump into your collection.",
+    "placeholder": "Search cards, sets or users…",
+    "popularLabel": "Popular searches:",
+    "quickLinks": "Or go straight to"
   }
 }

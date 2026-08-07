@@ -127,7 +127,7 @@ export const createAuthGuard = (
                 authStore.firebaseNeededNow?.();
                 await waitForAuthReady(authStore);
                 if (authStore.user && !isUnverifiedSessionOnRegister()) {
-                    next('/saved-matches');
+                    next('/inicio');
                 } else {
                     next();
                 }
@@ -141,7 +141,7 @@ export const createAuthGuard = (
                 await waitForAuthReady(authStore);
             }
             if (authStore.user && isStillCurrent() && !isUnverifiedSessionOnRegister()) {
-                redirect('/saved-matches');
+                redirect('/inicio');
             }
             return;
         }

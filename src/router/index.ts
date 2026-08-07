@@ -15,8 +15,22 @@ const router = createRouter({
     history: createWebHistory(),
     routes: [
         {
+            // Rafael 2026-08-07: the authenticated landing is no longer the matches hub.
+            // Landing on /saved-matches meant every login paid the match recalculation up
+            // front; /inicio reads nothing from Firestore, so the app is usable immediately
+            // and matches recalculate when you actually open them.
             path: '/',
-            redirect: '/saved-matches',
+            redirect: '/inicio',
+        },
+        {
+            path: '/inicio',
+            name: 'home',
+            component: () => import('../views/HomeView.vue'),
+            meta: { requiresAuth: true, title: 'seo.pages.savedMatches.title', description: 'seo.pages.savedMatches.description', robots: 'noindex, nofollow' },
+        },
+        {
+            path: '/dashboard',
+            redirect: '/inicio',
         },
         {
             // RED hub merge: Contactos is now a tab inside /saved-matches, not a standalone page.
@@ -46,10 +60,6 @@ const router = createRouter({
             name: 'resetPassword',
             component: () => import('../views/ResetPasswordView.vue'),
             meta: { requiresGuest: true, title: 'seo.pages.resetPassword.title', description: 'seo.pages.resetPassword.description', robots: 'noindex, nofollow' },
-        },
-        {
-            path: '/dashboard',
-            redirect: '/saved-matches',
         },
         {
             path: '/collection',

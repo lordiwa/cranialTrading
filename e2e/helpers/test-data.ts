@@ -14,6 +14,7 @@ export const ROUTES = {
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
   dashboard: '/dashboard',
+  home: '/inicio',
   collection: '/collection',
   search: '/search',
   market: '/market',

@@ -82,7 +82,7 @@ const onHandleTouchEnd = (e: TouchEvent) => {
       <div
           v-if="show"
           data-testid="bottom-sheet-overlay"
-          class="fixed inset-0 z-50 bg-black bg-opacity-80"
+          class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[4px]"
           @click.self="handleOverlayClick"
       >
         <div
@@ -93,7 +93,7 @@ const onHandleTouchEnd = (e: TouchEvent) => {
             :aria-labelledby="title ? titleId : undefined"
             :aria-label="!title && ariaLabel ? ariaLabel : undefined"
             :class="[
-              'absolute inset-x-0 bottom-0 bg-primary border-t-2 border-neon/40 rounded-t-lg shadow-strong flex flex-col',
+              'absolute inset-x-0 bottom-0 bg-primary border-t border-line-strong rounded-t-xl shadow-strong flex flex-col',
               heightClass,
             ]"
             style="padding-bottom: env(safe-area-inset-bottom);"
@@ -107,13 +107,13 @@ const onHandleTouchEnd = (e: TouchEvent) => {
               @touchmove.passive="onHandleTouchMove"
               @touchend.passive="onHandleTouchEnd"
           >
-            <span class="block w-10 h-1 rounded bg-silver/30" aria-hidden="true"></span>
+            <span class="block w-10 h-1 rounded-full bg-silver-30" aria-hidden="true"></span>
           </div>
 
           <!-- Header -->
           <div
               data-testid="bottom-sheet-header"
-              class="flex items-center justify-between gap-2 px-4 pb-2 border-b border-silver-10"
+              class="flex items-center justify-between gap-2 px-4 pb-2 border-b border-line"
           >
             <h2
                 v-if="title"
@@ -126,7 +126,7 @@ const onHandleTouchEnd = (e: TouchEvent) => {
                 data-testid="bottom-sheet-close"
                 @click="closeSheet"
                 :aria-label="t('common.actions.close')"
-                class="bg-neon text-primary hover:brightness-110 transition-fast p-2 rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
+                class="text-silver-50 hover:text-silver hover:bg-surface-2 transition-all duration-200 ease-v2 p-2 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:shadow-glow-neon"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -142,7 +142,7 @@ const onHandleTouchEnd = (e: TouchEvent) => {
           <!-- Optional sticky footer -->
           <div
               v-if="$slots.footer"
-              class="border-t border-silver-10 px-3 py-2 bg-primary"
+              class="border-t border-line px-3 py-2 bg-primary"
           >
             <slot name="footer" />
           </div>

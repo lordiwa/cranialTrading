@@ -30,7 +30,7 @@ const getProgressBarClass = (toast: Toast) => {
             v-for="toast in toastStore.toasts"
             :key="toast.id"
             :class="[
-              'bg-primary border-2 shadow-strong rounded',
+              'bg-primary border shadow-strong rounded-lg',
               getToastClasses(toast),
               isProgressToast(toast) ? 'min-w-[280px]' : ''
             ]"
@@ -76,7 +76,7 @@ const getProgressBarClass = (toast: Toast) => {
           <!-- Progress bar -->
           <div
               v-if="isProgressToast(toast)"
-              class="h-1 bg-silver-10 overflow-hidden"
+              class="h-1 bg-surface-2 overflow-hidden"
           >
             <div
                 :class="['h-full transition-all duration-300 ease-out', getProgressBarClass(toast)]"

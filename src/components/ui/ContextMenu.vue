@@ -74,7 +74,7 @@ onBeforeUnmount(() => {
     <div
       v-if="show && ready"
       ref="menuRef"
-      class="ctx-menu fixed z-[70] min-w-[180px] max-w-[240px] bg-primary border border-silver-30 rounded shadow-lg shadow-black/50 py-1"
+      class="ctx-menu fixed z-[70] min-w-[180px] max-w-[240px] bg-primary border border-line-strong rounded-md shadow-strong py-1"
       :style="{ left: `${adjustedX}px`, top: `${adjustedY}px` }"
     >
       <template v-for="item in items" :key="item.id">
@@ -95,7 +95,7 @@ onBeforeUnmount(() => {
           <SvgIcon v-if="item.icon" :name="item.icon" size="tiny" class="flex-shrink-0" />
           <span class="truncate">{{ item.label }}</span>
         </button>
-        <div v-if="item.dividerAfter" class="border-b border-silver-20 my-1" />
+        <div v-if="item.dividerAfter" class="border-b border-line my-1" />
       </template>
     </div>
   </Teleport>

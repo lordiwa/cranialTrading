@@ -55,7 +55,7 @@ const handleEscape = (e: KeyboardEvent) => {
     <Transition name="fade">
       <div
           v-if="show"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 px-4"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[4px] px-4"
           @click.self="handleOverlayClick"
           @keydown="handleEscape"
       >
@@ -65,12 +65,12 @@ const handleEscape = (e: KeyboardEvent) => {
             aria-modal="true"
             :aria-labelledby="title ? titleId : undefined"
             :aria-label="!title && ariaLabel ? ariaLabel : undefined"
-            :class="['relative bg-primary border border-silver-50 shadow-strong w-full p-lg transition-normal max-h-[90vh] overflow-y-auto rounded-lg', maxWidth]"
+            :class="['relative bg-primary border border-line-strong shadow-strong w-full p-lg transition-normal max-h-[90vh] overflow-y-auto rounded-xl', maxWidth]"
         >
           <button
               @click="closeModal"
               :aria-label="t('common.actions.close')"
-              class="absolute top-3 right-3 md:top-4 md:right-4 bg-neon text-primary hover:brightness-110 transition-fast p-1.5 rounded"
+              class="absolute top-3 right-3 md:top-4 md:right-4 min-w-[44px] min-h-[44px] flex items-center justify-center text-silver-50 hover:text-silver hover:bg-surface-2 rounded-md transition-all duration-200 ease-v2 focus-visible:outline-none focus-visible:shadow-glow-neon"
           >
             <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -78,7 +78,7 @@ const handleEscape = (e: KeyboardEvent) => {
           </button>
 
           <h2 v-if="title" :id="titleId" class="text-h3 md:text-h2 font-bold text-silver mb-3 md:mb-4 pr-8">{{ title }}</h2>
-          <div class="border-t border-silver-20 my-3 md:my-4" v-if="title"></div>
+          <div class="border-t border-line my-3 md:my-4" v-if="title"></div>
 
           <slot />
         </div>

@@ -194,13 +194,18 @@
         @apply border-silver-50 text-silver-50 cursor-not-allowed;
     }
 
+    /* v2 convergence (design→app): recipe is the prototype's `.input`
+       (cranial-design/prototype/_shell-reference.html:101-105) — surface-1 fill,
+       hairline `line` border, rounded-md, and a focus state that adds the neon glow
+       instead of swapping to a 2px border. The old border-2 focus changed the box
+       model on focus, which nudged every field by 1px as you tabbed through a form. */
     .input-base {
-        @apply w-full bg-primary border border-silver-10 px-3 py-2 h-[40px] text-small md:text-body text-silver placeholder:text-neon/40 font-sans rounded;
-        transition: border-color, box-shadow 150ms ease-out;
+        @apply w-full bg-surface-1 border border-line px-3 py-2 h-[44px] text-small md:text-body text-silver placeholder:text-silver-30 font-sans rounded-md;
+        transition: all 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
     }
 
     .input-base:focus {
-        @apply border-2 border-neon;
+        @apply border-neon shadow-glow-neon outline-none;
     }
 
     .input-base:disabled {
@@ -208,7 +213,7 @@
     }
 
     .input-base.error {
-        @apply border-2 border-rust;
+        @apply border-rust;
     }
 
     .card-base {

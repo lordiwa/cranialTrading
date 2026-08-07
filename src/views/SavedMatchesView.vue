@@ -41,6 +41,7 @@ import {
   sumPotentialValue,
 } from '../utils/matchChipFilter'
 import { getTotalUserCount } from '../services/stats'
+import { logSanitizedError } from '../utils/logSanitizedError'
 import type { CardCondition, CardStatus } from '../types/card'
 
 const route = useRoute()
@@ -74,6 +75,15 @@ const syncing = ref(false)
 const calculatedMatches = ref<SimpleMatch[]>([])
 const progressCurrent = ref(0)
 const progressTotal = ref(0)
+/**
+ * Recalculo en segundo plano (perf, reporte 2026-08-07).
+ *
+ * Antes el recalculo completo corria DENTRO del `loading` de initView, asi que el
+ * landing autenticado no mostraba nada hasta terminarlo — aunque los matches ya
+ * estaban persistidos en Firestore y listos para pintar. Ahora `loading` cubre solo
+ * la carga de lo persistido y este flag gatea el panel de progreso del refresco.
+ */
+const recalculating = ref(false)
 const totalUsers = ref(0)
 // SCRUM-71.1: discardedMatchIds = personas BLOQUEADas (filtran todos sus matches).
 // discardedMatchKeys = matches descartados individualmente (suprimen SOLO ese match).
@@ -768,7 +778,25 @@ const initView = async () => {
       preferencesStore.loadPreferences(),
       buyRequestsStore.loadBuyRequests(), // SCRUM-70.2
     ])
+  } finally {
+    // Los matches YA persistidos estan en el store: pintar ahora. Todo lo que sigue
+    // enriquece o refresca lo que ya se ve, asi que no debe gatear el render — antes
+    // el recalculo completo corria aca dentro y dejaba la pantalla vacia durante
+    // toda la fase mas cara del landing.
+    loading.value = false
+  }
 
+  void refreshInBackground()
+}
+
+/**
+ * Enriquecido + recalculo posteriores al primer render. Nunca gatean `loading`.
+ * Se traga sus errores a proposito: es un refresco de algo que el usuario ya esta
+ * viendo, y como es fire-and-forget una excepcion aqui seria un unhandled rejection.
+ */
+const refreshInBackground = async () => {
+  try {
+    // Solo decora filas ya renderizadas con el email del otro usuario.
     await loadSavedMatchesWithEmails()
 
     // Contar usuarios totales
@@ -776,10 +804,15 @@ const initView = async () => {
 
     // Calcular matches si tiene cartas o preferencias
     if (collectionStore.cards.length > 0 || preferencesStore.preferences.length > 0) {
-      await calculateMatches()
+      recalculating.value = true
+      try {
+        await calculateMatches()
+      } finally {
+        recalculating.value = false
+      }
     }
-  } finally {
-    loading.value = false
+  } catch (error) {
+    logSanitizedError('[SavedMatchesView] background refresh failed', error)
   }
 }
 
@@ -882,7 +915,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Progress bar -->
-      <div v-if="loading && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6 rounded-none">
+      <div v-if="recalculating && progressTotal > 0" class="bg-primary border border-neon p-4 mb-6 rounded-none">
         <div class="flex items-center justify-between mb-2">
           <p class="text-small text-neon font-bold">{{ t('dashboard.calculatingMatches.title') }}</p>
           <p class="text-tiny text-silver-70">{{ progressCurrent }} / {{ progressTotal }}</p>

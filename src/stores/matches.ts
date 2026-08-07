@@ -263,9 +263,33 @@ export const useMatchesStore = defineStore('matches', () => {
     };
 
     /**
+     * Promesa en vuelo compartida (perf, reporte 2026-08-07).
+     *
+     * En el landing autenticado esto se llamaba 2-3 veces a la vez: initView de
+     * SavedMatchesView, el MatchNotificationsDropdown del header al montarse, y la
+     * recarga posterior al recalculo. Cada llamante concurrente pagaba las lecturas
+     * completas por su cuenta (medido: 18 getDocs para 3 llamantes contra 6 para
+     * uno). Mientras haya una carga en curso, todos comparten su promesa; una vez
+     * que se resuelve el memo se limpia, asi que un llamante posterior si relee.
+     */
+    let _loadAllInFlight: Promise<void> | null = null;
+
+    /**
      * Carga matches de las 3 colecciones y limpia expirados
      */
-    const loadAllMatches = async () => {
+    const loadAllMatches = (): Promise<void> => {
+        if (!authStore.user) return Promise.resolve();
+        if (_loadAllInFlight) return _loadAllInFlight;
+
+        // Se limpia SIEMPRE al terminar, exito o error — un memo pegado dejaria al
+        // usuario sin matches hasta recargar la pagina entera.
+        _loadAllInFlight = _loadAllMatches().finally(() => {
+            _loadAllInFlight = null;
+        });
+        return _loadAllInFlight;
+    };
+
+    const _loadAllMatches = async () => {
         if (!authStore.user) return;
 
         loading.value = true;

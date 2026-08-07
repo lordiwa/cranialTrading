@@ -54,7 +54,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { batchSyncCardsToPublic, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 
 beforeEach(() => {
   setDocMock.mockClear()
@@ -470,5 +470,83 @@ describe('searchUserPublicCards', () => {
 
     expect(page.cards).toEqual([])
     expect(getDocsMock).not.toHaveBeenCalled()
+  })
+})
+
+// ─── perf: bounded-concurrency chunk fanout (bug report 2026-08-07) ──────────
+//
+// findCardsMatchingPreferences and findPreferencesMatchingCards each split the
+// card-name list into 30-name Firestore 'in' chunks and awaited them ONE AT A
+// TIME. On a 59k collection that is thousands of serial round-trips on the
+// post-login landing. These two helpers make the fanout concurrent while keeping
+// a cap, so Firestore is not hit with unbounded parallelism.
+
+describe('chunkList', () => {
+  it('splits into chunks of the given size', () => {
+    expect(chunkList([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])
+  })
+
+  it('returns one chunk when the list is shorter than the size', () => {
+    expect(chunkList([1, 2], 30)).toEqual([[1, 2]])
+  })
+
+  it('returns no chunks for an empty list', () => {
+    expect(chunkList([], 30)).toEqual([])
+  })
+
+  it('does not drop the remainder on an exact multiple', () => {
+    expect(chunkList([1, 2, 3, 4], 2)).toEqual([[1, 2], [3, 4]])
+  })
+})
+
+describe('mapWithConcurrency', () => {
+  it('preserves input order in the results regardless of completion order', async () => {
+    const delays = [30, 0, 20, 10]
+    const out = await mapWithConcurrency(delays, 4, async (ms, i) => {
+      await new Promise(r => setTimeout(r, ms))
+      return i
+    })
+    expect(out).toEqual([0, 1, 2, 3])
+  })
+
+  it('never runs more than `limit` tasks at once', async () => {
+    let inFlight = 0
+    let peak = 0
+    await mapWithConcurrency(Array.from({ length: 20 }, (_, i) => i), 3, async () => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise(r => setTimeout(r, 1))
+      inFlight--
+      return null
+    })
+    expect(peak).toBeLessThanOrEqual(3)
+  })
+
+  it('actually runs concurrently — 4 tasks at limit 4 are not serialised', async () => {
+    let peak = 0
+    let inFlight = 0
+    await mapWithConcurrency([1, 2, 3, 4], 4, async () => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise(r => setTimeout(r, 5))
+      inFlight--
+      return null
+    })
+    expect(peak).toBe(4)
+  })
+
+  it('returns an empty array for no items without invoking the worker', async () => {
+    const worker = vi.fn()
+    expect(await mapWithConcurrency([], 4, worker)).toEqual([])
+    expect(worker).not.toHaveBeenCalled()
+  })
+
+  it('rejects if any task rejects', async () => {
+    await expect(
+      mapWithConcurrency([1, 2, 3], 2, async (n) => {
+        if (n === 2) throw new Error('boom')
+        return n
+      }),
+    ).rejects.toThrow('boom')
   })
 })

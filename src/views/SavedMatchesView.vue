@@ -435,16 +435,18 @@ const calculateMatches = async () => {
     }))
     const foundMatches: SimpleMatch[] = []
 
-    // PASO 1: Buscar cartas que coincidan con mi wishlist (lo que BUSCO)
+    // PASO 1 y 2: las dos busquedas son independientes entre si (una lee
+    // public_cards, la otra public_preferences, y ninguna consume el resultado de
+    // la otra), asi que van en paralelo. Encadenarlas duplicaba la fase de red.
     progressTotal.value = 2
     progressCurrent.value = 1
 
-    const matchingCards = await findCardsMatchingPreferences(myWishlist, authStore.user.id)
+    const [matchingCards, matchingPrefs] = await Promise.all([
+      findCardsMatchingPreferences(myWishlist, authStore.user.id),
+      findPreferencesMatchingCards(myCards, authStore.user.id),
+    ])
 
-    // PASO 2: Buscar preferencias que coincidan con mis cartas (VENDO)
     progressCurrent.value = 2
-
-    const matchingPrefs = await findPreferencesMatchingCards(myCards, authStore.user.id)
 
     // Agrupar por usuario
     const userMatches = groupMatchesByUser(matchingCards, matchingPrefs)

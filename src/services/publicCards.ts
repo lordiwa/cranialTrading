@@ -29,6 +29,57 @@ import {
 import { db } from './firebase'
 import type { Card } from '../types/card'
 
+/** Firestore caps an 'in' filter at 30 values. */
+const FIRESTORE_IN_LIMIT = 30
+
+/**
+ * How many chunk queries may be in flight at once.
+ *
+ * The match finders used to await their chunks ONE AT A TIME, so a 59k-card
+ * collection turned into thousands of serial round-trips on the post-login
+ * landing. Unbounded Promise.all is not the answer either — Firestore multiplexes
+ * over a limited number of connections and a few thousand simultaneous getDocs
+ * just queues with extra memory. 8 is the usual sweet spot.
+ */
+const MAX_CONCURRENT_CHUNK_QUERIES = 8
+
+/** Split a list into fixed-size chunks. Pure — exported for unit testing. */
+export function chunkList<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+}
+
+/**
+ * Map over items with at most `limit` workers running concurrently, preserving
+ * input order in the result. Rejects as soon as any task rejects.
+ *
+ * Pure (given a pure worker) — exported for unit testing.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    // Each runner pulls the next index until the queue drains, so a slow task
+    // never blocks the others behind a fixed partition.
+    for (let i = next++; i < items.length; i = next++) {
+      // The loop condition already bounds i, so the indexed access is defined —
+      // the cast only satisfies noUncheckedIndexedAccess.
+      results[i] = await worker(items[i] as T, i)
+    }
+  })
+
+  await Promise.all(runners)
+  return results
+}
+
 export interface PublicCard {
   docId: string // Firestore document ID
   cardId: string // matches the user's card document ID
@@ -388,30 +439,29 @@ export async function findCardsMatchingPreferences(
     return []
   }
 
-  // Firestore 'in' query limited to 30 items, so chunk if needed
-  const chunks: string[][] = []
-  for (let i = 0; i < cardNames.length; i += 30) {
-    chunks.push(cardNames.slice(i, i + 30))
-  }
+  // Firestore 'in' query limited to 30 items, so chunk — and run the chunks
+  // concurrently (bounded): serially awaiting them made this thousands of
+  // sequential round-trips on a large collection.
+  const chunks = chunkList(cardNames, FIRESTORE_IN_LIMIT)
 
-  const results: PublicCard[] = []
-
-  for (const chunk of chunks) {
+  const perChunk = await mapWithConcurrency(chunks, MAX_CONCURRENT_CHUNK_QUERIES, async (chunk) => {
     const q = query(
       collection(db, 'public_cards'),
       where('cardName', 'in', chunk)
     )
     const snapshot = await getDocs(q)
 
+    const found: PublicCard[] = []
     snapshot.forEach(docSnap => {
       const data = docSnap.data() as PublicCard
       if (data.userId !== excludeUserId) {
-        results.push({ ...data, docId: docSnap.id })
+        found.push({ ...data, docId: docSnap.id })
       }
     })
-  }
+    return found
+  })
 
-  return results
+  return perChunk.flat()
 }
 
 /**
@@ -435,30 +485,27 @@ export async function findPreferencesMatchingCards(
 
   if (cardNames.length === 0) return []
 
-  // Firestore 'in' query limited to 30 items, so chunk if needed
-  const chunks: string[][] = []
-  for (let i = 0; i < cardNames.length; i += 30) {
-    chunks.push(cardNames.slice(i, i + 30))
-  }
+  // Parallel sibling of findCardsMatchingPreferences above — same bounded fanout.
+  const chunks = chunkList(cardNames, FIRESTORE_IN_LIMIT)
 
-  const results: PublicPreference[] = []
-
-  for (const chunk of chunks) {
+  const perChunk = await mapWithConcurrency(chunks, MAX_CONCURRENT_CHUNK_QUERIES, async (chunk) => {
     const q = query(
       collection(db, 'public_preferences'),
       where('cardName', 'in', chunk)
     )
     const snapshot = await getDocs(q)
 
+    const found: PublicPreference[] = []
     snapshot.forEach(docSnap => {
       const data = docSnap.data() as PublicPreference
       if (data.userId !== excludeUserId) {
-        results.push({ ...data, docId: docSnap.id })
+        found.push({ ...data, docId: docSnap.id })
       }
     })
-  }
+    return found
+  })
 
-  return results
+  return perChunk.flat()
 }
 
 /**

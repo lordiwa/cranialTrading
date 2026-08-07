@@ -360,3 +360,109 @@ describe('live region announcements', () => {
     expect(gs.ariaLiveMessage.value).toContain('header.search.suggestionsCountSingular')
   })
 })
+
+// ─── describe: erase-then-retype race (bug report 2026-08-07) ────────────────
+//
+// QA repro: type a card name, erase it fast, then type again — the dropdown ends
+// up showing suggestions for the erased text. Cause: clearing cancelled the
+// pending debounce but never invalidated the request already in flight, so its
+// response still passed the `seq !== searchSeq` guard and repopulated state.
+
+describe('erasing invalidates the in-flight request', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('a response in flight when the query is erased never repopulates suggestions', async () => {
+    let resolveFirst!: (names: string[]) => void
+    getCardSuggestionsMock.mockImplementationOnce(
+      () => new Promise<string[]>((res) => { resolveFirst = res }),
+    )
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'sol'
+    gs.handleInput()
+    await vi.advanceTimersByTimeAsync(300) // request for "sol" is now in flight
+
+    // Erase fast — below the 2-char threshold.
+    gs.searchQuery.value = ''
+    gs.handleInput()
+
+    // "sol" finally answers.
+    resolveFirst(['Sol Ring', 'Solemn Simulacrum'])
+    await vi.runAllTimersAsync()
+
+    expect(gs.suggestions.value).toEqual([])
+  })
+
+  it('the erased query cannot overwrite the results of what was typed next', async () => {
+    let resolveFirst!: (names: string[]) => void
+    getCardSuggestionsMock
+      .mockImplementationOnce(() => new Promise<string[]>((res) => { resolveFirst = res }))
+      .mockResolvedValueOnce(['Bolt of Keranos'])
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'sol'
+    gs.handleInput()
+    await vi.advanceTimersByTimeAsync(300)
+
+    gs.searchQuery.value = ''
+    gs.handleInput()
+
+    gs.searchQuery.value = 'bolt'
+    gs.handleInput()
+    await vi.advanceTimersByTimeAsync(300)
+    expect(gs.suggestions.value).toEqual(['Bolt of Keranos'])
+
+    // The stale "sol" response lands last — it must lose.
+    resolveFirst(['Sol Ring'])
+    await vi.runAllTimersAsync()
+
+    expect(gs.suggestions.value).toEqual(['Bolt of Keranos'])
+  })
+
+  it('does not leave a "loading" dropdown hanging over an emptied input', async () => {
+    getCardSuggestionsMock.mockImplementationOnce(() => new Promise<string[]>(() => { /* never resolves */ }))
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'sol'
+    gs.handleInput()
+    await vi.advanceTimersByTimeAsync(300)
+    expect(gs.loading.value).toBe(true)
+
+    gs.searchQuery.value = ''
+    gs.handleInput()
+
+    expect(gs.loading.value).toBe(false)
+    expect(gs.isExpanded.value).toBe(false)
+  })
+
+  it('clearSearch invalidates an in-flight request too', async () => {
+    let resolveFirst!: (names: string[]) => void
+    getCardSuggestionsMock.mockImplementationOnce(
+      () => new Promise<string[]>((res) => { resolveFirst = res }),
+    )
+
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'sol'
+    gs.handleInput()
+    await vi.advanceTimersByTimeAsync(300)
+
+    gs.clearSearch()
+    resolveFirst(['Sol Ring'])
+    await vi.runAllTimersAsync()
+
+    expect(gs.suggestions.value).toEqual([])
+    expect(gs.loading.value).toBe(false)
+  })
+
+  it('clearing cancels a debounce that has not fired yet', async () => {
+    const gs = useGlobalSearch()
+    gs.searchQuery.value = 'sol'
+    gs.handleInput()
+
+    gs.clearSearch()
+    await vi.runAllTimersAsync()
+
+    expect(getCardSuggestionsMock).not.toHaveBeenCalled()
+  })
+})

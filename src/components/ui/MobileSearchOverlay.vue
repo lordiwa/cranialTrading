@@ -36,12 +36,16 @@ const inputRef = ref<HTMLInputElement | null>(null)
 
 // Auto-focus input when overlay opens (setTimeout for iOS compatibility — D-18 unchanged)
 watch(() => props.open, (isOpen) => {
+  // Clear on BOTH transitions, not just on close. Closing already cleared, but a
+  // response still in flight could refill the state afterwards, and re-opening never
+  // cleared again — so the next open showed the previous session's suggestions.
+  // (clearSearch now also invalidates the in-flight request; this keeps the overlay
+  // correct even if that response lands between close and re-open.)
+  clearSearch()
   if (isOpen) {
     void nextTick(() => {
       setTimeout(() => inputRef.value?.focus(), 100)
     })
-  } else {
-    clearSearch()
   }
 })
 

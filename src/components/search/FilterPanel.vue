@@ -134,10 +134,35 @@ watch(
   { deep: true }
 )
 
+/**
+ * Generation token for the autocomplete request (bug report 2026-08-07).
+ * Cancelling suggestionTimeout only helps while the request has not been SENT.
+ * Once it is in flight, erasing or retyping left it current, so an out-of-order
+ * response for an older prefix won permanently. Same pattern as stores/search.ts
+ * (TASK-108) and useSearchSuggestions.
+ */
+let suggestionReqId = 0
+
+/**
+ * Single cancellation path for every "the name field is being emptied" case —
+ * the X button, the CLEAR pill, and anything else that blanks filters.name.
+ * Blanking the field inline (as both used to) left the armed debounce and the
+ * in-flight request alive, so a stale dropdown reopened over an empty input.
+ */
+const handleClearName = () => {
+  clearTimeout(suggestionTimeout)
+  suggestionReqId++
+  suppressSuggestions.value = true
+  filters.name = ''
+  suggestions.value = []
+  showSuggestions.value = false
+}
+
 const handleNameInput = (value: string) => {
   filters.name = value
   suppressSuggestions.value = false
   clearTimeout(suggestionTimeout)
+  const reqId = ++suggestionReqId
   if (value.length < 2) {
     suggestions.value = []
     showSuggestions.value = false
@@ -147,9 +172,11 @@ const handleNameInput = (value: string) => {
     void (async () => {
       try {
         const results = await getCardSuggestions(value)
+        if (reqId !== suggestionReqId) return // superseded — query changed or was cleared
         suggestions.value = results.slice(0, 8)
         showSuggestions.value = !suppressSuggestions.value && suggestions.value.length > 0
       } catch (err) {
+        if (reqId !== suggestionReqId) return
         console.error('Error obteniendo sugerencias:', err)
         suggestions.value = []
       }
@@ -159,6 +186,8 @@ const handleNameInput = (value: string) => {
 
 const selectSuggestion = (suggestion: string) => {
   filters.name = suggestion
+  clearTimeout(suggestionTimeout)
+  suggestionReqId++
   suppressSuggestions.value = true
   showSuggestions.value = false
   suggestions.value = []
@@ -266,7 +295,9 @@ const handleSearch = async () => {
 }
 
 const handleClear = () => {
-  filters.name = ''
+  // Parallel sibling of the X button — same cancellation path, or the CLEAR pill
+  // resurrects a stale suggestion dropdown the same way.
+  handleClearName()
   handleAdvancedReset()
   filters.onlyReleased = true
   if (props.autoSearch) {
@@ -354,7 +385,7 @@ const pillClasses = 'inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-ful
           />
           <button
               v-if="filters.name && filters.name.length > 0"
-              @click="filters.name = ''; showSuggestions = false; suggestions = []"
+              @click="handleClearName"
               :aria-label="t('common.actions.clear')"
               class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-silver-30 hover:text-silver transition-colors duration-200 ease-v2 rounded-full hover:bg-surface-2"
               type="button"

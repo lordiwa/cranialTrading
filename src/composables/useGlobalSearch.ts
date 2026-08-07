@@ -56,6 +56,18 @@ export function useGlobalSearch() {
   }
 
   const clearResults = () => {
+    // Invalidate whatever is in flight. Erasing the query used to only cancel the
+    // pending debounce; a request already sent kept its seq current, so its response
+    // sailed through the guard in performSearch and repopulated the dropdown with
+    // suggestions for text the input no longer held (QA repro: erase fast, retype).
+    searchSeq++
+    if (searchTimeout) {
+      clearTimeout(searchTimeout)
+      searchTimeout = null
+    }
+    // Safe to force off now that the bump above guarantees the in-flight response
+    // can no longer re-enter the finally block that would flip it back to true.
+    loading.value = false
     suggestions.value = []
     resetHighlight()
   }
@@ -65,6 +77,8 @@ export function useGlobalSearch() {
 
     if (searchQuery.value.length < 2) {
       clearResults()
+      // An emptied box must close its popup, not leave a stale panel floating.
+      isOpen.value = false
       return
     }
 

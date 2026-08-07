@@ -173,6 +173,14 @@ export const useSearchStore = defineStore('search', () => {
      * Limpiar resultados y filtros
      */
     const clearSearch = () => {
+        // Invalidate whatever is in flight. Without this a request started before the
+        // clear kept its reqId current, so it sailed through the guard and repopulated
+        // results for a query the user had already erased — and because lastFilters was
+        // left null, setSort() had nothing to replay and the sort control silently died.
+        lastReqId++
+        // The superseded request's own finally sees a stale reqId and skips this, so
+        // clearing has to do it — same reasoning as the cache-hit branch above.
+        loading.value = false
         results.value = []
         lastQuery.value = ''
         lastFilters.value = null

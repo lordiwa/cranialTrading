@@ -2514,6 +2514,10 @@
         "title": "Mercado",
         "description": "Explora cartas en venta e intercambio de otros jugadores."
       },
+      "home": {
+        "title": "Inicio",
+        "description": "Buscá en el mercado y entrá a tu colección, matches y wishlist."
+      },
       "savedMatches": {
         "title": "Mis Matches",
         "description": "Revisa tus matches de intercambio y conecta con otros jugadores."

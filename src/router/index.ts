@@ -26,7 +26,7 @@ const router = createRouter({
             path: '/inicio',
             name: 'home',
             component: () => import('../views/HomeView.vue'),
-            meta: { requiresAuth: true, title: 'seo.pages.savedMatches.title', description: 'seo.pages.savedMatches.description', robots: 'noindex, nofollow' },
+            meta: { requiresAuth: true, title: 'seo.pages.home.title', description: 'seo.pages.home.description', robots: 'noindex, nofollow' },
         },
         {
             path: '/dashboard',

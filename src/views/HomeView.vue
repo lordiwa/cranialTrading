@@ -17,6 +17,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from '../composables/useI18n';
+import AppContainer from '../components/layout/AppContainer.vue';
 import IconV2 from '../components/ui/IconV2.vue';
 
 const { t } = useI18n();
@@ -47,7 +48,10 @@ const searchTerm = (term: string) => {
 </script>
 
 <template>
-  <main id="main-content" class="min-h-[70vh] flex flex-col items-center justify-center px-4 py-12">
+  <!-- AppContainer owns the shell (header, nav, tab bar) AND the single
+       <main id="main-content"> landmark — this view must not declare its own. -->
+  <AppContainer>
+    <div class="min-h-[60vh] flex flex-col items-center justify-center">
     <div class="w-full max-w-[640px] text-center">
       <h1 class="text-h2 md:text-h1 font-display font-bold text-silver">{{ t('home.title') }}</h1>
       <p class="mt-3 text-small md:text-body text-silver-50">{{ t('home.subtitle') }}</p>
@@ -105,5 +109,6 @@ const searchTerm = (term: string) => {
         </div>
       </div>
     </div>
-  </main>
+    </div>
+  </AppContainer>
 </template>

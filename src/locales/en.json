@@ -2514,6 +2514,10 @@
         "title": "Market",
         "description": "Browse cards for sale and trade from other players."
       },
+      "home": {
+        "title": "Home",
+        "description": "Search the marketplace and jump into your collection, matches and wishlist."
+      },
       "savedMatches": {
         "title": "My Matches",
         "description": "Review your trade matches and connect with other players."

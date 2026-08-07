@@ -1528,6 +1528,10 @@ export const useCollectionStore = defineStore('collection', () => {
         _lastQuerySort = sort ?? _defaultSort
 
         paginationMeta.value.loading = true
+        // A loadNextPage left in flight now belongs to a superseded generation and
+        // will skip its own finally, so clear its spinner here — otherwise the
+        // orphaned "loading more" state sticks until the next successful append.
+        paginationMeta.value.loadingMore = false
 
         try {
             const { queryCardIndex } = await import('../services/cloudFunctions')
@@ -1568,6 +1572,12 @@ export const useCollectionStore = defineStore('collection', () => {
         if (!paginationMeta.value.hasMore) return
         if (!authStore.user) return
 
+        // Same generation guard queryPage uses. Without it, a page still in flight
+        // when the user changed the search appended the PREVIOUS filter's cards onto
+        // the new result set and overwrote page/total/hasMore with the old query's
+        // values — the "search stops working correctly" half of the 2026-08-07 report.
+        const generation = _queryGeneration
+
         paginationMeta.value.loadingMore = true
 
         try {
@@ -1581,6 +1591,10 @@ export const useCollectionStore = defineStore('collection', () => {
                 pageSize: paginationMeta.value.pageSize,
             })
 
+            // Discard stale response — a queryPage call replaced the result set while
+            // we were waiting, so this page belongs to filters nobody is looking at.
+            if (generation !== _queryGeneration) return
+
             // Append new cards to existing array
             const newCards = response.cards.map(rec => indexToCard(rec as unknown as IndexCard))
             paginatedCards.value = [...paginatedCards.value, ...newCards]
@@ -1590,9 +1604,14 @@ export const useCollectionStore = defineStore('collection', () => {
             paginationMeta.value.pageSize = response.pageSize
             paginationMeta.value.hasMore = response.hasMore
         } catch (error) {
+            if (generation !== _queryGeneration) return
             logSanitizedError('[loadNextPage] Error loading next page', error)
         } finally {
-            paginationMeta.value.loadingMore = false
+            // Only the current generation owns the flag — a superseded page must not
+            // clear a spinner that now belongs to a newer request.
+            if (generation === _queryGeneration) {
+                paginationMeta.value.loadingMore = false
+            }
         }
     }
 

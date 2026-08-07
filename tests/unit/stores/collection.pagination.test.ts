@@ -500,6 +500,81 @@ describe('collection store: pagination', () => {
       expect(store.paginatedCards[0].id).toBe('new-card')
     })
 
+    // Regression (bug report 2026-08-07): loadNextPage had no generation guard, so
+    // an infinite-scroll page still in flight when the user changed the search
+    // appended the PREVIOUS filter's cards onto the new result set and overwrote
+    // page/total/hasMore with the old query's values.
+    it('discards an in-flight loadNextPage when a newer queryPage supersedes it', async () => {
+      const store = useCollectionStore()
+
+      // Seed page 0 with hasMore so loadNextPage is allowed to run.
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'old-1', n: 'Old One' })], { total: 100, hasMore: true })
+      )
+      await store.queryPage({ search: 'old' }, undefined, 0)
+      expect(store.paginationMeta.hasMore).toBe(true)
+
+      // Infinite scroll fires and stays in flight.
+      let resolveNextPage: (value: QueryCardIndexResponse) => void
+      const nextPagePromise = new Promise<QueryCardIndexResponse>((resolve) => {
+        resolveNextPage = resolve
+      })
+      mockQueryCardIndex.mockReturnValueOnce(nextPagePromise)
+      const nextPageCall = store.loadNextPage()
+      await new Promise(r => setTimeout(r, 0))
+
+      // Meanwhile the user types a new search — a fresh queryPage lands first.
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'new-1', n: 'New One' })], { total: 1, hasMore: false })
+      )
+      await store.queryPage({ search: 'new' }, undefined, 0)
+      expect(store.paginatedCards.map(c => c.id)).toEqual(['new-1'])
+
+      // The superseded page-2 response arrives last.
+      resolveNextPage!(makeCfResponse(
+        [makeIndexCardRecord({ i: 'old-2', n: 'Old Two' })],
+        { total: 100, hasMore: true, page: 1 }
+      ))
+      await nextPageCall
+
+      // It must NOT be appended onto the new search's results...
+      expect(store.paginatedCards.map(c => c.id)).toEqual(['new-1'])
+      // ...nor resurrect the old query's pagination metadata.
+      expect(store.paginationMeta.total).toBe(1)
+      expect(store.paginationMeta.hasMore).toBe(false)
+      expect(store.paginationMeta.page).toBe(0)
+    })
+
+    it('does not leave loadingMore stuck after a superseded page is discarded', async () => {
+      const store = useCollectionStore()
+
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'a-1' })], { total: 100, hasMore: true })
+      )
+      await store.queryPage({ search: 'a' }, undefined, 0)
+
+      let resolveNextPage: (value: QueryCardIndexResponse) => void
+      const nextPagePromise = new Promise<QueryCardIndexResponse>((resolve) => {
+        resolveNextPage = resolve
+      })
+      mockQueryCardIndex.mockReturnValueOnce(nextPagePromise)
+      const nextPageCall = store.loadNextPage()
+      await new Promise(r => setTimeout(r, 0))
+      expect(store.paginationMeta.loadingMore).toBe(true)
+
+      mockQueryCardIndex.mockResolvedValueOnce(
+        makeCfResponse([makeIndexCardRecord({ i: 'b-1' })], { total: 1, hasMore: false })
+      )
+      await store.queryPage({ search: 'b' }, undefined, 0)
+
+      // The new query owns the view now — the orphaned spinner must be gone.
+      expect(store.paginationMeta.loadingMore).toBe(false)
+
+      resolveNextPage!(makeCfResponse([makeIndexCardRecord({ i: 'a-2' })], { total: 100, hasMore: true }))
+      await nextPageCall
+      expect(store.paginationMeta.loadingMore).toBe(false)
+    })
+
     it('applies response when no newer call was made (non-stale)', async () => {
       const store = useCollectionStore()
 

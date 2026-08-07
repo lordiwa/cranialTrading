@@ -561,6 +561,13 @@ export function useCardFilter<T extends FilterableCard>(
   return {
     // State
     filterQuery,
+    /**
+     * `filterQuery` after the 200ms debounce (cleared instantly on empty).
+     * Exposed so callers that run their own filtering pipeline over the card list
+     * — e.g. CollectionView's wishlist — react at the same rate `filteredCards`
+     * does, instead of re-scanning the whole collection on every keystroke.
+     */
+    debouncedFilterQuery: _debouncedQuery,
     sortBy,
     groupBy,
     selectedColors,

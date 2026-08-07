@@ -98,9 +98,11 @@ const statusCounts = computed(() => {
 const wishlistCards = computed(() => {
   let cards = collectionCards.value.filter(c => c.status === 'wishlist')
 
-  // Aplicar filtro de búsqueda (mismo que filteredCards)
-  if (filterQuery.value.trim()) {
-    const q = filterQuery.value.toLowerCase()
+  // Aplicar filtro de búsqueda (mismo que filteredCards — usa la query YA
+  // debounceada, igual que filteredCards: con la cruda, cada tecla de un borrado
+  // sostenido re-escaneaba y re-ordenaba la colección entera en el main thread)
+  if (debouncedFilterQuery.value.trim()) {
+    const q = debouncedFilterQuery.value.toLowerCase()
     cards = cards.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.edition.toLowerCase().includes(q)
@@ -214,6 +216,7 @@ const statusFilteredCards = computed(() => {
 // Shared filter composable (text search, sort, group, chip filters)
 const {
   filterQuery,
+  debouncedFilterQuery,
   sortBy,
   groupBy: collectionGroupBy,
   selectedColors,

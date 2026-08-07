@@ -325,3 +325,126 @@ describe('priceMatchingHelper', () => {
     })
   })
 })
+
+// ─── perf regression (bug report 2026-08-07: "the site is dead slow") ────────
+//
+// This helper runs once per CANDIDATE USER on the post-login landing, against the
+// full collection (59k cards on a real account). Two costs were found:
+//   1. a console.info block that filtered+mapped BOTH full collections four times
+//      per call, unstripped in production;
+//   2. a nested find/filter inside a loop over the collection, making the work
+//      O(myCards x theirPreferences) + O(myPreferences x theirCards).
+
+describe('perf: no debug logging in the hot path', () => {
+  it('calculateBidirectionalMatch does not write to console.info', () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const store = usePriceMatchingStore()
+
+    store.calculateBidirectionalMatch(
+      [makeCard({ id: 'm1', name: 'Sol Ring', status: 'trade', quantity: 1, price: 5 })],
+      [makePreference({ name: 'Black Lotus', type: 'BUSCO', quantity: 1 })],
+      [makeCard({ id: 't1', name: 'Black Lotus', status: 'trade', quantity: 1, price: 500 })],
+      [makePreference({ name: 'Sol Ring', type: 'BUSCO', quantity: 1 })],
+    )
+
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('perf: matching is indexed, not quadratic', () => {
+  // Generous bound: a correct indexed implementation runs this in a few ms. The
+  // quadratic version does ~30k x 300 = 9M case-insensitive comparisons per call,
+  // each allocating two lowercased strings, and blows far past this.
+  const BUDGET_MS = 1500
+
+  function bigCollection(n: number, prefix: string) {
+    return Array.from({ length: n }, (_, i) =>
+      makeCard({ id: `${prefix}-${i}`, name: `${prefix} Card ${i}`, status: 'trade', quantity: 1, price: 1 }))
+  }
+
+  function manyPrefs(n: number, prefix: string) {
+    return Array.from({ length: n }, (_, i) =>
+      makePreference({ name: `${prefix} Card ${i}`, type: 'BUSCO', quantity: 1 }))
+  }
+
+  it('calculateBidirectionalMatch handles 30k cards x 300 preferences within budget', () => {
+    const store = usePriceMatchingStore()
+    const myCards = bigCollection(30_000, 'Mine')
+    const theirCards = bigCollection(30_000, 'Theirs')
+    const myPrefs = manyPrefs(300, 'Theirs')
+    const theirPrefs = manyPrefs(300, 'Mine')
+
+    const started = performance.now()
+    const result = store.calculateBidirectionalMatch(myCards, myPrefs, theirCards, theirPrefs)
+    const elapsed = performance.now() - started
+
+    expect(result).not.toBeNull()
+    expect(result!.myCardsInfo).toHaveLength(300)
+    expect(result!.theirCardsInfo).toHaveLength(300)
+    expect(elapsed).toBeLessThan(BUDGET_MS)
+  })
+
+  it('calculateUnidirectionalMatch handles 30k cards x 300 preferences within budget', () => {
+    const store = usePriceMatchingStore()
+    const myCards = bigCollection(30_000, 'Mine')
+    const theirCards = bigCollection(30_000, 'Theirs')
+    const myPrefs = manyPrefs(300, 'Theirs')
+    const theirPrefs = manyPrefs(300, 'Mine')
+
+    const started = performance.now()
+    const result = store.calculateUnidirectionalMatch(myCards, myPrefs, theirCards, theirPrefs)
+    const elapsed = performance.now() - started
+
+    expect(result).not.toBeNull()
+    expect(elapsed).toBeLessThan(BUDGET_MS)
+  })
+})
+
+describe('indexing must preserve the existing matching semantics', () => {
+  it('uses the FIRST matching BUSCO preference when several share a name', () => {
+    const store = usePriceMatchingStore()
+    const result = store.calculateBidirectionalMatch(
+      [makeCard({ id: 'm1', name: 'Sol Ring', status: 'trade', quantity: 9, price: 5 })],
+      [makePreference({ name: 'Black Lotus', type: 'BUSCO', quantity: 1 })],
+      [makeCard({ id: 't1', name: 'Black Lotus', status: 'trade', quantity: 1, price: 500 })],
+      [
+        makePreference({ name: 'Sol Ring', type: 'BUSCO', quantity: 2 }),
+        makePreference({ name: 'Sol Ring', type: 'BUSCO', quantity: 7 }),
+      ],
+    )
+    // The first pref (qty 2) wins, not the second and not their sum.
+    expect(result!.myCardsInfo).toHaveLength(1)
+    expect(result!.myCardsInfo[0].quantity).toBe(2)
+  })
+
+  it('ignores a same-named preference whose type is not BUSCO', () => {
+    const store = usePriceMatchingStore()
+    const result = store.calculateBidirectionalMatch(
+      [makeCard({ id: 'm1', name: 'Sol Ring', status: 'trade', quantity: 4, price: 5 })],
+      [makePreference({ name: 'Black Lotus', type: 'BUSCO', quantity: 1 })],
+      [makeCard({ id: 't1', name: 'Black Lotus', status: 'trade', quantity: 1, price: 500 })],
+      [
+        makePreference({ name: 'Sol Ring', type: 'VENDO', quantity: 1 }),
+        makePreference({ name: 'Sol Ring', type: 'BUSCO', quantity: 3 }),
+      ],
+    )
+    // The VENDO entry must not shadow the BUSCO one.
+    expect(result!.myCardsInfo[0].quantity).toBe(3)
+  })
+
+  it('returns every printing they own of a card I want, in collection order', () => {
+    const store = usePriceMatchingStore()
+    const result = store.calculateBidirectionalMatch(
+      [makeCard({ id: 'm1', name: 'Sol Ring', status: 'trade', quantity: 1, price: 5 })],
+      [makePreference({ name: 'Black Lotus', type: 'BUSCO', quantity: 5 })],
+      [
+        makeCard({ id: 't1', name: 'Black Lotus', edition: 'Alpha', status: 'trade', quantity: 1, price: 500 }),
+        makeCard({ id: 't2', name: 'Black Lotus', edition: 'Beta', status: 'wishlist', quantity: 1, price: 400 }),
+        makeCard({ id: 't3', name: 'Black Lotus', edition: 'Unlimited', status: 'sale', quantity: 2, price: 300 }),
+      ],
+      [makePreference({ name: 'Sol Ring', type: 'BUSCO', quantity: 1 })],
+    )
+    // t2 is wishlist and must be excluded; order t1 then t3 must be preserved.
+    expect(result!.theirCardsInfo.map(c => c.id)).toEqual(['t1', 't3'])
+  })
+})

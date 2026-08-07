@@ -18,6 +18,43 @@ interface MatchCalculation {
     matchType: 'bidirectional' | 'unidirectional'
 }
 
+/**
+ * Index the FIRST BUSCO preference per lowercased name.
+ *
+ * Replaces a `theirPreferences.find(...)` performed inside a loop over the whole
+ * collection, which made the pass O(cards x preferences) — ~9M case-insensitive
+ * comparisons per candidate user on a 59k collection, each allocating two
+ * lowercased strings. "First wins" is deliberate: it is the behaviour `find`
+ * already had, and a same-named non-BUSCO entry must not shadow a BUSCO one.
+ */
+function indexFirstBuscoPreferenceByName(preferences: Preference[]): Map<string, Preference> {
+    const byName = new Map<string, Preference>()
+    for (const pref of preferences) {
+        if (pref.type !== 'BUSCO' || !pref.name) continue
+        const key = pref.name.toLowerCase()
+        if (!byName.has(key)) byName.set(key, pref)
+    }
+    return byName
+}
+
+/**
+ * Index offerable cards (anything not wishlist, with stock) by lowercased name,
+ * preserving collection order within each name.
+ *
+ * Replaces a `theirCards.filter(...)` performed inside a loop over preferences.
+ */
+function indexOfferableCardsByName(cards: Card[]): Map<string, Card[]> {
+    const byName = new Map<string, Card[]>()
+    for (const card of cards) {
+        if (!card.name || card.status === 'wishlist' || !(card.quantity > 0)) continue
+        const key = card.name.toLowerCase()
+        const bucket = byName.get(key)
+        if (bucket) bucket.push(card)
+        else byName.set(key, [card])
+    }
+    return byName
+}
+
 export const usePriceMatchingStore = defineStore('priceMatching', () => {
 
     /**
@@ -58,21 +95,15 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
         const myOffering: Card[] = []
         let myValue = 0
 
-        console.info('Bidireccional check:', {
-            myCards: myCards.filter(c => c.status !== 'wishlist').map(c => ({ name: c.name, edition: c.edition })),
-            myPrefs: myPreferences.filter(p => p.type === 'BUSCO').map(p => ({ name: p.name, edition: p.edition })),
-            theirCards: theirCards.filter(c => c.status !== 'wishlist').map(c => ({ name: c.name, edition: c.edition })),
-            theirPrefs: theirPreferences.filter(p => p.type === 'BUSCO').map(p => ({ name: p.name, edition: p.edition })),
-        })
+        // Indexed once per call — see indexFirstBuscoPreferenceByName.
+        const theirBuscoByName = indexFirstBuscoPreferenceByName(theirPreferences)
+        const theirOfferableByName = indexOfferableCardsByName(theirCards)
 
         // Mi oferta: cartas que ELLOS BUSCAN (solo BUSCO)
         for (const myCard of myCards) {
-            if (myCard.status === 'wishlist') continue
+            if (myCard.status === 'wishlist' || !myCard.name) continue
 
-            const matchingPref = theirPreferences.find(p =>
-                p.name?.toLowerCase() === myCard.name?.toLowerCase() &&
-                p.type === 'BUSCO'
-            )
+            const matchingPref = theirBuscoByName.get(myCard.name.toLowerCase())
 
             if (matchingPref) {
                 // Usar la cantidad que ELLOS BUSCAN, limitada a lo que YO TENGO
@@ -84,7 +115,6 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 const adjustedCard = { ...myCard, quantity: matchQty }
                 myOffering.push(adjustedCard)
                 myValue += (myCard.price || 0) * matchQty
-                console.info(`Mi carta "${myCard.name}" x${matchQty} (buscan ${theirWantedQty}, tengo ${myAvailableQty})`)
             }
         }
 
@@ -93,13 +123,9 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
         let theirValue = 0
 
         for (const myPref of myPreferences) {
-            if (myPref.type !== 'BUSCO') continue
+            if (myPref.type !== 'BUSCO' || !myPref.name) continue
 
-            const matching = theirCards.filter(
-                c => c.name?.toLowerCase() === myPref.name?.toLowerCase() &&
-                    c.status !== 'wishlist' &&
-                    c.quantity > 0
-            )
+            const matching = theirOfferableByName.get(myPref.name.toLowerCase()) ?? []
 
             for (const card of matching) {
                 // Usar la cantidad que YO BUSCO, limitada a lo que el otro TIENE
@@ -111,20 +137,11 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 const adjustedCard = { ...card, quantity: matchQty }
                 theirOffering.push(adjustedCard)
                 theirValue += (card.price || 0) * matchQty
-                console.info(`Su carta "${card.name}" x${matchQty} (busco ${wantedQty}, tiene ${availableQty})`)
             }
         }
 
-        console.info('Resultado bidireccional:', {
-            myOffering: myOffering.length,
-            theirOffering: theirOffering.length,
-            myValue,
-            theirValue,
-        })
-
         // BIDIRECCIONAL: ambos lados deben tener cartas
         if (myOffering.length === 0 || theirOffering.length === 0) {
-            console.info('Bidireccional fallido: un lado vacío')
             return null
         }
 
@@ -164,14 +181,15 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
             const myOffering: Card[] = []
             let myValue = 0
 
+            // Indexed once per call — see indexFirstBuscoPreferenceByName.
+            const theirBuscoByName = indexFirstBuscoPreferenceByName(theirPreferences)
+            const theirOfferableByName = indexOfferableCardsByName(theirCards)
+
             // Mi oferta: cartas que ELLOS BUSCAN (solo BUSCO)
             for (const myCard of myCards) {
                 if (myCard.status === 'wishlist' || !myCard.name) continue
 
-                const matchingPref = theirPreferences.find(p =>
-                    p.name?.toLowerCase() === myCard.name?.toLowerCase() &&
-                    p.type === 'BUSCO'
-                )
+                const matchingPref = theirBuscoByName.get(myCard.name.toLowerCase())
 
                 if (matchingPref) {
                     // Usar la cantidad que ELLOS BUSCAN, limitada a lo que YO TENGO
@@ -193,11 +211,7 @@ export const usePriceMatchingStore = defineStore('priceMatching', () => {
                 if (!myPref.name) continue
 
                 // Buscar si él tiene esa carta en colección (cualquier estado excepto wishlist)
-                const matching = theirCards.filter(
-                    c => c.name?.toLowerCase() === myPref.name?.toLowerCase() &&
-                        c.status !== 'wishlist' &&
-                        c.quantity > 0
-                )
+                const matching = theirOfferableByName.get(myPref.name.toLowerCase()) ?? []
 
                 for (const card of matching) {
                     // Usar la cantidad que YO BUSCO, limitada a lo que el otro TIENE

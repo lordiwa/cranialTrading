@@ -3,7 +3,6 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from '../../composables/useI18n'
 import { useGlobalSearch } from '../../composables/useGlobalSearch'
-import SvgIcon from './SvgIcon.vue'
 import IconV2 from './IconV2.vue'
 
 const { t } = useI18n()
@@ -91,12 +90,14 @@ defineExpose({
     <!-- sr-only live region for screen reader announcements (D-12, D-15) -->
     <span aria-live="polite" aria-atomic="true" class="sr-only">{{ ariaLiveMessage }}</span>
 
-    <!-- Search Input (promoted header search — big, square, neon border) -->
-    <div class="flex items-stretch bg-primary border-[1.5px] border-neon/50 focus-within:border-neon transition-colors">
-      <SvgIcon
+    <!-- Search input — v2 pill, same vocabulary as the logged-out LandingHeader
+         (LandingHeader.vue:119) so the search affordance is identical across the
+         whole site instead of the app header keeping the pre-v2 square neon box. -->
+    <div class="flex items-center gap-2 border border-line rounded-full pl-4 pr-1.5 py-1.5 bg-surface-1 focus-within:border-neon focus-within:shadow-glow-neon transition-all duration-200 ease-v2">
+      <IconV2
         name="search"
-        size="small"
-        class="self-center ml-3 mr-1 text-neon pointer-events-none flex-shrink-0"
+        :size="18"
+        class="text-silver-30 pointer-events-none flex-shrink-0"
       />
       <input
         ref="inputRef"
@@ -110,7 +111,7 @@ defineExpose({
         :aria-activedescendant="activeDescendantId ?? undefined"
         :aria-label="t('header.search.placeholder')"
         :placeholder="t('header.search.placeholder')"
-        class="flex-1 min-w-0 bg-transparent border-none px-2 py-2.5 text-body text-silver placeholder-silver-50 focus:outline-none"
+        class="flex-1 min-w-0 bg-transparent border-none py-1 text-body text-silver placeholder-silver-30 outline-none focus:outline-none"
         @input="handleInput"
         @focus="searchQuery.length >= 2 && (isOpen = true)"
         @keydown="handleInputKeydown"
@@ -119,7 +120,7 @@ defineExpose({
       <button
         v-if="searchQuery.length > 0"
         @click.stop="handleClearSearch"
-        class="self-center w-6 h-6 flex items-center justify-center text-silver-50 hover:text-silver transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon"
+        class="self-center w-6 h-6 flex items-center justify-center rounded-full text-silver-30 hover:text-silver transition-all duration-200 ease-v2 flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon"
         type="button"
         :aria-label="t('header.search.clearAriaLabel')"
       >
@@ -129,16 +130,15 @@ defineExpose({
       <kbd
         v-else
         aria-hidden="true"
-        class="self-center text-tiny text-silver-50 px-2 hidden lg:inline flex-shrink-0"
+        class="self-center text-tiny text-silver-30 px-1 hidden lg:inline flex-shrink-0"
       >
         /
       </kbd>
-      <div class="w-px bg-silver-20 my-2 hidden sm:block flex-shrink-0"></div>
-      <!-- BUSCAR button -->
+      <!-- BUSCAR button — v2 neon pill (LandingHeader.vue:138) -->
       <RouterLink
         :to="searchQuery.length > 0 ? { path: '/search', query: { q: searchQuery } } : '/search'"
         @click="isOpen = false"
-        class="flex items-center bg-neon text-primary font-bold text-tiny uppercase tracking-wide px-4 hover:bg-neon/90 transition-colors flex-shrink-0"
+        class="flex items-center px-4 py-1.5 bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-full hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 flex-shrink-0"
       >
         {{ t('header.nav.search') }}
       </RouterLink>
@@ -157,11 +157,11 @@ defineExpose({
     <!-- Suggestions dropdown — name-only autocomplete (TASK-076) -->
     <div
       v-if="isExpanded"
-      class="absolute top-full left-0 right-0 mt-2 bg-primary border border-silver-30 rounded-none shadow-lg max-h-[70vh] overflow-hidden z-50"
+      class="absolute top-full left-0 right-0 mt-2 bg-primary border border-line-strong rounded-md shadow-strong max-h-[70vh] overflow-hidden z-50"
     >
       <!-- Loading -->
       <div v-if="loading" class="p-4 text-center">
-        <span class="text-small text-silver-50">{{ t('common.actions.loading') }}...</span>
+        <span class="text-small text-silver-30">{{ t('common.actions.loading') }}...</span>
       </div>
 
       <!-- Suggestions listbox -->
@@ -181,8 +181,8 @@ defineExpose({
           :to="resolveSuggestionRoute(name)"
           @click="clearSearch"
           :class="[
-            'block w-full px-4 py-2.5 text-small text-silver hover:bg-silver-10 transition-colors border-b border-silver-20 last:border-0 truncate',
-            activeDescendantId === `option-suggestion-${index}` ? 'bg-silver-10' : ''
+            'block w-full px-4 py-2.5 text-small text-silver hover:bg-surface-2 transition-colors duration-200 ease-v2 border-b border-line last:border-0 truncate',
+            activeDescendantId === `option-suggestion-${index}` ? 'bg-surface-2' : ''
           ]"
           translate="no"
         >
@@ -195,7 +195,7 @@ defineExpose({
         v-if="!loading && searchQuery.length >= 2"
         :to="{ path: '/search', query: { q: searchQuery } }"
         @click="clearSearch"
-        class="block w-full px-4 py-2.5 text-center text-tiny text-silver-50 hover:text-neon border-t border-silver-20 transition-colors"
+        class="block w-full px-4 py-2.5 text-center text-tiny text-silver-50 hover:text-neon border-t border-line transition-colors duration-200 ease-v2"
       >
         {{ t('header.search.viewAllResults') }} →
       </RouterLink>

@@ -97,7 +97,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
         <span aria-live="polite" aria-atomic="true" class="sr-only">{{ ariaLiveMessage }}</span>
 
         <!-- Top bar -->
-        <div class="flex items-center gap-2 px-3 py-2 border-b border-silver-20 flex-shrink-0">
+        <div class="flex items-center gap-2 px-3 py-2 border-b border-line flex-shrink-0">
           <button
             @click="close"
             class="p-1.5 text-silver-50 hover:text-silver transition-colors flex-shrink-0"
@@ -107,10 +107,10 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
             <SvgIcon name="chevron-left" size="small" />
           </button>
           <div class="relative flex-1">
-            <SvgIcon
+            <IconV2
               name="search"
-              size="small"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-silver-50 pointer-events-none"
+              :size="18"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-silver-30 pointer-events-none"
             />
             <input
               ref="inputRef"
@@ -124,14 +124,14 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               :aria-activedescendant="activeDescendantId ?? undefined"
               :aria-label="t('header.search.placeholder')"
               :placeholder="t('header.search.placeholder')"
-              class="w-full bg-primary border border-silver-30 pl-10 pr-8 py-2.5 text-small text-silver placeholder-silver-50 focus:border-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary rounded-none transition-all"
+              class="w-full bg-surface-1 border border-line rounded-full pl-10 pr-8 py-2.5 text-small text-silver placeholder-silver-30 outline-none focus:border-neon focus:shadow-glow-neon focus:outline-none transition-all duration-200 ease-v2"
               @input="handleInput"
               @keydown="handleInputKeydown"
             />
             <button
               v-if="searchQuery.length > 0"
               @click.stop="clearSearch"
-              class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-50 hover:text-silver transition-colors rounded-full hover:bg-silver-20 focus-visible:outline-none focus-visible:shadow-glow-neon"
+              class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-silver-30 hover:text-silver transition-all duration-200 ease-v2 rounded-full hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"
               type="button"
               :aria-label="t('header.search.clearAriaLabel')"
             >
@@ -175,8 +175,8 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
               :to="resolveSuggestionRoute(name)"
               @click="close"
               :class="[
-                'block w-full px-4 py-3 text-small text-silver hover:bg-silver-10 active:bg-silver-10 transition-colors border-b border-silver-20 last:border-0 truncate',
-                activeDescendantId === `option-suggestion-${index}` ? 'bg-silver-10' : ''
+                'block w-full px-4 py-3 text-small text-silver hover:bg-surface-2 active:bg-surface-2 transition-colors duration-200 ease-v2 border-b border-line last:border-0 truncate',
+                activeDescendantId === `option-suggestion-${index}` ? 'bg-surface-2' : ''
               ]"
               translate="no"
             >
@@ -194,7 +194,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onDocKeydown) })
         </div>
 
         <!-- Advanced Search link at bottom -->
-        <div class="border-t border-silver-20 px-4 py-3 flex-shrink-0">
+        <div class="border-t border-line px-4 py-3 flex-shrink-0">
           <RouterLink
             :to="'/search'"
             @click="emit('close')"

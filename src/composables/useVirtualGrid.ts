@@ -24,6 +24,37 @@ export function shouldLoadMore(
 }
 
 /**
+ * Decide whether an items-length change should snap the grid back to the top.
+ *
+ * The grid resets scroll when the result SET changes (filter/sort/search), but an
+ * infinite-scroll page append also changes the length — and resetting there yanked
+ * the window to the top of the document mid-scroll. A list that grew kept its
+ * existing prefix, so the user's position is still meaningful: leave it alone.
+ * A list that shrank, emptied, or grew out of nothing is a new result set.
+ *
+ * Pure function — exported for unit testing.
+ */
+export function shouldResetScroll(length: number, previous: number | undefined): boolean {
+  if (previous === undefined) return false
+  if (previous === 0) return length > 0
+  return length < previous
+}
+
+/**
+ * Document-relative top of an element, derived from its viewport rect.
+ *
+ * `offsetTop` is measured from the nearest positioned ancestor, but the window
+ * virtualizer compares row offsets against `window.scrollY`, which is
+ * document-relative. Using offsetTop understated the margin by everything above
+ * the grid inside its positioned wrapper.
+ *
+ * Pure function — exported for unit testing.
+ */
+export function documentOffsetTop(rect: Pick<DOMRect, 'top'>, scrollY: number): number {
+  return Math.max(0, rect.top + scrollY)
+}
+
+/**
  * Chunk a flat array of items into rows of `columns` items each.
  * Exported for unit testing.
  */
@@ -111,7 +142,12 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
       columnCount.value = options.getColumns
         ? options.getColumns(width)
         : getColumnCount(width, compact.value)
-      scrollMargin.value = containerRef.value.offsetTop
+      // Document-relative, not offsetTop: the window virtualizer compares row
+      // offsets against window.scrollY (see documentOffsetTop).
+      scrollMargin.value = documentOffsetTop(
+        containerRef.value.getBoundingClientRect(),
+        window.scrollY,
+      )
     }
   }
 
@@ -119,12 +155,20 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
     if (resizeObserver) resizeObserver.disconnect()
     resizeObserver = new ResizeObserver(() => {
       const prevCols = columnCount.value
+      const prevMargin = scrollMargin.value
       updateLayout()
-      if (prevCols !== columnCount.value) {
+      // Re-measure when the grid moved on the page too, not only when the column
+      // count changed — content above the grid (hero, filters, chips) reflows and
+      // silently invalidates every cached row offset.
+      if (prevCols !== columnCount.value || prevMargin !== scrollMargin.value) {
         virtualizer.value.measure()
       }
     })
     resizeObserver.observe(el)
+    // The container's own box does not change when content ABOVE it reflows, so
+    // observe the offsetParent as well to catch hero/filter height changes.
+    const parent = el.offsetParent
+    if (parent instanceof HTMLElement) resizeObserver.observe(parent)
   }
 
   onMounted(() => {
@@ -173,9 +217,13 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
     window.removeEventListener('scroll', handleScroll)
   })
 
-  // Scroll to top when items change (filter/sort)
-  watch(() => options.items.value.length, () => {
-    virtualizer.value.scrollToOffset(0)
+  // Scroll back to the grid when the result SET changes (filter/sort/search).
+  // Never on an infinite-scroll append — see shouldResetScroll.
+  watch(() => options.items.value.length, (length, previous) => {
+    if (!shouldResetScroll(length, previous)) return
+    // Anchor on the grid, not the document top: scrollToOffset does not add
+    // scrollMargin back, so passing 0 scrolls the whole page to y=0.
+    virtualizer.value.scrollToOffset(scrollMargin.value)
   })
 
   return {

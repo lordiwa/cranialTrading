@@ -71,6 +71,7 @@ const canShowInterest = computed(() => {
 const {
   cards,
   loadingMore: loadingMorePublicCards,
+  searching,
   saleCount,
   tradeCount,
   loadFirstPage: loadFirstPublicCardsPage,
@@ -631,8 +632,14 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div v-if="cards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
+      <!-- Empty state — "this profile publishes nothing" ONLY.
+           A server-side search that returns zero hits also empties `cards`, and
+           letting this branch win there unmounts the whole v-else subtree, which
+           takes the search bar itself with it (leaving the visitor unable to clear
+           the term) and collapses the document height so the browser clamps the
+           window scroll to the top. Zero-hit searches fall through to the inner
+           "no results after filtering" state below, which keeps the bar mounted. -->
+      <div v-if="cards.length === 0 && !searching && !filterQuery.trim()" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
         <p class="text-body text-silver-70">
           {{ t('profile.noPublicCards') }}
         </p>

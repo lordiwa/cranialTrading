@@ -1,5 +1,59 @@
-import { chunkIntoRows, shouldLoadMore } from '@/composables/useVirtualGrid'
+import { chunkIntoRows, documentOffsetTop, shouldLoadMore, shouldResetScroll } from '@/composables/useVirtualGrid'
 import { makeCard } from '../helpers/fixtures'
+
+describe('shouldResetScroll', () => {
+  // Regression: the scroll-reset watcher used to fire on ANY items.length change,
+  // including infinite-scroll appends, which yanked the window to the top of the
+  // document mid-scroll in both /collection and the public profile grid.
+  it('does NOT reset when the list grew (infinite-scroll page append)', () => {
+    expect(shouldResetScroll(100, 50)).toBe(false)
+  })
+
+  it('does NOT reset when a second page lands on an already-long list', () => {
+    expect(shouldResetScroll(600, 550)).toBe(false)
+  })
+
+  it('resets when the list shrank (filter narrowed the results)', () => {
+    expect(shouldResetScroll(12, 500)).toBe(true)
+  })
+
+  it('resets when the list was emptied', () => {
+    expect(shouldResetScroll(0, 500)).toBe(true)
+  })
+
+  it('does not reset when the length is unchanged', () => {
+    expect(shouldResetScroll(50, 50)).toBe(false)
+  })
+
+  it('does not reset on the very first observation (prev undefined)', () => {
+    // Vue fires the watcher with prev === undefined only if it runs immediately;
+    // treating that as a reset would fight a restored scroll position.
+    expect(shouldResetScroll(50, undefined)).toBe(false)
+  })
+
+  it('resets when growing from an empty list is actually a replacement', () => {
+    // 0 -> N is a genuine new result set, not an append: there is no prefix to keep.
+    expect(shouldResetScroll(50, 0)).toBe(true)
+  })
+})
+
+describe('documentOffsetTop', () => {
+  // Regression: scrollMargin used offsetTop, which is relative to the nearest
+  // positioned ancestor (CollectionView wraps the grid in a `relative` div), not
+  // the document. The window virtualizer compares against window.scrollY, so the
+  // whole hero+filters height was missing from every row offset.
+  it('adds the current scroll offset to the viewport-relative top', () => {
+    expect(documentOffsetTop({ top: 120 } as DOMRect, 800)).toBe(920)
+  })
+
+  it('returns the raw rect top when the page is not scrolled', () => {
+    expect(documentOffsetTop({ top: 640 } as DOMRect, 0)).toBe(640)
+  })
+
+  it('never returns a negative margin when the grid is scrolled past', () => {
+    expect(documentOffsetTop({ top: -500 } as DOMRect, 200)).toBe(0)
+  })
+})
 
 describe('shouldLoadMore', () => {
   const THRESHOLD = 1000

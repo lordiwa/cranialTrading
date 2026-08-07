@@ -885,16 +885,19 @@ onMounted(() => {
 const wishlistSectionRef = ref<HTMLElement | null>(null)
 
 // Watch for filter query parameter (from navigation links)
-watch(() => route.query.filter, (newFilter, oldFilter) => {
+//
+// Only the arrival case is handled. The old `filter` disappeared -> reset to 'all'
+// + scrollTo(top) branch was removed: useCollectionFilterUrl.buildQuery() omits the
+// legacy `filter` key, so its very first router.replace (fired by any filter or
+// search keystroke) dropped `?filter=wishlist` from the URL and tripped that branch,
+// silently resetting the status chip and yanking the page to the top mid-typing.
+// The wishlist deep-link state now lives in `?status=wishlist`, which
+// hydrateFromUrl absorbs directly.
+watch(() => route.query.filter, (newFilter) => {
   if (newFilter === 'wishlist') {
     statusFilter.value = 'wishlist'
     setTimeout(() => {
       wishlistSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
-  } else if (oldFilter === 'wishlist' && !newFilter) {
-    statusFilter.value = 'all'
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
     }, 100)
   }
 }, { immediate: true })

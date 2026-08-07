@@ -55,6 +55,16 @@ export interface UsePublicProfileCardsOptions {
   onPageLoaded?: () => void
 }
 
+export interface LoadFirstPageOptions {
+  /**
+   * Keep the currently-rendered cards visible until the new page arrives, instead
+   * of blanking them synchronously. Used when restoring pagination after a search
+   * is cleared — blanking there collapses the document height and makes the
+   * browser clamp the window scroll to the top.
+   */
+  preserveCardsWhileLoading?: boolean
+}
+
 export interface UsePublicProfileCards {
   cards: Ref<Card[]>
   loadingMore: Ref<boolean>
@@ -63,7 +73,7 @@ export interface UsePublicProfileCards {
   tradeCount: Ref<number>
   /** True while a debounced server-side search (setSearchTerm) is in flight. */
   searching: Ref<boolean>
-  loadFirstPage: (userId: string) => Promise<void>
+  loadFirstPage: (userId: string, opts?: LoadFirstPageOptions) => Promise<void>
   loadMore: (userId: string) => Promise<void>
   /** Debounced entry point for profile text search (TASK-138 AC1). Fire-and-forget. */
   setSearchTerm: (userId: string, term: string) => void
@@ -110,10 +120,16 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
     }
   }
 
-  const loadFirstPage = async (userId: string): Promise<void> => {
+  const loadFirstPage = async (userId: string, opts: LoadFirstPageOptions = {}): Promise<void> => {
     const myGeneration = ++generation
     cursor = null
-    cards.value = []
+    // Blanking `cards` here is right when switching profiles (showing the previous
+    // visitor's cards under a new name would be wrong), but wrong when restoring
+    // pagination after a search-clear: the grid subtree unmounts on
+    // `cards.length === 0`, the document collapses to the empty state's height, and
+    // the browser clamps the window scroll to the top. Keep the old cards on screen
+    // until the replacement page lands in that case.
+    if (!opts.preserveCardsWhileLoading) cards.value = []
     hasMore.value = false
     saleCount.value = 0
     tradeCount.value = 0
@@ -169,6 +185,11 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
 
   const runSearch = async (userId: string, term: string): Promise<void> => {
     const myGeneration = ++generation
+    // Remember where pagination stood: if the search FAILS we must put it back,
+    // otherwise hasMore stays false and loadMore() short-circuits forever, leaving
+    // the profile grid permanently stuck at whatever page it had reached.
+    const prevCursor = cursor
+    const prevHasMore = hasMore.value
     cursor = null
     hasMore.value = false // search is a single capped page — never further paginated
     // Review addendum M1: a loadMore() left in flight sees its generation go
@@ -186,6 +207,8 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
       options.onPageLoaded?.()
     } catch (err) {
       if (myGeneration !== generation) return
+      cursor = prevCursor
+      hasMore.value = prevHasMore
       console.error('[usePublicProfileCards] Error searching public cards:', err)
       options.onError?.()
     } finally {
@@ -207,7 +230,7 @@ export function usePublicProfileCards(options: UsePublicProfileCardsOptions = {}
       // unconditionally refetching page 1 here used to blank the grid on
       // every first keystroke before the real search results arrived.
       if (searchActive) {
-        void loadFirstPage(userId)
+        void loadFirstPage(userId, { preserveCardsWhileLoading: true })
       }
       return
     }

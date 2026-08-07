@@ -538,5 +538,60 @@ describe('usePublicProfileCards', () => {
       expect(onError).toHaveBeenCalledTimes(1)
       expect(searching.value).toBe(false)
     })
+
+    // Regression (bug report 2026-08-07): a failed search left the grid unable to
+    // paginate. runSearch zeroed cursor/hasMore before it knew the query would
+    // succeed and never put them back, so after an error loadMore() short-circuited
+    // on !hasMore forever.
+    it('restores pagination state when the search query rejects', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'p1' })], { c: 1 }, true))
+      mockSearch.mockRejectedValueOnce(new Error('boom'))
+      const { loadFirstPage, hasMore, cards, loadMore, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+      expect(hasMore.value).toBe(true)
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+      await Promise.resolve()
+
+      expect(hasMore.value).toBe(true)
+
+      // ...and the restored cursor is the one the failed search was handed, so the
+      // next page continues where pagination left off instead of re-fetching page 1.
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'p2' })], null, false))
+      await loadMore('user-1')
+      expect(mockGetPage).toHaveBeenLastCalledWith('user-1', 60, { c: 1 })
+      expect(cards.value.map(c => c.id)).toEqual(['p1', 'p2'])
+    })
+
+    // Regression (bug report 2026-08-07): clearing the search blanked cards to []
+    // synchronously while the restoring first-page fetch was still in flight. In the
+    // view that unmounted the whole grid subtree (v-if="cards.length === 0"), the
+    // document collapsed to the height of the empty state, and the browser clamped
+    // the window scroll to the top — the reported "screen scrolls up".
+    it('keeps the previous cards on screen while clearing the search refetches page 1', async () => {
+      mockGetPage.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'p1' })], null, false))
+      mockSearch.mockResolvedValueOnce(makePage([makePublicCard({ cardId: 'hit' })], null, false))
+      const { loadFirstPage, cards, setSearchTerm } = usePublicProfileCards()
+      await loadFirstPage('user-1')
+
+      setSearchTerm('user-1', 'bolt')
+      await vi.advanceTimersByTimeAsync(300)
+      expect(cards.value.map(c => c.id)).toEqual(['hit'])
+
+      // Clear the search — the restoring fetch has NOT resolved yet.
+      let resolveRestore!: (page: PublicCardsPage) => void
+      mockGetPage.mockReturnValueOnce(new Promise<PublicCardsPage>((res) => { resolveRestore = res }))
+      setSearchTerm('user-1', '')
+      await Promise.resolve()
+
+      // The grid must still have content to render — not an empty array.
+      expect(cards.value).not.toEqual([])
+
+      resolveRestore(makePage([makePublicCard({ cardId: 'p1' })], null, false))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(cards.value.map(c => c.id)).toEqual(['p1'])
+    })
   })
 })

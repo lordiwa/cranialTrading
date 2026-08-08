@@ -2,11 +2,25 @@
 /**
  * HomeView — the authenticated landing (/inicio).
  *
- * Rafael's constraint, and the whole reason this view exists: ZERO Firestore reads
- * on mount. Landing on /saved-matches meant the first thing after login was the
- * match recalculation (144s → 36s after the v1.53.2 batch, but still the ceiling).
- * This view reads nothing — no collection, no card_index, no matches, no counters —
- * so it paints as soon as the bundle does.
+ * Rafael's constraint, and the whole reason this view exists: this view's own
+ * template reads nothing from Firestore — no collection, no card_index, no
+ * matches, no counters — so its own code paints as soon as the bundle does.
+ * Landing on /saved-matches meant the first thing after login was the match
+ * recalculation (144s → 36s after the v1.53.2 batch, but still the ceiling).
+ *
+ * CORRECTION (TASK-148, 2026-08-08 deep review): "ZERO Firestore reads on
+ * mount" used to be claimed for the whole authenticated shell, not just this
+ * view's template, and that was false — measured. AppContainer (rendered
+ * below) mounts AppHeader on every authenticated route, and AppHeader always
+ * mounts MatchNotificationsDropdown (`hidden md:block` on its desktop nav
+ * row is CSS-only, the component still mounts on mobile too), which used to
+ * call loadAllMatches() unconditionally in its own onMounted: 6 Firestore
+ * collection getDocs (cleanExpiredMatches' 2 + 4 more in parallel), plus
+ * batched deletes, fired on landing with zero user gesture. Fixed in the
+ * same ticket: that load now defers to the bell click instead of onMount.
+ * This view's own code is still read-free; whether the full authenticated
+ * shell is now truly zero-read has not been re-measured, so don't restate
+ * that as fact without measuring it again.
  *
  * That constraint is why there are no numbers on this screen. Every counter worth
  * showing (cards owned, new matches, unread messages) costs at least one read, so

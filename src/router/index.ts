@@ -17,8 +17,13 @@ const router = createRouter({
         {
             // Rafael 2026-08-07: the authenticated landing is no longer the matches hub.
             // Landing on /saved-matches meant every login paid the match recalculation up
-            // front; /inicio reads nothing from Firestore, so the app is usable immediately
-            // and matches recalculate when you actually open them.
+            // front; matches now recalculate when you actually open them instead.
+            // CORRECTION (TASK-148, 2026-08-08): this used to also claim "/inicio reads
+            // nothing from Firestore" — false, measured. AppHeader (mounted on every
+            // authenticated route via AppContainer) always mounted MatchNotificationsDropdown,
+            // which fired loadAllMatches() unconditionally on its own mount (6 Firestore
+            // getDocs + batched deletes), landing included. Fixed in TASK-148 by deferring
+            // that load to the bell click instead of onMount.
             path: '/',
             redirect: '/inicio',
         },

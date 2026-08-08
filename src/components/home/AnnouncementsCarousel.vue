@@ -2,8 +2,12 @@
 /**
  * Announcements carousel for /inicio.
  *
- * Content comes from src/data/announcements.ts (in the bundle), so this adds ZERO
- * Firestore reads to the landing — the whole point of that screen.
+ * Content comes from src/data/announcements.ts (in the bundle), so this component
+ * adds zero Firestore reads of its own.
+ *
+ * (TASK-148, 2026-08-08: that's this component's own contribution only — it does
+ * NOT mean the landing as a whole was zero-read; it measurably wasn't, see
+ * src/views/HomeView.vue's header comment for the measured cost and the fix.)
  *
  * No auto-advance on purpose: the landing's job is to get out of the way, and a
  * slide that moves on its own steals attention from the search field and fights

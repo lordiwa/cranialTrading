@@ -6,8 +6,13 @@ test.describe('Login', () => {
     await loginPage.goto();
   });
 
-  // The authenticated landing moved off the matches hub (2026-08-07): /inicio reads
-  // nothing from Firestore, so login no longer pays the match recalculation up front.
+  // The authenticated landing moved off the matches hub (2026-08-07): login no longer
+  // pays the match recalculation up front — that now happens when /saved-matches is
+  // actually opened.
+  // CORRECTION (TASK-148, 2026-08-08): this used to also claim "/inicio reads nothing
+  // from Firestore" — false, measured (AppHeader's MatchNotificationsDropdown fired
+  // loadAllMatches() unconditionally on mount, landing included). Fixed by deferring
+  // that load to the bell click instead of onMount; see src/views/HomeView.vue.
   test('successful login redirects to the /inicio landing @smoke', async ({ loginPage, page }) => {
     const email = process.env.TEST_USER_A_EMAIL!;
     const password = process.env.TEST_USER_A_PASSWORD!;

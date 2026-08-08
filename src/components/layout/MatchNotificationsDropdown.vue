@@ -22,17 +22,18 @@ const badgeCount = computed(() => {
   return matchesStore.newMatches.filter(m => m.status === 'nuevo').length
 })
 
-// Load matches on first interaction or when user is authenticated
+// TASK-148: this component mounts on every authenticated route regardless of
+// viewport (`hidden md:block` on the desktop nav row is CSS-only — the
+// component still mounts, and fires, on mobile too). Loading on mount meant
+// /inicio paid loadAllMatches()'s 6 Firestore collection reads plus batched
+// deletes with zero user gesture. Deferred to the bell click instead — the
+// badge/dropdown populate as soon as the user actually opens it.
 const ensureLoaded = async () => {
   if (!loaded.value) {
     loaded.value = true
     await matchesStore.loadAllMatches()
   }
 }
-
-onMounted(() => {
-  void ensureLoaded()
-})
 
 // Show up to 6 most recent new matches
 const recentAlerts = computed(() => {
@@ -48,6 +49,7 @@ const recentAlerts = computed(() => {
 
 const toggleDropdown = () => {
   isOpen.value = !isOpen.value
+  void ensureLoaded()
 }
 
 const closeDropdown = () => {

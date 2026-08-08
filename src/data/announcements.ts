@@ -2,9 +2,13 @@
  * Announcements shown on the /inicio carousel.
  *
  * This file IS the editing surface — Rafael edits it and the next deploy publishes.
- * It deliberately lives in the bundle rather than Firestore so the landing keeps its
- * zero-extra-reads property: a Firestore-backed announcements collection would put a
- * read back on the one screen built to avoid them.
+ * It deliberately lives in the bundle rather than Firestore so this data source adds
+ * no read of its own: a Firestore-backed announcements collection would cost a read
+ * every time the carousel renders.
+ *
+ * (TASK-148, 2026-08-08: don't read this as "the landing is zero-read" — it wasn't;
+ * see src/views/HomeView.vue's header comment for the measured cost and the fix.
+ * This file's own contribution has always been zero, independent of that.)
  *
  * Trade-off to know: changing an announcement needs a deploy. If that becomes
  * annoying, moving to Firestore is the fix — and it costs one read per landing.

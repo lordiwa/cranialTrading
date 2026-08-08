@@ -34,6 +34,7 @@ import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
 import { useCollectionPagination } from '../composables/useCollectionPagination'
 import { useDelayedFlag } from '../composables/useDelayedFlag'
 import { sumCkFirst } from '../utils/priceAggregation'
+import { selectCollectionDisplayCards } from '../utils/collectionFilters'
 
 const route = useRoute()
 const router = useRouter()
@@ -383,14 +384,15 @@ const usesUnsupportedServerFilter = computed(() => {
 })
 
 // Paginated cards for collection view
-const collectionDisplayCards = computed(() => {
-  if (usesUnsupportedServerFilter.value) return filteredCards.value
-  const paginated = collectionStore.paginatedCards
-  if (paginated.length > 0 || collectionStore.paginationMeta.loading) {
-    return paginated
-  }
-  return filteredCards.value
-})
+// TASK-156: extracted to selectCollectionDisplayCards (utils/collectionFilters.ts) so the
+// "don't show stale paginatedCards while a new query is loading" rule is unit-testable —
+// see that function's doc comment for why `loading` must short-circuit before the length check.
+const collectionDisplayCards = computed(() => selectCollectionDisplayCards({
+  usesUnsupportedServerFilter: usesUnsupportedServerFilter.value,
+  loading: collectionStore.paginationMeta.loading,
+  paginatedCards: collectionStore.paginatedCards,
+  filteredCards: filteredCards.value,
+}))
 
 // Card count display
 const paginatedCardCount = computed(() => {

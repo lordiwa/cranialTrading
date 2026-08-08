@@ -157,3 +157,38 @@ export const buildPaginationSort = (sortBy: string): { field: 'name' | 'price' |
     direction: sortBy === 'name' ? 'asc' : 'desc',
   }
 }
+
+// ============================================================
+// Display card selection (TASK-156)
+// ============================================================
+
+export interface SelectDisplayCardsParams<T> {
+  /** True when an advanced filter is active that the server-side query does not support (mana value, keywords, etc.) — forces client-side filtering. */
+  usesUnsupportedServerFilter: boolean
+  /** collectionStore.paginationMeta.loading — true while a queryPage() call for the CURRENT filters is in flight. */
+  loading: boolean
+  /** collectionStore.paginatedCards — may still hold the PREVIOUS query's results while a new one is loading. */
+  paginatedCards: T[]
+  /** Client-side filtered fallback (used when there's no usable paginated data yet, or filters the server can't apply). */
+  filteredCards: T[]
+}
+
+/**
+ * Selects which cards CollectionView should render.
+ *
+ * TASK-156 fix: while `loading` is true, `paginatedCards` still holds the PREVIOUS
+ * query's results (queryPage only replaces them once the response lands — see
+ * collection.ts queryPage). Falling through to that stale array while a new
+ * search/filter is in flight showed cards unrelated to what the user just typed
+ * (the "buscador devuelve cartas ajenas" bug) — reproduced by typing a search term
+ * over an already-mounted grid, verified via `collectionStore.paginationMeta` in
+ * a live browser session. Returning [] during that window lets the existing
+ * `showFilterLoader` spinner (200ms delayed) cover the gap instead.
+ */
+export const selectCollectionDisplayCards = <T>(params: SelectDisplayCardsParams<T>): T[] => {
+  const { usesUnsupportedServerFilter, loading, paginatedCards, filteredCards } = params
+  if (usesUnsupportedServerFilter) return filteredCards
+  if (loading) return []
+  if (paginatedCards.length > 0) return paginatedCards
+  return filteredCards
+}

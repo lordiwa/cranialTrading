@@ -139,6 +139,13 @@ const isActive = (path: string) => {
 // Global search ref for keyboard shortcut
 const globalSearchRef = ref<{ focus: () => void } | null>(null)
 
+// /inicio IS a search screen — its hero field is the point of the page. Showing the
+// header search there put two identical pills ~150px apart, both going to /search,
+// and worse: "/" always focused the header one, i.e. the wrong one for that page.
+// Hiding it here leaves exactly one search on the route (desktop pill AND the mobile
+// icon-button — they are the same affordance at two breakpoints, Rule 6).
+const showHeaderSearch = computed(() => route.path !== '/inicio')
+
 // Keyboard shortcut: "/" to focus search
 const handleKeydown = (e: KeyboardEvent) => {
   // Don't trigger if typing in input fields
@@ -146,6 +153,10 @@ const handleKeydown = (e: KeyboardEvent) => {
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
     return
   }
+
+  // Where the header search is hidden, let "/" fall through to the view that owns
+  // the page's search (HomeView) instead of swallowing it with preventDefault.
+  if (!showHeaderSearch.value) return
 
   if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault()
@@ -191,7 +202,7 @@ onUnmounted(() => {
 
         <!-- Global Search (Desktop, promoted + centered) -->
         <div class="hidden md:flex flex-1 justify-center min-w-0">
-          <GlobalSearch v-if="isAuthenticated" ref="globalSearchRef" data-tour="nav-search" class="w-full max-w-[640px] min-w-0" />
+          <GlobalSearch v-if="isAuthenticated && showHeaderSearch" ref="globalSearchRef" data-tour="nav-search" class="w-full max-w-[640px] min-w-0" />
         </div>
 
         <!-- Right side: User & Settings -->
@@ -200,6 +211,7 @@ onUnmounted(() => {
           <div v-if="isAuthenticated" class="flex items-center gap-1">
             <!-- Mobile search icon-btn -->
             <button
+                v-if="showHeaderSearch"
                 @click="showMobileSearch = true"
                 :aria-label="t('header.search.placeholder')"
                 class="md:hidden relative inline-flex items-center justify-center rounded-md w-11 h-11 text-silver-50 transition-all duration-200 ease-v2 hover:text-silver hover:bg-surface-2 focus-visible:outline-none focus-visible:shadow-glow-neon"

@@ -1,6 +1,8 @@
 {
   "common": {
     "actions": {
+      "previous": "Anterior",
+      "next": "Siguiente",
       "save": "GUARDAR",
       "cancel": "CANCELAR",
       "delete": "ELIMINAR",
@@ -2545,6 +2547,7 @@
     }
   },
   "home": {
+    "announcements": "Anuncios",
     "title": "¿Qué carta buscás?",
     "subtitle": "Buscá en todo el mercado, o entrá directo a tu colección.",
     "placeholder": "Buscar cartas, sets o usuarios…",

@@ -14,16 +14,38 @@
  *
  * Match recalculation now happens when you actually open /saved-matches.
  */
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from '../composables/useI18n';
 import AppContainer from '../components/layout/AppContainer.vue';
+import AnnouncementsCarousel from '../components/home/AnnouncementsCarousel.vue';
 import IconV2 from '../components/ui/IconV2.vue';
 
 const { t } = useI18n();
 const router = useRouter();
 
 const searchQuery = ref('');
+const inputRef = ref<HTMLInputElement | null>(null);
+
+// AppHeader hides its own search on this route and stops handling "/" here, so the
+// shortcut is ours to own — it should land on the hero field, which IS this page's
+// search. Same guards as the header's handler so it never steals a keystroke from
+// someone already typing.
+const handleSlash = (e: KeyboardEvent) => {
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    inputRef.value?.focus();
+  }
+};
+
+onMounted(() => {
+  globalThis.addEventListener('keydown', handleSlash);
+});
+onUnmounted(() => {
+  globalThis.removeEventListener('keydown', handleSlash);
+});
 
 // Static list on purpose — pulling "popular" from real data would mean a read.
 const popularSearches = ['Black Lotus', 'Lightning Bolt', 'Sol Ring', 'Counterspell', 'Brainstorm'];
@@ -63,6 +85,7 @@ const searchTerm = (term: string) => {
       >
         <IconV2 name="search" :size="20" class="text-silver-30 pointer-events-none flex-shrink-0" />
         <input
+            ref="inputRef"
             v-model="searchQuery"
             data-testid="home-search-input"
             type="search"
@@ -91,6 +114,12 @@ const searchTerm = (term: string) => {
         >
           {{ term }}
         </button>
+      </div>
+
+      <!-- Announcements — content ships in the bundle (src/data/announcements.ts),
+           so this costs no Firestore reads. -->
+      <div class="mt-10">
+        <AnnouncementsCarousel />
       </div>
 
       <!-- Quick links -->

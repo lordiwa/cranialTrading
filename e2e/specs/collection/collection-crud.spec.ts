@@ -74,8 +74,7 @@ test.describe('Collection CRUD', () => {
   });
 
   test('edit card: open detail modal → edit → save → changes persist', async ({ collectionPage, commonPage, page }) => {
-    // Wait for cards to load
-    await page.waitForTimeout(1000);
+    // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
     const cardCount = await collectionPage.getCardCount();
     if (cardCount === 0) return; // Skip if no cards
 
@@ -95,7 +94,7 @@ test.describe('Collection CRUD', () => {
   });
 
   test('delete card: open detail → delete → confirm → card removed', async ({ collectionPage, commonPage, page }) => {
-    await page.waitForTimeout(1000);
+    // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
     const countBefore = await collectionPage.getCardCount();
     if (countBefore === 0) return;
 
@@ -109,9 +108,9 @@ test.describe('Collection CRUD', () => {
       await deleteBtn.click();
       await commonPage.confirmAction();
       await commonPage.waitForToast('success');
-      await page.waitForTimeout(1000);
-      const countAfter = await collectionPage.getCardCount();
-      expect(countAfter).toBeLessThan(countBefore);
+      // Poll instead of a fixed sleep — waits on the observable effect of the
+      // delete (the grid's own card count dropping), not on a guessed settle time.
+      await expect.poll(() => collectionPage.getCardCount()).toBeLessThan(countBefore);
     }
   });
 
@@ -153,7 +152,7 @@ test.describe('Collection CRUD', () => {
   });
 
   test('cancel deletion from confirm dialog leaves card intact', async ({ collectionPage, commonPage, page }) => {
-    await page.waitForTimeout(1000);
+    // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
     const countBefore = await collectionPage.getCardCount();
     if (countBefore === 0) return;
 
@@ -166,7 +165,7 @@ test.describe('Collection CRUD', () => {
     if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await deleteBtn.click();
       await commonPage.cancelAction();
-      await page.waitForTimeout(500);
+      await modal.waitFor({ state: 'hidden', timeout: 5_000 });
       const countAfter = await collectionPage.getCardCount();
       expect(countAfter).toBe(countBefore);
     }

@@ -11,6 +11,14 @@ export class CollectionPage {
   readonly cardGrid: Locator;
   readonly selectModeButton: Locator;
   readonly bulkActions: Locator;
+  // Anchored to data-testid="collection-card" (CollectionGridCardCompact.vue /
+  // CollectionGridCardFull.vue) — not `.grid img[loading="lazy"]`. The grid is
+  // window-virtualized (useVirtualGrid): on a large collection (40k+ cards) the
+  // real card rows can take well past 8s to mount after navigation, so
+  // waitForGridReady() waits for the first card to actually appear before
+  // clickCardInGrid/getCardCount read it, instead of assuming a fixed settle
+  // time (TASK-145).
+  readonly gridCards: Locator;
 
   // Add Card Modal elements
   readonly addModal: {
@@ -45,6 +53,7 @@ export class CollectionPage {
     this.cardGrid = page.locator('.grid').first();
     this.selectModeButton = page.locator('button').filter({ hasText: /select|seleccionar/i });
     this.bulkActions = page.locator('[class*="bulk"]');
+    this.gridCards = page.locator('[data-testid="collection-card"]');
 
     // Add Card Modal — scoped to the z-50 modal overlay
     const addModalContainer = page.locator('.fixed.inset-0.z-50').first();
@@ -101,15 +110,18 @@ export class CollectionPage {
     await this.addModal.resultCards.first().click({ force: true });
   }
 
+  async waitForGridReady(timeout = 30_000) {
+    await this.gridCards.first().waitFor({ state: 'visible', timeout }).catch(() => {});
+  }
+
   async clickCardInGrid(index = 0) {
-    // Cards are displayed as images in a grid — click on the card image
-    const cards = this.page.locator('.grid img[loading="lazy"]');
-    await cards.nth(index).click({ force: true });
+    await this.waitForGridReady();
+    await this.gridCards.nth(index).click();
   }
 
   async getCardCount(): Promise<number> {
-    const cards = this.page.locator('.grid img[loading="lazy"]');
-    return cards.count();
+    await this.waitForGridReady();
+    return this.gridCards.count();
   }
 
   async switchView(mode: 'visual' | 'texto') {

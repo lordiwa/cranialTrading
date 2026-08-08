@@ -396,6 +396,7 @@ const handleContextMenuSelect = async (itemId: string) => {
          cards corrupted low-end Mali GPUs (cranialBugColl / Tecno Spark 30C, Mali-G52).
          Status changes + public toggle remain available via the context menu and swipe-right. -->
     <div
+        data-testid="collection-card"
         class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
         :class="[
           selectionMode && isSelected ? 'border-neon border-2' : '',

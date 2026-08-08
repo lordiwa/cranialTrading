@@ -137,7 +137,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="compactCardRef" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
+  <div ref="compactCardRef" data-testid="collection-card" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
     <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded-lg">
       <!-- Status badge (v2 dot pill, DESIGN-DIRECTION.md §5) — sale/trade/wishlist only -->
       <span

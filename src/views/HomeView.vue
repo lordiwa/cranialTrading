@@ -19,24 +19,31 @@ import { useRouter } from 'vue-router';
 import { useI18n } from '../composables/useI18n';
 import AppContainer from '../components/layout/AppContainer.vue';
 import AnnouncementsCarousel from '../components/home/AnnouncementsCarousel.vue';
+import GlobalSearch from '../components/ui/GlobalSearch.vue';
 import IconV2 from '../components/ui/IconV2.vue';
 
 const { t } = useI18n();
 const router = useRouter();
 
-const searchQuery = ref('');
-const inputRef = ref<HTMLInputElement | null>(null);
+// Rafael on dev: "el buscador de inicio no muestra sugerencias parece roto". It was
+// never broken — it was a bare input, while the header search is a real combobox
+// backed by useGlobalSearch. Shipping a hand-rolled autocomplete here would have
+// created a SIXTH independent search surface, which is exactly the shape that
+// produced the debounce/race bug fixed across five surfaces in v1.53.1. So the hero
+// now renders the same GlobalSearch component the header uses: identical
+// suggestions, debounce, keyboard navigation and ARIA wiring, one implementation.
+const searchRef = ref<{ focus: () => void } | null>(null);
 
 // AppHeader hides its own search on this route and stops handling "/" here, so the
-// shortcut is ours to own — it should land on the hero field, which IS this page's
-// search. Same guards as the header's handler so it never steals a keystroke from
-// someone already typing.
+// shortcut is ours to own — it focuses the hero search, which IS this page's search.
+// Same guards as the header's handler so it never steals a keystroke from someone
+// already typing.
 const handleSlash = (e: KeyboardEvent) => {
   const target = e.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
   if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
-    inputRef.value?.focus();
+    searchRef.value?.focus();
   }
 };
 
@@ -59,11 +66,6 @@ const quickLinks = [
   { to: '/collection?filter=wishlist', labelKey: 'header.nav.wishlist', icon: 'star' },
 ] as const;
 
-const submitSearch = () => {
-  const q = searchQuery.value.trim();
-  void router.push(q ? { path: '/search', query: { q } } : '/search');
-};
-
 const searchTerm = (term: string) => {
   void router.push({ path: '/search', query: { q: term } });
 };
@@ -78,29 +80,12 @@ const searchTerm = (term: string) => {
       <h1 class="text-h2 md:text-h1 font-display font-bold text-silver">{{ t('home.title') }}</h1>
       <p class="mt-3 text-small md:text-body text-silver-50">{{ t('home.subtitle') }}</p>
 
-      <!-- v2 search pill — same vocabulary as LandingHeader/GlobalSearch -->
-      <form
-          class="mt-8 flex items-center gap-2 border border-line rounded-full pl-5 pr-1.5 py-1.5 bg-surface-1 focus-within:border-neon focus-within:shadow-glow-neon transition-all duration-200 ease-v2"
-          @submit.prevent="submitSearch"
-      >
-        <IconV2 name="search" :size="20" class="text-silver-30 pointer-events-none flex-shrink-0" />
-        <input
-            ref="inputRef"
-            v-model="searchQuery"
-            data-testid="home-search-input"
-            type="search"
-            :aria-label="t('home.placeholder')"
-            :placeholder="t('home.placeholder')"
-            class="flex-1 min-w-0 bg-transparent border-none py-2 text-body text-silver placeholder-silver-30 outline-none focus:outline-none"
-        />
-        <button
-            type="submit"
-            data-testid="home-search-submit"
-            class="px-4 py-2 bg-neon text-primary font-bold text-[11px] uppercase tracking-[.1em] rounded-full hover:bg-[#6FD07C] hover:shadow-glow-neon transition-all duration-200 ease-v2 flex-shrink-0"
-        >
-          {{ t('header.nav.search') }}
-        </button>
-      </form>
+      <!-- The header's own search component, reused verbatim: suggestions, debounce,
+           keyboard nav and ARIA all come from useGlobalSearch instead of a second
+           implementation that would drift from it. -->
+      <div class="mt-8 text-left" data-testid="home-search">
+        <GlobalSearch ref="searchRef" class="w-full" />
+      </div>
 
       <!-- Popular searches -->
       <div class="mt-6 flex flex-wrap items-center justify-center gap-2">

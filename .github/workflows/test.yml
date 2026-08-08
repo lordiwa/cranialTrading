@@ -97,6 +97,13 @@ jobs:
       # e2e job cannot be pointed at dev without also shipping a dev-configured
       # bundle to prod. Smoke keeps the part worth having (the prod bundle boots
       # and can authenticate) without the destructive part.
+      #
+      # TASK-151: this guarantee only holds because @smoke is kept mutator-free
+      # by convention, not by anything --grep enforces on its own — two specs
+      # ("create new binder", "create new deck") were tagged @smoke and were
+      # writing real documents to production on every push to main until this
+      # ticket. Any test newly tagged @smoke MUST be read-only (no create/edit/
+      # delete against Firestore); verify that before adding the tag.
       - name: Run E2E tests (full suite on develop, smoke only on main)
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
@@ -128,7 +135,7 @@ jobs:
           projectId: cranial-trading-dev
           channelId: live
 
-  # ── Deploy to Production (gated on all E2E tests) ──────────────────
+  # ── Deploy to Production (gated on the e2e job — @smoke subset only on main, see above) ──
   deploy-prod:
     needs: [build, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

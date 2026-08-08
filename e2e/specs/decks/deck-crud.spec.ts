@@ -5,7 +5,11 @@ test.describe('Deck CRUD', () => {
     await decksPage.goto();
   });
 
-  test('create new deck → appears in deck list @smoke', async ({ decksPage, commonPage }) => {
+  // TASK-151: NOT @smoke — this test creates a real deck document. `main`'s
+  // CI gate runs `--grep @smoke` against the production-configured bundle, so
+  // any @smoke-tagged mutator writes to the PRODUCTION Firestore project on
+  // every push to main. Keep this test in the full suite / e2e:decks only.
+  test('create new deck → appears in deck list', async ({ decksPage, commonPage }) => {
     const deckName = `E2E Deck ${Date.now()}`;
     await decksPage.createDeck(deckName, 'modern');
 

@@ -5,7 +5,11 @@ test.describe('Binders', () => {
     await bindersPage.goto();
   });
 
-  test('create new binder → appears in binder list @smoke', async ({ bindersPage, commonPage, page }) => {
+  // TASK-151: NOT @smoke — this test creates a real binder document. `main`'s
+  // CI gate runs `--grep @smoke` against the production-configured bundle, so
+  // any @smoke-tagged mutator writes to the PRODUCTION Firestore project on
+  // every push to main. Keep this test in the full suite / e2e:binders only.
+  test('create new binder → appears in binder list', async ({ bindersPage, commonPage, page }) => {
     const binderName = `E2E Binder ${Date.now()}`;
     await bindersPage.createBinder(binderName, 'Test description');
 

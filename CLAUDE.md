@@ -166,6 +166,12 @@ npm run e2e                # Playwright E2E tests
 
 **The push-to-develop gate is unchanged: the full suite is still mandatory before every push to `develop` (see the Deployment Flow above). This policy only moves the full-suite run from "every ticket" to "once per tanda, right before the push" — it does not weaken the gate.**
 
+#### Which environment E2E runs against (important, and not obvious)
+
+The CI `build` job builds `--mode development` on `develop` and production mode on `main`, and the `e2e` job tests **the very same `dist` artifact** that `deploy-dev` / `deploy-prod` then publishes. So E2E on `develop` hits the `cranial-trading-dev` project, and E2E on `main` hits **production**. Since the tested artifact and the deployed artifact must stay identical, the answer is not to rebuild in dev mode for `main` — that would ship a dev-configured bundle to prod. Instead **`main` runs `--grep @smoke` only**: the full suite is redundant there (`main` only ever fast-forwards an already-green `develop`, so the code is identical and already tested against dev), while smoke still proves the production-configured bundle boots and can authenticate — without running every mutating spec (card / deck / binder CRUD, password change, account registration) against the production database.
+
+Locally, `playwright.config.ts` defaults `VITE_MODE` to `development`, so `npm run e2e` on your machine hits the dev project. **That default used to be `production`, which meant every local E2E run silently mutated the production database.** Pass `VITE_MODE=production` only when you deliberately want to exercise the prod bundle, and know what that account will be subjected to.
+
 Smoke tests are tagged `@smoke` in their title (e.g. `test('successful login redirects to saved-matches @smoke', ...)`) and run across whatever project(s) Playwright routes them to (`chromium` / `no-auth-tests`) — no separate config needed.
 
 Area → specs mapping (targeted scripts run only that folder, still through the full Playwright project/auth setup):

@@ -87,8 +87,23 @@ jobs:
             echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
             exit 1
           fi
-      - name: Run all E2E tests
-        run: npx playwright test
+      # develop runs the full suite against the dev project — that IS the gate.
+      # main only ever fast-forwards an already-green develop, so re-running the
+      # full suite there re-tests identical code; the one thing it would add is
+      # exercising the production-configured bundle, and it pays for that by
+      # running every mutating spec (card/deck/binder CRUD, password change,
+      # account registration) against the PRODUCTION database — the same dist
+      # artifact is both what e2e tests and what deploy-prod publishes, so the
+      # e2e job cannot be pointed at dev without also shipping a dev-configured
+      # bundle to prod. Smoke keeps the part worth having (the prod bundle boots
+      # and can authenticate) without the destructive part.
+      - name: Run E2E tests (full suite on develop, smoke only on main)
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            npx playwright test --grep @smoke
+          else
+            npx playwright test
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

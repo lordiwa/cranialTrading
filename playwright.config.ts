@@ -63,9 +63,16 @@ export default defineConfig({
   webServer: remoteBaseURL
     ? undefined
     : {
+        // Local runs default to the DEV project, not production. The previous
+        // default ('production') meant every local `npm run e2e` authenticated
+        // as the test user against the PRODUCTION Firebase project and ran the
+        // mutating specs there — adding and deleting real cards, decks and
+        // binders, and changing that account's password. Local and dev are
+        // meant to be the same environment; only prod is different. Override
+        // with VITE_MODE=production to deliberately exercise the prod bundle.
         command: process.env.CI
           ? 'npx vite preview --port 4173'
-          : `npx vite build --mode ${process.env.VITE_MODE || 'production'} && npx vite preview --port 4173`,
+          : `npx vite build --mode ${process.env.VITE_MODE || 'development'} && npx vite preview --port 4173`,
         port: 4173,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

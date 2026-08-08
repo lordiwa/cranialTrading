@@ -1,0 +1,29 @@
+{
+  "key": "TASK-153",
+  "title": "La grilla de Coleccion tarda 20-27 segundos en mostrar la primera fila con 41.000 cartas",
+  "description": "Medido en vivo contra cranial-trading-dev el 2026-08-08, durante la implementacion de TASK-145. NO es un problema de tests: es lo que ve el usuario.\\n\\nMEDICION: con una coleccion de 41.093 cartas, a los ~13-19 segundos todavia habia 0 o 1 filas reales renderizadas. Las 5 filas del viewport inicial, con sus imagenes, recien aparecieron entre los ~20 y los ~27 segundos. Mientras tanto la UI muestra \"Loading prices... 0/41093\".\\n\\nLECTURA: `CollectionGrid.vue` usa `useVirtualGrid` (window-virtualizer de @tanstack/vue-virtual), asi que la virtualizacion en si esta puesta. Lo que compite es el trabajo pesado en curso: la carga de precios de Card Kingdom para la coleccion ENTERA bloquea el hilo principal y retrasa el primer render util de la grilla. La virtualizacion no sirve de nada si algo mas monopoliza el hilo mientras tanto.\\n\\nPOR QUE IMPORTA MAS QUE EL TICKET QUE LO DESTAPO: el criterio de exito declarado del proyecto es mover colecciones de mas de 50.000 cartas con fluidez en dispositivos de gama baja. Esta medicion es en una maquina de escritorio; en gama baja va a ser peor. Y toca dos de los cuatro flujos prioritarios de negocio: el Nº3 (quitar cartas o ponerlas a la venta) empieza justamente por ver la grilla, y el Nº2 (buscar en la coleccion propia) tambien.\\n\\nRELACIONADO: existe un baseline de perf medido del landing (144 s hasta usable, 212 peticiones a Firestore) con un metodo repetible que conviene reusar aca para medir el antes y el despues. Tambien se relaciona con TASK-148, donde el coste real de montar /inicio resulto ser mayor que el declarado.\\n\\nEste ticket es de DIAGNOSTICO Y PROPUESTA, no de implementacion a ciegas: primero medir donde se va el tiempo, despues decidir. No hay que arrancar optimizando por intuicion.",
+  "acceptance_criteria": [
+    "Se mide con perfilador de navegador donde se va el tiempo entre la navegacion a /collection y la primera fila util: cuanto es carga de precios, cuanto Firestore, cuanto render, cuanto layout. Numeros, no impresiones",
+    "Se mide en dos tamanos de coleccion (la de ~200 cartas y la de ~41.000) para separar lo que escala de lo que es coste fijo",
+    "Se comprueba si la carga de precios de Card Kingdom puede diferirse o trocearse para que no bloquee el primer render de la grilla, y se documenta el resultado aunque sea negativo",
+    "La propuesta resultante se presenta a Rafael ANTES de implementar: puede haber varias salidas (diferir precios, renderizar la grilla sin precios y rellenarlos despues, paginar mas chico) y la eleccion es suya",
+    "El metodo de medicion queda documentado para poder repetirlo y comparar el despues"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "collection",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T05:43:29.694Z",
+  "updated_at": "2026-08-08T05:43:29.694Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

@@ -1,0 +1,37 @@
+{
+  "key": "TASK-165",
+  "title": "La ruta /inicio no baja su propio chunk hasta que termina la lectura de /users: 3,1 s de pantalla sin vista",
+  "description": "Medido en PRODUCCION el 2026-08-08, pestaña visible, cache caliente, tres corridas coincidentes. Este es el tramo C del desglose de la primera carga de /inicio.\\n\\nCADENA VERIFICADA (medicion de red + lectura de codigo, las dos coinciden):\\n1. `/inicio` declara `meta: { requiresAuth: true }` en `src/router/index.ts:29`.\\n2. El guard de `requiresAuth` hace `await waitForAuthReady(authStore)` en `src/router/authGuard.ts:155`, que bloquea la navegacion mientras `authStore.loading` sea true.\\n3. `authStore.loading` SOLO pasa a false en el `finally` de `loadUserData` — `src/stores/auth.ts:334`.\\n4. `loadUserData` hace `getDoc(doc(db,'users',userId))` en `src/stores/auth.ts:250`.\\n\\nCONSECUENCIA: la navegacion no resuelve, y por lo tanto el `import('../views/HomeView.vue')` de la ruta NI SIQUIERA SE PIDE, hasta que vuelve la lectura del documento /users.\\n\\nNUMEROS MEDIDOS (produccion, 2026-08-08):\\n- `accounts:lookup` de Firebase Auth: empieza 2431 ms, dura 134 ms.\\n- `getDoc(users/{uid})` por canal Firestore: empieza 2585 ms, dura 1547 ms.\\n- Se pide `HomeView.js`: 5572 ms.\\n- Tramo C total: 2431 -> 5572 ms = 3141 ms con el usuario mirando el loader.\\n\\nEL PUNTO CLAVE: el guard necesita saber SI HAY SESION (dato que Firebase Auth ya tiene a los 2565 ms), no necesita el PERFIL del usuario (username, location, avatar). Hoy espera las dos cosas porque el mismo flag `loading` cubre ambas.\\n\\nOJO — RIESGO: cambiar cuando se apaga `loading` toca el arranque de sesion entero. Hay consumidores que asumen que si `loading` es false entonces `user.value` esta completo. Hay que trazarlos TODOS antes de tocar (Regla 1 de anti-loop). No es un cambio de una linea.\\n\\nRELACION CON OTROS TICKETS: es un tramo DISTINTO y mas grande que TASK-148 (que es el tramo D, la ráfaga de matches a partir de 5572 ms). Los dos se quitan para aislar el tramo B, que son 1791 ms todavia sin explicar entre que el SDK de Firebase termina de bajar (640 ms) y su primera llamada de red (2431 ms).",
+  "acceptance_criteria": [
+    "La navegacion a /inicio deja de estar bloqueada por la lectura del documento /users: el chunk de HomeView se pide en cuanto Firebase Auth resuelve si hay sesion o no, sin esperar el perfil",
+    "Se traza y se documenta en el ticket TODO consumidor que hoy asume 'loading false implica user completo'. Ninguno queda roto: o se adapta, o se le da una senal propia de perfil-cargado",
+    "El usuario anonimo sigue siendo redirigido a /login exactamente como hoy, y el usuario con sesion no ve un parpadeo de contenido de invitado",
+    "Tests unitarios primero (TDD) sobre authGuard y sobre el store de auth, cubriendo: sesion valida, sin sesion, y perfil que tarda o falla despues de que la ruta ya resolvio",
+    "Se vuelve a medir /inicio con el mismo metodo (timing de red + cuando se pide el chunk de HomeView) y el numero nuevo queda registrado en el ticket. Medido, no estimado",
+    "`npm run test:unit` verde y `npx vite build` exitoso"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "landing",
+    "auth",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T18:30:00.000Z",
+      "body": "MEDICION POST-FIX (2026-08-08), AC5. Bundle en modo development en local, sesion real, pestaña visible. El chunk HomeView.js pasa a pedirse a los 1845 ms, EN PARALELO con el getDoc del perfil (1852 ms), en vez de esperarlo. En produccion antes del cambio se pedia a los 5572 ms, despues de que volviera la lectura.\n\nLIMITE CONOCIDO Y DECLARADO, no resuelto por este ticket: App.vue:87-93 sigue gateando el RouterView con authStore.loading (via shouldBlockOnAuthLoading, App.vue:41), asi que la VISTA sigue sin pintarse hasta que termina el getDoc del perfil. Lo que este ticket compra es la descarga del chunk fuera del camino critico, no los ~1547 ms de la lectura. El AC1 se redacto por mecanismo (\"el chunk se pide\") en vez de por resultado (\"la vista es visible en X ms\") — error de redaccion del orquestador, no del implementador. Cobrar esos 1547 ms exige gatear el loader por sessionKnown y adaptar los consumidores que muestran perfil: es otro ticket.\n\nHALLAZGO NUEVO SIN EXPLICAR (tramo E): el input del hero recien queda disponible a los 9754 ms en local, con el getDoc terminado a los ~2666 ms. Hay ~7 s despues del montaje que ningun diagnostico de esta sesion cubre. Sospecha sin verificar: preloadPriceData de App.vue."
+    }
+  ],
+  "created_at": "2026-08-08T00:00:00.000Z",
+  "updated_at": "2026-08-08T18:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier",
+  "marker": "[EXPLICIT]"
+}

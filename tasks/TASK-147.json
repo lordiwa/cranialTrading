@@ -1,0 +1,39 @@
+{
+  "key": "TASK-147",
+  "title": "UC-08 (operaciones masivas) no tiene cobertura real — dos tests sin un solo expect",
+  "description": "Refutado en TASK-144 / ESTRATEGIA B3 el 2026-08-08. Flujo de negocio Nº3, prioritario.\\n\\nMUTACION M2 — FICHA (A5):\\n- Proyecto Firebase: cranial-trading-dev. Produccion NO tocada.\\n- Costura mutada: `src/stores/collection.ts:901` `batchUpdateCards` -> `onProgress?.(100); return true` inmediato. El cambio masivo de estado no cambia ni un documento.\\n- Tests bajo prueba: `e2e/specs/collection/collection-crud.spec.ts:118` (\\\"bulk change status to Sale\\\") y `:137` (\\\"bulk delete\\\").\\n- Esperado si el caso estuviera cubierto: ROJO. Observado: VERDE los dos, 2/2 (`--repeat-each=2`).\\n- Higiene B5: revertida y verificada limpia. Nunca commiteada.\\n\\nMECANISMO: los dos tests no contienen **ni un solo `expect`**. Su cadena entera vive dentro de `if (... .catch(() => false))` anidados, de modo que si cualquiera de las condiciones no se cumple el cuerpo se saltea y el test termina en verde sin haber ejercitado nada. Medido: la primera guarda (`selectModeButton`) SI se cumple — empareja exactamente 1 boton visible \\\"Select\\\", asi que la hipotesis del modo estricto de Playwright queda descartada. La que falla es la siguiente: sin cartas observables en la grilla (TASK-145) no hay `input[type=\\\"checkbox\\\"]` visible y el cuerpo se saltea entero.\\n\\nALCANCE HONESTO DE LO REFUTADO (B4): M2 mutó unicamente el camino de cambio de estado. Que `:137` (borrado masivo) tambien pasara en verde NO queda condenado por M2, porque esa mutacion no tocaba su costura — queda condenado por el argumento independiente de que no tiene ningun `expect`. Su mutacion propia esta pendiente y es parte de este ticket.\\n\\nAdemas, el documento declaraba un path secundario \\\"borrado masivo cancelado\\\" como cubierto por E2E y no existe tal test; ya se corrigio en `docs/CASOS-DE-USO.html` (commit cc7f251).\\n\\nDEPENDE de TASK-145.",
+  "acceptance_criteria": [
+    "Existe un test que FALLA con la mutacion M2 puesta (`batchUpdateCards` -> `return true` inmediato) y PASA sin ella, verificado ejecutandolo en ambos sentidos",
+    "Existe un test que FALLA con una mutacion equivalente en la costura del borrado masivo y PASA sin ella — la costura propia de `:137`, que M2 no llego a cubrir",
+    "Ninguno de los dos tests masivos queda sin `expect`: cada uno asevera el estado resultante de las cartas afectadas, no solo la aparicion de un toast",
+    "Se elimina el patron de guardas anidadas `if (await X.isVisible(...).catch(() => false))` como envoltorio de las aserciones: las precondiciones se aseveran con `expect` para que su ausencia enrojezca en vez de saltear el cuerpo",
+    "Se agrega el test del path secundario \"borrado masivo cancelado\", que hoy no existe pese a estar declarado, y se revierte la marca de sin-E2E en `docs/CASOS-DE-USO.html` cuando exista",
+    "El estado de partida se declara y se restaura (A4): las operaciones masivas mutan varias cartas de la cuenta compartida de dev y no pueden dejar deriva no acotada"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-145"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T18:30:00.000Z",
+      "body": "VERIFICADO POR EL ORQUESTADOR (2026-08-08). Corrida propia de npm run e2e:collection contra dev: 16 pasan, 1 salteado, 4.5 min. El salteado es el test.fixme honesto de editar, bloqueado por TASK-155. Los tests masivos pasaron a durar 32-45 s y quedaron anclados a los conteos del STORE COMPLETO (\"status counts move in the store, not just the toast\"), que es el ancla correcta segun el mecanismo 14 del catalogo. No se commiteo nada del agente sin correrlo antes."
+    }
+  ],
+  "created_at": "2026-08-08T05:22:54.316Z",
+  "updated_at": "2026-08-08T18:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

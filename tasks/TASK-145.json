@@ -1,0 +1,45 @@
+{
+  "key": "TASK-145",
+  "title": "La grilla de Coleccion no es observable por los E2E: el locator devuelve 1 carta sobre 41.093",
+  "description": "Refutado por mutacion dirigida en TASK-144 / ESTRATEGIA B3 el 2026-08-08. Es la CAUSA RAIZ de que UC-07 y UC-08 (flujo de negocio Nº3, quitar cartas o ponerlas a la venta) no tengan cobertura real.\\n\\nEVIDENCIA MEDIDA contra cranial-trading-dev, cuenta de CI, vista en modo \\\"visual\\\":\\n- El chip ALL de la propia UI dice 41.093 cartas.\\n- `e2e/pages/collection.page.ts:111` cuenta `.grid img[loading=\\\"lazy\\\"]`. A los 1000 ms devuelve **0**. A los 3000 ms devuelve **1**. A los 8000 ms sigue devolviendo **1**.\\n- `.grid img` (sin el filtro de lazy) tambien da 1. Hay 2 elementos `.grid` en la pagina.\\n\\nDos defectos distintos, y conviene no confundirlos:\\n(1) TIMING: a 1000 ms el contador es 0. Los tests de `collection-crud.spec.ts` esperan exactamente `waitForTimeout(1000)` y despues consultan `getCardCount()`, asi que leen 0.\\n(2) LOCATOR: aun a 8000 ms el locator solo ve 1 imagen en una coleccion de 41.093 cartas. `clickCardInGrid` (`:106`) usa el MISMO selector, asi que \\\"tocar la carta 0 de la grilla\\\" es hoy una operacion que apenas engancha un elemento.\\n\\nTEORIA PREVIA FALSADA, para que no se vuelva a proponer: en la sesion del 2026-08-07 quedo anotada la sospecha de que `collection-views.spec.ts` dejaba la cuenta en modo LISTA y contaminaba la corrida siguiente. Se midio: `viewTypeSelect` vale `\\\"visual\\\"`. No es el modo de vista. Tampoco es el modo estricto de Playwright: se midio que `selectModeButton` empareja exactamente 1 boton visible.\\n\\nMientras este ticket no se resuelva, cualquier test que dependa de contar o tocar cartas de la grilla es incapaz de fallar por la razon correcta.",
+  "acceptance_criteria": [
+    "`getCardCount()` devuelve un numero acorde a lo que la UI muestra en la grilla (decenas, no 1) contra la cuenta de dev, y lo hace de forma estable en 3 corridas seguidas",
+    "`clickCardInGrid(0)` abre el modal de detalle de forma reproducible 3/3 contra dev, sin `force: true` enmascarando un locator que no engancha",
+    "El locator deja de depender del atributo `loading=\"lazy\"`: se ancla a un `data-testid` o equivalente puesto en el componente de tarjeta, para que un cambio de estrategia de carga de imagenes no vuelva a romper la observabilidad",
+    "Se elimina la espera fija `waitForTimeout(1000)` como condicion previa a contar cartas: se reemplaza por una espera a una condicion observable de la grilla",
+    "No se modifica el comportamiento de la aplicacion para acomodar al test: si hace falta agregar un `data-testid`, es lo unico que cambia en `src/`"
+  ],
+  "status": "done",
+  "priority": "critical",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "21c7e9d",
+    "649f71e",
+    "1e0a492"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-08T06:02:21.514Z",
+      "body": "REVIEW EN CONTEXTO FRESCO — VEREDICTO FINAL (2026-08-08). Commits revisados: 21c7e9d + 649f71e.\n\nPRIMERA PASADA — 1 HIGH, 2 MEDIUM, 2 LOW.\nEl HIGH fue que el patron que este ticket existia para eliminar SOBREVIVIO, mejor disfrazado: `waitForGridReady` terminaba en `.waitFor({...}).catch(() => {})`, un escape silencioso, y los tres `if (count === 0) return` de editar/borrar/cancelar seguian intactos. Si la grilla tardaba mas de lo previsto, el timeout se tragaba, el conteo daba 0 y los tres tests salian VERDES sin ejecutar una sola asercion. En palabras del reviewer: no flakea, degrada a skip invisible, que es peor que un flake porque nadie lo ve.\n\nREBOTE 1 — resuelto en 649f71e y verificado:\n- El `.catch(() => {})` ya no esta, con comentario de por que no debe volver.\n- Los tres guards son ahora `expect(...).toBeGreaterThan(0)`. No queda ningun return temprano por conteo en los tests del ticket.\n- PRUEBA DE ROJO EXIGIDA Y ENTREGADA: se apunto el locator a un testid inexistente, el test fallo de verdad con el stack en `waitForGridReady` y sin catch enmascarando, se restauro y volvio a verde. Sin esa prueba no habriamos sabido si el escape se elimino o solo se mudo de lugar.\n- Excepcion aceptada tras juzgarla: el `if (cardCount > 0)` del cleanup de \"add card\" queda intacto. Esta DESPUES de las aserciones reales del test, asi que saltearlo no produce un verde vacio sino un verde con aserciones mas la fuga de una carta — el compromiso \"leak, don't redden\" ya documentado. No es el patron del HIGH.\n\nVEREDICTO: AC1 a AC5 CUMPLIDOS. HIGH vivos: NINGUNO.\n\nRESIDUAL QUE ENTRA EN UN TERCER COMMIT en vez de quedar como deuda: subir `waitForGridReady` de 30 s a 60 s quedo INERTE, porque `playwright.config.ts:28` fija el timeout de test en 45.000 ms y aborta antes. El margen real es aun menor que 18 s, porque el `beforeEach` con su `goto()` consume el mismo presupuesto. En un runner de GitHub (1.5-2x mas lento, con la carga de precios de 41k cartas ocupando el hilo principal) un montaje de 27 s locales puede irse a 40-50 s, y con `retries: 2` eso no seria rojo duro sino flake invisible con duracion triplicada. Solucion elegida: `test.setTimeout(90_000)` a nivel del describe, NO subir el timeout global (escondería regresiones en los otros ~128 tests). Beneficio extra: el fallo pasa a reportar \"waiting for [data-testid=collection-card]\", que se diagnostica solo.\n\nDERIVADOS a otros tickets, no perdidos: aserciones por identidad en vez de por conteo sobre grilla virtualizada -> TASK-146. Specs que siguen usando `img[loading=\"lazy\"]` (collection-views, preferences-crud) -> anotados en TASK-144 como superficie B sin atacar."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T06:06:59.294Z",
+      "body": "CERRADO 2026-08-08. Tres commits: 21c7e9d (anclar la grilla a un data-testid observable), 649f71e (eliminar el escape silencioso del wait, rebote del reviewer) y 1e0a492 (test.setTimeout(90_000) en el describe). Ninguno pusheado: Rafael pidio que el push se haga al final, asi que auto_push_after_close esta en false.\n\nLos 5 criterios cumplidos, verificados por un reviewer en contexto fresco que no vio el razonamiento del developer. Ningun HIGH vivo.\n\nLO QUE ESTE TICKET ENSENO, mas alla de su alcance:\n1. La causa raiz NO era un locator roto, como yo habia diagnosticado. Era el tiempo de montaje: con 41.093 cartas y useVirtualGrid, la primera fila tarda 20-27 s en aparecer, con la carga de precios compitiendo por el hilo principal. Mi sonda dejo de medir a los 8 s y de ahi salio mi conclusion equivocada. El defecto de producto que esto destapo esta en TASK-153, y es mas importante que este ticket.\n2. El primer intento PARECIA resolver el ticket y reintroducia su propio defecto: cambiaba un sleep corto por un timeout largo con `.catch(() => {})`, o sea el mismo verde vacio mejor disfrazado. Lo encontro el reviewer, no el developer ni yo.\n3. La prueba de rojo exigida (romper el locator a proposito, comprobar que enrojece, restaurar) fue lo que separo 'lo arregle' de 'lo mudé de lugar'. Es el mismo criterio que TASK-146 y TASK-147 exigen con su mutacion, y conviene que sea el estandar de aqui en mas.\n4. El arreglo del timeout de 30 a 60 s habia quedado INERTE porque playwright.config.ts fija 45 s a nivel de test. Lo detecte al leer los dos numeros; el reviewer lo confirmo y afino: el beforeEach con su goto consume el mismo presupuesto, asi que el margen era todavia menor. Se resolvio con setTimeout a nivel del describe en vez de tocar el timeout global, que habria escondido regresiones en los otros ~128 tests.\n\nDERIVADOS, no perdidos: aserciones por identidad en vez de por conteo sobre grilla virtualizada -> TASK-146. Specs que siguen usando img[loading=\"lazy\"] (collection-views, preferences-crud) -> anotados en TASK-144 como superficie B sin atacar. Los 20-27 s de montaje -> TASK-153."
+    }
+  ],
+  "created_at": "2026-08-08T05:22:09.581Z",
+  "updated_at": "2026-08-08T06:06:59.294Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

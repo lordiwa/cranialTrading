@@ -1,0 +1,30 @@
+{
+  "key": "TASK-164",
+  "title": "La regla de sobreasignacion tiene TRES caminos con TRES comportamientos distintos, y solo uno hace lo que dice el documento",
+  "description": "Hallazgo del wargaming de TASK-144 (2026-08-08) sobre el FLUJO Nº4. IMPORTANTE: es un hallazgo de LECTURA DE CODIGO, NO verificado por ejecucion, y se declara asi de forma explicita. En esta sesion ya se falsaron CUATRO teorias que parecian solidas leyendo codigo, asi que esto es una sospecha fuerte y no un hecho.\\n\\nPOR QUE NO SE PUDO EJECUTAR: la cuenta de dev tiene 0 mazos, y cualquier intento real de sobreasignar habria exigido crear uno, cosa que estaba prohibida para no ensuciar la cuenta compartida ni chocar con otro agente. Verificar esto en ejecucion es el primer criterio de aceptacion.\\n\\nLA REGLA DECLARADA: el documento de casos de uso dice, para UC-13, que \"asignar mas copias de las que se poseen produce un error de sobreasignacion y se rechaza\". Es la regla de negocio CENTRAL de los mazos, porque un mazo asigna cartas que ya estan en la coleccion en vez de duplicarlas.\\n\\nLO QUE SE ENCONTRO AL LEER: no hay una regla, hay TRES caminos de codigo con TRES comportamientos distintos para el mismo caso de negocio.\\n1. `src/components/collection/ManageDecksModal.vue:81-92` — el modal de gestionar mazos desde la coleccion. Si se excede lo disponible, muestra un toast de ERROR y hace `return` sin escribir nada. ESTE es el unico que coincide con lo documentado.\\n2. `src/stores/decks.ts:997-1057` `updateAllocation`, usado por el stepper +/- DENTRO del editor de mazo (`DeckView.vue:498`). Internamente rechaza (`return false`) si excede el maximo, pero el toast de error solo aparece si no viene `silent`, y `DeckView.vue:498` lo llama con `silent=true`. El llamador (`handleDeckGridQuantityUpdate`, `DeckView.vue:532-563`) atrapa ese `false` y, en vez de mostrar el error, abre un modal de confirmacion preguntando si agregar a la coleccion o a la wishlist. El usuario NUNCA ve un rechazo: ve una eleccion, y las dos opciones terminan asignando el excedente igual.\\n3. `src/stores/decks.ts:595-697` `allocateCardToDeck`, al agregar una carta nueva desde la coleccion. NO rechaza nada: calcula lo disponible, asigna lo que hay, y manda el resto a la wishlist automaticamente, con un toast de tipo `info` y no de error. El propio codigo lo documenta en las lineas 592-594: \"si la cantidad excede lo disponible, el excedente va a la wishlist\". Es deliberado.\\n\\nO SEA: de los tres puntos de entrada por los que alguien puede intentar sobreasignar, uno rechaza y dos redirigen el excedente en silencio.\\n\\nESTO ES UN CASO DE LIBRO DE LA REGLA 6 del proyecto (los puntos paralelos deben cambiarse de forma atomica): tres implementaciones divergentes de la misma regla de negocio.\\n\\nY SE VINCULA CON EL PEOR HALLAZGO DEL BARRIDO: `deck-editor.spec.ts` tiene CUATRO tests placeholder, incluido el que dice cubrir la sobreasignacion. La regla central del flujo Nº4 diverge en tres caminos y no hay ni un test que mire ninguno. Ver TASK-159.\\n\\nCLASIFICACION PROBABLE (A6), a confirmar tras ejecutar: no parece (a) defecto de la app, porque el desvio a wishlist esta comentado como intencional. Es mas probable (b) el documento generaliza mal un comportamiento que solo aplica a un punto de entrada, o (c) comportamiento intencional mal documentado. La distincion importa: determina si esto se arregla en el codigo o en el documento.",
+  "acceptance_criteria": [
+    "PRIMERO: verificar POR EJECUCION los tres caminos, con una cuenta que tenga mazos con cartas asignadas. Sin eso, todo lo anterior es lectura de codigo y en esta sesion ya se falsaron cuatro teorias asi",
+    "Establecer cual es el comportamiento CORRECTO desde el punto de vista del negocio: rechazar la sobreasignacion, o desviar el excedente a la wishlist. Es decision de Rafael, no tecnica — las dos son defendibles y hoy conviven las dos",
+    "Una vez decidido, los TRES caminos se comportan igual, cambiados de forma atomica (Regla 6). No se acepta arreglar uno y dejar los otros para despues",
+    "Se corrige el documento de casos de uso para que UC-13 describa el comportamiento real, sea cual sea",
+    "Existe un test que FALLA si cualquiera de los tres caminos vuelve a divergir — y que efectivamente ejercite la sobreasignacion, a diferencia del placeholder actual de deck-editor.spec.ts"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "decks",
+    "user-flow",
+    "decision-producto"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T15:35:54.844Z",
+  "updated_at": "2026-08-08T15:35:54.844Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[INFERRED:strong]"
+}

@@ -1,0 +1,35 @@
+{
+  "key": "TASK-148",
+  "title": "La landing /inicio NO lee cero de Firestore: dispara 6 lecturas de coleccion mas borrados, y el codigo afirma lo contrario",
+  "description": "Hallazgo HIGH del deep review de TASK-143 (2026-08-08), confirmado adversarialmente.\\n\\nLa razon de ser declarada de /inicio es de rendimiento: no pagar el recalculo de matches en cada login. El codigo, el mensaje de commit y hasta el comentario de un spec afirman \"ZERO Firestore reads on mount\". ES FALSO.\\n\\nCADENA VERIFICADA: HomeView renderiza `<AppContainer>` -> `AppContainer.vue:9` renderiza `<AppHeader>` -> el bloque de nav autenticado de `AppHeader.vue:403-424` renderiza `<MatchNotificationsDropdown>` (ojo: `hidden md:block` es SOLO CSS, el componente se monta igual) -> `MatchNotificationsDropdown.vue:33-35` llama `void ensureLoaded()` dentro de `onMounted`, SIN gesto del usuario -> `matchesStore.loadAllMatches()`.\\n\\nCOSTE REAL: `stores/matches.ts:292-316` corre `cleanExpiredMatches()` (2 `getDocs` completos sobre matches_nuevos y matches_guardados, `matches.ts:396-402`) MAS 4 `getDocs` en paralelo sobre matches_nuevos, matches_guardados, matches_eliminados y una consulta OR sobre la coleccion cruzada `shared_matches`. Total: 6 lecturas de coleccion. Ademas hace borrados batched en `matches.ts:409-411` — o sea que la landing tambien ESCRIBE.\\n\\nAFIRMACIONES FALSAS A CORREGIR, no solo el comportamiento:\\n- `src/views/HomeView.vue:4-15` (\"ZERO Firestore reads on mount... no matches, no counters\")\\n- `e2e/specs/auth/login.spec.ts:9-10` (\"/inicio reads nothing from Firestore, so login no longer pays the match recalculation up front\")\\n- `src/router/index.ts:18-21`, `src/data/announcements.ts:4-8`, `src/components/home/AnnouncementsCarousel.vue:4-5`\\n\\nCONTEXTO: esto ya se habia detectado de refilon en la sesion del 2026-08-07 (\"el cero-lecturas NO resulto literal\"), pero nunca se cuantifico ni se corrigio, y las afirmaciones falsas siguen en el arbol. El deep review lo cuantifico.\\n\\nPRIORIDAD DE NEGOCIO: /inicio es la puerta de entrada al flujo Nº1. El baseline medido del landing era 144 s hasta usable y 212 peticiones a Firestore.",
+  "acceptance_criteria": [
+    "Se mide el coste real de montar /inicio (numero de lecturas y escrituras a Firestore) con el metodo repetible del baseline de perf, y el numero queda registrado en el ticket — no estimado, medido",
+    "O bien /inicio deja de disparar loadAllMatches al montar (carga diferida a gesto del usuario sobre la campana), o bien se corrige toda afirmacion de 'cero lecturas' en codigo, comentarios y specs para que diga la verdad. Decidir cual con Rafael antes de implementar: son dos tickets distintos disfrazados de uno",
+    "Si se opta por diferir la carga: la campana de notificaciones sigue mostrando su insignia correctamente cuando el usuario la usa, y no se rompe en las demas rutas autenticadas donde el header tambien monta",
+    "Ninguna afirmacion sobre coste de lecturas queda en el arbol sin estar respaldada por una medicion"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "deep-review",
+    "perf",
+    "landing",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T18:30:00.000Z",
+      "body": "MEDICION POST-FIX (2026-08-08), que es lo que pedia el AC1. Bundle en modo development servido en localhost, sesion real, pestaña visible. Peticiones a Firestore al montar /inicio: de ~18 (medidas en produccion antes del cambio) a 2. La carga de matches ya no se dispara en onMounted sino en el clic sobre la campana.\n\nCONTRAPARTIDA ACEPTADA POR RAFAEL tras UAT local: el badge del tab bar MOBILE queda en 0 hasta que el usuario entra a Matches, porque antes se alimentaba de rebote del onMounted del dropdown de desktop (que se montaba igual en mobile: hidden md:block es solo CSS). Es consecuencia esperada de diferir a gesto, no un defecto."
+    }
+  ],
+  "created_at": "2026-08-08T05:37:09.489Z",
+  "updated_at": "2026-08-08T18:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

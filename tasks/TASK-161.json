@@ -1,0 +1,29 @@
+{
+  "key": "TASK-161",
+  "title": "Areas no prioritarias con cobertura nula: matches, ajustes, notificaciones, mensajes y ayuda",
+  "description": "Barrido estatico de TASK-144 (2026-08-08). Todo esto cae FUERA de los cuatro flujos prioritarios de negocio, y por eso va agrupado y con prioridad menor — pero se registra para que la decision de no atenderlo sea consciente y no un olvido.\\n\\nMATCHES (el area con mas codigo del sistema, y sin cobertura real):\\n- `matches.page.ts:87` `matchAction` se invoca con 'share|compartir' en `match-management.spec.ts:45`, y NO existe ningun boton de compartir en `MatchCard.vue` ni en `SavedMatchCard.vue` (grep exhaustivo de los botones de accion, sin resultado). Nunca empareja.\\n- `match-management.spec.ts:53-62` \"block user from match card\" — tampoco existe un boton de bloquear por tarjeta: el bloqueo real vive en el menu de desbordamiento de `SavedMatchesView.vue:900-912`, desconectado de `matchAction`. Y aunque existiera, el test NUNCA referencia la lista de bloqueados que su titulo promete.\\n- 5 de los 7 tests de `match-management.spec.ts` son `if (count > 0) { ... }` sin ningun expect adentro.\\n- `match-calculation.spec.ts:47` — `expect(matchCount > 0 || noMatches || tabVisible).toBeTruthy()`; la pestana \"Nuevos\" esta montada por defecto siempre, asi que `tabVisible` es practicamente tautologico.\\n- `match-calculation.spec.ts:64` — `expect(true).toBe(true)` literal.\\n\\nAJUSTES:\\n- `settings-data.spec.ts` — el ARCHIVO COMPLETO, sus cuatro tests, no tiene NI UN expect. Cubre exportacion de la coleccion en dos formatos, reenvio de verificacion y reinicio del tour.\\n- `settings.page.ts:69` — `username.toggleButton` busca \"CHANGE USERNAME\"/\"CAMBIAR USUARIO\" y ese texto no existe en ninguno de los tres idiomas; el label real es solo \"Username\" (`SettingsView.vue:653`).\\n- `settings-profile.spec.ts:16` — `expect(x || true).toBeTruthy()`.\\n\\nNOTIFICACIONES:\\n- `navigation.page.ts:31` — `notificationBell = [class*=\"bell\"], [class*=\"notification\"]`. Esa clase no existe en TODO src/ (grep confirmado): el boton real es `IconV2 name=\"swap\"` (`AppHeader.vue:424`). Muerto.\\n- `navigation.page.ts:32` — `notificationDropdown = [class*=\"dropdown\"]`, tambien muerto.\\n- Consecuencia: 3 de los 4 tests del bloque \"Match Notifications\" dependen de ese locator, incluida la UNICA asercion real del bloque, que por lo tanto nunca se ejecuta.\\n\\nMENSAJES: `messages.spec.ts:73` — `expect(convCount).toBeGreaterThanOrEqual(0)`, tautologia. Ademas hay dos `test.skip(true, ...)` incondicionales ya conocidos.\\n\\nAYUDA Y PREFERENCIAS: `help-legal.spec.ts:9-14` y `:34-42` — dos tests enteramente dentro de `if (isVisible())` sin ningun expect. `preferences-crud.spec.ts:36-58` — doble guarda anidada sin cubrir el caso negativo.\\n\\nTAMBIEN: `navigation.page.ts:25` `helpMenu = button:has-text(\"?\")` esta muerto (el boton real es solo un icono). Hoy no lo usa ningun spec, pero romperia `switchLanguage()` en silencio si algo lo invocara.",
+  "acceptance_criteria": [
+    "Rafael decide el alcance ANTES de tocar nada: esto es todo fuera de los cuatro flujos prioritarios, asi que puede ser legitimo arreglar solo una parte, o ninguna. Lo que no es legitimo es dejar tests que aparentan cubrir lo que no cubren",
+    "Para lo que se decida atender: ningun test queda con cero expect, con asercion tautologica ni con locator muerto, y cada uno se verifica capaz de fallar",
+    "Para lo que se decida NO atender: los tests afectados se marcan de forma visible (test.fixme con el motivo) en vez de seguir reportando verde. Un verde falso es peor que un test ausente",
+    "Se corrigen las filas de cobertura correspondientes en docs/CASOS-DE-USO.html para que el documento deje de declarar cubierto lo que no lo esta"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T13:52:12.483Z",
+  "updated_at": "2026-08-08T13:52:12.483Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

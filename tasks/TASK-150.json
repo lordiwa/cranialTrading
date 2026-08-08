@@ -1,0 +1,30 @@
+{
+  "key": "TASK-150",
+  "title": "El test del logo es un verde vacio: el locator no empareja nada y la asercion vive dentro de un if",
+  "description": "Hallazgo MEDIUM del deep review de TASK-143 (2026-08-08), confirmado adversarialmente. Es EXACTAMENTE el mismo modo de fallo que TASK-144 demostro por mutacion en la coleccion, encontrado de forma independiente en otra parte del sistema.\\n\\nLa tanda reapunto cuatro superficies a /inicio: `router/index.ts:14-17` (redireccion de '/'), `router/index.ts:26-29` (redireccion de '/dashboard'), `authGuard.ts:130` y `:144`, y `AppHeader.vue:195` (el logo, `to=\\\"/inicio\\\"`). Solo las dos ramas del authGuard ganaron cobertura.\\n\\nDEFECTO 1 — verde vacio: `e2e/pages/navigation.page.ts:33` sigue definiendo `logoLink = page.locator('a[href=\\\"/\\\"]').first()`. Ese selector NO EMPAREJA NADA: el logo antes apuntaba a '/saved-matches' y ahora a '/inicio'; el unico `to=\\\"/\\\"` que queda en `src/` es el de NotFoundView. Su unico consumidor, `e2e/specs/help/help-legal.spec.ts:38`, envuelve el click en `if (await navigationPage.logoLink.isVisible())`. Resultado: el test se saltea en silencio y seguiria pasando en verde apunte el logo a donde apunte.\\n\\nDEFECTO 2 — sin cobertura: las redirecciones de '/' y '/dashboard' no tienen ni una asercion, ni unitaria ni E2E.\\n\\nPor que importa: el AC2 de TASK-143 pedia verificar que ningun camino devuelva al usuario a /saved-matches sin pedirlo. Tres de las cuatro superficies no lo verifica nada ejecutable.",
+  "acceptance_criteria": [
+    "`navigation.page.ts:33` apunta al logo real y se verifica que el locator empareja exactamente 1 elemento — medido, no supuesto",
+    "El test del logo deja de estar envuelto en `if (isVisible())`: si el logo no esta, el test debe enrojecer, no saltearse",
+    "El test del logo asevera el DESTINO (/inicio), de modo que falle si alguien lo reapunta",
+    "Existe cobertura de que '/' y '/dashboard' redirigen a /inicio",
+    "Cada test se verifica capaz de fallar: se reapunta el logo a proposito, se comprueba que enrojece, se restaura"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "deep-review",
+    "cobertura-real",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T05:37:51.779Z",
+  "updated_at": "2026-08-08T05:37:51.779Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

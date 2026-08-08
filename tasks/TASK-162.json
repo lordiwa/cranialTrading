@@ -1,0 +1,29 @@
+{
+  "key": "TASK-162",
+  "title": "Ningun flujo se prueba jamas en espanol, que es el idioma por defecto de la aplicacion",
+  "description": "Hallazgo transversal del barrido de TASK-144 (2026-08-08). No rompe nada HOY, y justamente por eso conviene registrarlo antes de que rompa.\\n\\nEl idioma por defecto de la aplicacion es ESPANOL. Pero `e2e/auth.setup.ts` fuerza el locale a INGLES para toda la suite, y una cantidad grande de locators estan escritos como expresiones regulares de texto que solo emparejan en ingles. Consecuencia: los flujos se validan unicamente en un idioma que no es el que ve la mayoria de los usuarios.\\n\\nEJEMPLOS VERIFICADOS contra `src/locales/es.json` y `pt.json`:\\n- `collection.page.ts:64` `selectModeButton` no empareja el \"Selecionar\" de portugues.\\n- `matches.page.ts:35` `refreshButton` no empareja el \"ATUALIZAR\" de portugues.\\n- `contacts.page.ts:12` `emptyState` no empareja el texto portugues (\"Voce nao tem...\" rompe la subcadena buscada).\\n- Hay huecos equivalentes en `decks.page.ts`, `binders.page.ts`, `settings.page.ts`, `preferences.page.ts`, `register.page.ts` y `reset-password.page.ts`.\\n\\nEsto es inerte mientras el locale siga forzado a ingles. Se vuelve un apagon de cobertura en el momento en que alguien cambie ese default, corra la suite en otro idioma, o agregue un test que no pase por `auth.setup.ts`. Y mientras tanto significa que la interfaz en espanol —la que ve el usuario real— no la ejerce ningun test automatizado.\\n\\nRELACIONADO: se comprobo programaticamente que las 1792 claves de en.json, es.json y pt.json estan completas, sin claves huerfanas. O sea que el problema no son las traducciones: son los tests, que estan atados al texto en vez de a algo estable.",
+  "acceptance_criteria": [
+    "Rafael decide si esto se atiende ahora o se deja registrado como deuda consciente — no rompe nada hoy y compite con hallazgos que si tienen efecto inmediato",
+    "Si se atiende: los locators dejan de depender de texto visible y se anclan a algo estable (data-testid o rol ARIA), que es lo unico que sobrevive a un cambio de idioma o de redaccion",
+    "Si se atiende: se decide si la suite debe correr en espanol, que es el idioma real por defecto, y no en ingles",
+    "Si NO se atiende: queda anotado en CLAUDE.md que la suite E2E solo valida la interfaz en ingles, para que nadie lea un verde como si cubriera los tres idiomas"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "i18n"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T13:52:32.980Z",
+  "updated_at": "2026-08-08T13:52:32.980Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

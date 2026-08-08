@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resultados del wargaming adversarial — Cranial Trading</title>
+<style>
+  :root{
+    --bg:#0a0a0a; --panel:#121212; --panel-2:#171717; --line:#272727;
+    --txt:#EEEEEE; --muted:#9a9a9a; --dim:#6f6f6f;
+    --neon:#5AC168; --rust:#E04B32; --amber:#D9A441; --steel:#6E93C8;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font-family:"Open Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+    font-size:16px; line-height:1.65; letter-spacing:.005em;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:0 24px 96px}
+
+  /* ---------- encabezado ---------- */
+  header.top{padding:72px 0 40px; border-bottom:1px solid var(--line)}
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--neon); margin:0 0 18px;
+  }
+  h1{font-size:clamp(30px,5vw,46px); line-height:1.12; margin:0 0 20px; font-weight:700; letter-spacing:-.02em}
+  .lede{font-size:19px; color:#cfcfcf; max-width:70ch; margin:0 0 28px}
+  .meta{display:flex; flex-wrap:wrap; gap:10px 28px; font-family:var(--mono); font-size:12px; color:var(--dim)}
+  .meta b{color:var(--muted); font-weight:400}
+
+  /* ---------- estructura ---------- */
+  section{padding-top:64px}
+  h2{
+    font-size:13px; font-family:var(--mono); letter-spacing:.18em; text-transform:uppercase;
+    color:var(--neon); margin:0 0 8px; font-weight:600;
+  }
+  h2 + .sub{font-size:26px; font-weight:700; margin:0 0 26px; letter-spacing:-.015em; line-height:1.25}
+  h3{font-size:17px; margin:34px 0 12px; font-weight:700}
+  p{margin:0 0 16px; max-width:76ch}
+  a{color:var(--neon)}
+  code{font-family:var(--mono); font-size:.88em; background:#1c1c1c; padding:.12em .4em; border-radius:3px; color:#d6d6d6; word-break:break-word}
+  b,strong{color:#fff}
+
+  /* ---------- tarjetas de números ---------- */
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:14px; margin:0 0 12px}
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px 18px}
+  .stat .n{font-size:34px; font-weight:700; line-height:1; letter-spacing:-.02em}
+  .stat .n.bad{color:var(--rust)} .stat .n.warn{color:var(--amber)} .stat .n.ok{color:var(--neon)}
+  .stat .l{font-size:12.5px; color:var(--muted); margin-top:9px; line-height:1.45}
+
+  /* ---------- callouts ---------- */
+  .call{border-left:3px solid var(--neon); background:var(--panel); padding:18px 20px; border-radius:0 8px 8px 0; margin:0 0 22px}
+  .call.warn{border-left-color:var(--amber)}
+  .call.bad{border-left-color:var(--rust)}
+  .call .t{font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
+  .call p:last-child{margin-bottom:0}
+
+  /* ---------- tablas ---------- */
+  .tw{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:0 0 22px; background:var(--panel)}
+  table{border-collapse:collapse; width:100%; min-width:640px; font-size:14.5px}
+  th{
+    text-align:left; padding:13px 16px; background:var(--panel-2); color:var(--muted);
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; font-weight:600;
+    border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  td{padding:12px 16px; border-bottom:1px solid #1e1e1e; vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.id{font-family:var(--mono); font-size:13px; color:var(--dim); white-space:nowrap}
+
+  /* ---------- etiquetas de veredicto ---------- */
+  .tag{
+    display:inline-block; font-family:var(--mono); font-size:10.5px; letter-spacing:.09em;
+    text-transform:uppercase; padding:3px 8px; border-radius:4px; white-space:nowrap; border:1px solid;
+  }
+  .t-ref{color:var(--rust); border-color:#5a2118; background:#1e0f0c}
+  .t-sos{color:var(--amber); border-color:#584316; background:#1d1608}
+  .t-doc{color:var(--steel); border-color:#22374f; background:#0d151e}
+  .t-no{color:var(--dim); border-color:#2a2a2a; background:#141414}
+  .t-ok{color:var(--neon); border-color:#1e4426; background:#0c1a0f}
+
+  /* ---------- catálogo numerado ---------- */
+  ol.mech{list-style:none; counter-reset:m; padding:0; margin:0}
+  ol.mech li{
+    counter-increment:m; position:relative; padding:16px 18px 16px 62px;
+    border:1px solid var(--line); border-radius:9px; background:var(--panel); margin-bottom:10px;
+  }
+  ol.mech li::before{
+    content:counter(m,decimal-leading-zero); position:absolute; left:18px; top:15px;
+    font-family:var(--mono); font-size:14px; color:var(--neon); font-weight:600;
+  }
+  ol.mech li.star{border-color:#3a2a10; background:#16120a}
+  ol.mech li.star::before{color:var(--amber)}
+  ol.mech .mt{font-weight:700; display:block; margin-bottom:4px}
+  ol.mech p{margin:0; font-size:14.5px; color:#c4c4c4}
+
+  /* ---------- ficha de mutación ---------- */
+  .ficha{border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:4px 20px 8px; margin:0 0 18px}
+  .ficha dl{display:grid; grid-template-columns:minmax(150px,190px) 1fr; gap:0; margin:0; font-size:14.5px}
+  .ficha dt{padding:11px 0; color:var(--muted); font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; border-bottom:1px solid #1e1e1e}
+  .ficha dd{padding:11px 0 11px 18px; margin:0; border-bottom:1px solid #1e1e1e}
+  .ficha dl > :nth-last-child(1), .ficha dl > :nth-last-child(2){border-bottom:none}
+  @media(max-width:640px){
+    .ficha dl{grid-template-columns:1fr}
+    .ficha dt{padding-bottom:0; border-bottom:none}
+    .ficha dd{padding-left:0; padding-top:2px}
+  }
+
+  ul.plain{margin:0 0 18px; padding-left:22px}
+  ul.plain li{margin-bottom:9px; max-width:76ch}
+
+  footer{margin-top:80px; padding-top:26px; border-top:1px solid var(--line); color:var(--dim); font-size:13px}
+  @media print{body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">TASK-144 · Wargaming adversarial</p>
+  <h1>Qué sobrevivió al ataque, y qué no</h1>
+  <p class="lede">
+    El objetivo declarado de este ejercicio no era confirmar los casos de uso: era <b>falsarlos</b>.
+    Lo que sigue es el resultado de atacar el documento de casos de uso y la suite E2E que
+    supuestamente los cubre. El hallazgo principal no es la lista de tests rotos — es el
+    <b>catálogo de catorce mecanismos</b> que producen tests en verde que no prueban nada.
+  </p>
+  <div class="meta">
+    <span><b>Fecha:</b> 2026-08-08</span>
+    <span><b>Entorno:</b> cranial-trading-dev</span>
+    <span><b>Base:</b> 27 casos de uso · 134 tests · 26 specs</span>
+    <span><b>Producción:</b> no atacada</span>
+  </div>
+</header>
+
+<section>
+  <h2>Resumen</h2>
+  <p class="sub">Los números que quedaron en pie</p>
+  <div class="stats">
+    <div class="stat"><div class="n warn">72</div><div class="l">tests sospechosos sobre 134, en el pase estático</div></div>
+    <div class="stat"><div class="n bad">31</div><div class="l">tests sin un solo <code>expect</code></div></div>
+    <div class="stat"><div class="n bad">14</div><div class="l">mecanismos distintos de «verde vacío»</div></div>
+    <div class="stat"><div class="n bad">4</div><div class="l">premisas del propio documento caídas en la Fase&nbsp;0</div></div>
+    <div class="stat"><div class="n ok">1</div><div class="l">de 26 specs quedó limpio tras verificarlo 1:1</div></div>
+    <div class="stat"><div class="n">20</div><div class="l">tickets generados (TASK-145 a TASK-164)</div></div>
+  </div>
+
+  <div class="call bad">
+    <p class="t">La frase que resume todo</p>
+    <p>De veintiséis archivos de spec, el <b>único</b> que quedó limpio después de verificarlo uno a uno
+    contra sus componentes es <code>collection-crud.spec.ts</code> — y sólo porque lo arreglamos
+    durante este mismo ejercicio. No es un descuido aislado: es un patrón instalado en todo el árbol,
+    agravado por el rediseño v2, que movió controles sin actualizar los tests que los buscaban.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Metodología</h2>
+  <p class="sub">Tres fases, y sólo una de ellas condena</p>
+  <p>
+    La regla que gobierna todo el ejercicio: <b>leer código produce sospechosos, sólo ejecutar condena</b>.
+    Una guarda defensiva legítima y una escapatoria silenciosa se ven idénticas en el código.
+    La diferencia sólo se demuestra mutando la aplicación y volviendo a correr el test.
+  </p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Fase</th><th>Qué hace</th><th>Qué produce</th></tr></thead>
+      <tbody>
+        <tr><td class="id">FASE 0</td><td>Valida que el blanco existe: la ruta, el spec citado, el elemento citado. Un caso cuya premisa no se sostiene no se ataca — se corrige el documento.</td><td>Correcciones al documento. <b>No</b> genera tickets de bug.</td></tr>
+        <tr><td class="id">ESTRATEGIA&nbsp;A</td><td>Falsar el <b>comportamiento</b> de la app, con predicado verificable previo y seis dimensiones de ataque (volumen, forma del dato, estado persistido, tiempo y concurrencia, identidad, servicios externos).</td><td><span class="tag t-no">sin empezar</span></td></tr>
+        <tr><td class="id">ESTRATEGIA&nbsp;B</td><td>Falsar la <b>cobertura declarada</b>. Dos pases: uno estático que marca sospechosos, y una mutación quirúrgica que condena. Una mutación por vez, nunca commiteada.</td><td>Refutaciones con demostración.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="call">
+    <p class="t">Por qué las mutaciones importan tanto</p>
+    <p>Una refutación no se acepta sin ficha completa: proyecto Firebase, cuenta, estado de partida,
+    pasos, resultado esperado, resultado observado y reproducibilidad mínima 2 de 2. Una refutación
+    irreproducible no es una refutación: es una anomalía y va a otra lista. Y lo que se refuta es
+    «este caso de uso está cubierto», <b>nunca</b> «este test no sirve» — el test puede estar cubriendo
+    otra cosa perfectamente bien.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Fase 0</h2>
+  <p class="sub">Cuatro premisas del propio documento se cayeron antes de atacar nada</p>
+  <p>Todas son defectos del <b>documento</b>, no de la aplicación. Se corrigieron en la sección 17 de
+  <code>docs/CASOS-DE-USO.html</code> y no generan ticket de bug.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Premisa</th><th>Realidad medida</th></tr></thead>
+      <tbody>
+        <tr><td>«48 casos de uso»</td><td>Son <b>27</b> (UC-01 a UC-27). El número equivocado estaba en el encabezado, en el pie y en la descripción del propio ticket de wargaming.</td></tr>
+        <tr><td>UC-09 declaraba cobertura <code>@smoke</code> en <code>collection-views.spec.ts</code></td><td>Ese archivo <b>no tiene ningún</b> <code>@smoke</code>. El único de la carpeta está en <code>collection-crud.spec.ts:9</code>. Afectaba a un flujo prioritario.</td></tr>
+        <tr><td>UC-08 declaraba un E2E de «borrado masivo cancelado»</td><td>No existe. El único test de cancelación es de <b>una</b> carta, y ya se contaba en UC-07: el mismo test contado dos veces.</td></tr>
+        <tr><td>«133 tests»</td><td>Son <b>134</b> declaraciones <code>test()</code> en 26 archivos. CLAUDE.md sigue diciendo 133.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Los cuatro flujos de negocio</h2>
+  <p class="sub">Prioridad definida por Rafael — manda sobre criterio técnico</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>#</th><th>Flujo</th><th>Casos</th><th>Estado tras el ataque</th></tr></thead>
+      <tbody>
+        <tr><td class="id">Nº1</td><td>Buscar cartas para revisar precios</td><td class="id">UC-05, 11, 22</td><td><span class="tag t-sos">sospechosos sin mutar</span> UC-05 no tiene spec propio y es la puerta de entrada. <code>price-movers.spec.ts:40</code> y <code>portfolio-impact.spec.ts:15</code> no tienen ni un <code>expect</code>.</td></tr>
+        <tr><td class="id">Nº2</td><td>Buscar en perfiles y colecciones ajenas</td><td class="id">UC-09, 20</td><td><span class="tag t-ref">refutado</span> El test del buscador de la colección escribía en el buscador del <b>header</b> y nunca filtró nada. UC-20 tiene aserciones tautológicas y un logout que no desloguea.</td></tr>
+        <tr><td class="id">Nº3</td><td>Quitar cartas o ponerlas a la venta</td><td class="id">UC-07, 08</td><td><span class="tag t-ref">refutado con mutación</span> Agotado por Estrategia&nbsp;B: dos refutaciones y causa raíz identificada, que además resultó ser un defecto de producto.</td></tr>
+        <tr><td class="id">Nº4</td><td>Mazos y organización en carpetas</td><td class="id">UC-12, 13, 14, 15</td><td><span class="tag t-ref">refutado</span> Cuatro de los cinco tests del editor de mazos son cáscaras que no tocan lo que su título promete.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="call warn">
+    <p class="t">Matches no está en la lista</p>
+    <p>Pese a ser el área con más código del proyecto, Matches no está entre los cuatro flujos
+    prioritarios. Una versión anterior del documento lo llamaba «el flujo que justifica el producto»:
+    era una lectura por densidad de código, y quedó corregida.</p>
+  </div>
+</section>
+
+<section>
+  <h2>El entregable principal</h2>
+  <p class="sub">Catorce mecanismos que producen tests verdes que no prueban nada</p>
+  <p>Cada uno está verificado por medición, por mutación o por lectura del componente correspondiente.
+  Sirven como lista de control para cualquier test nuevo de este proyecto.</p>
+  <ol class="mech">
+    <li><span class="mt">Return temprano por conteo</span><p><code>if (cardCount === 0) return</code> saltea todas las aserciones que vienen después. Condenado por mutación.</p></li>
+    <li><span class="mt">Escape silencioso</span><p><code>.waitFor(...).catch(() =&gt; {})</code> se traga el timeout y el test sigue como si nada. Es peor que un test intermitente: no se ve.</p></li>
+    <li><span class="mt">Locator de una interfaz que ya no existe</span><p>El modal de detalle v2 no tiene input de cantidad ni botón de borrar. La guarda parecía defensiva y en realidad tapaba un locator muerto.</p></li>
+    <li><span class="mt"><code>.first()</code> sobre un selector genérico</span><p>Agarra un elemento de otra parte de la página. El header está en toda ruta autenticada, así que es el ladrón de coincidencias número uno.</p></li>
+    <li><span class="mt">Texto de botón cambiado</span><p>El borrado masivo dice «DELETE {count}» y el regex buscaba «delete all».</p></li>
+    <li><span class="mt">Elemento que no existe</span><p>No hay <code>input[type="checkbox"]</code> en la grilla v2 — la selección es un div. Los tests masivos jamás entraron a su propio cuerpo.</p></li>
+    <li><span class="mt">Tautología sobre <code>.count()</code></span><p><code>expect(count).toBeGreaterThanOrEqual(0)</code>: un conteo nunca es negativo, así que matemáticamente no puede fallar. Aparece en 4 archivos.</p></li>
+    <li><span class="mt">Tautología por <code>typeof</code></span><p><code>expect(typeof visible).toBe('boolean')</code>, cuando <code>visible</code> ya venía forzado a booleano por un <code>.catch(() =&gt; false)</code>.</p></li>
+    <li><span class="mt">Tautología por <code>|| true</code></span><p><code>expect(x || true).toBeTruthy()</code> anula por completo cualquier chequeo previo. Aparece en 3 specs.</p></li>
+    <li><span class="mt">Aserción hardcodeada</span><p><code>expect(true).toBe(true)</code>. No mira la aplicación en absoluto.</p></li>
+    <li><span class="mt">Desajuste de objetivo</span><p>El test ejecuta la acción bajo prueba, pero lo único que asevera <b>ya era cierto antes</b> de actuar. Esto es lo que permitió que un defecto real del buscador pasara inadvertido: el test que «cubría» el buscador nunca miró los resultados.</p></li>
+    <li><span class="mt">Acción que no existe en el componente</span><p>El page object es genérico y el spec le pasa un texto que ningún botón real tiene. Ni siquiera hace falta que el componente cambie: basta con que el spec invente la acción.</p></li>
+    <li><span class="mt">Cobertura fantasma</span><p>El título promete más de lo que el cuerpo verifica. «username, location, avatar visible» sólo comprueba username. Es el más insidioso: leyendo la suite uno cree que el área está cubierta.</p></li>
+    <li class="star"><span class="mt">Deriva de índice en grilla virtualizada — el más peligroso</span><p>Una aserción anclada a «la carta del índice 0, antes contra después» no es confiable, y no importa cómo se la formule: se probaron conteo, identidad simple e identidad con sondeo de estabilidad, y las tres fallaron. Durante los ~30 s que dura un test, el índice 0 puede pasar a ser otra carta por el asentamiento en segundo plano, sin ninguna relación con si la operación ocurrió.</p></li>
+  </ol>
+  <div class="call warn">
+    <p class="t">Por qué el mecanismo 14 justifica todo el método</p>
+    <p>Los otros trece se ven leyendo el código con atención. <b>Este no.</b> Una aserción por identidad
+    parece exactamente lo correcto — de hecho fue lo que yo mismo indiqué como arreglo — y aun así es
+    vacía. Sólo la mutación lo reveló: el test de borrado masivo pasaba <b>con</b> la mutación puesta.
+    Sin mutar, habríamos cerrado el ticket convencidos de tener cobertura real.</p>
+    <p><b>Ancla correcta:</b> algo derivado del store completo — el contador de la insignia del nav, los
+    conteos de los chips de estado — nunca de la ventana virtualizada. Un no-op deja esos números
+    exactamente iguales.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Refutaciones con demostración</h2>
+  <p class="sub">Las mutaciones, con su ficha completa</p>
+
+  <h3>M1 — UC-07 «editar y borrar una carta»</h3>
+  <div class="ficha">
+    <dl>
+      <dt>Costura mutada</dt><dd><code>src/stores/collection.ts:807</code> — <code>updateCard</code> devuelve <code>true</code> de inmediato. Guardar no persiste nada, ni optimista ni en Firestore.</dd>
+      <dt>Test bajo prueba</dt><dd><code>collection-crud.spec.ts:76</code> — «edit card → save → changes persist»</dd>
+      <dt>Esperado si cubierto</dt><dd>ROJO</dd>
+      <dt>Observado</dt><dd><b style="color:var(--rust)">VERDE, 5,7 s</b> · reproducibilidad 2/2</dd>
+      <dt>Higiene</dt><dd>Mutación revertida y <code>git status</code> verificado limpio antes de la siguiente. Nunca commiteada.</dd>
+      <dt>Veredicto</dt><dd>Refutado que UC-07 esté cubierto. El test ni siquiera llega a ejecutar su cuerpo.</dd>
+    </dl>
+  </div>
+
+  <h3>M2 — UC-08 «operar sobre muchas cartas a la vez»</h3>
+  <div class="ficha">
+    <dl>
+      <dt>Costura mutada</dt><dd><code>src/stores/collection.ts:901</code> — <code>batchUpdateCards</code> convertido en no-op.</dd>
+      <dt>Tests bajo prueba</dt><dd><code>collection-crud.spec.ts:118</code> y <code>:137</code></dd>
+      <dt>Observado</dt><dd><b style="color:var(--rust)">VERDES 2/2</b> con <code>--repeat-each=2</code></dd>
+      <dt>Alcance honesto</dt><dd>M2 sólo mutó el camino de cambio de estado, así que el verde de <code>:137</code> no queda condenado <i>por M2</i> — queda condenado por el argumento independiente de que no tiene ningún <code>expect</code>.</dd>
+    </dl>
+  </div>
+
+  <div class="call bad">
+    <p class="t">La causa raíz resultó ser un defecto de producto, no de tests</p>
+    <p>Los tests esperaban 1 s fijo y después contaban cartas en la grilla. Medido en vivo: con
+    <b>41.093 cartas</b>, a los 13-19 s todavía había 0-1 filas reales, y las cinco filas del viewport
+    inicial recién aparecieron <b>entre los 20 y los 27 segundos</b>, con «Loading prices 0/41093»
+    compitiendo por el hilo principal. Los tests leían 0 cartas y salían por el <code>return</code> sin
+    ejecutar nada.</p>
+    <p>El criterio de éxito declarado del proyecto es mover más de 50.000 cartas con fluidez en gama
+    baja. Esto empezó como un problema de observabilidad de los E2E y terminó siendo
+    <b>TASK-153</b>.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Veredicto por caso de uso</h2>
+  <p class="sub">Los 27, con lo que realmente sabemos de cada uno</p>
+  <div class="call warn">
+    <p class="t">Leer esta tabla con cuidado</p>
+    <p><span class="tag t-no">no atacado</span> <b>no significa «sano»</b>. Significa que no se gastó
+    presupuesto ahí. Dado que el único spec que sobrevivió a una verificación 1:1 fue uno de veintiséis,
+    la expectativa razonable para lo no atacado es que esté igual de comprometido.</p>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>UC</th><th>Caso de uso</th><th>Veredicto</th><th>Detalle</th></tr></thead>
+      <tbody>
+        <tr><td class="id">UC-01</td><td>Registrarse</td><td><span class="tag t-no">no atacado</span></td><td>Su test es flake conocido por rate-limit de Firebase, y escribe cuentas reales.</td></tr>
+        <tr><td class="id">UC-02</td><td>Iniciar sesión</td><td><span class="tag t-no">no atacado</span></td><td>Premisa <code>@smoke</code> validada en Fase 0.</td></tr>
+        <tr><td class="id">UC-03</td><td>Recuperar contraseña olvidada</td><td><span class="tag t-no">no atacado</span></td><td>—</td></tr>
+        <tr><td class="id">UC-04</td><td>Cambiar contraseña con sesión activa</td><td><span class="tag t-no">no atacado</span></td><td>—</td></tr>
+        <tr><td class="id">UC-05</td><td>Buscar una carta desde la landing</td><td><span class="tag t-sos">hueco</span></td><td><b>No tiene spec propio</b> y es la puerta de entrada al flujo Nº1. Ya se reportó roto una vez en dev.</td></tr>
+        <tr><td class="id">UC-06</td><td>Agregar una carta a la colección</td><td><span class="tag t-no">no atacado</span></td><td>Su test deja documentos en la base en cada corrida.</td></tr>
+        <tr><td class="id">UC-07</td><td>Editar y borrar una carta</td><td><span class="tag t-ref">refutado</span></td><td>Mutación M1: verde con <code>updateCard</code> en no-op. → TASK-146</td></tr>
+        <tr><td class="id">UC-08</td><td>Operar sobre muchas cartas a la vez</td><td><span class="tag t-ref">refutado</span></td><td>Mutación M2 + dos tests sin un solo <code>expect</code>. → TASK-147</td></tr>
+        <tr><td class="id">UC-09</td><td>Filtrar, ordenar y cambiar de vista</td><td><span class="tag t-ref">refutado</span></td><td>Premisa <code>@smoke</code> falsa, y el test del buscador escribía en el buscador del header. → TASK-154</td></tr>
+        <tr><td class="id">UC-10</td><td>Exportar la colección</td><td><span class="tag t-no">no atacado</span></td><td>—</td></tr>
+        <tr><td class="id">UC-11</td><td>Buscar una carta en el catálogo</td><td><span class="tag t-sos">sospechoso</span></td><td><code>price-movers.spec.ts:40</code> sin <code>expect</code>. Sin mutar.</td></tr>
+        <tr><td class="id">UC-12</td><td>Crear y borrar un mazo</td><td><span class="tag t-ref">refutado</span></td><td>Parte del barrido del flujo Nº4. → TASK-159</td></tr>
+        <tr><td class="id">UC-13</td><td>Editar el contenido de un mazo</td><td><span class="tag t-ref">refutado</span></td><td>4 de 5 tests del editor son cáscaras. → TASK-159</td></tr>
+        <tr><td class="id">UC-14</td><td>Importar un mazo desde Moxfield</td><td><span class="tag t-ref">defecto real</span></td><td>El asistente ofrece «IMPORTAR 0 CARTAS» habilitado sin aviso. → TASK-163</td></tr>
+        <tr><td class="id">UC-15</td><td>Crear, llenar y publicar un binder</td><td><span class="tag t-ref">defecto real</span></td><td>El modal de crear carpeta dice «el nombre del <b>mazo</b> es requerido». → TASK-163</td></tr>
+        <tr><td class="id">UC-16</td><td>Calcular matches</td><td><span class="tag t-no">no atacado</span></td><td>Área no prioritaria. → TASK-161</td></tr>
+        <tr><td class="id">UC-17</td><td>Gestionar un match hasta el contacto</td><td><span class="tag t-sos">sospechoso</span></td><td>Acciones que no existen en el componente (mecanismo 12). → TASK-161</td></tr>
+        <tr><td class="id">UC-18</td><td>Administrar contactos guardados</td><td><span class="tag t-no">no atacado</span></td><td>→ TASK-161</td></tr>
+        <tr><td class="id">UC-19</td><td>Conversar con otro tradeador</td><td><span class="tag t-doc">cobertura declarada falsa</span></td><td>Dos <code>test.skip(true)</code> que el documento contaba como cobertura del filtro.</td></tr>
+        <tr><td class="id">UC-20</td><td>Explorar un perfil público</td><td><span class="tag t-ref">refutado</span></td><td>Aserciones tautológicas, un logout que no desloguea y el perfil equivocado. → TASK-157</td></tr>
+        <tr><td class="id">UC-21</td><td>Armar un carrito y enviar un pedido</td><td><span class="tag t-no">no atacado</span></td><td>Bajó de prioridad: no está entre los cuatro flujos.</td></tr>
+        <tr><td class="id">UC-22</td><td>Staples, movimientos e impacto en cartera</td><td><span class="tag t-sos">sospechoso</span></td><td><code>portfolio-impact.spec.ts:15</code> sin <code>expect</code>. Sin mutar.</td></tr>
+        <tr><td class="id">UC-23</td><td>Gestionar perfil y datos</td><td><span class="tag t-no">no atacado</span></td><td>→ TASK-161</td></tr>
+        <tr><td class="id">UC-24</td><td>Cambiar de idioma</td><td><span class="tag t-ref">hueco transversal</span></td><td>La suite <b>nunca</b> corre en español, que es el idioma por defecto. → TASK-162</td></tr>
+        <tr><td class="id">UC-25</td><td>Recibir avisos del sistema</td><td><span class="tag t-no">no atacado</span></td><td>→ TASK-161</td></tr>
+        <tr><td class="id">UC-26</td><td>Consultar ayuda y textos legales</td><td><span class="tag t-no">no atacado</span></td><td>→ TASK-161</td></tr>
+        <tr><td class="id">UC-27</td><td>Navegar entre secciones</td><td><span class="tag t-ref">refutado</span></td><td>El test del logo: el locator no empareja nada y la aserción vive dentro de un <code>if</code>. → TASK-150</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Defectos reales de la aplicación</h2>
+  <p class="sub">Ya no son problemas de tests</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Ticket</th><th>Defecto</th><th>Estado de la evidencia</th></tr></thead>
+      <tbody>
+        <tr><td class="id">TASK-156<br><span class="tag t-ref">critical</span></td><td>El buscador de la colección devuelve cartas ajenas al término cuando se escribe sobre la grilla ya montada. La misma consulta puesta en la URL al montar funciona perfecto.</td><td>Verificado con experimento de control, <b>pero con síntoma distinto</b> al del agente que lo encontró (él vio cartas ajenas a los 3 s; yo vi grilla vacía a los 6 s). Apunta a carrera, no a filtro mal escrito. Pista: el camino interactivo materializa todos los filtros por defecto en la URL, el de la URL sólo lleva <code>?q=</code>.</td></tr>
+        <tr><td class="id">TASK-153<br><span class="tag t-sos">high</span></td><td>La grilla de colección tarda 20-27 s en mostrar la primera fila con 41.000 cartas.</td><td>Medido en vivo contra dev. Es el que convirtió un problema de tests en un problema de producto.</td></tr>
+        <tr><td class="id">TASK-163<br><span class="tag t-sos">medium</span></td><td>El asistente de importación ofrece «IMPORTAR 0 CARTAS» habilitado si se pega texto no parseable, sin aviso. Y el modal de crear carpeta reusa la clave i18n de mazos.</td><td>Observado directamente.</td></tr>
+        <tr><td class="id">TASK-158<br><span class="tag t-sos">high</span></td><td>La regla de filtrado de precios que CLAUDE.md declara sin acotar existe <b>sólo</b> en la búsqueda anónima del login.</td><td>Verificado con grep: la función se usa en un único lugar; el store de búsqueda sólo ordena; el modal de agregar no filtra. <b>Necesita decisión:</b> implementarla en los tres lugares o acotar la redacción del documento.</td></tr>
+        <tr><td class="id">TASK-164<br><span class="tag t-sos">high</span></td><td>La regla de sobreasignación tiene tres caminos con tres comportamientos. Sólo uno rechaza como dice el documento; los otros dos desvían el excedente a la wishlist en silencio.</td><td><b>Por lectura, no ejecutado</b> — la cuenta de dev tiene 0 mazos. <b>Necesita decisión:</b> ¿rechazar o desviar?</td></tr>
+        <tr><td class="id">TASK-151<br><span class="tag t-ref">high</span></td><td>Dos specs etiquetados <code>@smoke</code> crean mazos y binders reales, y siguen escribiendo en la base de <b>producción</b> en cada push a main.</td><td>Hallado por el deep review de la tanda anterior.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Higiene metodológica</h2>
+  <p class="sub">Las teorías que propuse y resultaron falsas</p>
+  <p>Se registran a propósito. Las cuatro eran razonables leyendo el código, y las cuatro cayeron
+  al medir. Es la mejor justificación de por qué el pase estático no condena.</p>
+  <ul class="plain">
+    <li><b>«<code>collection-views.spec.ts</code> deja la cuenta en modo lista y contamina la corrida siguiente»</b> — heredada de una sesión anterior. Medido: la vista estaba en «visual». Falso.</li>
+    <li><b>«El modo estricto de Playwright lanza dentro del <code>.catch</code> porque el locator empareja varios botones»</b> — medido: empareja exactamente un botón visible. Falso.</li>
+    <li><b>«Además del timing hay un locator roto»</b> — falso: el selector identificaba bien la imagen cuando existía. La grilla simplemente <b>no se había montado</b>, y yo dejé de medir a los 8 s. La conclusión vino de haber dejado de mirar demasiado pronto.</li>
+    <li><b>«El test :76 al menos prueba que el modal abre y que el guardado emite un toast»</b> — falso, y lo corrijo: no prueba ni eso. La refutación no se cae, se agrava.</li>
+  </ul>
+  <div class="call">
+    <p class="t">Una corrección al registro</p>
+    <p>En un reporte anterior di por buena la verificación por mutación de <b>dos</b> tests de UC-08.
+    Uno de los dos era falso verde y se detectó después, al re-verificar. Queda corregido acá para que
+    no persista en el historial una afirmación más fuerte que la evidencia.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Alcance no atacado</h2>
+  <p class="sub">Declarado, no omitido</p>
+  <p>La regla del presupuesto cerrado obliga a listar lo que quedó fuera. Nada de esto está
+  verificado sano:</p>
+  <ul class="plain">
+    <li><b>Estrategia A completa</b> — falsar el <i>comportamiento</i> de la app (no la cobertura) no se empezó. El flujo Nº3 quedó pendiente porque había un agente mutando esa misma cuenta y habría contaminado los resultados.</li>
+    <li><b>Flujos Nº1, Nº2 y Nº4 sin mutar</b> — sólo barrido estático y verificación 1:1. Los sospechosos están identificados pero no condenados.</li>
+    <li><b>Otros usos del selector frágil</b> <code>img[loading="lazy"]</code> — <code>collection-views.spec.ts:12/46/49</code> y <code>preferences-crud.spec.ts:38</code>. Misma enfermedad, specs distintos.</li>
+    <li><b>Áreas no prioritarias</b> — matches, ajustes, notificaciones, mensajes y ayuda. Cobertura nula. <b>Necesita decisión:</b> ¿se arreglan, se arreglan en parte, o se marcan como <code>test.fixme</code> para que dejen de reportar verde falso?</li>
+  </ul>
+</section>
+
+<footer>
+  Generado a partir de TASK-144 y sus ocho comentarios de ejecución, y del deep review de TASK-143.
+  Todo dato de esta página es rastreable a una medición, una mutación o una lectura de código citada
+  en esos tickets. Lo que es hipótesis está marcado como tal.
+</footer>
+
+</div>
+</body>
+</html>

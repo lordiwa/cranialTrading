@@ -1,0 +1,29 @@
+{
+  "key": "TASK-152",
+  "title": "Dos defectos menores del kit v2: /inicio con barra final duplica el buscador, y el foco neon sobrevive al estado de error",
+  "description": "Dos hallazgos LOW del deep review de TASK-143 (2026-08-08), confirmados adversarialmente. Se agrupan porque son chicos, del mismo kit y sin relacion entre si mas que el tamano.\\n\\nDEFECTO 1 — `src/components/layout/AppHeader.vue`\\n`const showHeaderSearch = computed(() => route.path !== '/inicio')` compara el path de forma exacta. vue-router por defecto usa `strict: false`, asi que `/inicio/` (con barra final) empareja la ruta y `route.path` vale `'/inicio/'`. En esa URL:\\n- vuelve a renderizarse el buscador del header JUNTO al del hero de HomeView: dos instancias de GlobalSearch en pantalla,\\n- las dos emiten los MISMOS ids de DOM fijos (`search-listbox-suggestions` y `option-suggestion-N`, `GlobalSearch.vue:170,178`), o sea ids duplicados que rompen el cableado `aria-controls` del combobox,\\n- y `handleKeydown` de AppHeader deja de salir temprano, con lo cual la tecla '/' se `preventDefault()` hacia el campo del header MIENTRAS el listener de HomeView tambien dispara.\\nArreglo sugerido: comparar por `route.name === 'home'` o tolerar la barra final.\\n\\nDEFECTO 2 — `src/style.css`\\nLos campos en estado de error conservan el resplandor de foco neon cuando estan enfocados, lo que contradice el borde rust del propio estado de error. Es incoherencia visual del kit, no funcional.",
+  "acceptance_criteria": [
+    "`showHeaderSearch` deja de romperse con la barra final: en `/inicio/` se muestra UN solo buscador, igual que en `/inicio`",
+    "En `/inicio/` la tecla '/' la atiende un solo handler, no dos",
+    "No quedan ids de DOM duplicados en pantalla en ninguna de las dos URLs — verificado en el navegador, no razonado",
+    "Un campo enfocado en estado de error muestra un tratamiento de foco coherente con el borde rust, sin el resplandor neon",
+    "Verificacion visual en el navegador de los dos defectos, en escritorio y en movil"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "deep-review",
+    "design-system",
+    "landing"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T05:38:28.012Z",
+  "updated_at": "2026-08-08T05:38:28.012Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

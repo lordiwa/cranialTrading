@@ -1,0 +1,31 @@
+{
+  "key": "TASK-149",
+  "title": "La tanda /inicio + kit v2 shippeo logica nueva con cero tests: el carrusel, el atajo '/' y showHeaderSearch",
+  "description": "Hallazgo HIGH del deep review de TASK-143 (2026-08-08), confirmado adversarialmente. Consolida tres hallazgos que apuntan al mismo hueco.\\n\\nLos UNICOS cambios de test en todo el rango `4a3973e^..HEAD` son sustituciones de texto: `tests/unit/router/authGuard.test.ts` cambia '/saved-matches' por '/inicio' en 8 aserciones, y `e2e/specs/auth/login.spec.ts` agrega una asercion de URL. Nada mas. Las sustituciones fijan la constante nueva pero no agregan ni una linea de cobertura del comportamiento.\\n\\nLOGICA SIN NINGUN TEST:\\n- `AnnouncementsCarousel.vue:129-137` — `go()` con envolvente por modulo y `goTo()`\\n- `AnnouncementsCarousel.vue:116-124` — el mapeo de diapositivas indexado por locale\\n- `HomeView.vue:52-66` — `handleSlash`: las guardas, el `preventDefault` y el ciclo de vida de add/removeEventListener\\n- `HomeView.vue:80-82` — el push de ruta con `searchTerm`\\n- `AppHeader.vue:147` — `showHeaderSearch`, que es LO UNICO que evita que el handler del header y el de HomeView actuen los dos sobre la tecla '/'\\n- No existe ninguna prueba de que HomeView RENDERICE: solo se asevera la URL de destino. No hay carpeta `e2e/specs/home`.\\n\\nLa tanda se acogio a la exencion de 'pure UI/styling changes with no logic' de CLAUDE.md. Los cinco puntos son logica, asi que la exencion no aplica. Tampoco se cumplio el otro camino de CLAUDE.md ('New Vue component -> E2E only'): no hay E2E de /inicio.\\n\\nOJO CON EL PRECEDENTE DE TASK-144: en este mismo proyecto acabamos de demostrar por mutacion que tests que existen pueden no probar nada. Un test nuevo que no pueda fallar no cierra este ticket.",
+  "acceptance_criteria": [
+    "Tests unitarios del carrusel: `go()` envuelve correctamente en ambos extremos (adelante desde el ultimo, atras desde el primero), `goTo()` acota indices fuera de rango, y el mapeo por locale devuelve la diapositiva del idioma activo",
+    "Tests unitarios de `handleSlash`: se ignora dentro de input, textarea y contenteditable; hace preventDefault cuando corresponde; y el listener se quita al desmontar (fuga de listener = fallo)",
+    "Test de que HomeView RENDERIZA sus partes (hero con buscador, atajos rapidos, carrusel), no solo de que la URL sea /inicio",
+    "Test de que el buscador del header NO se muestra en /inicio y SI en el resto de rutas autenticadas — la condicion `showHeaderSearch`",
+    "Cada test nuevo se verifica capaz de fallar: se rompe a proposito la costura que cubre, se comprueba que enrojece, y se restaura. Sin esa verificacion el criterio no se da por cumplido",
+    "`npm run test:unit` y `npx vite build` en verde"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "deep-review",
+    "cobertura-real",
+    "landing",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T05:37:31.540Z",
+  "updated_at": "2026-08-08T05:37:31.540Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

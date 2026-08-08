@@ -11,7 +11,7 @@
     "Cada hallazgo verificado adversarialmente antes de reportarse; los refutados se listan aparte",
     "Los hallazgos que sobrevivan se materializan como tickets nuevos en tasks/, no como comentarios sueltos"
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "review",
@@ -35,10 +35,20 @@
       "at": "2026-08-07T00:00:00.000Z",
       "author": "orchestrator",
       "body": "Pistas concretas donde mirar primero, por orden de sospecha: (1) SearchView.vue:69 baja la colección entera — ya ticketeado como TASK-142, no re-reportar, pero sí juzgar si invalida el diseño de la landing; (2) el tour (useTour) no navega y sus pasos 2-3 anclan a [data-tour=\"status-filters\"] y [data-tour=\"fab-add-card\"], que sólo existen en CollectionView — roto DESDE ANTES, pero /inicio tiene aún menos elementos que anclar y además ahora esconde [data-tour=\"nav-search\"]; (3) el badge de mensajes sólo se puebla si abrís Mensajes (pre-existente); (4) HomeView y AppHeader ahora tienen DOS handlers de keydown para '/' coordinados por una condición de ruta — verificar que no se pisen ni queden ambos activos en ninguna transición; (5) el carrusel lee announcements.ts con Record<SupportedLocale,string>: qué pasa si se agrega un locale nuevo y una entrada no lo tiene."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T05:28:10.682Z",
+      "body": "CORRECCION DEL ALCANCE ANTES DE CORRER (2026-08-08). Corrida aprobada por Rafael.\n\nEl rango declarado en el AC1, `base=origin/develop` .. `7e1ae02`, HOY ESTA VACIO: la tanda ya se pusheo y `7e1ae02` es ancestro de `origin/develop` (que esta en 97f4a6d). Verificado con `git merge-base --is-ancestor`.\n\nEl rango equivalente correcto es `4a3973e^..7e1ae02` — verificado: 19 archivos, +422/-40, que coincide exacto con los numeros del ticket.\n\nDECISION DE ALCANCE, declarada como supuesto y no como hecho: se revisa `4a3973e^..HEAD` en vez de detenerse en 7e1ae02, restringido a `src/` y `e2e/`. Motivo: despues de 7e1ae02 aterrizaron dos commits que son parte del MISMO trabajo y que cambian justo lo que los criterios 2 y 5 mandan revisar —\n- `9705b85` reescribio el buscador del hero de /inicio para reusar GlobalSearch (el autocompletado propio que tenia ya no existe),\n- `338e9a3` apunto los specs del authGuard a /inicio.\nRevisar el rango estricto seria auditar una version del hero que ya no esta en la rama. Se excluyen los commits de `state/` y `docs/`, que son ruido de sesion.\n\nSi Rafael prefiere el rango estricto, se rehace acotado — el cambio es de una linea en la invocacion."
+    },
+    {
+      "author": "reviewer",
+      "at": "2026-08-08T05:38:55.315Z",
+      "body": "DEEP REVIEW EJECUTADO (2026-08-08). 30 agentes, 0 errores, ~7,4 min, 4 dimensiones + verificacion adversarial por hallazgo.\n\nRANGO REAL REVISADO: `4a3973e^..HEAD` restringido a src/ y e2e/ (ver el comentario anterior: el rango del AC1 estaba vacio porque la tanda ya se pusheo).\n\nNUMEROS: 26 hallazgos propuestos por las 4 dimensiones -> 14 REFUTADOS en la verificacion adversarial -> 12 confirmados (4 HIGH, 4 MEDIUM, 4 LOW). El workflow marca la tanda como BLOQUEADA por los HIGH. Que se cayera mas de la mitad es buena senal: los verificadores no se limitaron a ratificar. NOTA HONESTA: el resultado del workflow solo devuelve los confirmados; el detalle de los 14 refutados quedo en el journal.jsonl de la corrida, no se transcribio aca.\n\nCONFIRMADOS, deduplicados (varios llegaron por dimensiones distintas):\n- HIGH — \"/inicio no lee nada de Firestore\" es FALSO: la cadena HomeView -> AppContainer -> AppHeader -> MatchNotificationsDropdown llama loadAllMatches en onMounted sin gesto del usuario = 6 lecturas de coleccion mas borrados batched. Las afirmaciones falsas siguen en HomeView.vue, en el spec de login y en el mensaje de commit. -> TASK-148\n- HIGH — logica nueva con cero tests: carrusel (go/goTo, mapeo por locale), handleSlash (guardas y ciclo de vida), el push de searchTerm, showHeaderSearch, y ninguna prueba de que HomeView renderice. La exencion de 'styling only' no aplica a logica. (3 hallazgos consolidados) -> TASK-149\n- MEDIUM — el test del logo es un VERDE VACIO: `navigation.page.ts:33` usa `a[href=\"/\"]`, que no empareja nada, y su asercion vive dentro de `if (isVisible())`. Ademas las redirecciones de '/' y '/dashboard' no tienen cobertura. Es el MISMO modo de fallo que TASK-144 demostro por mutacion, hallado de forma independiente. -> TASK-150\n- MEDIUM/HIGH — el gate de `main` sigue escribiendo en PRODUCCION: `binders.spec.ts:8` y `deck-crud.spec.ts:8` son creadores y estan etiquetados @smoke. El comentario que se agrego en v1.55.2 promete algo que el codigo no da. (3 hallazgos consolidados) -> TASK-151\n- LOW x2 — `/inicio/` con barra final duplica el buscador (ids de DOM repetidos y dos handlers de '/'), y el foco neon sobrevive al estado de error. -> TASK-152\n\nAC6 (verificacion adversarial): cumplido por el workflow. AC7 (materializar como tickets): cumplido, TASK-148 a 152.\nAC2, AC3, AC4 y AC5: los cuatro se respondieron, y los cuatro dieron INSATISFECHOS — es el resultado del review, no un fallo de ejecucion.\n\nPENDIENTE PARA CERRAR: este ticket es uat-only y Rafael NO delego el UAT en esta sesion, asi que el cierre requiere su verdicto."
     }
   ],
   "created_at": "2026-08-07T00:00:00.000Z",
-  "updated_at": "2026-08-07T00:00:00.000Z",
+  "updated_at": "2026-08-08T05:38:58.850Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

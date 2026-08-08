@@ -1,0 +1,43 @@
+{
+  "key": "TASK-146",
+  "title": "UC-07 (editar y borrar una carta) no tiene cobertura real — demostrado con mutacion",
+  "description": "Refutado en TASK-144 / ESTRATEGIA B3 el 2026-08-08. Flujo de negocio Nº3, prioritario.\\n\\nLO REFUTADO, con el alcance acotado que exige B4: lo que queda demostrado es que **el caso de uso UC-07 no esta cubierto**, NO que estos tests \\\"no sirvan\\\" en abstracto.\\n\\nMUTACION M1 — FICHA (A5):\\n- Proyecto Firebase: cranial-trading-dev (VITE_MODE=development, default desde v1.55.2). Produccion NO tocada.\\n- Costura mutada: `src/stores/collection.ts:807` `updateCard` -> `return true` inmediato. Guardar no persiste nada: ni el parche optimista de la UI ni la escritura a Firestore.\\n- Test bajo prueba: `e2e/specs/collection/collection-crud.spec.ts:76` \\\"edit card: open detail modal -> edit -> save -> changes persist\\\".\\n- Esperado si el caso estuviera cubierto: ROJO. Observado: VERDE, 5.7 s. Reproducibilidad 2/2.\\n- Higiene B5: mutacion revertida y `git status` verificado limpio antes de la siguiente. Nunca commiteada.\\n\\nMECANISMO (medido despues, y corrige una lectura inicial equivocada): el test no llega ni a abrir el modal. Hace `waitForTimeout(1000)`, consulta `getCardCount()` y a los 1000 ms ese contador vale **0** (ver TASK-145), asi que sale por el `return` de la linea 80. No prueba la persistencia, y tampoco prueba que el modal abra: no prueba nada. El mismo `return` temprano afecta a `:97` (borrar) y a `:155` (cancelar el borrado), cuyos `expect` por lo tanto nunca se evaluan.\\n\\nSeveridad (A7): prioridad de negocio Nº3 x alcanzabilidad alta = ALTA. Una regresion silenciosa en el guardado o el borrado de cartas llega a produccion sin que ningun test la vea.\\n\\nDEPENDE de TASK-145: mientras la grilla no sea observable, un test nuevo tampoco podria fallar por la razon correcta.",
+  "acceptance_criteria": [
+    "Existe un test que FALLA con la mutacion M1 puesta (`updateCard` -> `return true` inmediato en `src/stores/collection.ts`) y PASA sin ella. Esta es la prueba de que el test nuevo sirve, y se verifica ejecutandola en ambos sentidos, no razonandola",
+    "El test de editar verifica la PERSISTENCIA que su titulo promete: cambia la cantidad, recarga la pagina y asevera el valor nuevo. Sin recarga no se acepta",
+    "Existe un test que FALLA con una mutacion equivalente en el camino de borrado y PASA sin ella",
+    "Ningun test de `collection-crud.spec.ts` puede terminar en verde por un `return` temprano: se elimina el patron `if (cardCount === 0) return`, o bien la precondicion de que haya cartas se asevera explicitamente con un `expect` que enrojezca si no se cumple",
+    "El estado de partida queda declarado en el test (A4): que cantidad tenia la carta antes, y se restaura o se declara el estado nuevo, para no dejar deriva no acotada en la cuenta compartida de dev"
+  ],
+  "status": "blocked",
+  "priority": "high",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-145"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-08T05:47:30.506Z",
+      "body": "HALLAZGO HEREDADO DEL REVIEW DE TASK-145 (2026-08-08) — pertenece a este ticket porque es exactamente su materia.\n\nLas aserciones por CONTEO sobre una grilla virtualizada son debiles y hay que reemplazarlas por aserciones de IDENTIDAD:\n\n- `getCardCount()` cuenta las cards RENDERIZADAS en la ventana del virtualizador (decenas), no las 41.093 de la coleccion.\n- Test de BORRAR (`collection-crud.spec.ts:113`): con 41k items, borrar 1 carta no reduce de forma durable el conteo de la ventana — el virtualizador la rellena enseguida. Que `expect.poll(...).toBeLessThan(countBefore)` pase 3/3 sugiere que esta atrapando un estado TRANSITORIO del remount diferido (el patron conocido de carrera de persistencia de card_index). O sea: pasa, pero por la razon equivocada, y depende del timing.\n- Test de CANCELAR (`:156` -> `:169`): `waitForGridReady` solo garantiza que la PRIMERA card sea visible, asi que `countBefore` puede capturarse a mitad del montaje (p.ej. 8 cards) y `countAfter` con la ventana ya completa (p.ej. 30) — daria ROJO legitimo pero espurio. Riesgo de flake real en CI.\n\nFORMA CORRECTA sugerida: capturar la identidad de la carta en el indice 0 (nombre o testid) ANTES de la operacion, y aseverar que cambio o desaparecio en el caso de borrar, y que sigue siendo la misma en el caso de cancelar. La identidad es estable frente al relleno del virtualizador; el conteo no.\n\nEsto se suma a los criterios de aceptacion ya escritos, no los reemplaza: el test sigue teniendo que FALLAR con la mutacion puesta y PASAR sin ella."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T07:32:54.133Z",
+      "body": "PARCIAL Y BLOQUEADO (2026-08-08). Commit ad85670 en develop, sin push.\n\nQUE ENTRO Y ESTA VERIFICADO:\n- Borrar y cancelar pasan de aserciones por CONTEO a aserciones por IDENTIDAD, que era el requisito que agrego el reviewer de TASK-145.\n- El cleanup de \"add card\" arreglado: usaba el mismo `editModal.deleteButton` muerto, o sea que NUNCA borro nada. Era una fuga real de una carta en cada corrida, en todas las corridas hasta hoy.\n- Cuatro data-testid en las filas de cantidad de CardDetailModal. Unico cambio en src/, sin logica.\nVerificado por el orquestador, no solo reportado: archivo completo 7 pasan / 1 omitido en 1.8 min contra dev, mas 1577 unitarios verdes y 0 errores de lint.\n\nQUE NO ENTRO, declarado y no omitido: el criterio 2 (editar con recarga y aseverar persistencia) NO se cumple. Queda como `test.fixme` con el titulo nombrando su bloqueo, o sea que se reporta como omitido y nunca como verde, y la deuda queda visible. NO se tapo con una espera fija: se probaron esperas de 20 s que a veces alcanzaban y a veces no, que es la definicion de un flake.\n\nPOR QUE ESTA BLOQUEADO: `updateCard` no dispara refresh del indice y el debounce de card_index muere si la pagina recarga antes de que dispare, asi que hoy no existe senal observable contra la cual aseverar la persistencia. Es un hueco de PRODUCTO, no de test -> TASK-155. Este ticket no se puede cerrar honestamente hasta que TASK-155 se resuelva o se determine que no hay dano real.\n\nTERCER MECANISMO DE VERDE VACIO ENCONTRADO ACA, y vale registrarlo: `CardDetailModal` v2 no tiene input de cantidad NI boton de borrar — la cantidad es un stepper +/- por estado y el borrado se movio al card de la grilla. Los locators `editModal.quantityInput` y `editModal.deleteButton` no emparejaban NADA. Por eso el `if (await qtyInput.isVisible().catch(() => false))` nunca entraba: la guarda no era defensiva, tapaba un locator muerto. Los tests describian una interfaz que ya no existe.\n\nNOTA OPERATIVA: el agente developer dejo de responder a tres mensajes seguidos, quedando inactivo un minuto despues de cada uno, con el trabajo sin commitear. El trabajo no se perdio y se verifico que no habia ninguna mutacion sin revertir. El commit lo hizo el orquestador tras verificar en verde. Una corrida intermedia dio 4 rojos con pagina en blanco en el goto; los mismos tests pasan en aislado y la corrida siguiente dio verde entera, asi que fue el servidor de preview y no los tests — se establecio antes de tocar nada, en vez de subir un timeout."
+    }
+  ],
+  "created_at": "2026-08-08T05:22:31.291Z",
+  "updated_at": "2026-08-08T07:32:57.439Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

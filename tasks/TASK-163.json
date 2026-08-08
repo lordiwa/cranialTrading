@@ -1,0 +1,30 @@
+{
+  "key": "TASK-163",
+  "title": "El asistente de importacion ofrece IMPORTAR 0 CARTAS sin ninguna advertencia, y el modal de carpeta dice \"mazo\"",
+  "description": "Dos defectos del FLUJO Nº4 encontrados por el wargaming de TASK-144 (2026-08-08), los dos verificados POR EJECUCION contra cranial-trading-dev.\\n\\n═══ DEFECTO 1: importacion sin validar que se haya reconocido algo ═══\\nEl modal \"IMPORTAR MAZO\" detecta automaticamente si lo pegado es una URL de Moxfield, una lista de cartas o un CSV. Para una URL de Moxfield que responde 404 el manejo es CORRECTO: muestra \"Moxfield error: 404\" y no persiste nada. Ese path secundario del documento se sostiene.\\n\\nPero con texto pegado que NO es una URL ni una lista reconocible, no hay ninguna validacion.\\n- Pasos: Mazos -> Importar -> pegar texto no parseable (se probo \"not-a-url-at-all-just-garbage-text\" y \"totally random gibberish 12345\") -> Analizar.\\n- Observado: CERO mensaje de error. El asistente avanza al wizard completo (condicion por defecto, nombre del mazo, formato, estado de las cartas) mostrando \"Mainboard: 0 | Sideboard: 0\" y un boton final \"IMPORTAR 0 CARTAS\" HABILITADO — confirmado sin atributo `disabled` en el arbol de accesibilidad.\\n- Reproducibilidad: 2/2.\\n- Consecuencia: quien no repare en el contador en cero crea un mazo vacio creyendo que importo su lista, sin que nada le avise de que no se reconocio ni una carta.\\n- No se completo el ultimo paso (no se cliqueo el boton) porque habria persistido un mazo en la cuenta compartida.\\nClasificacion A6: (a) defecto de la app. El wizard valida el caso \"URL que responde 404\" pero no valida \"cero cartas reconocidas\" antes de habilitar la confirmacion.\\n\\n═══ DEFECTO 2: el modal de crear carpeta muestra el mensaje de error de los mazos ═══\\nCrear una carpeta con el nombre vacio SI se rechaza correctamente y no persiste nada (verificado: el contador de carpetas quedo igual antes y despues). Pero el mensaje que ve el usuario es \"El nombre del mazo es requerido\".\\nCausa raiz: `src/components/binders/CreateBinderModal.vue:30` llama `t('decks.createModal.validation.nameRequired')` — reusa la clave i18n de mazos en lugar de tener la propia.\\nClasificacion A6: (a) defecto de la app, menor. No es funcional, es de texto: alguien creando una carpeta lee un mensaje que habla de mazos.\\n\\nNOTA: si se agrega una clave nueva de i18n hay que ponerla en los TRES archivos de locale (en, es, pt) en el mismo cambio — es regla dura del proyecto.",
+  "acceptance_criteria": [
+    "El boton de confirmar importacion queda DESHABILITADO cuando el analisis reconocio 0 cartas, o bien el asistente muestra un error explicito y no avanza al wizard",
+    "Se decide cual de las dos salidas es mejor para el usuario: bloquear el avance apenas falla el analisis, o dejar avanzar pero impedir la confirmacion. La primera avisa antes",
+    "El modal de crear carpeta usa una clave i18n propia, presente en en.json, es.json y pt.json en el mismo commit",
+    "Existe un test que FALLA si se vuelve a habilitar la confirmacion con 0 cartas reconocidas",
+    "Se verifica en el navegador, no solo por test — pegar texto basura y comprobar que el usuario recibe un aviso claro"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "wargaming",
+    "decks",
+    "binders",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T15:35:22.983Z",
+  "updated_at": "2026-08-08T15:35:22.983Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

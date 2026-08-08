@@ -1,0 +1,30 @@
+{
+  "key": "TASK-158",
+  "title": "La regla de filtrado de precios que CLAUDE.md declara solo existe en el buscador anonimo del login",
+  "description": "Refutacion del wargaming de TASK-144 (2026-08-08), FLUJO Nº1 de prioridad de negocio (buscar cartas para revisar precios) — el mas prioritario de los cuatro.\\n\\nCLAUDE.md declara, sin acotarla a ningun componente, la regla \"Price Filter Logic (card search results)\": si los resultados contienen cartas con `prices.usd > 0`, mostrar SOLO las cartas con precio; si ninguna tiene precio, mostrarlas todas. El proposito declarado es evitar el spam de resultados sin precio.\\n\\nMEDIDO en cranial-trading-dev, solo lectura, reproducibilidad 2/2: buscando \"Lightning Bolt\" en `/search` (UC-11) conviven en la misma grilla 20 resultados CON precio y 5 marcados \"N/A\". La regla no se aplica.\\n\\nCAUSA RAIZ, verificada por el orquestador con grep y no solo reportada:\\n- `applyPricedFirstFilter` esta definida en `src/utils/loginCardSearch.ts:18` y se usa en UN SOLO lugar de todo el repo: `src/views/LoginView.vue:49`, o sea la busqueda anonima previa al login.\\n- `src/stores/search.ts:121`, que alimenta `/search` (UC-11), usa `sortPricedFirst` — ORDENA, no oculta.\\n- `src/components/collection/AddCardModal.vue:380` hace `searchResults.value = results.slice(0, 12)`, sin ningun filtro de precio, pese a que el documento de casos de uso cita esta regla textualmente para UC-06.\\nDe los tres lugares donde la regla aplicaria, esta implementada en uno.\\n\\nDATO ADICIONAL observado en vivo: la grilla de resultados de AddCardModal ni siquiera MUESTRA el precio antes de elegir impresion, asi que en ese paso el usuario no puede juzgar por precio de ninguna manera.\\n\\nESTO NECESITA UNA DECISION DE PRODUCTO ANTES QUE CODIGO, y por eso no se implementa a ciegas. Hay dos salidas legitimas y opuestas:\\n(a) La regla es correcta y falta implementarla en /search y en AddCardModal. Ojo: ocultar resultados sin precio en el catalogo puede esconder cartas que el usuario si quiere ver.\\n(b) La regla solo tenia sentido para la busqueda anonima del login, y lo que esta mal es CLAUDE.md, que la enuncia como global. En ese caso se acota la redaccion y se corrige el documento de casos de uso.\\nLa eleccion es de Rafael.",
+  "acceptance_criteria": [
+    "Rafael decide entre (a) implementar la regla en /search y AddCardModal, o (b) acotar la regla en CLAUDE.md a la busqueda anonima del login. No se escribe codigo antes de esa decision",
+    "Si (a): la regla queda implementada en los tres lugares con UNA sola funcion compartida, no tres copias — en este proyecto la duplicacion de logica de busqueda ya causo bugs de carrera, y hay CINCO superficies de autocompletado independientes",
+    "Si (a): existe un test que FALLA sin el filtro y PASA con el, mirando los RESULTADOS y no el input",
+    "Si (b): se corrige la redaccion de CLAUDE.md para que diga donde aplica de verdad, y se corrige la fila de UC-06 en docs/CASOS-DE-USO.html, que hoy cita la regla como si aplicara ahi",
+    "En cualquier caso se decide si la grilla de AddCardModal deberia mostrar precio antes de elegir impresion, dado que hoy no lo muestra y el flujo Nº1 es precisamente revisar precios"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "search",
+    "user-flow",
+    "decision-producto"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T13:46:15.002Z",
+  "updated_at": "2026-08-08T13:46:15.002Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

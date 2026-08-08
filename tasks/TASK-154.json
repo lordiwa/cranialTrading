@@ -1,0 +1,29 @@
+{
+  "key": "TASK-154",
+  "title": "FLUJO Nº2 REFUTADO: el test del buscador de la coleccion escribia en el buscador del header y nunca filtro nada",
+  "description": "Refutacion NUEVA de TASK-144 / ESTRATEGIA B, encontrada el 2026-08-08 mientras se implementaba TASK-146. Cae en el FLUJO Nº2 de prioridad de negocio (buscar cartas en la coleccion propia), que yo habia declarado explicitamente como no atacado.\\n\\nMEDIDO, no inferido de leer el DOM: se dumpeo cada input que emparejaba el locator, con su placeholder y su boundingBox.\\n- indice 0 = \"Search cards...\" -> el buscador GLOBAL del header (visible, y=8px)\\n- indice 1 = \"Search by name...\" -> el filtro de la coleccion (CardFilterBar.vue)\\n\\n`e2e/pages/collection.page.ts` definia `searchInput` como `input[placeholder*=\"earch\"]` con `.first()`. El del header aparece ANTES en el DOM, asi que `.first()` agarraba el del header. Todo lo que el test escribia iba al buscador global, no al filtro de la coleccion.\\n\\nEFECTO CONFIRMADO POR COMPORTAMIENTO: con el locator viejo, escribir actualizaba el VALOR del input pero la URL se quedaba en `/collection` sin `?q=`. Con el locator correcto (`getByPlaceholder(/search by name/i)`), la URL pasa a `/collection?q=...` de verdad.\\n\\nQUE QUEDA REFUTADO, con el alcance acotado de B4: `collection-filters.spec.ts:24` (\"search bar filters collection by card name\") NUNCA toco la grilla. Su unica asercion es `toHaveValue()` — comprueba que el texto quedo escrito en un input, jamas que algo se haya filtrado. El caso de uso UC-09 (filtrar y buscar en la coleccion propia) NO esta cubierto en su parte de busqueda.\\n\\nEl locator ya quedo arreglado dentro del trabajo de TASK-146 porque estaba en el mismo archivo. Lo que falta es el TEST: que asevere el filtrado real y que sea capaz de fallar.\\n\\nNOTA: el documento docs/CASOS-DE-USO.html declara UC-09 cubierto por collection-filters.spec.ts. Hay que corregir esa fila.",
+  "acceptance_criteria": [
+    "El test asevera el FILTRADO REAL, no el valor del input: tras escribir un nombre, la grilla muestra solo coincidencias y la URL lleva el `?q=`",
+    "El test FALLA si el locator vuelve a apuntar al buscador del header — verificado apuntandolo a proposito al del header, comprobando que enrojece, y restaurando",
+    "Se revisa si el mismo patron `.first()` sobre un placeholder generico aparece en otros page objects, dado que hay CINCO superficies de autocompletado independientes en la app y el buscador del header esta presente en toda ruta autenticada",
+    "Se corrige la fila de cobertura de UC-09 en docs/CASOS-DE-USO.html"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T07:18:13.364Z",
+  "updated_at": "2026-08-08T07:18:13.364Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

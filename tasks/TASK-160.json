@@ -1,0 +1,30 @@
+{
+  "key": "TASK-160",
+  "title": "Locators muertos en flujos Nº1 y Nº2: el boton de girar carta, el enlace de contacto y el banner de cartera no existen",
+  "description": "Barrido estatico de TASK-144 (2026-08-08), cada uno verificado contra el componente Vue correspondiente. Son locators que NO PUEDEN emparejar nada, no sospechas.\\n\\nFLUJO Nº1 (precios y busqueda):\\n1. `market.page.ts:65` — `portfolio.totalDelta = [class*=\"text-h\"].first()` empareja SIEMPRE el `<h1 class=\"text-h2\">` del titulo de MarketView (`MarketView.vue:264`, sin v-if), que se renderiza antes que el banner real (`PortfolioSummaryBanner.vue:24`, que es `text-h3` y condicional). El banner de impacto en cartera NUNCA se lee. Afecta al unico test activo de `portfolio-impact.spec.ts`.\\n2. `portfolio-impact.spec.ts:15-20` \"sort by impact vs percentage\" — CERO expect.\\n3. `portfolio-impact.spec.ts:26` — `expect(count).toBeGreaterThanOrEqual(0)`, tautologia: un `.count()` de Playwright nunca es negativo.\\n4. `search.spec.ts:23` — `expect(typeof visible).toBe('boolean')`, tautologia; `visible` ya viene forzado a booleano por un `.catch(() => false)`.\\n5. `search.spec.ts:78` — `expect(modalVisible || true).toBeTruthy()`, tautologia por el `|| true`.\\n6. `market.page.ts:53` — `movers.searchInput = input[type=\"text\"].first()` sin acotar a `main`, a diferencia de `search.page.ts` que si lo acota. Agarraria el buscador GLOBAL del header, que esta presente en /market. Hoy inerte porque `price-movers.spec.ts` esta bajo `describe.skip`, pero revive si se reactiva.\\n\\nFLUJO Nº2 (perfiles ajenos y coleccion propia):\\n7. `collection.page.ts:323` — `faceToggleButton = button:has-text(\"↔\")`. `CollectionGridCardFull.vue:453-461` usa `<SvgIcon name=\"flip\">` y NO contiene el caracter \"↔\" en ninguna parte (grep sin resultados). Nunca empareja. Afecta a los DOS tests de cartas de doble cara de `collection-views.spec.ts`, cuya unica asercion real vive dentro de un `if (count > 0)` que nunca entra. Las cartas de doble cara tienen CUATRO presentaciones distintas del mismo dato y ninguna esta cubierta.\\n8. `contacts.page.ts:31` — `profileLink() = a[href*=\"/@\"]`. `SavedContactCard.vue` no tiene ningun `<a>` ni RouterLink: solo `<img>`, `<p>` y tres `<BaseButton>`. Nunca empareja. Afecta a \"visit contact public profile link\", cuya unica asercion (`waitForURL`) nunca se ejecuta.\\n9. `collection-views.spec.ts:14` — `expect(count).toBeGreaterThanOrEqual(0)`, tautologia.\\n10. `collection-filters.spec.ts` (3 de 4 tests) y `collection-views.spec.ts` \"text view\" — la asercion terminal es `expect(statusFilters).toBeVisible()`, que YA era verdad antes de la interaccion. No mide el efecto de filtrar, ordenar ni cambiar de vista: solo que el contenedor sigue ahi. Es el desajuste que permitio que el defecto de TASK-156 pasara inadvertido durante meses.\\n\\nMECANISMO NUEVO catalogado aca: DESAJUSTE DE OBJETIVO DE ASERCION — el test ejecuta la accion bajo prueba pero lo unico que asevera ya era cierto antes de actuar.",
+  "acceptance_criteria": [
+    "Cada locator listado se corrige y se verifica que empareja exactamente el elemento previsto — medido con un conteo, no supuesto",
+    "El boton de girar de las cartas de doble cara se ancla a algo estable (data-testid), no al caracter ↔ que no existe, y el test cubre las CUATRO presentaciones: grilla, lista, modal de detalle y resultados de busqueda",
+    "Las aserciones tautologicas (`toBeGreaterThanOrEqual(0)`, `typeof x === 'boolean'`, `|| true`) se reemplazan por aserciones que puedan fallar",
+    "Los tests de filtros y vistas aseveran el EFECTO sobre las cartas mostradas, no que el contenedor de filtros siga visible",
+    "Cada test corregido se verifica capaz de fallar rompiendo a proposito la condicion que cubre"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T13:51:45.535Z",
+  "updated_at": "2026-08-08T13:51:45.535Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

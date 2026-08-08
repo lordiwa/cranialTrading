@@ -1,0 +1,30 @@
+{
+  "key": "TASK-159",
+  "title": "FLUJO Nº4 sin cobertura real: 4 de 5 tests del editor de mazos son cascaras que no tocan lo que prometen",
+  "description": "Barrido estatico de TASK-144 (2026-08-08), verificado contra los componentes. FLUJO Nº4 de prioridad de negocio (agregar mazos y organizar la coleccion en carpetas). El documento lo declaraba \"la cobertura mas completa del sistema\": es falso.\\n\\n1) `deck-editor.spec.ts` — CUATRO de cinco tests son placeholders puros. \"sideboard move\", \"adjust quantity\", \"over-allocation validation\" y \"stats panel\" hacen unicamente `goto()` y `expect(newDeckButton).toBeVisible()`. Ninguno toca mainboard, sideboard, cantidades ni estadisticas, pese a que sus titulos dicen exactamente eso. Es cobertura fantasma: el nombre promete lo que el cuerpo no hace.\\n   Consecuencia directa: el path secundario mas importante de UC-13 —\"asigna mas copias de las que posee, error de sobreasignacion\"— figura como cubierto por E2E y NO lo esta. La sobreasignacion es la regla de negocio central de los mazos, porque un mazo asigna cartas que ya estan en la coleccion en vez de duplicarlas.\\n\\n2) `decks.page.ts` — `editor.mainboard`, `editor.sideboard`, `editor.statsPanel`, `editor.addCardButton`, `editor.saveButton`, `deckList` y `getDeckCount()` estan declarados y NUNCA se usan en ningun spec. Coherente con el punto 1: la infraestructura para probarlo existe, nadie la uso.\\n\\n3) `deck-crud.spec.ts:42` y `binders.spec.ts:42` — los dos tests de \"nombre vacio impide guardar\" terminan en `expect(true).toBeTruthy(); // Test passes if no crash`. Es una asercion hardcoded: no mira la app. El documento declara ese path secundario cubierto por E2E en UC-12 y UC-15.\\n\\n4) `deck-crud.spec.ts:82-92` \"open existing deck in editor\" — ifs anidados sin rama else ni asercion: si no hay mazos visibles, no hace nada y pasa.\\n\\n5) `deck-import.spec.ts:35` — `expect(x || true).toBeTruthy()`. El `|| true` anula cualquier chequeo previo.\\n\\nMECANISMOS NUEVOS que aparecen aca y no estaban en los seis catalogados: asercion hardcoded (`expect(true).toBe(true)`), tautologia por `|| true`, y cobertura fantasma (el titulo promete mas que el cuerpo).",
+  "acceptance_criteria": [
+    "Los cuatro tests placeholder de `deck-editor.spec.ts` ejercitan de verdad lo que su titulo dice, o se renombran para no mentir. Mentir en el titulo no es aceptable: alguien leyendo la suite cree que el area esta cubierta",
+    "El path de SOBREASIGNACION queda cubierto de verdad: asignar mas copias de las que se poseen debe ser rechazado, y el test debe FALLAR si la validacion se quita — verificado quitandola a proposito y restaurandola",
+    "Ningun test de mazos ni binders termina en `expect(true)` ni en `expect(x || true)`: cada uno asevera el estado real de la app",
+    "Los locators declarados y nunca usados de `decks.page.ts` se usan o se borran — un page object con locators muertos invita a escribir tests que no prueban nada",
+    "Se corrigen las filas de cobertura de UC-12, UC-13 y UC-15 en docs/CASOS-DE-USO.html"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T13:51:17.740Z",
+  "updated_at": "2026-08-08T13:51:17.740Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

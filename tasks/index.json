@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-07T00:00:00.000Z",
+  "generated_at": "2026-08-08T15:36:39.236Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -736,7 +736,139 @@
     {
       "key": "TASK-143",
       "title": "Deep review adversarial de la tanda /inicio + kit v2 (origin/develop..7e1ae02, 5 commits, 19 archivos)",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-144",
+      "title": "Wargaming adversarial contra los 48 casos de uso documentados — objetivo: falsarlos, no confirmarlos",
       "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-145",
+      "title": "La grilla de Coleccion no es observable por los E2E: el locator devuelve 1 carta sobre 41.093",
+      "status": "done",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-146",
+      "title": "UC-07 (editar y borrar una carta) no tiene cobertura real — demostrado con mutacion",
+      "status": "blocked",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-147",
+      "title": "UC-08 (operaciones masivas) no tiene cobertura real — dos tests sin un solo expect",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-148",
+      "title": "La landing /inicio NO lee cero de Firestore: dispara 6 lecturas de coleccion mas borrados, y el codigo afirma lo contrario",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-149",
+      "title": "La tanda /inicio + kit v2 shippeo logica nueva con cero tests: el carrusel, el atajo '/' y showHeaderSearch",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-150",
+      "title": "El test del logo es un verde vacio: el locator no empareja nada y la asercion vive dentro de un if",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-151",
+      "title": "El gate de main sigue escribiendo en la base de PRODUCCION: dos specs @smoke crean mazos y binders reales",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-152",
+      "title": "Dos defectos menores del kit v2: /inicio con barra final duplica el buscador, y el foco neon sobrevive al estado de error",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-153",
+      "title": "La grilla de Coleccion tarda 20-27 segundos en mostrar la primera fila con 41.000 cartas",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-154",
+      "title": "FLUJO Nº2 REFUTADO: el test del buscador de la coleccion escribia en el buscador del header y nunca filtro nada",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-155",
+      "title": "Editar una carta y recargar enseguida puede perder la actualizacion del indice: el debounce de card_index muere con el contexto",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-156",
+      "title": "El buscador de la coleccion devuelve cartas ajenas al termino cuando se escribe sobre la grilla ya montada",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-157",
+      "title": "UC-20 (perfil publico) no tiene cobertura real: aserciones tautologicas, un logout que no desloguea y el perfil equivocado",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-158",
+      "title": "La regla de filtrado de precios que CLAUDE.md declara solo existe en el buscador anonimo del login",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-159",
+      "title": "FLUJO Nº4 sin cobertura real: 4 de 5 tests del editor de mazos son cascaras que no tocan lo que prometen",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-160",
+      "title": "Locators muertos en flujos Nº1 y Nº2: el boton de girar carta, el enlace de contacto y el banner de cartera no existen",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-161",
+      "title": "Areas no prioritarias con cobertura nula: matches, ajustes, notificaciones, mensajes y ayuda",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-162",
+      "title": "Ningun flujo se prueba jamas en espanol, que es el idioma por defecto de la aplicacion",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-163",
+      "title": "El asistente de importacion ofrece IMPORTAR 0 CARTAS sin ninguna advertencia, y el modal de carpeta dice \"mazo\"",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-164",
+      "title": "La regla de sobreasignacion tiene TRES caminos con TRES comportamientos distintos, y solo uno hace lo que dice el documento",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-165",
+      "title": "La ruta /inicio no baja su propio chunk hasta que termina la lectura de /users: 3,1 s de pantalla sin vista",
+      "status": "done",
       "priority": "high"
     }
   ]

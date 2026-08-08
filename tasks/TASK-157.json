@@ -1,0 +1,32 @@
+{
+  "key": "TASK-157",
+  "title": "UC-20 (perfil publico) no tiene cobertura real: aserciones tautologicas, un logout que no desloguea y el perfil equivocado",
+  "description": "Refutacion de TASK-144 / ESTRATEGIA B (2026-08-08). FLUJO Nº2 de prioridad de negocio (buscar cartas en perfiles ajenos). El documento declara UC-20 cubierto por `user-profile.spec.ts` con etiqueta @smoke; los tres tests que sostienen esa afirmacion no prueban lo que dicen.\\n\\n1) `user-profile.spec.ts:19` — \"visitante sin sesion NO ve los botones de interes ni de contacto\". Tres defectos superpuestos:\\n   - La asercion es `expect(typeof visible).toBe('boolean')`. Es una TAUTOLOGIA: se cumple tanto si el boton esta como si no.\\n   - El \"logout\" es `page.context().clearCookies()`, pero la sesion de Firebase en esta app vive ENTERAMENTE en localStorage (`firebase:authUser:...`); `e2e/.auth/user.json` tiene 0 cookies. Medido: tras el clearCookies el token sigue en localStorage y el usuario sigue autenticado durante todo el test.\\n   - Ademas apunta a `/@rafael`, que es el perfil PROPIO de la cuenta autenticada. El boton de contacto no aparece, pero por `isOwnProfile`, no por falta de sesion. El test pasa por la razon equivocada, por partida triple.\\n\\n2) `user-profile.spec.ts:9` — \"browse public cards on profile with text search filter\", que cubre el paso 4 de UC-20 (\"filtra por nombre\"). No tiene NINGUN `expect`. Y el locator `searchInput = page.locator('input[type=\"text\"]').first()` (`user-profile.page.ts:23`) no esta acotado al filtro del perfil: es el MISMO patron ya ticketeado en TASK-154. Medido en vivo: la cuenta `rafael` de dev tiene 0 cartas publicas, asi que el `CardFilterBar` del perfil NUNCA se monta y el unico `input[type=\"text\"]` de la pagina es el buscador GLOBAL del header. El test tipea en el header y no asevera nada. Cobertura real del paso 4: CERO.\\n\\n3) `user-profile.spec.ts:40` — \"logged-in user viewing own profile sees different UI\". CERO `expect`. Solo un comentario `// Should see wishlist link instead of contact button` que nunca se verifica. Pasa siempre.\\n\\nSEPTIMO MECANISMO DE VERDE VACIO, nuevo: la ASERCION TAUTOLOGICA (`expect(typeof x).toBe('boolean')`). Se suma a los seis ya catalogados. Conviene barrer la suite buscando mas.\\n\\nOJO CON EL DATO DE PARTIDA: que la cuenta de dev no tenga cartas publicas hace que varias ramas de UC-20 sean inobservables. Cualquier test nuevo necesita una cuenta con cartas publicas, o el mismo hueco se reproduce.",
+  "acceptance_criteria": [
+    "El test del visitante sin sesion usa un estado GENUINAMENTE sin sesion — el proyecto `no-auth-tests` de Playwright, sin storageState — y no `clearCookies()`, que no toca localStorage y por lo tanto no desloguea nada",
+    "Ese test apunta a un perfil AJENO, no al propio, y asevera explicitamente que el boton de contacto NO esta visible. Nada de tautologias: si el boton apareciera, el test debe enrojecer",
+    "El test del filtro por nombre corre contra una cuenta CON cartas publicas y asevera el efecto sobre las cartas mostradas, no el valor del input. El locator queda acotado al filtro del perfil y se verifica que empareja exactamente 1 elemento",
+    "El test del perfil propio asevera de verdad la diferencia de UI que su comentario describe",
+    "Cada test nuevo se verifica capaz de fallar rompiendo a proposito la condicion que cubre",
+    "Se barre la suite entera buscando el patron de asercion tautologica (`expect(typeof ...)`, `toBeGreaterThanOrEqual(0)` sobre un conteo, y similares) y se reporta lo encontrado",
+    "Se corrige la fila de cobertura de UC-20 en docs/CASOS-DE-USO.html"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "cobertura-real",
+    "wargaming",
+    "e2e",
+    "qa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T13:44:42.730Z",
+  "updated_at": "2026-08-08T13:44:42.730Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

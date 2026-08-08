@@ -1,0 +1,30 @@
+{
+  "key": "TASK-155",
+  "title": "Editar una carta y recargar enseguida puede perder la actualizacion del indice: el debounce de card_index muere con el contexto",
+  "description": "SOSPECHA FUERTE con evidencia observada, encontrada el 2026-08-08 al implementar TASK-146. NO esta confirmada como dano visible al usuario: eso es lo primero que hay que establecer, y por eso este ticket es de diagnostico antes que de arreglo.\\n\\nLO OBSERVADO: `updateCard()` guarda el documento de la carta en Firestore enseguida (por eso el toast de exito sale rapido) pero NO dispara `refreshCurrentPage()` — es deliberado, ver el comentario en `collection.ts:869` (TASK-113). El indice de listado y busqueda (`card_index`, 21 chunks en la cuenta de 41k) se persiste con un debounce de 2 s y despues escribe los 21 chunks de forma secuencial, sin ninguna senal observable en la UI de cuando termina.\\n\\nSi la pagina se recarga antes de que ese temporizador dispare, el contexto JS se destruye y el temporizador muere con el: la actualizacion del indice NO llega nunca. No es que tarde — se pierde.\\n\\nPOR QUE PODRIA IMPORTARLE AL USUARIO: el documento de la carta si quedo guardado, pero el indice que alimenta el listado y la busqueda queda viejo. Un usuario que edita la cantidad de una carta y recarga o navega enseguida podria seguir viendo el valor anterior en la grilla y en la busqueda, aunque el dato real este bien. Eso es exactamente la clase de incoherencia que erosiona la confianza en el inventario.\\n\\nCONTRASTE QUE REFUERZA LA SOSPECHA: `addCard()` y `deleteCard()` SI marcan `_pendingMembershipRefresh` y disparan `refreshCurrentPage()` solos cuando el write de chunks termina — o sea que ahi hay una senal observable de fin. `updateCard()` no la tiene. La asimetria puede ser deliberada o puede ser el hueco.\\n\\nCONTEXTO: se relaciona con el patron conocido de carrera de persistencia de card_index (parche optimista + refresco diferido con token de generacion y guarda de temporizador pendiente). Tambien con TASK-153: la grilla ya tarda 20-27 s en montar en esta cuenta, asi que cualquier trabajo diferido compite con eso.\\n\\nCAE EN EL FLUJO Nº3 de prioridad de negocio (quitar cartas o ponerlas a la venta).",
+  "acceptance_criteria": [
+    "PRIMERO: establecer si esto le pasa a un usuario real o solo al test. Reproducir a mano — editar la cantidad de una carta, recargar antes de 2 s, y ver si la grilla y la busqueda muestran el valor viejo o el nuevo. Si no hay dano visible, se cierra documentando por que y no se toca codigo",
+    "Si hay dano: cuantificar la ventana de perdida (el debounce de 2 s mas lo que tarden los 21 chunks) y en que condiciones se dispara",
+    "Evaluar por que `updateCard` no marca `_pendingMembershipRefresh` como si hacen `addCard` y `deleteCard`, y si esa asimetria es deliberada o es el defecto",
+    "La propuesta de arreglo se presenta a Rafael antes de implementar — hay varias salidas posibles (persistir antes, marcar el refresh pendiente, avisar al usuario) y la eleccion es suya",
+    "NO se arregla contorsionando el test de TASK-146 para que el problema no se note"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "collection",
+    "user-flow",
+    "diagnostico"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T07:18:36.798Z",
+  "updated_at": "2026-08-08T07:18:36.798Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[INFERRED:strong]"
+}

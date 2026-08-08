@@ -1,0 +1,36 @@
+{
+  "key": "TASK-156",
+  "title": "El buscador de la coleccion devuelve cartas ajenas al termino cuando se escribe sobre la grilla ya montada",
+  "description": "PRIMER DEFECTO REAL DE LA APLICACION encontrado por el wargaming de TASK-144 (2026-08-08). Todo lo anterior habian sido defectos de tests o del documento; este le pasa al usuario.\\n\\nFLUJO Nº2 de prioridad de negocio (buscar cartas en la coleccion propia). Alcanzabilidad muy alta: es el uso normal — nadie edita la URL a mano.\\n\\nPREDICADO FALSADO: tras tipear un termino en el buscador de /collection ya montada, las cartas visibles deben coincidir con el termino.\\n\\nFICHA (A5):\\n- Proyecto Firebase: cranial-trading-dev. Produccion no tocada. Solo lectura, no se muto nada.\\n- Estado de partida: cuenta E2E, ~41.093 cartas, sin filtros previos.\\n- Pasos: ir a /collection, esperar el montaje (20-27 s conocidos), tipear \"Lightning Bolt\" en el buscador, esperar el debounce y el refetch.\\n- Resultado documentado: la grilla se acota a las coincidencias.\\n- Resultado observado: la grilla muestra \"Lightning Bolt\" (1) mas \"Emeritus of Conflict\" x5, \"Soul-Guide Lantern\", \"Szarel, Genesis Shepherd\", \"Steel Overseer\" y \"Threefold Thunderhulk\" — ninguna relacionada con el termino salvo la primera. Mismo conjunto y mismo orden en cada repeticion.\\n- Reproducibilidad: 3/3.\\n\\nEXPERIMENTO DE CONTROL, que es lo que hace solido el hallazgo: navegando en FRESCO a `/collection?q=Lightning+Bolt`, con la query ya en la URL al montar, las 20 cartas visibles son \"Lightning Bolt\" correctamente (1/1). O sea que el filtro del backend NO esta roto: se corrompe unicamente cuando el usuario escribe de forma interactiva sobre la grilla ya montada, que es justo el camino que describe el happy path del documento.\\n\\nMECANISMO NO AISLADO, y se declara como tal: hay sospecha de un problema de reactividad de la grilla virtualizada compitiendo con la carga del indice de precios (\"Loading prices... 0/41093\"), pero NO esta confirmado. Aislarlo es parte de este ticket. Relacionado con TASK-153 (la grilla tarda 20-27 s en montar por esa misma carga de precios).\\n\\nPOR QUE NADIE LO VIO: `collection-filters.spec.ts` declara cubrir este caso, y sus cuatro tests no miran ni una sola carta de la grilla. El del buscador solo asevera `toHaveValue('Lightning')`, o sea que el texto quedo escrito en el input. Un test que no mira los resultados no podia ver que los resultados estuvieran mal. Ver TASK-154.",
+  "acceptance_criteria": [
+    "Se reproduce y se aisla el mecanismo: por que el filtrado interactivo devuelve cartas ajenas al termino y el mismo filtro por URL al montar devuelve las correctas. La respuesta manda sobre el arreglo — no arreglar por intuicion",
+    "Se comprueba si depende del tamano de la coleccion: reproducir en la cuenta de ~200 cartas y en la de ~41.000 para separar lo que escala de lo que es coste fijo",
+    "Se comprueba si depende de la carga de precios en curso: repetir el ataque una vez que 'Loading prices' termino, para confirmar o descartar la sospecha de competencia por el hilo principal",
+    "Corregido, un usuario que escribe en el buscador con la grilla ya montada ve solo coincidencias del termino — verificado en el navegador, no solo por test",
+    "Existe un test que FALLA con el defecto presente y PASA sin el, y que mira las CARTAS de la grilla y no el valor del input"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "wargaming",
+    "collection",
+    "user-flow",
+    "bug"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T13:50:28.723Z",
+      "body": "VERIFICACION INDEPENDIENTE DEL ORQUESTADOR (2026-08-08). Sonda propia, sin reusar la del agente, contra https://cranial-trading-dev.web.app. Solo lectura.\n\nRESULTADO: el hallazgo SE SOSTIENE — el camino interactivo falla y el control funciona — pero el SINTOMA OBSERVADO ES DISTINTO, y eso importa para el diagnostico:\n- Interactivo (escribir \"Lightning Bolt\" sobre la grilla ya montada, esperar 6 s): 0 de 0 cartas. La grilla queda VACIA.\n- Control (navegar en fresco a /collection?q=Lightning%20Bolt): 15 de 15 correctas.\nEl agente wg-flujo2 habia observado, con 3 s de espera, cartas EQUIVOCADAS (Emeritus of Conflict, Soul-Guide Lantern, etc.), no una grilla vacia.\n\nQUE SIGNIFICA LA DISCREPANCIA: los dos observamos que el camino interactivo NO devuelve los resultados correctos y que el control SI, o sea que la refutacion del happy path se sostiene por partida doble. Pero el sintoma varia entre corridas y entre tiempos de espera (3 s -> cartas ajenas; 6 s -> vacio), lo cual apunta a una CARRERA y no a un filtro mal escrito. Esto refuerza el criterio 1 del ticket: hay que aislar el mecanismo antes de arreglar nada.\n\nPISTA NUEVA, que ninguno de los dos habia registrado: en el camino interactivo la URL termina siendo\n  /collection?q=Lightning+Bolt&colors=White,Blue,...&types=Creatures,...&rarity=Common,...&mv=0,1,2,...\no sea con TODOS los parametros de filtro por defecto materializados, mientras que el control lleva unicamente `?q=Lightning%20Bolt`. Son dos consultas distintas. Vale investigar si el camino interactivo emite un juego completo de filtros que el de la URL no emite, y si esa diferencia es la que rompe el resultado.\n\nSALVEDAD HONESTA: mi sonda espero 6 s tras escribir. No puedo distinguir \"la grilla quedo vacia\" de \"la grilla seguia cargando\". Quien tome el ticket deberia medir hasta la estabilizacion, no a tiempo fijo.\n\nNOTA OPERATIVA: mis dos primeras sondas fallaron por dos motivos que conviene recordar. (1) Sin `test.setTimeout`, el techo de 45 s de playwright.config.ts corta antes de que monte la grilla. (2) La sonda dependia del `data-testid=\"collection-card\"` que agregamos hoy, y el dev DESPLEGADO corre el bundle anterior porque no se pusheo nada — cualquier verificacion contra ese entorno debe apoyarse solo en lo que ya estaba desplegado."
+    }
+  ],
+  "created_at": "2026-08-08T13:44:07.234Z",
+  "updated_at": "2026-08-08T13:50:28.723Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

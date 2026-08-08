@@ -68,7 +68,7 @@ const onCreateBinder = () => {
 </script>
 
 <template>
-  <div class="bg-silver-5 border border-silver-10 p-3 mb-4 rounded space-y-3 relative">
+  <div class="bg-silver-5 border border-silver-10 p-3 mb-4 rounded space-y-3 relative" data-testid="bulk-selection-bar">
     <div v-if="bulkActionLoading" class="absolute inset-0 bg-primary/70 rounded flex flex-col items-center justify-center z-10 gap-2">
       <span class="text-small font-bold text-neon animate-pulse">
         {{ bulkActionProgress > 0 ? `${bulkActionProgress}%` : t('collection.bulkEdit.processing') }}
@@ -108,6 +108,7 @@ const onCreateBinder = () => {
       <span class="text-tiny font-bold text-silver-50 uppercase w-14">{{ t('collection.bulkEdit.statusLabel') }}</span>
       <button
           :disabled="selectedCount === 0 || bulkActionLoading"
+          data-testid="bulk-status-collection"
           class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-neon/50 disabled:opacity-30 disabled:cursor-not-allowed text-neon"
           @click="emit('change-status', 'collection')"
       >
@@ -116,6 +117,7 @@ const onCreateBinder = () => {
       </button>
       <button
           :disabled="selectedCount === 0 || bulkActionLoading"
+          data-testid="bulk-status-trade"
           class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-blue-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-blue-400"
           @click="emit('change-status', 'trade')"
       >
@@ -124,6 +126,7 @@ const onCreateBinder = () => {
       </button>
       <button
           :disabled="selectedCount === 0 || bulkActionLoading"
+          data-testid="bulk-status-sale"
           class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-yellow-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-yellow-400"
           @click="emit('change-status', 'sale')"
       >
@@ -132,6 +135,7 @@ const onCreateBinder = () => {
       </button>
       <button
           :disabled="selectedCount === 0 || bulkActionLoading"
+          data-testid="bulk-status-wishlist"
           class="flex items-center gap-1 px-2 py-1 rounded border border-silver-10 text-tiny font-bold transition-colors hover:border-red-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-red-400"
           @click="emit('change-status', 'wishlist')"
       >
@@ -222,6 +226,7 @@ const onCreateBinder = () => {
       <BaseButton
           size="small"
           variant="danger"
+          data-testid="bulk-delete-button"
           :disabled="selectedCount === 0 || bulkActionLoading"
           @click="emit('delete')"
       >

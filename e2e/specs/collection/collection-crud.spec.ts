@@ -167,50 +167,153 @@ test.describe('Collection CRUD', () => {
     await expect.poll(() => collectionPage.cardIdentity(0)).not.toBe(identityBefore);
   });
 
-  test('bulk select → bulk change status to Sale → verify status updated', async ({ collectionPage, commonPage, page }) => {
-    // Enter selection mode
-    const selectBtn = collectionPage.selectModeButton;
-    if (!(await selectBtn.isVisible({ timeout: 3000 }).catch(() => false))) return;
-    await selectBtn.click();
-    await page.waitForTimeout(500);
+  // TASK-147: this whole chain used to live inside nested
+  // `if (await X.isVisible(...).catch(() => false))` guards with no `expect`
+  // anywhere in the body — if any guard failed, the rest silently skipped and
+  // the test still went green (proved by mutation: `batchUpdateCards` → return
+  // `true` immediately passed 2/2). Two dead locators were part of why the
+  // guards failed on this v2 grid: `input[type="checkbox"]` never matched —
+  // CollectionGridCardFull.vue's selection affordance is a plain `<div>`
+  // overlay, not a real checkbox input, so clicking the grid card itself
+  // (which toggles selection via `handleCardActivate` when `selectionMode` is
+  // true) is the only real path — and the delete button's old regex
+  // (`/delete all|eliminar/i`) never matched the real "DELETE {count}" /
+  // "ELIMINAR {count}" label either. Both are now targeted with the
+  // `data-testid`s added to BulkSelectionActionBar.vue instead of guessing text.
+  //
+  // Assertion strategy — course-corrected TWICE on this exact test (both
+  // regressions found by re-verification runs, not by design up front):
+  // the toast fires on `ok === true` regardless of whether the mutation is
+  // in place (the mutated `batchUpdateCards` returns `true` immediately
+  // without touching `cards.value`), so a toast check alone can't
+  // distinguish real persistence from the no-op mutation. The first replace-
+  // ment — re-opening CardDetailModal to read `statusDistribution` — was
+  // dropped as unreliable. The second — the grid card's own status badge at
+  // index 0 — looked solid (passed 7/7 across two repeat-each=2 runs) but
+  // then failed on a THIRD, independent verification run: over the ~30s
+  // this test takes, index 0 on this virtualized grid can drift to a
+  // genuinely different card from background pagination settling (the same
+  // root cause documented on the bulk-delete test below, which this test
+  // predates the fix on). Position-based checks on this grid are not
+  // provably stable no matter how they're phrased. `statusChipCount()` —
+  // the status filter chips' counts — has no such dependency: it's a
+  // page-level number computed off the full `collectionStore.cards` array
+  // (`statusCounts` in CollectionView.vue), nothing to do with which row a
+  // virtualizer renders where.
+  test('bulk select → bulk change status to Sale → status counts move in the store, not just the toast', async ({ collectionPage, commonPage }) => {
+    // Start from a card known to be status=collection so the "before" state
+    // is unambiguous (A4: starting state declared).
+    await collectionPage.filterByStatus('collection');
+    const cardCount = await collectionPage.getCardCount();
+    expect(cardCount).toBeGreaterThan(0);
 
-    // Select first card via checkbox or click
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await checkbox.click();
-      const saleButton = page.getByRole('button', { name: /sale|venta/i });
-      if (await saleButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await saleButton.click();
-        await commonPage.waitForToast('success');
-      }
-    }
+    const collectionCountBefore = await collectionPage.statusChipCount('collection');
+    const availableCountBefore = await collectionPage.statusChipCount('available');
+    expect(collectionCountBefore).toBeGreaterThan(0);
+
+    await collectionPage.selectModeButton.click();
+    await collectionPage.clickCardInGrid(0);
+    await expect(collectionPage.gridCards.nth(0)).toHaveAttribute('aria-pressed', 'true');
+
+    await collectionPage.bulkStatusButton('sale').click();
+    await commonPage.waitForToast('success');
+
+    // Real assertion: the card's own status actually changed in the store —
+    // the mutated `batchUpdateCards` never touches `cards.value`, so these
+    // counts would stay exactly where they started under the mutation.
+    await expect.poll(() => collectionPage.statusChipCount('collection')).toBe(collectionCountBefore - 1);
+    await expect.poll(() => collectionPage.statusChipCount('available')).toBe(availableCountBefore + 1);
+
+    // Restore (A4): move the same card back to its original status so this
+    // run doesn't leave unbounded drift on the shared dev collection.
+    await collectionPage.selectModeButton.click();
+    await collectionPage.clickCardInGrid(0);
+    await collectionPage.bulkStatusButton('collection').click();
+    await commonPage.waitForToast('success');
+
+    await expect.poll(() => collectionPage.statusChipCount('collection')).toBe(collectionCountBefore);
+    await expect.poll(() => collectionPage.statusChipCount('available')).toBe(availableCountBefore);
   });
 
-  test('bulk select → bulk delete → confirm → cards removed', async ({ collectionPage, commonPage, page }) => {
-    const selectBtn = collectionPage.selectModeButton;
-    if (!(await selectBtn.isVisible({ timeout: 3000 }).catch(() => false))) return;
-    await selectBtn.click();
-    await page.waitForTimeout(500);
+  // TASK-147: total-count based, NOT identity-at-index-0 — course-corrected
+  // after an identity-based version of this exact test turned out to be a
+  // FALSE GREEN under its own mutation. Root cause: index 0 on this
+  // virtualized grid can change to a genuinely different card over the
+  // ~30s a full test takes, from background card_index/pagination settling —
+  // a change entirely unrelated to whether OUR delete actually ran. That drift
+  // was enough on its own to make `cardIdentity(0)` differ before vs. after,
+  // so the mutated `batchDeleteCards` (no-op, deletes nothing) still passed
+  // 1/1 when tried. `totalCardCount()` (the nav badge, driven by the full
+  // `collectionStore.cards` array) has no such position dependency: a no-op
+  // delete leaves it exactly unchanged, so this is the assertion that
+  // actually depends on the deletion having happened.
+  test('bulk select → bulk delete → confirm → selected card removed', async ({ collectionPage, commonPage }) => {
+    const cardCount = await collectionPage.getCardCount();
+    expect(cardCount).toBeGreaterThan(0);
 
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await checkbox.click();
-      const deleteButton = page.getByRole('button', { name: /delete all|eliminar/i });
-      if (await deleteButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await deleteButton.click();
-        await commonPage.confirmAction();
-        await commonPage.waitForToast('success');
-      }
-    }
+    const countBefore = await collectionPage.totalCardCount();
+    expect(countBefore).toBeGreaterThan(0);
+
+    await collectionPage.selectModeButton.click();
+    await collectionPage.clickCardInGrid(0);
+    await expect(collectionPage.gridCards.nth(0)).toHaveAttribute('aria-pressed', 'true');
+
+    await collectionPage.bulkDeleteButton.click();
+    await commonPage.confirmAction();
+    await commonPage.waitForToast('success');
+
+    // Mutation used to prove this test can fail: `batchDeleteCards` →
+    // returns `{ success: true, deleted: cardIds.length, failed: 0 }`
+    // immediately, without touching `cards.value`/`paginatedCards.value` or
+    // Firestore — its own seam, distinct from the single-card `deleteCard`
+    // mutation, per AC2.
+    await expect.poll(() => collectionPage.totalCardCount()).toBe(countBefore - 1);
   });
 
-  // TASK-146: identity-based (see the delete test above for why count is
-  // unreliable here). getCardCount()'s own waitForGridReady() only guarantees
-  // the FIRST card is visible, not that the whole virtualizer window has
-  // finished mounting — capturing countBefore mid-mount and countAfter once
-  // the window is fuller used to risk a spurious red on this test. Comparing
-  // identity at index 0 sidesteps that: it doesn't care how many cards are
-  // rendered elsewhere in the window, only whether this specific slot changed.
+  // TASK-147 AC5: the secondary "bulk delete cancelled" path was declared
+  // covered in docs/CASOS-DE-USO.html and did not exist — the bulk delete
+  // test above confirms, it never cancelled. This is that missing test.
+  // Anchored to a page-level TOTAL, not a grid position (course-corrected
+  // after position-based attempts here proved unreliable — TASK-147): even
+  // reading grid index 0 only after entering selection mode, with a
+  // stability-polling identity read, "before" and "after" identity at index
+  // 0 still didn't reliably refer to the same card across a cancel with no
+  // real mutation involved. `totalCardCount()`
+  // (the nav badge, driven by the full `collectionStore.cards` array, not
+  // the virtualized/paginated grid) sidesteps that whole class of problem —
+  // it's a single page-level number, nothing to do with which row a
+  // virtualizer happens to render at position 0. It's still a falsifiable
+  // assertion: if `cancelAction()` mis-clicked CONFIRM instead of CANCEL (or
+  // handleBulkDelete didn't actually gate on the confirm result), the count
+  // would drop by exactly 1, same as the real delete in the test above.
+  test('bulk select → bulk delete → cancel confirm → selection and count intact', async ({ collectionPage, commonPage }) => {
+    const cardCount = await collectionPage.getCardCount();
+    expect(cardCount).toBeGreaterThan(0);
+
+    const countBefore = await collectionPage.totalCardCount();
+    expect(countBefore).toBeGreaterThan(0);
+
+    await collectionPage.selectModeButton.click();
+    await collectionPage.clickCardInGrid(0);
+    await expect(collectionPage.gridCards.nth(0)).toHaveAttribute('aria-pressed', 'true');
+
+    await collectionPage.bulkDeleteButton.click();
+    await commonPage.cancelAction();
+
+    await expect.poll(() => collectionPage.totalCardCount()).toBe(countBefore);
+
+    // handleBulkDelete returns early on `!confirmed`, before touching
+    // selectionMode/selectedCardIds — selection survives a cancelled confirm.
+    await expect(collectionPage.gridCards.nth(0)).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  // TASK-146: identity-based, not count-based (reviewer finding on TASK-145's
+  // rebote). On a 41k-card window-virtualized grid, deleting one card doesn't
+  // durably drop getCardCount() — the virtualizer refills the visible window
+  // right behind it, so a count poll can pass by catching a transient
+  // mid-remount state instead of the real removal. What IS durable is WHICH
+  // card sits at index 0: after a real delete it's a different card (or the
+  // grid is empty); after the mutation below it's still the same one.
   test('cancel deletion from confirm dialog leaves card intact', async ({ collectionPage, commonPage }) => {
     const cardCount = await collectionPage.getCardCount();
     expect(cardCount).toBeGreaterThan(0);

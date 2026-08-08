@@ -101,6 +101,24 @@ export class CollectionPage {
     await this.statusFilters.locator('button').filter({ hasText: new RegExp(status, 'i') }).click();
   }
 
+  /**
+   * Reads the count badge off a status filter chip ("Collection 3",
+   * "AVAILABLE 41089") — driven by `statusCounts` (CollectionView.vue),
+   * itself derived from the full `collectionStore.cards` array. Same
+   * position-independence rationale as `totalCardCount()`: no grid index
+   * involved, so a bulk status change is provable without depending on
+   * which card a virtualizer happens to render at position 0 (TASK-147 —
+   * an index-0 status-badge check for this exact scenario turned out
+   * flaky for the identical reason the identity-based delete check was).
+   * `status` matches `filterByStatus`'s regex convention.
+   */
+  async statusChipCount(status: string): Promise<number> {
+    const chip = this.statusFilters.locator('button').filter({ hasText: new RegExp(status, 'i') }).first();
+    const text = await chip.textContent();
+    const match = (text ?? '').match(/(\d+)/);
+    return match ? Number(match[1]) : 0;
+  }
+
   async openAddCardModal() {
     // Try desktop button first, fall back to FAB
     try {
@@ -242,6 +260,35 @@ export class CollectionPage {
 
   async incrementStatus(status: 'collection' | 'sale' | 'trade' | 'wishlist') {
     await this.statusRow(status).getByRole('button').last().click();
+  }
+
+  // ========== BULK SELECTION (TASK-147) ==========
+  // data-testid added to BulkSelectionActionBar.vue's status/delete buttons —
+  // their old text-based locators (`/delete all|eliminar/i`) never matched the
+  // real "DELETE {count}"/"ELIMINAR {count}" button label, which is exactly
+  // why the bulk-delete test's guard silently no-op'd (TASK-147 finding).
+  bulkStatusButton(status: 'collection' | 'sale' | 'trade' | 'wishlist'): Locator {
+    return this.page.locator(`[data-testid="bulk-status-${status}"]`);
+  }
+
+  get bulkDeleteButton(): Locator {
+    return this.page.locator('[data-testid="bulk-delete-button"]');
+  }
+
+  /**
+   * The "Collection" nav-link badge (AppHeader.vue) — `collectionStore.cards.length`,
+   * the full client-side array (every card doc, not the paginated/windowed
+   * grid). Immune to the virtualizer's index-0 instability (TASK-147
+   * finding: entering selection mode / any layout shift can change which
+   * card the DOM renders at grid index 0, so position-based before/after
+   * comparisons for a NO-OP like "cancel" are unreliable). A cancelled bulk
+   * delete must leave this total exactly unchanged; a real delete decrements
+   * it — that's the falsifiable signal this method exists for.
+   */
+  async totalCardCount(): Promise<number> {
+    const badge = this.page.locator('[data-testid="nav-collection"], [data-tour="nav-collection"]').first().locator('span').last();
+    const text = await badge.textContent();
+    return Number((text ?? '0').replace(/[^\d]/g, ''));
   }
 
   /** Get the toggle button for a dual-faced card (↔️) */

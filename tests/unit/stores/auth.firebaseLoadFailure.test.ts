@@ -132,6 +132,21 @@ describe('ensureSubscription failure handling (HIGH-1)', () => {
     expect(onAuthStateChangedMock).not.toHaveBeenCalled()
   })
 
+  // TASK-165: a failed SDK load must resolve the session question too (not
+  // just `loading`), otherwise the router guard's new sessionKnown-based wait
+  // (see router/authGuard.ts) would hang forever instead of falling through
+  // to the same "treat as logged-out" outcome `loading` already gets here.
+  it('a failed SDK load also resolves sessionKnown=true/hasSession=false, so the guard does not hang', async () => {
+    state.authShouldFailOnce = true
+    const { store } = await freshStores()
+
+    expect(store.sessionKnown).toBe(false)
+    await store.firebaseNeededNow()
+
+    expect(store.sessionKnown).toBe(true)
+    expect(store.hasSession).toBe(false)
+  })
+
   it('after a failure, a later trigger (e.g. a retry) attempts a fresh subscription instead of replaying the dead promise', async () => {
     state.authShouldFailOnce = true
     const { store } = await freshStores()

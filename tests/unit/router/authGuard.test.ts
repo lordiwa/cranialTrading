@@ -42,6 +42,12 @@ const createFakeAuthStore = (initialLoading: boolean, initialUser: unknown = nul
     loading: initialLoading,
     user: initialUser,
     emailVerified: initialEmailVerified,
+    // TASK-165: for tests that don't specifically exercise the
+    // sessionKnown/hasSession decoupling (i.e. everything except the
+    // requiresAuth describe block below), keep them moving in lockstep with
+    // loading/user via resolve() below — same timing as before this ticket.
+    sessionKnown: !initialLoading,
+    hasSession: Boolean(initialUser),
     $subscribe: (callback: () => void) => {
       listeners.add(callback)
       return () => listeners.delete(callback)
@@ -52,6 +58,8 @@ const createFakeAuthStore = (initialLoading: boolean, initialUser: unknown = nul
     store.user = nextUser
     store.emailVerified = emailVerified
     store.loading = false
+    store.sessionKnown = true
+    store.hasSession = Boolean(nextUser)
     listeners.forEach((cb) => { cb() })
   }
   return { store, resolve, firebaseNeededNow }
@@ -319,6 +327,8 @@ describe('createAuthGuard — (c) requiresAuth keeps today\'s exact wait-then-de
       loading: true,
       user: null,
       emailVerified: false,
+      sessionKnown: false,
+      hasSession: false,
       $subscribe: () => () => { /* never invokes the callback */ },
     }
     const next = vi.fn()
@@ -329,10 +339,123 @@ describe('createAuthGuard — (c) requiresAuth keeps today\'s exact wait-then-de
     // Auth resolves "out of band" (missed reactivity tick) — only the 2s
     // fallback timer will notice and unblock the guard.
     store.loading = false
+    store.sessionKnown = true
     await vi.advanceTimersByTimeAsync(2000)
     await pending
 
     expect(next).toHaveBeenCalledWith({ path: '/login', query: { returnUrl: '/collection' } })
+    vi.useRealTimers()
+  })
+})
+
+describe('createAuthGuard — (c) requiresAuth resolves on sessionKnown, decoupled from the full profile load (TASK-165)', () => {
+  // TASK-165 root cause: `loading` only flips false after loadUserData's
+  // getDoc('/users/{uid}') round-trip settles (stores/auth.ts). Measured in
+  // production: that read alone took 1547ms and pushed the requiresAuth
+  // route's own chunk request out by 3.1s. The guard only needs to know IF
+  // there's a session — sessionKnown/hasSession resolve as soon as
+  // onAuthStateChanged fires, well before the profile read finishes.
+  const createDecoupledStore = (initialSessionKnown: boolean) => {
+    const listeners = new Set<() => void>()
+    const firebaseNeededNow = vi.fn()
+    const store: AuthGuardStore = {
+      // loading/user intentionally stay "still loading" for the whole test —
+      // proves the guard does NOT wait on them anymore for this route type.
+      loading: true,
+      user: null,
+      emailVerified: false,
+      sessionKnown: initialSessionKnown,
+      hasSession: false,
+      $subscribe: (callback: () => void) => {
+        listeners.add(callback)
+        return () => listeners.delete(callback)
+      },
+      firebaseNeededNow,
+    }
+    const resolveSession = (hasSession: boolean) => {
+      store.sessionKnown = true
+      store.hasSession = hasSession
+      listeners.forEach((cb) => { cb() })
+    }
+    return { store, resolveSession, firebaseNeededNow }
+  }
+
+  it('resolves the navigation once sessionKnown flips true, even though the profile (loading/user) is still pending', async () => {
+    const { store, resolveSession } = createDecoupledStore(false)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresAuth: true }, '/inicio'), asRoute({}), next)
+    await Promise.resolve()
+    expect(next).not.toHaveBeenCalled()
+
+    resolveSession(true)
+    await pending
+
+    expect(next).toHaveBeenCalledWith()
+    // The profile genuinely never arrived in this test — confirms the guard
+    // did not (and does not need to) wait on it.
+    expect(store.loading).toBe(true)
+    expect(store.user).toBe(null)
+  })
+
+  it('redirects to /login when sessionKnown resolves with no session, without waiting on the profile', async () => {
+    const { store, resolveSession } = createDecoupledStore(false)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresAuth: true }, '/inicio'), asRoute({}), next)
+    resolveSession(false)
+    await pending
+
+    expect(next).toHaveBeenCalledWith({ path: '/login', query: { returnUrl: '/inicio' } })
+  })
+
+  it('resolves immediately when sessionKnown is already true (mirrors the pre-existing "already resolved" case)', async () => {
+    const { store } = createDecoupledStore(true)
+    store.hasSession = true
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    await guard(asRoute({ requiresAuth: true }, '/inicio'), asRoute({}), next)
+
+    expect(next).toHaveBeenCalledWith()
+  })
+
+  it('still calls firebaseNeededNow() before waiting on sessionKnown (TASK-132 eager-load trigger preserved)', async () => {
+    const { store, resolveSession, firebaseNeededNow } = createDecoupledStore(false)
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresAuth: true }, '/inicio'), asRoute({}), next)
+    await Promise.resolve()
+    expect(firebaseNeededNow).toHaveBeenCalledTimes(1)
+
+    resolveSession(true)
+    await pending
+  })
+
+  it('falls back to the 2s re-check timeout when sessionKnown never flips via $subscribe (regression lock, mirrors the loading-based fallback)', async () => {
+    vi.useFakeTimers()
+    const store: AuthGuardStore = {
+      loading: true,
+      user: null,
+      emailVerified: false,
+      sessionKnown: false,
+      hasSession: false,
+      $subscribe: () => () => { /* never invokes the callback */ },
+    }
+    const next = vi.fn()
+    const guard = createAuthGuard(store, vi.fn())
+
+    const pending = guard(asRoute({ requiresAuth: true }, '/inicio'), asRoute({}), next)
+
+    store.sessionKnown = true
+    store.hasSession = false
+    await vi.advanceTimersByTimeAsync(2000)
+    await pending
+
+    expect(next).toHaveBeenCalledWith({ path: '/login', query: { returnUrl: '/inicio' } })
     vi.useRealTimers()
   })
 })
@@ -445,6 +568,8 @@ describe('createAuthGuard — firebaseNeededNow eager-load trigger (TASK-132 rev
       loading: true,
       user: null,
       emailVerified: false,
+      sessionKnown: false,
+      hasSession: false,
       $subscribe: (callback: () => void) => {
         listeners.add(callback)
         return () => listeners.delete(callback)
@@ -456,6 +581,8 @@ describe('createAuthGuard — firebaseNeededNow eager-load trigger (TASK-132 rev
     const pending = guard(asRoute({ requiresAuth: true }, '/collection'), asRoute({}), next)
     store.user = { id: 'u1' }
     store.loading = false
+    store.sessionKnown = true
+    store.hasSession = true
     listeners.forEach((cb) => { cb() })
     await pending
 

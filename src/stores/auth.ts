@@ -130,6 +130,28 @@ export const useAuthStore = defineStore('auth', () => {
     const isLoggingOut = ref(false);
     const toastStore = useToastStore();
 
+    /**
+     * TASK-165: `loading` only flips false once loadUserData's own
+     * `/users/{uid}` getDoc round-trip settles (see loadUserData's `finally`
+     * below) — measured in production, that read alone can take 1.5s+. The
+     * router guard (router/authGuard.ts) only needs to know WHETHER there is
+     * a session, not the full profile, so it can unblock a requiresAuth
+     * navigation (and let the route's own view chunk start downloading) as
+     * soon as Firebase Auth itself resolves — well before the profile read
+     * finishes.
+     *
+     * sessionKnown/hasSession are written SYNCHRONOUSLY inside the
+     * onAuthStateChanged callback below, in both branches, before the async
+     * loadUserData() call — mirroring exactly how emailVerified and
+     * setLastKnownAuthState already work. `loading`/`user` keep their EXACT
+     * existing semantics (full profile ready) — every other consumer in the
+     * app that assumes `loading === false` implies `user` is fully populated
+     * is unaffected, since this ticket does not touch loading/user's timing
+     * at all, only adds two new signals alongside them.
+     */
+    const sessionKnown = ref(false);
+    const hasSession = ref(false);
+
     // TASK-132 review fix: the ACTUAL download+subscribe work, factored out
     // of initAuth() and memoized on its own (independent of initAuth's
     // re-entrancy) so it can be triggered from two different places —
@@ -153,6 +175,12 @@ export const useAuthStore = defineStore('auth', () => {
 
                     if (firebaseUser) {
                         emailVerified.value = firebaseUser.emailVerified;
+                        // TASK-165: session existence is known NOW — written before the
+                        // async loadUserData round-trip, same as emailVerified/last-known
+                        // above, so the router guard can unblock on this without waiting
+                        // for the profile.
+                        hasSession.value = true;
+                        sessionKnown.value = true;
                         // TASK-129: last-known cache written synchronously, before the
                         // async loadUserData round-trip, so the NEXT app load's router
                         // guard / App.vue loader gate can decide optimistically.
@@ -162,6 +190,8 @@ export const useAuthStore = defineStore('auth', () => {
                         user.value = null;
                         emailVerified.value = false;
                         loading.value = false;
+                        hasSession.value = false;
+                        sessionKnown.value = true;
                         setLastKnownAuthState('guest');
                     }
                 });
@@ -183,6 +213,12 @@ export const useAuthStore = defineStore('auth', () => {
                 subscriptionPromise = null;
                 initAuthPromise = null;
                 loading.value = false;
+                // TASK-165: a failed SDK load must resolve the session question too,
+                // not just `loading` — otherwise the guard's sessionKnown-based wait
+                // would hang forever instead of falling through to the same
+                // "treat as logged-out" outcome `loading` already gets here.
+                hasSession.value = false;
+                sessionKnown.value = true;
                 logSanitizedError('Failed to initialize Firebase Auth', error);
                 toastStore.show(t('auth.messages.connectionError'), 'error');
             });
@@ -1066,6 +1102,8 @@ export const useAuthStore = defineStore('auth', () => {
         user,
         loading,
         emailVerified,
+        sessionKnown,
+        hasSession,
         initAuth,
         firebaseNeededNow,
         register,

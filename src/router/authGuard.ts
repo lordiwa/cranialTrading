@@ -9,6 +9,16 @@ import { getLastKnownAuthState, type LastKnownAuthState } from '../utils/authLas
 export interface AuthGuardStore {
     loading: boolean;
     user: unknown;
+    // TASK-165: independent of loading/user (which only resolve once the full
+    // profile — /users/{uid} getDoc — has loaded). sessionKnown flips true as
+    // soon as Firebase Auth's onAuthStateChanged has fired once; hasSession
+    // mirrors whether that resolved to a logged-in user. Used ONLY by the
+    // requiresAuth branch below, so a requiresAuth navigation (e.g. /inicio)
+    // can unblock — and let its own view chunk start downloading — without
+    // waiting on the profile read. requiresGuest keeps using loading/user
+    // unchanged (untouched by this ticket).
+    sessionKnown: boolean;
+    hasSession: boolean;
     // TASK-126 round 2: needed so the requiresGuest branch can special-case
     // /register for an authenticated-but-unverified session (see below) —
     // without it the guard could not distinguish that case from a fully
@@ -63,6 +73,30 @@ const waitForAuthReady = async (authStore: AuthGuardStore): Promise<void> => {
             }, 2000);
         });
         if (!authStore.loading) break;
+    }
+};
+
+/**
+ * TASK-165: same re-subscribing wait-loop shape as waitForAuthReady above,
+ * but gated on sessionKnown instead of the full-profile `loading` flag —
+ * used only by the requiresAuth branch, which does not need the profile to
+ * decide whether to redirect to /login.
+ */
+const waitForSessionKnown = async (authStore: AuthGuardStore): Promise<void> => {
+    while (!authStore.sessionKnown) {
+        await new Promise<void>((resolve) => {
+            const unwatch = authStore.$subscribe(() => {
+                if (authStore.sessionKnown) {
+                    unwatch();
+                    resolve();
+                }
+            });
+            setTimeout(() => {
+                try { unwatch(); } catch { /* ignore */ }
+                resolve();
+            }, 2000);
+        });
+        if (authStore.sessionKnown) break;
     }
 };
 
@@ -146,15 +180,23 @@ export const createAuthGuard = (
             return;
         }
 
-        // requiresAuth: unchanged wait-then-decide behavior. The view is
-        // gated on the loader until auth resolves (see App.vue's
-        // shouldShowAuthLoader), so — same as above — start the SDK
+        // requiresAuth: TASK-165 — waits on sessionKnown (Firebase Auth
+        // resolving whether there IS a session) instead of the full-profile
+        // `loading` flag, so the navigation — and the target route's own
+        // async chunk import() — unblocks without waiting on the
+        // /users/{uid} profile read. App.vue's own loader (shouldShowAuthLoading,
+        // still gated on `loading`) keeps covering the screen until the
+        // profile is actually ready, so this only lets the chunk fetch and
+        // the profile read run in PARALLEL instead of sequentially — no
+        // visible behavior change, no risk to the ~30 consumers elsewhere in
+        // the app that assume `loading === false` implies `user` is fully
+        // populated (see stores/auth.ts). Same as above — start the SDK
         // download now rather than behind a "wait for paint" signal that
         // paint itself is blocked on (TASK-132 review fix).
         authStore.firebaseNeededNow?.();
-        await waitForAuthReady(authStore);
+        await waitForSessionKnown(authStore);
 
-        if (!authStore.user) {
+        if (!authStore.hasSession) {
             next({ path: '/login', query: { returnUrl: to.fullPath } });
             return;
         }

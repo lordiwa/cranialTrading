@@ -875,7 +875,7 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
 
         <div class="space-y-1">
           <!-- Collection -->
-          <div class="flex items-center justify-between py-1.5">
+          <div class="flex items-center justify-between py-1.5" data-testid="qty-row-collection">
             <div class="flex items-center gap-2.5">
               <span class="w-[9px] h-[9px] rounded-full bg-neon flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.collection') }}</span>
@@ -899,7 +899,7 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           </div>
 
           <!-- Sale -->
-          <div class="flex items-center justify-between py-1.5">
+          <div class="flex items-center justify-between py-1.5" data-testid="qty-row-sale">
             <div class="flex items-center gap-2.5">
               <span class="w-[9px] h-[9px] rounded-full bg-[#C4553F] flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.sale') }}</span>
@@ -923,7 +923,7 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           </div>
 
           <!-- Trade -->
-          <div class="flex items-center justify-between py-1.5">
+          <div class="flex items-center justify-between py-1.5" data-testid="qty-row-trade">
             <div class="flex items-center gap-2.5">
               <span class="w-[9px] h-[9px] rounded-full bg-[#60A5FA] flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.trade') }}</span>
@@ -947,7 +947,7 @@ watch(selectedPrint, (print: ScryfallCard | null) => {
           </div>
 
           <!-- Wishlist -->
-          <div class="flex items-center justify-between py-1.5">
+          <div class="flex items-center justify-between py-1.5" data-testid="qty-row-wishlist">
             <div class="flex items-center gap-2.5">
               <span class="w-[9px] h-[9px] rounded-full bg-gold flex-shrink-0"></span>
               <span class="text-small text-silver">{{ t('common.status.wishlist') }}</span>

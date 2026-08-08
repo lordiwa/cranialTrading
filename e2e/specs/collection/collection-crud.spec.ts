@@ -1,6 +1,17 @@
 import { test, expect } from '../../fixtures/test';
 import { SEARCH_TERMS } from '../../helpers/test-data';
 
+// TASK-146: deliberately obscure, not SEARCH_TERMS.common ("Lightning Bolt")
+// or another format staple — this CI account has 25+ pre-existing entries for
+// Lightning Bolt alone (and a dozen-plus for "Giant Growth", tried first —
+// see git history), which is exactly the ambiguity the "edit card" fixture
+// below needs to avoid: it must be the ONLY match for its own name, both
+// right after adding it and again after a full page reload, so re-finding it
+// needs no identity/edition disambiguation at all. Femeref Knight (Mirage) is
+// a real, virtually never-played card — verified empirically to have zero
+// pre-existing matches in this account before relying on it here.
+const EDIT_FIXTURE_CARD_NAME = 'Femeref Knight';
+
 test.describe('Collection CRUD', () => {
   // The default 45s test timeout (playwright.config.ts) is shared by the
   // beforeEach's goto() AND the rest of the test body. On the CI account
@@ -68,64 +79,92 @@ test.describe('Collection CRUD', () => {
       await collectionPage.page.waitForTimeout(4500);
       const cardCount = await collectionPage.getCardCount();
       if (cardCount > 0) {
-        await collectionPage.clickCardInGrid(0);
-        const modal = collectionPage.page.locator('.fixed.inset-0.z-50');
-        await modal.waitFor({ state: 'visible', timeout: 5_000 });
-        const deleteBtn = collectionPage.editModal.deleteButton;
-        if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await deleteBtn.click();
-          await commonPage.confirmAction();
-          await commonPage.waitForToast('success');
-        }
+        // TASK-146: this used to open the detail modal and look for a
+        // deleteButton there — CardDetailModal.vue's v2 redesign has no such
+        // button, so that locator never matched and this cleanup silently
+        // no-op'd on every run (a real leak, not the accepted one-card leak
+        // the comment above describes). The delete affordance lives on the
+        // grid card itself; confirm goes through the separate ConfirmModal.
+        await collectionPage.deleteButtonInGrid(0).click();
+        await commonPage.confirmAction();
+        await commonPage.waitForToast('success');
       }
     } catch {
       // Swallow — accepted leak of at most one card this run.
     }
   });
 
-  test('edit card: open detail modal → edit → save → changes persist', async ({ collectionPage, commonPage, page }) => {
-    // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
-    // Asserted, not skipped: against the CI account (41k+ cards) a count of 0
-    // is always a real failure, never a legitimate empty-collection state.
+  // TASK-146 AC2 — SCOPE NARROWED, criterion not honestly met today; tracked
+  // separately as TASK-155, not solved here. Do not "fix" this with a fixed
+  // wait — that's the exact anti-pattern this whole ticket exists to remove.
+  //
+  // AC2 as written demands asserting quantity persistence against a real
+  // page.reload(). That's meaningful because updateCard() (collection.ts)
+  // writes the CARD doc immediately (fast — the success toast fires right
+  // after) but the LISTING/SEARCH index write is a separate, debounced
+  // (2s) background job with NO observable UI completion signal — and,
+  // discovered here: updateCard() deliberately does NOT call
+  // refreshCurrentPage() the way addCard()/deleteCard() do (TASK-113;
+  // `_pendingMembershipRefresh` is only set by add/delete, never update —
+  // collection.ts:791,1057,1236, absent from updateCard). So there is no
+  // in-page signal to poll for "the edit's index write finished", and
+  // reloading before that unobserved write completes doesn't just read
+  // stale data — it CANCELS the pending write outright (page.reload() kills
+  // the pending JS timer). A fixed wait "long enough" is exactly a guess
+  // that sometimes passes and sometimes doesn't: flake that HIDES this gap
+  // instead of surfacing it, which is worse than not having the test.
+  //
+  // Product-level implication (why this belongs in a real ticket, not a
+  // sleep): a user who edits a quantity and reloads soon after could see
+  // the OLD value in the grid/search — even though the card doc itself
+  // saved correctly — because the listing index update behind it can be
+  // silently lost. Flow #3 (editar/borrar carta), business-priority #3.
+  //
+  // What IS covered here, honestly: the add flow's OWN persistence uses the
+  // observable signal that DOES exist (addCard() sets
+  // `_pendingMembershipRefresh`, and once its index write finishes it calls
+  // refreshCurrentPage() on its own — polling cardName(0) for that re-sort,
+  // no reload, no guessed wait). That is real, verified, mutation-provable
+  // coverage for UC-07's "add" half; it just isn't what AC2 asked for.
+  test.fixme(
+    'edit card: change quantity → save → reload → change persists (blocked by TASK-155)',
+    async () => {
+      // Intentionally not implemented. See the comment block above and
+      // TASK-155 (the listing index has no completion signal for updateCard,
+      // unlike addCard/deleteCard — that's a product gap, not a test gap).
+    },
+  );
+
+  // TASK-146: identity-based, not count-based (reviewer finding on TASK-145's
+  // rebote). On a 41k-card window-virtualized grid, deleting one card doesn't
+  // durably drop getCardCount() — the virtualizer refills the visible window
+  // right behind it, so a count poll can pass by catching a transient
+  // mid-remount state instead of the real removal. What IS durable is WHICH
+  // card sits at index 0: after a real delete it's a different card (or the
+  // grid is empty); after the mutation below it's still the same one.
+  //
+  // Mutation used to prove this test can fail: src/stores/collection.ts
+  // `deleteCard` → `return true` immediately (mirrors the ticket's M1 for
+  // updateCard — skips both the optimistic UI removal and the Firestore
+  // delete). With it, the confirm flow still shows a false "eliminada"
+  // success toast (deleteResult.value is hardcoded true in
+  // CollectionView.handleDelete) but nothing actually leaves the grid, so
+  // this test's identity assertion fails; reverting makes it pass — verified
+  // both ways (see commit message for the run evidence).
+  test('delete card: click delete on grid card → confirm → card removed', async ({ collectionPage, commonPage }) => {
     const cardCount = await collectionPage.getCardCount();
     expect(cardCount).toBeGreaterThan(0);
 
-    await collectionPage.clickCardInGrid(0);
+    const identityBefore = await collectionPage.cardIdentity(0);
+    expect(identityBefore).not.toBe(' :: ');
 
-    // Wait for edit modal (z-50 overlay)
-    const modal = page.locator('.fixed.inset-0.z-50');
-    await modal.waitFor({ state: 'visible', timeout: 5_000 });
+    // No detail modal in this flow — CardDetailModal.vue has no delete
+    // affordance (TASK-146); delete lives on the grid card itself.
+    await collectionPage.deleteButtonInGrid(0).click();
+    await commonPage.confirmAction();
+    await commonPage.waitForToast('success');
 
-    // Change quantity if input is visible
-    const qtyInput = collectionPage.editModal.quantityInput;
-    if (await qtyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await qtyInput.fill('3');
-      await collectionPage.editModal.saveButton.click();
-      await commonPage.waitForToast('success');
-    }
-  });
-
-  test('delete card: open detail → delete → confirm → card removed', async ({ collectionPage, commonPage, page }) => {
-    // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
-    // Asserted, not skipped: against the CI account (41k+ cards) a count of 0
-    // is always a real failure, never a legitimate empty-collection state.
-    const countBefore = await collectionPage.getCardCount();
-    expect(countBefore).toBeGreaterThan(0);
-
-    await collectionPage.clickCardInGrid(0);
-
-    const modal = page.locator('.fixed.inset-0.z-50');
-    await modal.waitFor({ state: 'visible', timeout: 5_000 });
-
-    const deleteBtn = collectionPage.editModal.deleteButton;
-    if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteBtn.click();
-      await commonPage.confirmAction();
-      await commonPage.waitForToast('success');
-      // Poll instead of a fixed sleep — waits on the observable effect of the
-      // delete (the grid's own card count dropping), not on a guessed settle time.
-      await expect.poll(() => collectionPage.getCardCount()).toBeLessThan(countBefore);
-    }
+    await expect.poll(() => collectionPage.cardIdentity(0)).not.toBe(identityBefore);
   });
 
   test('bulk select → bulk change status to Sale → verify status updated', async ({ collectionPage, commonPage, page }) => {
@@ -165,25 +204,24 @@ test.describe('Collection CRUD', () => {
     }
   });
 
-  test('cancel deletion from confirm dialog leaves card intact', async ({ collectionPage, commonPage, page }) => {
-    // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
-    // Asserted, not skipped: against the CI account (41k+ cards) a count of 0
-    // is always a real failure, never a legitimate empty-collection state.
-    const countBefore = await collectionPage.getCardCount();
-    expect(countBefore).toBeGreaterThan(0);
+  // TASK-146: identity-based (see the delete test above for why count is
+  // unreliable here). getCardCount()'s own waitForGridReady() only guarantees
+  // the FIRST card is visible, not that the whole virtualizer window has
+  // finished mounting — capturing countBefore mid-mount and countAfter once
+  // the window is fuller used to risk a spurious red on this test. Comparing
+  // identity at index 0 sidesteps that: it doesn't care how many cards are
+  // rendered elsewhere in the window, only whether this specific slot changed.
+  test('cancel deletion from confirm dialog leaves card intact', async ({ collectionPage, commonPage }) => {
+    const cardCount = await collectionPage.getCardCount();
+    expect(cardCount).toBeGreaterThan(0);
 
-    await collectionPage.clickCardInGrid(0);
+    const identityBefore = await collectionPage.cardIdentity(0);
+    expect(identityBefore).not.toBe(' :: ');
 
-    const modal = page.locator('.fixed.inset-0.z-50');
-    await modal.waitFor({ state: 'visible', timeout: 5_000 });
+    await collectionPage.deleteButtonInGrid(0).click();
+    await commonPage.cancelAction();
 
-    const deleteBtn = collectionPage.editModal.deleteButton;
-    if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteBtn.click();
-      await commonPage.cancelAction();
-      await modal.waitFor({ state: 'hidden', timeout: 5_000 });
-      const countAfter = await collectionPage.getCardCount();
-      expect(countAfter).toBe(countBefore);
-    }
+    const identityAfter = await collectionPage.cardIdentity(0);
+    expect(identityAfter).toBe(identityBefore);
   });
 });

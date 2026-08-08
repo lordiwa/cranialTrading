@@ -9,7 +9,6 @@
     "decks",
     "feature",
     "improvement",
-    "jira-import",
     "ui"
   ],
   "assignee": null,
@@ -24,6 +23,6 @@
     }
   ],
   "created_at": "2026-05-01T12:34:25.412-0500",
-  "updated_at": "2026-05-01T12:34:59.343-0500",
-  "jira_key": "SCRUM-45"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

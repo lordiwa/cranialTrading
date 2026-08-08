@@ -3,11 +3,10 @@
   "title": "TC-P04-03: Cmd+click / Ctrl+click abre destinos en pestaña nueva",
   "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-21 (tipo: Impovement user personal space, estado original: Q/A)\n\n**Componente:** Navegación con RouterLink (12 puntos de la app)\n**Requirement:** NICE-11 (test crítico de aceptación)\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué se valida?\n\nCuando un usuario hace **Cmd+click** (Mac) o **Ctrl+click** (Windows) sobre un enlace, el navegador debe abrirlo en una **pestaña nueva** sin afectar la pestaña actual. Esto es comportamiento estándar web. Esta TC valida que en TODOS los puntos de navegación de la app funcione así.\n\n## Preconditions\n\n* Estar logueado en `cranial-trading-dev.web.app`\n* Desktop. Mac usa `Cmd`, Windows usa `Ctrl`\n* Tener algunos decks, binders, y matches creados (para tener resultados de búsqueda)\n\n## Cómo probar cada uno\n\nPara cada uno de los 12 puntos abajo: hacer **Cmd/Ctrl+click**. Después verificar 3 cosas:\n\n1. Se abrió una pestaña nueva con la URL correcta\n2. La pestaña actual NO navegó (sigue donde estabas)\n3. En la pestaña actual el dropdown / modal / panel se cerró\n\n## 12 puntos a probar\n\n| # | Dónde está | Cómo llegar | URL destino esperada | Qué pasa en pestaña actual |\n| --- | --- | --- | --- | --- |\n| 3.1 | Resultado de colección en GlobalSearch | Pulsar `/` → escribir query → Cmd+click en primer resultado | `/collection?search=<nombre>` | Dropdown se cierra, input se limpia |\n| 3.2 | Resultado de usuarios en GlobalSearch | Cambiar a tab \"Usuarios\" → Cmd+click | `/@<username>` | Dropdown se cierra |\n| 3.3 | Resultado de Scryfall en GlobalSearch | Cambiar a tab \"Scryfall\" → Cmd+click | `/collection?addCard=<nombre>` | Dropdown se cierra |\n| 3.4 | \"Búsqueda Avanzada\" del GlobalSearch | Cmd+click en el link al final del dropdown | `/search` | Dropdown se cierra |\n| 3.5 | Mismo que 3.1-3.4 pero en mobile | Abrir buscador móvil → repetir 3.1-3.4 | Mismas URLs | Overlay se cierra |\n| 3.6 | FAQ del header | Menú de Ayuda (?) → Cmd+click en \"FAQ\" | `/faq` | Menú de ayuda se cierra |\n| 3.7 | Notificación de match | Click en ícono de campana → Cmd+click en una notificación | `/saved-matches?match=<id>` | Dropdown de notificaciones se cierra |\n| 3.8 | \"Ver todos los matches\" | Click en campana → Cmd+click en el footer | `/saved-matches` | Dropdown se cierra |\n| 3.9 | \"Búsqueda Avanzada\" del modal Add Card | Abrir modal de Agregar Carta → Cmd+click en \"Búsqueda Avanzada\" | `/search` | Modal se cierra |\n| 3.10 | \"Búsqueda Avanzada\" en filtro de colección | `/collection` → escribir en filtro → Cmd+click en sugerencia \"Búsqueda Avanzada\" | `/search` | Lista de sugerencias se cierra |\n| 3.11 | Mismo que 3.10 pero en deck | Abrir un deck → repetir 3.10 | `/search` | Lista de sugerencias se cierra |\n| 3.12 | Mismo que 3.10 pero en binder | Abrir un binder → repetir 3.10 | `/search` | Lista de sugerencias se cierra |\n\n## Pass / Fail\n\n* **Pass:** los 12 sub-tests cumplen las 3 condiciones (nueva pestaña + sin navegación en actual + side effect en actual)\n* **Fail:** cualquiera navega en la pestaña actual al hacer Cmd+click",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "todo",
   "priority": "high",
   "labels": [
     "improvement",
-    "jira-import",
     "nice-11",
     "phase-4",
     "qa-manual",
@@ -23,9 +22,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:36.935Z",
       "body": "Migrado desde SCRUM-21 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "RE-ABIERTO 2026-08-08 (limpieza de backlog): Caso de prueba manual. Sigue siendo valido, pero hoy no hay nadie haciendo Q/A manual. Vuelve a todo."
     }
   ],
   "created_at": "2026-04-18T17:27:49.211-0500",
-  "updated_at": "2026-04-19T16:01:50.148-0500",
-  "jira_key": "SCRUM-21"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

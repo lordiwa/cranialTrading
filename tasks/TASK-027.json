@@ -3,13 +3,12 @@
   "title": "CMC y type_line se pierden en cartas importadas (rompe curva y filtro de maná)",
   "description": "**Epic:** TASK-015 (Deck Intelligence)\n**Migrado de Jira:** SCRUM-27 (tipo: Error, estado original: Q/A)\n\n## Síntomas\n\nTras importar un deck (Moxfield URL / CSV / binder), la curva de maná (SCRUM-10) muestra muchas cartas no-tierra bucketeadas en CMC 0, y el filtro por maná en CollectionView muestra la misma distorsión. No son datos viejos — el bug aparece en cartas recién importadas.\n\n## Root cause — análisis refinado\n\nHay **4 flujos de import** distintos. Dos funcionan, dos están rotos:\n\n| Flujo | Función que arma el Card | ¿Guarda cmc? |\n| --- | --- | --- |\n| Individual (AddCardModal) | `addCard()` con cmc explícito desde Scryfall | ✅ SÍ |\n| Texto pegado (paste deck list) | `buildCollectionCardFromScryfall()` en `importHelpers.ts:96` | ✅ SÍ |\n| Moxfield URL | `buildRawMoxfieldCard()` en `importHelpers.ts:139` | ❌ NO |\n| CSV (ManaBox/Moxfield/Urza's) | `buildRawCsvCard()` + `buildCsvCardData()` en `DecksView.vue:281` | ❌ NO |\n\n### Por qué el patrón existente funciona\n\n`buildCollectionCardFromScryfall` (`src/utils/importHelpers.ts:96`) recibe `ExtractedScryfallData` y copia `cmc`, `type_line`, `colors`, `rarity`, `oracle_text`, `keywords`, `legalities`, `full_art` al `ImportCardData` (líneas 120-129). El user doc queda con todos los campos, el server-side index rebuild los recoge, el reload los trae bien.\n\n### Por qué los demás están rotos\n\n`buildRawMoxfieldCard` y `buildRawCsvCard` fueron diseñados como \"raw / sin Scryfall fetch — enriquece después en background\". El comentario lo dice literal. Ese diseño está roto porque:\n\n1. `enrichCardsWithMissingMetadata` (`stores/collection.ts:552`) escribe `cmc` + `type_line` + otros sólo al `scryfall_cache` (vía `CACHE_ONLY_FIELDS` línea 494-497), NO al user doc.\n2. `loadFromIndex` (línea 316) hidrata `cards.value` desde el blob del index sin hacer merge con `scryfall_cache`.\n3. `cardToIndex` (línea 200) serializa `cm: card.cmc ?? 0` — undefined queda como 0 en el blob sin sentinel.\n\nResultado: tras reload, el metadata se pierde. Enrichment vuelve a correr pero el ciclo se repite porque nunca escribe al user doc.\n\n## Impacto\n\n* Curva de maná (SCRUM-10) bloqueada — muestra datos incorrectos.\n* Filtro por maná en CollectionView categoriza cartas sin CMC como \"0\".\n* Afecta futuras features que lean metadata: análisis de color pie, stats por tipo, sugerencias de deckbuilding.\n\n## Fix\n\nSincronizar los 2 flujos rotos con el patrón correcto ya existente. Archivos a tocar:\n\n1. `src/utils/importHelpers.ts`: actualizar firmas de `buildRawMoxfieldCard` y `buildRawCsvCard` para aceptar `scryfallData?: ExtractedScryfallData` opcional y copiar cmc/type_line/colors/rarity/etc. (mismo patrón que `buildCollectionCardFromScryfall`).\n2. `src/composables/useCollectionImport.ts` — `handleImport` (Moxfield batch, líneas 396-417): hacer batch `getCardsByIds` ANTES del loop, construir `scryfallMap`, pasar a `buildRawMoxfieldCard`.\n3. `src/composables/useCollectionImport.ts` — `handleImportCsv` (líneas 533-547): batch Scryfall + passthrough a `buildRawCsvCard`.\n4. `src/composables/useCollectionImport.ts` — `handleImportBinder` y `handleImportBinderCsv`: mismo patrón.\n5. `src/views/DecksView.vue` — `handleImportDirect` (línea 419-477): `enrichCardFromScryfall` ya obtiene cmc — incluir en `collectionCardData` (línea 456-468, agregar `cmc, type_line, colors`).\n6. `src/views/DecksView.vue` — `handleImportCsv` (líneas 492-554): `buildCsvCardData` (línea 281) ya tiene `scryfallDataMap` — agregar cmc/type_line/colors al return.\n7. **Defensivo (bonus):** cambiar `cardToIndex` a `cm: card.cmc ?? -1` como sentinel + `indexToCard` reconvierte -1 a undefined. Previene serializaciones fantasma futuras. Requiere verificar impacto en server-side `buildCardIndex` Cloud Function.\n\n### Cartas ya rotas en colecciones existentes\n\nModificar `persistEnrichmentBatches` (`stores/collection.ts:490`) para que `cmc` + `type_line` + `colors` se escriban también al **user doc** (no sólo al `scryfall_cache`). Sacar esos campos de `CACHE_ONLY_FIELDS` o escribir a ambos lugares. En el próximo load, enrichment auto-fixea las cartas ya rotas.\n\n## Criterios de aceptación\n\n* \\[ \\] Tras importar un deck Moxfield vía URL, abrir la curva inmediatamente muestra CMCs correctos (no todo en bucket 0).\n* \\[ \\] Tras importar un deck vía CSV (ManaBox/Moxfield/Urza's), curva y filtro muestran CMCs correctos.\n* \\[ \\] Tras reload, la curva sigue correcta sin esperar a re-enriquecimiento.\n* \\[ \\] Filtro por maná en CollectionView categoriza cartas correctamente (sin bucket 0 inflado).\n* \\[ \\] Cartas ya importadas (pre-fix) se auto-enriquecen en el próximo load y muestran CMC correcto.\n* \\[ \\] Tests unitarios: `buildRawMoxfieldCard` / `buildRawCsvCard` copian cmc/type_line/colors cuando reciben Scryfall data; ignoran cuando no.\n* \\[ \\] `npx vite build` y `npm run test:unit` verdes.\n\n## Relación con SCRUM-10\n\nSCRUM-10 (curva de maná) bloqueado hasta que este bug se resuelva. Mantener SCRUM-10 en \"En curso\". Este ticket se fixea primero y luego SCRUM-10 cierra tras verificar que la curva muestra datos correctos post-import.",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "done",
   "priority": "high",
   "labels": [
     "bug",
     "data-integrity",
     "import",
-    "jira-import",
     "scrum-10-blocker"
   ],
   "assignee": "Mato",
@@ -21,9 +20,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:36.962Z",
       "body": "Migrado desde SCRUM-27 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "CIERRE 2026-08-08 (limpieza de backlog pedida por Rafael): cmc y type_line SI se guardan hoy en el import (useCollectionImport.ts:187-188 y 220-221). Verificado en codigo 2026-08-08."
     }
   ],
   "created_at": "2026-04-18T19:56:44.812-0500",
-  "updated_at": "2026-04-27T18:03:55.402-0500",
-  "jira_key": "SCRUM-27"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

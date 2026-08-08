@@ -9,7 +9,7 @@
     "La propuesta de arreglo se presenta a Rafael antes de implementar — hay varias salidas posibles (persistir antes, marcar el refresh pendiente, avisar al usuario) y la eleccion es suya",
     "NO se arregla contorsionando el test de TASK-146 para que el problema no se note"
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "wargaming",
@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "developer",
+      "at": "2026-08-08T22:16:35.684141Z",
+      "body": "DIAGNOSTICO COMPLETO 2026-08-08. Medido en vivo contra cranial-trading-dev con la cuenta E2E de 41k cartas, build --mode development, instrumentacion temporal revertida (verificado por el orquestador: collection.ts no aparece en git status y tiene 0 console.log).\n\nAC1 — HAY DANO REAL AL USUARIO, confirmado en vivo, no es solo el test. Editar la cantidad de una carta y recargar ~1.4 s despues deja la grilla Y la busqueda mostrando el valor VIEJO. El documento de la carta si tiene el valor nuevo (updateDoc es inmediato); lo que queda viejo es el indice que alimenta grilla y busqueda.\n\nDATO QUE NO ESTABA EN EL TICKET: el stepper de cantidad por si solo no guarda nada — solo apila un cambio local en statusDistribution. El guardado real ocurre recien al click de GUARDAR.\n\nAC2 — LA VENTANA ES MUCHO MAYOR DE LO QUE ASUMIA EL TICKET. El debounce son 2011-2018 ms medidos, y es la parte CHICA. El coste dominante es el loop de 21 chunks: cada setDoc tardo entre 4 y 9 segundos, uno tardo 61 SEGUNDOS, y en una corrida de 150 s sin ninguna otra interaccion el loop iba por el chunk 18 de 21. La ventana real de exposicion para UNA sola edicion es del orden de 100-200+ segundos. COTA INFERIOR, no medicion cerrada: nunca se observo un loop completando entero.\n\nCORROBORADO EN CODIGO por el orquestador: collection.ts:699-703 es un for con await setDoc por chunk, estrictamente secuencial, 2000 cartas por documento, mas un getDocs de toda la coleccion de indice y deleteDoc secuenciales al final.\n\nAC3 — LA ASIMETRIA DE _pendingMembershipRefresh ES REAL PERO ES UNA PISTA FALSA PARCIAL. Ese flag solo gobierna un re-query dentro de la misma sesion SPA sin recargar. Una recarga mata el setTimeout del debounce IGUAL para add, delete y update: el flag no protege contra el escenario del ticket. Es un problema menor y distinto del principal.\n\nLAGUNAS DECLARADAS: (1) la reproduccion termino ejercitando el camino addCard/deleteCard porque la carta usada tenia cantidad 0 y pasar de 0 a 1 dispara un create, no un update — el mecanismo de perdida es el mismo persistIndexToFirestore compartido, pero no se repitio aislado con un update puro (1 a 2); (2) el estado de la cuenta E2E se restauro y verifico solo por UI, no con lectura directa de Firestore.\n\nPROPUESTA — REQUIERE DECISION DE RAFAEL, no se implemento nada:\n1. Persistir antes o con debounce mas corto. Ataca la parte CHICA del problema.\n2. Paralelizar o batchear la escritura de los 21 chunks (writeBatch, limite 10MiB). Ataca la parte GRANDE: llevaria la ventana de minutos a segundos. RECOMENDADA por el agente y compartida por el orquestador.\n3. Flush en pagehide/beforeunload. Riesgoso: el navegador no garantiza que una promesa async termine.\n4. Marcar el refresh pendiente tambien en updateCard. Cierra la asimetria pero NO resuelve el bug del reload.\n5. Avisar al usuario mientras el indice se guarda. Cambia UX, no arregla la causa."
+    }
+  ],
   "created_at": "2026-08-08T07:18:36.798Z",
-  "updated_at": "2026-08-08T07:18:36.798Z",
+  "updated_at": "2026-08-08T22:16:35.684141Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[INFERRED:strong]"

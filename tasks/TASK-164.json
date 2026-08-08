@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "rafael",
+      "at": "2026-08-08T21:57:49.754047Z",
+      "body": "DECISION DE RAFAEL 2026-08-08: el excedente SIGUE desviandose a la wishlist (es util: lo que falta queda anotado) pero DEJA DE SER SILENCIOSO. Los tres caminos deben hacer lo mismo y avisarlo. O sea: ManageDecksModal deja de rechazar y pasa a desviar-avisando, y los otros dos suman el aviso. Actualizar tambien la redaccion del documento, que hoy dice que se rechaza."
+    }
+  ],
   "created_at": "2026-08-08T15:35:54.844Z",
-  "updated_at": "2026-08-08T15:35:54.844Z",
+  "updated_at": "2026-08-08T21:57:49.754047Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[INFERRED:strong]"

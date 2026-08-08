@@ -3,12 +3,11 @@
   "title": "Editor de decks: stack visual de copias multiples (estilo Moxfield/Arena)",
   "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-37 (tipo: Historia, estado original: Q/A)\n\n## Contexto\n\nSub-ticket de **SCRUM-35**. Este es el problema #2 de los tres originales: feature visual nueva inspirada en Moxfield y MTG Arena.\n\n## Comportamiento actual\n\nCuando una carta tiene N copias en el deck, se muestra **una sola miniatura** con un badge `xN` en la esquina inferior izquierda. Si el usuario tiene varias copias del mismo nombre con prints distintos (edition/foil/condition), todas colapsan en una entrada visual basada en `groupBy='name'`.\n\n## Comportamiento esperado\n\nReplicar el patrón visual de **Moxfield / MTG Arena**: las copias múltiples se renderizan como un **stack de cartas superpuestas** (offset pequeño de 4–6 px), con la carta superior totalmente visible y las inferiores asomando por el borde. Cada \"capa\" idealmente representa el print real de cada copia (no la misma imagen repetida) — útil para ver de un vistazo si hay 2 NM y 1 foil.\n\n## Solución propuesta (a confirmar en discuss/planning)\n\n* `position: absolute` con `transform: translate(Xpx, Ypx)` para apilar hasta N capas.\n* Cap visual en 4 capas (si hay más, se sigue mostrando el badge `xN`).\n* Fast path: cuando todas las copias comparten print, usar la misma imagen para todas las capas.\n* Cuando hay prints distintos: ordenar capas por foil > NM > resto.\n* El badge `xN` se mantiene para lectura rápida del total.\n* **Performance**: este efecto NO aplica al binder con 35k cards (`useBinderVirtualScroll`) — solo deck editor (≤250 cards).\n\n## Entry points\n\n* Render del grid: `DeckEditorGrid.vue:567–596` (regular) y `:521–550` (binder virtual scroll — NO tocar).\n* Tamaños existentes: `w-full md:w-[85px] lg:w-[105px] xl:w-[130px] 2xl:w-[182px] aspect-[3/4]`.\n* Datos: cada `DisplayDeckCard` ya tiene `scryfallId` y `edition`. Para mostrar prints distintos hay que enriquecer la consulta para devolver una capa por allocation, no una entrada agrupada.\n\n## Criterios de aceptación\n\n* \\[ \\] Carta con 1 copia se ve igual que hoy (sin stack).\n* \\[ \\] Carta con 2+ copias muestra capas superpuestas con offset visible y sin tapar el badge `xN`.\n* \\[ \\] Si hay prints diferentes, cada capa muestra su print correspondiente.\n* \\[ \\] El layout del grid no se rompe (las capas no empujan a las cartas vecinas).\n* \\[ \\] Click/hover funciona sobre toda la pila (no solo la capa superior).\n* \\[ \\] Visual aprobado por Rafael contra referencia de Moxfield/Arena antes de mergear.\n* \\[ \\] Sin regresiones de performance (binder editor sigue funcionando con 35k cards).\n* \\[ \\] Funciona en mainboard, sideboard, y commander zone.\n\n## Out of scope\n\n* Aplicar el stack al binder editor.\n* Aplicar el stack a la collection grid.\n* Cambiar `groupBy` por defecto.\n\n## Relaciona\n\n* **Padre lógico**: SCRUM-35.\n* **Epic**: SCRUM-14 Deck Editor UX.\n* **Bloqueado por (soft)**: SCRUM-36 — conviene tener la reactividad del contador arreglada antes de tocar el render.",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "decks",
     "frontend",
-    "jira-import",
     "story",
     "ux"
   ],
@@ -21,9 +20,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:37.037Z",
       "body": "Migrado desde SCRUM-37 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "CIERRE 2026-08-08 (limpieza de backlog pedida por Rafael): Stack visual de copias multiples: shippeado en v1.28.0."
     }
   ],
   "created_at": "2026-04-26T13:49:44.986-0500",
-  "updated_at": "2026-04-26T18:37:19.466-0500",
-  "jira_key": "SCRUM-37"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

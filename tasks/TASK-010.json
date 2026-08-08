@@ -9,7 +9,6 @@
     "decks",
     "frontend",
     "improvement",
-    "jira-import",
     "research"
   ],
   "assignee": "ismachucho",
@@ -24,6 +23,6 @@
     }
   ],
   "created_at": "2026-04-13T20:50:26.538-0500",
-  "updated_at": "2026-05-09T20:48:35.646-0500",
-  "jira_key": "SCRUM-10"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

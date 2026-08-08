@@ -8,7 +8,6 @@
   "labels": [
     "decks",
     "improvement",
-    "jira-import",
     "mana-curve",
     "qa-manual",
     "scrum-10"
@@ -25,6 +24,6 @@
     }
   ],
   "created_at": "2026-04-19T13:43:09.290-0500",
-  "updated_at": "2026-05-09T20:25:17.199-0500",
-  "jira_key": "SCRUM-30"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

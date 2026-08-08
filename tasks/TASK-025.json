@@ -3,13 +3,12 @@
   "title": "TC-P04-07: Verificación de traducciones (i18n) en 3 idiomas",
   "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-25 (tipo: Impovement user personal space, estado original: Q/A)\n\n**Componente:** Locales (idiomas) — inglés, español, portugués\n**Requirement:** ARCH-10 (cierre de internacionalización)\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué se valida?\n\nQue los textos del buscador (incluidos los anuncios para lectores de pantalla, que no se ven a simple vista) estén traducidos correctamente en los 3 idiomas que soporta la app: inglés, español, portugués.\n\n## ¿Qué son aria-label y aria-live?\n\nSon atributos invisibles del HTML que los lectores de pantalla leen en voz alta. No se ven en la pantalla pero existen en el código.\n\n* **aria-label:** texto alternativo de un botón (ej: el botón ✕ tiene `aria-label=\"Limpiar búsqueda\"`)\n* **aria-live:** región que el lector de pantalla anuncia automáticamente cuando cambia (ej: \"3 resultados en colección\")\n\n## ¿Cómo veo aria-label / aria-live?\n\n1. Abrir DevTools (`F12` en cualquier navegador)\n2. Click en pestaña \"Elements\" (o \"Elementos\")\n3. Click en el ícono de la flecha 🔍 arriba a la izquierda → click en el botón ✕ del input de búsqueda\n4. En el panel inferior, mirar las propiedades — el `aria-label=\"...\"` aparece ahí\n\n## Preconditions\n\n* Logueado en dev\n\n## Steps\n\nRepetir estos pasos para CADA idioma (cambiar idioma en Configuración → Idioma):\n\n### Para English / Español / Português\n\n1. Pulsar `/` (slash) → escribir cualquier cosa → Tab hasta el botón ✕ que aparece para limpiar (NO clickear, solo enfocarlo) → inspeccionar su `aria-label` con DevTools\n2. Escribir `bolt` → esperar \\~800ms → buscar en el HTML el elemento `<span aria-live=\"polite\">` y leer su contenido\n\n## Resultados esperados\n\n| Idioma | aria-label del botón ✕ | Texto del aria-live (con N resultados) |\n| --- | --- | --- |\n| English | `Clear search` | `{N} results in collection` |\n| Español | `Limpiar búsqueda` | `{N} resultados en colección` |\n| Português | `Limpar busca` | `{N} resultados em coleção` |\n\n## Pass / Fail\n\n* **Pass:** las 6 cadenas (3 idiomas × 2 textos) coinciden exactamente con la tabla\n* **Fail:** el aria-live muestra una clave literal como `header.search.resultsCount` — eso significa que la traducción NO se cargó (bug)\n\n## Nota técnica para futuro\n\nEsto se puede automatizar: Playwright puede cambiar idioma, escribir, y leer el contenido de aria-label / aria-live para comparar.",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "todo",
   "priority": "medium",
   "labels": [
     "arch-10",
     "i18n",
     "improvement",
-    "jira-import",
     "phase-4",
     "qa-auto",
     "search"
@@ -23,9 +22,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:36.955Z",
       "body": "Migrado desde SCRUM-25 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "RE-ABIERTO 2026-08-08 (limpieza de backlog): Caso de prueba manual de i18n. Se solapa con TASK-162. Vuelve a todo."
     }
   ],
   "created_at": "2026-04-18T17:28:16.598-0500",
-  "updated_at": "2026-04-19T16:01:56.475-0500",
-  "jira_key": "SCRUM-25"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

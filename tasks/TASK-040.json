@@ -3,11 +3,10 @@
   "title": "Tech debt: replicar array spread fix en binders.ts (paralelo a SCRUM-36)",
   "description": "**Epic:** TASK-014 (Deck Editor UX)\n**Migrado de Jira:** SCRUM-40 (tipo: Error, estado original: Q/A)\n\n## Contexto\n\nEn `src/stores/decks.ts` se aplicó (commit f8f5569, v1.27.4) un patrón de **array spread fix** en las funciones que mutan `decks.value[idx].allocations` in-place. El patrón es:\n\n```ts\nconst idx = decks.value.findIndex(d => d.id === deckId)\nif (idx !== -1) {\n  decks.value[idx] = snapshotDeck(deck)\n  decks.value = [...decks.value]\n}\n```\n\nEsto es necesario para que el computed `deckAllocationTotalIndex` (`decks.ts:194`) re-evalúe inmediatamente tras la mutación. Sin esto, una llamada subsecuente a `getTotalAllocatedForCard` devuelve un valor stale, lo que rompe la lógica que depende de la cantidad disponible (`available = card.quantity - totalAllocated`).\n\n## Funciones ya patcheadas en decks.ts\n\n* `allocateCardToDeck` (ya tenía el patrón pre-existente)\n* `moveCardBoard` (ya lo tenía)\n* `deallocateCard` ✓ patcheada en v1.27.4\n* `reduceAllocationsForCard` ✓ patcheada en v1.27.4\n* `convertAllocationsToWishlist` ✓ patcheada en v1.27.4\n\n## Funciones a auditar y posiblemente patchear en `src/stores/binders.ts`\n\n`BinderView` consume `binders.value` con un patrón análogo a decks. Si las funciones de mutación de `binder.allocations` mutan in-place sin replazar la referencia, el grid del binder puede mostrar valores stale tras agregar/quitar cards.\n\nFunciones a revisar:\n\n* `allocateCardToBinder` — verificar si tiene el array spread fix.\n* `deallocateCardFromBinder` (si existe) — agregar fix.\n* Cualquier otro mutator de `binder.allocations`.\n\n## Solución propuesta\n\n1. Leer `src/stores/binders.ts` y mapear todas las funciones que tocan `binder.allocations` o `binders.value[idx]`.\n2. Aplicar el mismo patrón (`findIndex` + `snapshotBinder` + array spread) donde falte.\n3. Verificar que existe un helper `snapshotBinder` análogo a `snapshotDeck`. Si no, crearlo.\n4. Verificar que el computed `binderAllocationTotalIndex` (si existe) o el equivalente, se invalida correctamente.\n5. Tests de regresión: agregar/quitar carta de un binder y verificar que el badge `xN` refresca sin recargar.\n\n## Out of scope\n\n* Bugs nuevos del flujo binder. Solo aplicar el patrón.\n* Cambios al UI de binders.\n\n## Acceptance criteria\n\n* \\[ \\] Todas las funciones que mutan `binder.allocations` aplican array spread.\n* \\[ \\] Al agregar/quitar una card de un binder, el grid refresca inmediatamente.\n* \\[ \\] No hay regresión en `BinderView`.",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "bug",
-    "jira-import",
     "qa-manual"
   ],
   "assignee": "ismachucho",
@@ -19,9 +18,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:37.056Z",
       "body": "Migrado desde SCRUM-40 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "CIERRE 2026-08-08 (limpieza de backlog pedida por Rafael): El patron ya esta aplicado en binders.ts (binders.value[idx] = snapshotBinder(...) en :379, :454, :496, :531). Verificado 2026-08-08."
     }
   ],
   "created_at": "2026-04-27T10:26:56.101-0500",
-  "updated_at": "2026-05-11T20:19:01.281-0500",
-  "jira_key": "SCRUM-40"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

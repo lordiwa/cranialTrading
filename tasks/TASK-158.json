@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "rafael",
+      "at": "2026-08-08T21:57:49.754047Z",
+      "body": "DECISION DE RAFAEL 2026-08-08: implementar la regla de filtrado de precios en LOS TRES lugares (LoginView ya la tiene; falta stores/search.ts y AddCardModal). CLAUDE.md queda como esta: es el codigo el que se alinea al documento, no al reves. Toca el flujo prioritario N1 (precios)."
+    }
+  ],
   "created_at": "2026-08-08T13:46:15.002Z",
-  "updated_at": "2026-08-08T13:46:15.002Z",
+  "updated_at": "2026-08-08T21:57:49.754047Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

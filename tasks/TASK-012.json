@@ -7,7 +7,6 @@
   "priority": "medium",
   "labels": [
     "improvement",
-    "jira-import",
     "market",
     "pricing",
     "research"
@@ -24,6 +23,6 @@
     }
   ],
   "created_at": "2026-04-13T21:27:04.606-0500",
-  "updated_at": "2026-04-25T13:45:07.606-0500",
-  "jira_key": "SCRUM-12"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

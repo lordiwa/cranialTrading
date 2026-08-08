@@ -7,7 +7,6 @@
   "priority": "medium",
   "labels": [
     "epic",
-    "jira-import",
     "testing",
     "tooling"
   ],
@@ -23,6 +22,6 @@
     }
   ],
   "created_at": "2026-04-18T17:16:31.172-0500",
-  "updated_at": "2026-04-18T17:17:09.713-0500",
-  "jira_key": "SCRUM-18"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

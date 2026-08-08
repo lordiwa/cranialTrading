@@ -7,7 +7,6 @@
   "priority": "medium",
   "labels": [
     "epic",
-    "jira-import",
     "market",
     "pricing"
   ],
@@ -23,6 +22,6 @@
     }
   ],
   "created_at": "2026-04-18T17:16:28.529-0500",
-  "updated_at": "2026-04-18T17:17:03.359-0500",
-  "jira_key": "SCRUM-16"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

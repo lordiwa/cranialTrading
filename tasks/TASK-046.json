@@ -9,7 +9,6 @@
     "decks",
     "design-debt",
     "improvement",
-    "jira-import",
     "ui"
   ],
   "assignee": null,
@@ -24,6 +23,6 @@
     }
   ],
   "created_at": "2026-05-01T15:34:18.448-0500",
-  "updated_at": "2026-05-01T15:34:46.812-0500",
-  "jira_key": "SCRUM-46"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

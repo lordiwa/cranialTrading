@@ -8,7 +8,6 @@
   "labels": [
     "bug",
     "frontend",
-    "jira-import",
     "pricing",
     "ux"
   ],
@@ -24,6 +23,6 @@
     }
   ],
   "created_at": "2026-04-09T21:08:32.473-0500",
-  "updated_at": "2026-04-18T17:17:30.728-0500",
-  "jira_key": "SCRUM-7"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

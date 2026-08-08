@@ -3,10 +3,9 @@
   "title": "Verificación dev de SCRUM-73/66/67/44 (chequeo Rafael → re-QA ismachucho)",
   "description": "**Migrado de Jira:** SCRUM-74 (tipo: Historia, estado original: En curso)\n\n## Objetivo\n\nChequeo manual de Rafael en **cranial-trading-dev.web.app** (v1.34.3) de 4 fixes desplegados hoy 2026-06-07, ANTES de que ismachucho re-haga QA.\n\n⚠️ **Pre-requisito para prod:** la regla `/usernames` de Firestore ya está desplegada a **dev** manualmente, pero el CI NO despliega reglas. Antes de mergear develop→main hay que desplegar reglas a prod (`firebase deploy --only firestore:rules --project prod`), si no el registro se rompe en prod.\n\n---\n\n### SCRUM-73 — Username único + resolución @username\n\n* \\[ \\] Registrarse con username nuevo → crea cuenta + pantalla de verificación de email.\n* \\[ \\] Registrarse con username ya existente → bloqueado (\"username ocupado\").\n* \\[ \\] Ver perfil público `@username` → resuelve la cuenta/cartas correctas (no la equivocada).\n\n### SCRUM-66 — Buscador /collection\n\n* \\[ \\] Tipear carta que tenés → filtra el grid local en vivo.\n* \\[ \\] Tipear carta que NO tenés → aparece \"Agregar como nueva carta\" → abre AddCardModal pre-rellenado.\n* \\[ \\] `/decks/:id` y `/binders/:id` mantienen Discovery intacto.\n\n### SCRUM-67 — Filtros avanzados en perfil ajeno\n\n* \\[ \\] En `/@otro-usuario` aplicar filtros color/tipo/set/mana value → devuelven las cartas que el grid muestra (equivalencia con perfil propio).\n* \\[ \\] Combinaciones (negro+criatura, etc.) funcionan.\n\n### SCRUM-44 — Ruido MTGJSON en consola\n\n- [ ] Abrir un deck + detalle de carta → consola SIN errores rojos 404/CORS de MTGJSON. Los precios (CK) siguen funcionando.\n\n---\n\n## Flujo\n\n1. Rafael verifica los 4 en dev (este ticket, En curso).\n2. Con OK de Rafael → ismachucho re-revisa: **SCRUM-73/66/67 ya en Q/A**, **SCRUM-44** pasa a Q/A tras su push.\n\n**Commits:** SCRUM-73/66 `a7c3794` (v1.34.1) · SCRUM-67 `2f209f4` (v1.34.2) · SCRUM-44 `f4d63ef` (v1.34.3).",
   "acceptance_criteria": [],
-  "status": "in_progress",
+  "status": "done",
   "priority": "medium",
   "labels": [
-    "jira-import",
     "qa-manual",
     "story"
   ],
@@ -19,9 +18,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:37.203Z",
       "body": "Migrado desde SCRUM-74 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: En curso; asignado a: Mato."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "CIERRE 2026-08-08 (limpieza de backlog pedida por Rafael): Sus sujetos (73, 66, 67) quedaron cerrados por verificacion en codigo. Lo unico vivo era el 44, que sigue abierto por su cuenta."
     }
   ],
   "created_at": "2026-06-07T15:07:13.808-0500",
-  "updated_at": "2026-06-07T15:07:29.856-0500",
-  "jira_key": "SCRUM-74"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

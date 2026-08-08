@@ -341,7 +341,7 @@ All multi-agent work runs through the **agentic-framework plugin agents only**: 
 
 ### Tickets
 
-Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json) — the full Jira backlog was migrated here 2026-06-12 (`jira_key` field preserves the original SCRUM key; TASK number = SCRUM number). Jira is no longer required for day-to-day work.
+Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json). This is the ONLY ticket system — there is no external tracker. The backlog originally came from a Jira board (migrated 2026-06-12, TASK number = old SCRUM number), but that link was severed on 2026-08-08: the `jira_key` field was blanked on all tickets, the `jira-import` label removed, and the `jira-pm` skill deleted. Do not create, read, or reconcile against Jira; do not reintroduce a `jira_key`.
 
 ### Task Sizing & Parallelism
 
@@ -432,7 +432,6 @@ Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json
 | design-status | Read-only diff of app routes ↔ Claude Design cards ↔ Figma frames via mapping.json — reports gaps, drift, known deprecated/orphan, and nodeId discrepancies | `.claude/skills/design-status/SKILL.md` |
 | frontend-design | Design thinking process and aesthetic guidelines for building visually distinctive frontend interfaces | `.claude/skills/frontend-design/SKILL.md` |
 | i18n-check | Verify all i18n keys exist in en.json, es.json, and pt.json locale files | `.claude/skills/i18n-check/SKILL.md` |
-| jira-pm | LEGACY — Jira backlog was migrated to `tasks/` on 2026-06-12; only use for closing out the old Jira board | `.claude/skills/jira-pm/SKILL.md` |
 | optimize-seo | Run an SEO audit via the agentic-framework researcher agent, categorize findings, and generate an actionable implementation plan with optional fix execution | `.claude/skills/optimize-seo/SKILL.md` |
 | pr | Create a pull request with standard format from current branch to develop or main | `.claude/skills/pr/SKILL.md` |
 | tdd | Walk through the TDD workflow (red/green/refactor) for a given task | `.claude/skills/tdd/SKILL.md` |

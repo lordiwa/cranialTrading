@@ -7,7 +7,6 @@
   "priority": "medium",
   "labels": [
     "improvement",
-    "jira-import",
     "nice-11",
     "phase-4",
     "qa-manual",
@@ -26,6 +25,6 @@
     }
   ],
   "created_at": "2026-04-18T17:27:53.754-0500",
-  "updated_at": "2026-05-03T12:19:55.806-0500",
-  "jira_key": "SCRUM-22"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

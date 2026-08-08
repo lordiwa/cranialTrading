@@ -3,11 +3,10 @@
   "title": "Improvement personal user space",
   "description": "**Migrado de Jira:** SCRUM-64 (tipo: Impovement user personal space, estado original: Q/A)\n\nAl hacer click en el logo oficial de la página cranial trading, este automáticamente redirige a matches, se buscaria implementar un espacio destinado al perfil personal del usuario ( poder cambiarse de nombre, foto de perfil, noticias del competitivo del mundo de magic, cambios del mercado",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
-    "improvement",
-    "jira-import"
+    "improvement"
   ],
   "assignee": "Mato",
   "depends_on": [],
@@ -18,9 +17,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:37.154Z",
       "body": "Migrado desde SCRUM-64 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: Mato."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "CIERRE 2026-08-08 (limpieza de backlog pedida por Rafael): La premisa vencio: el logo ya NO lleva a matches sino a /inicio (AppHeader.vue:196, decision de Rafael del 2026-08-07), y el espacio de perfil personal existe."
     }
   ],
   "created_at": "2026-05-03T14:33:50.588-0500",
-  "updated_at": "2026-05-09T19:51:55.942-0500",
-  "jira_key": "SCRUM-64"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

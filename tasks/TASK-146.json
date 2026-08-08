@@ -19,7 +19,7 @@
   ],
   "assignee": null,
   "depends_on": [
-    "TASK-145"
+    "TASK-155"
   ],
   "linked_commits": [],
   "linked_prs": [],
@@ -33,10 +33,15 @@
       "author": "orchestrator",
       "at": "2026-08-08T07:32:54.133Z",
       "body": "PARCIAL Y BLOQUEADO (2026-08-08). Commit ad85670 en develop, sin push.\n\nQUE ENTRO Y ESTA VERIFICADO:\n- Borrar y cancelar pasan de aserciones por CONTEO a aserciones por IDENTIDAD, que era el requisito que agrego el reviewer de TASK-145.\n- El cleanup de \"add card\" arreglado: usaba el mismo `editModal.deleteButton` muerto, o sea que NUNCA borro nada. Era una fuga real de una carta en cada corrida, en todas las corridas hasta hoy.\n- Cuatro data-testid en las filas de cantidad de CardDetailModal. Unico cambio en src/, sin logica.\nVerificado por el orquestador, no solo reportado: archivo completo 7 pasan / 1 omitido en 1.8 min contra dev, mas 1577 unitarios verdes y 0 errores de lint.\n\nQUE NO ENTRO, declarado y no omitido: el criterio 2 (editar con recarga y aseverar persistencia) NO se cumple. Queda como `test.fixme` con el titulo nombrando su bloqueo, o sea que se reporta como omitido y nunca como verde, y la deuda queda visible. NO se tapo con una espera fija: se probaron esperas de 20 s que a veces alcanzaban y a veces no, que es la definicion de un flake.\n\nPOR QUE ESTA BLOQUEADO: `updateCard` no dispara refresh del indice y el debounce de card_index muere si la pagina recarga antes de que dispare, asi que hoy no existe senal observable contra la cual aseverar la persistencia. Es un hueco de PRODUCTO, no de test -> TASK-155. Este ticket no se puede cerrar honestamente hasta que TASK-155 se resuelva o se determine que no hay dano real.\n\nTERCER MECANISMO DE VERDE VACIO ENCONTRADO ACA, y vale registrarlo: `CardDetailModal` v2 no tiene input de cantidad NI boton de borrar — la cantidad es un stepper +/- por estado y el borrado se movio al card de la grilla. Los locators `editModal.quantityInput` y `editModal.deleteButton` no emparejaban NADA. Por eso el `if (await qtyInput.isVisible().catch(() => false))` nunca entraba: la guarda no era defensiva, tapaba un locator muerto. Los tests describian una interfaz que ya no existe.\n\nNOTA OPERATIVA: el agente developer dejo de responder a tres mensajes seguidos, quedando inactivo un minuto despues de cada uno, con el trabajo sin commitear. El trabajo no se perdio y se verifico que no habia ninguna mutacion sin revertir. El commit lo hizo el orquestador tras verificar en verde. Una corrida intermedia dio 4 rojos con pagina en blanco en el goto; los mismos tests pasan en aislado y la corrida siguiente dio verde entera, asi que fue el servidor de preview y no los tests — se establecio antes de tocar nada, en vez de subir un timeout."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:41.663800Z",
+      "body": "CORRECCION DE METADATO 2026-08-08: depends_on decia TASK-145, que esta done desde hace dias. El bloqueo real es TASK-155: el AC2 de este ticket exige recargar la pagina y aseverar el valor nuevo, y TASK-155 investiga precisamente si esa recarga pierde la actualizacion del indice. Hasta saber eso, un test de persistencia no podria fallar por la razon correcta."
     }
   ],
   "created_at": "2026-08-08T05:22:31.291Z",
-  "updated_at": "2026-08-08T07:32:57.439Z",
+  "updated_at": "2026-08-08T21:53:41.663800Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

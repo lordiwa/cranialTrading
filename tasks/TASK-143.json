@@ -11,7 +11,7 @@
     "Cada hallazgo verificado adversarialmente antes de reportarse; los refutados se listan aparte",
     "Los hallazgos que sobrevivan se materializan como tickets nuevos en tasks/, no como comentarios sueltos"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "high",
   "labels": [
     "review",
@@ -45,10 +45,15 @@
       "author": "reviewer",
       "at": "2026-08-08T05:38:55.315Z",
       "body": "DEEP REVIEW EJECUTADO (2026-08-08). 30 agentes, 0 errores, ~7,4 min, 4 dimensiones + verificacion adversarial por hallazgo.\n\nRANGO REAL REVISADO: `4a3973e^..HEAD` restringido a src/ y e2e/ (ver el comentario anterior: el rango del AC1 estaba vacio porque la tanda ya se pusheo).\n\nNUMEROS: 26 hallazgos propuestos por las 4 dimensiones -> 14 REFUTADOS en la verificacion adversarial -> 12 confirmados (4 HIGH, 4 MEDIUM, 4 LOW). El workflow marca la tanda como BLOQUEADA por los HIGH. Que se cayera mas de la mitad es buena senal: los verificadores no se limitaron a ratificar. NOTA HONESTA: el resultado del workflow solo devuelve los confirmados; el detalle de los 14 refutados quedo en el journal.jsonl de la corrida, no se transcribio aca.\n\nCONFIRMADOS, deduplicados (varios llegaron por dimensiones distintas):\n- HIGH — \"/inicio no lee nada de Firestore\" es FALSO: la cadena HomeView -> AppContainer -> AppHeader -> MatchNotificationsDropdown llama loadAllMatches en onMounted sin gesto del usuario = 6 lecturas de coleccion mas borrados batched. Las afirmaciones falsas siguen en HomeView.vue, en el spec de login y en el mensaje de commit. -> TASK-148\n- HIGH — logica nueva con cero tests: carrusel (go/goTo, mapeo por locale), handleSlash (guardas y ciclo de vida), el push de searchTerm, showHeaderSearch, y ninguna prueba de que HomeView renderice. La exencion de 'styling only' no aplica a logica. (3 hallazgos consolidados) -> TASK-149\n- MEDIUM — el test del logo es un VERDE VACIO: `navigation.page.ts:33` usa `a[href=\"/\"]`, que no empareja nada, y su asercion vive dentro de `if (isVisible())`. Ademas las redirecciones de '/' y '/dashboard' no tienen cobertura. Es el MISMO modo de fallo que TASK-144 demostro por mutacion, hallado de forma independiente. -> TASK-150\n- MEDIUM/HIGH — el gate de `main` sigue escribiendo en PRODUCCION: `binders.spec.ts:8` y `deck-crud.spec.ts:8` son creadores y estan etiquetados @smoke. El comentario que se agrego en v1.55.2 promete algo que el codigo no da. (3 hallazgos consolidados) -> TASK-151\n- LOW x2 — `/inicio/` con barra final duplica el buscador (ids de DOM repetidos y dos handlers de '/'), y el foco neon sobrevive al estado de error. -> TASK-152\n\nAC6 (verificacion adversarial): cumplido por el workflow. AC7 (materializar como tickets): cumplido, TASK-148 a 152.\nAC2, AC3, AC4 y AC5: los cuatro se respondieron, y los cuatro dieron INSATISFECHOS — es el resultado del review, no un fallo de ejecucion.\n\nPENDIENTE PARA CERRAR: este ticket es uat-only y Rafael NO delego el UAT en esta sesion, asi que el cierre requiere su verdicto."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "CIERRE 2026-08-08 (limpieza de backlog pedida por Rafael): El deep review se ejecuto el 2026-08-08: 30 agentes, 26 hallazgos, 14 refutados, 12 confirmados. Sus hallazgos ya viven como TASK-145 a TASK-152."
     }
   ],
   "created_at": "2026-08-07T00:00:00.000Z",
-  "updated_at": "2026-08-08T05:38:58.850Z",
+  "updated_at": "2026-08-08T21:53:25.547397Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

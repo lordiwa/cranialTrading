@@ -3,13 +3,12 @@
   "title": "TC-P04-01: Navegación por teclado — buscador global (desktop)",
   "description": "**Epic:** TASK-017 (Search & Discovery)\n**Migrado de Jira:** SCRUM-19 (tipo: Impovement user personal space, estado original: Q/A)\n\n**Componente:** GlobalSearch (buscador del header), accesibilidad\n**Requirement:** ARCH-10\n**Phase:** 4 (v1.24.0)\n\n## ¿Qué se valida?\n\nQue el buscador global del header funcione 100% con teclado, sin necesidad de mouse. Importante para usuarios con discapacidad motriz que solo pueden usar teclado.\n\n## Preconditions\n\n* Estar logueado en `cranial-trading-dev.web.app`\n* Viewport desktop (≥768px de ancho — pantalla normal de PC, no móvil)\n* Navegador: Chrome o Safari\n\n## Steps\n\n1. Estar en cualquier página que NO sea de input (ej: dashboard, colección). Pulsar la tecla `/` (slash, junto al Shift derecho)\n2. Escribir `bolt` (sin pulsar Enter)\n3. Esperar a que aparezcan resultados en el dropdown debajo del input\n4. Pulsar `↓` (flecha abajo)\n5. Pulsar `↓` repetidamente hasta llegar al último resultado, y una vez más\n6. Estando en el primer resultado, pulsar `↑` (flecha arriba)\n7. Pulsar `End` (tecla End o \"Fin\"), después pulsar `Home` (tecla Home o \"Inicio\")\n8. Estando con un resultado resaltado, pulsar `Enter`\n9. Volver atrás (Alt+←). Repetir steps 1-3 SIN tocar las flechas. Pulsar `Enter`\n10. Volver atrás. Repetir steps 1-3. Pulsar `Esc`\n\n## Resultados esperados\n\n| Step | Qué debe pasar |\n| --- | --- |\n| 1 | El cursor se posiciona dentro del input del buscador (está enfocado), el dropdown sigue cerrado |\n| 4 | El primer resultado se resalta visualmente (borde neón verde o fondo distinto) |\n| 5 | Al pasar el último, vuelve al primero (loop) |\n| 6 | Al subir desde el primero, va al último |\n| 7 | End salta al último resultado, Home salta al primero |\n| 8 | Navega a la URL del resultado seleccionado, el dropdown se cierra |\n| 9 | Sin flechas, Enter va a `/search?q=bolt` (búsqueda avanzada) |\n| 10 | El dropdown se cierra, el cursor sigue en el input |\n\n## Pass / Fail\n\n* **Pass:** los 10 steps cumplen el comportamiento esperado\n* **Fail:** cualquier tecla no tiene efecto, no hay highlight visual, o navega a URL incorrecta",
   "acceptance_criteria": [],
-  "status": "in_review",
+  "status": "todo",
   "priority": "high",
   "labels": [
     "a11y",
     "arch-10",
     "improvement",
-    "jira-import",
     "keyboard",
     "phase-4",
     "qa-manual",
@@ -24,9 +23,14 @@
       "author": "jira-migration",
       "at": "2026-06-12T14:45:36.924Z",
       "body": "Migrado desde SCRUM-19 (cranialtrading.atlassian.net) el 2026-06-12. Estado Jira: Q/A; asignado a: ismachucho."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T21:53:25.547397Z",
+      "body": "RE-ABIERTO 2026-08-08 (limpieza de backlog): Caso de prueba manual de accesibilidad. Sigue siendo valido, pero hoy no hay nadie haciendo Q/A manual. Vuelve a todo."
     }
   ],
   "created_at": "2026-04-18T17:27:29.324-0500",
-  "updated_at": "2026-04-19T16:01:47.518-0500",
-  "jira_key": "SCRUM-19"
+  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "jira_key": null
 }

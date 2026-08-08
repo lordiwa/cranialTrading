@@ -94,7 +94,7 @@ describe('createAuthGuard — (b) requiresGuest, last-known = guest/unknown', ()
     await pending
 
     expect(redirect).toHaveBeenCalledTimes(1)
-    expect(redirect).toHaveBeenCalledWith('/saved-matches')
+    expect(redirect).toHaveBeenCalledWith('/inicio')
     expect(next).toHaveBeenCalledTimes(1) // no loop: next() was never called a second time
   })
 
@@ -140,7 +140,7 @@ describe('createAuthGuard — (b) requiresGuest, last-known = authenticated', ()
     resolve({ id: 'u1' })
     await pending
 
-    expect(next).toHaveBeenCalledWith('/saved-matches')
+    expect(next).toHaveBeenCalledWith('/inicio')
     expect(redirect).not.toHaveBeenCalled() // decided synchronously via next(), not the async path
   })
 
@@ -167,7 +167,7 @@ describe('createAuthGuard — (b) requiresGuest /register unverified-session exc
   // production. Scoped strictly to to.path === '/register' — /login and
   // every other requiresGuest route must redirect exactly as before.
   describe('sync path (last-known = authenticated)', () => {
-    it('lets an unverified logged-in user through to /register (does NOT redirect to /saved-matches)', async () => {
+    it('lets an unverified logged-in user through to /register (does NOT redirect to /inicio)', async () => {
       setLastKnownAuthState('authenticated')
       const { store, resolve } = createFakeAuthStore(true)
       const next = vi.fn()
@@ -192,7 +192,7 @@ describe('createAuthGuard — (b) requiresGuest /register unverified-session exc
       resolve({ id: 'u1' }, true) // logged in, verified
       await pending
 
-      expect(next).toHaveBeenCalledWith('/saved-matches')
+      expect(next).toHaveBeenCalledWith('/inicio')
     })
 
     it('still redirects an unverified logged-in user away from /login (unchanged — exception is /register-only)', async () => {
@@ -205,7 +205,7 @@ describe('createAuthGuard — (b) requiresGuest /register unverified-session exc
       resolve({ id: 'u1' }, false)
       await pending
 
-      expect(next).toHaveBeenCalledWith('/saved-matches')
+      expect(next).toHaveBeenCalledWith('/inicio')
     })
 
     it('lets a guest (no session at all) through to /register as before', async () => {
@@ -246,7 +246,7 @@ describe('createAuthGuard — (b) requiresGuest /register unverified-session exc
       resolve({ id: 'u1' }, true)
       await pending
 
-      expect(redirect).toHaveBeenCalledWith('/saved-matches')
+      expect(redirect).toHaveBeenCalledWith('/inicio')
     })
 
     it('still fires the deferred redirect for an unverified logged-in user who lands on /login (unchanged — exception is /register-only)', async () => {
@@ -259,7 +259,7 @@ describe('createAuthGuard — (b) requiresGuest /register unverified-session exc
       resolve({ id: 'u1' }, false)
       await pending
 
-      expect(redirect).toHaveBeenCalledWith('/saved-matches')
+      expect(redirect).toHaveBeenCalledWith('/inicio')
     })
   })
 })
@@ -364,7 +364,7 @@ describe('createAuthGuard — (b) requiresGuest optimistic redirect respects isS
     resolve({ id: 'u1' })
     await pending
 
-    expect(redirect).toHaveBeenCalledWith('/saved-matches')
+    expect(redirect).toHaveBeenCalledWith('/inicio')
   })
 
   it('defaults isStillCurrent to "always current" when the caller omits it (backward compatible)', async () => {
@@ -377,7 +377,7 @@ describe('createAuthGuard — (b) requiresGuest optimistic redirect respects isS
     resolve({ id: 'u1' })
     await pending
 
-    expect(redirect).toHaveBeenCalledWith('/saved-matches')
+    expect(redirect).toHaveBeenCalledWith('/inicio')
   })
 })
 
@@ -487,7 +487,7 @@ describe('shouldBlockOnAuthLoading — pure decision reused by App.vue\'s full-s
   // which during the app's very first (still-pending) navigation is Vue
   // Router's START_LOCATION sentinel — meta: {}, matched: []. Without a
   // signal for "route not confirmed yet", a requiresAuth deep-link (or the
-  // '/' → /saved-matches redirect) would read as meta={} and this function
+  // '/' → /inicio redirect) would read as meta={} and this function
   // would return false, letting App.vue render a blank RouterView + footer
   // shell for the whole auth round-trip instead of the loader.
   describe('routeConfirmed (4th param) — initial-navigation-pending case', () => {

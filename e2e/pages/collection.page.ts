@@ -97,6 +97,30 @@ export class CollectionPage {
     await this.page.waitForLoadState('domcontentloaded');
   }
 
+  /**
+   * CardFilterBar's local search input opens an autocomplete dropdown
+   * ("In my collection" section — one of the 5 independent search surfaces,
+   * see project memory) that only closes on a genuine `document` click
+   * outside its wrapper (`handleClickOutside` in CardFilterBar.vue). A
+   * Playwright click on an element the still-open dropdown happens to
+   * overlap never reaches the target — actionability checks retry instead
+   * of firing the event that would dismiss it — so any test that types into
+   * `searchInput` and then clicks elsewhere on the toolbar must dismiss the
+   * dropdown first.
+   *
+   * Target is the page's `<h1>` ("My Collection"), NOT a coordinate on
+   * `body`: a positional click at the viewport's top-left corner lands on
+   * whatever happens to be topmost there — the skip-to-content link and the
+   * header logo both live in that region, and the logo is a `<a href=
+   * "/inicio">` that would silently navigate the test off /collection. The
+   * h1 is inert, language-agnostic (matched by tag, not text), and
+   * unambiguously outside CardFilterBar's `wrapperRef`, so it fires the real
+   * `document` click-outside listener with nothing else attached to it.
+   */
+  async dismissSearchDropdown() {
+    await this.page.locator('h1').first().click();
+  }
+
   async filterByStatus(status: string) {
     await this.statusFilters.locator('button').filter({ hasText: new RegExp(status, 'i') }).click();
   }
@@ -219,6 +243,55 @@ export class CollectionPage {
   }
 
   /**
+   * Scans the currently rendered grid (top to bottom, capped at
+   * `maxCandidates`) for a card whose `cardIdentity()` matches `identity`
+   * exactly, returning its index or `null` if not found. Exists so a test
+   * can relocate "the same card" after an operation that moves it out of
+   * the active filter (e.g. status change) instead of trusting a fixed grid
+   * position — same rationale as `cardIdentity`/`totalCardCount` above:
+   * position 0 on this virtualized grid is not a stable pointer, only
+   * identity is. Callers still narrow the candidate set first (status
+   * filter + name search) since this itself is just a linear scan.
+   */
+  async findGridIndexByIdentity(identity: string, maxCandidates = 50): Promise<number | null> {
+    await this.waitForGridReady();
+    const count = Math.min(await this.gridCards.count(), maxCandidates);
+    for (let i = 0; i < count; i++) {
+      if ((await this.cardIdentity(i)) === identity) return i;
+    }
+    return null;
+  }
+
+  /**
+   * Locates a card by identity and clicks it, re-resolving the index on
+   * each attempt instead of computing it once and trusting it stays put.
+   * Found necessary under `--repeat-each` stress after a filter/search
+   * change: the grid can still be settling right after
+   * `findGridIndexByIdentity` returns, so a click against a pre-computed
+   * index occasionally hit "element is not stable" / "detached from the
+   * DOM, retrying" — the row shifted between locate and click. Same
+   * virtualized-grid instability this file documents elsewhere, just
+   * triggered by search/filter narrowing here instead of background
+   * pagination settling.
+   */
+  async clickCardByIdentity(identity: string, maxAttempts = 3): Promise<number> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const index = await this.findGridIndexByIdentity(identity);
+      if (index === null) {
+        throw new Error(`clickCardByIdentity: no card matching identity "${identity}" found in the current grid`);
+      }
+      try {
+        await this.gridCards.nth(index).click({ timeout: 5_000 });
+        return index;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * The "ELIMINAR"/"DELETE" button rendered directly on a grid card
    * (CollectionGridCardFull.vue "Row 8") — NOT inside the detail modal.
    * CardDetailModal.vue's v2 redesign has no delete affordance of its own;
@@ -273,6 +346,34 @@ export class CollectionPage {
 
   get bulkDeleteButton(): Locator {
     return this.page.locator('[data-testid="bulk-delete-button"]');
+  }
+
+  /**
+   * Waits for `data-testid="bulk-selection-bar"` (BulkSelectionActionBar.vue)
+   * to fully disappear after a bulk action — it's `v-if="selectionMode"` in
+   * CollectionView.vue, and `selectionMode` only flips back to `false` once
+   * `batchUpdateCards`/`batchDeleteCards` has actually resolved. A success
+   * toast alone isn't sufficient proof the store update has landed: the
+   * toast can still be visible (its own 4s auto-dismiss window) from a
+   * PRIOR bulk action when a second one fires shortly after, so
+   * `waitForToast` immediately resolves against that stale element instead
+   * of the new one — this waits on the bar's own loading/selection state
+   * instead, which can't be satisfied by a leftover element from an earlier
+   * action.
+   *
+   * The 45s default is measured, not padded: on a `--repeat-each=3` run of
+   * the bulk-status test this timed out at 15s on the RESTORE step while the
+   * page simultaneously showed the "1 cards changed to Collection" success
+   * toast and the already-updated chip count — i.e. the write had landed and
+   * only the bar's own teardown was still pending. On a 41k-card collection
+   * `batchUpdateCards`'s post-write refresh is slow enough that 15s fails
+   * the test for a mutation that demonstrably succeeded. A generous timeout
+   * costs nothing on the happy path (the wait resolves as soon as the bar
+   * goes) and this is the wrong place to be strict: the falsifiable
+   * assertions are the statusChipCount polls, not this teardown wait.
+   */
+  async waitForBulkActionComplete(timeout = 45_000) {
+    await this.page.locator('[data-testid="bulk-selection-bar"]').waitFor({ state: 'hidden', timeout });
   }
 
   /**

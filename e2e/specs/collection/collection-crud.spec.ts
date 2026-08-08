@@ -211,12 +211,23 @@ test.describe('Collection CRUD', () => {
     const availableCountBefore = await collectionPage.statusChipCount('available');
     expect(collectionCountBefore).toBeGreaterThan(0);
 
+    // Identity captured BEFORE the status change, while the card is still
+    // under the `collection` filter at index 0 — used only to re-FIND the
+    // same card afterwards, never to assert on (the chip counts above/below
+    // are the real assertions). Needed because the restore step below moves
+    // this card out of the `collection` filter entirely, so index 0 there
+    // is guaranteed to point at a DIFFERENT card by the time we get back to
+    // it (mechanism 14 / TASK-144: index-0 drift on a virtualized grid,
+    // this time caused by the filter itself, not background settling).
+    const identityBefore = await collectionPage.cardIdentity(0);
+
     await collectionPage.selectModeButton.click();
     await collectionPage.clickCardInGrid(0);
     await expect(collectionPage.gridCards.nth(0)).toHaveAttribute('aria-pressed', 'true');
 
     await collectionPage.bulkStatusButton('sale').click();
     await commonPage.waitForToast('success');
+    await collectionPage.waitForBulkActionComplete();
 
     // Real assertion: the card's own status actually changed in the store —
     // the mutated `batchUpdateCards` never touches `cards.value`, so these
@@ -225,12 +236,30 @@ test.describe('Collection CRUD', () => {
     await expect.poll(() => collectionPage.statusChipCount('available')).toBe(availableCountBefore + 1);
 
     // Restore (A4): move the same card back to its original status so this
-    // run doesn't leave unbounded drift on the shared dev collection.
+    // run doesn't leave unbounded drift on the shared dev collection. The
+    // card now lives under the `available` filter (status=sale), not
+    // `collection` — switch filters and narrow by name before re-locating
+    // it by identity, rather than assuming it re-lands at index 0.
+    const [nameBefore] = identityBefore.split(' :: ');
+    await collectionPage.filterByStatus('available');
+    await collectionPage.searchInput.fill(nameBefore);
+    await collectionPage.dismissSearchDropdown();
+
     await collectionPage.selectModeButton.click();
-    await collectionPage.clickCardInGrid(0);
+    await collectionPage.clickCardByIdentity(identityBefore);
     await collectionPage.bulkStatusButton('collection').click();
     await commonPage.waitForToast('success');
+    await collectionPage.waitForBulkActionComplete();
 
+    // No need to reset the search/filter narrowing before reading the chips
+    // back: the status chip buttons render unconditionally regardless of
+    // which filter is active (CollectionView.vue's `v-for` over the status
+    // counts isn't gated on `statusFilter`), and their counts come from the
+    // full `collectionStore.cards` array, not the filtered/searched grid —
+    // so they're readable as-is. An earlier version reset search/filter
+    // here defensively; under `--repeat-each` stress that extra
+    // fill/click pair itself became a source of flakiness (the toolbar
+    // shifts as `selectionMode` toggles off), for no assertion benefit.
     await expect.poll(() => collectionPage.statusChipCount('collection')).toBe(collectionCountBefore);
     await expect.poll(() => collectionPage.statusChipCount('available')).toBe(availableCountBefore);
   });

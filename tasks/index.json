@@ -784,7 +784,7 @@
     {
       "key": "TASK-151",
       "title": "El gate de main sigue escribiendo en la base de PRODUCCION: dos specs @smoke crean mazos y binders reales",
-      "status": "todo",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -814,7 +814,7 @@
     {
       "key": "TASK-156",
       "title": "El buscador de la coleccion devuelve cartas ajenas al termino cuando se escribe sobre la grilla ya montada",
-      "status": "todo",
+      "status": "done",
       "priority": "critical"
     },
     {
@@ -869,6 +869,18 @@
       "key": "TASK-165",
       "title": "La ruta /inicio no baja su propio chunk hasta que termina la lectura de /users: 3,1 s de pantalla sin vista",
       "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-166",
+      "title": "Tramo E de /inicio: ~7 segundos entre que el perfil llega y el buscador queda usable, sin causa identificada",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-167",
+      "title": "vite build sin --mode produce un bundle de PRODUCCION y puede pisar un preview de dev en el mismo puerto",
+      "status": "todo",
       "priority": "high"
     }
   ]

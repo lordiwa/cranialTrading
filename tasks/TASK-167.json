@@ -1,0 +1,36 @@
+{
+  "key": "TASK-167",
+  "title": "vite build sin --mode produce un bundle de PRODUCCION y puede pisar un preview de dev en el mismo puerto",
+  "description": "INCIDENTE REAL, 2026-08-08. Nadie perdio datos, pero por suerte y no por diseño.\\n\\nQUE PASO: el orquestador dejo levantado un `vite preview` en el puerto 4271 sirviendo un `dist/` compilado a proposito con `--mode development` (o sea, apuntando a cranial-trading-dev) para medir el rendimiento de /inicio con una sesion real. Mas tarde, un agente que trabajaba en TASK-156 corrio `npx vite build` SIN `--mode` como parte de su verificacion normal — que es exactamente lo que manda CLAUDE.md en la Regla 7 — y eso sobrescribio ese mismo `dist/` con un bundle configurado contra PRODUCCION. El servidor de preview siguio corriendo en el mismo puerto, ahora sirviendo produccion.\\n\\nEl agente entonces \"verifico el arreglo en vivo contra localhost:4271\" creyendo que estaba en dev, y reporto que la cuenta de dev se habia quedado sin cartas: 41.093 -> 5.653 -> 204. Esa conclusion es FALSA. 204 es el numero conocido de la cuenta de PRODUCCION (esta anotado en el traspaso de la sesion del 2026-08-08). Estaba mirando produccion.\\n\\nVERIFICADO POR EL ORQUESTADOR, no inferido:\\n- `grep` sobre `dist/assets/*.js`: 12 apariciones de `cranial-trading` y CERO de `cranial-trading-dev`.\\n- Marca de tiempo del dist: 13:25, posterior a la compilacion en modo development del orquestador de las 12:31.\\n- Los tests E2E quedaron descartados como causa de borrado: `bulk delete` selecciona UNA carta (`clickCardInGrid(0)`) y asevera `countBefore - 1`; no existe ningun \"select all\" en toda la suite (grep sin resultados).\\n\\nPOR QUE IMPORTA: v1.55.2 arreglo el camino de Playwright (el default de `VITE_MODE` en playwright.config.ts paso de production a development). Este es un camino DISTINTO y quedo sin cubrir: `vite build` a secas usa modo produccion por defecto, y cualquier verificacion manual o de agente servida desde ese dist pega a la base real. La leccion de \"el E2E corria contra prod\" se aplico a una sola de las dos puertas.\\n\\nAGRAVANTE: el propio CLAUDE.md instruye correr `npx vite build` (Regla 7, definicion de \"terminado\"), sin advertir que eso genera un bundle de produccion. O sea que la practica recomendada del proyecto es la que arma la trampa.\\n\\nNo hay evidencia de escrituras contra produccion en este incidente — los experimentos del agente fueron tipear en el buscador y sondear el store, ambos de solo lectura — pero eso es una propiedad de lo que ese agente eligio hacer, no una garantia del sistema.",
+  "acceptance_criteria": [
+    "Existe una salvaguarda que impide que una verificacion local o de un agente pegue a produccion sin intencion explicita. Decidir cual con Rafael: por ejemplo que el default de `vite build` sea development y que produccion exija `--mode production` explicito, o un aviso visible en el arranque del preview diciendo contra que proyecto apunta",
+    "La aplicacion muestra de forma inequivoca contra que proyecto Firebase esta corriendo cuando no es produccion, para que mirar la pantalla alcance para saberlo",
+    "CLAUDE.md deja de recomendar `npx vite build` a secas sin advertir que produce un bundle de produccion, o el comando pasa a ser seguro por defecto",
+    "Queda documentado que este es el SEGUNDO camino por el que el trabajo local pego a produccion, para que la proxima revision busque un tercero en vez de dar el tema por cerrado",
+    "La salvaguarda NO puede depender de que alguien recuerde pasar --mode: quedo demostrado dentro de este mismo ticket que el comando puede dispararse sin intencion. El default tiene que ser seguro."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "riesgo-operativo",
+    "ci",
+    "tooling",
+    "incidente"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T19:30:00.000Z",
+      "body": "CORRECCION IMPORTANTE (2026-08-08). La descripcion original afirmaba dos cosas mas fuertes que la evidencia. Las dos quedan RETIRADAS:\n\n1. NO HUBO PERDIDA DE DATOS EN DEV, y nunca la hubo. El agente reporto que la cuenta de dev caia de 41.093 a 5.653 a 204 cartas. Comprobado en vivo: son CUENTAS DISTINTAS, no una cuenta vaciandose. Las 41.093 son de la cuenta E2E (la de los secrets del repo, con la que se autentica auth.setup.ts). Las 5.653 son de la cuenta personal de Rafael en dev. Verificado navegando a localhost con el bundle en modo development: projectId leido en runtime de los requests a firestore.googleapis.com = cranial-trading-dev, y el chip TODAS de la UI = 5653. El agente comparo su observacion contra un numero del traspaso que pertenecia a otra cuenta.\n\n2. NO HAY EVIDENCIA de que nadie haya operado contra produccion. El orquestador afirmo que el agente estuvo mirando produccion y no puede sostenerlo: Firebase indexa la sesion persistida por API key, asi que un bundle de produccion servido en localhost:4271 no habria reconocido la sesion de dev y habria redirigido a /login. La secuencia mas coherente con los hechos es que el agente verifico en vivo mientras el preview todavia servia el bundle de dev, y corrio la compilacion DESPUES, como cierre, que es el orden que manda la Regla 7 de CLAUDE.md.\n\nLO QUE SI SE SOSTIENE, y es la unica razon por la que el ticket sigue vivo: se verifico en disco que la compilacion sin --mode dejo un dist con 12 apariciones de cranial-trading y CERO de cranial-trading-dev, y que el preview del orquestador estuvo sirviendo ese dist. El riesgo es real y esta sin proteger. Lo que no ocurrio es el dano. Baja de critical a high por eso.\n\nEVIDENCIA NUEVA, Y ES LA MEJOR QUE TIENE ESTE TICKET: mientras escribia esta misma correccion, el orquestador volvio a pisar el dist con un bundle de produccion SIN QUERER. Un backtick dentro de una cadena de JavaScript pasada por linea de comandos fue interpretado por bash como sustitucion de comandos y ejecuto la compilacion dos veces, en modo produccion, contra el mismo preview que se acababa de dejar apuntando a dev. La trampa se disparo sola, sin que nadie escribiera el comando a proposito, minutos despues de haberla documentado. Cualquier salvaguarda que dependa de que la persona o el agente recuerde pasar --mode es insuficiente: el default tiene que ser seguro.\n\nHALLAZGO COLATERAL: quedo un servidor de vite de OTRO proyecto (meta-harvester / Modern Meta Lab) escuchando en el puerto 5173 de esta maquina. Mismo genero de trampa: un puerto conocido sirviendo algo que no es lo que uno cree."
+    }
+  ],
+  "created_at": "2026-08-08T19:00:00.000Z",
+  "updated_at": "2026-08-08T19:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

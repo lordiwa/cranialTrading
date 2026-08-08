@@ -1,0 +1,29 @@
+{
+  "key": "TASK-166",
+  "title": "Tramo E de /inicio: ~7 segundos entre que el perfil llega y el buscador queda usable, sin causa identificada",
+  "description": "Medido el 2026-08-08 en local (bundle en modo development servido desde preview, sesión real contra el proyecto dev, pestaña VISIBLE), DESPUÉS de que TASK-148 y TASK-165 ya estaban aplicados.\\n\\nNÚMEROS MEDIDOS:\\n- domContentLoaded: 227 ms\\n- domComplete: 352 ms\\n- first-contentful-paint: 248 ms\\n- accounts:lookup de Firebase Auth: empieza 1724 ms, dura 118 ms\\n- chunk HomeView.js: se pide a 1845 ms\\n- getDoc del perfil (canal Firestore): empieza 1852 ms, dura 504 ms — o sea termina ~2356 ms\\n- segunda petición a Firestore: 2537 ms, dura 129 ms — o sea todo Firestore terminó ~2666 ms\\n- Total de peticiones a Firestore en el arranque: 2\\n- **El input del buscador del hero recién existe en el DOM a los 9754 ms**\\n\\nEL HUECO: entre los ~2666 ms (cuando ya volvió todo lo que la ruta esperaba) y los 9754 ms hay unos 7 SEGUNDOS que ningún diagnóstico de la sesión del 2026-08-08 explica. No es el guard (TASK-165 lo desacopló), no son los matches (TASK-148 los difirió: quedan 2 peticiones, no 18), y no es la descarga del chunk (14 ms).\\n\\nSOSPECHA, EXPLÍCITAMENTE NO VERIFICADA: `preloadPriceData` de `src/services/mtgjson.ts`, que App.vue importa y que usa la base IndexedDB `mtgjson_cache`. NO se midió, NO se leyó el camino completo, y en esta misma sesión se cayeron CUATRO teorías propuestas por lectura de código. Tratarla como punto de partida, no como causa.\\n\\nMÉTODO SUGERIDO, y esto importa más que la sospecha: NO diagnosticar leyendo. Sacar una traza de performance de DevTools durante la carga, o instrumentar con marcas, y recién después leer el código del camino que la traza señale. El resto de esta tanda de perf se resolvió midiendo y se descarriló cada vez que se intentó adivinar.\\n\\nRELACIÓN CON EL RESTO DEL DESGLOSE DE /inicio (medido en producción el mismo día): tramo A 0-640 ms bundle, tramo B 640-2431 ms SIN EXPLICAR (1791 ms dentro de la inicialización del SDK de Firebase Auth, ver su propia nota), tramo C 2431-5572 ms resuelto a medias por TASK-165, tramo D la ráfaga de matches resuelta por TASK-148, y este tramo E que es el más grande de todos los que quedan.\\n\\nPRIORIDAD DE NEGOCIO: /inicio es la puerta de entrada al flujo Nº1 (buscar cartas para revisar precios), y lo que tarda 9,7 segundos en estar disponible es exactamente el buscador — el elemento protagonista de esa pantalla.",
+  "acceptance_criteria": [
+    "Se identifica con MEDICIÓN (traza de DevTools o instrumentación con marcas, no lectura de código) qué ocupa los ~7 segundos entre que termina el último getDoc del arranque y el input del hero queda disponible",
+    "El número queda registrado en el ticket con el método usado y el entorno, igual que el resto del desglose",
+    "Si la causa resulta ser trabajo diferible, se propone el cambio en un ticket aparte — este ticket es de diagnóstico, no de implementación a ciegas",
+    "Si la sospecha de preloadPriceData resulta FALSA, queda escrito en el ticket que se falsó, para que nadie la vuelva a proponer"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "landing",
+    "diagnostico",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-08T18:45:00.000Z",
+  "updated_at": "2026-08-08T18:45:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

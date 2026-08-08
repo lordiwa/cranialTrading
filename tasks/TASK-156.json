@@ -9,7 +9,7 @@
     "Corregido, un usuario que escribe en el buscador con la grilla ya montada ve solo coincidencias del termino — verificado en el navegador, no solo por test",
     "Existe un test que FALLA con el defecto presente y PASA sin el, y que mira las CARTAS de la grilla y no el valor del input"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "wargaming",
@@ -26,10 +26,15 @@
       "author": "orchestrator",
       "at": "2026-08-08T13:50:28.723Z",
       "body": "VERIFICACION INDEPENDIENTE DEL ORQUESTADOR (2026-08-08). Sonda propia, sin reusar la del agente, contra https://cranial-trading-dev.web.app. Solo lectura.\n\nRESULTADO: el hallazgo SE SOSTIENE — el camino interactivo falla y el control funciona — pero el SINTOMA OBSERVADO ES DISTINTO, y eso importa para el diagnostico:\n- Interactivo (escribir \"Lightning Bolt\" sobre la grilla ya montada, esperar 6 s): 0 de 0 cartas. La grilla queda VACIA.\n- Control (navegar en fresco a /collection?q=Lightning%20Bolt): 15 de 15 correctas.\nEl agente wg-flujo2 habia observado, con 3 s de espera, cartas EQUIVOCADAS (Emeritus of Conflict, Soul-Guide Lantern, etc.), no una grilla vacia.\n\nQUE SIGNIFICA LA DISCREPANCIA: los dos observamos que el camino interactivo NO devuelve los resultados correctos y que el control SI, o sea que la refutacion del happy path se sostiene por partida doble. Pero el sintoma varia entre corridas y entre tiempos de espera (3 s -> cartas ajenas; 6 s -> vacio), lo cual apunta a una CARRERA y no a un filtro mal escrito. Esto refuerza el criterio 1 del ticket: hay que aislar el mecanismo antes de arreglar nada.\n\nPISTA NUEVA, que ninguno de los dos habia registrado: en el camino interactivo la URL termina siendo\n  /collection?q=Lightning+Bolt&colors=White,Blue,...&types=Creatures,...&rarity=Common,...&mv=0,1,2,...\no sea con TODOS los parametros de filtro por defecto materializados, mientras que el control lleva unicamente `?q=Lightning%20Bolt`. Son dos consultas distintas. Vale investigar si el camino interactivo emite un juego completo de filtros que el de la URL no emite, y si esa diferencia es la que rompe el resultado.\n\nSALVEDAD HONESTA: mi sonda espero 6 s tras escribir. No puedo distinguir \"la grilla quedo vacia\" de \"la grilla seguia cargando\". Quien tome el ticket deberia medir hasta la estabilizacion, no a tiempo fijo.\n\nNOTA OPERATIVA: mis dos primeras sondas fallaron por dos motivos que conviene recordar. (1) Sin `test.setTimeout`, el techo de 45 s de playwright.config.ts corta antes de que monte la grilla. (2) La sonda dependia del `data-testid=\"collection-card\"` que agregamos hoy, y el dev DESPLEGADO corre el bundle anterior porque no se pusheo nada — cualquier verificacion contra ese entorno debe apoyarse solo en lo que ya estaba desplegado."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T20:00:00.000Z",
+      "body": "VERIFICADO EN VIVO POR EL ORQUESTADOR (2026-08-08) contra cranial-trading-dev, con el projectId leido en runtime de los requests a firestore.googleapis.com — no asumido. Cuenta de 5653 cartas, grilla montada a los 7581 ms, tipeando sobre la grilla ya montada.\n\nSe uso el input correcto: la pagina tiene DOS inputs de texto y el indice 0 es el buscador del header. Confundirlos es el mecanismo 4 del catalogo de TASK-144, y es exactamente el defecto que tenia el test viejo (TASK-154).\n\nRESULTADO MEDIDO tras tipear \"Lightning Bolt\":\n- t=0 ms: 6 cartas viejas, ninguna relacionada (Sultai Devotee, Lethal Throwdown, Engineered Plague...)\n- t=1418 ms: 0 cartas. Ventana de carga, y ya NO muestra las viejas. Este es el fix.\n- t=3433 ms: 4 cartas, todas del termino buscado.\n\nRESIDUO CONOCIDO Y ACEPTADO, que el reporte del agente no menciona: durante los ~300 ms del debounce, antes de que arranque la consulta, las cartas viejas siguen visibles. Es mucho menos perceptible que los ~2 s del round-trip, y vaciar la grilla en cada tecla seria peor. Se deja asi a proposito, declarado.\n\nALCANCE QUE NO SE PUDO CERRAR: el agente no logro reproducir a escala 41.000 cartas porque la cuenta con la que verificaba (la personal de Rafael en dev) tiene 5653. El mecanismo es logica de cliente e independiente del tamaño, pero su VISIBILIDAD escala con lo que tarde la Cloud Function: cuanto mas grande la coleccion, mas larga la ventana. Verificarlo a 41k con la cuenta E2E queda pendiente y no se declara hecho.\n\nDESCARTADO CON EVIDENCIA: la materializacion de todos los filtros por defecto en la URL era la pista principal y resulto cosmetica — buildPaginationFilters no manda ningun filtro al servidor cuando estan todos seleccionados. Queda anotado para que no se vuelva a proponer.\n\nSIN VERIFICAR, declarado como hipotesis abierta: si \"Loading prices\" compite por el hilo principal o retrasa la Cloud Function. Ni confirmado ni descartado.\n\nCommit: 11d3db2."
     }
   ],
   "created_at": "2026-08-08T13:44:07.234Z",
-  "updated_at": "2026-08-08T13:50:28.723Z",
+  "updated_at": "2026-08-08T20:00:00.000Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

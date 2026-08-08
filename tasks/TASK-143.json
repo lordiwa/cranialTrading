@@ -1,0 +1,45 @@
+{
+  "key": "TASK-143",
+  "title": "Deep review adversarial de la tanda /inicio + kit v2 (origin/develop..7e1ae02, 5 commits, 19 archivos)",
+  "description": "Pedido por Rafael 2026-08-07. Correr el workflow `deep-review` (hivemind) sobre la tanda completa de la landing nueva y la convergencia del kit compartido. Alcance exacto: `base=origin/develop` .. `7e1ae02` — 5 commits, 19 archivos, +422/-40.\n\nCommits:\n- 4a3973e feat(ui): kit compartido a v2 (BaseButton, BaseModal, BaseToast, ContextMenu, BottomSheet, .input-base)\n- 0c01652 feat(home): /inicio, landing de lecturas mínimas\n- cd4c302 fix(home): AppContainer + claves SEO propias\n- 9bb7756 fix(home): un solo buscador en /inicio + atajo '/'\n- 7e1ae02 fix(header): el logo va a /inicio\n\nPOR QUÉ ESTE TICKET EXISTE, y esto es lo que el review tiene que atacar: la tanda se construyó rápido y el orquestador se equivocó VARIAS VECES durante ella. Errores reales cometidos y corregidos en el camino, que son la pista de dónde puede haber más: (1) afirmé que los badges del nav quedaban en cero y era FALSO — MatchNotificationsDropdown carga matches desde el header en toda vista autenticada; (2) afirmé que .input-base 'arrastra todo formulario del sitio' y es FALSO — sólo BaseInput lo usa, y lo importan 6 archivos; (3) dije '101 cards' cuando eran 22; (4) inserté el botón BUSCAR dentro del span del placeholder y en el filtro de página de Mazos/Binders; (5) copié la etiqueta 'Wishlist' a Design cuando la app dice 'NECESITO'; (6) reformateé los 3 locales enteros sin querer. NINGUNO de esos lo detectaron los tests: los encontró mirar la app corriendo o releer. Asumir que quedan más.\n\nEl review NO reemplaza al reviewer por-ticket; es una pasada extra por ser una tanda grande y de flujo de usuario.",
+  "acceptance_criteria": [
+    "Correr `deep-review` con base=origin/develop y el rango de la tanda; requiere aprobación explícita de Rafael por run (el workflow es human-gated)",
+    "Dimensión flujo de usuario: verificar que /inicio + los redirects (authGuard 2 ramas, /, /dashboard, logo) no dejen ningún camino que devuelva al usuario a /saved-matches sin pedirlo",
+    "Dimensión coste real: cuantificar qué lee /inicio de verdad (hay un canal Listen abierto; 'cero lecturas' NO es literal) y contrastarlo con lo que dicen los mensajes de commit — si un commit afirma algo falso, es un hallazgo",
+    "Dimensión kit v2: buscar regresiones visuales/funcionales en los 26 archivos que importan BaseButton y los 13 que importan BaseModal; foco en el cambio de .input-base de 40px a 44px, que altera la densidad de todo formulario",
+    "Dimensión test-adequacy: la tanda NO tiene tests unitarios nuevos (se acogió a 'styling only' de CLAUDE.md); juzgar si eso es defendible para HomeView, el carrusel y el atajo '/', que SÍ tienen lógica",
+    "Cada hallazgo verificado adversarialmente antes de reportarse; los refutados se listan aparte",
+    "Los hallazgos que sobrevivan se materializan como tickets nuevos en tasks/, no como comentarios sueltos"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "review",
+    "deep-review",
+    "user-flow",
+    "landing",
+    "design-system"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "4a3973e",
+    "0c01652",
+    "cd4c302",
+    "9bb7756",
+    "7e1ae02"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "at": "2026-08-07T00:00:00.000Z",
+      "author": "orchestrator",
+      "body": "Pistas concretas donde mirar primero, por orden de sospecha: (1) SearchView.vue:69 baja la colección entera — ya ticketeado como TASK-142, no re-reportar, pero sí juzgar si invalida el diseño de la landing; (2) el tour (useTour) no navega y sus pasos 2-3 anclan a [data-tour=\"status-filters\"] y [data-tour=\"fab-add-card\"], que sólo existen en CollectionView — roto DESDE ANTES, pero /inicio tiene aún menos elementos que anclar y además ahora esconde [data-tour=\"nav-search\"]; (3) el badge de mensajes sólo se puebla si abrís Mensajes (pre-existente); (4) HomeView y AppHeader ahora tienen DOS handlers de keydown para '/' coordinados por una condición de ruta — verificar que no se pisen ni queden ambos activos en ninguna transición; (5) el carrusel lee announcements.ts con Record<SupportedLocale,string>: qué pasa si se agrega un locale nuevo y una entrada no lo tiene."
+    }
+  ],
+  "created_at": "2026-08-07T00:00:00.000Z",
+  "updated_at": "2026-08-07T00:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

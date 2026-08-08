@@ -1,0 +1,36 @@
+{
+  "key": "TASK-142",
+  "title": "Perf /search: SearchView baja la colección entera en onMounted — anula el ahorro de la landing /inicio en el primer clic",
+  "description": "Hallado 2026-08-07 revisando el flujo de usuario de la nueva landing. SearchView.vue:69 hace `if (authStore.user && !collectionStore.cards.length) void collectionStore.loadCollection()` en onMounted. Consecuencia de flujo: /inicio se construyó para no leer nada, pero su acción principal — el buscador del hero, que ocupa el centro de la pantalla y es el 90% de la propuesta — navega a /search, y ahí se baja el card_index completo. Para el usuario que entra a buscar una carta (el caso de uso que la pantalla invita a hacer) el tiempo hasta poder trabajar es casi el mismo que antes del rediseño: movimos el costo un clic más adelante, no lo sacamos. Ironía a tener presente: hoy el destino MÁS barato desde la landing es Matches, que es justo de donde la sacamos.\n\nPara qué se usa la colección en SearchView: `buildOwnedCountMap(collectionStore.cards)` (línea 73) alimenta `getOwnedCount`, que pinta el badge de 'cuántas tenés' sobre cada resultado. Es UNA función sobre nombres en minúscula — no necesita el objeto Card completo ni las 59k entradas cargadas en memoria.\n\nNO tocar el resto de SearchView (Rule 2): el arreglo es cómo se obtiene el conteo de poseídas, no la vista.",
+  "acceptance_criteria": [
+    "Entrar a /search desde el buscador de /inicio no dispara collectionStore.loadCollection()",
+    "El badge de 'ya la tenés' sobre los resultados sigue mostrando el conteo correcto (verificar con una carta que exista repetida en la colección, ej. Lightning Bolt en la cuenta de CI que tiene 25+ printings)",
+    "Medido en Chrome sobre la cuenta real: peticiones a Firestore al entrar a /search desde /inicio, antes vs después, anotadas en el ticket",
+    "CollectionView sigue cargando la colección como hoy — este ticket no cambia esa ruta",
+    "Sin regresión en e2e/specs/search/"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "search",
+    "landing",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "at": "2026-08-07T00:00:00.000Z",
+      "author": "orchestrator",
+      "body": "Caminos posibles, sin decidir (research-first): (a) una consulta acotada a card_index por los nombres que devuelve la búsqueda, en vez de la colección entera; (b) reusar el patrón de conteo que ya exista para public_cards; (c) aceptar el costo y cerrar el ticket como wontfix, asumiendo que /inicio sirve al que NO viene a buscar. La opción (c) es legítima pero hay que decirla en voz alta, porque contradice el diseño de la landing. OJO con el 'card_index persist race pattern' (memoria) si se toca cualquier camino de escritura — este ticket debería ser sólo de lectura."
+    }
+  ],
+  "created_at": "2026-08-07T00:00:00.000Z",
+  "updated_at": "2026-08-07T00:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier",
+  "marker": "[EXPLICIT]"
+}

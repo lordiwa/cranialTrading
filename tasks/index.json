@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T00:29:23.349Z",
+  "generated_at": "2026-08-07T00:00:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -520,7 +520,7 @@
     {
       "key": "TASK-107",
       "title": "Design-sync: actualizar cards 11-collection en Claude Design a 4 chips de filtro (paridad con la app)",
-      "status": "in_progress",
+      "status": "done",
       "priority": "low"
     },
     {
@@ -726,6 +726,18 @@
       "title": "Bug latente colección: batchUpdateCards multi-chunk sin atomicidad — un throw en chunk N+1 deja los chunks previos commiteados en Firestore pero cero estado local/public sync",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-142",
+      "title": "Perf /search: SearchView baja la colección entera en onMounted — anula el ahorro de la landing /inicio en el primer clic",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-143",
+      "title": "Deep review adversarial de la tanda /inicio + kit v2 (origin/develop..7e1ae02, 5 commits, 19 archivos)",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

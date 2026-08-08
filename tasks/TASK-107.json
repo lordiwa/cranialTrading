@@ -7,7 +7,7 @@
     "Ambos cards re-subidos a Claude Design y verificados visualmente",
     "mapping.json/notas coherentes con la decisión"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "low",
   "labels": [
     "design-sync",
@@ -19,9 +19,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "at": "2026-08-07T00:00:00.000Z",
+      "author": "orchestrator",
+      "body": "Cerrado 2026-08-07. AC1: verificado — ambos HTML locales ya tenian los 4 chips (desktop lineas 230-233, mobile lineas 174-177); la edicion del 2026-07-16 estaba bien, lo que falto fue la subida. AC2: write_files OK (written: 2) sobre projectId 8d44c2c8-9cb3-4c60-bf52-4d9d320f746e con planId plan_8d44c2c89cb34c60_27375282f36c — la parte de 'verificados visualmente' queda como UAT de Rafael en claude.ai/design, no la vi renderizada. AC3: nota agregada a la entrada 11-collection de mapping.json dejando la decision por escrito. Contexto: la subida original se habia interrumpido en el finalize_plan."
+    }
+  ],
   "created_at": "2026-07-13T19:00:00.000Z",
-  "updated_at": "2026-07-16T21:06:54.211Z",
+  "updated_at": "2026-08-07T00:00:00.000Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

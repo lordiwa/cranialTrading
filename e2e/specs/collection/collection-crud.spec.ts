@@ -75,8 +75,10 @@ test.describe('Collection CRUD', () => {
 
   test('edit card: open detail modal → edit → save → changes persist', async ({ collectionPage, commonPage, page }) => {
     // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
+    // Asserted, not skipped: against the CI account (41k+ cards) a count of 0
+    // is always a real failure, never a legitimate empty-collection state.
     const cardCount = await collectionPage.getCardCount();
-    if (cardCount === 0) return; // Skip if no cards
+    expect(cardCount).toBeGreaterThan(0);
 
     await collectionPage.clickCardInGrid(0);
 
@@ -95,8 +97,10 @@ test.describe('Collection CRUD', () => {
 
   test('delete card: open detail → delete → confirm → card removed', async ({ collectionPage, commonPage, page }) => {
     // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
+    // Asserted, not skipped: against the CI account (41k+ cards) a count of 0
+    // is always a real failure, never a legitimate empty-collection state.
     const countBefore = await collectionPage.getCardCount();
-    if (countBefore === 0) return;
+    expect(countBefore).toBeGreaterThan(0);
 
     await collectionPage.clickCardInGrid(0);
 
@@ -153,8 +157,10 @@ test.describe('Collection CRUD', () => {
 
   test('cancel deletion from confirm dialog leaves card intact', async ({ collectionPage, commonPage, page }) => {
     // getCardCount() waits for the grid to actually render (TASK-145) — no fixed sleep needed.
+    // Asserted, not skipped: against the CI account (41k+ cards) a count of 0
+    // is always a real failure, never a legitimate empty-collection state.
     const countBefore = await collectionPage.getCardCount();
-    if (countBefore === 0) return;
+    expect(countBefore).toBeGreaterThan(0);
 
     await collectionPage.clickCardInGrid(0);
 

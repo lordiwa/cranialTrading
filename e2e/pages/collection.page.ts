@@ -110,8 +110,11 @@ export class CollectionPage {
     await this.addModal.resultCards.first().click({ force: true });
   }
 
-  async waitForGridReady(timeout = 30_000) {
-    await this.gridCards.first().waitFor({ state: 'visible', timeout }).catch(() => {});
+  // No .catch() here on purpose (TASK-145 rebote 1 / HIGH-1a): a grid that
+  // never mounts must fail the test, not silently resolve into a 0 count
+  // that then reads as a legitimate "empty collection" skip downstream.
+  async waitForGridReady(timeout = 60_000) {
+    await this.gridCards.first().waitFor({ state: 'visible', timeout });
   }
 
   async clickCardInGrid(index = 0) {

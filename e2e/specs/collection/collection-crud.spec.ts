@@ -2,6 +2,16 @@ import { test, expect } from '../../fixtures/test';
 import { SEARCH_TERMS } from '../../helpers/test-data';
 
 test.describe('Collection CRUD', () => {
+  // The default 45s test timeout (playwright.config.ts) is shared by the
+  // beforeEach's goto() AND the rest of the test body. On the CI account
+  // (41k+ cards) the grid's first real row alone can take 20-27s to mount
+  // locally — slower CI runners push that close to or past 45s, which would
+  // make waitForGridReady's 60s ceiling unreachable and turn a real timeout
+  // into invisible flake instead of a hard red (TASK-145 rebote 2 / MEDIUM).
+  // Scoped to this file only — NOT raised in playwright.config.ts, which
+  // would mask regressions in the other ~128 tests.
+  test.setTimeout(90_000);
+
   test.beforeEach(async ({ collectionPage }) => {
     await collectionPage.goto();
   });

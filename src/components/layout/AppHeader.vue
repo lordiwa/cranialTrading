@@ -192,8 +192,8 @@ onUnmounted(() => {
     <div class="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8">
       <!-- ROW 1: logo · big search · help · avatar -->
       <div class="flex items-center gap-4 md:gap-6 h-14 md:h-[72px]">
-        <!-- Logo -->
-        <router-link to="/saved-matches" class="flex items-center gap-2.5 flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon rounded-md">
+        <!-- Logo — goes home, and home is /inicio now, not the matches hub -->
+        <router-link to="/inicio" class="flex items-center gap-2.5 flex-shrink-0 focus-visible:outline-none focus-visible:shadow-glow-neon rounded-md">
           <svg class="w-7 h-7 md:w-[30px] md:h-[30px] text-neon flex-shrink-0" viewBox="0 0 100 100" fill="currentColor">
             <use href="/icons.svg#cranial-logo" />
           </svg>

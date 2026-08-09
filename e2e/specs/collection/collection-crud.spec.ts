@@ -336,24 +336,33 @@ test.describe('Collection CRUD', () => {
     await expect(collectionPage.gridCards.nth(0)).toHaveAttribute('aria-pressed', 'true');
   });
 
-  // TASK-146: identity-based, not count-based (reviewer finding on TASK-145's
-  // rebote). On a 41k-card window-virtualized grid, deleting one card doesn't
-  // durably drop getCardCount() — the virtualizer refills the visible window
-  // right behind it, so a count poll can pass by catching a transient
-  // mid-remount state instead of the real removal. What IS durable is WHICH
-  // card sits at index 0: after a real delete it's a different card (or the
-  // grid is empty); after the mutation below it's still the same one.
+  // TASK-146 → TASK-168: this assertion has now been through THREE anchors.
+  // getCardCount() failed first: on a 59k-card window-virtualized grid the
+  // virtualizer refills the visible window right behind a removed row, so a
+  // count poll can pass by catching a transient mid-remount state. Identity at
+  // grid index 0 replaced it and failed too — twice in consecutive CI runs —
+  // because opening the confirm dialog shifts the layout and the virtualizer
+  // re-renders its window, putting a different card at position 0 with or
+  // without a real deletion. The anchor that holds is the nav badge:
+  // collectionStore.cards.length, the whole array, no grid index anywhere.
   test('cancel deletion from confirm dialog leaves card intact', async ({ collectionPage, commonPage }) => {
     const cardCount = await collectionPage.getCardCount();
     expect(cardCount).toBeGreaterThan(0);
 
-    const identityBefore = await collectionPage.cardIdentity(0);
-    expect(identityBefore).not.toBe(' :: ');
+    // Anchor on the nav badge (collectionStore.cards.length), never on which
+    // card sits at grid index 0. Identity-at-index-0 was the previous anchor
+    // and it failed in CI twice in a row: opening the confirm dialog shifts
+    // the layout, the virtualizer re-renders its window, and a different card
+    // lands at position 0 — with or without a real deletion. The badge counts
+    // the whole array, so it cannot move for a reason unrelated to the
+    // operation under test. A cancel must leave it exactly unchanged; a real
+    // deletion decrements it, which is what makes this falsifiable.
+    const totalBefore = await collectionPage.totalCardCount();
+    expect(totalBefore).toBeGreaterThan(0);
 
     await collectionPage.deleteButtonInGrid(0).click();
     await commonPage.cancelAction();
 
-    const identityAfter = await collectionPage.cardIdentity(0);
-    expect(identityAfter).toBe(identityBefore);
+    expect(await collectionPage.totalCardCount()).toBe(totalBefore);
   });
 });

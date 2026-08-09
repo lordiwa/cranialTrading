@@ -344,27 +344,71 @@ export const useCollectionStore = defineStore('collection', () => {
 
             if (snapshot.empty) return false
 
+            // TASK-168: chunks MUST be consumed in numeric order, and a card id
+            // may only be taken once.
+            //
+            // getDocs returns documents in lexicographic id order, where
+            // chunk_10 sorts before chunk_2 — so without an explicit numeric
+            // sort a stale high-numbered chunk can shadow the fresh low-numbered
+            // entry for the same card. And an orphan chunk (a persist whose
+            // write loop or orphan cleanup was interrupted) repeats cards that
+            // the surviving low chunks already carry: the old `push(...)`
+            // concatenation added them a second time, inflating the collection
+            // by up to INDEX_CHUNK_SIZE phantom cards. That inflated array was
+            // then persisted by the next mutation, growing totalChunks so the
+            // orphan cleanup (which only deletes indices >= totalChunks) stopped
+            // deleting — the corruption compounded on itself.
+            //
+            // This is the read path on purpose: it is the only layer that can
+            // defend against an index that is ALREADY corrupt on disk.
+            const chunkNumberOf = (id: string): number => {
+                const n = parseInt(id.replace('chunk_', ''), 10)
+                return isNaN(n) ? Number.MAX_SAFE_INTEGER : n
+            }
+            const orderedDocs = [...snapshot.docs].sort(
+                (a, b) => chunkNumberOf(a.id) - chunkNumberOf(b.id)
+            )
+
             const allIndex: IndexCard[] = []
+            const seenIds = new Set<string>()
+            let duplicatesDropped = 0
             let indexVersion = 1 // default for chunks without version field
-            for (const docSnap of snapshot.docs) {
+            for (const docSnap of orderedDocs) {
                 const data = docSnap.data()
                 if (data.cards && Array.isArray(data.cards)) {
-                    allIndex.push(...(data.cards as IndexCard[]))
+                    for (const ic of data.cards as IndexCard[]) {
+                        if (seenIds.has(ic.i)) {
+                            duplicatesDropped++
+                            continue
+                        }
+                        seenIds.add(ic.i)
+                        allIndex.push(ic)
+                    }
                 }
                 if (data.version) indexVersion = data.version as number
             }
 
             const dfCount = allIndex.filter(ic => ic.df).length
             console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks (v${indexVersion}), ${dfCount} dual-faced`)
+            if (duplicatesDropped > 0) {
+                console.warn(`[loadCollection] card_index was corrupt: dropped ${duplicatesDropped} duplicate entries across ${snapshot.docs.length} chunks (TASK-168). Rebuilding in background.`)
+            }
 
             cardIndexRaw.value = allIndex
             cards.value = allIndex.map(indexToCard)
             rebuildCardIndex()
             // collectionSummary auto-derives from cards via computed (NICE-09)
 
-            // Auto-rebuild stale index in background
-            if (indexVersion < EXPECTED_INDEX_VERSION) {
-                console.info(`[loadCollection] Index v${indexVersion} is stale (expected v${EXPECTED_INDEX_VERSION}), rebuilding in background...`)
+            // Auto-rebuild stale OR corrupt index in background. The dedup above
+            // makes this session correct; the rebuild is what repairs the stored
+            // index so the duplicates stop being re-read (and re-persisted) on
+            // every future load — including for real users who hit this, without
+            // any manual intervention (TASK-168 AC5/AC6).
+            if (indexVersion < EXPECTED_INDEX_VERSION || duplicatesDropped > 0) {
+                const reason = indexVersion < EXPECTED_INDEX_VERSION
+                    ? `stale (v${indexVersion}, expected v${EXPECTED_INDEX_VERSION})`
+                    : `corrupt (${duplicatesDropped} duplicate entries)`
+                console.info(`[loadCollection] Index is ${reason}, rebuilding in background...`)
                 import('../services/cloudFunctions').then(({ buildCardIndex: rebuildIndex }) => {
                     rebuildIndex().then(result => {
                         console.info(`[loadCollection] Index rebuilt: ${result.totalCards} cards → ${result.chunks} chunks`)
@@ -750,9 +794,18 @@ export const useCollectionStore = defineStore('collection', () => {
         // Write chunks in background (fire-and-forget)
         void (async () => {
             try {
-                await writeChunksConcurrently(allIndex, userId, totalChunks, INDEX_CHUNK_SIZE)
-
-                // Delete orphaned chunks (e.g., collection shrank from 5 chunks to 2)
+                // Delete orphaned chunks (e.g. collection shrank from 5 chunks to 2)
+                // BEFORE writing, not after (TASK-168 AC3). This step used to run
+                // after the write loop, which meant anything that killed the JS
+                // context mid-write — closing the tab, losing wifi, the browser
+                // reclaiming the tab — skipped it entirely and left an orphan
+                // behind for loadFromIndex to concatenate on the next load.
+                //
+                // Deleting first is safe and strictly better: orphans are indices
+                // >= totalChunks, so every card they hold is already covered by
+                // the chunks 0..totalChunks-1 this loop is about to write from the
+                // same in-memory array. If the write then dies, the worst outcome
+                // is a stale-but-consistent index rather than an inflated one.
                 const indexCol = collection(db, 'users', userId, 'card_index')
                 const existingChunks = await getDocs(indexCol)
                 const orphans = existingChunks.docs.filter(chunkDoc => {
@@ -760,6 +813,8 @@ export const useCollectionStore = defineStore('collection', () => {
                     return !isNaN(chunkNum) && chunkNum >= totalChunks
                 })
                 await runWithConcurrency(orphans, chunkDoc => deleteDoc(chunkDoc.ref), INDEX_WRITE_CONCURRENCY)
+
+                await writeChunksConcurrently(allIndex, userId, totalChunks, INDEX_CHUNK_SIZE)
             } catch (err) {
                 logSanitizedError('[IndexSync] Failed to persist index', err, 'warn')
             } finally {

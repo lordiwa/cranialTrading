@@ -337,6 +337,13 @@ export const useCollectionStore = defineStore('collection', () => {
     const EXPECTED_INDEX_VERSION = 3
 
     /**
+     * Cards per card_index chunk. Must match INDEX_CHUNK_SIZE in the
+     * buildCardIndex Cloud Function — both the writer and the truncation check
+     * below depend on the two agreeing.
+     */
+    const INDEX_CHUNK_SIZE = 2000
+
+    /**
      * TASK-168: whether cardIndexRaw can be trusted as the COMPLETE membership
      * of the collection. Only a full card load, or a card_index read whose
      * chunks were contiguous 0..N-1 with no duplicates, earns `true`.
@@ -420,7 +427,32 @@ export const useCollectionStore = defineStore('collection', () => {
             // on the strength of it.
             const chunkNumbers = orderedDocs.map(d => chunkNumberOf(d.id))
             const isContiguousFromZero = chunkNumbers.every((n, idx) => n === idx)
-            const indexLooksComplete = isContiguousFromZero && duplicatesDropped === 0
+
+            // ...and "contiguous from zero" is NOT enough on its own, because a
+            // rebuild in flight looks exactly like that. buildCardIndex writes
+            // chunk_0..chunk_N-1 SEQUENTIALLY, one awaited setDoc each — measured
+            // at 81s for 30 chunks. For that whole window the subcollection holds
+            // a contiguous PREFIX, which would sail past the contiguity check as
+            // "complete" while being only a fraction of the collection. Then the
+            // cleanup deletes everything above the prefix — and a 10-chunk prefix
+            // is exactly the ~20.000-card state that must have started the dev
+            // account's decay.
+            //
+            // What separates a prefix from a finished index: in a finished index
+            // the LAST chunk is a remainder, so it is full only when the
+            // collection size is an exact multiple of INDEX_CHUNK_SIZE. In a
+            // prefix, the highest chunk read is always full — it is a middle
+            // chunk with more still to come. So a completely full last chunk
+            // means "assume there is more we did not see".
+            //
+            // The false positive (a collection that really is a multiple of 2000)
+            // costs one skipped cleanup and one background rebuild. Cheap.
+            const lastChunkSize = orderedDocs.length > 0
+                ? ((orderedDocs[orderedDocs.length - 1]?.data()?.cards as IndexCard[] | undefined)?.length ?? 0)
+                : 0
+            const looksTruncated = lastChunkSize === INDEX_CHUNK_SIZE
+
+            const indexLooksComplete = isContiguousFromZero && duplicatesDropped === 0 && !looksTruncated
             indexKnownComplete = indexLooksComplete
 
             const dfCount = allIndex.filter(ic => ic.df).length
@@ -430,6 +462,9 @@ export const useCollectionStore = defineStore('collection', () => {
             }
             if (!isContiguousFromZero) {
                 console.warn(`[loadCollection] card_index has GAPS — chunks present: [${chunkNumbers.join(', ')}]. The loaded index is incomplete; orphan cleanup is disabled until a rebuild restores it (TASK-168).`)
+            }
+            if (looksTruncated) {
+                console.warn(`[loadCollection] card_index looks TRUNCATED — the highest chunk read (chunk_${chunkNumbers[chunkNumbers.length - 1]}) is completely full, which usually means a rebuild is still writing. Orphan cleanup disabled (TASK-168).`)
             }
 
             cardIndexRaw.value = allIndex
@@ -829,7 +864,6 @@ export const useCollectionStore = defineStore('collection', () => {
             return
         }
         const userId = authStore.user.id
-        const INDEX_CHUNK_SIZE = 2000
 
         const allIndex = cardIndexRaw.value
         const totalChunks = Math.ceil(allIndex.length / INDEX_CHUNK_SIZE) || 1

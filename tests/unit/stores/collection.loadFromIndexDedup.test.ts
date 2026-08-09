@@ -259,6 +259,49 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
     await vi.waitFor(() => expect(mockBuildCardIndex).toHaveBeenCalled())
   })
 
+  it('a contiguous PREFIX read mid-rebuild does not count as complete, so nothing gets deleted above it', async () => {
+    // buildCardIndex writes chunk_0..N-1 sequentially — measured at 81s for 30
+    // chunks. Load inside that window and you read chunk_0..k: contiguous from
+    // zero, no duplicates. It passes every structural check and is still only a
+    // fraction of the collection. If the cleanup trusts it, it deletes every
+    // real chunk above k — which is how a 10-chunk / ~20.000-card state (and
+    // then the chunk_10..15 hole) can arise in the first place.
+    //
+    // The tell is that the highest chunk read is COMPLETELY FULL: in a finished
+    // index the last chunk is a remainder.
+    vi.useFakeTimers()
+    try {
+      const CHUNK = 2000
+      const full = (n: number, offset: number) =>
+        Array.from({ length: n }, (_, i) => makeIndexCard(`c${offset + i}`))
+
+      // Two full chunks: the shape of a rebuild that has written 2 of many.
+      mockGetDocs.mockResolvedValueOnce(
+        snapshotOf([
+          chunkDoc('chunk_0', full(CHUNK, 0)),
+          chunkDoc('chunk_1', full(CHUNK, CHUNK)),
+        ])
+      )
+
+      const store = useCollectionStore()
+      await store.loadCollection()
+
+      // Meanwhile the rebuild has finished and written chunk_2 as well.
+      mockGetDocs.mockResolvedValue(
+        snapshotOf([chunkDoc('chunk_0', []), chunkDoc('chunk_1', []), chunkDoc('chunk_2', [])])
+      )
+
+      await store.updateCard('c0', { status: 'sale' })
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+
+      // chunk_2 is numbered >= totalChunks(2) and WOULD have been deleted.
+      expect(mockDeleteDoc).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('deletes orphan chunks HIGHEST-NUMBER-FIRST, so an interrupted cleanup leaves a contiguous prefix', async () => {
     // getDocs returns chunks lexicographically: chunk_0, chunk_1, chunk_10,
     // chunk_11, ..., chunk_2. Deleting in that order is what punched the

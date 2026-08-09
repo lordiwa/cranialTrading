@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-09T02:06:42.144Z",
+  "generated_at": "2026-08-09T04:29:27.495Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -887,6 +887,18 @@
       "key": "TASK-168",
       "title": "card_index se duplica a si mismo: la coleccion crece sola en multiplos exactos de 2000 cartas",
       "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-169",
+      "title": "Cualquiera puede listar todos los usuarios y leer sus emails sin estar logueado",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-170",
+      "title": "El perfil publico da 404 si el username tiene mayusculas y el usuario es anterior al indice",
+      "status": "todo",
       "priority": "high"
     }
   ]

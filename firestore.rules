@@ -15,11 +15,23 @@ service cloud.firestore {
         allow write: if request.auth.uid == userId;
       }
 
-      // Colección de cartas del usuario
-      // Lectura pública para permitir ver perfiles sin login
-      // El cliente filtra por public === true
+      // Colección de cartas del usuario — PRIVADA, solo el dueño.
+      //
+      // TASK-087: antes era `allow read: if true` con el comentario "el cliente
+      // filtra por public === true". Filtrar en el cliente no es seguridad: la
+      // regla se evalúa en el servidor y cualquiera podía leer la colección
+      // entera y la lista de deseados de cualquier usuario sin estar logueado.
+      // Verificado contra dev antes de cerrarlo: una petición REST anónima
+      // devolvía HTTP 200 con los documentos de carta.
+      //
+      // Lo público sale por /public_cards, que tiene su propia regla de lectura
+      // abierta y solo contiene cartas en venta/cambio con public === true.
+      // Se revisó todo el cliente antes de cerrar: los únicos accesos a
+      // users/{uid}/cards son del propio dueño; el perfil público lee
+      // /public_cards. Las Cloud Functions usan el SDK admin y no pasan por
+      // estas reglas.
       match /cards/{cardId} {
-        allow read: if true;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 

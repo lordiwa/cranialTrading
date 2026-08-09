@@ -1,0 +1,26 @@
+{
+  "key": "TASK-170",
+  "title": "El perfil publico da 404 si el username tiene mayusculas y el usuario es anterior al indice",
+  "description": "Encontrado el 2026-08-09 verificando TASK-087 en el navegador.\n\nhttps://cranial-trading-dev.web.app/@RafaMoose muestra \"404 - Usuario no encontrado. @RafaMoose no existe o su perfil es privado\", y el usuario existe.\n\nCAUSA, verificada por REST contra dev:\n- El perfil resuelve primero por el indice /usernames, cuyo id de documento es el username normalizado en minusculas. Para esta cuenta la entrada NO existe (es anterior al indice): /usernames/rafamoose da 404.\n- Entonces cae al camino de respaldo de src/services/userLookup.ts:30, que consulta /users where username == norm, o sea 'rafamoose' EN MINUSCULAS. Pero el campo username del documento guarda 'RafaMoose' con mayusculas, y la comparacion de Firestore distingue mayusculas.\n- Probado en las dos direcciones: la consulta anonima con 'rafamoose' devuelve HTTP 200 y no encuentra nada; con 'RafaMoose' encuentra el usuario. No es un problema de permisos, es la comparacion.\n\nNO ES UN PROBLEMA DE REGLAS: la consulta esta permitida. Se descarto explicitamente que lo causara el cambio de TASK-087.\n\nIMPACTO: pega en el flujo prioritario numero 2 (buscar cartas en perfiles de otros usuarios). Cualquier cuenta anterior al indice que tenga una mayuscula en el username tiene el perfil publico inaccesible. En dev, la unica cuenta con cartas publicas es justamente esta.\n\nDOS ARREGLOS POSIBLES, no excluyentes: rellenar el indice /usernames para las cuentas viejas, o guardar tambien un campo con el username normalizado y consultar por ese en el respaldo.",
+  "acceptance_criteria": [
+    "El perfil publico de una cuenta anterior al indice con mayusculas en el username abre correctamente, verificado en el navegador sin login",
+    "Existe un test que falla con el defecto puesto y pasa sin el, ejecutado en ambos sentidos",
+    "Queda claro si el arreglo es rellenar /usernames, normalizar la consulta de respaldo, o las dos"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-09T04:29:27.495Z",
+  "updated_at": "2026-08-09T04:29:27.495Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

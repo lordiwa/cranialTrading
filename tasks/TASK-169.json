@@ -1,0 +1,29 @@
+{
+  "key": "TASK-169",
+  "title": "Cualquiera puede listar todos los usuarios y leer sus emails sin estar logueado",
+  "description": "Encontrado el 2026-08-09 revisando TASK-087. VERIFICADO CONTRA DEV, no es teoria: una peticion REST anonima a la coleccion /users devuelve HTTP 200 con los documentos, y los campos expuestos son createdAt, email, location, username.\n\nO sea que cualquiera, sin cuenta y sin login, puede bajarse la lista completa de usuarios con sus direcciones de correo y su ubicacion. Es exposicion de datos personales, y ademas habilita recoleccion masiva para spam.\n\nLA REGLA: firestore.rules linea 8-9, match /users/{userId} con allow read: if true. En Firestore esa regla cubre tanto leer un documento suelto (get) como listar la coleccion entera (list), asi que no solo se puede mirar un perfil concreto: se puede enumerar todo.\n\nPOR QUE NO SE ARREGLA SOLO CERRANDO LA REGLA: las reglas de Firestore no filtran por campo. Mientras el email viva en el mismo documento que el perfil publico, o se expone todo o no se expone nada. Y hay tres caminos del cliente que HOY consultan /users sin estar logueado:\n1. src/stores/auth.ts:744 — chequeo de disponibilidad de username al registrarse (camino de respaldo para usuarios viejos). Romperlo rompe el registro.\n2. src/services/userLookup.ts:30 — resolucion del perfil publico por username (mismo respaldo).\n3. src/services/stats.ts:22 — conteo total de usuarios.\n\nDOS CAMINOS POSIBLES, hace falta decision:\nA. Sacar el email del documento publico y moverlo a un subdocumento privado solo del dueño. Es el arreglo de fondo, pero necesita migracion de datos y tocar todo lo que lee user.email.\nB. Separar get de list en la regla: dejar allow get publico (el perfil publico sigue andando) y exigir login para list. Corta la recoleccion masiva pero el email sigue expuesto para quien sepa el uid. Rompe los tres caminos anonimos de arriba salvo que se los pase por el indice /usernames, que ya existe y no expone email.\n\nRelacionado: TASK-087 (misma revision; ese cerro la lectura abierta de users/{uid}/cards).",
+  "acceptance_criteria": [
+    "Decidir entre el camino A (sacar el email del documento publico) y el B (separar get de list), con Rafael",
+    "Una peticion anonima que intente LISTAR /users queda denegada, verificado por REST igual que se verifico el agujero",
+    "Si se elige A: ningun documento de /users tiene ya el campo email, y todo lo que leia user.email sigue funcionando",
+    "El registro sigue funcionando: el chequeo de disponibilidad de username no depende de listar /users sin login",
+    "El perfil publico por username sigue abriendo sin login, verificado en el navegador"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "security",
+    "data-integrity",
+    "user-flow"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-09T04:29:12.039Z",
+  "updated_at": "2026-08-09T04:29:12.039Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

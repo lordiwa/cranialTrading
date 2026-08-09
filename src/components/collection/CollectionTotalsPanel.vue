@@ -33,16 +33,24 @@ const showChart = ref(false)
 const chartLoading = ref(false)
 const history = ref<PriceSnapshot[]>([])
 
+// TASK-153: fetchAllPrices() (via preloadSetMappings' 300+ sequential
+// downloads and the sequential per-card price fetch loop) competes for main
+// thread and network right in the window where the grid is trying to paint
+// its first row. Deferred by the same 3s used below for the post-import
+// case, so it starts after the initial render has had a chance to land
+// instead of at max priority from the moment cards.length flips.
+const INITIAL_PRICE_FETCH_DELAY_MS = 3000
+
 // Fetch prices when collection loads (but not during import)
 watch(() => collectionStore.cards.length, (newLen, oldLen) => {
   if (newLen > 0 && oldLen === 0 && !collectionStore.importing) {
-    void fetchAllPrices()
+    setTimeout(() => void fetchAllPrices(), INITIAL_PRICE_FETCH_DELAY_MS)
   }
 })
 
 onMounted(() => {
   if (collectionStore.cards.length > 0 && !collectionStore.importing) {
-    void fetchAllPrices()
+    setTimeout(() => void fetchAllPrices(), INITIAL_PRICE_FETCH_DELAY_MS)
   }
 })
 

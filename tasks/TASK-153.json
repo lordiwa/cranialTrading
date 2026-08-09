@@ -9,7 +9,7 @@
     "La propuesta resultante se presenta a Rafael ANTES de implementar: puede haber varias salidas (diferir precios, renderizar la grilla sin precios y rellenarlos despues, paginar mas chico) y la eleccion es suya",
     "El metodo de medicion queda documentado para poder repetirlo y comparar el despues"
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "high",
   "labels": [
     "perf",
@@ -20,9 +20,25 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "developer",
+      "at": "2026-08-08T22:32:07.772152Z",
+      "body": "DIAGNOSTICO 2026-08-08. Medido en vivo contra cranial-trading-dev.web.app con Playwright headless reusando el storageState de e2e/auth.setup.ts (nunca se tipeo una contrasena a mano), con PerformanceObserver de longtask y captura de todos los requests a Firestore y Cloud Functions. Tres corridas coincidentes.\n\nHALLAZGO CENTRAL, y NO estaba en el ticket original: el cuello de botella no son los precios, es un GATE INNECESARIO. En CollectionView.vue:850-857, triggerPaginationQuery() — que dispara queryCardIndex, la Cloud Function que trae LA PAGINA de 50 cartas que la grilla realmente pinta — esta encadenado detras de un await Promise.all que incluye loadCollection(), la descarga y parseo del indice COMPLETO (30 chunks, 59k cartas) que solo hace falta para contadores y filtros. Confirmado en las 3 corridas: el POST a queryCardIndex arranca segundos DESPUES del log de loadCollection, nunca antes. VERIFICADO EN CODIGO por el orquestador, literal. Ademas se verifico que useCollectionPagination no lee cards.value (solo llama queryPage con filtros y orden), asi que desacoplar se ve viable — falta comprobar las precondiciones propias de queryPage antes de implementar.\n\nREPARTO DE TIEMPO MEDIDO (cuenta E2E, cache frio, 22-33 s hasta que aparecen cartas):\n- 0-0.9 s: arranca la pagina, fetchAllPrices dispara desde el onMounted de CollectionTotalsPanel.\n- 0.3-2.2 s: descarga, descomprime y parsea AllPricesToday.json.gz de MTGJSON.\n- 3.7-5.3 s: lista de sets de Scryfall (348 sets).\n- 6-21 s: loadCollection() trae 30 chunks de card_index. Aca caen longtasks de 1.7 s, 1.7 s y 5.1 s: es el map de indexToCard mas rebuildCardIndex sobre 59k registros bloqueando el hilo principal. NO es solo red.\n- Recien despues arranca queryCardIndex, y despues pinta la grilla.\n- En paralelo, desde los ~20 s, preloadSetMappings dispara mas de 300 descargas secuenciales en lotes de 5, que siguen mas alla de los 60 s en cache frio, con otro longtask de 5.3 s.\n\nAC3 — se pueden diferir los precios? EVIDENCIA MIXTA, reportada completa: NO son el bloqueador directo de la query de la grilla (corren en paralelo, no delante), pero SI compiten por hilo principal y red en la ventana critica. Diferirlos ayuda pero NO resuelve el gate por si solo.\n\nAC2 NO CUMPLIDO: falta la medicion en la cuenta chica. El agente no tiene credenciales de la cuenta personal de Rafael y no puede tipear contrasenas. Requiere decision de Rafael (que Rafael inicie sesion el mismo en un Chrome conectado, que genere un storageState, o que se acepte una proyeccion no medida).\n\nOBSERVACION SIN EXPLICAR: la cuenta E2E figura con 59.093 cartas en esta medicion, y hoy mismo a las 14:30 un snapshot de fallo de Playwright la mostraba con 41.093. No se escalo ni se investigo; queda anotado.\n\nPROPUESTA — REQUIERE DECISION DE RAFAEL, no se implemento nada:\n1. Desacoplar triggerPaginationQuery() de loadCollection(): menor riesgo, mayor impacto medido.\n2. Diferir fetchAllPrices o trocear preloadSetMappings (ya hay precedente: el caso post-import usa setTimeout de 3000 ms).\n3. Las dos juntas.\n4. Paginar mas chico NO ataca la causa medida."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-08T22:32:54.193862Z",
+      "body": "VERIFICACION QUE CIERRA LA UNICA DUDA DECLARADA SOBRE LA OPCION 1 (2026-08-08). Se leyo queryPage (collection.ts:1518-1555) para comprobar si tenia precondiciones ocultas que justificaran el gate.\n\nNO LAS TIENE. Su unica precondicion es authStore.user (linea 1523). Llama a la Cloud Function queryCardIndex y mapea la respuesta con indexToCard. NO lee cards.value, NO lee cardIndexRaw, NO depende de ningun estado que ponga loadCollection.\n\nCONCLUSION: desacoplar triggerPaginationQuery() de loadCollection() no tiene dependencia de datos que lo impida. Lo unico que seguiria llegando tarde son los contadores de los chips de estado y los totales, que se derivan del indice completo — pero eso ya pasa hoy; el cambio solo evita que la GRILLA los espere.\n\nQueda pendiente de implementacion la eleccion de Rafael, y verificar que el orden de arranque garantice authStore.user antes de initView (hoy lo garantiza el guard de ruta mas el gate de App.vue sobre authStore.loading)."
+    },
+    {
+      "author": "rafael",
+      "at": "2026-08-08T22:50:39.788568Z",
+      "body": "DECISION DE RAFAEL 2026-08-08: se implementan LAS DOS opciones — desacoplar triggerPaginationQuery() de loadCollection() Y diferir/trocear la carga de precios (preloadSetMappings). El AC2 (medicion en la cuenta chica de 5,6k) se deja PARA EL FINAL: Rafael abrira un navegador e iniciara sesion el mismo, y desde ahi se mide. No se descarta el AC, se pospone."
+    }
+  ],
   "created_at": "2026-08-08T05:43:29.694Z",
-  "updated_at": "2026-08-08T05:43:29.694Z",
+  "updated_at": "2026-08-08T22:50:39.788568Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

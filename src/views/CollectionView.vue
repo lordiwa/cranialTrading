@@ -846,15 +846,23 @@ watch(() => collectionStore.loading, (isLoading) => {
 const initView = async () => {
   startSlowLoadTimer()
 
+  // TASK-153: fire the grid's own paginated query immediately, in parallel
+  // with the Promise.all below instead of chained behind it. queryPage's
+  // only precondition is authStore.user (already guaranteed by the route
+  // guard) — it doesn't read cards.value/cardIndexRaw, so it doesn't need
+  // to wait for loadCollection's full 59k-card index parse (30 chunks +
+  // indexToCard/rebuildCardIndex), which was gating the first useful grid
+  // row on work the grid itself never uses. Status-chip counters and totals
+  // still depend on the full index and still arrive after loadCollection —
+  // that was already true before this change.
+  triggerPaginationQuery()
+
   try {
     await Promise.all([
       collectionStore.loadCollection(),
       decksStore.loadDecks(),
       binderStore.loadBinders()
     ])
-
-    // Trigger initial server-side paginated query
-    triggerPaginationQuery()
 
     // Legacy redirect: ?deck= and ?binder= query params (from old /collection?deck=X links)
     const deckParam = route.query.deck as string | undefined

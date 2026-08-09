@@ -660,6 +660,60 @@ export const useCollectionStore = defineStore('collection', () => {
     let _persistRunning = false
     let _persistRerunRequested = false
 
+    /**
+     * TASK-155: card_index chunks used to be written with a strictly
+     * sequential `for (...) { await setDoc(...) }` loop. Measured live
+     * against the 41k-card dev account, each chunk setDoc took 4-9s (one
+     * took 61s), and a 21-chunk collection could still be mid-loop (chunk
+     * 18/21) after 150s of waiting. A page reload during that window loses
+     * the index update entirely — the debounce timer and the in-flight
+     * async chain both die with the JS context, even though the card
+     * document itself already saved.
+     *
+     * Fix: a bounded-concurrency worker pool, not a single writeBatch.
+     * writeBatch was ruled out — a prior attempt at batching 30 chunks
+     * (TASK-116/120) failed 5 times in a row hitting Firestore's 10 MiB
+     * per-batch limit, and 21 chunks of 2000 cards each don't fit in one
+     * 10 MiB batch either (INDEX_CHUNK_SIZE=2000 was sized to keep each
+     * chunk safely under the unrelated 1 MB per-document limit, not the
+     * 10 MiB batch limit — packing several such chunks into one batch can
+     * still blow past 10 MiB). Bounded concurrency writes each chunk as its
+     * own independent setDoc (no batch, so no 10 MiB ceiling to hit) while
+     * cutting the number of serial steps from `totalChunks` down to
+     * `ceil(totalChunks / INDEX_WRITE_CONCURRENCY)`.
+     */
+    const INDEX_WRITE_CONCURRENCY = 5
+
+    /** Bounded-concurrency worker pool: at most `concurrency` promises from `worker` in flight at once. */
+    async function runWithConcurrency<T>(items: T[], worker: (item: T) => Promise<unknown>, concurrency: number): Promise<void> {
+        let nextIndex = 0
+        async function runNext(): Promise<void> {
+            while (nextIndex < items.length) {
+                // eslint-disable-next-line security/detect-object-injection
+                const item = items[nextIndex]
+                nextIndex++
+                // Bounds are already guaranteed by the while condition; the guard
+                // exists only because noUncheckedIndexedAccess types this as
+                // `T | undefined`. Skipping rather than asserting keeps the pool
+                // honest if `items` is ever handed a sparse array.
+                if (item === undefined) continue
+                await worker(item)
+            }
+        }
+        const workerCount = Math.min(concurrency, items.length)
+        await Promise.all(Array.from({ length: workerCount }, () => runNext()))
+    }
+
+    /** Write all card_index chunks with at most INDEX_WRITE_CONCURRENCY setDoc calls in flight at once. */
+    async function writeChunksConcurrently(allIndex: IndexCard[], userId: string, totalChunks: number, chunkSize: number): Promise<void> {
+        const chunkNumbers = Array.from({ length: totalChunks }, (_, c) => c)
+        await runWithConcurrency(chunkNumbers, async (c) => {
+            const chunkCards = allIndex.slice(c * chunkSize, (c + 1) * chunkSize)
+            const chunkRef = doc(db, 'users', userId, 'card_index', `chunk_${c}`)
+            await setDoc(chunkRef, { cards: chunkCards, count: chunkCards.length, updatedAt: Timestamp.now() })
+        }, INDEX_WRITE_CONCURRENCY)
+    }
+
     function persistIndexToFirestore() {
         if (_indexPersistTimer) clearTimeout(_indexPersistTimer)
         _indexPersistTimer = setTimeout(() => {
@@ -696,21 +750,16 @@ export const useCollectionStore = defineStore('collection', () => {
         // Write chunks in background (fire-and-forget)
         void (async () => {
             try {
-                for (let c = 0; c < totalChunks; c++) {
-                    const chunkCards = allIndex.slice(c * INDEX_CHUNK_SIZE, (c + 1) * INDEX_CHUNK_SIZE)
-                    const chunkRef = doc(db, 'users', userId, 'card_index', `chunk_${c}`)
-                    await setDoc(chunkRef, { cards: chunkCards, count: chunkCards.length, updatedAt: Timestamp.now() })
-                }
+                await writeChunksConcurrently(allIndex, userId, totalChunks, INDEX_CHUNK_SIZE)
 
                 // Delete orphaned chunks (e.g., collection shrank from 5 chunks to 2)
                 const indexCol = collection(db, 'users', userId, 'card_index')
                 const existingChunks = await getDocs(indexCol)
-                for (const chunkDoc of existingChunks.docs) {
+                const orphans = existingChunks.docs.filter(chunkDoc => {
                     const chunkNum = parseInt(chunkDoc.id.replace('chunk_', ''), 10)
-                    if (!isNaN(chunkNum) && chunkNum >= totalChunks) {
-                        await deleteDoc(chunkDoc.ref)
-                    }
-                }
+                    return !isNaN(chunkNum) && chunkNum >= totalChunks
+                })
+                await runWithConcurrency(orphans, chunkDoc => deleteDoc(chunkDoc.ref), INDEX_WRITE_CONCURRENCY)
             } catch (err) {
                 logSanitizedError('[IndexSync] Failed to persist index', err, 'warn')
             } finally {

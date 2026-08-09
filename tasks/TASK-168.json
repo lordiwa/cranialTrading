@@ -1,0 +1,31 @@
+{
+  "key": "TASK-168",
+  "title": "card_index se duplica a si mismo: la coleccion crece sola en multiplos exactos de 2000 cartas",
+  "description": "Encontrado el 2026-08-08 investigando por que la cuenta de E2E crecia sola. Rafael sospechaba de las pruebas automatizadas; NO son las pruebas creando cartas.\n\nLA EVIDENCIA QUE LO DESTAPO: cuatro lecturas del contador de la misma cuenta en dos horas, sacadas de snapshots de fallo de Playwright: 41.093, luego 59.093, luego 43.094, luego 47.093. Las diferencias son +2.001, +3.999 y +18.000 — multiplos exactos de 2.000 con un +-1 que explica la carta que el test add-card agrega y borra. 2.000 es exactamente INDEX_CHUNK_SIZE. No es crecimiento organico: son CHUNKS ENTEROS apareciendo.\n\nLA CAUSA, CONFIRMADA EN CODIGO: loadFromIndex (src/stores/collection.ts:340-361) hace getDocs() de TODOS los documentos de la subcoleccion card_index y concatena sus arrays con allIndex.push(...data.cards), SIN deduplicar por id de carta y SIN filtrar por el rango de chunks esperado. Lo que encuentre, lo suma.\n\nEL BUCLE QUE SE RETROALIMENTA:\n1. Un chunk viejo sobrevive. Pasa si la escritura o la limpieza de huerfanos se interrumpe — y la limpieza corre DESPUES del loop de escritura, asi que cerrar la pestania a mitad se la saltea entera. Con la ventana medida en TASK-155 (100-200+ s para escribir 21 chunks secuenciales) esa interrupcion es facil.\n2. La siguiente carga concatena ese chunk de mas: el conteo sube hasta 2.000 cartas fantasma.\n3. Cualquier edicion posterior persiste el array YA INFLADO. Se escriben mas chunks, totalChunks crece, y la limpieza de huerfanos (que solo borra los de indice >= totalChunks) ya no borra nada.\n4. Se repite y compone.\n\nPOR QUE IMPORTA MAS QUE UN TICKET DE TESTS: no es un problema de la cuenta de pruebas. Le puede pasar a cualquier usuario al que se le corte una escritura del indice — cierra la pestania, se le va el wifi, el navegador mata la pestania por memoria. El resultado es cartas duplicadas en la grilla, valor de coleccion inflado y totales mentirosos, con el dato REAL intacto en los documentos de carta. Es corrupcion silenciosa de la vista, no del dato.\n\nADEMAS CONTAMINA TODA LA MEDICION: mientras esto pase, ningun numero de perf tomado sobre esa cuenta es comparable con otro tomado en otro momento, porque el tamanio de la coleccion cambia solo. Ya causo una atribucion equivocada de regresion en esta misma sesion.\n\nRELACIONADO: TASK-155 (la ventana larga de escritura es lo que hace probable la interrupcion) y TASK-153 (las mediciones de perf se toman sobre esta cuenta).",
+  "acceptance_criteria": [
+    "Confirmar en Firestore, contando los documentos de users/{uid}/card_index de la cuenta de E2E, que hay mas chunks de los que corresponden al numero real de cartas. Esto NO se pudo hacer en la sesion del hallazgo porque el clasificador de seguridad bloqueo enumerar usuarios; hace falta el uid por otra via",
+    "loadFromIndex deja de confiar ciegamente en lo que encuentre: deduplicar por id de carta al concatenar, o leer solo los chunks del rango esperado, o ambas. La reparacion tiene que ser en la LECTURA, porque es la unica capa que puede protegerse de un estado ya corrupto en disco",
+    "La limpieza de chunks huerfanos deja de depender de que el loop de escritura llegue hasta el final. Hoy corre despues y se saltea entera si el contexto muere",
+    "Existe un test que FALLA con el defecto puesto y PASA sin el: simular una subcoleccion card_index con un chunk huerfano extra y aseverar que el conteo cargado es el real, no el inflado. Verificado ejecutandolo en ambos sentidos, no razonandolo",
+    "Reparar el indice de la cuenta de E2E (hay un camino de rebuild en background por EXPECTED_INDEX_VERSION que puede servir) y dejar constancia del numero real de cartas ANTES y DESPUES, para que las mediciones de perf vuelvan a ser comparables",
+    "Evaluar si algun usuario real quedo con el indice inflado, y si hace falta una reparacion masiva"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "assignee": null,
+  "depends_on": [],
+  "labels": [
+    "bug",
+    "data-integrity",
+    "collection",
+    "user-flow"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-09T00:31:04.536148Z",
+  "updated_at": "2026-08-09T00:31:04.536148Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier",
+  "marker": "[EXPLICIT]"
+}

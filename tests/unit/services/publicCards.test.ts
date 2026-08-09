@@ -550,3 +550,50 @@ describe('mapWithConcurrency', () => {
     ).rejects.toThrow('boom')
   })
 })
+
+/**
+ * TASK-169: public_cards and public_preferences are readable by ANYONE with no
+ * login (TASK-085 opened them on purpose so anonymous visitors can see who
+ * sells a card). Both writers were also copying the owner's email address into
+ * every document, which made the whole user base's emails harvestable in bulk
+ * by an unauthenticated REST call — verified live against dev before this fix.
+ *
+ * The contact email now lives in contact_info/{userId}, which requires auth to
+ * read. Nothing published to an anonymous-readable collection may carry it.
+ */
+describe('public_cards / public_preferences never publish the owner email (TASK-169)', () => {
+  const emailArg = 'victima@example.com'
+
+  it('syncCardToPublic writes no email field', async () => {
+    await syncCardToPublic(
+      makeCard({ id: 'c1', name: 'Lightning Bolt', status: 'sale', public: true }),
+      'user-1', 'seller', 'Montevideo', null,
+    )
+    expect(setDocMock).toHaveBeenCalled()
+    const payload = setDocMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(payload).not.toHaveProperty('email')
+    expect(JSON.stringify(payload)).not.toContain(emailArg)
+  })
+
+  it('batchSyncCardsToPublic writes no email field', async () => {
+    await batchSyncCardsToPublic(
+      [makeCard({ id: 'c2', name: 'Counterspell', status: 'trade', public: true })],
+      'user-1', 'seller', 'Montevideo', null,
+    )
+    expect(batchSetMock).toHaveBeenCalled()
+    const payload = batchSetMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(payload).not.toHaveProperty('email')
+    expect(JSON.stringify(payload)).not.toContain(emailArg)
+  })
+
+  it('syncAllUserCards writes no email field', async () => {
+    await syncAllUserCards(
+      [makeCard({ id: 'c3', name: 'Brainstorm', status: 'sale', public: true })],
+      'user-1', 'seller', 'Montevideo', null,
+    )
+    expect(batchSetMock).toHaveBeenCalled()
+    const payload = batchSetMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(payload).not.toHaveProperty('email')
+    expect(JSON.stringify(payload)).not.toContain(emailArg)
+  })
+})

@@ -135,7 +135,6 @@ export async function syncCardToPublic(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
   const publicCardId = `${userId}_${card.id}`
@@ -164,7 +163,12 @@ export async function syncCardToPublic(
       quantity: card.quantity || 1,
       image: card.image || '',
       location: userLocation,
-      email: userEmail,
+      // TASK-169: el email NO se publica aca. public_cards se lee SIN login
+      // (TASK-085, a proposito, para que un visitante vea quien vende), asi que
+      // copiar el correo del dueño en cada documento permitia bajarse en masa
+      // los emails de toda la plataforma con una peticion anonima. Verificado
+      // en vivo contra dev antes de este arreglo. El contacto vive ahora en
+      // contact_info/{userId}, que exige estar logueado para leerse.
       updatedAt: Timestamp.now(),
     }
     await setDoc(publicCardRef, publicCard)
@@ -183,7 +187,6 @@ export async function batchSyncCardsToPublic(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string,
   userAvatarUrl?: string | null,
   onProgress?: (completedChunks: number, totalChunks: number) => void
 ): Promise<void> {
@@ -221,7 +224,7 @@ export async function batchSyncCardsToPublic(
           quantity: card.quantity || 1,
           image: card.image || '',
           location: userLocation,
-          email: userEmail,
+          // TASK-169: sin email, ver syncCardToPublic
           updatedAt: Timestamp.now(),
         })
       } else {
@@ -251,7 +254,6 @@ export async function syncPreferenceToPublic(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
   const publicPrefId = `${userId}_${preference.id}`
@@ -270,7 +272,7 @@ export async function syncPreferenceToPublic(
   if (preference.maxPrice !== undefined) publicPref.maxPrice = preference.maxPrice
   if (preference.minCondition !== undefined) publicPref.minCondition = preference.minCondition
   if (userLocation) publicPref.location = userLocation
-  if (userEmail) publicPref.email = userEmail
+  // TASK-169: sin email, ver syncCardToPublic
   await setDoc(publicPrefRef, publicPref)
 }
 
@@ -291,7 +293,6 @@ export async function syncAllUserCards(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
   // TASK-085: whitelist sale/trade (see syncCardToPublic comment above).
@@ -340,7 +341,7 @@ export async function syncAllUserCards(
         quantity: card.quantity || 1,
         image: card.image || '',
         location: userLocation ?? '',
-        email: userEmail ?? '',
+        // TASK-169: sin email, ver syncCardToPublic
         updatedAt: Timestamp.now(),
       })
     }
@@ -357,7 +358,6 @@ function buildPreferenceData(
   username: string,
   userAvatarUrl?: string | null,
   userLocation?: string,
-  userEmail?: string
 ): Record<string, string | number | Timestamp | null> {
   const data: Record<string, string | number | Timestamp | null> = {
     prefId: pref.id,
@@ -371,7 +371,7 @@ function buildPreferenceData(
   if (pref.maxPrice !== undefined) data.maxPrice = pref.maxPrice
   if (pref.minCondition !== undefined) data.minCondition = pref.minCondition
   if (userLocation) data.location = userLocation
-  if (userEmail) data.email = userEmail
+  // TASK-169: sin email, ver syncCardToPublic
   return data
 }
 
@@ -380,7 +380,6 @@ export async function syncAllUserPreferences(
   userId: string,
   username: string,
   userLocation?: string,
-  userEmail?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
   // First, remove all existing public preferences for this user
@@ -409,7 +408,7 @@ export async function syncAllUserPreferences(
     for (const pref of chunk) {
       const publicPrefId = `${userId}_${pref.id}`
       const publicPrefRef = doc(db, 'public_preferences', publicPrefId)
-      batch.set(publicPrefRef, buildPreferenceData(pref, userId, username, userAvatarUrl, userLocation, userEmail))
+      batch.set(publicPrefRef, buildPreferenceData(pref, userId, username, userAvatarUrl, userLocation))
     }
     await batch.commit()
   }

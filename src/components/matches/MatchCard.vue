@@ -116,10 +116,35 @@ const handleDeletePermanent = () => {
   emit('discard', props.match.id ?? props.match.docId)
 }
 
-// CONTACTO - Copiar email
+// CONTACTO - email
+//
+// TASK-169: el email ya no viaja dentro del match. Venia copiado en cada
+// documento de public_cards, que se lee SIN login, asi que se podian bajar en
+// masa los emails de toda la plataforma. Ahora vive en contact_info/{uid}, que
+// exige sesion, y se pide en el momento de abrir el modal — que es el unico
+// lugar donde hace falta y siempre hay usuario logueado.
+const resolvedEmail = ref<string | null>(null)
+const emailLoading = ref(false)
+
+const openContactModal = async () => {
+  showContactModal.value = true
+  const otherUserId = props.match.otherUserId
+  if (!otherUserId || resolvedEmail.value !== null) return
+  emailLoading.value = true
+  try {
+    const { getContactInfo } = await import('../../services/contactInfo')
+    const info = await getContactInfo(otherUserId)
+    resolvedEmail.value = info?.email ?? ''
+  } catch {
+    resolvedEmail.value = ''
+  } finally {
+    emailLoading.value = false
+  }
+}
+
 const copyEmailToClipboard = async () => {
   try {
-    await navigator.clipboard.writeText(props.match.otherEmail ?? '')
+    await navigator.clipboard.writeText(resolvedEmail.value ?? '')
     toastStore.show(t('matches.contactModal.emailCopied'), 'success')
   } catch {
     toastStore.show(t('messages.errors.sendError'), 'error')
@@ -158,7 +183,7 @@ const handleSaveContact = async () => {
     await contactsStore.saveContact({
       userId: otherUserId,
       username: props.match.otherUsername,
-      email: props.match.otherEmail ?? '',
+      email: resolvedEmail.value ?? '',
       location: props.match.otherLocation ?? 'Unknown',
       avatarUrl: props.match.otherAvatarUrl ?? null,
     })
@@ -371,7 +396,7 @@ const handleSaveContact = async () => {
         <BaseButton
             variant="secondary"
             class="flex-1 flex items-center justify-center gap-2"
-            @click="showContactModal = true"
+            @click="openContactModal"
         >
           <SvgIcon name="user" size="tiny" />
           {{ t('matches.actions.contact') }}
@@ -447,7 +472,7 @@ const handleSaveContact = async () => {
         <!-- Email -->
         <div>
           <p class="text-tiny text-silver-70 uppercase font-bold mb-1">{{ t('matches.contactModal.email') }}</p>
-          <p class="text-body text-silver">{{ match.otherEmail }}</p>
+          <p class="text-body text-silver">{{ emailLoading ? '…' : (resolvedEmail || '—') }}</p>
         </div>
       </div>
 

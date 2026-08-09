@@ -88,7 +88,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             // Sync to public (non-blocking, toast on failure)
             const userInfo = getUserInfo()
             if (userInfo) {
-                syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
+                syncPreferenceToPublic(newPref, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl)
                     .catch((err: unknown) => {
                         logSanitizedError('[PublicSync] Error syncing preference', err)
                         toastStore.show('Error sincronizando preferencia', 'error')
@@ -117,7 +117,6 @@ export const usePreferencesStore = defineStore('preferences', () => {
                 userInfo.userId,
                 userInfo.username,
                 userInfo.location,
-                userInfo.email,
                 userInfo.avatarUrl
             )
             console.info('Preferences synced to public')

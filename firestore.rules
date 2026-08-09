@@ -136,6 +136,18 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
+    // TASK-169: email de contacto, fuera de todo lo que se lee sin login.
+    // Antes viajaba dentro de cada documento de public_cards y
+    // public_preferences, que son de lectura abierta — cualquiera podía bajarse
+    // los emails de toda la plataforma sin cuenta. Las reglas no filtran por
+    // campo, así que el dato se mudó acá: leer exige estar logueado, escribir
+    // exige ser el dueño. El perfil público no lo necesita y sigue abriéndose
+    // sin login; el modal de contacto de matches lo pide y siempre tiene sesión.
+    match /contact_info/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
     // Preferencias públicas (lo que buscan) - cualquier autenticado puede leer
     match /public_preferences/{docId} {
       allow read: if request.auth != null;

@@ -320,6 +320,18 @@ export const useAuthStore = defineStore('auth', () => {
                         // best-effort: doc stays stale until the next successful sync, non-fatal
                     }
                 }
+
+                // TASK-169: mantener contact_info/{uid} al dia. Es donde vive el
+                // email desde que se saco de public_cards/public_preferences (que
+                // se leen sin login). Se hace aca porque toda carga de sesion
+                // pasa por este punto, igual que la sincronizacion de arriba.
+                // Best-effort a proposito: si falla, el contacto no aparece en
+                // matches, pero no debe cortar el login.
+                if (user.value.email) {
+                    void import('../services/contactInfo')
+                        .then(({ syncContactInfo }) => syncContactInfo(userId, user.value!.email, user.value!.username))
+                        .catch(() => { /* no fatal */ });
+                }
             } else {
                 const firebaseUser = auth.currentUser;
                 if (firebaseUser) {

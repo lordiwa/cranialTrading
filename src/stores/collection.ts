@@ -987,7 +987,7 @@ export const useCollectionStore = defineStore('collection', () => {
             // Sync to public collection (non-blocking, log-only on failure)
             const userInfo = getUserInfo()
             if (userInfo) {
-                syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
+                syncCardToPublic(newCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl)
                     .catch((err: unknown) => {
                         logSanitizedError('[PublicSync] Error syncing card', err)
                     })
@@ -1079,7 +1079,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 // Sync to public collection (non-blocking, log-only on failure)
                 const userInfo = getUserInfo()
                 if (userInfo) {
-                    syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl)
+                    syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl)
                         .catch((err: unknown) => {
                             logSanitizedError('[PublicSync] Error syncing card update', err)
                         })
@@ -1182,7 +1182,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 const progressCb = onProgress
                     ? (completed: number) => { onProgress(Math.round(((firestoreChunkCount + completed) / totalSteps) * 100)) }
                     : undefined
-                batchSyncCardsToPublic(cardsToSync, userInfo.userId, userInfo.username, userInfo.location, userInfo.email, userInfo.avatarUrl, progressCb)
+                batchSyncCardsToPublic(cardsToSync, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl, progressCb)
                     .catch((err: unknown) => { logSanitizedError('[PublicSync] Batch sync failed (non-fatal)', err) })
             }
 
@@ -1622,7 +1622,6 @@ export const useCollectionStore = defineStore('collection', () => {
                 userInfo.userId,
                 userInfo.username,
                 userInfo.location,
-                userInfo.email,
                 userInfo.avatarUrl
             )
 
@@ -1642,7 +1641,6 @@ export const useCollectionStore = defineStore('collection', () => {
                 userInfo.userId,
                 userInfo.username,
                 userInfo.location,
-                userInfo.email,
                 userInfo.avatarUrl
             )
 

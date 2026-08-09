@@ -20,9 +20,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-09T16:26:18.818Z",
+      "body": "PRIMERA MITAD CERRADA 2026-08-09, en dev y en produccion. La segunda sigue abierta y necesita decision de Rafael.\n\nCORRECCION AL TICKET: la descripcion original decia que el email se filtraba por /users. Es cierto, pero la fuga ANONIMA grande no era esa: el email se copiaba dentro de CADA documento de public_cards, que se lee sin login. Verificado en vivo antes de tocar nada: prod tenia 5.213 documentos, los 5.213 con email; dev 3.796 de 3.796. Con una sola peticion REST anonima se bajaban los correos de toda la plataforma.\nSegunda correccion: public_preferences NO es de lectura anonima, exige sesion. Ahi el email quedaba expuesto a cualquier usuario registrado, no a cualquiera de internet. Se limpio igual.\n\nQUE SE HIZO (v1.56.11, commit en develop y mergeado a main):\n- Los cinco puntos de escritura dejan de publicar el email, y se quito el parametro userEmail de las firmas y de los siete llamadores — no queda el parametro colgado para que nadie lo recablee sin querer.\n- Nueva coleccion contact_info/{userId}: lectura solo con sesion, escritura solo del dueño. Se mantiene al dia en cada carga de sesion, best-effort para no cortar el login si falla.\n- El modal de contacto de matches pide el email ahi al abrirse, y guardar contacto usa el email resuelto en vez del que venia en el match.\n- Reglas desplegadas A MANO a dev y a prod (el CI solo despliega hosting).\n- Migracion de datos corrida en los dos entornos: prod 5.213 + 4 limpiados, dev 3.796 + 25, cero fallos.\n\nVERIFICADO, no razonado:\n- Peticion anonima a public_cards en prod y en dev: 0 documentos con email.\n- contact_info sin login 403, con login 200.\n- contact_info se escribe solo al iniciar sesion: 2 documentos aparecieron sin intervencion.\n- Suite 1607/1607, tipos y build verdes. CI de prod verde con deploy-prod en success.\n- 3 tests nuevos, en rojo antes del cambio.\n\nLO QUE NO SE VERIFICO: el modal de contacto EN LA INTERFAZ. Solo aparece en matches guardados, y para llegar hay que darle \"ME INTERESA\" a un match real, lo que le manda una notificacion de verdad a una persona real. No se hizo. La regla y el servicio si estan probados.\n\nSIGUE ABIERTO, y es lo que necesita decision:\n- El email sigue dentro del documento de /users, que es de lectura publica.\n- Se puede LISTAR /users sin login: HTTP 200 con createdAt, email, location y username. Enumeracion completa de la base de usuarios.\n- Los tres caminos que consultan /users sin login (registro en auth.ts:744, perfil publico en userLookup.ts:30, conteo en stats.ts:22) hay que mudarlos al indice /usernames antes de poder cerrar la regla. Eso se cruza con TASK-170."
+    }
+  ],
   "created_at": "2026-08-09T04:29:12.039Z",
-  "updated_at": "2026-08-09T04:29:12.039Z",
+  "updated_at": "2026-08-09T16:26:18.818Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

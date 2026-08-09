@@ -10,7 +10,7 @@
     "Reparar el indice de la cuenta de E2E (hay un camino de rebuild en background por EXPECTED_INDEX_VERSION que puede servir) y dejar constancia del numero real de cartas ANTES y DESPUES, para que las mediciones de perf vuelvan a ser comparables",
     "Evaluar si algun usuario real quedo con el indice inflado, y si hace falta una reparacion masiva"
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "high",
   "assignee": null,
   "depends_on": [],
@@ -42,10 +42,15 @@
       "author": "orchestrator",
       "at": "2026-08-09T02:06:42.144Z",
       "body": "PUNTO 4 (el hueco de entendimiento) CERRADO, y de paso destapo un agujero en el guard de v1.56.6.\n\nLA PREGUNTA ERA: que dejo cardIndexRaw en ~20.000 cartas la primera vez. Sin eso no se explicaba como EMPIEZA la degradacion, solo como se compone.\n\nLA RESPUESTA, leida en el codigo de la Cloud Function (functions/index.js:1172): buildCardIndex escribe los chunks SECUENCIALMENTE, un await por chunk:\n  for (let c = 0; c < totalChunks; c++) { await indexRef.doc(`chunk_${c}`).set(...) }\nMedido en vivo al reparar la cuenta: 81 s para 30 chunks. Durante TODA esa ventana la subcoleccion contiene solo chunk_0..k — un PREFIJO CONTIGUO DESDE CERO.\n\nY ahi esta el agujero: el guard de v1.56.6 aceptaba \"contiguo desde cero + sin duplicados\" como completo. Un prefijo cumple las dos cosas. O sea que una carga adentro de la ventana de rebuild pasaba el chequeo siendo una fraccion de la coleccion, y el persist borraba todo lo que hubiera por encima. Un prefijo de 10 chunks son 20.000 cartas — exactamente el totalChunks=10 que hace falta para que la lista de borrado lexicografica empiece en chunk_10 y produzca el agujero chunk_10..15 que se midio. Las tres piezas cierran: el prefijo da el 10, el orden lexicografico da CUALES seis, y la interrupcion da que sean seis.\n\nCIRCULO VICIOSO COMPLETO, que es lo que explicaba la oscilacion: indice roto -> la app dispara rebuild -> durante los 81 s otra carga lee un prefijo -> el persist borra chunks reales -> indice roto. Se realimenta sin intervencion.\n\nARREGLO (620892c, v1.56.8): la señal que separa un prefijo de un indice terminado es que en uno terminado el ULTIMO chunk es un RESTO — solo esta lleno si la coleccion es multiplo exacto de 2000. En un prefijo, el chunk mas alto leido siempre esta lleno, porque es un chunk del medio con mas por venir. Entonces: ultimo chunk completamente lleno => asumir que hay mas que no vimos => no es completo => no se borra nada y se dispara rebuild.\nFalso positivo posible: coleccion que de verdad sea multiplo de 2000. Cuesta una limpieza salteada y un rebuild. Barato.\nINDEX_CHUNK_SIZE subio a constante del store: la lectura y la escritura tienen que coincidir y estaba enterrada dentro de _runPersistLoop.\n\nVerificado en ambos sentidos: con looksTruncated forzado a false, el test del prefijo se pone en rojo (\"expected not to be called, but was called 1 times\"). 9 casos en el archivo. Suite 1604/1604. type-check y build en modo development verdes.\n\nMEJORA DE FONDO QUE NO SE HIZO Y CONVIENE TICKETEAR: buildCardIndex escribe 30 chunks EN SERIE (81 s) teniendo la CF el array entero en memoria. Paralelizarlo con concurrencia acotada — el mismo tratamiento que TASK-155 le dio al cliente — reduciria la ventana de inconsistencia de ~81 s a ~15 s. El guard ya la hace inofensiva, pero la ventana sigue existiendo."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-09T16:26:31.460Z",
+      "body": "[CLOSE-EXCEPTION] Los seis criterios estan cumplidos y verificados con evidencia, no razonados: AC1 medido en Firestore (24 chunks con agujero chunk_10..15, 47.093 contra 59.198 reales), AC2/AC3/AC4 con 9 tests corridos EN AMBOS SENTIDOS, AC5 con la cuenta reparada a 30 chunks contiguos y 18 muestras de vigilancia sanas en 3 horas atravesando varias corridas de E2E, AC6 cubierto por el auto-rebuild. Ademas CI verde con deploy-dev y deploy-prod en success, y perf medida en los dos entornos. NO corrio un subagente revisor porque el humano instruyo explicitamente en esta sesion no usar la herramienta de agentes; la verificacion la hizo el orquestador y esta documentada en los comentarios del ticket."
     }
   ],
   "created_at": "2026-08-09T00:31:04.536148Z",
-  "updated_at": "2026-08-09T02:06:42.144Z",
+  "updated_at": "2026-08-09T16:26:31.460Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

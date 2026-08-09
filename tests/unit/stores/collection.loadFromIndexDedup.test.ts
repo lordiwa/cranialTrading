@@ -206,6 +206,59 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
     await vi.waitFor(() => expect(mockBuildCardIndex).toHaveBeenCalled())
   })
 
+  it('a card_index with a HOLE never lets the persist delete "orphans" (TASK-168, segunda vuelta)', async () => {
+    // Measured live on the dev E2E account: card_index held chunk_0..9 and
+    // chunk_16..29 — six chunks missing — summing 47.093 cards while
+    // users/{uid}/cards actually held 59.198. The index was 12.105 cards SHORT.
+    //
+    // The danger is what happens NEXT: the persist derives totalChunks from
+    // cardIndexRaw.length, then deletes every chunk numbered >= totalChunks as
+    // an orphan. Off a short read that deletes chunks holding REAL cards — the
+    // hole widens itself. A load with gaps must disarm the cleanup entirely.
+    vi.useFakeTimers()
+    try {
+      mockGetDocs.mockResolvedValueOnce(
+        snapshotOf([
+          chunkDoc('chunk_0', [makeIndexCard('a')]),
+          // chunk_1 is MISSING — this is the hole.
+          chunkDoc('chunk_2', [makeIndexCard('b')]),
+        ])
+      )
+
+      const store = useCollectionStore()
+      await store.loadCollection()
+
+      mockGetDocs.mockResolvedValue(
+        snapshotOf([chunkDoc('chunk_0', []), chunkDoc('chunk_2', [])])
+      )
+
+      await store.updateCard('a', { status: 'sale' })
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+
+      // chunk_2 is numbered >= totalChunks(1) and WOULD have been deleted.
+      expect(mockDeleteDoc).not.toHaveBeenCalled()
+      // The chunks it does know about are still written — the data is not lost.
+      expect(mockSetDoc).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a gapped index triggers the background rebuild that restores the missing chunks', async () => {
+    mockGetDocs.mockResolvedValue(
+      snapshotOf([
+        chunkDoc('chunk_0', [makeIndexCard('a')]),
+        chunkDoc('chunk_2', [makeIndexCard('b')]),
+      ])
+    )
+
+    const store = useCollectionStore()
+    await store.loadCollection()
+
+    await vi.waitFor(() => expect(mockBuildCardIndex).toHaveBeenCalled())
+  })
+
   it('orphan chunks are deleted even when the chunk write loop fails (AC3)', async () => {
     // The orphan cleanup used to run AFTER the write loop, so anything that
     // interrupted the writes left the orphan behind — which is precisely how the

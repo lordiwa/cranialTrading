@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-08T15:36:39.236Z",
+  "generated_at": "2026-08-09T00:56:41.581Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -58,7 +58,7 @@
     {
       "key": "TASK-013",
       "title": "Paridad de ediciones entre buscadores (rápido vs avanzado)",
-      "status": "in_review",
+      "status": "todo",
       "priority": "medium"
     },
     {
@@ -94,19 +94,19 @@
     {
       "key": "TASK-019",
       "title": "TC-P04-01: Navegación por teclado — buscador global (desktop)",
-      "status": "in_review",
+      "status": "todo",
       "priority": "high"
     },
     {
       "key": "TASK-020",
       "title": "TC-P04-02: Navegación por teclado — buscador móvil",
-      "status": "in_review",
+      "status": "todo",
       "priority": "medium"
     },
     {
       "key": "TASK-021",
       "title": "TC-P04-03: Cmd+click / Ctrl+click abre destinos en pestaña nueva",
-      "status": "in_review",
+      "status": "todo",
       "priority": "high"
     },
     {
@@ -130,19 +130,19 @@
     {
       "key": "TASK-025",
       "title": "TC-P04-07: Verificación de traducciones (i18n) en 3 idiomas",
-      "status": "in_review",
+      "status": "todo",
       "priority": "medium"
     },
     {
       "key": "TASK-026",
       "title": "TC-P04-08: Screen reader smoke test",
-      "status": "in_review",
+      "status": "todo",
       "priority": "medium"
     },
     {
       "key": "TASK-027",
       "title": "CMC y type_line se pierden en cartas importadas (rompe curva y filtro de maná)",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -166,7 +166,7 @@
     {
       "key": "TASK-031",
       "title": "TC-27-04: Cartas MDFC (dos caras) aparecen en bucket del hechizo, no en bucket 0",
-      "status": "in_review",
+      "status": "todo",
       "priority": "medium"
     },
     {
@@ -184,31 +184,31 @@
     {
       "key": "TASK-034",
       "title": "Searcher con discovery + version picker (decks/binders/collection)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-035",
       "title": "Editor de decks: contador no refresca, stack visual de copias y placeholder duplicado",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-036",
       "title": "Editor de decks: contador xN no refresca al agregar copia desde modal",
-      "status": "in_review",
+      "status": "todo",
       "priority": "high"
     },
     {
       "key": "TASK-037",
       "title": "Editor de decks: stack visual de copias multiples (estilo Moxfield/Arena)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-038",
       "title": "Editor de decks: ocultar placeholder + del grid en mobile (duplica al FAB)",
-      "status": "in_review",
+      "status": "done",
       "priority": "low"
     },
     {
@@ -220,13 +220,13 @@
     {
       "key": "TASK-040",
       "title": "Tech debt: replicar array spread fix en binders.ts (paralelo a SCRUM-36)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-041",
       "title": "Editor decks/binders/collection: + como FAB en desktop (no placeholder en grid)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -244,7 +244,7 @@
     {
       "key": "TASK-044",
       "title": "Bug: MTGJSON AllPricesToday endpoint devuelve 404 + CORS",
-      "status": "in_review",
+      "status": "todo",
       "priority": "medium"
     },
     {
@@ -262,31 +262,31 @@
     {
       "key": "TASK-064",
       "title": "Improvement personal user space",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-065",
       "title": "Cuando se ve el profile de un usuario sin ser uno ese usuario el filtro del buscador ya no existe",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-066",
       "title": "Buscador /collection: input filtra grid local + remover Discovery + affordance agregar nueva carta",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-067",
       "title": "Filtros avanzados rotos en perfil publico ajeno (regresion SCRUM-65)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-068",
       "title": "Corrupción GPU en vista Collection (modo Visual) en Android Mali gama baja",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -298,13 +298,13 @@
     {
       "key": "TASK-070",
       "title": "Mejora necesaria en la interaccion de carrito de compra.",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-071",
       "title": "Mejora necesaria al sistema de matches",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -316,13 +316,13 @@
     {
       "key": "TASK-073",
       "title": "Forzar username único al registrarse + resolución robusta de @username",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
       "key": "TASK-074",
       "title": "Verificación dev de SCRUM-73/66/67/44 (chequeo Rafael → re-QA ismachucho)",
-      "status": "in_progress",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -502,7 +502,7 @@
     {
       "key": "TASK-104",
       "title": "Design→app v2 F8: perfil público + Settings (pase v2) + welcome tour",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -586,7 +586,7 @@
     {
       "key": "TASK-118",
       "title": "Auth: restaurar login con Google — existía en la app y se quitó con el rediseño",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -736,13 +736,13 @@
     {
       "key": "TASK-143",
       "title": "Deep review adversarial de la tanda /inicio + kit v2 (origin/develop..7e1ae02, 5 commits, 19 archivos)",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-144",
       "title": "Wargaming adversarial contra los 48 casos de uso documentados — objetivo: falsarlos, no confirmarlos",
-      "status": "todo",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -796,7 +796,7 @@
     {
       "key": "TASK-153",
       "title": "La grilla de Coleccion tarda 20-27 segundos en mostrar la primera fila con 41.000 cartas",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "high"
     },
     {
@@ -808,7 +808,7 @@
     {
       "key": "TASK-155",
       "title": "Editar una carta y recargar enseguida puede perder la actualizacion del indice: el debounce de card_index muere con el contexto",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "high"
     },
     {
@@ -881,6 +881,12 @@
       "key": "TASK-167",
       "title": "vite build sin --mode produce un bundle de PRODUCCION y puede pisar un preview de dev en el mismo puerto",
       "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-168",
+      "title": "card_index se duplica a si mismo: la coleccion crece sola en multiplos exactos de 2000 cartas",
+      "status": "in_progress",
       "priority": "high"
     }
   ]

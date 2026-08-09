@@ -132,7 +132,11 @@ describe('collection store: bounded-concurrency card_index chunk writes (TASK-15
 
       mockGetDocs.mockResolvedValueOnce({
         empty: false,
-        docs: [{ data: () => ({ cards, version: 3 }) }],
+        // The doc `id` matters since TASK-168: loadFromIndex orders chunks
+        // numerically and decides whether the chunk set is complete (contiguous
+        // from 0) before the persist is allowed to delete anything. Real
+        // Firestore snapshots always carry an id; this fixture was omitting it.
+        docs: [{ id: 'chunk_0', data: () => ({ cards, version: 3 }) }],
       })
 
       const store = useCollectionStore()

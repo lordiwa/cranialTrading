@@ -336,6 +336,19 @@ export const useCollectionStore = defineStore('collection', () => {
     /** Expected index version — bump in Cloud Function when format changes */
     const EXPECTED_INDEX_VERSION = 3
 
+    /**
+     * TASK-168: whether cardIndexRaw can be trusted as the COMPLETE membership
+     * of the collection. Only a full card load, or a card_index read whose
+     * chunks were contiguous 0..N-1 with no duplicates, earns `true`.
+     *
+     * The persist loop deletes every chunk numbered >= totalChunks as an
+     * "orphan", where totalChunks comes from cardIndexRaw.length. That is only
+     * sound if cardIndexRaw really is everything: a short read makes the cleanup
+     * delete chunks holding real cards, widening the very hole it read. Starts
+     * false so nothing deletes before a load has established the truth.
+     */
+    let indexKnownComplete = false
+
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {
         try {
@@ -361,7 +374,8 @@ export const useCollectionStore = defineStore('collection', () => {
             //
             // This is the read path on purpose: it is the only layer that can
             // defend against an index that is ALREADY corrupt on disk.
-            const chunkNumberOf = (id: string): number => {
+            const chunkNumberOf = (id: string | undefined): number => {
+                if (typeof id !== 'string') return Number.MAX_SAFE_INTEGER
                 const n = parseInt(id.replace('chunk_', ''), 10)
                 return isNaN(n) ? Number.MAX_SAFE_INTEGER : n
             }
@@ -388,10 +402,34 @@ export const useCollectionStore = defineStore('collection', () => {
                 if (data.version) indexVersion = data.version as number
             }
 
+            // TASK-168 (segunda vuelta): is this index COMPLETE, or did we just
+            // read a hole?
+            //
+            // Measured live on the dev E2E account: card_index held chunk_0..9
+            // and chunk_16..29 — six chunks simply missing — summing 47.093 cards
+            // while users/{uid}/cards actually held 59.198. The index was 12.105
+            // cards SHORT, not long. That gap is what the orphan cleanup leaves
+            // when it is interrupted partway through deleting a trailing range.
+            //
+            // Why that matters here and not only as a curiosity: the next persist
+            // derives totalChunks from cardIndexRaw.length, and then deletes every
+            // chunk numbered >= totalChunks as an "orphan". Feed it a short read
+            // and it deletes chunks that hold REAL cards — the hole widens itself.
+            // So a load that is not provably complete must mark the in-memory
+            // index untrustworthy, and the persist must refuse to delete anything
+            // on the strength of it.
+            const chunkNumbers = orderedDocs.map(d => chunkNumberOf(d.id))
+            const isContiguousFromZero = chunkNumbers.every((n, idx) => n === idx)
+            const indexLooksComplete = isContiguousFromZero && duplicatesDropped === 0
+            indexKnownComplete = indexLooksComplete
+
             const dfCount = allIndex.filter(ic => ic.df).length
             console.info(`[loadCollection] Loaded card_index: ${allIndex.length} cards from ${snapshot.docs.length} chunks (v${indexVersion}), ${dfCount} dual-faced`)
             if (duplicatesDropped > 0) {
                 console.warn(`[loadCollection] card_index was corrupt: dropped ${duplicatesDropped} duplicate entries across ${snapshot.docs.length} chunks (TASK-168). Rebuilding in background.`)
+            }
+            if (!isContiguousFromZero) {
+                console.warn(`[loadCollection] card_index has GAPS — chunks present: [${chunkNumbers.join(', ')}]. The loaded index is incomplete; orphan cleanup is disabled until a rebuild restores it (TASK-168).`)
             }
 
             cardIndexRaw.value = allIndex
@@ -399,15 +437,17 @@ export const useCollectionStore = defineStore('collection', () => {
             rebuildCardIndex()
             // collectionSummary auto-derives from cards via computed (NICE-09)
 
-            // Auto-rebuild stale OR corrupt index in background. The dedup above
+            // Auto-rebuild stale, corrupt OR incomplete index in background. The dedup above
             // makes this session correct; the rebuild is what repairs the stored
             // index so the duplicates stop being re-read (and re-persisted) on
             // every future load — including for real users who hit this, without
             // any manual intervention (TASK-168 AC5/AC6).
-            if (indexVersion < EXPECTED_INDEX_VERSION || duplicatesDropped > 0) {
+            if (indexVersion < EXPECTED_INDEX_VERSION || !indexLooksComplete) {
                 const reason = indexVersion < EXPECTED_INDEX_VERSION
                     ? `stale (v${indexVersion}, expected v${EXPECTED_INDEX_VERSION})`
-                    : `corrupt (${duplicatesDropped} duplicate entries)`
+                    : duplicatesDropped > 0
+                        ? `corrupt (${duplicatesDropped} duplicate entries)`
+                        : 'incomplete (missing chunks)'
                 console.info(`[loadCollection] Index is ${reason}, rebuilding in background...`)
                 import('../services/cloudFunctions').then(({ buildCardIndex: rebuildIndex }) => {
                     rebuildIndex().then(result => {
@@ -465,6 +505,9 @@ export const useCollectionStore = defineStore('collection', () => {
 
         // Build cardIndexRaw from loaded cards
         cardIndexRaw.value = all.map(cardToIndex)
+        // Read straight from the card documents themselves — complete by
+        // construction, so orphan cleanup may trust it again (TASK-168).
+        indexKnownComplete = true
 
         if (!importing.value) {
             enrichCardsWithMissingMetadata().catch((err: unknown) => {
@@ -806,13 +849,28 @@ export const useCollectionStore = defineStore('collection', () => {
                 // the chunks 0..totalChunks-1 this loop is about to write from the
                 // same in-memory array. If the write then dies, the worst outcome
                 // is a stale-but-consistent index rather than an inflated one.
-                const indexCol = collection(db, 'users', userId, 'card_index')
-                const existingChunks = await getDocs(indexCol)
-                const orphans = existingChunks.docs.filter(chunkDoc => {
-                    const chunkNum = parseInt(chunkDoc.id.replace('chunk_', ''), 10)
-                    return !isNaN(chunkNum) && chunkNum >= totalChunks
-                })
-                await runWithConcurrency(orphans, chunkDoc => deleteDoc(chunkDoc.ref), INDEX_WRITE_CONCURRENCY)
+                //
+                // ...but ONLY when the in-memory index is provably complete
+                // (TASK-168, segunda vuelta). Deleting "orphans" off the back of
+                // a short read is how chunks holding real cards get destroyed:
+                // measured live, the dev account's index was missing chunk_10..15
+                // and under-reported the collection by 12.105 cards. When we know
+                // the index is incomplete we skip the cleanup entirely and let
+                // the background rebuild restore the truth; leaving a genuine
+                // orphan behind for one more cycle is harmless (the read path
+                // dedups it), while deleting a real chunk is not recoverable
+                // from the index alone.
+                if (indexKnownComplete) {
+                    const indexCol = collection(db, 'users', userId, 'card_index')
+                    const existingChunks = await getDocs(indexCol)
+                    const orphans = existingChunks.docs.filter(chunkDoc => {
+                        const chunkNum = parseInt(chunkDoc.id.replace('chunk_', ''), 10)
+                        return !isNaN(chunkNum) && chunkNum >= totalChunks
+                    })
+                    await runWithConcurrency(orphans, chunkDoc => deleteDoc(chunkDoc.ref), INDEX_WRITE_CONCURRENCY)
+                } else {
+                    console.warn('[IndexSync] Skipping orphan-chunk cleanup: the loaded card_index was incomplete or corrupt, so its length cannot decide which chunks are orphans (TASK-168).')
+                }
 
                 await writeChunksConcurrently(allIndex, userId, totalChunks, INDEX_CHUNK_SIZE)
             } catch (err) {
@@ -1192,6 +1250,9 @@ export const useCollectionStore = defineStore('collection', () => {
             cards.value = []
             cardsById.clear()
             cardIndexRaw.value = []
+            // Everything is gone and this path deletes every chunk itself, so
+            // "empty" is the complete truth (TASK-168).
+            indexKnownComplete = true
 
             // Delete card_index chunks so deleted cards don't reappear on reload.
             // Use batches of 10 to avoid "Transaction too big" (each chunk is ~400KB).

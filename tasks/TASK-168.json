@@ -10,7 +10,7 @@
     "Reparar el indice de la cuenta de E2E (hay un camino de rebuild en background por EXPECTED_INDEX_VERSION que puede servir) y dejar constancia del numero real de cartas ANTES y DESPUES, para que las mediciones de perf vuelvan a ser comparables",
     "Evaluar si algun usuario real quedo con el indice inflado, y si hace falta una reparacion masiva"
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "high",
   "assignee": null,
   "depends_on": [],
@@ -22,10 +22,16 @@
   ],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-09T00:56:41.581Z",
+      "body": "Implementado en 4c634d1 (v1.56.5), sobre develop.\n\nAC2 HECHO — src/stores/collection.ts loadFromIndex. Dos cambios, no uno:\n(a) los chunks se ordenan NUMERICAMENTE antes de consumirlos. getDocs devuelve orden lexicografico, donde chunk_10 va antes que chunk_2, asi que sin ese sort un chunk viejo de indice alto podia TAPAR la entrada fresca de la misma carta. Esto no estaba en el diagnostico original y salio al escribir el test.\n(b) se deduplica por id de carta (Set sobre ic.i), quedandose con la primera aparicion — que tras el sort es siempre la del chunk mas bajo, o sea la fresca.\n\nAC3 HECHO — _runPersistLoop. El borrado de chunks huerfanos pasa a correr ANTES del loop de escritura, no despues. Borrar primero es seguro y estrictamente mejor: los huerfanos son indices >= totalChunks, y cada carta que contienen ya esta cubierta por los chunks 0..totalChunks-1 que el loop esta por escribir del MISMO array en memoria. Si la escritura muere igual, el peor caso pasa a ser un indice viejo-pero-consistente en vez de uno inflado.\n\nAC4 HECHO Y VERIFICADO EN AMBOS SENTIDOS, ejecutado, no razonado:\n- tests/unit/stores/collection.loadFromIndexDedup.test.ts, 5 casos.\n- Antes del arreglo: 3 de 5 en rojo (el de conteo inflado daba 5 en vez de 3; el de orden lexicografico daba 3 en vez de 2; el de auto-reparacion no disparaba rebuild). El quinto caso, el de control con indice limpio, pasaba desde el principio — que es lo que se quiere de un control.\n- El de AC3 se verifico aparte volviendo a poner el defecto (borrado despues de la escritura): se pone en rojo con \"expected [] to deeply equal [...2]\" y vuelve a verde al restaurar el orden.\n- Suite completa: 1600/1600 verde (eran 1595). type-check limpio. vite build --mode development verde.\n\nAC6 CUBIERTO POR MECANISMO, sin migracion masiva: cuando loadFromIndex detecta duplicados dispara el rebuild de indice en background (el mismo camino que ya existia para indices de version vieja). O sea que cualquier usuario real con el indice inflado se repara solo la proxima vez que abre la coleccion, sin intervencion. No hace falta script de reparacion masiva.\n\nLO QUE SIGUE ABIERTO Y NO SE PUEDE CERRAR DESDE ACA:\n- AC1: sigue sin confirmarse contando los documentos de users/{uid}/card_index de la cuenta E2E. Falta el uid. El bloqueo del clasificador fue a ENUMERAR usuarios, no a leer una ruta concreta, asi que con el uid en mano la lectura por REST deberia andar (gcloud esta autenticado).\n- AC5: reparar el indice de esa cuenta y anotar el numero real ANTES/DESPUES. Con el arreglo desplegado deberia repararse sola en la primera carga que haga el CI, pero eso hay que VERIFICARLO, no darlo por hecho — y el numero \"antes\" ya no se puede tomar limpio despues de que se repare.\n\nHIPOTESIS A VERIFICAR, no afirmacion: si esto era la causa del CI rojo de develop en collection-crud.spec.ts:203, el rojo deberia irse solo una vez que la cuenta se desinfle."
+    }
+  ],
   "created_at": "2026-08-09T00:31:04.536148Z",
-  "updated_at": "2026-08-09T00:31:04.536148Z",
+  "updated_at": "2026-08-09T00:56:41.581Z",
   "jira_key": null,
-  "verification_tier": "tdd-tier",
+  "verification_tier": "tdd",
   "marker": "[EXPLICIT]"
 }

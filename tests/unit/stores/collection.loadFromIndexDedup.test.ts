@@ -259,6 +259,41 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
     await vi.waitFor(() => expect(mockBuildCardIndex).toHaveBeenCalled())
   })
 
+  it('deletes orphan chunks HIGHEST-NUMBER-FIRST, so an interrupted cleanup leaves a contiguous prefix', async () => {
+    // getDocs returns chunks lexicographically: chunk_0, chunk_1, chunk_10,
+    // chunk_11, ..., chunk_2. Deleting in that order is what punched the
+    // chunk_10..15 hole in the dev account — those six are the first six
+    // entries of the deletion list when totalChunks is 10. Descending order
+    // means an interruption can only ever trim the tail.
+    vi.useFakeTimers()
+    try {
+      mockGetDocs.mockResolvedValueOnce(snapshotOf([chunkDoc('chunk_0', [makeIndexCard('a')])]))
+
+      const store = useCollectionStore()
+      await store.loadCollection()
+
+      // Lexicographic order, as Firestore hands them over.
+      mockGetDocs.mockResolvedValue(
+        snapshotOf([
+          chunkDoc('chunk_0', []),
+          chunkDoc('chunk_1', []),
+          chunkDoc('chunk_10', []),
+          chunkDoc('chunk_11', []),
+          chunkDoc('chunk_2', []),
+        ])
+      )
+
+      await store.updateCard('a', { status: 'sale' })
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+
+      const order = mockDeleteDoc.mock.calls.map(c => (c[0] as { path: string }).path.split('/').pop())
+      expect(order).toEqual(['chunk_11', 'chunk_10', 'chunk_2', 'chunk_1'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('orphan chunks are deleted even when the chunk write loop fails (AC3)', async () => {
     // The orphan cleanup used to run AFTER the write loop, so anything that
     // interrupted the writes left the orphan behind — which is precisely how the

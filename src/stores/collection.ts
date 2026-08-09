@@ -863,11 +863,35 @@ export const useCollectionStore = defineStore('collection', () => {
                 if (indexKnownComplete) {
                     const indexCol = collection(db, 'users', userId, 'card_index')
                     const existingChunks = await getDocs(indexCol)
-                    const orphans = existingChunks.docs.filter(chunkDoc => {
-                        const chunkNum = parseInt(chunkDoc.id.replace('chunk_', ''), 10)
-                        return !isNaN(chunkNum) && chunkNum >= totalChunks
-                    })
-                    await runWithConcurrency(orphans, chunkDoc => deleteDoc(chunkDoc.ref), INDEX_WRITE_CONCURRENCY)
+                    const orphans = existingChunks.docs
+                        .map(chunkDoc => ({
+                            chunkDoc,
+                            num: parseInt(chunkDoc.id.replace('chunk_', ''), 10),
+                        }))
+                        .filter(({ num }) => !isNaN(num) && num >= totalChunks)
+                        // HIGHEST NUMBER FIRST, one at a time (TASK-168). The
+                        // deletion used to go in the order getDocs returned —
+                        // which is LEXICOGRAPHIC, so chunk_10..chunk_19 come
+                        // right after chunk_1 and long before chunk_2. That is
+                        // exactly how the dev account lost chunk_10..15 and
+                        // nothing else: with totalChunks=10 those six are the
+                        // first six entries of the deletion list, and the loop
+                        // died after six. An interrupted cleanup therefore
+                        // punched a HOLE IN THE MIDDLE — the worst possible
+                        // state, because the next read comes back short and
+                        // (before the completeness guard above) fed an even
+                        // smaller totalChunks back into this same deletion.
+                        //
+                        // Descending and serial makes an interrupted cleanup
+                        // leave a contiguous PREFIX instead: stale, but sound.
+                        // Concurrency is deliberately given up here — orphans
+                        // are normally one or two documents, and the ordering
+                        // guarantee is worth more than the round trips.
+                        .sort((a, b) => b.num - a.num)
+
+                    for (const { chunkDoc } of orphans) {
+                        await deleteDoc(chunkDoc.ref)
+                    }
                 } else {
                     console.warn('[IndexSync] Skipping orphan-chunk cleanup: the loaded card_index was incomplete or corrupt, so its length cannot decide which chunks are orphans (TASK-168).')
                 }

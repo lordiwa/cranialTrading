@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { type Component, onMounted, shallowRef } from 'vue';
-import HelpCarouselModal from '../ui/HelpCarouselModal.vue';
-import WelcomeModal from '../ui/WelcomeModal.vue';
 import { shouldRenderAuthenticatedChrome } from '../../utils/authChrome';
 import { getLastKnownAuthState } from '../../utils/authLastKnown';
 
@@ -26,6 +24,21 @@ import { getLastKnownAuthState } from '../../utils/authLastKnown';
 const AppHeader = shallowRef<Component | null>(null);
 
 /**
+ * TASK-184: the two global modals are deferred for a different reason than
+ * the header, and it is worth stating because it was invisible until a CDP
+ * initiator stack pointed at it. Neither renders anything until it is
+ * opened, so their cost was never their markup — WelcomeModal imports
+ * useTour, and composables/useTour statically imports firebase/firestore.
+ * That one static edge put the whole 162KB gzip Firebase chunk into
+ * /inicio's ROUTE chunk graph, so it was requested at t+2.4s no matter what
+ * stores/auth.ts did about deferring its own fetch. Deferring the auth
+ * store's request alone was measured changing nothing at all (5594ms vs
+ * 5560ms) precisely because this edge, not that request, is what pulled it.
+ */
+const HelpCarouselModal = shallowRef<Component | null>(null);
+const WelcomeModal = shallowRef<Component | null>(null);
+
+/**
  * The header is the topmost element, so mounting it late pushes everything
  * below it down — the exact layout jump TASK-182 went out of its way to
  * avoid in the other direction. The placeholder holds the header's own
@@ -38,17 +51,38 @@ const AppHeader = shallowRef<Component | null>(null);
  */
 const showAuthenticatedChrome = shouldRenderAuthenticatedChrome(false, false, getLastKnownAuthState());
 
-onMounted(() => {
-    // Two frames, not one: the first fires before the browser has painted
-    // the frame this mount belongs to, so scheduling inside it would still
-    // put the header's chunk request ahead of the paint we are protecting.
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            void import('./AppHeader.vue').then((m) => {
-                AppHeader.value = m.default;
-            });
-        });
+let deferredLoadStarted = false;
+const loadDeferredChrome = (): void => {
+    if (deferredLoadStarted) return;
+    deferredLoadStarted = true;
+    void import('./AppHeader.vue').then((m) => {
+        AppHeader.value = m.default;
     });
+    void import('../ui/HelpCarouselModal.vue').then((m) => {
+        HelpCarouselModal.value = m.default;
+    });
+    void import('../ui/WelcomeModal.vue').then((m) => {
+        WelcomeModal.value = m.default;
+    });
+};
+
+onMounted(() => {
+    // Two frames, not one: the first fires before the browser has painted the
+    // frame this mount belongs to, so scheduling inside it would still put
+    // these requests ahead of the paint they exist to protect.
+    requestAnimationFrame(() => {
+        requestAnimationFrame(loadDeferredChrome);
+    });
+    // THE TIMER IS NOT BELT-AND-BRACES, IT IS THE ONLY THING THAT WORKS IN A
+    // BACKGROUND TAB. requestAnimationFrame does not fire while a tab is not
+    // visible, so on the rAF path alone the header simply never appeared —
+    // caught by opening the app in a real Chrome window that happened not to
+    // be focused, not by any measurement (Playwright's pages count as
+    // visible, so every harness run looked perfect). Opening a link in a new
+    // background tab, or restoring a session, is an ordinary thing to do.
+    // When the tab IS visible the rAF path wins this race long before the
+    // timer, so the deferral is unaffected.
+    setTimeout(loadDeferredChrome, 1000);
 });
 </script>
 
@@ -79,9 +113,9 @@ onMounted(() => {
     </main>
 
     <!-- Global Help Carousel Modal -->
-    <HelpCarouselModal />
+    <component :is="HelpCarouselModal" v-if="HelpCarouselModal" />
 
     <!-- Onboarding Tour Welcome -->
-    <WelcomeModal />
+    <component :is="WelcomeModal" v-if="WelcomeModal" />
   </div>
 </template>

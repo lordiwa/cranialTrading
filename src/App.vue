@@ -6,7 +6,6 @@ import { useAuthStore } from './stores/auth';
 import { useI18n } from './composables/useI18n';
 import { shouldBlockOnAuthLoading } from './router/authGuard';
 import { getLastKnownAuthState } from './utils/authLastKnown';
-import { preloadPriceData } from './services/mtgjson';
 import BaseToast from './components/ui/BaseToast.vue';
 import BaseLoader from './components/ui/BaseLoader.vue';
 import ConfirmModal from './components/ui/ConfirmModal.vue';
@@ -68,9 +67,19 @@ const showFooter = computed(() => {
   return !noFooterRoutes.has(routeName);
 });
 
+// TASK-171: preloadPriceData() used to fire here unconditionally on every
+// route (including /inicio and /login, neither of which shows a single
+// price) — 5.48MB compressed of AllPricesToday.json.gz on every cold boot,
+// regardless of whether the visitor ever opens a price-showing view. It is
+// the exact same memoized fetchPriceData() that getCardPrices() already
+// calls lazily (services/mtgjson.ts) — every real price consumer
+// (CollectionTotalsPanel's already-3s-deferred fetchAllPrices, and the
+// per-card useCardPrices() in grid cards / modals / search results / match
+// cards) triggers it on its own, exactly when and where it's needed. No
+// replacement call was added elsewhere: it would just reintroduce the same
+// blanket download this ticket removes, for zero benefit.
 onMounted(() => {
   void authStore.initAuth(); // TASK-132: initAuth() is now async internally (see stores/auth.ts)
-  void preloadPriceData(); // fire-and-forget: download AllPricesToday.json.gz in background
 });
 </script>
 

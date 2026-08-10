@@ -1,4 +1,4 @@
-import { chunkIntoRows, documentOffsetTop, shouldLoadMore, shouldRemeasureOnFirstLoad, shouldResetScroll } from '@/composables/useVirtualGrid'
+import { chunkIntoRows, documentOffsetTop, shouldLoadMore, shouldResetScroll } from '@/composables/useVirtualGrid'
 import { makeCard } from '../helpers/fixtures'
 
 describe('shouldResetScroll', () => {
@@ -34,40 +34,6 @@ describe('shouldResetScroll', () => {
   it('resets when growing from an empty list is actually a replacement', () => {
     // 0 -> N is a genuine new result set, not an append: there is no prefix to keep.
     expect(shouldResetScroll(50, 0)).toBe(true)
-  })
-})
-
-describe('shouldRemeasureOnFirstLoad', () => {
-  // TASK-175: the 0 -> N transition (loading skeleton -> real grid) is when
-  // content above the grid reflows the most, staling the cached scrollMargin
-  // and pushing row 0 up into the section title. This locks exactly when the
-  // forced re-measure fires.
-  it('fires on the very first observation (prev undefined) if items already exist', () => {
-    expect(shouldRemeasureOnFirstLoad(50, undefined)).toBe(true)
-  })
-
-  it('fires when growing from an empty list (skeleton -> real grid)', () => {
-    expect(shouldRemeasureOnFirstLoad(50, 0)).toBe(true)
-  })
-
-  it('does not fire on the very first observation with no items yet', () => {
-    expect(shouldRemeasureOnFirstLoad(0, undefined)).toBe(false)
-  })
-
-  it('does not fire on an infinite-scroll page append (already had items)', () => {
-    expect(shouldRemeasureOnFirstLoad(100, 50)).toBe(false)
-  })
-
-  it('does not fire when the list shrank (filter narrowed results)', () => {
-    expect(shouldRemeasureOnFirstLoad(12, 500)).toBe(false)
-  })
-
-  it('does not fire when the list was emptied', () => {
-    expect(shouldRemeasureOnFirstLoad(0, 500)).toBe(false)
-  })
-
-  it('does not fire when the length is unchanged', () => {
-    expect(shouldRemeasureOnFirstLoad(50, 50)).toBe(false)
   })
 })
 

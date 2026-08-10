@@ -1,4 +1,4 @@
-import { computed, nextTick, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 
 /**
@@ -38,26 +38,6 @@ export function shouldResetScroll(length: number, previous: number | undefined):
   if (previous === undefined) return false
   if (previous === 0) return length > 0
   return length < previous
-}
-
-/**
- * Decide whether an items-length change is the "first real data arrived"
- * transition — i.e. the loading skeleton (CollectionView's SkeletonCard
- * block) being replaced by the real grid.
- *
- * TASK-175: this is exactly the moment the page content ABOVE the grid
- * reflows the most (section title/hero/stat chips going from placeholder to
- * final text, the skeleton block disappearing), which staled the
- * `scrollMargin` computed at mount and pushed row 0 up into the section
- * title (measured: 581px -> 528px as cards.length grew, 0 -> N). The only
- * automatic correction was the ResizeObserver on containerRef/its
- * offsetParent — async, at least one frame late. This decides when to force
- * a synchronous re-measure instead of waiting on that passive observer.
- *
- * Pure function — exported for unit testing.
- */
-export function shouldRemeasureOnFirstLoad(length: number, previous: number | undefined): boolean {
-  return (previous === undefined || previous === 0) && length > 0
 }
 
 /**
@@ -239,30 +219,7 @@ export function useVirtualGrid<T>(options: VirtualGridOptions<T>) {
 
   // Scroll back to the grid when the result SET changes (filter/sort/search).
   // Never on an infinite-scroll append — see shouldResetScroll.
-  watch(() => options.items.value.length, async (length, previous) => {
-    // TASK-175 review (team-lead): the 0 -> N transition isn't the only
-    // moment content above the grid reflows — a status-chip filter or a
-    // name search also narrows the result set (shouldResetScroll's "shrank"
-    // case) while the filter-count text above changes width/height too.
-    // Reuse shouldResetScroll's own "is this a genuinely new result set"
-    // heuristic (not just the first-load case) so the remeasure fires there
-    // too. Known residual gap, inherited from shouldResetScroll itself, not
-    // introduced here: a filter/search change that WIDENS the result set
-    // (N -> M growth) is indistinguishable by length alone from an
-    // infinite-scroll page append, so it stays untouched — same tradeoff
-    // shouldResetScroll already makes for the scroll-anchor decision below.
-    if (shouldRemeasureOnFirstLoad(length, previous) || shouldResetScroll(length, previous)) {
-      // Review (team-lead): nextTick() only flushes Vue's own DOM patch —
-      // it does NOT by itself guarantee the browser has recomputed layout.
-      // getBoundingClientRect() (inside updateLayout(), called next) forces
-      // a synchronous layout flush the moment it's read, so calling it
-      // right after nextTick() does observe the real post-reflow position,
-      // not a stale one — verified empirically after this change (see
-      // TASK-175 report) rather than assumed from the API contract alone.
-      await nextTick()
-      updateLayout()
-      virtualizer.value.measure()
-    }
+  watch(() => options.items.value.length, (length, previous) => {
     if (!shouldResetScroll(length, previous)) return
     // Anchor on the grid, not the document top: scrollToOffset does not add
     // scrollMargin back, so passing 0 scrolls the whole page to y=0.

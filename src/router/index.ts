@@ -31,7 +31,25 @@ const router = createRouter({
             path: '/inicio',
             name: 'home',
             component: () => import('../views/HomeView.vue'),
-            meta: { requiresAuth: true, title: 'seo.pages.home.title', description: 'seo.pages.home.description', robots: 'noindex, nofollow' },
+            // TASK-182: deliberately NOT requiresAuth. This route's own view
+            // (HomeView + GlobalSearch) reads nothing from the auth store —
+            // verified, zero authStore references — so the only thing the
+            // guard's wait bought here was a blank screen until Firebase Auth
+            // resolved. Measured at 600Kbps: blocking on that was the single
+            // largest component of the 7.5s to a usable hero, and it blocked
+            // BY DESIGN rather than by accident, which is why byte-trimming
+            // (TASK-171, TASK-178) barely moved the clock.
+            //
+            // Rafael's product call that makes this legal: a visitor with no
+            // session now SEES /inicio and can search (Scryfall needs no
+            // account) instead of being bounced to /login. robots stays
+            // noindex — reachable without an account is not the same as
+            // indexable, and that is a separate SEO decision.
+            //
+            // AppHeader's own nav is gated on TASK-182's optimistic
+            // predicate (utils/authChrome) so a logged-in user does not watch
+            // the navigation pop in during the window this opens.
+            meta: { title: 'seo.pages.home.title', description: 'seo.pages.home.description', robots: 'noindex, nofollow' },
         },
         {
             path: '/dashboard',

@@ -7,6 +7,8 @@ import { useMatchesStore } from '../../stores/matches'
 import { useMessagesStore } from '../../stores/messages'
 import { type SupportedLocale, useI18n } from '../../composables/useI18n'
 import { useTour } from '../../composables/useTour'
+import { shouldRenderAuthenticatedChrome } from '../../utils/authChrome'
+import { getLastKnownAuthState } from '../../utils/authLastKnown'
 import { sumUnreadCounts } from '../../utils/messageUnread'
 import IconV2 from '../ui/IconV2.vue'
 import UserPopover from '../ui/UserPopover.vue'
@@ -60,7 +62,17 @@ const handleHelpClickOutside = (e: MouseEvent) => {
   }
 }
 
-const isAuthenticated = computed(() => !!authStore.user)
+// TASK-182: /inicio dropped requiresAuth, so this header can now be on
+// screen while Firebase Auth is still resolving. `!!authStore.user` alone
+// would hide every nav element below (they all sit behind
+// v-if="isAuthenticated") for that whole window and then pop them in — a
+// layout jump on every load. Read once at setup: the cached value cannot
+// change while this component is alive without the store also resolving,
+// which the computed already reacts to.
+const lastKnownAuthState = getLastKnownAuthState()
+const isAuthenticated = computed(() =>
+  shouldRenderAuthenticatedChrome(authStore.hasSession, authStore.sessionKnown, lastKnownAuthState)
+)
 
 // Badge counts
 const newMatchesCount = computed(() => matchesStore.getUnseenCount())

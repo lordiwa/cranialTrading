@@ -35,6 +35,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('@/services/firebase', () => ({ db: {}, auth: { currentUser: null } }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: vi.fn(),

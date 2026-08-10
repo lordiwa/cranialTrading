@@ -21,6 +21,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('@/services/firebase', () => ({ db: {} }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({ user: { id: 'me-id', username: 'me' } }),
 }))

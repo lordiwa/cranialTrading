@@ -10,6 +10,7 @@ vi.mock('@/services/firebase', () => ({
   db: {},
   auth: {},
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('@/services/market', () => ({
   getPriceMovers: vi.fn(),

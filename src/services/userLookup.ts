@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from './firestore';
 import { normalizeUsername } from '../utils/username';
 
 /**

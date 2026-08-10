@@ -1,7 +1,7 @@
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { useI18n } from './useI18n'
 import { useAuthStore } from '../stores/auth'
 

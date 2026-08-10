@@ -42,7 +42,7 @@ export async function searchPublicCards(
     // after stores/auth.ts's own static imports were removed.
     const [{ collection, getDocs, limit, query, where }, { db }] = await Promise.all([
       import('firebase/firestore'),
-      import('./firebase'),
+      import('./firestore'),
     ])
     const publicCardsRef = collection(db, 'public_cards')
     const publicCardsQuery = query(

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { addDoc, collection, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
 import { useCollectionStore } from './collection'
 import { computeTotalValue, planFulfillment } from '../utils/buyRequest'

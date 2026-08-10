@@ -12,7 +12,7 @@ import {
     updateDoc,
     writeBatch,
 } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'

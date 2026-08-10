@@ -57,6 +57,7 @@ vi.mock('@/services/firebase', () => ({
   },
   db: {},
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: (...args: unknown[]) => onAuthStateChangedMock(...args),

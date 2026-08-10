@@ -22,6 +22,7 @@ vi.mock('@/services/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-user-id' } },
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 const mockBuildCardIndex = vi.fn().mockResolvedValue({ totalCards: 0, chunks: 0 })
 

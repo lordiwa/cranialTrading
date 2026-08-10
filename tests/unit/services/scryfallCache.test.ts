@@ -24,6 +24,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({
   db: {},
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 // Mock the raw scryfall service
 const mockRawGetCardById = vi.fn()

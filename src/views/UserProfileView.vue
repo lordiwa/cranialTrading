@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHead, useSeoMeta } from '@unhead/vue';
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../services/firestore';
 import { resolveUsernameToUid } from '../services/userLookup';
 import { getCardsByIds } from '../services/scryfallCache';
 import { buildEnrichmentPatch, needsEnrichment } from '../utils/cardEnrichment';

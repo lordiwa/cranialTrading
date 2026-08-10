@@ -19,6 +19,7 @@ vi.mock('@/services/firebase', () => ({
   auth: {},
   db: {},
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),

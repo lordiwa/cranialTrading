@@ -9,7 +9,7 @@ import {
     onSnapshot,
     Timestamp,
 } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { type Contact } from '../types/contact'

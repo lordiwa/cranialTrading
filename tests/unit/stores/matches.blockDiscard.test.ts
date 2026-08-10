@@ -24,6 +24,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('@/services/firebase', () => ({ db: {} }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/services/cloudFunctions', () => ({ notifyMatchUser: vi.fn().mockResolvedValue({ success: true }) }))
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({ user: { id: 'me-id', username: 'me', location: 'X', avatarUrl: null } }),

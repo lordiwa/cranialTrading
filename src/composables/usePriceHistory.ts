@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, writeBatch } from 'firebase/firestore'
-import { auth, db } from '../services/firebase'
+import { auth } from '../services/firebase'
+import { db } from '../services/firestore'
 import { useToastStore } from '../stores/toast'
 import type { Card } from '../types/card'
 import type { CardPrices } from '../services/mtgjson'

@@ -12,7 +12,7 @@ import { useToastStore } from '../stores/toast'
 import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs } from 'firebase/firestore'
 import { resolveUsernameToUid } from '../services/userLookup'
 import {

@@ -31,6 +31,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('@/services/firebase', () => ({ db: {} }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 // Mutable auth state — tests adjust user to simulate different auth states
 type MockUser = { id: string; tourCompleted?: boolean } | null

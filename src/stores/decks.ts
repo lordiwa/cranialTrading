@@ -10,7 +10,7 @@ import {
     Timestamp,
     updateDoc,
 } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { getCardsByIds } from '../services/scryfallCache'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'

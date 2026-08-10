@@ -27,6 +27,7 @@ vi.mock('firebase/firestore', () => ({
   where: (...args: unknown[]) => whereMock(...(args as [string, string, unknown])),
 }))
 vi.mock('@/services/firebase', () => ({ db: {} }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
 import { searchPublicCards } from '@/services/publicCardSearch'

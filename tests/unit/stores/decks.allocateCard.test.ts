@@ -17,6 +17,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({
   db: {},
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('@/services/scryfall', () => ({
   getCardsByIds: vi.fn().mockResolvedValue([]),

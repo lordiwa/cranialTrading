@@ -16,6 +16,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({
   db: {},
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('@/composables/useI18n', () => ({
   t: (key: string) => key,

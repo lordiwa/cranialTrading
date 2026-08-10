@@ -4,6 +4,7 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import type * as FirebaseAuthNS from 'firebase/auth';
 import type * as FirebaseFirestoreNS from 'firebase/firestore';
 import type * as FirebaseServicesNS from '../services/firebase';
+import type * as FirestoreServiceNS from '../services/firestore';
 import { type User } from '../types/user';
 import { useToastStore } from './toast';
 import { t, useI18n } from '../composables/useI18n';
@@ -33,12 +34,13 @@ import { isValidUsername, normalizeUsername } from '../utils/username';
 type FirebaseAuthModule = typeof FirebaseAuthNS;
 type FirebaseFirestoreModule = typeof FirebaseFirestoreNS;
 type FirebaseServicesModule = typeof FirebaseServicesNS;
+type FirestoreServiceModule = typeof FirestoreServiceNS;
 
 interface FirebaseDeps {
     authFns: FirebaseAuthModule;
     firestoreFns: FirebaseFirestoreModule;
     auth: FirebaseServicesModule['auth'];
-    db: FirebaseServicesModule['db'];
+    db: FirestoreServiceModule['db'];
 }
 
 /**
@@ -98,15 +100,21 @@ const waitForFirstPaintOrTimeout = (timeoutMs: number): Promise<void> => {
 
 const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
     if (!firebaseDepsPromise) {
+        // TASK-178 phase 1: mechanical only — still loads Auth AND Firestore
+        // together on every call, same as before the split. Behavior is
+        // unchanged; only the import path for `db` moved (services/firebase.ts
+        // no longer exports it). Splitting this into an auth-only path and a
+        // firestore-only path is phase 2, not this commit.
         firebaseDepsPromise = Promise.all([
             import('firebase/auth'),
             import('firebase/firestore'),
             import('../services/firebase'),
-        ]).then(([authFns, firestoreFns, services]) => ({
+            import('../services/firestore'),
+        ]).then(([authFns, firestoreFns, services, firestoreService]) => ({
             authFns,
             firestoreFns,
             auth: services.auth,
-            db: services.db,
+            db: firestoreService.db,
         })).catch((error: unknown) => {
             // TASK-132 review fix (HIGH-1): a failed dynamic import (network
             // blip, or a stale deployment whose chunk hash no longer exists)

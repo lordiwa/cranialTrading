@@ -9,7 +9,7 @@
 
 import { ref } from 'vue'
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { useI18n } from './useI18n'

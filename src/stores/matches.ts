@@ -11,7 +11,7 @@ import {
     where,
     writeBatch,
 } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../services/firestore';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { t } from '../composables/useI18n';

@@ -1,5 +1,5 @@
 import { doc, getDoc } from 'firebase/firestore'
-import { db } from './firebase'
+import { db } from './firestore'
 import type { Card } from '../types/card'
 
 // Types

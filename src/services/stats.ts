@@ -4,7 +4,7 @@
  * full-collection reads.
  */
 import { collection, getCountFromServer, getDocs } from 'firebase/firestore'
-import { db } from './firebase'
+import { db } from './firestore'
 
 /**
  * Returns the total number of registered users (excluding the calling

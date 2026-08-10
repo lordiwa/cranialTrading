@@ -7,7 +7,7 @@
  * All other functions pass through to the raw scryfall service unchanged.
  */
 import { collection, doc, documentId, getDoc, getDocs, query, where } from 'firebase/firestore'
-import { db } from './firebase'
+import { db } from './firestore'
 import {
   getCardById as rawGetCardById,
   getCardsByIds as rawGetCardsByIds,

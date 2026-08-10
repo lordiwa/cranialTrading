@@ -14,6 +14,7 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn((n: number) => ({ limit: n })),
 }));
 vi.mock('@/services/firebase', () => ({ db: {} }));
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 beforeEach(() => {
   getDocMock.mockReset();

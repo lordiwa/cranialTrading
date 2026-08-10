@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Mock Firebase modules
 vi.mock('../../../src/services/firebase', () => ({ db: {} }))
+vi.mock('../../../src/services/firestore', () => ({ db: {} }))
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),
   getDocs: vi.fn(),

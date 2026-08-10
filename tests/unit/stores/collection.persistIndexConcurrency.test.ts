@@ -30,6 +30,7 @@ vi.mock('@/services/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-user-id' } },
 }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: vi.fn(),

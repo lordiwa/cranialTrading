@@ -52,6 +52,7 @@ vi.mock('firebase/firestore', () => ({
   writeBatch: () => writeBatchMock(),
 }))
 vi.mock('@/services/firebase', () => ({ db: {} }))
+vi.mock('@/services/firestore', () => ({ db: {} }))
 
 // eslint-disable-next-line import/first
 import { batchSyncCardsToPublic, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'

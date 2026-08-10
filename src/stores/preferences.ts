@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
 import { addDoc, collection, getDocs } from 'firebase/firestore'
-import { db } from '../services/firebase'
+import { db } from '../services/firestore'
 import { type Preference, type PreferenceType } from '../types/preferences'
 import {
     syncAllUserPreferences,

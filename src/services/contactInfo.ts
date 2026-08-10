@@ -16,7 +16,7 @@
  * logueado.
  */
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore'
-import { db } from './firebase'
+import { db } from './firestore'
 
 export interface ContactInfo {
   email: string

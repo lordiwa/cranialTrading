@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, Timestamp, where, writeBatch } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../services/firestore';
 import { useAuthStore } from './auth';
 import { useToastStore } from './toast';
 import { type Conversation, type Message } from '../types/message';

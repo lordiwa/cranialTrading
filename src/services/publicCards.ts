@@ -26,7 +26,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
-import { db } from './firebase'
+import { db } from './firestore'
 import type { Card } from '../types/card'
 
 /** Firestore caps an 'in' filter at 30 values. */

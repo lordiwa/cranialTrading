@@ -82,6 +82,15 @@ let dbInstance: IDBDatabase | null = null
 const failedSets = new Set<string>()
 const loadedSets = new Set<string>()
 
+// TASK-174: in-flight-promise dedup, mirroring ensureSetListLoaded's
+// setListLoadPromise pattern below. Without these, concurrent callers
+// (e.g. several CollectionGridCard IntersectionObservers firing in the same
+// tick) each see priceDataCache/loadedSets as not-yet-populated and kick off
+// their own duplicate network fetch — measured as 5 concurrent 5.48MB
+// AllPricesToday.json.gz downloads from a single /collection page load.
+let priceDataLoadPromise: Promise<Record<string, MTGJSONPriceFormats>> | null = null
+const setMappingLoadPromises = new Map<string, Promise<void>>()
+
 // Set of UPPERCASE set codes that MTGJSON actually publishes a file for.
 // Loaded lazily from MTGJSON's SetList and cached in IndexedDB. Empty until
 // loaded; an empty set means "unknown" → no pre-filtering (legacy behavior).
@@ -320,43 +329,61 @@ async function fetchGzippedJson<T>(url: string): Promise<T> {
 }
 
 /**
- * Fetch price data from MTGJSON (AllPricesToday)
+ * Fetch price data from MTGJSON (AllPricesToday). Exported for direct
+ * TASK-174 dedup tests — internal callers (getCardPrices, preloadPriceData)
+ * still call it the same way.
  */
-async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
+export async function fetchPriceData(): Promise<Record<string, MTGJSONPriceFormats>> {
   // Check memory cache first
   if (priceDataCache) {
     return priceDataCache
   }
 
-  // Check IndexedDB cache
-  const cachedData = await loadPriceDataFromCache()
-  if (cachedData) {
-    priceDataCache = cachedData
-    return cachedData
+  // TASK-174: de-dupe concurrent callers onto a single in-flight load,
+  // same pattern as ensureSetListLoaded's setListLoadPromise below.
+  if (priceDataLoadPromise) {
+    return priceDataLoadPromise
   }
 
-  console.info('Fetching MTGJSON price data...')
+  priceDataLoadPromise = (async () => {
+    try {
+      // Check IndexedDB cache
+      const cachedData = await loadPriceDataFromCache()
+      if (cachedData) {
+        priceDataCache = cachedData
+        return cachedData
+      }
 
-  try {
-    const response = await fetchGzippedJson<{ data: Record<string, MTGJSONPriceFormats> }>(
-      `${MTGJSON_API}/AllPricesToday.json.gz`
-    )
+      console.info('Fetching MTGJSON price data...')
 
-    priceDataCache = response.data
+      const response = await fetchGzippedJson<{ data: Record<string, MTGJSONPriceFormats> }>(
+        `${MTGJSON_API}/AllPricesToday.json.gz`
+      )
 
-    // Save to IndexedDB (async, don't await)
-    savePriceDataToCache(response.data).then(() => {
-      console.info('MTGJSON price data cached to IndexedDB')
-    }).catch((e: unknown) => {
-      console.warn('Failed to cache price data:', e)
-    })
+      priceDataCache = response.data
 
-    console.info('MTGJSON price data loaded')
-    return response.data
-  } catch (error) {
-    console.error('Error fetching MTGJSON price data:', error)
-    throw error
-  }
+      // Save to IndexedDB (async, don't await)
+      savePriceDataToCache(response.data).then(() => {
+        console.info('MTGJSON price data cached to IndexedDB')
+      }).catch((e: unknown) => {
+        console.warn('Failed to cache price data:', e)
+      })
+
+      console.info('MTGJSON price data loaded')
+      return response.data
+    } catch (error) {
+      console.error('Error fetching MTGJSON price data:', error)
+      throw error
+    } finally {
+      // Clear regardless of outcome: on success priceDataCache now short-
+      // circuits future calls before this is even checked; on failure this
+      // MUST clear so a later retry issues a fresh fetch instead of forever
+      // returning/awaiting a promise that already rejected.
+      priceDataLoadPromise = null
+    }
+  })()
+
+  return priceDataLoadPromise
 }
 
 /**
@@ -426,38 +453,68 @@ async function ensureSetListLoaded(): Promise<void> {
 }
 
 /**
- * Fetch set data from MTGJSON and build scryfallId -> uuid mapping
+ * Fetch set data from MTGJSON and build scryfallId -> uuid mapping.
+ * Exported for direct TASK-174 dedup tests.
  */
-async function fetchSetMapping(setCode: string): Promise<void> {
+export async function fetchSetMapping(setCode: string): Promise<void> {
+  const upper = setCode.toUpperCase()
+
   // Pre-filter: skip set codes MTGJSON does not publish a file for, to avoid
   // 404 + CORS console spam. When the SetList is unavailable (validSetCodes
   // empty), isKnownMtgjsonSet returns true and we fall back to fetching.
   if (!isKnownMtgjsonSet(setCode, validSetCodes)) {
-    failedSets.add(setCode.toUpperCase())
+    failedSets.add(upper)
     return
   }
 
-  console.info(`Fetching MTGJSON set data for ${setCode}...`)
-
-  try {
-    const response = await fetchGzippedJson<{ data: { cards: { uuid: string; identifiers: { scryfallId?: string } }[] } }>(
-      `${MTGJSON_API}/${setCode.toUpperCase()}.json.gz`
-    )
-
-    let count = 0
-    for (const card of response.data.cards || []) {
-      if (card.uuid && card.identifiers?.scryfallId) {
-        scryfallToUuidMap.set(card.identifiers.scryfallId, card.uuid)
-        count++
-      }
-    }
-
-    loadedSets.add(setCode.toUpperCase())
-    console.info(`Loaded ${count} cards from ${setCode}`)
-  } catch (error) {
-    console.warn(`[MTGJSON] Set ${setCode} failed (will skip for this session):`, error)
-    failedSets.add(setCode.toUpperCase())
+  // Already fully loaded this session — a set's mapping doesn't change
+  // mid-session, so a second call (e.g. a later card from the same set that
+  // happens not to be in the map, or simply re-entering the same code) has
+  // nothing new to fetch.
+  if (loadedSets.has(upper)) {
+    return
   }
+
+  // TASK-174: de-dupe concurrent callers for the SAME set onto a single
+  // in-flight load, same pattern as ensureSetListLoaded's setListLoadPromise
+  // above — keyed per set since different sets are independent fetches.
+  const existing = setMappingLoadPromises.get(upper)
+  if (existing) {
+    return existing
+  }
+
+  const loadPromise = (async () => {
+    console.info(`Fetching MTGJSON set data for ${setCode}...`)
+
+    try {
+      const response = await fetchGzippedJson<{ data: { cards: { uuid: string; identifiers: { scryfallId?: string } }[] } }>(
+        `${MTGJSON_API}/${upper}.json.gz`
+      )
+
+      let count = 0
+      for (const card of response.data.cards || []) {
+        if (card.uuid && card.identifiers?.scryfallId) {
+          scryfallToUuidMap.set(card.identifiers.scryfallId, card.uuid)
+          count++
+        }
+      }
+
+      loadedSets.add(upper)
+      console.info(`Loaded ${count} cards from ${setCode}`)
+    } catch (error) {
+      console.warn(`[MTGJSON] Set ${setCode} failed (will skip for this session):`, error)
+      failedSets.add(upper)
+    } finally {
+      // Clear regardless of outcome — on success loadedSets now short-
+      // circuits future calls above; on failure this MUST clear so a later
+      // retry of the same set issues a fresh fetch instead of hanging on
+      // (or silently no-op-ing against) an already-settled promise.
+      setMappingLoadPromises.delete(upper)
+    }
+  })()
+
+  setMappingLoadPromises.set(upper, loadPromise)
+  return loadPromise
 }
 
 /**

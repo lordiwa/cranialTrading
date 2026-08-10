@@ -98,8 +98,18 @@ async function measure(ctx, keepIndexedDb, applyThrottle = throttle, waitForCach
   await cdp.send('Network.enable');
   const reqMeta = new Map(); // requestId -> { url, resourceType }
   const byteLog = new Map(); // url -> { url, resourceType, declaredBytes, actualBytes, finished }
+  // TASK-178 phase 2: WHEN a request starts, relative to navigation, is the
+  // only way to answer this ticket's actual question — a chunk appearing in
+  // the boot request list is not the same as a chunk BLOCKING first render.
+  // navStart is stamped just before page.goto below; requests fired before
+  // that (there are none in practice) would read negative.
+  let navStart = null;
   cdp.on('Network.requestWillBeSent', (e) => {
-    reqMeta.set(e.requestId, { url: e.request.url, resourceType: e.type });
+    reqMeta.set(e.requestId, {
+      url: e.request.url,
+      resourceType: e.type,
+      startedAt: navStart === null ? null : Date.now() - navStart,
+    });
   });
   cdp.on('Network.responseReceived', (e) => {
     const meta = reqMeta.get(e.requestId);
@@ -113,6 +123,7 @@ async function measure(ctx, keepIndexedDb, applyThrottle = throttle, waitForCach
     byteLog.set(meta.url, {
       url: meta.url,
       resourceType: meta.resourceType,
+      startedAt: meta.startedAt,
       declaredBytes: cl ? Number(cl) : null,
       actualBytes: null,
       finished: false,
@@ -172,6 +183,7 @@ async function measure(ctx, keepIndexedDb, applyThrottle = throttle, waitForCach
     }
   }, keepIndexedDb);
 
+  navStart = Date.now();
   await page.goto(url, { waitUntil: 'commit', timeout: 120000 });
 
   // Wait for hero input, bounded. Longer under --throttle: FAST3G/harsh4G
@@ -320,11 +332,18 @@ results.forEach((r, i) => {
   });
   console.log(`  TOTAL declared=${(totalDeclared / 1024 / 1024).toFixed(2)}MB  |  deferrable=${(totalDeferrable / 1024 / 1024).toFixed(2)}MB  irreducible=${(totalIrreducible / 1024).toFixed(1)}KB`);
 
-  console.log(`  per-request detail:`);
-  [...r.byteLog].sort((a, b) => (b.declaredBytes ?? 0) - (a.declaredBytes ?? 0)).forEach(entry => {
+  // TASK-178 phase 2: ordered by request START time, not by size — reading a
+  // boot waterfall by size hides the one thing that decides whether a chunk
+  // is on the critical path. `AFTER HERO` means the hero input already
+  // existed in the DOM when this request was fired, so it cannot have
+  // delayed it.
+  console.log(`  per-request detail (in request order; hero input at ${r.heroInputAt ?? 'N/A'}ms):`);
+  [...r.byteLog].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0)).forEach(entry => {
     const kb = entry.declaredBytes != null ? (entry.declaredBytes / 1024).toFixed(1) + 'KB' : 'unknown';
     const finishedNote = entry.finished ? '' : ' [BODY STILL IN FLIGHT at snapshot]';
-    console.log(`    ${kb.padStart(10)}  ${classify(entry.url).padEnd(38)} ${entry.resourceType.padEnd(8)} ${entry.url}${finishedNote}`);
+    const at = entry.startedAt != null ? `t+${String(entry.startedAt).padStart(6)}ms` : '     t+?   ';
+    const afterHero = (entry.startedAt != null && r.heroInputAt != null && entry.startedAt > r.heroInputAt) ? ' [AFTER HERO]' : '';
+    console.log(`    ${at}  ${kb.padStart(10)}  ${classify(entry.url).padEnd(38)} ${entry.resourceType.padEnd(8)} ${entry.url}${finishedNote}${afterHero}`);
   });
 });
 

@@ -22,7 +22,12 @@
  */
 import { vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ authAccessAttempts: 0, authShouldFailOnce: false }))
+const state = vi.hoisted(() => ({
+  authAccessAttempts: 0,
+  authShouldFailOnce: false,
+  dbAccessAttempts: 0,
+  dbShouldFailOnce: false,
+}))
 
 const getDocMock = vi.fn()
 const onAuthStateChangedMock = vi.fn()
@@ -57,7 +62,22 @@ vi.mock('@/services/firebase', () => ({
   },
   db: {},
 }))
-vi.mock('@/services/firestore', () => ({ db: {} }))
+// TASK-178 phase 2: `db` is a getter for the same reason `auth` above is —
+// so a test can make exactly the next access throw, which makes
+// loadFirestoreDeps()'s mapper reject. Needed as its OWN switch now that the
+// two halves load and memoize independently: firestore-only callers
+// (checkUsernameAvailable, reserveUsername, ...) no longer touch `auth` at
+// all, so the auth switch can't reach them any more.
+vi.mock('@/services/firestore', () => ({
+  get db() {
+    state.dbAccessAttempts++
+    if (state.dbShouldFailOnce) {
+      state.dbShouldFailOnce = false
+      throw new Error('simulated firestore chunk load failure')
+    }
+    return {}
+  },
+}))
 
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: (...args: unknown[]) => onAuthStateChangedMock(...args),
@@ -92,15 +112,17 @@ beforeEach(() => {
   vi.resetModules()
   state.authAccessAttempts = 0
   state.authShouldFailOnce = false
+  state.dbAccessAttempts = 0
+  state.dbShouldFailOnce = false
   getDocMock.mockReset()
   onAuthStateChangedMock.mockReset()
   signInWithEmailAndPasswordMock.mockReset()
 })
 
 describe('loadFirebaseDeps memoized-rejection fix (HIGH-1)', () => {
-  it('a failed import is not cached forever — the next call attempts a fresh import and can succeed', async () => {
+  it('a failed FIRESTORE import is not cached forever — the next call attempts a fresh import and can succeed', async () => {
     getDocMock.mockResolvedValue({ exists: () => false })
-    state.authShouldFailOnce = true
+    state.dbShouldFailOnce = true
     const { store } = await freshStores()
 
     // First call: the underlying deps load fails. checkUsernameAvailable's
@@ -108,7 +130,7 @@ describe('loadFirebaseDeps memoized-rejection fix (HIGH-1)', () => {
     // what happens on the SECOND call, not this one.
     const firstResult = await store.checkUsernameAvailable('someuser')
     expect(firstResult).toBe(false)
-    expect(state.authAccessAttempts).toBe(1)
+    expect(state.dbAccessAttempts).toBe(1)
 
     // Second call: if the rejected promise were still memoized (the bug),
     // this would replay the SAME failure without ever touching the mock
@@ -116,7 +138,57 @@ describe('loadFirebaseDeps memoized-rejection fix (HIGH-1)', () => {
     // getter fires again (attempt 2) and this time succeeds.
     const secondResult = await store.checkUsernameAvailable('someuser')
     expect(secondResult).toBe(true)
+    expect(state.dbAccessAttempts).toBe(2)
+  })
+
+  // TASK-178 phase 2: same guarantee, now proven on the auth half too — the
+  // two memos are separate variables, so the recovery behaviour had to be
+  // re-established for each rather than inherited from the single old one.
+  it('a failed AUTH import is not cached forever either', async () => {
+    state.authShouldFailOnce = true
+    const { store } = await freshStores()
+
+    await store.firebaseNeededNow()
+    expect(state.authAccessAttempts).toBe(1)
+    expect(onAuthStateChangedMock).not.toHaveBeenCalled()
+
+    await store.firebaseNeededNow()
     expect(state.authAccessAttempts).toBe(2)
+    expect(onAuthStateChangedMock).toHaveBeenCalledTimes(1)
+  })
+
+  // TASK-178 phase 2, the split's actual load-bearing claim: the boot path
+  // (ensureSubscription, what the router guard waits on) must resolve WITHOUT
+  // the Firestore half being loaded at all. `db` is a getter, so an untouched
+  // dbAccessAttempts is direct evidence that services/firestore was never
+  // pulled in — which is what keeps the 112KB firestore chunk off the boot
+  // request list. If someone later reroutes ensureSubscription back through
+  // loadFirebaseDeps(), this goes red.
+  it('the boot subscription resolves without ever loading the Firestore half', async () => {
+    const { store } = await freshStores()
+
+    await store.firebaseNeededNow()
+
+    expect(onAuthStateChangedMock).toHaveBeenCalledTimes(1)
+    expect(state.authAccessAttempts).toBe(1)
+    expect(state.dbAccessAttempts).toBe(0)
+  })
+
+  // Each memo clears only itself: a dead Firestore chunk must not evict an
+  // auth subscription that loaded fine (they used to share one variable).
+  it('a Firestore failure does not tear down the already-loaded auth half', async () => {
+    getDocMock.mockResolvedValue({ exists: () => false })
+    const { store } = await freshStores()
+
+    await store.firebaseNeededNow()
+    expect(state.authAccessAttempts).toBe(1)
+
+    state.dbShouldFailOnce = true
+    await store.checkUsernameAvailable('someuser')
+
+    // The auth half was never re-imported — its memo survived intact.
+    expect(state.authAccessAttempts).toBe(1)
+    expect(onAuthStateChangedMock).toHaveBeenCalledTimes(1)
   })
 })
 

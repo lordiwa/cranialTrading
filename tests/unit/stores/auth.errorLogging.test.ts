@@ -42,6 +42,10 @@ vi.mock('firebase/auth', () => ({
   updatePassword: vi.fn(),
   deleteUser: vi.fn(),
   verifyBeforeUpdateEmail: vi.fn(),
+  // TASK-172: loginWithGoogle now reads authFns.browserPopupRedirectResolver
+  // to pass it as signInWithPopup's third argument — must be present in the
+  // mock or the module-namespace property access itself throws.
+  browserPopupRedirectResolver: { __marker: 'browserPopupRedirectResolver' },
 }))
 
 vi.mock('@/composables/useI18n', () => ({

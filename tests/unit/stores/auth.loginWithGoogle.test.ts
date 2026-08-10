@@ -31,6 +31,8 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('@/services/firebase', () => ({ db: {}, auth: { currentUser: null } }))
 
+const browserPopupRedirectResolverMock = { __marker: 'browserPopupRedirectResolver' }
+
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: vi.fn(),
   createUserWithEmailAndPassword: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('firebase/auth', () => ({
   confirmPasswordReset: vi.fn(),
   updatePassword: vi.fn(),
   deleteUser: vi.fn(),
+  browserPopupRedirectResolver: browserPopupRedirectResolverMock,
 }))
 
 vi.mock('@/composables/useI18n', () => ({
@@ -61,6 +64,25 @@ beforeEach(() => {
 import { useAuthStore } from '@/stores/auth'
 
 describe('loginWithGoogle', () => {
+  it('TASK-172: passes browserPopupRedirectResolver as the third argument of signInWithPopup (not via initializeAuth)', async () => {
+    signInWithPopupMock.mockResolvedValueOnce({
+      user: { uid: 'uid-resolver', displayName: 'Resolver Check', email: 'resolver@example.com', photoURL: null },
+    })
+    getDocMock
+      .mockResolvedValueOnce({ exists: () => true })
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ email: 'resolver@example.com', username: 'resolver_check', location: '', createdAt: { toDate: () => new Date() } }),
+      })
+
+    const store = useAuthStore()
+    await store.loginWithGoogle()
+
+    expect(signInWithPopupMock).toHaveBeenCalledTimes(1)
+    const [, , resolverArg] = signInWithPopupMock.mock.calls[0]
+    expect(resolverArg).toBe(browserPopupRedirectResolverMock)
+  })
+
   it('reserves a unique username and creates the user doc for a brand-new Google user', async () => {
     signInWithPopupMock.mockResolvedValueOnce({
       user: { uid: 'uid1', displayName: 'Rafael M', email: 'rafael@example.com', photoURL: 'http://x/p.png' },

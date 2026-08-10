@@ -539,7 +539,12 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const { authFns, firestoreFns, auth, db } = await loadFirebaseDeps();
             const provider = new authFns.GoogleAuthProvider();
-            const userCredential = await authFns.signInWithPopup(auth, provider);
+            // TASK-172: browserPopupRedirectResolver is passed here (per-call)
+            // instead of at initializeAuth() in services/firebase.ts, so the
+            // popup/redirect resolver — and the reCAPTCHA/gapi iframe it
+            // injects — only loads when someone actually clicks "sign in with
+            // Google", not on every app boot.
+            const userCredential = await authFns.signInWithPopup(auth, provider, authFns.browserPopupRedirectResolver);
             const firebaseUser = userCredential.user;
 
             // Check if user document exists

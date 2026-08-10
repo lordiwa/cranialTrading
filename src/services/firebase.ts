@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { browserLocalPersistence, browserPopupRedirectResolver, initializeAuth } from 'firebase/auth';
+import { browserLocalPersistence, initializeAuth } from 'firebase/auth';
 import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -12,9 +12,15 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// TASK-172: popupRedirectResolver is intentionally NOT passed here. Doing so
+// makes initializeAuth eagerly mount Firebase's popup/redirect resolver on
+// every app boot, which injects a reCAPTCHA/gapi iframe (api.js, bframe
+// script, rum beacon — ~3 third-party requests, ~2s each) into every page
+// load, even when nobody uses Google sign-in. The resolver is instead passed
+// per-call to signInWithPopup (see stores/auth.ts loginWithGoogle) — the only
+// place a popup is actually opened.
 export const auth = initializeAuth(app, {
     persistence: browserLocalPersistence,
-    popupRedirectResolver: browserPopupRedirectResolver,
 });
 export const db = initializeFirestore(app, {
     localCache: memoryLocalCache(),

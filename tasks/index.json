@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-09T16:26:31.460Z",
+  "generated_at": "2026-08-10T18:19:21.199Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -874,7 +874,7 @@
     {
       "key": "TASK-166",
       "title": "Tramo E de /inicio: ~7 segundos entre que el perfil llega y el buscador queda usable, sin causa identificada",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "high"
     },
     {
@@ -900,6 +900,90 @@
       "title": "El perfil publico da 404 si el username tiene mayusculas y el usuario es anterior al indice",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-171",
+      "title": "Sacar preloadPriceData del arranque global — /inicio no muestra ni un precio y baja AllPricesToday.json.gz igual",
+      "status": "done",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-172",
+      "title": "El iframe de reCAPTCHA de Google se carga en cada arranque aunque nadie use el login con Google",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-173",
+      "title": "Precios de Card Kingdom desde un archivo propio reducido en vez de bajar los 5,48 MB de MTGJSON al celular",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-174",
+      "title": "La descarga de precios se dispara 5 veces en paralelo: 27,4 MB en una sola carga de la colección",
+      "status": "done",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-175",
+      "title": "Los recuadros grises de carga en la colección: feos, y además la grilla salta y pisa el título de sección",
+      "status": "in_progress",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-176",
+      "title": "E2E rojo: \"bulk change status to Sale\" se queda esperando 90 s a que se oculte la barra de selección",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-177",
+      "title": "Tormenta de reintentos: si la descarga de precios se corta a mitad, varias tarjetas reintentan a la vez",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-178",
+      "title": "El tiempo de arranque en 4G lenta lo domina el bundle de la app, no los datos: ~7 s para bajar 360 KB",
+      "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-179",
+      "title": "La colección no llega a mostrar ni una carta en 44 segundos bajo 4G lenta, y no es por los precios",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-180",
+      "title": "Cuentas de prueba de 200k cartas en dev — el 30% del mercado nunca se ha probado",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-181",
+      "title": "Los stores del header importan firebase/firestore estáticamente y por eso los 112 KB entran en el arranque de /inicio",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-182",
+      "title": "/inicio deja de exigir sesión: el hero se pinta sin esperar a Firebase Auth y el buscador funciona sin cuenta",
+      "status": "in_review",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-183",
+      "title": "El header no se monta en el primer render de /inicio — se lleva puestos los stores, los iconos y el avatar",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-184",
+      "title": "Los dos modales globales metían Firebase entero en el arranque de /inicio",
+      "status": "in_review",
+      "priority": "critical"
     }
   ]
 }

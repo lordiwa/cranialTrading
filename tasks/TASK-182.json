@@ -1,0 +1,38 @@
+{
+  "key": "TASK-182",
+  "title": "/inicio deja de exigir sesión: el hero se pinta sin esperar a Firebase Auth y el buscador funciona sin cuenta",
+  "description": "Decisión de Rafael 2026-08-10, elegida sobre otras 14 alternativas. Sale de que TASK-178 fase 2 se revirtió por medir peor: recortar bytes no movió el reloj, porque el problema no es cuánto pesa Firebase sino que /inicio NO PUEDE EXISTIR hasta que Firebase resuelva.\n\nLO MEDIDO QUE JUSTIFICA ESTO: /inicio tiene requiresAuth, así que el guard del router espera a que cargue Firebase Auth antes de dejar pasar la navegación. Bloquear cada recurso por separado mostró que sin Firebase la pantalla NUNCA aparece. Es el 87% del bundle bloqueando POR DISEÑO. Baseline actual a 600 Kbps, /inicio en frío, mediana de 3 corridas: 7522 ms hasta que el buscador existe en el DOM.\n\nY EL DATO QUE LO HACE POSIBLE: HomeView.vue y GlobalSearch.vue no leen NADA de auth — cero referencias a authStore. La dependencia de sesión de /inicio es el guard y el header, no la pantalla.\n\nDECISIÓN DE PRODUCTO DE RAFAEL: un visitante sin sesión pasa a VER /inicio y a poder buscar, en vez de ser mandado a /login. Scryfall es público, la búsqueda no necesita cuenta. En lugar del menú de usuario ve el acceso a entrar.\n\nLAS DOS PARTES:\n(a) Sacar requiresAuth del meta de /inicio. Con eso shouldBlockOnAuthLoading deja de tapar la pantalla con el loader, el guard deja de llamar a firebaseNeededNow(), y Firebase pasa a cargarse por el camino diferido de TASK-132 — después del pintado, no antes.\n(b) EL RIESGO REAL, y por qué (b) no es opcional: AppHeader esconde TODA la navegación con v-if=\"isAuthenticated\", que hoy es !!authStore.user. Si la pantalla se pinta antes de que auth resuelva, un usuario logueado ve por un momento el header SIN navegación y después aparece — un salto de layout en cada carga. isAuthenticated tiene que pintarse optimista mientras la sesión no se conoce, usando el estado ya cacheado en localStorage (utils/authLastKnown, que existe desde TASK-129 justo para esto).\n\nOJO CON LO QUE NO HAY QUE ROMPER: /inicio queda con robots noindex como está hoy — que sea accesible sin cuenta no significa que se indexe, y eso es una decisión de SEO aparte. Y el redirect de '/' a /inicio se mantiene.\n\nCÓMO SE VERIFICA, y esto manda sobre el reloj: en la traza de red de /inicio a 600 Kbps, el chunk de Firebase deja de estar entre lo que bloquea la aparición del hero. El tiempo es consecuencia. Comparar contra un baseline tomado ESPALDA CON ESPALDA en la misma sesión de medición, nunca contra un número de hace horas — esa fue la trampa que casi se cuela hoy.",
+  "acceptance_criteria": [
+    "/inicio ya no tiene requiresAuth y un visitante sin sesión ve el hero y puede buscar",
+    "Un usuario con sesión no ve la navegación del header aparecer tarde ni saltar el layout: se pinta optimista con el estado cacheado mientras auth no resuelve",
+    "El estado cacheado que dice invitado, o la ausencia de estado, no pinta navegación de logueado",
+    "Medición antes y después a 600 Kbps con scripts/perf-measure-inicio.mjs, 3 corridas, baseline tomado espalda con espalda",
+    "En la traza de red, el chunk de Firebase deja de preceder la aparición del hero",
+    "/inicio conserva robots noindex y '/' sigue redirigiendo a /inicio",
+    "Sin regresión en la suite E2E, en particular e2e/specs/auth"
+  ],
+  "status": "in_review",
+  "priority": "critical",
+  "labels": [
+    "perf",
+    "4g-lenta",
+    "inicio"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "04e3bc3"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-10T21:30:00.000Z",
+      "body": "2026-08-10 — HECHO Y MEDIDO. Commit 04e3bc3. /inicio en frío a 600 Kbps, 3 corridas, espalda con espalda: 6849 ms sin el cambio contra 5879 ms con el cambio. ~970 ms, ~15%, sin que se solapen las corridas. Verificado además en navegador real: el invitado ve el hero y el autocompletado de Scryfall responde sin cuenta.\n\nEL BUG QUE SÓLO ATRAPÓ LA MEDICIÓN, y que es la lección de este ticket: la primera versión del predicado del header leía authStore.user e hizo exactamente lo que venía a evitar — la navegación se pintaba y DESAPARECÍA un instante después, 3 corridas de 3. TASK-165 había separado las señales: sessionKnown y hasSession se escriben sincrónicamente dentro de onAuthStateChanged, mientras que user espera la lectura de /users/{uid} en Firestore, que en enlace lento llega un segundo o más tarde. Leer user hacía que esa ventana pareciera \"ya resolvió, y es invitado\". Ahora lee hasSession, con un test clavado en ese estado exacto. Revisar el código no lo habría encontrado; una captura tomada en el primer pintado sí.\n\nHUECOS CONOCIDOS, dejados a propósito y sin arreglar acá: (1) /search sigue con requiresAuth, así que el invitado que realmente busca termina en /login — el autocompletado funciona, la página de resultados no, o sea que \"puede buscar\" es hoy la mitad; (2) los accesos COLECCIÓN / MATCHES / WISHLIST de /inicio se le muestran al invitado y lo rebotan a login. Los dos merecen su propio ticket si Rafael quiere cerrar la promesa de buscar sin cuenta.\n\nAC5 (medir contra dev desplegado) sigue sin cumplirse: se midió contra preview local porque la tanda no está en dev. El sesgo es que localhost sirve a velocidad de disco, mitigado con throttling de CDP a 600 Kbps sobre todas las peticiones."
+    }
+  ],
+  "created_at": "2026-08-10T20:10:00.000Z",
+  "updated_at": "2026-08-10T21:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

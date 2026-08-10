@@ -1,0 +1,33 @@
+{
+  "key": "TASK-184",
+  "title": "Los dos modales globales metían Firebase entero en el arranque de /inicio",
+  "description": "Sale de perseguir por qué el chunk de Firebase se seguía pidiendo en t+2,4 s después de TASK-182 y TASK-183.\n\nLA CADENA, encontrada con la pila de iniciador de CDP y no leyendo imports: AppContainer -> WelcomeModal -> composables/useTour -> import estático de firebase/firestore. Ese único borde metía los 162 KB comprimidos de Firebase en el grafo del chunk DE LA RUTA, así que se pedía en el arranque hiciera lo que hiciera stores/auth.ts con su propio import diferido.\n\nLA PRUEBA DE QUE ERA ESO: se difirió la petición de auth.ts a esperar el evento load en vez del primer pintado, y midió 5594 ms contra 5560 ms, o sea nada. Ese intento se descartó en vez de dejarlo como peso muerto. Ninguno de los dos modales renderiza nada hasta que se abre; su costo nunca fue su marcado.\n\nRESULTADO MEDIDO, /inicio en frío a 600 Kbps, 3 corridas: 5560 ms antes contra 3228 ms después. Acumulado con TASK-182 y TASK-183 contra el mismo baseline espalda con espalda: 6849 -> 3228 ms, ~3620 ms, ~53%. Y el chunk de Firebase ahora se pide DESPUÉS de que el hero existe en el DOM — el criterio de cierre que puso TASK-178 y que no se podía alcanzar desde auth.ts.\n\nEL BUG QUE CASI SE VA ASÍ, y que ninguna medición podía atrapar: programar los imports diferidos sólo desde requestAnimationFrame hacía que nunca corrieran en una pestaña no visible, porque rAF no dispara en segundo plano — el header simplemente no aparecía nunca. Todas las corridas de Playwright se veían perfectas porque sus páginas cuentan como visibles. Apareció al abrir la app en una ventana de Chrome real sin foco. Abrir un enlace en pestaña de fondo o restaurar una sesión es algo normal. Ahora un setTimeout compite con el camino de rAF, que sigue ganando siempre que la pestaña esté visible.",
+  "acceptance_criteria": [
+    "El chunk de Firebase no se pide antes de que el hero exista en el DOM de /inicio",
+    "Medición antes y después a 600 Kbps, 3 corridas, baseline espalda con espalda",
+    "Sin salto de layout, verificado en logueado e invitado a 1400 px y 390 px",
+    "Los modales diferidos siguen abriéndose (verificado a mano en navegador)",
+    "El header aparece también en una pestaña abierta en segundo plano",
+    "Sin regresión en la suite E2E"
+  ],
+  "status": "in_review",
+  "priority": "critical",
+  "labels": [
+    "perf",
+    "4g-lenta",
+    "inicio"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-183"
+  ],
+  "linked_commits": [
+    "46fa9da"
+  ],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-10T22:10:00.000Z",
+  "updated_at": "2026-08-10T22:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

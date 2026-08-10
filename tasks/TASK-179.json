@@ -1,0 +1,34 @@
+{
+  "key": "TASK-179",
+  "title": "La colección no llega a mostrar ni una carta en 44 segundos bajo 4G lenta, y no es por los precios",
+  "description": "Hallado 2026-08-10 por DOS agentes de forma independiente, midiendo cosas distintas, y confirmado descartando la causa que ambos sospechaban primero.\n\nLO MEDIDO: con la red estrangulada a 600 Kbps y la cuenta de pruebas de 59.087 cartas, /collection muestra sólo esqueletos de carga y CERO tarjetas reales durante toda la ventana de medición — 44 segundos en un caso, y en otra medición independiente ni la primera carta llegó a montar en 90 segundos.\n\nLA CAUSA QUE SE DESCARTÓ, y cómo: la primera hipótesis fue que las 5 descargas paralelas de precios (TASK-174) saturaban el enlace y dejaban sin ancho de banda a la carga de la colección. Sonaba redonda y encajaba con todo lo demás que se midió hoy. Es FALSA: el agente volvió a correr la medición bloqueando mtgjson.com por completo a nivel de red, y los números salieron EXACTAMENTE iguales — 60 esqueletos, cero tarjetas, hasta los 44 s. Los precios no tienen nada que ver.\n\nQUÉ QUEDA COMO CAUSA, sin confirmar: la propia carga inicial de la colección desde Firestore. El segundo agente, midiendo otra cosa, llegó a la misma conclusión por su cuenta: \"la paginación de Firestore domina antes de que cualquier IntersectionObserver dispare\". Ninguno de los dos lo persiguió porque no era su ticket.\n\nPOR QUÉ IMPORTA: la colección es el corazón de dos de los cuatro flujos prioritarios de negocio — revisar precios de cartas, y quitar o poner cartas a la venta. Si en la red del mercado de lanzamiento la pantalla tarda casi un minuto en mostrar la primera carta, esos flujos no son usables, por más rápido que arranque /inicio.\n\nSALVEDAD IMPORTANTE, que evita que este ticket empiece con el pie izquierdo: TODO lo anterior se midió con la cuenta de pruebas de 59.087 cartas. La cuenta real de Rafael tiene ~5.600, diez veces menos. NO se ha medido con una cuenta de tamaño realista, y la relación no tiene por qué ser lineal. El primer paso de este ticket es medir con una cuenta representativa antes de sacar cualquier conclusión sobre la experiencia real de un usuario.\n\nRELACIÓN CON OTROS TICKETS: TASK-175 (los esqueletos grises) es la CARA VISIBLE de esto — el usuario mira recuadros grises justamente durante todo este tiempo. Arreglar cómo se ven los esqueletos no arregla que la espera exista. Y TASK-173 (el archivo reducido de precios) no toca esto en absoluto: son datos distintos por caminos distintos.",
+  "acceptance_criteria": [
+    "Medido primero con una cuenta de tamaño realista (~5.600 cartas), no sólo con la de pruebas de 59.000: cuánto tarda en aparecer la primera carta a 600 Kbps",
+    "Identificado con medición qué domina ese tiempo — tamaño de la respuesta de Firestore, cantidad de peticiones, procesamiento en el cliente, o el render — aislando una variable por vez",
+    "Queda escrito si el tiempo escala con el tamaño de la colección y cómo, para saber si esto afecta a todos los usuarios o sólo a los que tienen colecciones enormes",
+    "Si se identifica una mejora concreta, va en un ticket aparte con su propia medición antes y después — éste es de diagnóstico",
+    "Las mediciones se hacen con estrangulamiento de red, que es la única condición donde el problema se ve"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "coleccion",
+    "4g-lenta"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-10T17:54:56.805Z",
+      "body": "2026-08-10 — CORRECCIÓN DE CRITERIO, por decisión de Rafael. La salvedad que este ticket trae escrita está mal enfocada y hay que darla vuelta.\n\nLO QUE DECÍA EL TICKET: que los 44 segundos se midieron con la cuenta de 59.087 cartas, que la de Rafael tiene ~5.600, y que el primer paso era medir con una cuenta \"de tamaño realista\" antes de sacar conclusiones.\n\nEL CRITERIO DE RAFAEL, que es mejor: si funciona con 59.000, funciona con 5.600. Al revés no. Medir con la cuenta chica sólo demuestra que cubrimos colecciones pequeñas. Además avisa que conoce colecciones de 100.000 cartas o más, o sea que 59.000 no es el extremo: está en el medio.\n\nCONSECUENCIA PARA ESTE TICKET: los 44 segundos dejan de ser una anécdota de un caso extremo y pasan a ser EL caso a cubrir. No hay que rebajarlo midiendo con una cuenta chica para que dé un número más cómodo. El AC de \"medir primero con una cuenta de tamaño realista\" queda invertido: la cuenta grande ES la realista para la pregunta de si el producto aguanta, y el objetivo de diseño debería ser 100.000 o más, no 59.000.\n\nEL MATIZ QUE SÍ SE MANTIENE, y que es distinto: para DIAGNOSTICAR una causa concreta, a veces conviene una cuenta chica, porque en la grande otra cosa domina y tapa la señal. Eso pasó hoy en vivo: un agente intentaba medir el estado de carga de las tarjetas (TASK-175) con la cuenta de 59.000, y la propia carga de datos tardaba tanto que nunca llegaba al momento que quería observar. La regla que queda es: probar el aguante siempre con la más grande; diagnosticar con la que deje ver el fenómeno.\n\nPREGUNTA ABIERTA A RAFAEL, todavía sin responder: si esas colecciones de 100.000 son de usuarios que ya usan la aplicación o de gente que quiere que la use. Cambia si esto es un problema de hoy o un objetivo de diseño para mañana."
+    }
+  ],
+  "created_at": "2026-08-10T17:38:03.565Z",
+  "updated_at": "2026-08-10T17:54:56.805Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

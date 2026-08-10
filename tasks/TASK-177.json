@@ -1,0 +1,29 @@
+{
+  "key": "TASK-177",
+  "title": "Tormenta de reintentos: si la descarga de precios se corta a mitad, varias tarjetas reintentan a la vez",
+  "description": "Hallado 2026-08-10 mientras se verificaba TASK-174, y reportado por el propio agente que hizo ese arreglo en vez de dejarlo pasar. Es un mecanismo DISTINTO al que arregla TASK-174, aunque el síntoma se parezca.\n\nQUÉ SE OBSERVÓ: con la red estrangulada a fast3g (1,6 Mbps), una navegación a /collection produjo 6 peticiones a AllPricesToday.json.gz en lugar de 1 — pero la secuencia de tiempos descarta que sea el bug de TASK-174. Lo medido: una primera petición arranca, tarda ~12 s y TERMINA (CDP marca loadingFinished). Unos 160 ms después aparecen 5 peticiones nuevas simultáneas. O sea que no hay solapamiento con la primera: la primera ya había terminado cuando arrancan las otras.\n\nHIPÓTESIS DEL AGENTE, explícitamente NO verificada del todo: bajo red lenta real contra internet real, el flujo de 5,48 MB se corta después de que el navegador ya lo dio por descargado — falla al convertirlo a blob o al descomprimirlo. Eso dispara el camino de error del arreglo de TASK-174, que limpia correctamente la promesa memoizada (eso SÍ está confirmado que funciona), y entonces todas las tarjetas que estaban esperando esa promesa fallida reintentan, sin sincronizarse entre ellas.\n\nO sea: TASK-174 arregla las carreras al INICIO, sin fallo de por medio. Esto es una tormenta de reintentos DESPUÉS de un fallo real de red. Son dos cosas distintas y el arreglo de una no cubre la otra.\n\nPOR QUÉ IMPORTA MÁS DE LO QUE PARECE, y por qué no es un caso de laboratorio: la app se lanza en un mercado con 4G lenta. Una descarga de 5,48 MB tarda ahí más de un minuto, y cuanto más larga es una descarga más probable es que se corte. O sea que en el entorno real de los usuarios este camino no es raro: es el esperable. Y el resultado de cortarse es que se reintenta cinco veces, empeorando justo la condición que lo causó.\n\nRELACIÓN CON TASK-173, a tener en cuenta antes de invertir mucho acá: el archivo propio reducido baja el tamaño de 5,48 MB a unos cientos de KB. Una descarga corta se corta muchísimo menos, así que 173 reduce la frecuencia de este problema de forma natural. Pero no lo elimina: una red mala corta descargas de cualquier tamaño, y la respuesta correcta a un fallo nunca es que cinco consumidores reintenten a la vez.\n\nNO CONFIRMADO Y HAY QUE CONFIRMARLO ANTES DE ARREGLAR: que la causa sea efectivamente el corte del flujo tras el loadingFinished. El agente no lo cerró y lo dijo. Puede ser eso u otra cosa; medirlo primero.",
+  "acceptance_criteria": [
+    "Se confirma con medición cuál es la causa real de las 5 peticiones posteriores — corte del flujo tras darse por descargado, u otra cosa — antes de tocar código",
+    "Un fallo de la descarga no produce N reintentos simultáneos: los consumidores que esperaban comparten un único reintento",
+    "El reintento no es inmediato ni infinito — hay una espera creciente y un tope, para no castigar una red que ya está mal",
+    "Tras agotar los reintentos, la interfaz muestra un estado claro en vez de quedarse esperando para siempre",
+    "Hay un test que prueba el comportamiento con un fallo de red y varios consumidores esperando a la vez",
+    "Verificado con la red estrangulada, que es la única condición donde el problema aparece — a velocidad normal es invisible"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "precios",
+    "4g-lenta"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-10T17:08:03.396Z",
+  "updated_at": "2026-08-10T17:08:03.396Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

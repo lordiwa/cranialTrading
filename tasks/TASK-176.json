@@ -1,0 +1,32 @@
+{
+  "key": "TASK-176",
+  "title": "E2E rojo: \"bulk change status to Sale\" se queda esperando 90 s a que se oculte la barra de selección",
+  "description": "Detectado 2026-08-10 por un agente mientras verificaba TASK-171. NO está arreglado ni diagnosticado — se registra con la evidencia para que nadie lo dé por flake sin mirarlo.\n\nQUÉ FALLA: `e2e/specs/collection/collection-crud.spec.ts`, el caso \"bulk select → bulk change status to Sale → status counts move in the store\". Timeout de 90 s esperando que `bulk-selection-bar` se oculte. Reproducido en aislamiento 2 de 2 veces, así que no es un fallo de una sola tirada.\n\nNO ESTÁ en la lista de flakes conocidos de CLAUDE.md (que son `auth/register.spec.ts` \"successful registration\" y `search/search.spec.ts` \"selecting autocomplete suggestion\").\n\nLO QUE EL AGENTE VERIFICÓ ANTES DE DESCARTARLO: el test es lógica de estado y contadores (cambiar collection↔sale y comprobar que los números de los chips se mueven). No toca precios ni mtgjson por ningún lado. Su cambio de TASK-171 fue borrar dos líneas del onMounted de App.vue, que no tiene relación con la selección masiva. Aun así dejó dicho, correctamente, que no lo puede descartar del todo compartiendo árbol de trabajo con otro agente.\n\nHIPÓTESIS PRINCIPAL, SIN VERIFICAR — escala, no regresión: la cuenta de pruebas tiene 59.000 cartas. Un segundo agente, midiendo otra cosa en la misma sesión, reportó que la pestaña de Chrome SE CONGELÓ un par de veces durante el montaje de la grilla con esa misma cuenta. Si la interfaz se congela procesando 59.000 cartas, la barra de selección no se oculta porque no corre nada, y el test agota sus 90 s esperando algo que sí va a pasar, más tarde. Eso explicaría el fallo sin ninguna regresión de código. Encaja además con lo ya sabido sobre reactividad de Vue con colecciones grandes.\n\nCÓMO SE RESUELVE ESTO BIEN, y por qué no se hizo ya: la regla del proyecto es rebaselinar antes de culpar — correr el test sobre un árbol limpio, AHORA, no comparar contra un verde de hace horas. No se hizo en el momento porque había dos agentes trabajando sobre el mismo árbol y un `git stash` ya había estado a punto de romper el índice antes. La verificación natural es la suite completa que se corre obligatoriamente antes de empujar a develop: si ahí sigue rojo con el árbol quieto, se investiga en serio; si pasa, era interferencia entre agentes o escala.\n\nNO TOCAR el spec ni `collection.page.ts` hasta tener esa respuesta. Subir el timeout sin entender la causa es exactamente el patrón que este proyecto ya identificó como forma de fabricar tests que pasan sin probar nada.",
+  "acceptance_criteria": [
+    "Se corre el test en un árbol limpio y quieto y queda registrado si falla o pasa — rebaseline real, no comparación contra un verde viejo",
+    "Si falla en árbol limpio: se identifica la causa con medición antes de tocar nada, distinguiendo congelamiento de la interfaz por escala de una regresión real de código",
+    "Si la causa es que la interfaz se congela con 59.000 cartas, se registra como hallazgo de rendimiento con su propio ticket y no se disimula subiendo el timeout del test",
+    "Si pasa en árbol limpio: queda escrito que fue interferencia entre agentes trabajando en el mismo árbol, para que la próxima vez se sospeche eso primero"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "e2e",
+    "coleccion"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-10T23:30:00.000Z",
+      "body": "2026-08-10 — CAUSA PROBADA POR MUTACIÓN. No es un test caprichoso: es un defecto de producto en el flujo prioritario Nº3.\n\nQUÉ PASA: cada cambio de estado en masa programa, a los 2 s, un guardado completo del card_index. Ese guardado lee las ~30 porciones enteras con un getDocs (para limpiar huérfanos) y reescribe las 30 — del orden de 30 MB de lectura más 30 MB de escritura — para cambiar UN campo de UNA carta. La escritura de la operación siguiente queda encolada detrás de esa tormenta en el cliente de Firestore.\n\nLA PRUEBA, mutación quirúrgica: empujando el debounce del guardado de 2 s a 10 min, sin tocar nada más, la segunda operación pasó de 14928/10139/14110 ms a 864/801/1149 ms. 3 de 3, unas 12 veces más rápido.\n\nDESCARTADO CON DATOS, no por razonamiento: (1) no es la red — en la peor corrida pasaron 36,7 s sin una sola petición antes de que la escritura saliera siquiera; (2) no es CPU bloqueando el hilo principal — durante B hay apenas 1,2-2,4 s de tareas largas sobre 10-15 s de espera.\n\nERROR MÍO QUE VALE ANOTAR: la primera corrida de control pareció FALSAR la hipótesis (pegadas: A=2503 ms, B=1753 ms, las dos rápidas). Estaba mal diseñada: con espera cero, B entra ANTES de que el debounce de 2 s dispare el guardado, así que ese brazo no probaba \"sin guardado\", probaba \"B le gana al guardado\". Se ve en que ese caso es bimodal — 1105 ms cuando gana, 18951 ms cuando no. Un control tiene que suprimir la causa, no correrle la carrera.\n\nPOR QUÉ IMPORTA MÁS QUE EL CI: en una colección grande, poner una carta a la venta y después otra deja la segunda colgada entre 10 y 58 s medidos. Es el flujo Nº3 de Rafael, y con el reparto de mercado (80% con más de 25k cartas) le pega a la mayoría.\n\nEL ARREGLO QUE SE DESPRENDE, no implementado todavía: escribir SÓLO las porciones que cambiaron en vez de las 30. Un cambio de estado de una carta toca exactamente una. Y saltear el getDocs de limpieza cuando la cantidad de porciones no bajó, que es el caso normal. OJO: es collection.ts, el archivo con el antecedente de pérdida de datos de TASK-168 — la limpieza de huérfanos y el guard de completitud no se tocan a la ligera."
+    }
+  ],
+  "created_at": "2026-08-10T16:59:24.416Z",
+  "updated_at": "2026-08-10T23:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

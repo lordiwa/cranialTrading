@@ -1,0 +1,35 @@
+{
+  "key": "TASK-172",
+  "title": "El iframe de reCAPTCHA de Google se carga en cada arranque aunque nadie use el login con Google",
+  "description": "Hallado 2026-08-10 en el waterfall que pasó Rafael de /inicio en producción. Tres peticiones a terceros, ~2 s cada una, en una pantalla donde nadie va a autenticarse:\n- `api.js?onload=__iframefcb535789` (5,9 kB, disparada desde el chunk de firebase, línea 2025)\n- `v4513226cdae34746b4dedf0b4dfa099e1781791509496` (11,6 kB, script)\n- `rum` (204, xhr)\n\nCAUSA, leída en código: `src/services/firebase.ts:17` pasa `popupRedirectResolver: browserPopupRedirectResolver` a `initializeAuth`. Eso hace que Firebase Auth monte el resolver de popup/redirect al inicializar, y ese resolver es el que inyecta el iframe de gapi/reCAPTCHA. El único uso real del popup está en `src/stores/auth.ts:542` (`signInWithPopup` con `GoogleAuthProvider`), o sea sólo cuando alguien pulsa el botón de Google.\n\nARREGLO: sacar `popupRedirectResolver` de `initializeAuth` y pasarlo como TERCER argumento de la llamada `signInWithPopup(auth, provider, browserPopupRedirectResolver)`, que es la forma que la API soporta justamente para esto. El import pasa a ser dinámico o queda en el módulo que hace login, según lo que salga más limpio sin romper el árbol de imports que TASK-132 dejó armado (Firebase fuera del grafo estático).\n\nRIESGO A VERIFICAR SÍ O SÍ: el login con Google tiene que seguir funcionando exactamente igual. Es el punto donde esto se rompe si se hace mal.",
+  "acceptance_criteria": [
+    "Cargar /inicio ya no pide api.js de recaptcha/gapi ni el script del bframe ni el rum — verificado en el panel de red del navegador, contando peticiones antes y después",
+    "Entrar con Google sigue funcionando de punta a punta, verificado a mano en dev con una cuenta real (no sólo leyendo código)",
+    "Entrar con email y contraseña sigue funcionando",
+    "El chunk de Firebase no vuelve a entrar en el grafo estático de imports — el arreglo no revierte lo que dejó TASK-132",
+    "npm run test:unit verde y npx vite build --mode development exitoso",
+    "Sin regresión en e2e/specs/auth/"
+  ],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "auth",
+    "inicio"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-10T16:20:09.130Z",
+      "body": "Revisión con profundidad FULL (90 líneas cambiadas, por debajo del umbral de 150, pero toca superficie de autenticación, lo que fuerza FULL). Veredicto: PASS. Sin hallazgos HIGH ni MEDIUM.\n\nTodo lo reportado por el Developer fue re-ejecutado por el reviewer, no aceptado de palabra:\n- npm run test:unit: 1609/1609 verdes. npx vite build --mode development: OK. npx playwright test e2e/specs/auth: 15/15, lo que cubre además el AC3 (login con email y contraseña).\n- El lock de regresión NO es vacuo: se reprodujo el rojo revirtiendo a mano la línea en src/services/firebase.ts, y firebase.initializeAuth.test.ts falla exactamente donde debe. Archivo restaurado y verificado limpio.\n- El cambio ELIMINA la carga eager, no la mueve: grep de browserPopupRedirectResolver en todo src/ da sólo stores/auth.ts:547 (vía el import dinámico) y el comentario de firebase.ts. Ningún módulo de arranque lo importa estáticamente. Además, cero usos de signInWithRedirect / getRedirectResult / linkWithPopup / reauthenticateWithPopup: no había ningún flujo de redirect dependiendo del resolver global.\n- AC1: el reviewer remidió sobre /inicio (no /login) con el dist recién compilado servido en preview — 14 peticiones de la app, AMBOS chunks de firebase cargados (o sea initializeAuth sí corrió), y CERO a recaptcha/gapi/gstatic/rum. El \"antes\" es el waterfall de producción que Rafael documentó en el ticket.\n- El arreglo del mock en auth.errorLogging.test.ts es necesario y NO enmascara nada: los argumentos se evalúan antes de la llamada, así que sin el export el acceso tiraba el error sintético de Vitest antes de que signInWithPopup rechazara — el test habría fallado por el error equivocado, no pasado en falso. Los tres caminos del catch siguen ejerciendo los códigos reales.\n- AC4: verificado más fuerte que lo que reportó el Developer — dist/index.html sólo hace modulepreload de index y vendor, y el entry referencia los chunks de firebase únicamente dentro del mapa de preload de import() dinámico, sin ningún import estático. Firebase sigue fuera del grafo estático que dejó TASK-132.\n\nLOW (no accionable ahora), src/stores/auth.ts:547: la app no tiene ningún camino de redirect. Si alguna vez se agrega login por redirect (por ejemplo como respaldo en móviles donde el popup se bloquea), habrá que pasarle el resolver también ahí. El comentario en firebase.ts ya lo deja documentado.\n\nPENDIENTE HUMANO, no es hallazgo: AC2 — login con Google de punta a punta con una cuenta real. Es el único punto donde este cambio puede romperse en el mundo real y ningún agente lo cubrió."
+    }
+  ],
+  "created_at": "2026-08-10T15:56:14.496Z",
+  "updated_at": "2026-08-10T16:20:09.130Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

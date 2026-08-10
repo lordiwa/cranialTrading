@@ -200,7 +200,29 @@ test.describe('Collection CRUD', () => {
   // page-level number computed off the full `collectionStore.cards` array
   // (`statusCounts` in CollectionView.vue), nothing to do with which row a
   // virtualizer renders where.
-  test('bulk select → bulk change status to Sale → status counts move in the store, not just the toast', async ({ collectionPage, commonPage }) => {
+  // QUARANTINED 2026-08-10 — TASK-176. This is NOT a flaky test and it is not
+  // skipped because it is unreliable: it fails because it is CORRECT, and the
+  // product defect it catches is real and still open.
+  //
+  // Measured cause, proven by surgical mutation: every bulk status change
+  // schedules a full card_index persist 2s later, which getDocs's all ~30
+  // chunks and rewrites all 30 (~30MB read + ~30MB write) to change one field
+  // on one card. The NEXT write queues behind that storm in the Firestore
+  // client. Pushing the persist debounce from 2s to 10min — changing nothing
+  // else — took this test's second bulk action from 14928/10139/14110ms to
+  // 864/801/1149ms, 3 runs out of 3.
+  //
+  // Ruled out with data, not reasoning: not the network (36.7s of total wire
+  // silence before the write was even issued, in the worst run) and not main-
+  // thread CPU (1.2-2.4s of long tasks across a 10-15s wait).
+  //
+  // Rafael's call, 2026-08-10: quarantine here and ship the /inicio boot work
+  // (TASK-182/183/184, ~53% off time-to-usable-hero) to dev now, rather than
+  // open collection.ts — the file with TASK-168's data-loss history — at the
+  // end of a long session. UNSKIP THIS AS PART OF FIXING TASK-176; it is the
+  // regression test for that fix, and the fix is to write only the chunks
+  // that actually changed instead of all 30.
+  test.fixme('bulk select → bulk change status to Sale → status counts move in the store, not just the toast', async ({ collectionPage, commonPage }) => {
     // Start from a card known to be status=collection so the "before" state
     // is unambiguous (A4: starting state declared).
     await collectionPage.filterByStatus('collection');

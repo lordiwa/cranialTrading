@@ -1,0 +1,27 @@
+{
+  "key": "TASK-180",
+  "title": "Cuentas de prueba de 200k cartas en dev — el 30% del mercado nunca se ha probado",
+  "description": "Ofrecido por Rafael 2026-08-10: tiene una colección importable de 200.000 cartas y propone cargarla en dos cuentas, srparca@gmail.com y rafael@remoose.com.\n\nPOR QUÉ HACE FALTA: el reparto real del mercado que dio Rafael es 30% con más de 100.000 cartas, 50% entre 25.000 y 55.000, y sólo 20% por debajo de 25.000. La única cuenta grande de pruebas que existe hoy tiene 59.087 cartas — o sea la mediana. El tercio superior del mercado nunca se probó y todo lo que creemos saber de esa escala es extrapolación. Con 200.000 se prueba el doble del techo declarado, que es la forma correcta de tener margen.\n\nDOS CUENTAS, no una: tener la misma colección grande en dos cuentas permite además probar el cruce entre usuarios (matches, ver la colección de otro, mensajes) a escala real, cosa que hoy no se puede.\n\nPRECAUCIONES, ninguna opcional:\n\n1. **EN DEV, NUNCA EN PRODUCCIÓN.** Este proyecto ya tuvo dos incidentes de trabajo local pegándole a producción (TASK-167 y el default de E2E). Antes de importar, verificar contra qué proyecto Firebase se está corriendo, y dejarlo escrito en el ticket.\n\n2. **CUIDADO CON LA CUENTA PERSONAL DE RAFAEL.** srparca@gmail.com ya tiene ~5.600 cartas en dev, y es la cuenta con la que él verifica cosas a ojo. Importar 200.000 encima no la reemplaza: las suma. Decidir explícitamente con él si quiere eso, o si conviene una cuenta nueva y dejar la suya como está para seguir viendo la app como la ve un usuario normal.\n\n3. **EL COSTE DE LA IMPORTACIÓN NO ES TRIVIAL.** Con 59.000 cartas, reconstruir el índice tardó 81 segundos escribiendo 30 bloques en serie. Con 200.000 son más de tres veces eso, y hay límites conocidos de Firestore de por medio (documento de 1 MB, 35.000 asignaciones compactas por carpeta, 10 MiB por lote de escritura). Estimar antes de lanzar, y no lanzar dos importaciones a la vez.\n\n4. **VERIFICAR QUE LA IMPORTACIÓN QUEDÓ SANA**, contando las cartas reales contra lo que dice el índice. Este proyecto ya tuvo un caso donde el índice perdía bloques en silencio y la cuenta parecía encogerse sola (TASK-168).\n\nPARA QUÉ SE VA A USAR, en orden: medir la carga de /collection bajo 4G lenta a 200.000 (TASK-179), y después cualquier trabajo de rendimiento que hoy se esté midiendo contra 59.000.",
+  "acceptance_criteria": [
+    "Las cuentas de prueba grandes existen en el proyecto DEV, con la verificación de contra qué proyecto se importó anotada en el ticket",
+    "Queda decidido con Rafael si la cuenta srparca@gmail.com de dev se usa para esto o se deja intacta como cuenta de tamaño normal",
+    "La importación se verifica sana: número de cartas reales contra lo que reporta el índice, sin bloques perdidos",
+    "Queda anotado cuánto tardó la importación y si aparecieron límites de Firestore, para saber qué esperar la próxima vez",
+    "Las credenciales quedan donde el equipo las usa hoy, sin exponerlas en el repositorio"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "testing",
+    "4g-lenta"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-10T18:08:37.802Z",
+  "updated_at": "2026-08-10T18:08:37.802Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

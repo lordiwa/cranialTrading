@@ -1,0 +1,28 @@
+{
+  "key": "TASK-181",
+  "title": "Los stores del header importan firebase/firestore estáticamente y por eso los 112 KB entran en el arranque de /inicio",
+  "description": "Sale de TASK-178 fase 2, que se revirtió por medir peor. Este ticket es la causa real que aquel no podía tocar.\n\nLO MEDIDO, con las pilas de iniciador de CDP, no razonando sobre el código: el chunk de Firestore que se descarga durante el arranque de /inicio NO lo pide stores/auth.ts. Lo pide vue-router al resolver el componente de ruta. La cadena es:\n\n  HomeView -> AppContainer -> AppHeader -> stores/{matches,collection,messages}\n                                       -> import estatico de 'firebase/firestore'\n\nComo un módulo ES se evalúa entero, el chunk propio de la ruta /inicio arrastra los 112 KB comprimidos de Firestore SIEMPRE, haga lo que haga auth.ts con sus imports dinámicos. Por eso partir el chunk de Firebase en dos no sacó nada del arranque y encima costó un viaje extra de ida y vuelta.\n\nLA PRUEBA DE QUE ES ESTO Y NO OTRA COSA: se difirió loadUserData hasta después del primer pintado y la petición de Firestore NO se movió — siguió clavada en t+4,8 s. Eso falsó la hipótesis de que la disparaba el perfil.\n\nQUÉ HAY QUE HACER: que stores/matches.ts, stores/collection.ts y stores/messages.ts dejen de importar firebase/firestore de forma estática, con el mismo patrón de import dinámico memoizado que TASK-132 ya aplicó en stores/auth.ts. OJO: puede haber más stores en la cadena del header — verificar la lista real antes de empezar, no confiar en estos tres.\n\nADVERTENCIA DE TAMAÑO: son 3+ stores con muchos sitios de llamada cada uno. Probablemente NO entra en un solo contexto — considerar partirlo por store. La fase 1 de TASK-178 dejó el método probado para esto: los tests que mockean la ruta vieja se rompen, y la lista exacta se saca CORRIENDO la suite, no por grep. El grep sobreestima (41 archivos mockean, sólo 37 rompían) y también subestima (publicCardSearch.ts usa import dinámico con destructuring y no aparece en ningún grep de texto).\n\nUNA VEZ HECHO ESTO, recién ahí tiene sentido volver a partir manualChunks.firebase — antes no. Y el criterio de cierre es el mismo que no se pudo cumplir en 178: que el chunk de Firestore NO figure en la traza de red del arranque de /inicio, o que figure después de que el hero ya existe en el DOM. El reloj es consecuencia, no la prueba.\n\nNÚMEROS DE REFERENCIA a 600 Kbps, /inicio en frío, mediana de 3 corridas: 7522 ms con el estado actual. Chunk de Firebase entero 162,76 KB comprimidos, del que auth+app son 50,63 KB y firestore 112,07 KB.",
+  "acceptance_criteria": [
+    "Se verifica y se deja escrito qué stores alcanzables desde AppHeader importan firebase/firestore estáticamente — la lista real, no la supuesta",
+    "Esos stores pasan a import dinámico memoizado con el patrón de TASK-132, sin revertirlo",
+    "En la traza de red de /inicio, el chunk de Firestore no se pide antes de que el hero exista en el DOM",
+    "Se mide antes y después a 600 Kbps con scripts/perf-measure-inicio.mjs, 3 corridas, y se compara contra un baseline tomado espalda con espalda, no contra un número viejo",
+    "Sin regresión en la suite E2E"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "4g-lenta",
+    "inicio"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-10T19:40:00.000Z",
+  "updated_at": "2026-08-10T19:40:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

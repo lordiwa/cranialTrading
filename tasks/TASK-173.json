@@ -1,0 +1,37 @@
+{
+  "key": "TASK-173",
+  "title": "Precios de Card Kingdom desde un archivo propio reducido en vez de bajar los 5,48 MB de MTGJSON al celular",
+  "description": "DECISIÓN DE RAFAEL 2026-08-10, con el contexto de que la app se lanza en un mercado con 4G lenta y tiene que ser liviana.\n\nEL PROBLEMA MEDIDO (TASK-166): `fetchPriceData` baja `https://mtgjson.com/api/v5/AllPricesToday.json.gz`, 5,48 MB comprimidos, y lo parsea entero en el cliente. A ~1 Mbps son 40-50 segundos saturando el enlace. TASK-171 lo saca del arranque, pero eso sólo mueve el costo: el flujo prioritario Nº1 es justamente revisar precios, así que el usuario lo paga igual al abrir su colección. Ningún camino que baje el dataset completo al cliente es viable en esta red.\n\nLO ELEGIDO: un archivo propio, reducido, que contenga SÓLO lo que la app usa — precio de Card Kingdom retail normal y foil por carta — regenerado por un proceso programado y servido estáticamente desde CDN. Sin coste por petición, cacheable, y de orden de cientos de KB en vez de 5,48 MB.\n\nCORRECCIÓN TÉCNICA A LA FORMA, NO AL FONDO: Rafael dijo \"Firebase Hosting\", y Hosting no se puede escribir en tiempo de ejecución — sólo se publica en el despliegue, y el CI de este proyecto despliega hosting únicamente desde la rama. Un archivo que se regenera solo cada día no puede vivir ahí. El equivalente que SÍ cumple lo que eligió (archivo estático, servido por CDN, sin coste por petición) es un objeto público en Cloud Storage con su cabecera de caché. Confirmar este detalle con Rafael antes de construir, pero la intención de su decisión se respeta tal cual.\n\nOPORTUNIDAD QUE NO HAY QUE DESPERDICIAR — indexar por scryfallId: hoy, para pasar de una carta a su precio, el cliente mantiene un mapa scryfallId→uuid de MTGJSON que se arma pidiendo un archivo POR SET (`fetchSetMapping`, en lotes de 5 en paralelo, `src/services/mtgjson.ts`). O sea que además de los 5,48 MB hay una ráfaga de peticiones por cada set de la colección. Si el archivo reducido se indexa DIRECTAMENTE por scryfallId, ese mapeo entero — y todas esas peticiones — desaparecen. Es probablemente el segundo ahorro más grande de este ticket después del tamaño.\n\nLÍMITE DE ALCANCE: no se cambia la fuente de precios. Card Kingdom sigue siendo el primario, como está decidido desde antes; esto cambia CÓMO llegan al cliente, no de dónde salen. No proponer fuentes nuevas.\n\nNO EMPEZAR A CONSTRUIR sin confirmar antes con Rafael: dónde vive el archivo (Cloud Storage vs otra opción), cada cuánto se regenera, y qué pasa mientras no existe todavía.",
+  "acceptance_criteria": [
+    "Existe un proceso programado que genera el archivo reducido de precios de Card Kingdom (retail normal y foil) y lo publica donde el cliente pueda leerlo, con cabecera de caché adecuada",
+    "El archivo está indexado por scryfallId — el cliente no necesita el mapa scryfallId→uuid ni las peticiones por set para resolver un precio",
+    "El tamaño del archivo publicado queda anotado en el ticket, comprimido y sin comprimir, comparado contra los 5,48 MB de hoy",
+    "La aplicación ya no descarga AllPricesToday.json.gz en ningún camino — verificado en el panel de red del navegador, no leyendo código",
+    "Los precios que se muestran en colección, mazos y carpetas siguen siendo los mismos que antes del cambio — comparados carta por carta sobre una muestra concreta anotada en el ticket",
+    "Medido en Chrome con estrangulamiento de red a ~600 Kbps: bytes totales y tiempo hasta que se ve un precio, antes vs después, anotados en el ticket",
+    "Hay un comportamiento definido y probado para cuando el archivo todavía no existe o no se puede bajar — la pantalla no se rompe ni se queda colgada",
+    "npm run test:unit verde y npx vite build --mode development exitoso"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "perf",
+    "precios",
+    "4g-lenta"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-10T16:22:43.494Z",
+      "body": "2026-08-10 — REQUISITO EXTRA, hallado mientras se planeaba TASK-171. Pendiente de confirmar con una medición, ya encargada.\n\n`fetchPriceData()` (src/services/mtgjson.ts:325) memoiza el RESULTADO ya resuelto en `priceDataCache`, pero NO deduplica la promesa en vuelo. Si dos llamadas entran antes de que la primera resuelva, las dos hacen el fetch.\n\nPor qué eso puede ser grave y no una ineficiencia menor: los precios por carta se piden desde `useCardPrices`, gateado por visibilidad con IntersectionObserver en las tarjetas de la grilla. Al entrar a /collection se hacen visibles varias tarjetas a la vez, o sea varias llamadas a `getCardPrices()` casi simultáneas. Si ninguna dedupe la promesa, se pueden estar disparando VARIAS descargas concurrentes de 5,48 MB cada una.\n\nEn fibra esto pasa desapercibido — la primera resuelve antes de que arranque la segunda. En 4G lenta cada descarga dura más de un minuto, así que se solapan de verdad, y la diferencia entre una y varias es la diferencia entre 73 segundos y varios minutos. Encaja con lo que Rafael reporta desde su celular.\n\nREQUISITO PARA ESTE TICKET: cualquiera sea la forma final de servir los precios, la carga del archivo tiene que deduplicar la petición en vuelo — una sola descarga por sesión aunque N consumidores la pidan a la vez — y tiene que haber un test que lo pruebe con llamadas concurrentes, no secuenciales.\n\nDeliberadamente NO se arregla en TASK-171: ese ticket sólo saca la descarga del arranque y no toca mtgjson.ts. La medición del conteo real de peticiones concurrentes está encargada y se anota acá cuando llegue."
+    }
+  ],
+  "created_at": "2026-08-10T16:14:38.080Z",
+  "updated_at": "2026-08-10T16:22:43.494Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

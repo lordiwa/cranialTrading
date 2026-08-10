@@ -1,0 +1,39 @@
+{
+  "key": "TASK-183",
+  "title": "El header no se monta en el primer render de /inicio — se lleva puestos los stores, los iconos y el avatar",
+  "description": "Opción 4 de las 15 que eligió Rafael 2026-08-10. Va DESPUÉS de TASK-182 y se mide encima de ese resultado, no del actual.\n\nDE DÓNDE SALE: la traza de iniciador de CDP durante el arranque de /inicio muestra que el componente de ruta arrastra AppHeader, y AppHeader arrastra los stores de matches, collection y messages — que a su vez importan firebase/firestore de forma estática (eso es TASK-181). Además el header pide icons.svg y el avatar de dicebear.com. Nada de eso hace falta para que el buscador del hero sea usable.\n\nLA IDEA: AppContainer monta AppHeader de forma diferida, después del primer pintado, con el mismo patrón de señal de pintado que ya usa stores/auth.ts (waitForFirstPaintOrTimeout / PAINTED_CONTENT_SELECTOR). El hero se pinta con su propio chunk y el header llega después.\n\nPOR QUÉ PUEDE VOLVER A NO FUNCIONAR, y hay que medirlo antes de celebrar: hoy mismo se difirió loadUserData y la petición de Firestore no se movió ni un milisegundo, porque quien la disparaba era otro. Si el chunk del header ya viene dentro del chunk de la ruta, diferir el MONTAJE no evita la DESCARGA — hay que confirmar en la traza que el recurso deja de pedirse, no que el reloj bajó. Puede requerir que AppHeader pase a ser un componente asíncrono de verdad (defineAsyncComponent) para que Vite lo saque a su propio chunk.\n\nEL RIESGO DE PRODUCTO: el header aparece después, o sea salto de layout, que es exactamente lo que TASK-182 se ocupa de evitar en el otro sentido. Hay que reservar el alto del header desde el primer pintado para que nada se mueva cuando llegue.\n\nOJO: AppContainer lo usan 11 vistas, no sólo HomeView. El cambio las afecta a todas — verificar las 11 y no sólo /inicio.",
+  "acceptance_criteria": [
+    "El header se monta después del primer pintado y el hero de /inicio no lo espera",
+    "En la traza de red de /inicio, los recursos que sólo usa el header (icons.svg, avatar, y el chunk del propio header si se separa) dejan de pedirse antes de que el hero exista",
+    "El alto del header queda reservado desde el primer pintado: no hay salto de layout cuando aparece",
+    "Se verifica en las 11 vistas que usan AppContainer, no sólo en /inicio",
+    "Medición antes y después a 600 Kbps, 3 corridas, con baseline espalda con espalda tomado DESPUÉS de TASK-182",
+    "Sin regresión en la suite E2E"
+  ],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "perf",
+    "4g-lenta",
+    "inicio"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-182"
+  ],
+  "linked_commits": [
+    "53f61e4"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-10T21:30:00.000Z",
+      "body": "2026-08-10 — HECHO Y MEDIDO. Commit 53f61e4. AppHeader sale a su propio chunk de 9,19 KB comprimidos y se importa dos frames después del montaje. /inicio en frío a 600 Kbps, 3 corridas: 5879 ms antes contra 5560 ms después, ~320 ms. Acumulado con TASK-182 contra el mismo baseline: 6849 -> 5560 ms, ~1290 ms, ~19%.\n\nLAS DOS MITADES SON OBLIGATORIAS: import estático con montaje diferido igual DESCARGA el header en el arranque, porque un módulo ES se evalúa entero; import dinámico con montaje inmediato igual lo pide en el camino crítico. TASK-178 fase 2 se revirtió por el mismo error en el otro sentido.\n\nEL SALTO DE LAYOUT, y cómo el primer intento lo falló: la primera versión levantaba una bandera a los dos frames y dejaba que un defineAsyncComponent tomara el lugar. La bandera se ponía en verdadero a los ~32 ms, el chunk todavía no había llegado, el componente asíncrono no renderizaba nada, y el espacio reservado se derrumbaba — medido en 118 px de salto en escritorio y 57 px en móvil. Ahora el cambio lo dispara que el módulo esté RESUELTO, nunca un temporizador, y el placeholder replica la estructura real del header (fila 1 siempre, fila de navegación de escritorio sólo cuando corresponde la barra de logueado, decidido por el mismo predicado utils/authChrome que usa el header, para que no puedan discrepar). Remedido en logueado e invitado a 1400 px y 390 px: 0 px de salto en los cuatro casos.\n\nPENDIENTE: AppContainer lo usan 11 vistas. La suite E2E es la verificación de las otras 10 y tiene que estar verde antes de que esto salga a ningún lado."
+    }
+  ],
+  "created_at": "2026-08-10T20:10:00.000Z",
+  "updated_at": "2026-08-10T21:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

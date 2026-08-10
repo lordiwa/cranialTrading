@@ -36,17 +36,12 @@ type FirebaseFirestoreModule = typeof FirebaseFirestoreNS;
 type FirebaseServicesModule = typeof FirebaseServicesNS;
 type FirestoreServiceModule = typeof FirestoreServiceNS;
 
-interface AuthDeps {
+interface FirebaseDeps {
     authFns: FirebaseAuthModule;
-    auth: FirebaseServicesModule['auth'];
-}
-
-interface FirestoreDeps {
     firestoreFns: FirebaseFirestoreModule;
+    auth: FirebaseServicesModule['auth'];
     db: FirestoreServiceModule['db'];
 }
-
-type FirebaseDeps = AuthDeps & FirestoreDeps;
 
 /**
  * TASK-132 review fix (HIGH-1, LOW-1): tags any failure that originates from
@@ -64,8 +59,7 @@ class FirebaseDepsLoadError extends Error {
     }
 }
 
-let authDepsPromise: Promise<AuthDeps> | null = null;
-let firestoreDepsPromise: Promise<FirestoreDeps> | null = null;
+let firebaseDepsPromise: Promise<FirebaseDeps> | null = null;
 
 /**
  * TASK-132: waits until the app has painted real content (the same DOM
@@ -104,37 +98,23 @@ const waitForFirstPaintOrTimeout = (timeoutMs: number): Promise<void> => {
     });
 };
 
-/**
- * TASK-178 phase 2: the SDK is loaded through three entry points instead of
- * one, so a caller only downloads the half it actually uses.
- *
- * The one that matters for boot is loadAuthDeps(): ensureSubscription() —
- * the call the router guard waits on for EVERY requiresAuth route, /inicio
- * included — needs only `onAuthStateChanged` + `auth`, yet used to pull
- * `firebase/firestore` (112KB gzip, more than twice the 50KB of app+auth)
- * onto the critical path with it. Nothing on the first-paint path reads a
- * Firestore document; loadUserData's profile read happens AFTER the guard
- * has already unblocked (see sessionKnown, TASK-165).
- *
- * The two halves memoize INDEPENDENTLY. That is the point: a boot that only
- * ever calls loadAuthDeps() must never cause the Firestore chunk to be
- * requested. The closing check for this ticket is exactly that, read off the
- * network trace — not a stopwatch.
- *
- * Direction matters and only one direction is load-bearing: services/firestore
- * imports `app` from services/firebase, so the Firestore path does drag the
- * app+auth chunk along. That is free — anything reaching Firestore is already
- * past the auth subscription, which loaded that chunk on boot. The reverse
- * (auth dragging Firestore) is the one this split forbids.
- */
-const loadAuthDeps = (): Promise<AuthDeps> => {
-    if (!authDepsPromise) {
-        authDepsPromise = Promise.all([
+const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
+    if (!firebaseDepsPromise) {
+        // TASK-178 phase 1: mechanical only — still loads Auth AND Firestore
+        // together on every call, same as before the split. Behavior is
+        // unchanged; only the import path for `db` moved (services/firebase.ts
+        // no longer exports it). Splitting this into an auth-only path and a
+        // firestore-only path is phase 2, not this commit.
+        firebaseDepsPromise = Promise.all([
             import('firebase/auth'),
+            import('firebase/firestore'),
             import('../services/firebase'),
-        ]).then(([authFns, services]) => ({
+            import('../services/firestore'),
+        ]).then(([authFns, firestoreFns, services, firestoreService]) => ({
             authFns,
+            firestoreFns,
             auth: services.auth,
+            db: firestoreService.db,
         })).catch((error: unknown) => {
             // TASK-132 review fix (HIGH-1): a failed dynamic import (network
             // blip, or a stale deployment whose chunk hash no longer exists)
@@ -143,42 +123,12 @@ const loadAuthDeps = (): Promise<AuthDeps> => {
             // replay the same dead rejection with no way to recover short of
             // a full page reload. Clear the memo so the NEXT call attempts a
             // fresh import(), then re-throw (tagged) so this specific
-            // caller's own catch still runs. Preserved per-half by phase 2:
-            // each memo clears only itself, so a Firestore-chunk failure
-            // can't evict an auth subscription that loaded fine.
-            authDepsPromise = null;
+            // caller's own catch still runs.
+            firebaseDepsPromise = null;
             throw new FirebaseDepsLoadError(error);
         });
     }
-    return authDepsPromise;
-};
-
-const loadFirestoreDeps = (): Promise<FirestoreDeps> => {
-    if (!firestoreDepsPromise) {
-        firestoreDepsPromise = Promise.all([
-            import('firebase/firestore'),
-            import('../services/firestore'),
-        ]).then(([firestoreFns, firestoreService]) => ({
-            firestoreFns,
-            db: firestoreService.db,
-        })).catch((error: unknown) => {
-            firestoreDepsPromise = null;
-            throw new FirebaseDepsLoadError(error);
-        });
-    }
-    return firestoreDepsPromise;
-};
-
-/**
- * Both halves, for the three call sites that genuinely need Auth AND
- * Firestore in the same operation (loadUserData, register, loginWithGoogle).
- * Kept as a single await so those paths fetch the two chunks in PARALLEL,
- * exactly as they did before the split — this is not a slower path, just a
- * narrower-by-default one.
- */
-const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
-    return Promise.all([loadAuthDeps(), loadFirestoreDeps()])
-        .then(([authDeps, firestoreDeps]) => ({ ...authDeps, ...firestoreDeps }));
+    return firebaseDepsPromise;
 };
 
 export const useAuthStore = defineStore('auth', () => {
@@ -220,10 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
     let subscriptionPromise: Promise<void> | null = null;
     const ensureSubscription = (): Promise<void> => {
         if (!subscriptionPromise) {
-            // TASK-178 phase 2: auth-only. This is THE critical-path call —
-            // the router guard blocks on it for every requiresAuth route,
-            // /inicio included — so it must not pull the Firestore chunk.
-            subscriptionPromise = loadAuthDeps().then(({ authFns, auth }) => {
+            subscriptionPromise = loadFirebaseDeps().then(({ authFns, auth }) => {
                 // Return value (the real unsubscribe fn) is intentionally
                 // not retained — nothing in this store ever tears the
                 // subscription down (logout() reloads the page instead,
@@ -427,7 +374,7 @@ export const useAuthStore = defineStore('auth', () => {
             }
         } catch {
             toastStore.show(t('auth.messages.loadUserError'), 'error');
-            const { auth } = await loadAuthDeps();
+            const { auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
                 user.value = {
@@ -510,7 +457,7 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const changeRegistrationEmail = async (newEmail: string): Promise<boolean> => {
         try {
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
@@ -545,7 +492,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const login = async (email: string, password: string) => {
         try {
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             const userCredential = await authFns.signInWithEmailAndPassword(auth, email, password);
             await loadUserData(userCredential.user.uid);
             emailVerified.value = userCredential.user.emailVerified;
@@ -648,7 +595,7 @@ export const useAuthStore = defineStore('auth', () => {
     const logout = async () => {
         try {
             isLoggingOut.value = true;
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             await authFns.signOut(auth);
             user.value = null;
             emailVerified.value = false;
@@ -670,7 +617,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const sendResetPasswordEmail = async (email: string) => {
         try {
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             await authFns.sendPasswordResetEmail(auth, email);
             toastStore.show(t('auth.messages.recoveryEmailSent'), 'success');
             return true;
@@ -687,7 +634,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const resetPassword = async (code: string, newPassword: string) => {
         try {
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             await authFns.confirmPasswordReset(auth, code, newPassword);
             toastStore.show(t('auth.messages.passwordReset'), 'success');
             return true;
@@ -706,7 +653,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const changePassword = async (currentPassword: string, newPassword: string) => {
         try {
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser?.email) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
@@ -732,7 +679,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const sendVerificationEmail = async () => {
         try {
-            const { authFns, auth } = await loadAuthDeps();
+            const { authFns, auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) {
                 toastStore.show(t('auth.messages.notAuthenticated'), 'error');
@@ -750,7 +697,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const checkEmailVerification = async () => {
         try {
-            const { auth } = await loadAuthDeps();
+            const { auth } = await loadFirebaseDeps();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) return false;
 
@@ -782,7 +729,7 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const reserveUsername = async (uid: string, norm: string): Promise<boolean> => {
         try {
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             await firestoreFns.setDoc(firestoreFns.doc(db, 'usernames', norm), { uid, createdAt: new Date() });
             return true;
         } catch {
@@ -796,7 +743,7 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const releaseUsername = async (norm: string): Promise<void> => {
         try {
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             await firestoreFns.deleteDoc(firestoreFns.doc(db, 'usernames', norm));
         } catch {
             // best-effort: a dangling reservation is acceptable, swallow.
@@ -809,7 +756,7 @@ export const useAuthStore = defineStore('auth', () => {
      */
     const checkUsernameAvailable = async (username: string): Promise<boolean> => {
         try {
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             const norm = normalizeUsername(username);
 
             // D-13: index-first. If a reservation exists, it's taken.
@@ -913,7 +860,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 username: newNorm,
                 lastUsernameChange: new Date()
@@ -948,7 +895,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 location: newLocation
             });
@@ -1077,7 +1024,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 avatarUrl
             });
@@ -1112,7 +1059,7 @@ export const useAuthStore = defineStore('auth', () => {
                 return false;
             }
 
-            const { firestoreFns, db } = await loadFirestoreDeps();
+            const { firestoreFns, db } = await loadFirebaseDeps();
             await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', user.value.id), {
                 avatarUrl: base64
             });

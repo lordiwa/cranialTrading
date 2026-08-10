@@ -395,9 +395,15 @@ const handleContextMenuSelect = async (itemId: string) => {
     <!-- Status-toggle bar removed: ~5 <svg><use> icons per card across ~10 virtualized
          cards corrupted low-end Mali GPUs (cranialBugColl / Tecno Spark 30C, Mali-G52).
          Status changes + public toggle remain available via the context menu and swipe-right. -->
+    <!-- TASK-175: bg-primary (not bg-secondary) — same color as the loading
+         overlay below (`v-if="!imageLoaded"` / the !hasImage branch), so
+         there is no visual difference between "container background showing
+         through" and "loading overlay visible": the transition is invisible
+         regardless of paint-order timing, instead of depending on the
+         overlay always winning a race. -->
     <div
         data-testid="collection-card"
-        class="relative aspect-[3/4] bg-secondary border-x border-b overflow-hidden rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
+        class="relative aspect-[3/4] bg-primary border-x border-b overflow-hidden rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-neon focus-visible:ring-offset-2 focus-visible:ring-offset-primary outline-none"
         :class="[
           selectionMode && isSelected ? 'border-neon border-2' : '',
           !selectionMode && isBeingDeleted ? 'border-rust animate-pulse' : '',

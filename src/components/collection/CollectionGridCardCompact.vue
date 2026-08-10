@@ -138,7 +138,13 @@ onUnmounted(() => {
 
 <template>
   <div ref="compactCardRef" data-testid="collection-card" class="group cursor-pointer min-h-[180px]" @click="emit('cardClick', card)">
-    <div class="relative aspect-[3/4] bg-secondary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded-lg">
+    <!-- TASK-175: bg-primary (not bg-secondary) — same color as the loading
+         overlay below (`v-if="!imageLoaded"` / the !hasImage branch), so
+         there is no visual difference between "container background showing
+         through" and "loading overlay visible": the transition is invisible
+         regardless of paint-order timing, instead of depending on the
+         overlay always winning a race. -->
+    <div class="relative aspect-[3/4] bg-primary border border-silver-30 overflow-hidden group-hover:border-neon transition-all rounded-lg">
       <!-- Status badge (v2 dot pill, DESIGN-DIRECTION.md §5) — sale/trade/wishlist only -->
       <span
           v-if="badgeInfo"

@@ -68,6 +68,18 @@ if (profileName && !NETWORK_PROFILES[profileName]) {
 }
 const storageStateArg = process.argv.find(a => a.startsWith('--storage-state='));
 
+// TRAP (cost ~1h to find, 2026-08-10): storageState in Playwright is scoped
+// by ORIGIN, which includes the PORT. e2e/.auth/user.json was captured
+// against playwright.config.ts's baseURL (http://localhost:4173). If your
+// local `npx vite preview` picks a DIFFERENT port (it auto-increments when
+// 4173 is busy — 4174, 4175...), the storageState silently does NOT apply:
+// no error, just a redirect to /login and every waitForFunction() on this
+// script's app-side marks TIMES OUT with zero explanation in the output.
+// Always confirm the preview really bound to :4173 (or pass a matching
+// --storage-state from a login captured against whatever port/origin you
+// actually navigate to — see scripts/perf-remote-login.mjs for a remote
+// origin, e.g. the deployed dev site) before spending time debugging "why
+// is nothing rendering."
 const STORAGE_STATE = storageStateArg
   ? path.resolve(storageStateArg.slice('--storage-state='.length))
   : path.resolve(__dirname, '..', 'e2e', '.auth', 'user.json');

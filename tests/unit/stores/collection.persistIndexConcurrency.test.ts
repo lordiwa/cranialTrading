@@ -89,6 +89,7 @@ vi.mock('@/stores/toast', () => ({
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore, type IndexCard } from '@/stores/collection'
+import { makeCard } from '../helpers/fixtures'
 
 function makeIndexCard(i: number): IndexCard {
   return {
@@ -161,8 +162,14 @@ describe('collection store: bounded-concurrency card_index chunk writes (TASK-15
       })
 
       // Trigger a mutation so the debounced persist fires again with the
-      // freshly-loaded 7-chunk cardIndexRaw.
-      await store.updateCard('card-0', { status: 'sale' })
+      // freshly-loaded 7-chunk cardIndexRaw. addCard (a membership change),
+      // not updateCard, on purpose: TASK-219 made a plain status update write
+      // only its own dirty chunk, which would leave only 1 write in flight —
+      // too little to prove concurrency. addCard still rewrites every chunk
+      // (paso 2 of TASK-176 narrows add/delete; out of scope here), so it
+      // still exercises all 7 chunks through the same bounded worker pool.
+      const { id: _id, updatedAt: _u, ...cardData } = makeCard({ id: 'ignored' })
+      await store.addCard(cardData as any)
       await vi.advanceTimersByTimeAsync(2000)
 
       // Drain all writes in waves, resolving whatever is currently in

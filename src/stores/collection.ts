@@ -306,6 +306,7 @@ export const useCollectionStore = defineStore('collection', () => {
     const loadCollection = async () => {
         if (!authStore.user) return
         loading.value = true
+        _indexLoadInFlight = true
 
         try {
             const userId = authStore.user.id
@@ -329,8 +330,92 @@ export const useCollectionStore = defineStore('collection', () => {
             logSanitizedError('Error loading collection', error)
             toastStore.show(t('collection.messages.loadError'), 'error')
         } finally {
+            _indexLoadInFlight = false
+            // Whatever this load just put in cardIndexRaw predates any mutation
+            // the user made while it was running — replay those now (TASK-185).
+            applyPendingIndexMutations()
             loading.value = false
         }
+    }
+
+    // ------------------------------------------------------------------
+    // TASK-185: mutations that land WHILE the collection is still loading
+    // ------------------------------------------------------------------
+    //
+    // The grid is painted from `paginatedCards` (the server-side card_index
+    // query), which returns in well under a second. `cards.value` and
+    // `cardIndexRaw` are only assigned at the END of loadFromIndex, after all
+    // ~30 chunks have been read and mapped — many seconds on a large account.
+    // The user can see cards and act on them for that whole window.
+    //
+    // Two things must hold for a mutation that lands inside it:
+    //  1. It must still happen. `deleteCard` used to bail out with a silent
+    //     `return false` when the card wasn't in `cards.value` yet, so every
+    //     delete in this window did nothing at all — no delete, no error, no
+    //     toast. That was the reported bug.
+    //  2. It must NOT derive card_index state from the not-yet-loaded index.
+    //     `_runPersistLoop` writes `cardIndexRaw` as the WHOLE index; running
+    //     it against an empty array overwrites chunk_0 (2000 real cards) with
+    //     one entry, and the orphan-cleanup guard (TASK-168) does not protect
+    //     against that — it only stops chunk DELETION, not chunk overwrite.
+    //
+    // So the mutation goes through to Firestore (the source of truth) and its
+    // index effect is queued, then replayed against the real index the moment
+    // the load finishes. The queue is intentionally id-based for deletes: an
+    // id is all `syncIndexLocal('delete')` needs.
+    let _indexLoadInFlight = false
+    const _pendingIndexAdds: Card[] = []
+    const _pendingIndexDeletes = new Set<string>()
+
+    /**
+     * Record a mutation's index effect, or apply it immediately when the index
+     * is already loaded. Returns true if it was applied now (caller persists),
+     * false if it was queued (persist happens after the load).
+     */
+    function syncIndexOrQueue(card: Card, action: 'add' | 'delete'): boolean {
+        if (_indexLoadInFlight) {
+            if (action === 'delete') {
+                _pendingIndexDeletes.add(card.id)
+                // A card added and then deleted inside the same window cancels out.
+                const queuedAddIdx = _pendingIndexAdds.findIndex(c => c.id === card.id)
+                if (queuedAddIdx > -1) _pendingIndexAdds.splice(queuedAddIdx, 1)
+            } else {
+                _pendingIndexAdds.push(card)
+            }
+            return false
+        }
+        syncIndexLocal(card, action)
+        return true
+    }
+
+    /** Replay queued mutations against the freshly-loaded index, then persist. */
+    function applyPendingIndexMutations() {
+        if (_pendingIndexDeletes.size === 0 && _pendingIndexAdds.length === 0) return
+
+        const deletes = new Set(_pendingIndexDeletes)
+        const adds = [..._pendingIndexAdds]
+        _pendingIndexDeletes.clear()
+        _pendingIndexAdds.length = 0
+
+        if (deletes.size > 0) {
+            cardIndexRaw.value = cardIndexRaw.value.filter(ic => !deletes.has(ic.i))
+            cards.value = cards.value.filter(c => !deletes.has(c.id))
+            for (const id of deletes) cardsById.delete(id)
+            paginatedCards.value = paginatedCards.value.filter(c => !deletes.has(c.id))
+        }
+
+        for (const card of adds) {
+            if (cardIndexRaw.value.some(ic => ic.i === card.id)) continue
+            cardIndexRaw.value = [...cardIndexRaw.value, cardToIndex(card)]
+            cards.value = [...cards.value, card]
+            cardsById.set(card.id, card)
+        }
+
+        console.info(`[IndexSync] Replayed ${deletes.size} deletion(s) and ${adds.length} addition(s) that landed while the collection was loading (TASK-185).`)
+        // TASK-219: adds/deletes can shift array positions — full rewrite,
+        // same as the equivalent syncIndexLocal branches below.
+        markAllChunksDirty()
+        persistIndexToFirestore()
     }
 
     /** Expected index version — bump in Cloud Function when format changes */
@@ -355,6 +440,49 @@ export const useCollectionStore = defineStore('collection', () => {
      * false so nothing deletes before a load has established the truth.
      */
     let indexKnownComplete = false
+
+    /**
+     * TASK-219 (paso 1 de TASK-176): chunk indices dirtied since the last
+     * successful chunk write. `null` means "everything is dirty" — the same,
+     * always-safe full-rewrite behavior this store had before TASK-219. It is
+     * the default whenever a mutation can shift array positions (add/delete —
+     * writing only the shifted-forward chunks is paso 2, deliberately out of
+     * scope here) or whenever cardIndexRaw was just replaced wholesale by a
+     * load/rebuild, so a fresh in-memory index is never compared position-
+     * by-position against a persist plan computed before it existed.
+     *
+     * Narrowed to a concrete Set only by mutations that provably touch a
+     * single known array position without changing length or order —
+     * updateCard's single-field patch and batchUpdateCards' status-only
+     * batch, both of which keep every card exactly where it already was.
+     */
+    let _dirtyChunks: Set<number> | null = new Set()
+
+    /** Mark every chunk dirty (the pre-TASK-219 default). */
+    function markAllChunksDirty(): void {
+        _dirtyChunks = null
+    }
+
+    /** Mark only the chunk holding array position `position` dirty. No-op once everything is already dirty. */
+    function markChunkDirty(position: number): void {
+        if (_dirtyChunks === null) return
+        _dirtyChunks.add(Math.floor(position / INDEX_CHUNK_SIZE))
+    }
+
+    /**
+     * TASK-219 AC2: totalChunks as of the last chunk write that actually
+     * completed. The orphan-cleanup getDocs (below) can only ever find
+     * something to delete when the collection SHRANK — if totalChunks has
+     * not gone down since this snapshot, the ~30MB read is pure waste.
+     *
+     * Reset to null by every fresh load (loadFromIndex / loadFromFullCards)
+     * and by deleteAllCards, so the FIRST persist of a session (or after a
+     * wholesale rebuild) always still runs the cleanup once — exactly the
+     * pre-TASK-219 behavior — establishing real ground truth for whatever
+     * orphans a previous, possibly-interrupted session may have left behind.
+     * Only persists AFTER that baseline may skip the read.
+     */
+    let _lastWrittenTotalChunks: number | null = null
 
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {
@@ -472,6 +600,17 @@ export const useCollectionStore = defineStore('collection', () => {
             rebuildCardIndex()
             // collectionSummary auto-derives from cards via computed (NICE-09)
 
+            // TASK-219: this load just became the new known-good baseline — it
+            // matches disk by construction, so nothing is dirty yet (NOT
+            // "everything dirty": a freshly loaded index needs no rewriting
+            // until a mutation actually touches it). Any dirty-chunk tracking
+            // from before this load no longer corresponds to real positions.
+            // We also don't yet know the on-disk CHUNK COUNT is what we think
+            // it is, so the next persist's cleanup still runs once regardless
+            // of dirty-chunk narrowing (see indexKnownComplete guard below).
+            _dirtyChunks = new Set()
+            _lastWrittenTotalChunks = null
+
             // Auto-rebuild stale, corrupt OR incomplete index in background. The dedup above
             // makes this session correct; the rebuild is what repairs the stored
             // index so the duplicates stop being re-read (and re-persisted) on
@@ -543,6 +682,11 @@ export const useCollectionStore = defineStore('collection', () => {
         // Read straight from the card documents themselves — complete by
         // construction, so orphan cleanup may trust it again (TASK-168).
         indexKnownComplete = true
+        // TASK-219: same reasoning as loadFromIndex above — a wholesale
+        // replacement invalidates any prior dirty-chunk tracking, and this
+        // fresh copy needs no rewriting until something actually mutates it.
+        _dirtyChunks = new Set()
+        _lastWrittenTotalChunks = null
 
         if (!importing.value) {
             enrichCardsWithMissingMetadata().catch((err: unknown) => {
@@ -706,11 +850,22 @@ export const useCollectionStore = defineStore('collection', () => {
         const newIndex = [...cardIndexRaw.value]
 
         if (action === 'delete') {
+            // splice shifts every following position back by one — every chunk
+            // from here forward changes. Full rewrite (paso 2 of TASK-176 is
+            // narrowing this; out of scope here).
             if (idx > -1) newIndex.splice(idx, 1)
+            markAllChunksDirty()
         } else if (action === 'add') {
+            // Appended at the END — could still land in a new trailing chunk,
+            // and add/delete are explicitly scoped OUT of the narrowing for
+            // this ticket (see file header). Full rewrite, same as delete.
             newIndex.push(cardToIndex(card))
+            markAllChunksDirty()
         } else if (action === 'update' && idx > -1) {
+            // Same length, same order, only this one position's content
+            // changes — TASK-219: only its chunk needs to be rewritten.
             newIndex[idx] = cardToIndex(card)
+            markChunkDirty(idx)
         }
 
         cardIndexRaw.value = newIndex
@@ -826,9 +981,13 @@ export const useCollectionStore = defineStore('collection', () => {
         await Promise.all(Array.from({ length: workerCount }, () => runNext()))
     }
 
-    /** Write all card_index chunks with at most INDEX_WRITE_CONCURRENCY setDoc calls in flight at once. */
-    async function writeChunksConcurrently(allIndex: IndexCard[], userId: string, totalChunks: number, chunkSize: number): Promise<void> {
-        const chunkNumbers = Array.from({ length: totalChunks }, (_, c) => c)
+    /**
+     * Write the given card_index chunk numbers with at most
+     * INDEX_WRITE_CONCURRENCY setDoc calls in flight at once. TASK-219:
+     * `chunkNumbers` is no longer always 0..totalChunks-1 — the caller passes
+     * only the chunks that actually changed when it can prove the rest didn't.
+     */
+    async function writeChunksConcurrently(allIndex: IndexCard[], userId: string, chunkNumbers: number[], chunkSize: number): Promise<void> {
         await runWithConcurrency(chunkNumbers, async (c) => {
             const chunkCards = allIndex.slice(c * chunkSize, (c + 1) * chunkSize)
             const chunkRef = doc(db, 'users', userId, 'card_index', `chunk_${c}`)
@@ -868,6 +1027,31 @@ export const useCollectionStore = defineStore('collection', () => {
         const allIndex = cardIndexRaw.value
         const totalChunks = Math.ceil(allIndex.length / INDEX_CHUNK_SIZE) || 1
 
+        // TASK-219: capture which chunks are actually dirty right now, then
+        // reset the accumulator immediately — same "snapshot, then reset
+        // before the async work starts" shape as `gen` above, so mutations
+        // landing WHILE this write is in flight are captured cleanly for
+        // whichever persist runs next (an organic re-trigger, or the
+        // coalesced rerun in the `finally` below), never lost and never
+        // double-counted against this run.
+        const dirtySnapshot = _dirtyChunks
+        _dirtyChunks = new Set()
+        // Every call site above marks something dirty before ever scheduling
+        // a persist, so a non-null-but-empty snapshot should not happen — but
+        // an empty set is not a safe "nothing to write" here (unlike null,
+        // which is an explicit "write everything"), so fall back to a full
+        // rewrite rather than silently writing nothing.
+        //
+        // !indexKnownComplete also forces a full rewrite regardless of the
+        // snapshot (TASK-168 territory, not touched otherwise): a corrupt or
+        // incomplete load's in-memory index may not match what's on disk
+        // chunk-for-chunk, and every persist rewriting every chunk was the
+        // mechanism that self-healed that mismatch. Narrowing must wait until
+        // a later load re-establishes indexKnownComplete = true.
+        const chunkNumbers = dirtySnapshot === null || dirtySnapshot.size === 0 || !indexKnownComplete
+            ? Array.from({ length: totalChunks }, (_, c) => c)
+            : [...dirtySnapshot].filter(c => c < totalChunks)
+
         // Write chunks in background (fire-and-forget)
         void (async () => {
             try {
@@ -894,7 +1078,21 @@ export const useCollectionStore = defineStore('collection', () => {
                 // orphan behind for one more cycle is harmless (the read path
                 // dedups it), while deleting a real chunk is not recoverable
                 // from the index alone.
-                if (indexKnownComplete) {
+                //
+                // TASK-219 AC2: the getDocs read above only exists to find
+                // chunks numbered >= totalChunks — which can only happen if
+                // totalChunks went DOWN since the last write that actually
+                // completed. If it did not, the read is guaranteed to come
+                // back with nothing to delete, so skip it. `_lastWrittenTotalChunks
+                // === null` (first persist after a load/rebuild, see its
+                // reset sites) always falls through to running the check —
+                // the one-time cost of establishing ground truth for whatever
+                // a prior, possibly-interrupted session may have left behind.
+                const totalChunksDidNotShrink = _lastWrittenTotalChunks !== null && totalChunks >= _lastWrittenTotalChunks
+                if (indexKnownComplete && totalChunksDidNotShrink) {
+                    // Nothing to do — totalChunks can't have shrunk, so no
+                    // orphan can exist that this read would have found.
+                } else if (indexKnownComplete) {
                     const indexCol = collection(db, 'users', userId, 'card_index')
                     const existingChunks = await getDocs(indexCol)
                     const orphans = existingChunks.docs
@@ -930,7 +1128,11 @@ export const useCollectionStore = defineStore('collection', () => {
                     console.warn('[IndexSync] Skipping orphan-chunk cleanup: the loaded card_index was incomplete or corrupt, so its length cannot decide which chunks are orphans (TASK-168).')
                 }
 
-                await writeChunksConcurrently(allIndex, userId, totalChunks, INDEX_CHUNK_SIZE)
+                await writeChunksConcurrently(allIndex, userId, chunkNumbers, INDEX_CHUNK_SIZE)
+                // Only recorded once the write actually completes — a thrown
+                // write below must NOT advance this, or a later persist could
+                // wrongly conclude totalChunks already matches disk.
+                _lastWrittenTotalChunks = totalChunks
             } catch (err) {
                 logSanitizedError('[IndexSync] Failed to persist index', err, 'warn')
             } finally {
@@ -980,9 +1182,12 @@ export const useCollectionStore = defineStore('collection', () => {
             cards.value = [...cards.value, newCard]
             cardsById.set(newCard.id, newCard)
 
-            // Sync index
-            syncIndexLocal(newCard, 'add')
-            persistIndexToFirestore()
+            // Sync index — queued instead if the index is still loading. Without
+            // this, persisting a 1-entry cardIndexRaw rewrites chunk_0 and wipes
+            // the 2000 real cards stored there (TASK-185).
+            if (syncIndexOrQueue(newCard, 'add')) {
+                persistIndexToFirestore()
+            }
 
             // Sync to public collection (non-blocking, log-only on failure)
             const userInfo = getUserInfo()
@@ -1166,9 +1371,15 @@ export const useCollectionStore = defineStore('collection', () => {
             // freeze / Mali crash). Same shape as batchDeleteCards' index rebuild.
             if (updatedCards.length > 0) {
                 const updatedById = new Map(updatedCards.map(c => [c.id, c]))
-                cardIndexRaw.value = cardIndexRaw.value.map((ic) => {
+                // TASK-219: this map preserves length and order — only the
+                // positions whose id is in updatedById actually change content,
+                // so only their chunks need rewriting. `.map`'s own index arg
+                // gives us the position for free, no extra pass needed.
+                cardIndexRaw.value = cardIndexRaw.value.map((ic, i) => {
                     const updated = updatedById.get(ic.i)
-                    return updated ? cardToIndex(updated) : ic
+                    if (!updated) return ic
+                    markChunkDirty(i)
+                    return cardToIndex(updated)
                 })
                 persistIndexToFirestore()
             }
@@ -1237,13 +1448,27 @@ export const useCollectionStore = defineStore('collection', () => {
     const deleteCard = async (cardId: string): Promise<boolean> => {
         if (!authStore.user) return false
 
-        // Find and remove card optimistically (immediate UI update)
+        // Find and remove card optimistically (immediate UI update).
+        //
+        // TASK-185: `cards.value` is NOT the only place the card can live. The
+        // grid renders `paginatedCards`, which is populated seconds earlier by
+        // the server-side index query, so during the initial load the user can
+        // right-click a perfectly visible card that `cards.value` doesn't know
+        // about yet. This used to `return false` and do nothing — no delete, no
+        // error, no toast. Resolve the card from wherever it actually is; the
+        // bulk path (batchDeleteCards) has always deleted by id without this
+        // gate, which is why bulk delete worked and single delete didn't.
         const cardIndex = cards.value.findIndex(c => c.id === cardId)
-        // eslint-disable-next-line security/detect-object-injection
-        const deletedCard = cards.value[cardIndex]
-        if (cardIndex === -1 || !deletedCard) return false
+        const deletedCard = cardIndex > -1
+            // eslint-disable-next-line security/detect-object-injection
+            ? cards.value[cardIndex]
+            : (cardsById.get(cardId) ?? paginatedCards.value.find(c => c.id === cardId))
+        // Still nothing anywhere: there is no card under this id to delete.
+        if (!deletedCard) return false
 
-        cards.value = cards.value.filter(c => c.id !== cardId)
+        if (cardIndex > -1) {
+            cards.value = cards.value.filter(c => c.id !== cardId)
+        }
         cardsById.delete(cardId)
 
         // Also patch the paginated grid (TASK-116) — CollectionView renders
@@ -1258,9 +1483,11 @@ export const useCollectionStore = defineStore('collection', () => {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
             await deleteDoc(cardRef)
 
-            // Sync index
-            syncIndexLocal(deletedCard, 'delete')
-            persistIndexToFirestore()
+            // Sync index — queued instead if the index is still loading, so the
+            // persist can't write an empty cardIndexRaw over chunk_0 (TASK-185).
+            if (syncIndexOrQueue(deletedCard, 'delete')) {
+                persistIndexToFirestore()
+            }
 
             // Remove from public collection (non-blocking, log-only on failure)
             removeCardFromPublic(cardId, authStore.user.id)
@@ -1280,9 +1507,14 @@ export const useCollectionStore = defineStore('collection', () => {
         } catch (error) {
             // Restore card on failure
             logSanitizedError('Error deleting card', error)
-            const restored = [...cards.value]
-            restored.splice(cardIndex, 0, deletedCard)
-            cards.value = restored
+            // Only put it back where it was actually removed from — with the
+            // TASK-185 fix, `cards.value` may never have held it (splice(-1)
+            // would insert it at the wrong end of the array).
+            if (cardIndex > -1) {
+                const restored = [...cards.value]
+                restored.splice(cardIndex, 0, deletedCard)
+                cards.value = restored
+            }
             cardsById.set(cardId, deletedCard)
             if (paginatedIndex > -1) {
                 const restoredPaginated = [...paginatedCards.value]
@@ -1311,6 +1543,11 @@ export const useCollectionStore = defineStore('collection', () => {
             // Everything is gone and this path deletes every chunk itself, so
             // "empty" is the complete truth (TASK-168).
             indexKnownComplete = true
+            // TASK-219: this path deletes every chunk itself below, bypassing
+            // _runPersistLoop entirely — reset so a later persist this session
+            // doesn't trust stale dirty/chunk-count bookkeeping from before the wipe.
+            _dirtyChunks = new Set()
+            _lastWrittenTotalChunks = null
 
             // Delete card_index chunks so deleted cards don't reappear on reload.
             // Use batches of 10 to avoid "Transaction too big" (each chunk is ~400KB).
@@ -1451,6 +1688,10 @@ export const useCollectionStore = defineStore('collection', () => {
         // writes fresh chunks reflecting the current cardIndexRaw AND deletes any
         // now-orphaned trailing chunks (see _doPersistIndex).
         cardIndexRaw.value = cards.value.map(cardToIndex)
+        // TASK-219: rebuilt from cards.value in cards.value's own order, which
+        // is not guaranteed to match the prior index order/positions — full
+        // rewrite, not a narrow diff.
+        markAllChunksDirty()
         persistIndexToFirestore()
 
         // Re-query the server card_index for the definitive membership/order,

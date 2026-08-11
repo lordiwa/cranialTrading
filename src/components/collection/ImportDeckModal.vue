@@ -7,7 +7,7 @@ import IconV2 from '../ui/IconV2.vue'
 import { useI18n } from '../../composables/useI18n'
 import { type CardCondition, type CardStatus } from '../../types/card'
 import { type DeckFormat } from '../../types/deck'
-import { extractDeckId, fetchMoxfieldDeck, type MoxfieldCard, type MoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
+import { countMoxfieldCards, extractDeckId, fetchMoxfieldDeck, type MoxfieldCard, type MoxfieldDeck, moxfieldToCardList } from '../../services/moxfield'
 import { isCsvFormat, isUrzasGathererCsv, parseCsvDeckImport, type ParsedCsvCard, parseUrzasGathererCsv } from '../../utils/cardHelpers'
 
 const props = withDefaults(defineProps<{
@@ -32,8 +32,19 @@ const inputText = ref('')
 const condition = ref<CardCondition>('NM')
 const includeSideboard = ref(true)
 const parsing = ref(false)
-const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string; cards?: string[] } | null>(null)
+const preview = ref<{ total: number; mainboard: number; sideboard: number; name?: string; cards?: string[]; skipped?: number } | null>(null)
 const errorMsg = ref('')
+
+// TASK-196: el conteo que se muestra en el boton Y el que decide si se puede
+// importar salen del MISMO sitio. Antes el boton se pintaba con una expresion
+// inline y no tenia :disabled, asi que podia decir "IMPORT NAN CARDS" y seguir
+// siendo clickeable. Si no es un numero utilizable, no hay nada que importar.
+const importCount = computed(() => {
+  const p = preview.value
+  if (!p) return 0
+  const n = includeSideboard.value ? p.total : p.mainboard
+  return Number.isFinite(n) && n > 0 ? n : 0
+})
 const isLink = ref(false)
 const moxfieldDeckData = ref<MoxfieldDeck | null>(null)
 const isCsv = ref(false)
@@ -99,7 +110,11 @@ const conditionOptions = computed(() => [
   { value: 'PO', label: t('common.conditions.PO') },
 ])
 
-interface ParsePreview { total: number; mainboard: number; sideboard: number; name?: string; cards?: string[] }
+// TASK-196: `skipped` son las cartas que Moxfield mando con una forma que no se
+// pudo leer. Se descartan para no tumbar el import entero, pero el usuario tiene
+// que enterarse — un descarte silencioso cambia un NaN visible por una perdida
+// invisible, que es peor.
+interface ParsePreview { total: number; mainboard: number; sideboard: number; name?: string; cards?: string[]; skipped?: number }
 
 const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> => {
   const result = await fetchMoxfieldDeck(deckId)
@@ -108,13 +123,37 @@ const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> 
     return null
   }
   const deck = result.data
-  moxfieldDeckData.value = deck
   const mainboardCards = deck.boards?.mainboard?.cards ?? {}
   const sideboardCards = deck.boards?.sideboard?.cards ?? {}
   const commanderCards = deck.boards?.commanders?.cards ?? {}
-  const mainboardCount = Object.values(mainboardCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
-  const sideboardCount = Object.values(sideboardCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
-  const commanderCount = Object.values(commanderCards).reduce((sum: number, item: MoxfieldCard) => sum + item.quantity, 0)
+  // TASK-196: las tres sumas eran `sum + item.quantity` sin guarda. UNA carta
+  // sin el campo bastaba para que el total fuera NaN, y el boton quedaba
+  // habilitado diciendo literalmente "IMPORT NAN CARDS". Dos lineas mas abajo el
+  // nombre SI se protegia — la guarda estaba en la cabeza, no en el codigo.
+  // countMoxfieldCards no puede devolver NaN y ademas informa los descartes.
+  const main = countMoxfieldCards(mainboardCards)
+  const side = countMoxfieldCards(sideboardCards)
+  const cmdr = countMoxfieldCards(commanderCards)
+  const mainboardCount = main.total
+  const sideboardCount = side.total
+  const commanderCount = cmdr.total
+  const invalidCount = main.invalid + side.invalid + cmdr.invalid
+  const total = mainboardCount + sideboardCount + commanderCount
+
+  // TASK-196: un mazo del que no se pudo leer NI UNA carta no es un mazo de 0
+  // cartas — es una respuesta que no entendimos. Se trata como error, no como
+  // preview vacio, para que el usuario no vea un boton "IMPORT 0 CARDS".
+  //
+  // La comprobacion va ANTES de tocar moxfieldDeckData, deckNameInput,
+  // deckFormat y commanderName. Encontrado en UAT: al validar DESPUES, un mazo
+  // ilegible dejaba el nombre del mazo fallido escrito en el formulario
+  // mientras se mostraba el error — la pantalla contaba dos historias.
+  if (total === 0 && invalidCount > 0) {
+    errorMsg.value = t('decks.importModal.errorMalformed')
+    return null
+  }
+
+  moxfieldDeckData.value = deck
   const cardNames = Object.values(mainboardCards).map((item: MoxfieldCard) => item.card?.name ?? '').filter(Boolean)
   deckNameInput.value = deck.name ?? ''
   if (deck.format === 'commander' || deck.format === 'edh') {
@@ -124,7 +163,8 @@ const parseMoxfieldInput = async (deckId: string): Promise<ParsePreview | null> 
       commanderName.value = firstCommander?.card?.name ?? ''
     }
   }
-  return { total: mainboardCount + sideboardCount + commanderCount, mainboard: mainboardCount + commanderCount, sideboard: sideboardCount, name: deck.name, cards: cardNames }
+
+  return { total, mainboard: mainboardCount + commanderCount, sideboard: sideboardCount, name: deck.name, cards: cardNames, skipped: invalidCount }
 }
 
 const parseCsvInput = (text: string): ParsePreview => {
@@ -167,6 +207,13 @@ const handleParse = async () => {
   moxfieldDeckData.value = null
   isCsv.value = false
   csvParsedCards.value = []
+  // TASK-196, encontrado en UAT: esto faltaba. Si el analisis fallaba, se
+  // mostraba el error PERO el preview del intento ANTERIOR seguia en pantalla,
+  // con su conteo, su aviso de descartes y un boton "IMPORTAR N CARTAS" que
+  // habria importado el mazo viejo. Un error junto a un preview que lo
+  // contradice es exactamente el defecto que este ticket viene a arreglar.
+  // Precede a este ticket: pasaba igual con un mazo privado (403) tras uno bueno.
+  preview.value = null
 
   const deckId = extractDeckId(inputText.value)
 
@@ -454,6 +501,13 @@ const handleCsvFile = async (event: Event) => {
         </span>
       </button>
 
+      <!-- TASK-196: cartas que Moxfield mando ilegibles. Se descartan para no
+           tumbar el import, pero se avisa: un descarte silencioso es una perdida
+           invisible. -->
+      <div v-if="preview?.skipped" role="alert" class="border border-warning-40 bg-warning-10 rounded-lg p-md">
+        <p class="text-small text-warning">{{ t('decks.importModal.warningSkipped', { count: preview.skipped }) }}</p>
+      </div>
+
       <div v-if="preview" class="flex gap-2 justify-end pt-2 border-t border-line">
         <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="handleClose">
           {{ t('common.actions.cancel') }}
@@ -461,10 +515,11 @@ const handleCsvFile = async (event: Event) => {
         <BaseButton
             variant="filled"
             class="flex-1 uppercase tracking-[.1em] !text-[12px] gap-2"
+            :disabled="!importCount"
             @click="handleImport"
         >
           <IconV2 name="import" :size="16" />
-          {{ t('decks.importModal.submit', { count: includeSideboard ? preview.total : preview.mainboard }) }}
+          {{ t('decks.importModal.submit', { count: importCount }) }}
         </BaseButton>
       </div>
     </div>

@@ -136,7 +136,6 @@
       "prevSlide": "Previous slide"
     }
   },
-
   "auth": {
     "login": {
       "title": "SIGN IN",
@@ -247,7 +246,6 @@
       "emailChangedReauth": "Your email changed. Please sign in again with your new email."
     }
   },
-
   "cart": {
     "title": "Exchange Cart",
     "emptyState": "Your cart is empty. Add cards from the collection above.",
@@ -280,7 +278,6 @@
     "decreaseQty": "Decrease quantity",
     "increaseQty": "Increase quantity"
   },
-
   "landing": {
     "tagline": "From Trash to Treasures",
     "subtitle": "The all-in-one platform to manage your MTG collection, find trading partners automatically, and close deals — no middlemen, no fees.",
@@ -331,10 +328,26 @@
       "cranial": "Cranial Trading",
       "others": "Other Tools",
       "rows": {
-        "allInOne": { "label": "All-in-one", "us": "Collection + Decks + Trading + Messages", "them": "Need 3-4 different sites" },
-        "matching": { "label": "Matching", "us": "Automatic match discovery", "them": "Manual search & posting" },
-        "messaging": { "label": "Communication", "us": "Built-in messaging", "them": "Discord, email, or forums" },
-        "price": { "label": "Cost", "us": "100% free, no fees", "them": "Subscriptions or trade fees" }
+        "allInOne": {
+          "label": "All-in-one",
+          "us": "Collection + Decks + Trading + Messages",
+          "them": "Need 3-4 different sites"
+        },
+        "matching": {
+          "label": "Matching",
+          "us": "Automatic match discovery",
+          "them": "Manual search & posting"
+        },
+        "messaging": {
+          "label": "Communication",
+          "us": "Built-in messaging",
+          "them": "Discord, email, or forums"
+        },
+        "price": {
+          "label": "Cost",
+          "us": "100% free, no fees",
+          "them": "Subscriptions or trade fees"
+        }
       },
       "cta": "Join for Free"
     },
@@ -387,7 +400,6 @@
       "about": "About Us"
     }
   },
-
   "header": {
     "nav": {
       "search": "Search",
@@ -439,7 +451,6 @@
       }
     }
   },
-
   "dashboard": {
     "title": "FIND MATCHES",
     "matchesFound": "matches found",
@@ -508,7 +519,6 @@
       "blockError": "Error blocking user"
     }
   },
-
   "collection": {
     "title": "MY COLLECTION",
     "subtitle": "{owned} cards owned",
@@ -565,8 +575,10 @@
       "myWishlist": "MY WISHLIST"
     },
     "pagination": {
-      "showingOf": "Showing {count} of {total}",
-      "loadingMore": "Loading more…"
+      "loading": "Loading collection…",
+      "slowLoad": "Large collection — this may take a moment",
+      "showingOf": "showing {count} of {total}",
+      "filtering": "Updating results…"
     },
     "empty": {
       "deckEmpty": "Empty deck",
@@ -680,15 +692,8 @@
       "importError": "Error importing cards",
       "synced": "Cards synced for matches",
       "syncError": "Error syncing cards"
-    },
-    "pagination": {
-      "loading": "Loading collection…",
-      "slowLoad": "Large collection — this may take a moment",
-      "showingOf": "showing {count} of {total}",
-      "filtering": "Updating results…"
     }
   },
-
   "cards": {
     "addModal": {
       "title": "ADD CARD",
@@ -847,7 +852,6 @@
       "delete": "Delete"
     }
   },
-
   "decks": {
     "title": "MY DECKS",
     "subtitle": "{count} decks created",
@@ -975,7 +979,9 @@
       "csvDetectedUG": "Urza's Gatherer CSV detected",
       "csvConditionNote": "Conditions will be imported per card from the CSV",
       "csvCards": "{count} cards found in CSV",
-      "errorUnknown": "Unknown error"
+      "errorUnknown": "Unknown error",
+      "errorMalformed": "Moxfield returned a deck we couldn't read: none of its cards had a usable quantity. Check the deck on Moxfield, or paste the list as plain text.",
+      "warningSkipped": "{count} card(s) were skipped: Moxfield sent them incomplete. The rest will be imported normally."
     },
     "editDeckCard": {
       "titleWishlist": "EDIT WISHLIST",
@@ -1260,7 +1266,6 @@
       "confirmRemoveCardMessage": "Remove \"{name}\" from the deck?"
     }
   },
-
   "matches": {
     "title": "Matches",
     "tabs": {
@@ -1419,7 +1424,6 @@
       "permanentDeleteError": "Error deleting"
     }
   },
-
   "messages": {
     "title": "MESSAGES",
     "subtitle": "active conversations",
@@ -1457,7 +1461,6 @@
       "listenError": "Error listening for messages"
     }
   },
-
   "contacts": {
     "title": "MY SAVED CONTACTS",
     "subtitle": "{count} contacts",
@@ -1474,7 +1477,6 @@
       "loadError": "Error loading contacts"
     }
   },
-
   "settings": {
     "kicker": "Your account",
     "title": "Settings",
@@ -1567,7 +1569,6 @@
       }
     }
   },
-
   "profile": {
     "notFound": {
       "title": "404 - User not found",
@@ -1590,7 +1591,6 @@
       "loadCardsError": "Error loading profile cards"
     }
   },
-
   "discovery": {
     "panel": {
       "titleVersions": "VERSIONS",
@@ -1650,7 +1650,6 @@
       "addCancelled": "Add cancelled"
     }
   },
-
   "search": {
     "view": {
       "title": "Search cards",
@@ -1759,14 +1758,12 @@
       "searchError": "Error searching cards"
     }
   },
-
   "notFound": {
     "title": "404",
     "heading": "Page not found",
     "message": "The page you're looking for doesn't exist or was moved.",
     "backHome": "BACK TO HOME"
   },
-
   "legal": {
     "terms": {
       "title": "Terms of Use",
@@ -1838,7 +1835,6 @@
     },
     "backToHome": "← Back to home"
   },
-
   "preferences": {
     "card": {
       "orBetter": "or better",
@@ -1875,12 +1871,10 @@
       "importButton": "IMPORT {count} AS WANTED"
     }
   },
-
   "confirm": {
     "defaultConfirm": "CONFIRM",
     "defaultCancel": "CANCEL"
   },
-
   "help": {
     "menu": {
       "faq": "Frequently asked questions",
@@ -2145,7 +2139,6 @@
       }
     }
   },
-
   "tour": {
     "welcome": {
       "kicker": "We're glad you're here",
@@ -2200,7 +2193,6 @@
       "done": "LET'S GO!"
     }
   },
-
   "market": {
     "title": "MARKET INSIGHTS",
     "subtitle": "Price movers, format staples, and market trends",
@@ -2267,7 +2259,7 @@
       "label": "Set"
     },
     "pagination": {
-      "showing": "Showing {from}\u2013{to} of {total}",
+      "showing": "Showing {from}–{to} of {total}",
       "page": "{current} / {total}"
     },
     "lastUpdated": "Last updated: {date}",
@@ -2359,7 +2351,6 @@
       "loadStaples": "Failed to load format staples"
     }
   },
-
   "binders": {
     "create": {
       "title": "NEW BINDER",
@@ -2415,11 +2406,9 @@
       "binderNamePlaceholder": "Leave empty to generate a random name"
     }
   },
-
   "footer": {
     "language": "Language"
   },
-
   "contact": {
     "title": "Contact Us",
     "subtitle": "We're here to help. Choose your preferred channel to reach us.",
@@ -2434,7 +2423,6 @@
     "faqCallout": "Many questions are already answered in our FAQ section.",
     "faqLink": "Go to FAQ"
   },
-
   "pages": {
     "kicker": {
       "about": "About us",
@@ -2444,7 +2432,6 @@
       "legal": "Legal"
     }
   },
-
   "seo": {
     "defaultDescription": "Magic: The Gathering trading platform. Manage your collection, find matches, and connect with other players.",
     "pages": {

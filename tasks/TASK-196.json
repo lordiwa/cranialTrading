@@ -8,7 +8,7 @@
     "Una carta sin el campo set no revienta a mitad del import (verificar moxfield.ts:93)",
     "Los casos 403 y 500 siguen comportandose como hoy"
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "medium",
   "labels": [
     "wargaming",
@@ -20,9 +20,20 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "at": "2026-08-11T10:45:00.000Z",
+      "author": "orchestrator",
+      "body": "IMPLEMENTADO, sin commitear. 13 tests nuevos, verificados en ROJO antes de tocar codigo (11 de 13 fallaban).\n\nEL TICKET SUBESTIMABA EL ALCANCE, en dos puntos:\n  1. No era UNA suma sin guarda, eran TRES (mainboard, sideboard y commanders) en las lineas 115-117 del modal.\n  2. moxfieldToCardList tenia el mismo bloque de codigo COPIADO TRES VECES (commanders, mainboard, sideboard), ninguno con guarda.\n\nEL SEGUNDO DEFECTO QUEDA VERIFICADO. D6 lo dejo sin atacar por prudencia (habria escrito en la cuenta compartida y un fallo a mitad dejaba estado parcial). Se probo sin tocar la red, porque moxfieldToCardList es una funcion pura: CONFIRMADO, item.card.set.toUpperCase() lanza 'TypeError: Cannot read properties of undefined (reading toUpperCase)' y aborta el import entero. El ticket lo listaba como sospecha; ahora es un hecho con test.\n\nCAMBIOS:\n  src/services/moxfield.ts — coerceQuantity() y countMoxfieldCards() nuevas. Los tres bloques duplicados se unifican en UN pushBoard(): si vuelve a faltar una guarda, falta en los tres a la vez y los tests la ven (Regla 6). Una carta inservible se descarta en vez de tumbar el mazo — el usuario prefiere 99 de 100 cartas antes que un error a mitad de camino.\n  src/components/collection/ImportDeckModal.vue — las tres sumas usan countMoxfieldCards. Nuevo computed importCount: el numero del boton y la decision de habilitarlo salen del MISMO sitio (antes el boton se pintaba con una expresion inline y NO tenia :disabled, por eso podia decir 'IMPORT NAN CARDS' y seguir siendo clickeable). Un mazo del que no se leyo ni una carta se trata como error, no como preview de 0.\n  src/locales/{en,es,pt}.json — errorMalformed y warningSkipped, en los tres a la vez (Regla 3).\n\nDECISION: los descartes se AVISAN, no se tragan. Un descarte silencioso cambia un NaN visible por una perdida invisible, que es peor. Ademas se rechazan cantidades negativas y fraccionarias: no existe media carta, y un -2 restaria del total en silencio.\n\nERROR PROPIO ATRAPADO ANTES DE CERRAR: el aviso lo escribi con border-amber / bg-amber-10 / text-amber copiando el estilo de DeckCardsList y DeckEditorGrid. `amber` NO EXISTE en tailwind.config.js — las tres clases eran no-ops y el aviso habria salido sin ningun color. Cambiado a la paleta `warning`, que si esta definida. OJO: las usos existentes en DeckCardsList.vue y DeckEditorGrid.vue tienen el mismo problema y quedan como estan (Regla 2, fuera de alcance) — merece su propio ticket.\n\nVERDE: 1688 tests unitarios (135 archivos), 0 rojos. type-check limpio. vite build --mode development OK.\n\nNO VERIFICADO EN NAVEGADOR, y es lo que falta para cerrar de verdad: no se abrio el modal con un mazo real malformado. Las funciones puras estan cubiertas por tests; que el boton quede deshabilitado y que el aviso se vea es POR CONSTRUCCION, no medido. Tampoco se ejercito el camino de import completo (TASK-189 toca el mismo flujo y conviene mirarlos juntos, como decia el ticket)."
+    },
+    {
+      "at": "2026-08-11T11:15:00.000Z",
+      "author": "orchestrator",
+      "body": "UAT EN NAVEGADOR — HECHO, Y ENCONTRO UN DEFECTO DE MI PROPIO CAMBIO. Lo unico que lo detecto fue mirar la pantalla; ningun test unitario lo habria visto.\n\nMETODO: se intercepto window.fetch para el proxy de Moxfield y se sirvieron mazos malformados sinteticos. NO se importo nada — solo se analizo. El stub se restauro al terminar.\n\nCASO 1, mazo parcialmente malo (una carta sin quantity, una sin set): 'Mainboard: 6 | Sideboard: 0', '6 CARTAS', aviso 'Se descartaron 1 carta(s)...' visible con color, y boton 'IMPORTAR 6 CARTAS'. Ningun NaN. El conteo es correcto: 4 + 2, con la carta sin quantity descartada.\n\nCASO 2, mazo 100% ilegible: aparecio el mensaje de error nuevo... PERO TAMBIEN SEGUIA EN PANTALLA EL PREVIEW DEL INTENTO ANTERIOR — 'Mainboard: 6', '6 CARTAS', el aviso viejo de descartes, y un boton 'IMPORTAR 6 CARTAS' que habria importado el mazo VIEJO. Ademas el nombre del formulario ya se habia pisado con el del mazo fallido. O sea: la pantalla contaba dos historias contradictorias a la vez, que es EXACTAMENTE la clase de defecto que este ticket viene a arreglar.\n\nDOS CAUSAS, las dos arregladas:\n  a) handleParse no limpiaba preview.value al fallar. Precede a este ticket: pasaba igual con un mazo privado (403) analizado despues de uno bueno. Agregado preview.value = null junto a los otros resets.\n  b) parseMoxfieldInput validaba DESPUES de escribir moxfieldDeckData, deckNameInput, deckFormat y commanderName. La comprobacion se movio ANTES de todo efecto secundario.\n\nREVERIFICADO tras el arreglo: caso 2 muestra SOLO el error, sin preview, sin boton, sin nombre pisado. Caso 1 sigue funcionando igual (se reprobo despues del reordenamiento, para descartar que arreglar uno rompiera el otro).\n\nSin errores en consola. 1688 tests unitarios verdes, type-check limpio, build OK.\n\nLECCION, y vale para toda la Familia F: los tests unitarios probaron las funciones puras y estaban todos verdes mientras la pantalla mentia. El defecto vivia en el ESTADO de la vista, no en el calculo."
+    }
+  ],
   "created_at": "2026-08-11T02:10:00.000Z",
-  "updated_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T11:15:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd-tier"
 }

@@ -65,6 +65,50 @@ export const fetchMoxfieldDeck = async (deckId: string): Promise<{ data: Moxfiel
     }
 }
 
+/**
+ * TASK-196 — coercion de la cantidad que llega de Moxfield.
+ *
+ * Moxfield es un tercero: el tipo `quantity: number` es una promesa que
+ * TypeScript no puede hacer cumplir en ejecucion. Una sola carta sin el campo
+ * bastaba para que la suma diera NaN y el boton dijera "IMPORT NAN CARDS".
+ *
+ * Un string numerico se acepta (cambio de tipo, no dato corrupto). Se rechaza
+ * todo lo demas, y ademas lo negativo y lo fraccionario: no existe media carta,
+ * y un -2 restaria del total en silencio. Devuelve null en vez de 0 para que
+ * quien llama pueda DISTINGUIR "cantidad ausente" de "cantidad cero", que es
+ * legitima.
+ */
+const coerceQuantity = (value: unknown): number | null => {
+    let n: number
+    if (typeof value === 'number') n = value
+    else if (typeof value === 'string' && value.trim() !== '') n = Number(value.trim())
+    else return null
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) return null
+    return n
+}
+
+/**
+ * TASK-196 — cuenta cartas de un board sin poder devolver NaN nunca.
+ *
+ * Devuelve tambien cuantas se descartaron: quien llama decide que hacer con un
+ * mazo incompleto (mostrar un error, deshabilitar el boton), y para eso necesita
+ * saber que hubo descartes. Tragarselos en silencio seria cambiar un NaN visible
+ * por una perdida invisible, que es peor.
+ */
+export const countMoxfieldCards = (
+    cards?: Record<string, MoxfieldCard>
+): { total: number; invalid: number } => {
+    if (!cards) return { total: 0, invalid: 0 }
+    let total = 0
+    let invalid = 0
+    for (const item of Object.values(cards)) {
+        const qty = coerceQuantity(item?.quantity)
+        if (qty == null) invalid++
+        else total += qty
+    }
+    return { total, invalid }
+}
+
 export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard = true): {
     quantity: number
     name: string
@@ -84,49 +128,41 @@ export const moxfieldToCardList = (deck: MoxfieldDeck, includeSideboard = true):
         isCommander: boolean
     }[] = [];
 
-    // Commanders (para Commander format)
-    if (deck.boards?.commanders?.cards) {
-        Object.values(deck.boards.commanders.cards).forEach(item => {
+    // TASK-196: los tres bloques (commanders / mainboard / sideboard) eran
+    // codigo IDENTICO copiado tres veces, y ninguno tenia guarda: una carta sin
+    // `set` reventaba con TypeError en .toUpperCase() A MITAD del import,
+    // dejando estado parcial. Ahora hay UN solo camino — si vuelve a faltar una
+    // guarda, falta en los tres a la vez y los tests lo ven (Regla 6).
+    //
+    // Una carta inservible se DESCARTA en vez de tumbar el mazo entero: el
+    // usuario prefiere 99 de 100 cartas antes que un error a mitad de camino.
+    const pushBoard = (
+        board: Record<string, MoxfieldCard> | undefined,
+        opts: { isInSideboard: boolean; isCommander: boolean }
+    ) => {
+        if (!board) return;
+        for (const item of Object.values(board)) {
+            const card = item?.card;
+            const quantity = coerceQuantity(item?.quantity);
+            // Sin nombre no hay nada que importar, y sin cantidad utilizable
+            // tampoco. `set` puede faltar: se degrada a cadena vacia, que es lo
+            // que ya hacen las importaciones por texto plano.
+            if (!card?.name || quantity == null) continue;
             cards.push({
-                quantity: item.quantity,
-                name: item.card.name,
-                setCode: item.card.set.toUpperCase(),
-                collectorNumber: item.card.cn,
-                scryfallId: item.card.scryfall_id,
-                isInSideboard: false,
-                isCommander: true,
+                quantity,
+                name: card.name,
+                setCode: typeof card.set === 'string' ? card.set.toUpperCase() : '',
+                collectorNumber: card.cn ?? '',
+                scryfallId: card.scryfall_id ?? '',
+                ...opts,
             });
-        });
-    }
+        }
+    };
 
-    // Mainboard
-    if (deck.boards?.mainboard?.cards) {
-        Object.values(deck.boards.mainboard.cards).forEach(item => {
-            cards.push({
-                quantity: item.quantity,
-                name: item.card.name,
-                setCode: item.card.set.toUpperCase(),
-                collectorNumber: item.card.cn,
-                scryfallId: item.card.scryfall_id,
-                isInSideboard: false,
-                isCommander: false,
-            });
-        });
-    }
-
-    // Sideboard (siempre incluir por defecto)
-    if (includeSideboard && deck.boards?.sideboard?.cards) {
-        Object.values(deck.boards.sideboard.cards).forEach(item => {
-            cards.push({
-                quantity: item.quantity,
-                name: item.card.name,
-                setCode: item.card.set.toUpperCase(),
-                collectorNumber: item.card.cn,
-                scryfallId: item.card.scryfall_id,
-                isInSideboard: true,
-                isCommander: false,
-            });
-        });
+    pushBoard(deck.boards?.commanders?.cards, { isInSideboard: false, isCommander: true });
+    pushBoard(deck.boards?.mainboard?.cards, { isInSideboard: false, isCommander: false });
+    if (includeSideboard) {
+        pushBoard(deck.boards?.sideboard?.cards, { isInSideboard: true, isCommander: false });
     }
 
     return cards;

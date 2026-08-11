@@ -136,7 +136,6 @@
       "prevSlide": "Anterior"
     }
   },
-
   "auth": {
     "login": {
       "title": "ENTRAR",
@@ -247,7 +246,6 @@
       "emailChangedReauth": "Seu email mudou. Entre novamente com seu novo email."
     }
   },
-
   "cart": {
     "title": "Carrinho de Troca",
     "emptyState": "Seu carrinho esta vazio. Adicione cartas da colecao.",
@@ -280,7 +278,6 @@
     "decreaseQty": "Diminuir quantidade",
     "increaseQty": "Aumentar quantidade"
   },
-
   "landing": {
     "tagline": "From Trash to Treasures",
     "subtitle": "A plataforma tudo-em-um para gerenciar sua coleção MTG, encontrar parceiros de troca automaticamente e fechar negócios — sem intermediários, sem taxas.",
@@ -331,10 +328,26 @@
       "cranial": "Cranial Trading",
       "others": "Outras Ferramentas",
       "rows": {
-        "allInOne": { "label": "Tudo-em-um", "us": "Coleção + Decks + Trading + Mensagens", "them": "Precisa de 3-4 sites diferentes" },
-        "matching": { "label": "Matching", "us": "Descoberta automática de matches", "them": "Busca e postagem manual" },
-        "messaging": { "label": "Comunicação", "us": "Mensagens integradas", "them": "Discord, email ou fóruns" },
-        "price": { "label": "Custo", "us": "100% grátis, sem taxas", "them": "Assinaturas ou taxas de troca" }
+        "allInOne": {
+          "label": "Tudo-em-um",
+          "us": "Coleção + Decks + Trading + Mensagens",
+          "them": "Precisa de 3-4 sites diferentes"
+        },
+        "matching": {
+          "label": "Matching",
+          "us": "Descoberta automática de matches",
+          "them": "Busca e postagem manual"
+        },
+        "messaging": {
+          "label": "Comunicação",
+          "us": "Mensagens integradas",
+          "them": "Discord, email ou fóruns"
+        },
+        "price": {
+          "label": "Custo",
+          "us": "100% grátis, sem taxas",
+          "them": "Assinaturas ou taxas de troca"
+        }
       },
       "cta": "Junte-se Grátis"
     },
@@ -387,7 +400,6 @@
       "about": "Sobre Nos"
     }
   },
-
   "header": {
     "nav": {
       "search": "Buscar",
@@ -439,7 +451,6 @@
       }
     }
   },
-
   "dashboard": {
     "title": "BUSCAR MATCHES",
     "matchesFound": "matches encontrados",
@@ -508,7 +519,6 @@
       "blockError": "Erro ao bloquear usuário"
     }
   },
-
   "collection": {
     "title": "MINHA COLEÇÃO",
     "subtitle": "{owned} cartas próprias",
@@ -565,8 +575,10 @@
       "myWishlist": "MINHA WISHLIST"
     },
     "pagination": {
-      "showingOf": "Mostrando {count} de {total}",
-      "loadingMore": "Carregando mais…"
+      "loading": "Carregando coleção…",
+      "slowLoad": "Coleção grande — pode demorar um momento",
+      "showingOf": "mostrando {count} de {total}",
+      "filtering": "Atualizando resultados…"
     },
     "empty": {
       "deckEmpty": "Deck vazio",
@@ -680,15 +692,8 @@
       "importError": "Erro ao importar cartas",
       "synced": "Cartas sincronizadas para matches",
       "syncError": "Erro sincronizando cartas"
-    },
-    "pagination": {
-      "loading": "Carregando coleção…",
-      "slowLoad": "Coleção grande — pode demorar um momento",
-      "showingOf": "mostrando {count} de {total}",
-      "filtering": "Atualizando resultados…"
     }
   },
-
   "cards": {
     "addModal": {
       "title": "ADICIONAR CARTA",
@@ -847,7 +852,6 @@
       "delete": "Excluir"
     }
   },
-
   "decks": {
     "title": "MEUS DECKS",
     "subtitle": "{count} decks criados",
@@ -975,7 +979,9 @@
       "csvDetectedUG": "CSV do Urza's Gatherer detectado",
       "csvConditionNote": "As condições serão importadas por carta do CSV",
       "csvCards": "{count} cartas encontradas no CSV",
-      "errorUnknown": "Erro desconhecido"
+      "errorUnknown": "Erro desconhecido",
+      "errorMalformed": "O Moxfield devolveu um deck que não foi possível ler: nenhuma de suas cartas tinha uma quantidade utilizável. Confira o deck no Moxfield, ou cole a lista como texto simples.",
+      "warningSkipped": "{count} carta(s) foram descartadas: o Moxfield as enviou incompletas. O restante será importado normalmente."
     },
     "editDeckCard": {
       "titleWishlist": "EDITAR WISHLIST",
@@ -1260,7 +1266,6 @@
       "confirmRemoveCardMessage": "Remover \"{name}\" do baralho?"
     }
   },
-
   "matches": {
     "title": "Matches",
     "tabs": {
@@ -1419,7 +1424,6 @@
       "permanentDeleteError": "Erro ao excluir"
     }
   },
-
   "messages": {
     "title": "MENSAGENS",
     "subtitle": "conversas ativas",
@@ -1457,7 +1461,6 @@
       "listenError": "Erro ao escutar mensagens"
     }
   },
-
   "contacts": {
     "title": "MEUS CONTATOS SALVOS",
     "subtitle": "{count} contatos",
@@ -1474,7 +1477,6 @@
       "loadError": "Erro ao carregar contatos"
     }
   },
-
   "settings": {
     "kicker": "Sua conta",
     "title": "Configurações",
@@ -1567,7 +1569,6 @@
       }
     }
   },
-
   "profile": {
     "notFound": {
       "title": "404 - Usuário não encontrado",
@@ -1590,7 +1591,6 @@
       "loadCardsError": "Erro ao carregar cartas do perfil"
     }
   },
-
   "discovery": {
     "panel": {
       "titleVersions": "VERSÕES",
@@ -1650,7 +1650,6 @@
       "addCancelled": "Adição cancelada"
     }
   },
-
   "search": {
     "view": {
       "title": "Buscar cartas",
@@ -1759,14 +1758,12 @@
       "searchError": "Erro ao buscar cartas"
     }
   },
-
   "notFound": {
     "title": "404",
     "heading": "Página não encontrada",
     "message": "A página que você procura não existe ou foi movida.",
     "backHome": "VOLTAR AO INÍCIO"
   },
-
   "legal": {
     "terms": {
       "title": "Termos de Uso",
@@ -1838,7 +1835,6 @@
     },
     "backToHome": "← Voltar ao início"
   },
-
   "preferences": {
     "card": {
       "orBetter": "ou melhor",
@@ -1875,12 +1871,10 @@
       "importButton": "IMPORTAR {count} COMO PROCURO"
     }
   },
-
   "confirm": {
     "defaultConfirm": "CONFIRMAR",
     "defaultCancel": "CANCELAR"
   },
-
   "help": {
     "menu": {
       "faq": "Perguntas frequentes",
@@ -2145,7 +2139,6 @@
       }
     }
   },
-
   "tour": {
     "welcome": {
       "kicker": "Seja bem-vindo(a)",
@@ -2200,7 +2193,6 @@
       "done": "VAMOS LÁ!"
     }
   },
-
   "market": {
     "title": "MERCADO",
     "subtitle": "Movimentos de preço, staples por formato e tendências",
@@ -2259,15 +2251,15 @@
     "search": "Buscar cartas…",
     "sort": {
       "label": "Ordenar por",
-      "change": "% Varia\u00e7\u00e3o",
-      "price": "Pre\u00e7o"
+      "change": "% Variação",
+      "price": "Preço"
     },
     "setFilter": {
-      "all": "Todas as edi\u00e7\u00f5es",
-      "label": "Edi\u00e7\u00e3o"
+      "all": "Todas as edições",
+      "label": "Edição"
     },
     "pagination": {
-      "showing": "Mostrando {from}\u2013{to} de {total}",
+      "showing": "Mostrando {from}–{to} de {total}",
       "page": "{current} / {total}"
     },
     "lastUpdated": "Atualizado: {date}",
@@ -2359,7 +2351,6 @@
       "loadStaples": "Erro ao carregar staples do formato"
     }
   },
-
   "binders": {
     "create": {
       "title": "NOVA PASTA",
@@ -2415,11 +2406,9 @@
       "binderNamePlaceholder": "Deixe vazio para gerar um nome aleatório"
     }
   },
-
   "footer": {
     "language": "Idioma"
   },
-
   "contact": {
     "title": "Contato",
     "subtitle": "Estamos aqui para ajudar. Escolha o canal de sua preferencia para entrar em contato.",
@@ -2434,7 +2423,6 @@
     "faqCallout": "Muitas perguntas ja estao respondidas na nossa secao de FAQ.",
     "faqLink": "Ir para FAQ"
   },
-
   "pages": {
     "kicker": {
       "about": "Sobre nós",
@@ -2444,7 +2432,6 @@
       "legal": "Legal"
     }
   },
-
   "seo": {
     "defaultDescription": "Plataforma de troca de cartas Magic: The Gathering. Gerencie sua colecao, encontre matches e conecte-se com outros jogadores.",
     "pages": {

@@ -150,14 +150,13 @@ export interface BuildCardIndexResponse {
   elapsed: string
 }
 
-export async function buildCardIndex(
-  userId?: string
-): Promise<BuildCardIndexResponse> {
-  const callable = httpsCallable<
-    { userId?: string },
-    BuildCardIndexResponse
-  >(functions, 'buildCardIndex', { timeout: 300000 })
-  const result = await callable({ userId })
+export async function buildCardIndex(): Promise<BuildCardIndexResponse> {
+  const callable = httpsCallable<Record<string, never>, BuildCardIndexResponse>(
+    functions,
+    'buildCardIndex',
+    { timeout: 300000 }
+  )
+  const result = await callable({})
   return result.data
 }
 

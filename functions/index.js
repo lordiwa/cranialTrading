@@ -1054,10 +1054,14 @@ function toIndexCard(id, data) {
 }
 
 /**
- * buildCardIndex — Builds or rebuilds the card_index for a user.
- * Reads all card docs, extracts compact fields, writes in chunks of 5000.
+ * buildCardIndex — Builds or rebuilds the card_index for the calling user.
  *
- * Call with: no args (self) or { userId } (admin-triggered)
+ * TASK-211: this used to accept an optional { userId } from the client and
+ * fall back to request.auth.uid only when omitted — i.e. it trusted a
+ * client-supplied uid with no check that it matched the caller, letting any
+ * logged-in user rebuild (and rewrite/delete stale chunks of) another
+ * user's card_index. No legitimate caller ever passed one, so the
+ * parameter is removed rather than validated.
  */
 exports.buildCardIndex = onCall(
   { maxInstances: 3, timeoutSeconds: 300, memory: '2GiB' },
@@ -1066,7 +1070,7 @@ exports.buildCardIndex = onCall(
       throw new HttpsError("unauthenticated", "Must be logged in");
     }
 
-    const userId = request.data?.userId || request.auth.uid;
+    const userId = request.auth.uid;
     logger.info(`[buildCardIndex] Starting for user ${userId}`);
     const startTime = Date.now();
 

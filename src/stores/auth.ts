@@ -294,7 +294,6 @@ export const useAuthStore = defineStore('auth', () => {
             const userDoc = await firestoreFns.getDoc(firestoreFns.doc(db, 'users', userId));
             if (userDoc.exists()) {
                 const data = userDoc.data() as {
-                    email: string;
                     username: string;
                     location: string;
                     createdAt: { toDate: () => Date };
@@ -304,7 +303,15 @@ export const useAuthStore = defineStore('auth', () => {
                 };
                 user.value = {
                     id: userId,
-                    email: data.email,
+                    // TASK-188: el email NO se lee del documento /users. Ese documento
+                    // es de lectura publica (el perfil de otro usuario se abre sin
+                    // sesion, requisito de producto) y las reglas de Firestore no
+                    // filtran por campo, asi que cualquier campo que viva ahi se
+                    // descarga sin cuenta. Medido: 134 emails en prod, 232 en dev.
+                    // Firebase Auth ya era la fuente de verdad desde TASK-124; ahora
+                    // es la unica. Los documentos heredados todavia traen el campo
+                    // hasta que corra la migracion — se ignora a proposito.
+                    email: auth.currentUser?.email ?? '',
                     username: data.username,
                     location: data.location,
                     createdAt: data.createdAt.toDate(),
@@ -312,22 +319,6 @@ export const useAuthStore = defineStore('auth', () => {
                     avatarUrl: data.avatarUrl ?? null,
                     tourCompleted: data.tourCompleted ?? false,
                 };
-
-                // TASK-124 review follow-up (HIGH-1): Firebase Auth is the source of
-                // truth for email. changeRegistrationEmail's verifyBeforeUpdateEmail
-                // changes it out-of-band (only takes effect once the user clicks the
-                // confirmation link), so the /users doc would go stale forever
-                // otherwise — every auth-state load passes through here, so sync it
-                // here rather than at the call site.
-                const currentAuthEmail = auth.currentUser?.email;
-                if (currentAuthEmail && currentAuthEmail !== data.email) {
-                    user.value.email = currentAuthEmail;
-                    try {
-                        await firestoreFns.updateDoc(firestoreFns.doc(db, 'users', userId), { email: currentAuthEmail });
-                    } catch {
-                        // best-effort: doc stays stale until the next successful sync, non-fatal
-                    }
-                }
 
                 // TASK-169: mantener contact_info/{uid} al dia. Es donde vive el
                 // email desde que se saco de public_cards/public_preferences (que
@@ -361,8 +352,8 @@ export const useAuthStore = defineStore('auth', () => {
                     };
 
                     try {
+                        // TASK-188: sin `email` — ver el comentario de arriba.
                         await firestoreFns.setDoc(firestoreFns.doc(db, 'users', userId), {
-                            email: user.value.email,
                             username: reservedUsername,
                             location: user.value.location,
                             createdAt: new Date(),
@@ -417,8 +408,9 @@ export const useAuthStore = defineStore('auth', () => {
             }
 
             // D-06 step 5: persist the user doc with the NORMALIZED username (D-05).
+            // TASK-188: sin `email` — /users es de lectura publica y las reglas no
+            // filtran por campo. El email vive en Firebase Auth y en contact_info.
             await firestoreFns.setDoc(firestoreFns.doc(db, 'users', userId), {
-                email,
                 username: norm,
                 location,
                 createdAt: new Date(),
@@ -567,8 +559,8 @@ export const useAuthStore = defineStore('auth', () => {
                 /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
                 const finalUsername = await reserveUniqueUsername(firebaseUser.uid, rawBase);
 
+                // TASK-188: sin `email` — /users es de lectura publica.
                 await firestoreFns.setDoc(firestoreFns.doc(db, 'users', firebaseUser.uid), {
-                    email: firebaseUser.email,
                     username: finalUsername,
                     location: '',
                     createdAt: new Date(),

@@ -13,7 +13,7 @@ import { useConfirmStore } from '../stores/confirm'
 import { useI18n } from '../composables/useI18n'
 import { formatDate } from '../utils/formatDate'
 import { db } from '../services/firestore'
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, getDocs } from 'firebase/firestore'
 import { resolveUsernameToUid } from '../services/userLookup'
 import {
   findCardsMatchingPreferences,
@@ -237,28 +237,25 @@ const formatLastSync = (date: Date): string => {
 }
 
 // ✅ CARGAR EMAILS para matches guardados
+//
+// TASK-188: antes esto leia el email del documento /users/{otherUserId}. Ese
+// documento es de lectura PUBLICA — el perfil de otro usuario se abre sin
+// sesion, y las reglas de Firestore no filtran por campo — asi que una peticion
+// anonima se bajaba el email de toda la plataforma. Es el mismo defecto que
+// TASK-169 arreglo en public_cards, en otra coleccion. El email ahora se pide a
+// contact_info/{uid}, cuya regla exige sesion; este flujo siempre la tiene.
 const loadSavedMatchesWithEmails = async () => {
   try {
+    const { getContactInfo } = await import('../services/contactInfo')
     const matchesWithData = await Promise.all(
         savedMatches.value.map(async (match) => {
-          try {
-            const userRef = doc(db, 'users', match.otherUserId)
-            const userSnap = await getDoc(userRef)
-
-            if (userSnap.exists()) {
-              const userData = userSnap.data() as Record<string, unknown>
-              return {
-                ...match,
-                otherEmail: (userData.email as string) ?? '',
-              }
-            }
-          } catch (err) {
-            console.error(`Error cargando email para ${match.otherUserId}:`, err)
-          }
-
+          // getContactInfo no lanza: devuelve null si no existe o si la lectura
+          // se deniega. La ausencia es "no hay contacto", nunca un error que
+          // corte el listado — igual que antes.
+          const contact = await getContactInfo(match.otherUserId)
           return {
             ...match,
-            otherEmail: '',
+            otherEmail: contact?.email ?? '',
           }
         })
     )

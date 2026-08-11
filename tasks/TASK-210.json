@@ -1,0 +1,25 @@
+{
+  "key": "TASK-210",
+  "title": "La coleccion /users se puede ENUMERAR entera sin sesion (username, location, createdAt de todos)",
+  "description": "Desprendido de TASK-188 el 2026-08-11, por decision de Rafael de mantener aquel ticket acotado al email (el dato critico) y desplegable el mismo dia.\n\nQUE PASA, y es distinto de TASK-188: aquella era una fuga de CAMPO (el email dentro del documento). Esta es una fuga de ALCANCE. `match /users/{userId} { allow read: if true }` no distingue entre `get` (leer UN documento, que es lo que necesita el perfil publico) y `list` (recorrer la coleccion entera). Una peticion REST anonima a /users devuelve HTTP 200 con TODOS los documentos.\n\nMEDIDO el 2026-08-11 con peticion anonima sin token:\n  cranial-trading      (PRODUCCION) -> 134 documentos\n  cranial-trading-dev  (DEV)        -> 232 documentos\n\nQUE SE LLEVA UN ANONIMO UNA VEZ APLICADO TASK-188: username, location, createdAt y avatarUrl de todos los usuarios de la plataforma, en una sola peticion. Ya no el email. Es el padron completo de la base de usuarios — util para scraping, para dimensionar a la competencia, y para cruzar usernames con otras plataformas.\n\nPOR QUE NO ES TRIVIAL, y por eso no entro en TASK-188: Firestore permite separar `get` de `list` (`allow get: if true; allow list: if <condicion>`), pero la app HOY depende de poder listar /users sin sesion en dos puntos, y ambos hay que resolverlos antes de cerrar la regla:\n  1. src/services/stats.ts:22 getTotalUserCount() — hace getCountFromServer sobre la coleccion /users, y la agregacion cuenta como `list`. Se usa para el contador de usuarios de la plataforma. Alternativa: leer el total de /platform_stats, que ya existe, es de lectura publica y lo escriben las Cloud Functions.\n  2. src/services/userLookup.ts:30 resolveUsernameToUid() — el fallback legacy hace query(where('username','==',norm), limit(1)), que tambien es `list`. Solo aplica a usuarios no backfilleados en /usernames; hay que confirmar CON DATOS cuantos quedan antes de quitarlo, no asumir que son cero.\n\nOJO: cerrar `list` sin arreglar los dos puntos de arriba rompe el contador de la home y el perfil publico de los usuarios legacy — en silencio, porque ambos caminos tienen catch que devuelve 0/null.\n\nRESTRICCION QUE NO SE PUEDE ROMPER, la misma de siempre: ver el perfil de otro usuario SIN estar logueado tiene que seguir funcionando. O sea `allow get: if true` se queda.\n\nOJO: las reglas de Firestore se despliegan A MANO. El CI solo despliega hosting.",
+  "acceptance_criteria": [
+    "Una peticion REST anonima que intente LISTAR /users es denegada (no devuelve el padron de usuarios)",
+    "Ver el perfil publico de un usuario concreto SIN sesion sigue funcionando igual (allow get se mantiene)",
+    "getTotalUserCount() sigue devolviendo un numero correcto sin depender de listar /users",
+    "resolveUsernameToUid() sigue resolviendo a los usuarios legacy, o queda demostrado CON DATOS que ya no existen",
+    "El candado de tests/integration/anonymousExposure.test.ts se extiende para cubrir la enumeracion",
+    "Las reglas quedan desplegadas a mano en dev Y en produccion"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": ["seguridad", "privacidad", "wargaming"],
+  "assignee": null,
+  "depends_on": ["TASK-188"],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T09:40:00.000Z",
+  "updated_at": "2026-08-11T09:40:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

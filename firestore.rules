@@ -5,6 +5,20 @@ service cloud.firestore {
     // Permitir lectura pública de usuarios (perfiles públicos)
     // Lectura: cualquiera puede ver perfiles públicos
     // Escritura: solo el dueño
+    //
+    // ⚠️ TASK-188 — ESTE DOCUMENTO ES PÚBLICO. NO METER DATOS PERSONALES ACÁ.
+    // La lectura abierta es deliberada: mirar el perfil de otro usuario SIN
+    // sesión es requisito de producto. Pero las reglas de Firestore se evalúan
+    // por DOCUMENTO, no por campo: cualquier campo que viva acá se descarga con
+    // una petición anónima, sin cuenta y sin token. Filtrar en el cliente no es
+    // seguridad.
+    // Ya pasó tres veces: TASK-087 (users/{uid}/cards), TASK-169 (el email
+    // dentro de public_cards) y TASK-188 (el email dentro de este documento —
+    // medido el 2026-08-11: 134 emails en producción, 232 en dev, HTTP 200).
+    // Campos permitidos: username, location, avatarUrl, createdAt,
+    // lastUsernameChange, tourCompleted. El email vive en Firebase Auth y en
+    // contact_info/{uid}, que exige sesión.
+    // El candado automático está en tests/integration/anonymousExposure.test.ts.
     match /users/{userId} {
       allow read: if true;
       allow write: if request.auth.uid == userId;

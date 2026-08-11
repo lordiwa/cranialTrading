@@ -75,8 +75,27 @@ import { useToastStore } from '@/stores/toast'
 // eslint-disable-next-line import/first
 import { auth as authMock } from '@/services/firebase'
 
-describe('loadUserData email sync (HIGH-1)', () => {
-  it('syncs a stale /users doc email to the current Firebase Auth email on login', async () => {
+/*
+ * TASK-188 SUPERSEDE A HIGH-1. La sincronizacion que estos dos tests protegian
+ * ya no existe, y su desaparicion es el arreglo, no una regresion.
+ *
+ * HIGH-1 existia porque el email vivia DENTRO del documento /users/{uid} y por
+ * lo tanto podia quedar rancio frente a Firebase Auth. TASK-188 saco el campo de
+ * ese documento — es de lectura publica y las reglas de Firestore no filtran por
+ * campo, asi que una peticion anonima se bajaba el email de todos los usuarios
+ * (medido: 134 en produccion, 232 en dev). Sin campo que guardar no hay nada que
+ * sincronizar: el email se lee siempre de auth.currentUser.
+ *
+ * La intencion original de HIGH-1 — que despues de un cambio de email por
+ * verifyBeforeUpdateEmail la sesion use la direccion nueva y no la abandonada —
+ * sigue cubierta, y mas fuerte: ahora la unica fuente es Firebase Auth.
+ * Los tests que la fijan estan en auth.noEmailInUserDoc.test.ts.
+ *
+ * MEDIUM-2 (el mapeo del error de checkEmailVerification) no lo toca TASK-188 y
+ * queda tal cual, abajo.
+ */
+describe('loadUserData email (TASK-188 reemplaza el sync de HIGH-1)', () => {
+  it('toma el email de Firebase Auth e ignora el campo rancio del documento heredado', async () => {
     authMock.currentUser = { uid: 'uid3', email: 'new@example.com' } as never
     signInWithEmailAndPasswordMock.mockResolvedValueOnce({
       user: { uid: 'uid3', emailVerified: true },
@@ -84,6 +103,7 @@ describe('loadUserData email sync (HIGH-1)', () => {
     getDocMock.mockResolvedValueOnce({
       exists: () => true,
       data: () => ({
+        // Documento previo a la migracion: todavia trae el campo.
         email: 'old@example.com',
         username: 'someuser',
         location: 'City',
@@ -94,14 +114,12 @@ describe('loadUserData email sync (HIGH-1)', () => {
     const store = useAuthStore()
     await store.login('new@example.com', 'pw')
 
-    expect(updateDocMock).toHaveBeenCalledWith(
-      expect.objectContaining({ col: 'users', id: 'uid3' }),
-      { email: 'new@example.com' }
-    )
     expect(store.user?.email).toBe('new@example.com')
+    // Y no lo "corrige" en el documento: reescribirlo reabriria la fuga.
+    expect(updateDocMock).not.toHaveBeenCalled()
   })
 
-  it('does not write when the doc email already matches Firebase Auth', async () => {
+  it('no escribe nada en /users cuando el documento ya no trae email', async () => {
     authMock.currentUser = { uid: 'uid4', email: 'same@example.com' } as never
     signInWithEmailAndPasswordMock.mockResolvedValueOnce({
       user: { uid: 'uid4', emailVerified: true },
@@ -109,7 +127,6 @@ describe('loadUserData email sync (HIGH-1)', () => {
     getDocMock.mockResolvedValueOnce({
       exists: () => true,
       data: () => ({
-        email: 'same@example.com',
         username: 'someuser',
         location: 'City',
         createdAt: { toDate: () => new Date() },
@@ -120,6 +137,7 @@ describe('loadUserData email sync (HIGH-1)', () => {
     await store.login('same@example.com', 'pw')
 
     expect(updateDocMock).not.toHaveBeenCalled()
+    expect(store.user?.email).toBe('same@example.com')
   })
 })
 

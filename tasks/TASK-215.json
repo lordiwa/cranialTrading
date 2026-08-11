@@ -10,7 +10,7 @@
     "Verificado DESPUES en las dos direcciones por cada una que se toque: la lectura ajena falla y la propia sigue funcionando",
     "El requisito de producto de Rafael sigue intacto: ver el perfil de otro usuario SIN sesion sigue funcionando igual, verificado en el navegador"
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "seguridad",
@@ -23,9 +23,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-11T22:44:04.222Z",
+      "body": "ESTADO AL PAUSAR: implementado, revisado (0 hallazgos que bloqueen), DESPLEGADO EN DEV, NO en prod, y EL COMMIT NO ESTA PUSHEADO.\n\nMEDIDO ANTES (contra dev, cuentas descartables): 11/11 subcolecciones LEGIBLES desde una cuenta ajena creada 30 segundos antes, y 11/11 legibles por el dueño.\nMEDIDO DESPUES (post-deploy a dev): 0/11 legibles por ajenos (todas 403), 11/11 legibles por el dueño. Las dos columnas se movieron en direcciones opuestas — eso es lo unico que distingue un cierre correcto de uno que cierra de mas.\n\nAC PENDIENTES: el 4 (desplegar a PROD, necesita OK de Rafael) y el 6 (verificar el perfil publico sin sesion en el navegador; el smoke de E2E lo cubre pero no se re-corrio despues de ESTE cambio).\n\nATENCION AL RETOMAR — INCONSISTENCIA DELIBERADA: dev corre reglas que NO estan en origin. Si alguien redespliega firestore:rules desde un checkout limpio de origin/develop, REABRE las once subcolecciones. Los commits son 54da43d y d2b2def, locales.\n\nPOR QUE NO SE PUSHEO: la suite completa dio 120 passed / 2 failed / 13 skipped. Los dos fallos son collection-crud \"delete card\" y \"bulk delete\", por TimeoutError de 10 s. NO LOS CAUSA ESTE CAMBIO, y el control es solido: re-corridos SOLOS contra las MISMAS reglas ya desplegadas, pasan (31,7 s y 33,4 s) — si las reglas prohibieran algo que el borrado necesita, fallarian igual en aislado. Cero menciones de permission/denied en la salida, y el DOM del fallo muestra la app cargada con el badge en 59203 cartas. Encaja con TASK-176: sacar una carta reescribe las 30 porciones del card_index y la operacion siguiente queda encolada 10-58 s.\n\nDECISION DE RAFAEL: opcion 2 — no pushear y atacar primero TASK-176/208, la causa real de la fragilidad, en vez de confiar en los reintentos del CI (que era la recomendacion) o marcar los tests como flaky conocidos.\n\nDOS HALLAZGOS DEL REVIEWER FUERA DEL DIFF, ya ticketeados y NO tocados (Regla 2): TASK-217 (critico — mensajes privados ajenos legibles, editables, borrables e inyectables) y TASK-218 (las cuatro colecciones legacy de raiz con la misma regla abierta)."
+    }
+  ],
   "created_at": "2026-08-11T19:48:24.763Z",
-  "updated_at": "2026-08-11T19:48:24.763Z",
+  "updated_at": "2026-08-11T22:44:04.222Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

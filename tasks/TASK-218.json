@@ -1,0 +1,31 @@
+{
+  "key": "TASK-218",
+  "title": "Las cuatro colecciones legacy a nivel raiz tienen la misma regla abierta que TASK-215 acaba de declarar vulnerable",
+  "description": "Encontrado por el hivemind:reviewer de contexto fresco durante la revision de TASK-215 (2026-08-11).\n\nfirestore.rules, lineas 239-258, bajo el comentario \"Legacy colecciones (mantener compatibilidad con\ndatos anteriores)\":\n\n    match /colecciones/{userId}/cards/{cardId}      allow read: if request.auth != null;\n    match /preferencias/{userId}/{preferenceId}     allow read: if request.auth != null;\n    match /matches_guardados/{userId}/{matchId}     allow read: if request.auth != null;\n    match /contactos_guardados/{userId}/{contactId} allow read: if request.auth != null;\n\nEs EXACTAMENTE la misma regla que TASK-215 acaba de cerrar en las once subcolecciones de\n/users/{userId}, a unas diez lineas de distancia, sobre los paths viejos de los mismos datos:\ncolecciones de cartas, preferencias, matches guardados y contactos guardados.\n\nPOR QUE ES MEDIUM Y NO HIGH: ningun codigo de src/ las lee, asi que probablemente esten vacias o\nabandonadas. Pero eso es una SUPOSICION sobre los DATOS, no sobre el codigo — que no haya lectores no\ndice nada sobre si hay documentos. Si tienen datos reales de cuando la app usaba esos paths, la\nexposicion es identica a la que se acaba de cerrar, y ademas mas silenciosa, porque nadie mira ahi.\n\nLO QUE HAY QUE DECIDIR: si estan vacias, la accion correcta probablemente sea BORRAR las cuatro reglas\nen vez de cerrarlas — una regla para un path muerto es superficie de ataque sin contrapartida. Si\ntienen datos, hay que decidir si se migran o se cierran.\n\nNO MEDIDO: no se conto un solo documento. Contarlos es el primer paso del ticket y es barato.",
+  "acceptance_criteria": [
+    "Contados los documentos reales en las cuatro colecciones legacy, en dev Y en prod — el dato que decide todo lo demas",
+    "Si estan vacias: las cuatro reglas se BORRAN en vez de cerrarse (una regla para un path muerto es superficie sin contrapartida)",
+    "Si tienen datos: decidido con Rafael si se migran a /users/{userId}/... o se cierran a dueño",
+    "Confirmado que ningun codigo de src/, functions/ ni scripts/ las lee ni las escribe",
+    "Desplegado A MANO a dev y a prod (el CI no despliega reglas)"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "seguridad",
+    "firestore-rules",
+    "legacy",
+    "no-medido",
+    "hallazgo-de-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T22:23:45.969Z",
+  "updated_at": "2026-08-11T22:23:45.969Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

@@ -1,0 +1,34 @@
+{
+  "key": "TASK-217",
+  "title": "Cualquier usuario con cuenta puede LEER, EDITAR, BORRAR e INYECTAR mensajes privados de cualquier conversacion ajena",
+  "description": "Encontrado por el hivemind:reviewer de contexto fresco durante la revision de TASK-215 (2026-08-11), y\nverificado leyendo las reglas por el orquestador. NO SE TOCO (Regla 2, y ademas merece su propio ticket\npor severidad).\n\nfirestore.rules, lineas 212-224:\n\n    match /conversations/{conversationId} {\n      allow create: if request.auth != null;\n      allow read, update: if request.auth != null;          // <-- sin chequeo de participante\n      allow delete: if request.auth != null\n        && request.auth.uid in resource.data.participantIds; // <-- el delete SI lo chequea\n\n      match /messages/{messageId} {\n        allow read, write: if request.auth != null;          // <-- write = create + update + delete\n      }\n    }\n\nES EL PEOR DE TODA LA FAMILIA, y por dos motivos distintos:\n\n1. NO ES SOLO LECTURA. `write` cubre crear, EDITAR y BORRAR. Cualquier usuario con cuenta puede:\n   - leer la conversacion privada completa de cualquier par de usuarios,\n   - EDITAR mensajes que escribio otra persona,\n   - BORRAR mensajes ajenos,\n   - INYECTAR mensajes en una conversacion ajena, que van a aparecer como si los hubiera escrito un\n     participante.\n   Todos los agujeros anteriores de esta familia (087, 169, 188, 214, 215) eran de LECTURA. TASK-211 y\n   213 eran de escritura pero sobre datos derivados o via una funcion; este es escritura directa sobre\n   contenido que un humano escribio y que la otra persona va a leer creyendo que es autentico.\n\n2. LA BARRERA ES REGISTRARSE, que es gratis y automatico.\n\nEL PROPIO COMENTARIO DE LA REGLA SE CONTRADICE CON LA REGLA: dice \"Permitir a usuarios autenticados\ncrear y leer conversaciones donde participan\" y no hay ningun chequeo de participante en el read ni en\nel update. Es el mismo patron que se encontro hoy en matches_nuevos (\"Solo el dueño puede leer\" sobre\nuna regla que dejaba leer a cualquiera). El delete SI valida participantIds, lo que confirma que la\nintencion estaba y que falto aplicarla a los otros verbos.\n\nY LA SOLUCION YA EXISTE EN EL ARCHIVO, diez lineas mas abajo: shared_matches (232-238) valida\ncorrectamente con\n    request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId\nNo hay que inventar el patron, hay que aplicarlo.\n\nNO MEDIDO: NO se ejecuto el ataque. Sale de leer firestore.rules. A diferencia de TASK-215, donde la\nlectura ajena se probo con cuentas descartables, aca no se probo nada todavia — y hay que hacerlo antes\nde cerrar, incluida la ESCRITURA, que es la parte grave.\n\nOCTAVA APARICION DE LA FAMILIA: 087, 169, 188, 211, 213, 214, 215, esta.",
+  "acceptance_criteria": [
+    "Confirmado EJECUTANDO con dos cuentas descartables: hoy una cuenta ajena LEE los mensajes de una conversacion en la que no participa, y ademas EDITA, BORRA e INYECTA un mensaje en ella",
+    "conversations: read y update exigen que request.auth.uid este en resource.data.participantIds, con el mismo patron que ya usa el delete de esa misma regla",
+    "messages: el write abierto se parte en create/update/delete con chequeo de participante, y el read exige participante",
+    "Trazado antes de cerrar que ningun flujo legitimo lea o escriba una conversacion en la que el usuario no participa (ojo con notificaciones, contadores de no-leidos y el listado de conversaciones)",
+    "Verificado DESPUES en las dos direcciones: el ajeno falla en lectura Y en escritura, y los dos participantes siguen conversando normalmente — probado en el navegador, no solo por script",
+    "Desplegado A MANO a dev y a prod (el CI no despliega reglas)"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "seguridad",
+    "autorizacion",
+    "firestore-rules",
+    "mensajes",
+    "privacidad",
+    "no-medido",
+    "hallazgo-de-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T22:23:28.634Z",
+  "updated_at": "2026-08-11T22:23:28.634Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

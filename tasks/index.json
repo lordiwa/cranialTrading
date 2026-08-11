@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T21:34:57.837Z",
+  "generated_at": "2026-08-11T22:44:04.222Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1168,12 +1168,24 @@
     {
       "key": "TASK-215",
       "title": "Once subcolecciones mas de /users/{userId} son legibles por cualquier usuario registrado — TASK-214 cierra 1 puerta de 12",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {
       "key": "TASK-216",
       "title": "El probe de TASK-211 se rompio con el fix de TASK-214: leia el card_index de la victima con el token del atacante",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-217",
+      "title": "Cualquier usuario con cuenta puede LEER, EDITAR, BORRAR e INYECTAR mensajes privados de cualquier conversacion ajena",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-218",
+      "title": "Las cuatro colecciones legacy a nivel raiz tienen la misma regla abierta que TASK-215 acaba de declarar vulnerable",
       "status": "todo",
       "priority": "medium"
     }

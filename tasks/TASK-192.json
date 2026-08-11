@@ -8,7 +8,7 @@
     "Un payload de precios invalido NO se cachea, o se invalida el cache al detectar el error",
     "Test unitario sobre formatPrice con valores no numericos (sin red)"
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "wargaming",
@@ -20,9 +20,20 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "at": "2026-08-11T10:25:00.000Z",
+      "author": "orchestrator",
+      "body": "IMPLEMENTADO, sin commitear. TDD: 41 tests nuevos, verificados en ROJO antes de tocar el codigo — incluido el TypeError exacto del ticket ('price.toFixed is not a function').\n\nDONDE ESTABA EL AGUJERO DE VERDAD: no en formatPrice sino en getLatestPrice (mtgjson.ts:232), que es la FRONTERA por donde entra el dato del tercero. Devolvia `pricePoint[latestDate] ?? null` tal cual venia y lo declaraba `number | null` — una promesa de tipo que nadie verificaba en ejecucion. formatPrice era solo donde explotaba.\n\nCAMBIOS:\n  src/services/mtgjson.ts — nueva coercePrice(), usada por getLatestPrice. formatPrice pasa a aceptar `unknown` y a delegar en la misma coercion. Se exporta __testables.\n  src/utils/formatters.ts — el OTRO formatPrice (Regla 6: punto paralelo, mismo defecto, se arregla en el mismo paso). Formatea market_data en MarketView y el banner de portafolio. Su firma era `(price: number)`, o sea que confiaba en el tipo y ni siquiera aceptaba null.\n\nDECISION DE DISENO: un string numerico se COERCE, no se descarta. '12.50' es un precio valido servido con otro tipo — un cambio de tipo del tercero, no un dato corrupto. Descartarlo dejaria toda la app en N/A durante las 24 h del TTL; coercionarlo la deja funcionando entera. Solo lo que no es un numero finito degrada a N/A.\n\nY se cierran a proposito los casos raros de la coercion de JS: Number([12.5]) es 12.5, Number(true) es 1 y Number('') es 0 — los tres se colarian como precios plausibles y mostrarian un valor INVENTADO, que es peor que un N/A honesto. Hay un test por cada uno.\n\nAC3 ('un payload invalido NO se cachea, o se invalida el cache') — NO IMPLEMENTADO, y lo recomiendo asi. Con la frontera saneada el payload malo ya no hace daño: nunca llega a render. Invalidar el cache significaria re-pedir un archivo de 27 MB contra un upstream roto, una y otra vez — en el mercado destino (4G lenta, donde la metrica son BYTES) eso es peor que la enfermedad. El daño real que describia el ticket ('la app rota un dia entero, y la unica salida es que el usuario borre los datos del sitio') queda eliminado por la coercion. Si Rafael quiere igual la invalidacion, es un cambio chico y aparte.\n\nFUERA DE ALCANCE, detectado y NO tocado (Regla 2):\n  - formatPercent y formatDollarChange en utils/formatters.ts tienen la misma forma y el mismo defecto. No son precios y el ticket no los menciona.\n  - Hay .toFixed(2) crudo sobre card.price en plantillas: DeckEditorGrid.vue:439, MatchCard.vue:306 y 307, DeckCardsList.vue:151 y 210, CollectionView.vue:175. Misma CLASE de fallo pero otro origen de datos (Firestore, no MTGJSON), asi que no lo alcanza este arreglo. Merece su propio ticket si interesa.\n\nVERDE: 1675 tests unitarios (134 archivos), 0 rojos. type-check limpio. vite build --mode development OK.\n\nNO VERIFICADO EN NAVEGADOR: no se reprodujo el escenario del wargaming (mutar en vuelo la respuesta de MTGJSON a string y mirar /search y /collection). Los tests cubren la funcion pura; la prueba de que la grilla YA NO desaparece es por construccion, no medida."
+    },
+    {
+      "at": "2026-08-11T11:15:00.000Z",
+      "author": "orchestrator",
+      "body": "UAT EN NAVEGADOR — HECHO (localhost, modo development, sesion real de Rafael).\n\n1. SIN REGRESION EN EL CAMINO REAL: busqueda de 'Sol Ring' con datos reales de MTGJSON ya descargados. Los precios renderizan: CK $2.79, TCG $1.14, BL $1.30. Los 'CK: -' que aparecen en algunas ediciones son legitimos (esas impresiones no tienen dato de Card Kingdom), no un efecto de la coercion — se confirma porque en la misma grilla otras ediciones si muestran precio.\n\n2. EL CASO MALFORMADO, PROBADO CONTRA EL MODULO REAL: en dev Vite sirve los modulos, asi que se importo /src/services/mtgjson.ts en la pagina y se llamo a las funciones de verdad, no a un mock. Resultados: formatPrice('12.50') -> '$12.50' (antes lanzaba TypeError y hacia desaparecer la grilla); objeto/array/NaN/booleano/null -> 'N/A'; 0 -> '$0.00'. getLatestPrice con string -> 12.5, con objeto o array -> null.\n\nNO SE HIZO, y es una decision consciente: no se envenenaron los 84.803 precios del archivo real de MTGJSON en vuelo, como habia hecho el wargaming. Ese archivo pesa 27 MB y procesarlo desde la consola ya colgo el navegador de Rafael una vez en la sesion del 2026-08-11. La prueba por importacion directa del modulo cubre el mismo mecanismo sin ese riesgo.\n\nSin errores en consola. 1688 tests unitarios verdes, type-check limpio, build OK."
+    }
+  ],
   "created_at": "2026-08-11T02:10:00.000Z",
-  "updated_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T11:15:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd-tier"
 }

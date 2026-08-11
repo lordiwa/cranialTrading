@@ -227,6 +227,37 @@ async function saveToDB(storeName: string, key: string, data: unknown): Promise<
 // ========== Price Data Functions ==========
 
 /**
+ * TASK-192 — coercion defensiva del precio que llega de MTGJSON.
+ *
+ * MTGJSON es un tercero: el tipo `number` de MTGJSONPricePoint es una promesa
+ * que TypeScript no puede hacer cumplir en tiempo de ejecucion. Si sirve el
+ * precio como string ('12.50'), lo que antes pasaba era un TypeError en
+ * .toFixed() que hacia desaparecer la grilla entera de resultados — y como el
+ * payload se cachea 24 h en IndexedDB, un fallo transitorio del tercero dejaba
+ * la app rota un dia entero.
+ *
+ * Un string numerico se ACEPTA (es un cambio de tipo, no un dato corrupto:
+ * descartarlo dejaria todo en N/A durante un dia). Cualquier otra cosa devuelve
+ * null y degrada SOLO ese precio.
+ *
+ * Los casos raros de la coercion de JS estan cerrados a proposito: Number([12.5])
+ * es 12.5, Number(true) es 1 y Number('') es 0 — los tres se colarian como
+ * precios plausibles y mostrarian un valor inventado, que es peor que un N/A.
+ */
+function coercePrice(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed === '') return null
+    const parsed = Number(trimmed)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+/**
  * Get the latest price from a price point object (date -> price)
  */
 function getLatestPrice(pricePoint?: MTGJSONPricePoint): number | null {
@@ -235,7 +266,7 @@ function getLatestPrice(pricePoint?: MTGJSONPricePoint): number | null {
   const latestDate = dates[0]
   if (!latestDate) return null
   // eslint-disable-next-line security/detect-object-injection
-  return pricePoint[latestDate] ?? null
+  return coercePrice(pricePoint[latestDate])
 }
 
 /**
@@ -646,8 +677,23 @@ export async function preloadPriceData(): Promise<void> {
 
 /**
  * Format price for display
+ *
+ * TASK-192: acepta `unknown` a proposito. La firma anterior era
+ * `number | null | undefined`, y esa promesa de tipo es exactamente lo que
+ * fallaba: el valor venia de un tercero sin validar, asi que el compilador
+ * garantizaba algo que en ejecucion no se cumplia. Un formateador de display
+ * NUNCA debe poder tumbar la pantalla — cualquier cosa que no sea un numero
+ * finito (o un string que lo represente) sale como N/A.
+ *
+ * La frontera real esta saneada en coercePrice/getLatestPrice; esto es la
+ * segunda puerta, para las rutas que reciben precios de otros origenes
+ * (card.price de Firestore, precios compartidos de mazos y carpetas).
  */
-export function formatPrice(price: number | null | undefined): string {
-  if (price == null) return 'N/A'
-  return `$${price.toFixed(2)}`
+export function formatPrice(price: unknown): string {
+  const value = coercePrice(price)
+  if (value == null) return 'N/A'
+  return `$${value.toFixed(2)}`
 }
+
+/** Solo para tests — no usar en produccion. */
+export const __testables = { getLatestPrice, coercePrice }

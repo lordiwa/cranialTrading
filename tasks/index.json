@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T19:59:24.724Z",
+  "generated_at": "2026-08-11T21:34:57.837Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1170,6 +1170,12 @@
       "title": "Once subcolecciones mas de /users/{userId} son legibles por cualquier usuario registrado — TASK-214 cierra 1 puerta de 12",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-216",
+      "title": "El probe de TASK-211 se rompio con el fix de TASK-214: leia el card_index de la victima con el token del atacante",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

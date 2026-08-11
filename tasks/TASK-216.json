@@ -1,0 +1,29 @@
+{
+  "key": "TASK-216",
+  "title": "El probe de TASK-211 se rompio con el fix de TASK-214: leia el card_index de la victima con el token del atacante",
+  "description": "Encontrado el 2026-08-11 al verificar el despliegue a PROD, corriendo\nscripts/build-card-index-authz-probe.mjs contra produccion despues de desplegar TASK-214.\n\nQUE PASA: el script aborta con\n  Error: No se pudo leer card_index/chunk_0 de <uid>: HTTP 403 — PERMISSION_DENIED\n  at readChunk0 (scripts/build-card-index-authz-probe.mjs:167)\n\nLA CAUSA ES UNA SUPOSICION QUE EL PROPIO SCRIPT DEJO ESCRITA Y QUE HOY ES FALSA. Su cabecera dice:\n  \"card_index reads use the *caller's own* idToken: firestore.rules grants\n   `allow read: if request.auth != null` on card_index (any authenticated user, not just the\n   owner) — so the attacker's own token is enough to read the victim's chunk_0 too\"\nEsa regla era EXACTAMENTE el agujero que cerro TASK-214. El script apoyaba su mecanismo de\nverificacion sobre la vulnerabilidad que la otra mitad del trabajo vino a eliminar.\n\nLO NOTABLE, y por eso conviene no borrar esta historia: EL FALLO ES EVIDENCIA. Que el token del\natacante ya no pueda leer el card_index de la victima es la confirmacion —la tercera, y por\naccidente— de que la regla nueva funciona en produccion.\n\nARREGLO: leer el chunk_0 de cada cuenta CON SU PROPIO token, en vez de leer los dos con el del\natacante. El script ya se loguea como ambas (provisiona las dos), asi que tiene los dos idToken a\nmano; es un cambio chico.\n\nCONSECUENCIA QUE HAY QUE DECIR: el fix de TASK-211 en PRODUCCION quedo verificado por IDENTIDAD DE\nARTEFACTO (es el mismo codigo desplegado que en dev, donde si se probo ejecutando dos veces, ANTES\nvulnerable y DESPUES arreglado), NO por ejecucion contra prod. No es lo mismo y no se va a presentar\ncomo si lo fuera. Este ticket existe para cerrar esa brecha.\n\nLECCION MAS GENERAL, que conviene mirar antes de escribir la proxima herramienta de este tipo: una\nherramienta de verificacion de seguridad no puede depender de un agujero de seguridad para funcionar,\nporque deja de andar justo cuando el sistema se arregla — o sea, justo cuando mas la necesitas para\nconfirmar el arreglo.",
+  "acceptance_criteria": [
+    "build-card-index-authz-probe.mjs lee el chunk_0 de cada cuenta con el token de esa cuenta, no con el del atacante",
+    "Re-corrido contra PROD: la corrida DESPUES da ARREGLADO (el chunk_0 del atacante aparece, el de la victima no), cerrando la verificacion empirica que quedo pendiente",
+    "Revisado si query-card-index-authz-probe.mjs tiene la misma dependencia y, si la tiene, corregida igual",
+    "El script declara explicitamente que no depende de ninguna regla permisiva para funcionar"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "tooling",
+    "seguridad",
+    "verificacion",
+    "hallazgo-de-deploy"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T21:32:47.309Z",
+  "updated_at": "2026-08-11T21:32:47.309Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

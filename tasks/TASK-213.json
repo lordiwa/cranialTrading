@@ -34,10 +34,15 @@
       "author": "orchestrator",
       "at": "2026-08-11T19:58:51.537Z",
       "body": "Cerrado. Decision de Rafael: se BORRA migrateUserCards, no se parcha.\n\nreview_depth FULL (500 lineas, seguridad, reglas que van a prod). Reviewer de contexto fresco: 0 HIGH, 0 MEDIUM, y verifico el candado extendido POR TRES MUTACIONES distintas.\n\nAC3 — EL PASO QUE CASI SE PIERDE: borrar la funcion del codigo NO la retira del deploy. Seguia desplegada e invocable en dev despues del commit. Retirada explicitamente:\n  firebase functions:delete migrateUserCards --project dev --force\n  -> \"functions[migrateUserCards(us-central1)] Successful delete operation.\"\nQueda dicho porque es exactamente la clase de paso que se da por hecho: el codigo se ve limpio, los tests pasan, y la funcion vulnerable sigue viva en el servidor.\n\nAC2 CERRADO CON DATOS, no con un argumento comodo. El developer declaro honestamente que no podia saber si habia documentos esperando la migracion. El reviewer lo resolvio: cero consumidores de `_migrated`, los campos que la funcion borraba se siguen escribiendo hoy (AddCardModal, useCollectionImport), y todos los lectores usan `?? ''`. La migracion ya estaba muerta porque nadie la llamaba; borrarla no cambia el estado de ningun documento.\n\n=== LO QUE NO SE HIZO ===\nEN PROD SIGUE DESPLEGADA. Solo se retiro de dev. El equivalente contra prod necesita OK explicito de Rafael y no se corrio.\nLOW heredado (L1): el barrido del candado no detecta el patron por ALIAS (const data = request.data; const userId = data.userId). Probado: pasa verde con el agujero puesto. No existe hoy en el codigo, pero la proteccion a futuro tiene ese hueco."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-11T21:34:47.025Z",
+      "body": "RETIRADA TAMBIEN DE PRODUCCION. Cierra el resto del AC3, que al cerrar el ticket estaba hecho solo en dev.\n\n  firebase functions:delete migrateUserCards --project prod --force\n  -> \"functions[migrateUserCards(us-central1)] Successful delete operation.\"\n\nYa no existe en ningun entorno. Vale repetir por que el paso es facil de saltear: borrarla del codigo dejaba el diff limpio, los tests verdes y la funcion viva e invocable en el servidor — en prod, donde ademas es DESTRUCTIVA (borra campos de users/{uid}/cards de quien se le pase)."
     }
   ],
   "created_at": "2026-08-11T18:51:39.696Z",
-  "updated_at": "2026-08-11T19:58:51.537Z",
+  "updated_at": "2026-08-11T21:34:47.025Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

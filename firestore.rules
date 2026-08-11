@@ -112,9 +112,19 @@ service cloud.firestore {
         allow write: if request.auth.uid == userId;
       }
 
-      // Lightweight card index for fast filtering & pagination
+      // Lightweight card index for fast filtering & pagination.
+      //
+      // TASK-214: this was `allow read: if request.auth != null` — any
+      // authenticated user could read ANY user's card_index directly via
+      // the SDK, no Cloud Function involved. Confirmed live against dev
+      // 2026-08-11 (scripts/query-card-index-authz-probe.mjs): a disposable
+      // attacker account read a disposable victim's full card_index.
+      // Owner-only, matching /cards above. The public-profile flow (view
+      // another user's collection without a session) reads /public_cards
+      // instead, which keeps its own open-read rule — this change does not
+      // affect it.
       match /card_index/{chunkId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 

@@ -878,117 +878,6 @@ exports.populateScryfallCacheManual = onRequest(
 );
 
 // ============================================================
-// MIGRATE USER CARDS
-// Strips Scryfall-only fields from user card docs (lazy migration)
-// Requires scryfall_cache to be populated first
-// ============================================================
-
-const SCRYFALL_ONLY_FIELDS = [
-  'type_line', 'cmc', 'colors', 'rarity', 'power', 'toughness',
-  'oracle_text', 'keywords', 'legalities', 'full_art', 'produced_mana',
-];
-
-/**
- * migrateUserCards — Callable function for lazy data migration.
- * Strips Scryfall-only fields from a user's card docs after verifying
- * they exist in scryfall_cache. Keeps convenience copies (name, edition, image, setCode).
- *
- * Call with: { userId } (admin) or no args (self-migration)
- */
-exports.migrateUserCards = onCall(
-  { maxInstances: 3, timeoutSeconds: 300, memory: '512MiB' },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Must be logged in");
-    }
-
-    // Allow self-migration or admin-triggered migration
-    const userId = request.data?.userId || request.auth.uid;
-    logger.info(`[migrateUserCards] Starting migration for user ${userId}`);
-    const startTime = Date.now();
-
-    const colRef = db.collection(`users/${userId}/cards`);
-    const snapshot = await colRef.get();
-
-    if (snapshot.empty) {
-      return { success: true, migrated: 0, skipped: 0, message: 'No cards to migrate' };
-    }
-
-    // Collect all unique scryfallIds and verify they exist in cache
-    const scryfallIds = [...new Set(
-      snapshot.docs.map(d => d.data().scryfallId).filter(Boolean)
-    )];
-
-    const cacheRefs = scryfallIds.map(id =>
-      db.collection(SCRYFALL_CACHE_COLLECTION).doc(id)
-    );
-
-    const cachedIds = new Set();
-    if (cacheRefs.length > 0) {
-      // getAll supports up to ~100 refs per call efficiently
-      const GETALL_CHUNK = 100;
-      for (let i = 0; i < cacheRefs.length; i += GETALL_CHUNK) {
-        const chunk = cacheRefs.slice(i, i + GETALL_CHUNK);
-        const cacheDocs = await db.getAll(...chunk);
-        for (const cDoc of cacheDocs) {
-          if (cDoc.exists) cachedIds.add(cDoc.id);
-        }
-      }
-    }
-
-    logger.info(`[migrateUserCards] Cache coverage: ${cachedIds.size}/${scryfallIds.length} scryfallIds`);
-
-    let migrated = 0;
-    let skipped = 0;
-    const BATCH_SIZE = 500;
-
-    for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
-      const chunk = snapshot.docs.slice(i, i + BATCH_SIZE);
-      const batch = db.batch();
-      let batchHasWrites = false;
-
-      for (const docSnap of chunk) {
-        const data = docSnap.data();
-
-        // Skip if scryfallId not in cache (can't safely strip fields)
-        if (!data.scryfallId || !cachedIds.has(data.scryfallId)) {
-          skipped++;
-          continue;
-        }
-
-        // Check if any Scryfall-only fields exist on this doc
-        const hasFieldsToRemove = SCRYFALL_ONLY_FIELDS.some(f => data[f] !== undefined);
-        if (!hasFieldsToRemove) continue;
-
-        // Build delete update
-        const deleteUpdate = {};
-        for (const field of SCRYFALL_ONLY_FIELDS) {
-          if (data[field] !== undefined) {
-            deleteUpdate[field] = admin.firestore.FieldValue.delete();
-          }
-        }
-
-        batch.update(docSnap.ref, deleteUpdate);
-        batchHasWrites = true;
-        migrated++;
-      }
-
-      if (batchHasWrites) {
-        await batch.commit();
-      }
-    }
-
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    logger.info(`[migrateUserCards] Done: ${migrated} migrated, ${skipped} skipped in ${elapsed}s`);
-
-    // Mark user as migrated
-    await db.doc(`users/${userId}`).set({ _migrated: true }, { merge: true });
-
-    return { success: true, migrated, skipped, elapsed: `${elapsed}s` };
-  }
-);
-
-// ============================================================
 // CARD INDEX — Lightweight index for fast filtering & pagination
 // Stores compact card summaries in chunked docs (5000 cards/chunk)
 // ============================================================
@@ -1435,8 +1324,17 @@ function paginateResults(cards, page, pageSize, mode) {
  * Reads card_index chunks for a user, applies filters/sort, and returns
  * one page of results plus the total matching count.
  *
+ * TASK-214: this used to accept a client-supplied userId (destructured from
+ * request.data, falling back to request.auth.uid only when omitted) and
+ * query that user's card_index with no check that it matched the caller —
+ * any logged-in user could read another user's full card inventory. No
+ * legitimate caller ever sent one (both call sites in src/stores/collection.ts
+ * pass their own uid), so the parameter is removed rather than validated.
+ * Reading someone else's inventory has no legitimate use here either — the
+ * public-profile flow serves from /public_cards, not card_index (see
+ * firestore.rules).
+ *
  * Input:
- *   userId: string           - whose collection to query
  *   filters: { search?, status?[], edition?[], color?[], rarity?[],
  *              type?[], foil?, condition?[], minPrice?, maxPrice? }
  *   sort: { field, direction }
@@ -1460,7 +1358,6 @@ exports.queryCardIndex = onCall(
     }
 
     const {
-      userId,
       filters = {},
       sort = { field: 'dateAdded', direction: 'desc' },
       page = 0,
@@ -1468,11 +1365,7 @@ exports.queryCardIndex = onCall(
       mode = 'cards',
     } = request.data || {};
 
-    // Validate userId
-    const targetUserId = userId || request.auth.uid;
-    if (!targetUserId || typeof targetUserId !== 'string') {
-      throw new HttpsError('invalid-argument', 'userId must be a non-empty string');
-    }
+    const targetUserId = request.auth.uid;
 
     // Validate page
     if (typeof page !== 'number' || page < 0 || !Number.isInteger(page)) {

@@ -28,6 +28,13 @@ La cuenta objetivo sale de `TEST_USER_A_EMAIL` (`.env.local`) salvo que pases
 node scripts/card-index-fixture.mjs --status
 ```
 
+**La lectura NO es atomica**: los documentos se paginan en decenas de segundos
+mientras el indice se lee en un solo `get()`, y arrancan casi a la vez pero no
+en el mismo instante exacto. Actividad de la app o de E2E en esa ventana (o en
+los ~2 minutos previos, por el lag de TASK-176) puede aparecer como
+divergencia que no es real. Ante `VEREDICTO: DIVERGENTE`, **re-correr antes de
+concluir** — el propio script lo recuerda en su salida.
+
 Compara documento por documento contra el indice y reporta tres cosas
 **distintas**, que no hay que confundir:
 
@@ -41,7 +48,11 @@ Compara documento por documento contra el indice y reporta tres cosas
   diagnosticar.
 
 Tambien avisa de chunks faltantes (la firma de TASK-168) y de ids duplicados
-entre chunks. Sale con codigo 0 si el indice coincide, 1 si diverge.
+entre chunks. Un chunk con sufijo no numerico (`chunk_x`) es corrupcion
+estructural, no divergencia de datos: se excluye de la comparacion y por si
+solo fuerza `VEREDICTO: DIVERGENTE` con codigo 1, aunque el resto coincida —
+el resultado de esa corrida es incompleto, no "limpio". Sale con codigo 0
+solo si el indice coincide Y no hay chunks invalidos, 1 en cualquier otro caso.
 
 ### `--break` — provocar la divergencia
 
@@ -69,9 +80,21 @@ como evidencia de que la causa exista** — para eso hay que ejercitar el bulk.
 node scripts/card-index-fixture.mjs --restore
 ```
 
-Devuelve al indice los estados guardados y borra el archivo de estado. Avisa si
-alguna carta ya no tenia el estado que puso `--break` (algo mas la cambio) o si
-desaparecio del indice. No pisa en silencio.
+Devuelve al indice los estados guardados y borra el archivo de estado — **si no
+hay drift**. Cuenta como drift tanto una carta que ya no tiene el estado que
+puso `--break` (algo mas la cambio, posiblemente legitimo) como una carta del
+fixture que ya no esta en el indice — las dos son "algo mas la toco" y se
+tratan igual. Ante cualquiera de las dos, **aborta ANTES de escribir**, no
+borra `.card-index-fixture.json`, y exige `--force` para continuar igual:
+
+```bash
+node scripts/card-index-fixture.mjs --restore --force
+```
+
+Con `--force`, o si no habia drift, escribe y borra el fixture. A partir de
+ahi ya no hay vuelta atras para las cartas con drift pisadas — el fixture solo
+describia el estado previo a `--break`, no el intermedio. La unica salida
+despues de eso es `--repair` (reconstruir desde los documentos, no deshacer).
 
 ### `--repair` — reconstruir el indice
 
@@ -80,7 +103,8 @@ node scripts/card-index-fixture.mjs --repair
 ```
 
 Invoca la Cloud Function `buildCardIndex` **desplegada**, la misma que llama la
-app. Tarda ~80 s en la cuenta de 59k. Es a proposito que no recalcule el indice
+app. Tarda ~80-115 s en la cuenta de 59k (medido en corridas reales, no un
+numero fijo). Es a proposito que no recalcule el indice
 localmente: duplicar la codificacion de `toIndexCard` haria que un cambio en
 `functions/index.js` dejara este script "reparando" a un formato viejo.
 
@@ -90,11 +114,16 @@ que no sea este script.
 ## Reglas de uso
 
 1. **`--status` antes y despues de todo.** Es la unica forma de saber que paso.
+   Y no es un veredicto de una sola corrida: ante divergencia, re-correr antes
+   de concluir (ver la nota de no-atomicidad arriba).
 2. **Capturar los ids antes de reparar.** `--repair` borra la evidencia; los
    fantasmas e invisibles que reporta `--status` son irrecuperables despues.
-3. **Nunca reparar con E2E corriendo.** La cuenta de `TEST_USER_A` es la del CI.
-   Un rebuild a mitad de una corrida ensucia los resultados y ya causo una falsa
-   atribucion antes (TASK-168).
+3. **Nunca correr `--break`, `--restore` o `--repair` con E2E corriendo.** La
+   cuenta de `TEST_USER_A` es la del CI. Los tres hacen read-modify-write sin
+   transaccion sobre los mismos 30 chunks que un rebuild real puede estar
+   reescribiendo a mitad de camino — no es un riesgo exclusivo de `--repair`.
+   Un rebuild a mitad de una corrida ensucia los resultados y ya causo una
+   falsa atribucion antes (TASK-168).
 4. **Un rojo raro de E2E sobre estados sale/trade: correr `--status` ANTES de
    diagnosticar.**
 

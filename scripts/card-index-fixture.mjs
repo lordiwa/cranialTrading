@@ -29,11 +29,22 @@
  *   node scripts/card-index-fixture.mjs --break --count=58 --from=sale --to=trade \
  *                                       --colors=W --rarity=mythic --min-price=10
  *   node scripts/card-index-fixture.mjs --restore
+ *   node scripts/card-index-fixture.mjs --restore --force  # pisa un drift detectado
  *   node scripts/card-index-fixture.mjs --repair
  *
- * --status y --restore no escriben nada que no se pueda deshacer. --break guarda
+ * --status no escribe nada. --restore SI puede dejar algo que no se deshace: si
+ * detecta drift (alguna carta ya no tiene el estado que puso --break, o ya no
+ * esta en el indice) aborta ANTES de escribir y exige --force para continuar —
+ * pero con --force, o si no hay drift, escribe y borra el fixture como
+ * siempre, y a partir de ahi la unica vuelta atras es --repair (reconstruir,
+ * no deshacer). --break guarda
  * SIEMPRE el estado previo en .card-index-fixture.json antes de tocar nada, y se
  * niega a correr si ya hay un fixture puesto sin restaurar.
+ *
+ * NUNCA correr --break, --restore o --repair con E2E corriendo sobre la misma
+ * cuenta (TEST_USER_A es la del CI): los tres hacen read-modify-write sin
+ * transaccion sobre los mismos 30 chunks que un rebuild real puede estar
+ * reescribiendo a mitad de camino. Verificar `gh run list` antes de escribir.
  *
  * --repair invoca la Cloud Function buildCardIndex DESPLEGADA, la misma que
  * llama la app, en vez de recalcular el indice aca. Es a proposito: recalcularlo
@@ -101,6 +112,11 @@ async function resolveUid() {
 /**
  * Lee el estado de TODOS los documentos de carta. Solo proyecta `status`:
  * son decenas de miles de documentos y no hace falta nada mas.
+ *
+ * NO ATOMICO: pagina ~30 consultas por cursor sobre 59k documentos (decenas
+ * de segundos), mientras el indice se lee en un solo get(). Actividad de la
+ * app o de E2E durante esa ventana puede aparecer como divergencia falsa en
+ * --status. Ver el aviso que imprime cmdStatus.
  */
 async function readDocStatuses(uid) {
   const col = db.collection(`users/${uid}/cards`);
@@ -124,13 +140,22 @@ async function readDocStatuses(uid) {
  * Lee los chunks del indice EN ORDEN NUMERICO. getDocs devuelve orden
  * lexicografico, donde chunk_10 va antes que chunk_2 — la trampa que causo
  * TASK-168. Devuelve los documentos crudos para poder reescribirlos.
+ *
+ * Devuelve { chunks, invalidIds }: un doc chunk_x (sufijo no numerico) pasa
+ * el filtro startsWith pero no es un chunk valido (Number('x') es NaN, ordena
+ * mal y ninguna deteccion de faltantes lo agarra), asi que se excluye de
+ * `chunks` y se reporta aparte en `invalidIds` — el llamador decide si eso
+ * basta para no confiar en el resto de la lectura (cmdStatus lo hace).
  */
 async function readIndexChunks(uid) {
   const snap = await db.collection(`users/${uid}/card_index`).get();
-  return snap.docs
+  const parsed = snap.docs
     .filter((d) => d.id.startsWith(CHUNK_PREFIX))
-    .map((d) => ({ id: d.id, n: Number(d.id.slice(CHUNK_PREFIX.length)), data: d.data() }))
-    .sort((a, b) => a.n - b.n);
+    .map((d) => ({ id: d.id, n: Number(d.id.slice(CHUNK_PREFIX.length)), data: d.data() }));
+
+  const invalidIds = parsed.filter((c) => Number.isNaN(c.n)).map((c) => c.id);
+  const chunks = parsed.filter((c) => !Number.isNaN(c.n)).sort((a, b) => a.n - b.n);
+  return { chunks, invalidIds };
 }
 
 /** id -> estado, segun el indice. Reporta duplicados, que serian corrupcion. */
@@ -163,8 +188,13 @@ async function cmdStatus(uid) {
   console.log(`Proyecto: ${projectId}`);
   console.log(`Cuenta:   ${uid}`);
   console.log('');
+  console.log('NOTA: esta lectura NO es atomica. Los documentos se paginan en decenas');
+  console.log('de segundos y el indice se lee aparte; actividad reciente de la app o de');
+  console.log('E2E puede aparecer como divergencia transitoria. Ante VEREDICTO: DIVERGENTE,');
+  console.log('re-correr antes de concluir.');
+  console.log('');
 
-  const [docs, chunks] = await Promise.all([readDocStatuses(uid), readIndexChunks(uid)]);
+  const [docs, { chunks, invalidIds }] = await Promise.all([readDocStatuses(uid), readIndexChunks(uid)]);
   const { byId: idx, duplicates } = indexStatuses(chunks);
 
   console.log(`Documentos reales : ${docs.size}`);
@@ -172,10 +202,17 @@ async function cmdStatus(uid) {
   if (duplicates > 0) {
     console.log(`  AVISO: ${duplicates} ids duplicados entre chunks (corrupcion, no divergencia)`);
   }
+  if (invalidIds.length > 0) {
+    console.log(`  AVISO: ${invalidIds.length} chunk(s) con sufijo no numerico, EXCLUIDOS de esta lectura: ${invalidIds.join(', ')}`);
+    console.log('  Las cartas que contengan no se comparan: el resultado de abajo es incompleto.');
+  }
 
-  // Chunks faltantes: la firma de TASK-168.
+  // Chunks faltantes: la firma de TASK-168. Va hasta el n MAXIMO presente, no
+  // hasta chunks.length-1 — con chunks {0,1,5,6} length es 4 y el loop viejo
+  // nunca llegaba a mirar si faltaba el 4.
+  const maxN = chunks.reduce((m, c) => Math.max(m, c.n), -1);
   const missing = [];
-  for (let i = 0; i < chunks.length; i++) {
+  for (let i = 0; i < maxN; i++) {
     if (!chunks.some((c) => c.n === i)) missing.push(i);
   }
   if (missing.length) console.log(`  AVISO: faltan chunks ${missing.join(', ')}`);
@@ -239,9 +276,21 @@ async function cmdStatus(uid) {
     }
   }
 
-  const clean = mismatched.length === 0 && onlyInDocs.length === 0 && onlyInIndex.length === 0;
+  const dataDivergent = mismatched.length > 0 || onlyInDocs.length > 0 || onlyInIndex.length > 0;
+  const clean = !dataDivergent && invalidIds.length === 0;
   console.log('');
-  console.log(clean ? 'VEREDICTO: el indice coincide con los documentos.' : 'VEREDICTO: DIVERGENTE.');
+  if (invalidIds.length > 0) {
+    console.log('VEREDICTO: DIVERGENTE (corrupcion estructural — chunk(s) invalido(s), ver AVISO arriba).');
+  } else {
+    console.log(clean ? 'VEREDICTO: el indice coincide con los documentos.' : 'VEREDICTO: DIVERGENTE.');
+  }
+  // El consejo de re-correr solo aplica a la divergencia de DATOS (no atomica
+  // por diseno). Un chunk con sufijo no numerico es corrupcion estructural,
+  // no una lectura desalineada en el tiempo: re-correr no lo cambia.
+  if (dataDivergent) {
+    console.log('Antes de concluir: re-correr --status. La lectura no es atomica (ver nota');
+    console.log('arriba) y actividad reciente puede producir una divergencia transitoria.');
+  }
 
   if (fs.existsSync(STATE_FILE)) {
     const st = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
@@ -275,7 +324,13 @@ async function cmdBreak(uid) {
     minPrice: val('min-price') != null ? Number(val('min-price')) : null,
   };
   const to = val('to', 'trade');
-  const count = val('count') != null ? Number(val('count')) : Infinity;
+  const rawCount = val('count');
+  const count = rawCount != null ? Number(rawCount) : Infinity;
+
+  if (rawCount != null && !(Number.isInteger(count) && count > 0)) {
+    console.error(`--count=${rawCount} no es un entero positivo. Si queres "todas", omiti --count.`);
+    return 1;
+  }
 
   if (filter.from === to) {
     console.error('--from y --to son iguales: no cambiaria nada.');
@@ -288,7 +343,10 @@ async function cmdBreak(uid) {
   console.log(`Accion:   marcar hasta ${count === Infinity ? 'todas' : count} como "${to}" EN EL INDICE, sin tocar los documentos`);
   console.log('');
 
-  const chunks = await readIndexChunks(uid);
+  const { chunks, invalidIds } = await readIndexChunks(uid);
+  if (invalidIds.length > 0) {
+    console.error(`AVISO: ${invalidIds.length} chunk(s) con sufijo no numerico, ignorados: ${invalidIds.join(', ')}`);
+  }
   const changes = [];
   const touched = new Set();
 
@@ -347,20 +405,54 @@ async function cmdRestore(uid) {
   console.log(`Restaurando ${state.changes.length} cartas puestas el ${state.at}...`);
 
   const byId = new Map(state.changes.map((c) => [c.i, c.from]));
-  const chunks = await readIndexChunks(uid);
-  const touched = new Set();
-  let restored = 0;
-  let drifted = 0;
+  const { chunks, invalidIds } = await readIndexChunks(uid);
+  if (invalidIds.length > 0) {
+    console.error(`AVISO: ${invalidIds.length} chunk(s) con sufijo no numerico, ignorados: ${invalidIds.join(', ')}`);
+  }
 
+  // PRIMERA PASADA, SOLO LECTURA: detecta drift ANTES de tocar nada. Si algo
+  // mas cambio el estado de una carta desde --break, restaurar igual pisaria
+  // ese cambio real. Una carta del fixture que desaparecio del indice es el
+  // mismo problema (algo mas la toco) y se trata igual: se aborta sin
+  // escribir salvo --force.
+  const drift = [];
+  const foundIds = new Set();
   for (const c of chunks) {
     for (const card of c.data.cards || []) {
       if (!byId.has(card.i)) continue;
-      // Si el estado actual ya no es el que pusimos, algo mas lo cambio en el
-      // medio. Se restaura igual, pero se avisa: no queremos pisar en silencio.
-      if (card.st !== state.to) drifted++;
+      foundIds.add(card.i);
+      if (card.st !== state.to) drift.push({ i: card.i, expected: state.to, actual: card.st });
+    }
+  }
+  const missing = state.changes.filter((c) => !foundIds.has(c.i)).map((c) => c.i);
+
+  if ((drift.length > 0 || missing.length > 0) && !has('--force')) {
+    console.error(`ABORTADO: ${drift.length} carta(s) ya no tienen el estado que puso --break y`);
+    console.error(`${missing.length} carta(s) del fixture ya no estan en el indice; algo mas las`);
+    console.error('cambio (posiblemente legitimo). No se escribio nada.');
+    if (drift.length) {
+      console.error('Muestra de estado distinto (hasta 5):');
+      for (const d of drift.slice(0, 5)) {
+        console.error(`  ${d.i}  esperado=${d.expected}  actual=${d.actual}`);
+      }
+    }
+    if (missing.length) {
+      console.error('Muestra de ausentes (hasta 5):');
+      for (const id of missing.slice(0, 5)) console.error(`  ${id}`);
+    }
+    console.error('');
+    console.error(`El fixture en ${path.basename(STATE_FILE)} NO se borro: podes revisar y`);
+    console.error('reintentar con --force si igual queres continuar, o dejarlo y correr');
+    console.error('--repair para reconstruir desde los documentos en su lugar.');
+    return 1;
+  }
+
+  const touched = new Set();
+  for (const c of chunks) {
+    for (const card of c.data.cards || []) {
+      if (!byId.has(card.i)) continue;
       card.st = byId.get(card.i);
       touched.add(c.id);
-      restored++;
     }
   }
 
@@ -369,15 +461,16 @@ async function cmdRestore(uid) {
     await db.doc(`users/${uid}/card_index/${c.id}`).update({ cards: c.data.cards });
   }
 
-  if (drifted > 0) {
-    console.log(`AVISO: ${drifted} cartas no tenian el estado que puso --break; algo mas las cambio.`);
-  }
-  if (restored < state.changes.length) {
-    console.log(`AVISO: ${state.changes.length - restored} cartas del fixture ya no estan en el indice.`);
+  if (drift.length > 0 || missing.length > 0) {
+    console.log(`AVISO: --force siguio adelante con ${drift.length} carta(s) con drift (se les`);
+    console.log('piso el estado con el que puso --break, ya no hay vuelta atras para esas) y');
+    console.log(`${missing.length} carta(s) que ya no estan en el indice (a esas no se les escribio`);
+    console.log('nada, no hay que restaurar; lo unico que se pierde es el registro del fixture,');
+    console.log('que se borra igual).');
   }
 
   fs.unlinkSync(STATE_FILE);
-  console.log(`Listo: ${restored} cartas restauradas. Fixture borrado.`);
+  console.log(`Listo: ${foundIds.size} cartas restauradas. Fixture borrado.`);
   return 0;
 }
 
@@ -414,9 +507,10 @@ async function cmdRepair(uid) {
     return 1;
   }
 
+  const region = process.env.FIREBASE_FUNCTIONS_REGION || 'us-central1';
   const started = Date.now();
   const fnRes = await fetch(
-    `https://us-central1-${projectId}.cloudfunctions.net/buildCardIndex`,
+    `https://${region}-${projectId}.cloudfunctions.net/buildCardIndex`,
     {
       method: 'POST',
       headers: {
@@ -437,8 +531,13 @@ async function cmdRepair(uid) {
   console.log(`Listo en ${elapsed}s: ${result.totalCards} cartas -> ${result.chunks} chunks.`);
 
   if (fs.existsSync(STATE_FILE)) {
-    fs.unlinkSync(STATE_FILE);
-    console.log('El fixture quedo obsoleto tras el rebuild: borrado.');
+    const st = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    if (st.uid === uid) {
+      fs.unlinkSync(STATE_FILE);
+      console.log('El fixture quedo obsoleto tras el rebuild: borrado.');
+    } else {
+      console.log(`AVISO: hay un fixture puesto para otra cuenta (${st.uid}), no se toco.`);
+    }
   }
   console.log('Corre --status para verificar que convergio.');
   return 0;

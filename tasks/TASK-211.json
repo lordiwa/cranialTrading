@@ -9,7 +9,7 @@
     "Revisadas las demas funciones onCall de functions/index.js por el mismo patron (userId del cliente sin comprobar) y ticketeadas las que aparezcan",
     "Test de regresion que falle si alguien vuelve a leer un uid del payload sin comprobarlo"
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "labels": [
     "seguridad",
@@ -20,11 +20,25 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "b9849f7",
+    "619be45"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-11T19:01:28.438Z",
+      "body": "REVISION DE CONTEXTO FRESCO, review_depth FULL (213 lineas cambiadas y superficie de seguridad; cualquiera de las dos forzaba FULL).\n\nVEREDICTO: 0 HIGH. El diff bajo revision es correcto, minimo y completo contra si mismo. Mergeable.\n\nAC1 VERIFICADO EJECUTANDO (grep): los tres llamadores mandan lo correcto — collection.ts:322 y :1690 sin argumento, card-index-fixture.mjs:520 con data:{}. No queda ningun otro. Borrar el parametro era la opcion correcta.\n\nAC5 VERIFICADO POR MUTACION, que es lo que nadie habia hecho: el candado corre verde (2/2), se reintrodujo el patron vulnerable en functions/index.js:1073 y se puso ROJO (2/2), y se restauro el archivo. NO ES VACUO. extractOnCallSource recorta bien (de buildCardIndex en 1066 hasta el proximo onCall en 1227, solo su bloque). Robustez extra no buscada: la segunda asercion exige la linea canonica exacta, asi que una reintroduccion por destructuring tambien la rompe. NO atrapa un override agregado DESPUES de la linea canonica — bypass rebuscado, no una regresion realista.\n\nAC4 INCOMPLETO = MEDIUM, y no bloquea el fix. El barrido del orquestador encontro migrateUserCards (TASK-213) pero SE LE PASO queryCardIndex (~1472), donde el uid entra por DESTRUCTURING y por eso el grep no lo matcheaba. Ticketeado ahora como TASK-214, con lo que AC4 queda cerrado.\nLo importante de ese hallazgo no es la funcion: es de LECTURA y firestore.rules:117 ya permite a cualquier autenticado leer cualquier card_index por el SDK, asi que la funcion no concede escalada. El agujero de fondo es la REGLA, y arreglar la funcion sola no cierra nada. Eso quedo escrito en TASK-214.\nLas otras cuatro onCall estan limpias: bulkImportCards (452), loadCollectionChunk (626) y loadCardPage (1234) usan request.auth.uid; notifyMatchUser (96) valida que el que llama sea fromUserId.\n\nAC3 NO EJECUTADO. Requiere desplegar functions a dev y el CI solo despliega hosting. El script se reviso COMO CODIGO y prueba lo que dice probar (login como A, invoca la funcion desplegada con el uid de la victima, compara updatedAt de chunk_0). Tiene guard de auto-igualdad.\nLOW: la exigencia de usar una cuenta B descartable y VACIA vive solo en un comentario en prosa — nada en el codigo impide apuntar a la cuenta del CI de 59k y disparar una reconstruccion de 113 s que colisione con E2E (solo ocurriria corriendo el ANTES vulnerable). Sugerido: chequear que la cuenta B tenga 0 cartas antes de invocar.\n\nGATE: reusado el verde del orquestador (1690/1690 unit, type-check limpio, vite build --mode development OK). El reviewer ejecuto ademas el candado en verde y en rojo."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-11T19:39:09.057Z",
+      "body": "Cerrado con evidencia EJECUTADA, no leida.\n\nreview_depth: FULL (213 lineas cambiadas y superficie de seguridad; cualquiera de las dos lo forzaba). Reviewer de contexto fresco: 0 HIGH, y verifico el candado POR MUTACION (verde 2/2, reintrodujo el patron vulnerable, rojo 2/2, restauro) — no es vacuo.\n\n=== AC3 CUMPLIDO — EL AGUJERO SE PROBO, NO SE RAZONO ===\nEs la primera de las cuatro apariciones de esta familia (087, 169, 188, 211) que se demuestra ejecutandola.\nDiseño: DOS cuentas descartables y VACIAS, autoprovisionadas y borradas por el script. functions/index.js:1174 hace totalChunks = Math.ceil(0/INDEX_CHUNK_SIZE) || 1, o sea que hasta una cuenta con 0 cartas recibe un chunk_0 — esa es la señal, y no hace falta ni una carta.\n\nANTES (funcion vulnerable desplegada):\n  atacante chunk_0 ausente / victima chunk_0 ausente -> invoca con {userId: victima} -> atacante AUSENTE, victima EXISTE. VEREDICTO: VULNERABLE.\nDeploy: firebase deploy --only functions:buildCardIndex --project dev, \"Successful update operation\". Verificado antes con gh run list que no hubiera CI corriendo.\nDESPUES: atacante EXISTE, victima AUSENTE. VEREDICTO: ARREGLADO.\n\nEL MISMO SCRIPT DIO VEREDICTOS OPUESTOS SOBRE LOS DOS ESTADOS. Eso es lo que prueba que discrimina, y no que imprima siempre lo mismo.\n\nDESVIACION DECLARADA DEL AC3: la letra decia \"DESPUES falla con permission-denied\" y NO falla — sigue dando HTTP 200 e ignora el userId del payload. Es deliberado y se juzga mejor: al no quedar ningun camino de error, tampoco queda forma de distinguir \"esa cuenta existe\" de \"no existe\", lo que ademas cierra el angulo de enumeracion que el propio ticket levantaba.\n\nAC4 CERRADO POR DOS HALLAZGOS, ninguno arreglado aca (Regla 2):\n  TASK-213 migrateUserCards — mismo patron, DESTRUCTIVO (borra campos de users/{uid}/cards), sin ningun llamador. Rafael decidio BORRARLA.\n  TASK-214 queryCardIndex — mismo patron por DESTRUCTURING, que es por lo que el grep del orquestador no lo vio; lo encontro el reviewer. Lo importante no es la funcion: firestore.rules:117 ya deja a cualquier autenticado leer cualquier card_index por el SDK, asi que arreglar la funcion sola no cierra nada.\n\n=== LO QUE NO SE VERIFICO, dicho para que no se lea mejor de lo que es ===\n1. El ANTES es n=1 y asi se queda: la funcion vulnerable ya no esta desplegada, o sea que esa corrida dejo de ser reproducible. Se acepta porque el mecanismo es determinista — no es una carrera ni una medicion de tiempo — y el resultado fue categorico: un documento que no existia paso a existir en la cuenta ajena.\n2. El commit 619be45 (el rediseño del script de ataque) NO paso por reviewer de contexto fresco. Es tooling de medicion, no codigo de producto, y su propia salida en los dos estados es la evidencia de que funciona — pero queda dicho, porque en TASK-212 el HIGH aparecio justo en el unico camino nuevo que nadie ejercito.\n3. No se probo contra prod. El fix esta desplegado SOLO en dev.\n4. La causa del HTTP 400 que trabo el primer intento era del orquestador: leia .env.development sin despojar las comillas del valor. No era la clave."
+    }
+  ],
   "created_at": "2026-08-11T16:30:59.148Z",
-  "updated_at": "2026-08-11T16:30:59.148Z",
+  "updated_at": "2026-08-11T19:39:09.057Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

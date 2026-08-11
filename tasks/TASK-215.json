@@ -1,0 +1,32 @@
+{
+  "key": "TASK-215",
+  "title": "Once subcolecciones mas de /users/{userId} son legibles por cualquier usuario registrado — TASK-214 cierra 1 puerta de 12",
+  "description": "Encontrado por el orquestador el 2026-08-11 al revisar el cambio de regla de TASK-214 antes de\ndesplegarlo. NO SE TOCO NADA (Regla 2).\n\nBajo `match /users/{userId}` en firestore.rules hay DOCE subcolecciones. Diez tienen exactamente la\nmisma regla, `allow read: if request.auth != null`, o sea que cualquier usuario CON CUENTA lee esa\nsubcoleccion de CUALQUIER otro usuario:\n\n  linea  27  decks\n  linea  53  preferences\n  linea  59  savedMatches\n  linea  65  savedContacts\n  linea  71  priceHistory\n  linea  77  cardPriceHistory\n  linea  85  matches_nuevos      (ademas allow create para cualquier autenticado)\n  linea  92  matches_guardados\n  linea  98  matches_eliminados\n  linea 104  contactos_guardados\n  linea 110  binders\n\nSolo DOS son de dueño: /cards (cerrada por TASK-087) y /card_index (que cierra TASK-214). O sea que\nTASK-214 cierra UNA PUERTA DE DOCE, y el patron que la hizo posible sigue vivo en las otras once.\n\n=== LO QUE NO SE AFIRMA ===\nNO se afirma que las once sean agujeros. `binders` y `decks` tienen interruptores de publico/en-venta\nen el producto, asi que su lectura abierta PUEDE ser deliberada. Eso hay que TRAZARLO, no suponerlo, y\nes exactamente el trabajo que TASK-214 hizo para card_index.\nLo que si se afirma es que la REGLA NO DISTINGUE: da acceso a toda la subcoleccion y deja el filtrado\nal cliente. Es el mismo error que el comentario de TASK-087 (\"el cliente filtra por public === true\"),\nque ya se declaro que no es seguridad.\n\n=== POR QUE IMPORTA AUNQUE ALGUNAS SEAN DELIBERADAS ===\nHay al menos cuatro donde cuesta imaginar una lectura legitima ajena, y el dato es sensible:\n  savedContacts y contactos_guardados — informacion de contacto de terceros.\n  priceHistory y cardPriceHistory — el valor economico de la coleccion de cualquiera, y su evolucion.\n  matches_* — con quien esta negociando cada usuario y que busca.\n  preferences — configuracion personal.\nLa barrera es tener una cuenta, y registrarse es gratis y automatico.\n\n=== NO MEDIDO ===\nNO se ejecuto ninguna lectura ajena contra estas once. Sale de LEER firestore.rules. Para card_index la\nlectura ajena SI se probo (scripts/query-card-index-authz-probe.mjs, HTTP 200 con los documentos del\notro), y como la regla es identica, la expectativa razonable es que se comporten igual — pero\nexpectativa no es medicion, y hay que confirmarlo antes de concluir.\n\n=== SEPTIMA APARICION DE LA FAMILIA ===\nTASK-087, TASK-169, TASK-188 (lectura), TASK-211 (escritura sobre el indice), TASK-213 (borrado sobre\nlos documentos), TASK-214 (lectura del indice), esta. Vale la pena decir el patron en voz alta: cada\nvez se cerro LA PUERTA QUE SE ENCONTRO, no la clase de puerta. Este ticket existe para cerrar la clase.\n\nORDEN SUGERIDO: no tocar reglas hasta trazar las once. Un cambio de regla equivocado rompe produccion\nen silencio y sin error de compilacion, y el CI no despliega reglas — se van a mano.",
+  "acceptance_criteria": [
+    "Confirmado EJECUTANDO, con una cuenta descartable, cuales de las once subcolecciones se leen de verdad desde una cuenta ajena (no asumirlo por la forma de la regla)",
+    "Trazado, por cada una de las once, si algun flujo legitimo del producto lee esa subcoleccion de OTRO usuario, con archivo:linea",
+    "Clasificadas las once en: cierre a dueño / lectura ajena deliberada que se conserva / necesita una regla mas fina que 'todo o nada'",
+    "Las que se cierren, cerradas y desplegadas A MANO a dev y a prod (el CI no despliega reglas)",
+    "Verificado DESPUES en las dos direcciones por cada una que se toque: la lectura ajena falla y la propia sigue funcionando",
+    "El requisito de producto de Rafael sigue intacto: ver el perfil de otro usuario SIN sesion sigue funcionando igual, verificado en el navegador"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "seguridad",
+    "firestore-rules",
+    "privacidad",
+    "no-medido",
+    "hallazgo-de-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T19:48:24.763Z",
+  "updated_at": "2026-08-11T19:48:24.763Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

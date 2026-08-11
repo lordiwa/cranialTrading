@@ -14,7 +14,7 @@
     "L4: la region sale de un env con default us-central1",
     "Verificado a mano contra dev: el ciclo --break / --status / --restore / --repair sigue funcionando igual que en la corrida de 78ba2de, y el nuevo guard de drift dispara cuando se lo provoca"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "tooling",
@@ -24,7 +24,10 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "c5908b1",
+    "78ba2de"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -36,10 +39,20 @@
       "author": "reviewer",
       "at": "2026-08-11T17:25:29.284Z",
       "body": "RONDA 3 (nits N1-N3). VEREDICTO FINAL: PUSHEABLE TAL CUAL.\n\nN3 obligo a tocar una CONDICION, no solo una frase: se introdujo `dataDivergent` separado de `clean`\npara poder callar el consejo de re-correr cuando la unica causa es corrupcion estructural. El\ndeveloper lo declaro por su cuenta en vez de dejarlo pasar como \"solo texto\" — eso es lo que\npermitio verificarlo.\n\nVERIFICADO POR TABLA DE VERDAD, no por confianza:\n  dataDivergent = mismatched>0 || onlyInDocs>0 || onlyInIndex>0\n  clean         = !dataDivergent && invalidIds === 0\n`clean` es ALGEBRAICAMENTE la misma condicion de antes (la conjuncion de los tres ===0 mas\ninvalidIds===0); solo se factorizo. El `return clean ? 0 : 1` no se toco. Exit codes IDENTICOS.\nLas cuatro combinaciones concuerdan entre veredicto impreso, exit code y presencia del consejo:\n  1. ninguna              -> \"coincide\", sin consejo, exit 0   (MEDIDO contra la cuenta real)\n  2. datos si, invalid no -> DIVERGENTE, consejo SI, exit 1\n  3. invalid si, datos no -> DIVERGENTE (corrupcion estructural), consejo NO, exit 1  <- la mejora\n  4. las dos              -> veredicto estructural, consejo SI, exit 1\nNo hay combinacion donde veredicto, exit y consejo se contradigan.\n\nN1 y N2: el texto quedo verdadero. La cabecera define drift igual que el gate real\n(drift.length > 0 || missing.length > 0), y el aviso post---force ya no afirma que se paso por\nencima de las cartas ausentes — dice lo que de verdad pasa: no se les escribio nada y lo unico que\nse pierde es el registro del fixture al borrarse.\n\n=== LA RAMA QUE NUNCA SE EJECUTO, declarada explicitamente a pedido del orquestador ===\n`invalidIds` no vacio (chunk con sufijo no numerico) NUNCA se ejecuto, ni por el developer ni por\nnadie. EL VEREDICTO SOBRE ESA RAMA DESCANSA EN LECTURA, NO EN EJECUCION, y el reviewer lo sostiene:\nla rama son dos console.log, un termino booleano en `clean` y la supresion del consejo — sin\nescrituras, sin loops, sin estado compartido; la tabla de verdad ES la verificacion. Ejercitarla de\nverdad exigiria plantar un doc `chunk_x` basura en la cuenta del CI que despues habria que borrar a\nmano (la herramienta no tiene camino para eso) y dejaria residuo.\nIDEM, por completitud: la fila 2 (datos divergentes) tampoco se re-ejecuto DESPUES del refactor de\nN3 — las corridas con mismatches fueron previas. Mismo criterio, misma conclusion.\nSI ALGUN DIA APARECE UN chunk_x REAL, ese es el momento de ejercitarla; queda escrito para ese dia.\n\nNANO-NITS QUE QUEDAN, no bloquean y se dejan anotados a proposito:\n  - SKILL.md (35-36 y regla 1): \"ante VEREDICTO: DIVERGENTE, re-correr... el script lo recuerda en su\n    salida\" ya no es cierto para el caso SOLO-estructural, donde el script correctamente NO lo\n    recuerda. Peor caso: un re-run inutil de 2 minutos, no una conclusion errada.\n  - El aviso post---force dice \"se les piso el estado con el que puso --break\", que tiene una lectura\n    correcta y una incorrecta. Se resuelve con el contexto de la frase siguiente."
+    },
+    {
+      "author": "uat",
+      "at": "2026-08-11T18:42:03.058Z",
+      "body": "1. --restore con drift provocado aborta sin escribir y sin borrar el fixture. Observado: ejecutado por el reviewer en ronda 2. Verdict: PASS — verificado por el Orquestador a pedido del humano\n2. --restore --force escribe, avisa, borra el fixture, y la carta con drift vuelve al estado del snapshot. Observado: ejecutado en ronda 2. Verdict: PASS — verificado por el Orquestador a pedido del humano\n3. --status declara la lectura no atomica y sugiere re-correr ante divergencia de datos. Observado: SKILL.md:31-35 y 117-118, y ejecutado contra la cuenta real. Verdict: PASS — verificado por el Orquestador a pedido del humano\n4. La cabecera dice que --restore SI puede dejar algo que no se deshace. Observado: scripts/card-index-fixture.mjs:35-42. Verdict: PASS — verificado por el Orquestador a pedido del humano\n5. La regla de no correr con E2E nombra --break, --restore y --repair. Observado: cabecera:44-47 y SKILL.md:121. Verdict: PASS — verificado por el Orquestador a pedido del humano\n6. El loop de chunks faltantes va hasta el maximo n presente. Observado: verificado por lectura; no ejercitado contra un agujero real. Verdict: PASS — verificado por el Orquestador a pedido del humano\n7. --repair valida uid antes de borrar el state file. Observado: verificado por lectura. Verdict: PASS — verificado por el Orquestador a pedido del humano\n8. --count no numerico avisa en vez de degradar. Observado: abc, -5 y vacio ejecutados, los tres exit 1 sin tocar el indice. Verdict: PASS — verificado por el Orquestador a pedido del humano\n9. Un chunk con sufijo no numerico fuerza veredicto DIVERGENTE y exit 1. Observado: NUNCA EJECUTADO. El veredicto descansa en lectura y en la tabla de verdad de la ronda 3 (dos console.log, un termino booleano en clean, supresion del consejo; sin escrituras ni estado compartido). Ejercitarlo exigiria plantar un doc chunk_x basura en la cuenta del CI sin camino automatico para borrarlo. Verdict: PASS — verificado por el Orquestador a pedido del humano, sobre lectura y no sobre ejecucion\n10. El ciclo --break / --status / --restore / --repair sigue funcionando contra dev. Observado: corrida real completa, 113,1 s. Verdict: PASS — verificado por el Orquestador a pedido del humano\n\nOverall result: PASS"
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-11T18:42:23.422Z",
+      "body": "Cerrado. Tier uat-only; veredicto de UAT delegado explicitamente por Rafael y registrado paso a paso (10/10 PASS), con el paso 9 declarado como verificado por lectura y no por ejecucion.\n\nreview_depth: FULL. Entradas del rubro: 243 lineas cambiadas (196+/47-, umbral 150) en 5 archivos, sobre una herramienta que escribe directo al card_index de una cuenta real. Tres rondas de reviewer de contexto fresco: ronda 1 encontro un HIGH (--force documentado en tres lugares e inerte, has('force') contra un argv con '--force'), ronda 2 delta limpio con el fix ejecutado, ronda 3 nits N1-N3 verificados por tabla de verdad sobre el refactor de dataDivergent/clean (exit codes identicos).\n\nLECCION OPERATIVA, que es lo que de verdad deja este ticket: el HIGH era EL UNICO CAMINO NUEVO QUE EL DEVELOPER NO EJECUTO. La verificacion del implementador heredo el punto ciego de su implementacion; el contexto fresco no. Es la evidencia empirica a favor del contrato de delegacion instalado el mismo dia (6c46025).\n\nRESIDUAL DECLARADO: la rama de invalidIds (chunk con sufijo no numerico) nunca se ejecuto. Si algun dia aparece un chunk_x real, ese es el momento de ejercitarla.\n\nYa esta en origin/develop; no queda nada que pushear."
     }
   ],
   "created_at": "2026-08-11T16:36:10.264Z",
-  "updated_at": "2026-08-11T17:25:29.284Z",
+  "updated_at": "2026-08-11T18:42:23.422Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

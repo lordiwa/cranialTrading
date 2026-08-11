@@ -1,0 +1,47 @@
+{
+  "key": "TASK-214",
+  "title": "queryCardIndex acepta un userId del cliente sin comprobarlo — pero el agujero de fondo es que firestore.rules deja leer cualquier card_index",
+  "description": "Encontrado por el hivemind:reviewer de contexto fresco al re-correr el barrido del AC4 de TASK-211\n(2026-08-11). El barrido previo del orquestador se lo habia PASADO: encontro migrateUserCards\n(TASK-213) pero no este. Vale la pena decirlo — el grep del orquestador buscaba `request.data?.userId`\ny aca el uid entra por DESTRUCTURING, que ese patron no matchea.\n\nEL CODIGO, functions/index.js ~1450, dentro de exports.queryCardIndex:\n\n    const { userId, ... } = request.data || {};\n    const targetUserId = userId || request.auth.uid;      // ~1472\n    ...\n    db.collection(`users/${targetUserId}/card_index`).get()\n\nMismo patron que TASK-211 y TASK-213: autenticacion si, autorizacion no. Los llamadores reales\n(src/stores/collection.ts:1866 y :1913) siempre mandan `userId: authStore.user.id`, o sea el propio,\npero el servidor nunca comprueba que el payload coincida con request.auth.uid.\n\n=== POR QUE ESTE ES MEDIUM Y NO HIGH, Y POR QUE ESO IMPORTA MAS QUE EL TICKET ===\nEs de LECTURA, no de escritura. Y sobre todo: firestore.rules:117 ya tiene\n\n    allow read: if request.auth != null\n\nsobre users/{uid}/card_index. O sea que CUALQUIER USUARIO AUTENTICADO YA PUEDE LEER EL card_index DE\nCUALQUIER OTRO directamente por el SDK, sin pasar por esta funcion. queryCardIndex no concede nada que\nel cliente no pueda hacer solo; no hay escalada, y por eso no es el bypass-de-admin que si hace graves\na buildCardIndex y migrateUserCards.\n\nLA CONSECUENCIA ES LA INVERSA DE LO QUE PARECE: arreglar la funcion sola NO cierra la exposicion.\nEl dato que queda expuesto es el inventario completo de cualquier usuario — nombres, ediciones,\ncantidades y precios. Es exactamente la misma clase de agujero que TASK-087 (allow read: if true sobre\nusers/{userId}/cards), que ya se cerro, pero sobre la proyeccion en vez de sobre los documentos. O sea\nque TASK-087 se cerro por una puerta y el mismo dato sigue saliendo por la otra.\n\nHAY QUE DECIDIR ANTES DE IMPLEMENTAR: la regla no puede volverse `if request.auth.uid == userId` a\nciegas sin comprobar primero que ningun flujo legitimo lee el card_index ajeno. Los perfiles publicos\nde otros usuarios son un requisito de producto explicito de Rafael y se sirven de public_cards, no de\ncard_index — pero eso hay que VERIFICARLO trazando, no asumirlo.\n\nNO MEDIDO: no se ejecuto el ataque, ni contra la funcion ni contra la regla. Sale de leer el codigo y\nlas reglas. Antes de cerrar hay que confirmarlo con una peticion REST autenticada como una cuenta\ndistinta a la victima.\n\nSEXTA APARICION DE LA FAMILIA: TASK-087, TASK-169, TASK-188 (lectura), TASK-211 (escritura sobre el\nindice), TASK-213 (borrado sobre los documentos), esta.",
+  "acceptance_criteria": [
+    "Confirmado con una peticion REST autenticada como una cuenta distinta: hoy se lee el card_index ajeno (a) por queryCardIndex pasando el userId de la victima y (b) directo por el SDK gracias a firestore.rules:117",
+    "Trazado que ningun flujo legitimo lee el card_index de otro usuario — en particular, confirmado que el perfil publico se sirve de public_cards y no de card_index",
+    "firestore.rules:117 deja de permitir la lectura de un card_index ajeno, y las reglas se despliegan A MANO a dev y a prod (el CI solo despliega hosting)",
+    "queryCardIndex deja de aceptar un userId del cliente: opera solo sobre request.auth.uid",
+    "Verificado DESPUES en las dos direcciones: la lectura ajena falla y la propia sigue funcionando, en dev y en prod",
+    "El candado de regresion estatico cubre tambien el patron por DESTRUCTURING (const { userId } = request.data), que es el que se le escapo al barrido original"
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "seguridad",
+    "autorizacion",
+    "cloud-functions",
+    "firestore-rules",
+    "card-index",
+    "no-medido",
+    "hallazgo-de-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "9f2cfa8"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-11T19:59:04.913Z",
+      "body": "REVISION DE CONTEXTO FRESCO, review_depth FULL (500 lineas, superficie de seguridad, y reglas de Firestore que van tambien a produccion).\n\nVEREDICTO: 0 HIGH, 0 MEDIUM.\n\nLA REGLA NUEVA ES CORRECTA. `match /card_index/{chunkId}` esta anidada dentro de `match /users/{userId}`, asi que el `userId` de `request.auth.uid == userId` resuelve al comodin del padre — el mismo patron exacto que /cards (linea 48), que ya era owner-only.\n\nNO ROMPE NINGUNA LECTURA LEGITIMA, y el reviewer trazo los consumidores POR SU CUENTA en vez de confiar en la lista del developer: los unicos lectores de card_index en el cliente son loadFromIndex (collection.ts:444), queryPage (:1866) y loadNextPage (:1913), y los tres usan authStore.user.id, el uid propio. Cero lecturas cruzadas.\nEL REQUISITO DE PRODUCTO DE RAFAEL QUEDA INTACTO: el perfil publico NO toca card_index — usePublicProfileCards.ts y UserProfileView.vue leen /public_cards, cuya regla de lectura abierta no se toco. buildCardIndex escribe por el SDK admin y no pasa por reglas.\n\nAC1 (evidencia ANTES) revisado y correcto: los dos caminos daban VULNERABLE contra dev — queryCardIndex devolvia las 3 cartas de la victima al atacante, y la lectura REST directa del chunk_0 ajeno daba HTTP 200 con exists=true.\n\nAC6 VERIFICADO POR MUTACION: el patron por DESTRUCTURING reintroducido en loadCollectionChunk pone el candado en rojo.\n\nEL SCRIPT DE SONDEO ES SEGURO (leidas las 254 lineas): cuentas descartables autoprovisionadas y autoborradas, con denylist explicita y guard que aborta contra srparca y TEST_USER_A_EMAIL.\n\nLOW L2: QueryCardIndexRequest.userId sigue en la interfaz TS y los dos call sites lo mandan, pero el server ahora lo ignora. Cosmetico, fuera del alcance de seguridad; se puede quitar en un follow-up."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-11T19:59:24.724Z",
+      "body": "Cerrado EN DEV, con las dos direcciones verificadas ejecutando. PROD NO — ver abajo.\n\nreview_depth FULL. Reviewer de contexto fresco: 0 HIGH, 0 MEDIUM; trazo los consumidores por su cuenta y verifico el candado por mutacion.\n\n=== AC1: EL AGUJERO ERA REAL POR LOS DOS CAMINOS, probado antes de tocar nada ===\nContra dev, cuentas descartables, victima con 3 cartas propias:\n  (a) queryCardIndex con el uid ajeno -> HTTP 200 con las 3 cartas de la victima. VULNERABLE.\n  (b) lectura REST directa de users/{victima}/card_index/chunk_0 con el token del atacante -> HTTP 200, exists=true. VULNERABLE.\nQue los DOS dieran positivo es el punto del ticket: arreglar solo la funcion no habria cerrado nada, porque la regla dejaba entrar igual por el SDK.\n\n=== DEPLOY A DEV ===\n  firebase deploy --only functions:queryCardIndex --project dev -> Successful update operation\n  firebase deploy --only firestore:rules --project dev -> released rules to cloud.firestore\n\n=== AC5: LAS DOS DIRECCIONES, no solo la que conviene ===\nLECTURA AJENA CERRADA (mismo probe, post-deploy): (a) queryCardIndex devuelve cards:[] total:0; (b) lectura REST directa -> HTTP 403.\nLECTURA PROPIA INTACTA, verificada con la APP REAL y no con un script: npm run e2e:smoke, 9/9 verdes contra dev. Dos de esos tests son los que importan aca — \"collection page loads with card grid visible\" prueba que el dueño sigue leyendo su propio card_index a traves de las reglas nuevas, y \"view public user profile\" prueba que el requisito de producto de Rafael (ver el perfil ajeno SIN sesion) sigue funcionando.\nSe uso E2E a proposito: un cambio de reglas no falla en compilacion, no rompe ningun test unitario y no da error en el cliente — simplemente empieza a negar lecturas que antes andaban. La unica verificacion honesta es ejercitar el camino real.\n\n=== LO QUE NO SE HIZO, y es lo mas importante que queda ===\nPROD SIGUE EXPUESTO. El AC3 pide desplegar a dev Y prod, y solo se hizo dev. Cualquier usuario registrado sigue pudiendo leer el card_index completo de cualquier otro en produccion. Necesita OK explicito de Rafael; el CI no despliega reglas.\nLOW L2: QueryCardIndexRequest.userId sigue en la interfaz TS y los dos call sites lo mandan, aunque el server lo ignore. Cosmetico.\nY EL HALLAZGO QUE ESTE TICKET DESTAPO: card_index era UNA de DOCE subcolecciones bajo /users/{userId}, y las otras once siguen con `allow read: if request.auth != null`. Esto cierra una puerta, no la clase de puerta. Es TASK-215."
+    }
+  ],
+  "created_at": "2026-08-11T19:01:08.496Z",
+  "updated_at": "2026-08-11T19:59:24.724Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

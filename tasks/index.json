@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T07:25:00.000Z",
+  "generated_at": "2026-08-11T09:40:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1006,7 +1006,7 @@
     {
       "key": "TASK-188",
       "title": "CRITICO: el email de todos los usuarios se descarga sin sesion desde la coleccion /users — en PROD y en dev",
-      "status": "todo",
+      "status": "in_review",
       "priority": "critical"
     },
     {
@@ -1030,7 +1030,7 @@
     {
       "key": "TASK-192",
       "title": "Un precio con tipo inesperado revienta y BORRA la grilla de resultados, y el payload malo queda cacheado 24 h",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {
@@ -1054,7 +1054,7 @@
     {
       "key": "TASK-196",
       "title": "Import de Moxfield con formato inesperado ofrece el boton 'IMPORT NAN CARDS'",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
@@ -1134,6 +1134,12 @@
       "title": "Paginar mientras se muta PIERDE cartas y DUPLICA cartas, en silencio, en las dos direcciones",
       "status": "todo",
       "priority": "critical"
+    },
+    {
+      "key": "TASK-210",
+      "title": "La coleccion /users se puede ENUMERAR entera sin sesion (username, location, createdAt de todos)",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

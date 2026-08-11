@@ -54,3 +54,6 @@ testsprite_tests/
 # Unused public mockups/screenshots
 public/*.png
 public/*.jpeg
+
+# fixture de divergencia de card_index (scripts/card-index-fixture.mjs)
+.card-index-fixture.json

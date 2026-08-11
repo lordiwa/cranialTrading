@@ -32,10 +32,15 @@
       "at": "2026-08-11T07:20:00.000Z",
       "author": "orchestrator",
       "body": "NUMEROS DE PROPAGACION medidos por D1 en el ataque de concurrencia — tiempo hasta que el\ncard_index refleja el cambio de UNA sola carta:\n    sacarla del conjunto:  29 s  y  26 s\n    volver a meterla:     106 s  y 135 s\n  (y en el ataque anterior: 48 s y 152 s)\n\nLos cuatro estan por encima o cerca del techo de la ventana de 10-58 s que documenta TASK-176, y hay\nuna ASIMETRIA consistente en las dos corridas: sacar es 4-5 veces mas rapido que meter. Esa asimetria\nno esta explicada por ningun ticket actual y puede ser una pista para TASK-176."
+    },
+    {
+      "at": "2026-08-11T16:45:00.000Z",
+      "author": "orchestrator",
+      "body": "MEDICION NUEVA 2026-08-11 16:40, con scripts/card-index-fixture.mjs --status sobre la MISMA\ncuenta (jV6gJqf3csPA4vRfO2k9Vb5ejYo2, dev). CONTRADICE LA AFIRMACION CENTRAL DEL TICKET:\n\n  cartas con ESTADO DISTINTO entre indice y documentos: 0\n\nLas 58 cartas marcadas trade en el indice contra 204 sale en los documentos YA NO ESTAN.\nEl ticket dice 'no converge solo: 4 verificaciones en mas de 15 minutos y sigue igual' y\n'es un estado estable e incorrecto'. Hoy no lo es.\n\nNO SE PUEDE DETERMINAR POR QUE. Entre aquella medicion y esta pasaron horas sin nadie mirando:\npudo converger solo (y entonces el diagnostico del ticket esta mal) o pudo limpiarlo un rebuild\ndisparado por una carga de la app o una corrida de E2E. NO HAY COMO DISTINGUIRLO a posteriori.\nSe declara como incierto a proposito en vez de elegir la explicacion comoda.\n\nCONSECUENCIA OPERATIVA: la 'reproduccion viva' que este ticket pedia preservar ya se perdio\nsola, antes de que nadie decidiera repararla. Por eso ahora existe scripts/card-index-fixture.mjs\n(+ skill card-index-fixture), que pone y quita la divergencia a voluntad — la reproduccion deja\nde depender de que una cuenta quede sucia.\n  SALVEDAD: --break reproduce el ESTADO, no la CAUSA. La causa sigue siendo TASK-206/207.\n\nLO QUE SI SIGUE DIVERGENTE, y es de OTRA FAMILIA (no es este ticket):\n  1 FANTASMA  e3WYHZ90Mn4BJHnaYlUs  Oboro Breezecaller (collection) — en el indice, sin documento\n  2 INVISIBLES bZ79UkO364aCGdqj9iwT  Worldly Tutor (sale)\n               bZBH39PPohM0Ar2lA8wx  A Reckoning Approaches (sale) — con documento, fuera del indice\n  Totales: 59.201 documentos contra 59.200 en el indice, 30 chunks, sin agujeros.\n\nOBSERVACION SUELTA, NO ES UN HALLAZGO: entre dos lecturas separadas por ~2 minutos, el reparto\nde estados DEL INDICE cambio (collection 66->67, sale 59065->59063, wishlist 0->1), pese a que\nE2E estaba en cola y no corriendo. Cada lectura del indice es una consulta atomica, asi que el\nindice cambio de verdad en el medio. NO se descarta una pestania de la app abierta en otra\nmaquina. n=2 y sin control: se anota, no se concluye."
     }
   ],
   "created_at": "2026-08-11T05:45:00.000Z",
-  "updated_at": "2026-08-11T07:20:00.000Z",
+  "updated_at": "2026-08-11T16:45:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd-tier"
 }

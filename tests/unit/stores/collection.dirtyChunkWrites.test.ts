@@ -306,4 +306,74 @@ describe('collection store: write only dirty card_index chunks (TASK-219)', () =
       vi.useRealTimers()
     }
   })
+
+  it('HIGH-1 (review of 80e2eee): a failed write does not lose dirty-chunk tracking — the chunk merges back into the next persist', async () => {
+    vi.useFakeTimers()
+    try {
+      const store = await loadLargeIndex(60001)
+      mockSetDoc.mockClear()
+      mockGetDocs.mockClear()
+
+      // First persist: only chunk 0 is dirty (card-0), but the write for it
+      // fails (e.g. a transient network blip — the normal case on 4G).
+      mockSetDoc.mockRejectedValueOnce(new Error('network blip'))
+      await store.updateCard('card-0', { status: 'sale' })
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mockSetDoc).toHaveBeenCalledTimes(1) // attempted chunk 0, and it threw
+
+      mockSetDoc.mockClear()
+      mockSetDoc.mockResolvedValue(undefined)
+
+      // Second, unrelated mutation touches a DIFFERENT chunk only — nothing
+      // re-touches card-0's chunk.
+      await store.updateCard('card-40000', { status: 'trade' }) // position 40000 -> chunk 20
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Pre-fix: _dirtyChunks was reset to a fresh Set() before the failed
+      // write and the snapshot (chunk 0) was discarded in the catch, so only
+      // chunk 20 would be written here — chunk 0 never gets a second chance
+      // to persist. Post-fix: the failed chunk 0 merges back and is written
+      // alongside chunk 20.
+      expect(writtenChunkNumbers()).toEqual([0, 20])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('HIGH-1: a failed FULL rewrite (dirtySnapshot === null) keeps everything dirty for the next persist', async () => {
+    vi.useFakeTimers()
+    try {
+      // 2001 cards -> 2 chunks, and adding a card forces a full rewrite
+      // (membership-changing mutations always mark everything dirty).
+      const store = await loadLargeIndex(2001)
+      mockSetDoc.mockClear()
+      mockGetDocs.mockClear()
+      mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+
+      mockSetDoc.mockRejectedValueOnce(new Error('network blip'))
+      // Any setDoc failing during the full-rewrite loop rejects the whole
+      // writeChunksConcurrently Promise.all, so the loop's catch runs even
+      // though only the first chunk attempt actually failed.
+      const { id: _id, updatedAt: _u, ...cardData } = { status: 'collection' as const, name: 'New Card', scryfallId: 'scryfall-new', edition: 'Test', setCode: 'TST', quantity: 1, condition: 'NM' as const, foil: false, language: 'en', price: 0, image: '', createdAt: new Date(), updatedAt: new Date() }
+      await store.addCard(cardData as never)
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+
+      mockSetDoc.mockClear()
+      mockSetDoc.mockResolvedValue(undefined)
+
+      // A later, single-chunk-only mutation must still trigger a FULL
+      // rewrite, because the prior failure left _dirtyChunks === null
+      // ("everything dirty"), not narrowed to whatever this mutation alone touches.
+      await store.updateCard('card-0', { status: 'sale' })
+      await vi.advanceTimersByTimeAsync(2000)
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(writtenChunkNumbers()).toEqual([0, 1])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

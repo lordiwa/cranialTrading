@@ -326,14 +326,45 @@ export const useCollectionStore = defineStore('collection', () => {
                     })
                 }).catch(() => {})
             }
-        } catch (error) {
-            logSanitizedError('Error loading collection', error)
-            toastStore.show(t('collection.messages.loadError'), 'error')
-        } finally {
+
+            // TASK-219 HIGH-2: only now, having reached here without throwing, does
+            // cardIndexRaw hold something real. Flip the gate and replay queued
+            // mutations here — inside the success path — rather than unconditionally
+            // in `finally`.
             _indexLoadInFlight = false
             // Whatever this load just put in cardIndexRaw predates any mutation
             // the user made while it was running — replay those now (TASK-185).
             applyPendingIndexMutations()
+        } catch (error) {
+            logSanitizedError('Error loading collection', error)
+            toastStore.show(t('collection.messages.loadError'), 'error')
+            // TASK-219 HIGH-2: `_indexLoadInFlight` is deliberately left `true`
+            // here — both loadFromIndex and the loadFromFullCards fallback failed,
+            // so cardIndexRaw is still empty/stale. Flipping the gate (like the
+            // success path above) would do one of two things, both wrong:
+            //   1. `applyPendingIndexMutations()` would persist that empty/stale
+            //      state as the WHOLE index, overwriting real chunks — chunk_0's
+            //      2000 real cards replaced by however many mutations queued.
+            //   2. Any mutation that resolves right after this (e.g. a deleteCard
+            //      whose Firestore await settles moments later) would see the gate
+            //      down and persist immediately through `syncIndexOrQueue`, same
+            //      corruption via a different door.
+            // What results looks perfectly sane on disk — contiguous, no dupes,
+            // not truncated — so nothing downstream flags it for a rebuild; the
+            // cards just vanish from the index silently. Leaving the gate up
+            // routes every mutation through the queue instead (chosen over
+            // discarding it: the underlying card write already reached Firestore,
+            // the source of truth, so replaying costs nothing once a load
+            // succeeds). The queue only drains on a later loadCollection() that
+            // reaches the success branch above — every caller (CollectionView,
+            // SearchView, MarketView, DeckView, BinderView, SavedMatchesView) already
+            // calls loadCollection() again on next mount/visit when cards.value is
+            // still empty, so a failed load self-heals on the next natural retry
+            // without any new retry mechanism here.
+            if (_pendingIndexAdds.length > 0 || _pendingIndexDeletes.size > 0) {
+                console.warn(`[IndexSync] loadCollection failed with ${_pendingIndexAdds.length} pending add(s) and ${_pendingIndexDeletes.size} pending delete(s) already queued — leaving them queued for the next successful load instead of persisting against a stale index (TASK-219).`)
+            }
+        } finally {
             loading.value = false
         }
     }
@@ -1135,6 +1166,20 @@ export const useCollectionStore = defineStore('collection', () => {
                 _lastWrittenTotalChunks = totalChunks
             } catch (err) {
                 logSanitizedError('[IndexSync] Failed to persist index', err, 'warn')
+                // TASK-219 HIGH-1: `dirtySnapshot` was reset to a fresh, empty
+                // `_dirtyChunks` before this write started (see above) — but the
+                // write just threw, so none of those chunks actually reached
+                // disk. Without this, the snapshot is gone for good: the next
+                // persist only knows about whatever mutated AFTER this failure,
+                // and card_index quietly drifts from the real cards until a
+                // full rebuild — the exact class of bug TASK-208 was. Merge it
+                // back (union with anything that landed mid-write); `null` on
+                // either side means "everything dirty" and wins.
+                if (dirtySnapshot === null || _dirtyChunks === null) {
+                    _dirtyChunks = null
+                } else {
+                    for (const c of dirtySnapshot) _dirtyChunks.add(c)
+                }
             } finally {
                 _persistRunning = false
                 if (_persistRerunRequested) {

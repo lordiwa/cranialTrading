@@ -37,11 +37,12 @@ vi.mock('@/services/firestore', () => ({ db: {} }))
 
 const mockBuildCardIndex = vi.fn().mockResolvedValue({ totalCards: 0, chunks: 0 })
 const mockQueryCardIndex = vi.fn().mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+const mockLoadCollectionChunk = vi.fn()
 
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: (...args: unknown[]) => mockQueryCardIndex(...args),
   buildCardIndex: (...args: unknown[]) => mockBuildCardIndex(...args),
-  loadCollectionChunk: vi.fn(),
+  loadCollectionChunk: (...args: unknown[]) => mockLoadCollectionChunk(...args),
   loadCardPage: vi.fn(),
 }))
 
@@ -160,6 +161,7 @@ describe('collection store: mutating BEFORE the card_index has loaded (TASK-185)
     mockAddDoc.mockResolvedValue({ id: 'new-card' })
     mockBuildCardIndex.mockResolvedValue({ totalCards: 0, chunks: 0 })
     mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+    mockLoadCollectionChunk.mockReset()
   })
 
   describe('deleteCard', () => {
@@ -288,6 +290,101 @@ describe('collection store: mutating BEFORE the card_index has loaded (TASK-185)
         expect(writes.length).toBeGreaterThan(0)
         const persisted = (writes[0]?.[1] as { cards: IndexCard[] }).cards
         expect(persisted.map(c => c.i).sort()).toEqual(['card-2', 'new-card'])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('loadCollection FAILS entirely (TASK-219 HIGH-2)', () => {
+    /**
+     * Gate the FULL-CARDS fallback path (loadFromIndex already returned false
+     * because the index doesn't exist) and hand back a `fail()` that rejects
+     * it, so `loadCollection`'s own try/catch runs with `cardIndexRaw` left
+     * empty/stale — exactly the state that used to get persisted as the
+     * "whole" index over the real one.
+     */
+    function startGatedFullCardsFailure(store: ReturnType<typeof useCollectionStore>) {
+      let reject!: (e: Error) => void
+      const gate = new Promise<never>((_res, rej) => { reject = rej })
+      gate.catch(() => {}) // the `fail()`/loadPromise chain below is the real consumer; this just silences the unhandled-rejection warning on `gate` itself
+      mockLoadCollectionChunk.mockImplementationOnce(async () => gate)
+      const loadPromise = store.loadCollection()
+      return {
+        fail: async (message = 'full load failed') => {
+          reject(new Error(message))
+          await loadPromise.catch(() => {}) // loadCollection itself never rejects — it catches internally
+        },
+      }
+    }
+
+    it('a mutation queued while the load is in flight is NOT replayed/persisted once the load fails', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const load = startGatedFullCardsFailure(store)
+        store.paginatedCards = [makeCard({ id: 'card-1' })] as never
+
+        // Lands while _indexLoadInFlight is still true -> queued, not applied.
+        await store.deleteCard('card-1')
+        expect(mockDeleteDoc).toHaveBeenCalledTimes(1) // the Firestore doc delete itself still happens
+        expect(indexChunkWrites()).toHaveLength(0) // queued, no persist attempted yet
+
+        await load.fail()
+        await vi.advanceTimersByTimeAsync(2100) // past the persist debounce, in case anything got scheduled
+
+        // Pre-fix: the `finally` ran `applyPendingIndexMutations()` unconditionally,
+        // which would filter the (empty) cardIndexRaw and persist chunk_0 as a
+        // near-empty index. Post-fix: a failed load must not replay/persist at all.
+        expect(indexChunkWrites()).toHaveLength(0)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('a mutation that resolves AFTER the failed load\'s finally still queues instead of persisting over the stale index', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const load = startGatedFullCardsFailure(store)
+        await load.fail()
+
+        // The load is fully settled now (loading.value is false). Without the
+        // fix, `_indexLoadInFlight` would already be false too, so this next
+        // mutation's `syncIndexOrQueue` would persist immediately against the
+        // still-empty `cardIndexRaw` — a second, independent path to the same
+        // corruption (the reviewer's "segundo camino").
+        store.paginatedCards = [makeCard({ id: 'card-2' })] as never
+        await store.deleteCard('card-2')
+        await vi.advanceTimersByTimeAsync(2100)
+
+        expect(indexChunkWrites()).toHaveLength(0)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('queued mutations from a failed load are picked up by the next SUCCESSFUL load, not lost', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const failedLoad = startGatedFullCardsFailure(store)
+        store.paginatedCards = [makeCard({ id: 'card-1' })] as never
+        await store.deleteCard('card-1')
+        await failedLoad.fail()
+
+        // A real retry (e.g. the user revisits /collection) succeeds this time.
+        const retry = startGatedLoad(store, [makeIndexCard('card-1'), makeIndexCard('card-2')])
+        await retry.finish()
+
+        // The queued delete replays against the now-real index.
+        expect(store.cards.map(c => c.id)).toEqual(['card-2'])
+
+        await vi.advanceTimersByTimeAsync(2100)
+        const writes = indexChunkWrites()
+        expect(writes.length).toBeGreaterThan(0)
+        const persisted = (writes[0]?.[1] as { cards: IndexCard[] }).cards
+        expect(persisted.map(c => c.i)).toEqual(['card-2'])
       } finally {
         vi.useRealTimers()
       }

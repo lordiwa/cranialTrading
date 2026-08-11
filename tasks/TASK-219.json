@@ -1,0 +1,30 @@
+{
+  "key": "TASK-219",
+  "title": "card_index: escribir SOLO las porciones que cambiaron, y saltear el getDocs de limpieza cuando el conteo no bajó (paso 1 de TASK-176)",
+  "description": "Desprendido del comentario de TASK-176 del 2026-08-10, que dice textualmente \"EL ARREGLO QUE SE DESPRENDE, no implementado todavia\". TASK-176 conserva sus criterios (el rebaseline de E2E); este ticket es el arreglo.\n\n=== LA CAUSA, YA MEDIDA — NO HAY QUE RE-DIAGNOSTICARLA ===\nCada mutacion programa (2 s de debounce) un guardado completo del card_index. Ese guardado:\n  1. hace un getDocs de las ~30 porciones ENTERAS para buscar huerfanos (~30 MB de lectura), y\n  2. reescribe las 30 porciones enteras (~30 MB de escritura)\n...para cambiar UN campo de UNA carta. La escritura de la operacion siguiente queda encolada\ndetras de esa tormenta en el cliente de Firestore: 10-58 s medidos.\n\nPROBADO POR MUTACION QUIRURGICA (TASK-176): empujando el debounce de 2 s a 10 min, sin tocar nada\nmas, la segunda operacion paso de 14928/10139/14110 ms a 864/801/1149 ms. 3 de 3.\nDESCARTADO CON DATOS: no es la red (36,7 s sin una sola peticion antes de que la escritura saliera\nsiquiera) ni CPU (1,2-2,4 s de tareas largas sobre 10-15 s de espera).\n\n=== EL HALLAZGO QUE HABILITA EL ARREGLO BARATO (trazado 2026-08-11) ===\nqueryCardIndex FILTRA Y ORDENA EL INDICE ENTERO DEL LADO DEL SERVIDOR antes de paginar\n(functions/index.js, filterIndexCards + sortIndexCards + paginateResults, ~1200-1315).\nO sea que EL ORDEN DE LAS CARTAS DENTRO DE LOS CHUNKS NO SE USA PARA NADA de lo que ve el usuario.\n\n=== ALCANCE DE ESTE TICKET (paso 1 — deliberadamente el mas chico que se puede medir) ===\nEn src/stores/collection.ts, _runPersistLoop (~939-1038) y writeChunksConcurrently (~912):\n\nA) ESCRIBIR SOLO LAS PORCIONES SUCIAS. Hoy writeChunksConcurrently escribe los chunks 0..totalChunks-1\n   SIEMPRE. Un cambio de estado de una carta (updateCard / batchUpdateCards) NO cambia la membresia,\n   asi que altera exactamente UNA posicion del array y por lo tanto UN chunk. Escribir solo ese.\n   Un alta o una baja SI desplaza el array: en ese caso todos los chunks desde el afectado hacia\n   adelante cambian de contenido y hay que escribirlos. Eso es esperado y queda para el paso 2.\n\nB) SALTEAR EL getDocs DE LIMPIEZA CUANDO totalChunks NO BAJO. La limpieza de huerfanos solo puede\n   encontrar algo si la coleccion se ENCOGIO. Si totalChunks es igual o mayor que el de la ultima\n   escritura conocida, el getDocs de ~30 MB no puede devolver ningun huerfano: es lectura pura\n   desperdiciada. Cuando SI bajo, la limpieza corre exactamente como hoy.\n\n=== LO QUE NO SE TOCA (leer antes de empezar) ===\n- El guard indexKnownComplete NO se toca, ni su semantica. Es el candado de TASK-168, el ticket con\n  antecedente de PERDIDA DE DATOS REAL (se destruyeron chunks con cartas reales por decidir\n  \"huerfano\" sobre una lectura corta). Si el guard dice que el indice no es completo, la limpieza se\n  saltea igual que hoy.\n- El borrado descendente y en serie de huerfanos NO se toca (TASK-168: una interrupcion tiene que\n  dejar un prefijo contiguo, nunca un agujero en el medio).\n- El formato en disco NO cambia. buildCardIndex (functions/index.js:1063) NO se toca. Un indice\n  escrito por este codigo tiene que ser byte-compatible con uno escrito por la Cloud Function.\n- El baile de _persistGen / _pendingMembershipRefresh / _persistRunning / _persistRerunRequested\n  (TASK-113/116/123) NO se toca. Ahi hay tres carreras ya cerradas.\n- NO subir ni bajar el debounce de 2 s. Ese fue el brazo de MUTACION del experimento, no el arreglo.\n\n=== POR QUE ESTO ES tdd Y NO uat-only ===\nEs logica de mutacion de estado sobre el archivo con antecedente de perdida de datos. Un error aca\nno se ve en pantalla: se ve semanas despues como cartas que faltan.",
+  "acceptance_criteria": [
+    "Un cambio de estado de UNA carta que no altera la membresia escribe UNA sola porcion, no las 30. Verificado contando setDoc, no leyendo el codigo",
+    "Cuando totalChunks no bajo respecto de la ultima escritura, NO se emite el getDocs de limpieza. Cuando SI bajo, la limpieza corre igual que hoy, descendente y en serie",
+    "El indice que produce este codigo es equivalente al que produce buildCardIndex desplegado: mismo formato de documento, mismos campos, y las mismas cartas en las mismas porciones para un mismo estado de coleccion",
+    "Los candados de TASK-168 siguen verdes y siguen siendo efectivos: se verifica POR MUTACION que desactivar el arreglo nuevo pone en rojo los tests nuevos, y que los tests de TASK-168 siguen detectando el borrado de un chunk real sobre una lectura corta",
+    "Medido en la app real contra la cuenta grande de dev: el tiempo de la SEGUNDA operacion tras un cambio de estado, antes y despues, con al menos 3 corridas por brazo. Se registra el numero aunque no mejore",
+    "La suite unitaria completa queda verde y npx vite build --mode development pasa"
+  ],
+  "status": "in_review",
+  "priority": "critical",
+  "labels": [
+    "card-index",
+    "flujo-3",
+    "perf",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T22:50:26.480Z",
+  "updated_at": "2026-08-11T23:24:58.415Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

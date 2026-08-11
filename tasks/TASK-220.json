@@ -1,0 +1,29 @@
+{
+  "key": "TASK-220",
+  "title": "Los 4 candados de pérdida de datos de TASK-185 se ponen rojos bajo carga y verdes en reposo",
+  "description": "Medido el 2026-08-11 durante TASK-219, sobre EL MISMO ARBOL, sin tocar una linea entre las dos corridas:\n\n  Corrida 1 (suite completa): 137 archivos, 1704 passed / 4 FAILED — los 4 en\n                              tests/unit/stores/collection.mutateBeforeIndexLoad.test.ts\n  Corrida 2 (suite completa): 137 archivos, 1708 passed / 0 failed\n  Corrida 3 (el archivo SOLO): 7/7 verdes\n\nLos 4 que fallaron son los candados de TASK-185, o sea LOS DE PERDIDA DE DATOS. Dos de los fallos:\n  - expect(indexChunkWrites()).toHaveLength(0) recibio 1. El comentario del propio test dice que\n    persistir ahi pondria chunk_0 = [la carta nueva] y destruiria las 2000 cartas guardadas ahi.\n  - expected [ 'card-2' ] to deeply equal [ 'card-2', 'new-card' ] — la mutacion encolada no llega\n    al indice cuando la carga termina.\n\nO sea que cuando fallan, fallan EXACTAMENTE con la firma del defecto que vinieron a impedir.\n\nPOR QUE IMPORTA MAS QUE UN TEST CAPRICHOSO: un candado que se pone rojo segun cuanta CPU haya no\ndistingue \"se rompio de verdad\" de \"habia carga\". La proxima vez que la perdida de datos vuelva de\nverdad, va a parecer otra tirada mala y se va a re-correr hasta que pase. Eso ya esta catalogado en\neste proyecto como forma de fabricar verdes vacios (TASK-144).\n\nHIPOTESIS SIN VERIFICAR, no confundir con diagnostico: los tests usan timers falsos con\nvi.advanceTimersByTimeAsync contra un debounce de 2000 ms y cadenas async reales. Ese patron es\nsensible a la carga de la maquina. La corrida roja reporto environment 326,27 s contra 306,82 s de\nla verde, o sea que la corrida roja SI estaba mas cargada. n=1 por brazo: se anota, no se concluye.\n\nDETALLE DE HERRAMIENTA QUE HAY QUE ARREGLAR IGUAL: `npm run test:unit | tail` salio con EXIT CODE 0\nteniendo 4 tests en rojo — el pipe se come el codigo de salida del proceso. Cualquier automatismo\nque se guie por el exit code da esa corrida por verde.",
+  "acceptance_criteria": [
+    "Reproducido a voluntad: se corre la suite bajo carga controlada N veces y se registra la tasa de rojos de esos 4 tests, en vez de depender de que aparezca sola",
+    "Identificado si la inestabilidad esta en el test (timers falsos contra cadenas async) o en el codigo de produccion. Si esta en el codigo, se abre ticket propio y NO se estabiliza el test para taparlo",
+    "Los 4 candados quedan deterministas: 20 corridas seguidas bajo carga sin un solo rojo",
+    "Verificado POR MUTACION que despues de estabilizarlos siguen detectando el defecto original — se rompe a proposito el encolado de TASK-185 y los 4 tienen que ponerse rojos",
+    "El exit code de npm run test:unit refleja el resultado real aunque se lo pipee"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "tests",
+    "card-index",
+    "verdes-vacios",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T23:23:43.503Z",
+  "updated_at": "2026-08-11T23:23:43.503Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

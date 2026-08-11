@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T22:44:04.222Z",
+  "generated_at": "2026-08-11T23:24:58.415Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1188,6 +1188,18 @@
       "title": "Las cuatro colecciones legacy a nivel raiz tienen la misma regla abierta que TASK-215 acaba de declarar vulnerable",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-219",
+      "title": "card_index: escribir SOLO las porciones que cambiaron, y saltear el getDocs de limpieza cuando el conteo no bajó (paso 1 de TASK-176)",
+      "status": "in_review",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-220",
+      "title": "Los 4 candados de pérdida de datos de TASK-185 se ponen rojos bajo carga y verdes en reposo",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

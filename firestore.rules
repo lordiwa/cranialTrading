@@ -24,8 +24,14 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
 
       // ✅ Colección de mazos del usuario: users/{userId}/decks/{deckId}
+      //
+      // TASK-215: era `allow read: if request.auth != null` — cualquier
+      // usuario autenticado podía leer los mazos de cualquier otro. Medido
+      // contra dev 2026-08-11 (scripts/query-subcollections-authz-probe.mjs):
+      // 11/11 subcolecciones bajo users/{userId} legibles por una cuenta
+      // ajena, esta incluida. Owner-only, igual que /cards y /card_index.
       match /decks/{deckId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
@@ -50,65 +56,88 @@ service cloud.firestore {
       }
 
       // Colección de preferencias del usuario
+      //
+      // TASK-215: owner-only, ver nota sobre /decks arriba (mismo probe,
+      // mismo hallazgo: legible por cualquier cuenta ajena antes de esto).
       match /preferences/{preferenceId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
-      // Colección de matches guardados
+      // Colección de matches guardados (camelCase — parece código muerto,
+      // ver nota de savedContacts abajo). TASK-215: owner-only de todos modos.
       match /savedMatches/{matchId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
-      // Colección de contactos guardados
+      // Colección de contactos guardados (camelCase).
+      //
+      // TASK-215: cerrada a owner-only por consistencia con las demás, pero
+      // esta colección (y su hermana savedMatches arriba) parece código
+      // muerto — ningún store la lee, ni siquiera el dueño; los stores
+      // reales usan matches_guardados/contactos_guardados (snake_case) más
+      // abajo. No se borra en este ticket — no era el encargo (Regla 2);
+      // queda anotado para un ticket aparte.
       match /savedContacts/{contactId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
       // Price history snapshots (collection-level daily totals)
+      // TASK-215: owner-only, ver nota sobre /decks arriba.
       match /priceHistory/{snapshotId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
       // Per-card price history
+      // TASK-215: owner-only, ver nota sobre /decks arriba.
       match /cardPriceHistory/{cardId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
       // Colección de matches nuevos (calculados)
       // Cualquier usuario autenticado puede crear un match (enviar interés)
       // Solo el dueño puede leer, actualizar y eliminar
+      //
+      // TASK-215: el `read` decía `if request.auth != null` — no cumplía el
+      // comentario de arriba ("solo el dueño puede leer"). Cerrado a
+      // owner-only; el `create` NO se toca — sigue abierto a cualquier
+      // autenticado a propósito, es lo que permite mandarle un match a otro
+      // usuario (matches.ts).
       match /matches_nuevos/{matchId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow create: if request.auth != null;
         allow update, delete: if request.auth.uid == userId;
       }
 
       // Colección de matches guardados
+      // TASK-215: owner-only, ver nota sobre /decks arriba.
       match /matches_guardados/{matchId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
       // Colección de matches eliminados
+      // TASK-215: owner-only, ver nota sobre /decks arriba.
       match /matches_eliminados/{matchId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
       // Colección de contactos guardados
+      // TASK-215: owner-only, ver nota sobre /decks arriba.
       match /contactos_guardados/{contactId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 
       // Binders del usuario
+      // TASK-215: owner-only, ver nota sobre /decks arriba.
       match /binders/{binderId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if request.auth.uid == userId;
       }
 

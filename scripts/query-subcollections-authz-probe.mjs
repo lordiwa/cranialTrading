@@ -191,26 +191,53 @@ async function main() {
       results.push({ sub, verdict, writeStatus: 200, readStatus: readRes.status });
     }
 
+    // Direccion 2 (regresion): la VICTIMA lee sus propias once subcolecciones
+    // con su propio token. Un cambio de reglas que cierre de mas (ej. typo en
+    // el uid comparado, o un `if false` por error) se veria identico a un
+    // cambio correcto si solo se mide la lectura ajena. Este bloque es el
+    // candado contra ese falso positivo.
+    console.log('');
+    console.log('Victima intenta leer sus PROPIAS subcolecciones con su propio token...');
+    const ownerResults = [];
+    for (const sub of SUBCOLLECTIONS) {
+      const docId = writtenDocs[sub];
+      if (!docId) {
+        ownerResults.push({ sub, verdict: 'NO_PROBADO (escritura de la victima fallo)', readStatus: null });
+        continue;
+      }
+      const readRes = await readDoc(victim.uid, sub, docId, victim.idToken);
+      const verdict = readRes.status === 200 ? 'OK (200)' : `ROTO (${readRes.status})`;
+      console.log(`  ${sub}: HTTP ${readRes.status} -> ${verdict}`);
+      ownerResults.push({ sub, verdict, readStatus: readRes.status });
+    }
+
     console.log('');
     console.log('=== TABLA FINAL ===');
-    console.log('subcoleccion'.padEnd(20) + 'veredicto');
-    console.log('-'.repeat(50));
+    console.log('subcoleccion'.padEnd(20) + 'lectura ajena'.padEnd(20) + 'lectura propia');
+    console.log('-'.repeat(60));
     for (const r of results) {
-      console.log(r.sub.padEnd(20) + r.verdict);
+      const own = ownerResults.find((o) => o.sub === r.sub);
+      console.log(r.sub.padEnd(20) + r.verdict.padEnd(20) + (own ? own.verdict : 'N/A'));
     }
 
     const leakable = results.filter((r) => r.readStatus === 200);
     const closed = results.filter((r) => r.readStatus === 403);
     const untested = results.filter((r) => r.readStatus == null);
+    const ownerOk = ownerResults.filter((r) => r.readStatus === 200);
+    const ownerBroken = ownerResults.filter((r) => r.readStatus != null && r.readStatus !== 200);
 
     console.log('');
-    console.log(`Legibles por cualquier cuenta autenticada: ${leakable.length}/${SUBCOLLECTIONS.length}`);
-    console.log(`Cerradas (403 pese a la regla esperada): ${closed.length}/${SUBCOLLECTIONS.length}`);
+    console.log(`Legibles por cualquier cuenta autenticada (ajena): ${leakable.length}/${SUBCOLLECTIONS.length}`);
+    console.log(`Cerradas para la cuenta ajena (403 pese a la regla esperada): ${closed.length}/${SUBCOLLECTIONS.length}`);
     if (closed.length > 0) {
       console.log(`  SORPRESA — cerradas: ${closed.map((r) => r.sub).join(', ')}`);
     }
     if (untested.length > 0) {
       console.log(`No probadas (escritura de la victima fallo): ${untested.map((r) => r.sub).join(', ')}`);
+    }
+    console.log(`Lectura propia OK (la victima se lee a si misma): ${ownerOk.length}/${SUBCOLLECTIONS.length}`);
+    if (ownerBroken.length > 0) {
+      console.log(`  REGRESION — el dueno no puede leer sus propios datos: ${ownerBroken.map((r) => r.sub).join(', ')}`);
     }
   } finally {
     console.log('');

@@ -1,0 +1,31 @@
+{
+  "key": "TASK-211",
+  "title": "buildCardIndex acepta un userId del cliente sin verificarlo: cualquier usuario logueado reescribe el card_index de cualquier otro",
+  "description": "Encontrado el 2026-08-11 leyendo functions/index.js para construir la herramienta de fixture de\ncard_index (TASK-208). NO se toco al encontrarlo, por Regla 2.\n\nEL CODIGO, functions/index.js linea ~1069, dentro de exports.buildCardIndex:\n\n    const userId = request.data?.userId || request.auth.uid;\n\nHay control de AUTENTICACION (request.auth) pero NO de AUTORIZACION: nunca se comprueba que\nrequest.data.userId sea igual a request.auth.uid. Cualquier usuario con sesion puede pasar el uid\nde otro y la funcion reconstruira — y por lo tanto REESCRIBIRA — los documentos de\nusers/{victima}/card_index.\n\nPOR QUE IMPORTA MAS DE LO QUE PARECE. No es solo lectura de datos ajenos:\n  1. Es ESCRITURA sobre datos de otro usuario, saltandose firestore.rules (las Cloud Functions\n     corren con privilegios de admin y las reglas no se les aplican).\n  2. buildCardIndex borra chunks que considera obsoletos (staleRefs). Una invocacion sobre una\n     cuenta ajena mientras esa cuenta esta escribiendo cae justo en la ventana de carrera que ya\n     documentaron TASK-168 y TASK-176.\n  3. Es cara: 2GiB de memoria, hasta 300 s, y ~82 s medidos sobre la cuenta de 59k. Invocarla en\n     bucle contra terceros es un vector de costo, con maxInstances 3 como unico tope.\n  4. Permite ENUMERAR: el error distingue una cuenta que existe de una que no, y los uid ya son\n     obtenibles — la enumeracion anonima de /users es justamente TASK-210.\n\nCUARTA APARICION DE LA MISMA FAMILIA en el proyecto: TASK-087 (cards de cualquiera legibles),\nTASK-169 (email dentro de public_cards), TASK-188 (email dentro de /users). Las tres anteriores\neran de LECTURA; esta es de ESCRITURA, o sea peor.\n\nNO MEDIDO, y hay que decirlo: NO se ejecuto el ataque. El hallazgo sale de leer el codigo, no de\nexplotarlo — no se probo contra dev ni contra prod, porque hacerlo significaba escribir sobre la\ncuenta de otro usuario. Antes de cerrar el ticket hay que confirmarlo empiricamente contra dev con\ndos cuentas propias.\n\nDUDA QUE HAY QUE RESOLVER ANTES DE PARCHAR: averiguar si algun llamador legitimo pasa data.userId.\nEn el cliente, src/services/cloudFunctions.ts:153 expone buildCardIndex con un parametro; si ningun\nllamador lo usa, el arreglo es borrar el parametro entero y usar siempre request.auth.uid, que es\nmas seguro que validar. Si algun flujo de admin lo necesita, hace falta un check de rol.",
+  "acceptance_criteria": [
+    "Trazado si algun llamador legitimo pasa data.userId; si ninguno lo hace, el parametro se ELIMINA en vez de validarse",
+    "buildCardIndex opera solo sobre request.auth.uid, o exige un rol de admin comprobado para operar sobre otro uid",
+    "Confirmado empiricamente contra dev con dos cuentas propias: ANTES del arreglo la cuenta A reconstruye el indice de la cuenta B, DESPUES falla con permission-denied",
+    "Revisadas las demas funciones onCall de functions/index.js por el mismo patron (userId del cliente sin comprobar) y ticketeadas las que aparezcan",
+    "Test de regresion que falle si alguien vuelve a leer un uid del payload sin comprobarlo"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "seguridad",
+    "autorizacion",
+    "cloud-functions",
+    "card-index",
+    "no-medido"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T16:30:59.148Z",
+  "updated_at": "2026-08-11T16:30:59.148Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

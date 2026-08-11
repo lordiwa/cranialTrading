@@ -1,0 +1,35 @@
+{
+  "key": "TASK-212",
+  "title": "card-index-fixture: la herramienta sobrevende su propia seguridad y --restore puede crear divergencia nueva",
+  "description": "Hallazgos de la revisión de contexto fresco del commit 78ba2de (hivemind:reviewer, 2026-08-11).\nVeredicto general: 0 HIGH, pusheable. Nada de esto cambia la arquitectura; son un guard y texto.\n\nTodo vive en scripts/card-index-fixture.mjs y .claude/skills/card-index-fixture/SKILL.md.\n\nPOR QUE IMPORTA MAS DE LO QUE PARECE PARA UN \"ARREGLO DE TEXTO\": esta herramienta existe para\nDECIDIR si una cuenta esta divergente. Si su salida se lee como mas confiable de lo que es, produce\nexactamente el error que vino a evitar — atribuir una divergencia real a ruido, o al reves.\n\n--- M1. --status puede dar falsos positivos y NO lo declara ---\nreadDocStatuses (~104-121) pagina ~30 consultas por cursor sobre 59k documentos, decenas de\nsegundos, mientras el indice se lee en un solo get() atomico. Ademas los dos arrancan en un\nPromise.all (~168), asi que ni siquiera parten del mismo instante.\nEscenario: la app o E2E agrega una carta durante la paginacion -> sale como \"solo en documentos\";\nla borra -> sale como \"FANTASMA\"; y con el lag de TASK-176 (10-152 s medidos) cualquier actividad\nen los ~2 minutos previos produce \"estado distinto\" transitorio.\nEl tool imprime \"VEREDICTO: DIVERGENTE\" y sale con codigo 1 sobre UNA sola lectura, sin sugerir\nre-correr. ESTO YA NOS PASO EN ESTA MISMA SESION: se reportaron 1 fantasma y 2 invisibles que al\nvolver a mirar habian desaparecido solas.\n\n--- M2. --restore puede CREAR divergencia nueva, y avisa DESPUES de escribir ---\ncmdRestore (~320): si el estado actual no es el que puso --break, cuenta `drifted` pero restaura\nigual, y el aviso se imprime DESPUES del bucle de escritura. El operador se entera del pisoton\ncuando ya ocurrio, sin chance de abortar. Ademas fs.unlinkSync borra el state file al final: no hay\nsegundo undo.\nEscenario: --break -> corre E2E y un rebuild real converge el indice con documentos que ademas\ncambiaron legitimamente -> --restore pisa esos estados CORRECTOS de vuelta a `from`.\nEl SKILL dice \"No pisa en silencio\", y es falso: avisa, pero no previene.\n\n--- M3. La regla de \"no correr con E2E\" solo cubre --repair ---\n--break y --restore hacen read-modify-write sin transaccion: leen los 30 chunks, mutan en memoria y\nescriben segundos despues. Si buildCardIndex reescribe un chunk en esa ventana, el script lo pisa\ncon el array viejo. Tienen exactamente el mismo peligro que --repair y la regla 3 del SKILL no los\nmenciona.\n(Lo que SI esta bien y no hay que tocar: update({cards}) no pisa `count` ni `version`, verificado.)\n\n--- M4. Claim falso en la cabecera del script (~35) ---\n\"--status y --restore no escriben nada que no se pueda deshacer\". --restore escribe chunks y borra\nel state file; si restauro mal (M2) no hay deshacer, solo --repair, que es RECONSTRUIR, no deshacer.\n\n--- L1. La deteccion de chunks faltantes subcuenta ---\ncmdStatus (~175): el loop va de 0 a chunks.length-1, no al maximo n. Con presentes {0,1,5,6}\nreporta faltan [2,3] pero no el 4. Nunca da silencio total ante un agujero, solo subcuenta.\n\n--- L2. --repair borra el state file sin validar de que cuenta es ---\n--restore valida uid, --repair no. Con --break --uid=A y luego --repair sobre la cuenta por defecto,\nse borra el registro de que se toco en A y el fixture de A queda puesto sin saber cuales cartas\neran. Peor: --repair solo funciona sobre TEST_USER_A (exige login con esa cuenta y aborta si\nlocalId !== uid), asi que un fixture puesto con --uid ajeno no se puede limpiar con esta herramienta.\n\n--- L3. --count=abc da NaN y se comporta como \"todas\" sin avisar ---\n\n--- L4. Region us-central1 hardcodeada en la URL de --repair ---\nCorrecta hoy (setGlobalOptions sin region) y probada, pero si algun dia se fija region falla con un\n404 poco obvio. Un env override con default us-central1 alcanza.\n\n--- L5. Un doc chunk_x (n=NaN) pasa el filtro startsWith y cae fuera de toda deteccion ---",
+  "acceptance_criteria": [
+    "M2: el drift se detecta ANTES de escribir; si alguna carta no tiene el estado que puso --break, --restore aborta sin escribir y exige --force para continuar",
+    "M2: el state file NO se borra si la restauracion se abortó, y el texto del SKILL deja de decir 'no pisa en silencio'",
+    "M1: --status declara la lectura no atomica en su salida y en el SKILL, y ante divergencia sugiere re-correr antes de concluir",
+    "M4: la frase de la cabecera se corrige — --restore SI puede dejar algo que no se deshace",
+    "M3: la regla de 'nunca con E2E corriendo' cubre explicitamente --break y --restore, no solo --repair",
+    "L1: el loop de chunks faltantes va hasta el maximo n presente, no hasta length-1",
+    "L2: --repair no borra un state file de otra cuenta; valida uid como hace --restore",
+    "L3 y L5: --count no numerico y chunk con sufijo no numerico avisan en vez de degradar en silencio",
+    "L4: la region sale de un env con default us-central1",
+    "Verificado a mano contra dev: el ciclo --break / --status / --restore / --repair sigue funcionando igual que en la corrida de 78ba2de, y el nuevo guard de drift dispara cuando se lo provoca"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "tooling",
+    "card-index",
+    "honestidad-de-la-herramienta",
+    "hallazgo-de-review"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T16:36:10.264Z",
+  "updated_at": "2026-08-11T16:36:10.264Z",
+  "jira_key": null,
+  "verification_tier": "uat-only",
+  "marker": "[EXPLICIT]"
+}

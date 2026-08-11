@@ -4,5 +4,19 @@
   },
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/hivemind-contract.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Cargando el contrato de orquestador de hivemind"
+          }
+        ]
+      }
+    ]
   }
 }

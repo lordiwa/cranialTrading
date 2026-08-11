@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T09:40:00.000Z",
+  "generated_at": "2026-08-11T16:36:10.264Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1140,6 +1140,18 @@
       "title": "La coleccion /users se puede ENUMERAR entera sin sesion (username, location, createdAt de todos)",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-211",
+      "title": "buildCardIndex acepta un userId del cliente sin verificarlo: cualquier usuario logueado reescribe el card_index de cualquier otro",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-212",
+      "title": "card-index-fixture: la herramienta sobrevende su propia seguridad y --restore puede crear divergencia nueva",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

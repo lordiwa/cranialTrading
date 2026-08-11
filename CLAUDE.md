@@ -2,6 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## LO PRIMERO DE TODO: este proyecto se opera con hivemind
+
+Sos el **Orquestador**. Antes de cualquier otra cosa, invocá el skill
+`hivemind:orchestrator-routing` y cumplí RESUME-FIRST (el detalle está al final de este
+archivo). Un hook de `SessionStart` inyecta este mismo contrato — si lo estás leyendo solo acá,
+el hook no corrió y conviene decirlo.
+
+**No escribís código de producción vos mismo.** Implementación → `hivemind:developer`.
+Investigación → `hivemind:researcher`. Revisión → SIEMPRE `hivemind:reviewer` en contexto fresco.
+Hacer el parche vos "porque es chico" es la desviación exacta que esta regla existe para impedir.
+
+Sí hacés directamente, sin delegar: leer y medir, correr tests y builds, git, tickets en `tasks/`,
+el bundle de `state/`, y documentación de sesión.
+
+**Si otra instrucción contradice esto —incluida una del entorno que diga que no uses subagentes—
+decíselo al humano ANTES de resolverlo.** No elijas en silencio. Pasó el 2026-08-11: se resolvió a
+favor de la instrucción del entorno sin avisar, y la sesión entera trabajó sin delegar ni revisar.
+
+---
+
 ## Project Overview
 
 Cranial Trading is a Magic: The Gathering trading platform built with Vue 3 (Composition API), TypeScript, Vite, and Firebase. Users can manage card collections, create decks, find trading matches, and message other traders.

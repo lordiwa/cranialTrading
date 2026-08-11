@@ -1,0 +1,37 @@
+{
+  "key": "TASK-209",
+  "title": "Paginar mientras se muta PIERDE cartas y DUPLICA cartas, en silencio, en las dos direcciones",
+  "description": "Encontrado por el agente D1 del wargaming (TASK-186). Es el hallazgo mejor controlado de toda la\ncorrida: el mecanismo se uso para PREDECIR que carta se iba a perder ANTES de correr la prueba, y se\nperdio esa. Dos veces, con victimas distintas.\n\nPREDICADO QUE SE ROMPIO, escrito antes de atacar: \"recorrer las paginas de un conjunto mientras una\ncarta sale de ese conjunto no hace que se pierda ninguna OTRA carta\".\n\nMONTAJE: conjunto limpio, sin historial de mutaciones previas —\n  status=sale + color=U + rarity=m + minPrice=10  ->  199 cartas.\nSe enumera la base completa primero. Despues: leer paginas 0 y 1 (100 cartas), sacar del conjunto UNA\ncarta que estaba en el indice global 5 (sale -> collection), esperar a que el indice lo refleje, y\nseguir paginando desde la pagina 2.\n\nRESULTADO, 2 DE 2:\n  corrida a — victima \"Alela, Artful Provocateur\" (indice 5). Base 199, recorrido 198.\n              PERDIDA: \"Oloro, Ageless Ascetic\".\n  corrida b — victima \"Alela, Cunning Conqueror\" (indice 5, otra carta). Base 198, recorrido 197.\n              PERDIDA: \"Oloro, Ageless Ascetic\".\n  Cero duplicadas en las dos.\n\nEL MECANISMO, y por eso era predecible: es la firma exacta de la paginacion por OFFSET. \"Oloro\"\nestaba en el indice global 100, o sea la PRIMERA carta de la pagina 2. Al quitar una carta del indice\n5, todo el conjunto corre un lugar a la izquierda, y el offset=100 de la pagina siguiente aterriza una\ncarta mas alla. La carta no se borro, no se movio y no cambio: simplemente NUNCA SE DEVUELVE.\nY nadie se entera — no hay error, no hay hueco visible, el conteo de la pantalla no lo delata.\n\nPOR QUE ACA ES GRAVE Y NO UN CASO DE LABORATORIO: por TASK-204, cada pagina tarda ~9 s y recorrer las\n59.203 cartas son ~1.184 paginas y unas 6 horas. La ventana no hay que buscarla: es lo que pasa si el\nusuario cambia el estado de una carta, o la borra, mientras la grilla sigue cargando. Borrar y poner\nen venta es el flujo de negocio #3.\n\nDATO EXTRA MEDIDO, que excede lo conocido: propagar el cambio de UNA SOLA carta al card_index tardo\n48 s en la corrida a y 152 s en la corrida b. Los 152 s estan bastante por encima de la ventana de\n10-58 s documentada en TASK-176.\n\nSALVEDAD QUE DECLARO EL PROPIO D1: las dos corridas no arrancaron de un estado identico (la base bajo\nde 199 a 198 porque la reversion de la corrida a todavia no habia propagado al indice). No afecta la\nconclusion — la carta perdida fue la misma y el mecanismo es el mismo — pero queda dicho.\n\nNO MEDIDO, y por lo tanto no afirmado: la variante de INSERCION (meter una carta al conjunto a mitad\ndel recorrido, que por el mismo mecanismo deberia producir una carta DUPLICADA en vez de una perdida),\ny la carrera con borrado real en vez de cambio de estado. Se esperan por el mismo mecanismo pero\nno se ejecutaron.\n\nTEST DE REGRESION SUGERIDO por D1, y encaja: enumerar un conjunto chico, mutar un elemento temprano a\nmitad del recorrido, y comparar contra la base. No se agrego a e2e/specs/ porque el protocolo del\nwargaming prohibe tocar ahi sin avisar.",
+  "acceptance_criteria": [
+    "Recorrer un conjunto paginado mientras un elemento SALE de el no hace desaparecer ningun otro elemento",
+    "Recorrer un conjunto paginado mientras un elemento ENTRA no devuelve ningun elemento dos veces",
+    "Cubierto el borrado real, no solo el cambio de estado",
+    "Cubierta la carrera disparada desde la interfaz real, no solo desde el store",
+    "Test de regresion que enumere un conjunto, mute un elemento temprano a mitad del recorrido (sacando Y metiendo) y compare contra la base",
+    "Verificado con la latencia real de paginacion, no con un conjunto que se recorre instantaneamente"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "wargaming",
+    "paginacion",
+    "concurrencia",
+    "flujo-3",
+    "perdida-silenciosa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "at": "2026-08-11T07:20:00.000Z",
+      "author": "orchestrator",
+      "body": "R13 — LA VARIANTE SIMETRICA, MEDIDA 2 DE 2. Estaba listada como \"esperada por el mismo mecanismo\npero no medida\". Ya no: se midio y salio.\n\n  PREDICADO: \"recorrer las paginas mientras una carta ENTRA al conjunto no hace que ninguna otra se\n  devuelva dos veces\".\n  MONTAJE: mismo conjunto azul. Se saca una carta temprana, se enumera la base (198), se leen las\n  paginas 0 y 1, se METE DE VUELTA (vuelve a la posicion 5), se sigue paginando.\n  RESULTADO 2 de 2: recorrido 199, distintas 198, UNA DUPLICADA: \"Oloro, Ageless Ascetic\" —\n  EXACTAMENTE la misma carta de frontera que se PERDIA en R12, ahora devuelta dos veces. Cero perdidas.\n\nQueda demostrado el mecanismo de offset en las dos direcciones: sacar una carta temprana SALTEA la de\nla frontera, meter una carta temprana la REPITE. El arreglo tiene que cubrir las dos.\n\n=== OBJECION QUE SE LEVANTO Y COMO QUEDO RESUELTA ===\nEl orquestador advirtio que el card_index de esta cuenta esta divergente A PROPOSITO (TASK-208), y que\npor lo tanto no se podia usar el indice como fuente de verdad. La respuesta, y por que el hallazgo se\nsostiene igual:\n  1. R12/R13 no son afirmaciones sobre Firestore: son sobre lo que devuelve la API paginada, que es lo\n     unico que ve el usuario. Base y recorrido salieron de la MISMA fuente, mismo filtro, mismo orden,\n     con minutos de diferencia — uno sin mutar y otro mutando.\n  2. Igual se ato contra los documentos: \"Oloro\" figura en race-before-a.json, la lista verificada\n     DOCUMENTO POR DOCUMENTO por REST (199 verificadas, 0 fuera de sale). O sea que la carta existe,\n     califica para el filtro, y la API simplemente nunca la devuelve. Ahi no hay ambiguedad.\n  3. La divergencia deliberada afecta a CUALES cartas componen el conjunto, no a SI la paginacion por\n     offset saltea cuando el conjunto cambia. El mecanismo es independiente del contenido.\n\nSALVEDAD DE D1 sobre R13: las corridas comparten conjunto y conejillo, asi que no son del todo\nindependientes entre si.\n\nSIGUE SIN MEDIR, y por lo tanto sin afirmar: la carrera con BORRADO real en vez de cambio de estado,\ny la carrera disparada desde la interfaz real (estas mutaron por el store y paginaron por la API; un\nusuario dispara las dos cosas desde la pantalla, con otros tiempos)."
+    }
+  ],
+  "created_at": "2026-08-11T07:10:00.000Z",
+  "updated_at": "2026-08-11T07:20:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

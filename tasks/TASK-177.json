@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "at": "2026-08-11T02:15:00.000Z",
+      "author": "orchestrator",
+      "body": "RESULTADO NEGATIVO MEDIDO por el agente D6 del wargaming (TASK-186) el 2026-08-11. LA TORMENTA DE REINTENTOS NO EXISTE en ninguno de los cuatro caminos probados.\n\nCon queryCardIndex devolviendo 503 sin cabecera CORS:\n  carga de /collection?q=...&status=sale          -> 1 peticion (t=2,3 s)\n  8 scrolls al fondo (dispara loadNextPage)       -> +0 peticiones en 20 s\n  tecleo de 12 teclas                             -> +1 peticion en 25 s\n  borrado de 12 teclas                            -> +1 peticion en 20 s\n  TOTAL                                            -> 3 peticiones en 127 s\n\nCuarto camino: AllPricesToday en 500 con scroll sostenido sobre 59k cartas -> UNA SOLA peticion, pese a 29 errores en consola. El dedup que se puso en TASK-174 aguanta.\n\nCONCLUSION: cada fallo produce exactamente una peticion y ninguna se reintenta sola. queryCardIndex y la carga de precios SE PUEDEN DESCARTAR de este ticket.\n\nESTO NO CIERRA EL TICKET: solo descarta dos caminos. Si la tormenta se observo alguna vez, hay que precisar en que pantalla y con que estimulo, porque los dos sospechosos mas obvios quedaron absueltos con medicion directa."
+    }
+  ],
   "created_at": "2026-08-10T17:08:03.396Z",
-  "updated_at": "2026-08-10T17:08:03.396Z",
+  "updated_at": "2026-08-11T02:15:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

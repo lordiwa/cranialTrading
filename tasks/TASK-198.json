@@ -1,0 +1,29 @@
+{
+  "key": "TASK-198",
+  "title": "Si queryCardIndex falla, la app no avisa NADA: el catch solo loguea y la grilla vacia se lee como \"no tenes cartas\"",
+  "description": "Encontrado por el agente D1 del wargaming (TASK-186). VERIFICADO EN EL CODIGO por el orquestador.\n\nsrc/stores/collection.ts:1883-1885 — el catch de queryPage es, entero:\n    } catch (error) {\n        logSanitizedError('[queryPage] Error querying card index', error)\n    } finally { ... paginationMeta.value.loading = false }\n\nNo hay estado de error, no hay reintento, no hay aviso al usuario. paginatedCards se queda como estaba\n(vacio en la primera carga) y loading pasa a false, asi que la interfaz muestra su estado vacio normal:\n\"Ninguna carta coincide\". El usuario no puede distinguir \"no tengo esa carta\" de \"se rompio el servidor\".\n\nES UN DEFECTO DISTINTO DE TASK-187 Y SOBREVIVE A SU ARREGLO: aunque la funcion deje de morirse por\nmemoria, CUALQUIER proximo fallo del endpoint (timeout, red, 500, cuota) vuelve a ser invisible.\nTASK-187 arregla la causa de hoy; este arregla que la app mienta cuando algo falle maniana.\n\nY nos ciega a nosotros tambien: durante el wargaming, un cero por dato y un cero por fallo fueron\nindistinguibles en la interfaz, lo que invalido dos verificaciones enteras (ver TASK-197).",
+  "acceptance_criteria": [
+    "Cuando queryPage falla, la interfaz distingue visiblemente el fallo del resultado vacio legitimo",
+    "El mensaje ofrece reintentar, y el reintento funciona",
+    "No se pierde el contenido que ya estaba en pantalla al fallar una consulta posterior",
+    "Test unitario del store que cubra el camino de error de queryPage"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "ux-error",
+    "coleccion",
+    "flujo-2",
+    "flujo-3"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:00:00.000Z",
+  "updated_at": "2026-08-11T05:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

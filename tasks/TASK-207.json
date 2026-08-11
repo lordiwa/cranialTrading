@@ -1,0 +1,33 @@
+{
+  "key": "TASK-207",
+  "title": "batchUpdateCards devuelve ok: true habiendo escrito a medias — el valor de retorno miente",
+  "description": "Encontrado por el agente D1 del wargaming (TASK-186).\n\nMEDIDO: se llamo al store con 71 ids exactos. Devolvio true en 1 segundo y solo una parte quedo\naplicada. En una llamada posterior volvio a aparecer resource-exhausted en consola y la funcion\nigual devolvio ok: true.\n\nEl valor de retorno no distingue \"escribi todo\" de \"se me agoto la cola de escrituras\". Cualquier\nllamador que confie en ese boolean — incluida la interfaz — va a reportar exito sobre una operacion\nparcial. Es el MOTOR de TASK-206.\n\nConecta con un patron ya conocido del proyecto: el limite de 10 MiB de writeBatch y los fallos de\nborrado del card_index. Ver la nota de memoria sobre fallos de borrado del indice antes de disenar\nel arreglo — ya hubo cinco intentos fallidos en ese terreno.",
+  "acceptance_criteria": [
+    "El valor de retorno distingue exito total, exito parcial y fallo, e informa cuantos documentos se escribieron",
+    "Todos los llamadores actuales se actualizan para manejar el caso parcial (buscarlos con grep, no asumir que hay uno)",
+    "Test unitario que simule el agotamiento de la cola y verifique que NO devuelve exito"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "bulk",
+    "firestore",
+    "flujo-3"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "at": "2026-08-11T07:20:00.000Z",
+      "author": "orchestrator",
+      "body": "DATO NUEVO DE D1 QUE CAMBIA DONDE BUSCAR LA CAUSA: el error\n\"resource-exhausted: Write stream exhausted maximum allowed queued writes\" volvio a aparecer\nACTUALIZANDO UNA SOLA CARTA con updateCard, en las 2 corridas del ataque de concurrencia.\n\nO sea que NO es exclusivo del bulk ni del tamanio del lote: la cola de escrituras se satura tambien\nen operaciones de una sola carta. Eso empuja a que la causa este en la escritura del card_index que\nARRASTRA cada update (las 30 porciones de TASK-176), no en cuantas cartas toca la operacion.\n\nConsecuencia practica: arreglar esto troceando el lote probablemente NO alcance."
+    }
+  ],
+  "created_at": "2026-08-11T05:45:00.000Z",
+  "updated_at": "2026-08-11T07:20:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

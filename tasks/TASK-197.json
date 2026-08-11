@@ -1,0 +1,30 @@
+{
+  "key": "TASK-197",
+  "title": "Buscar en la coleccion NO ignora acentos: \"Seance\" no encuentra \"Séance\" ni \"Aether Vial\" encuentra \"Æther Vial\"",
+  "description": "Hipotesis del agente D2 del wargaming (TASK-186). VERIFICADA POR EL ORQUESTADOR LEYENDO EL CODIGO,\nde forma determinista, despues de que TRES intentos de medirlo por el navegador fallaran (ver abajo).\n\nEL CODIGO, src/functions/queryCardIndexHelpers.ts:117-119 — es todo lo que hay:\n    if (filters.search && filters.search.trim() !== '') {\n      const q = filters.search.toLowerCase()\n      result = result.filter(c => c.n.toLowerCase().includes(q))\n    }\nSolo baja a minusculas. No normaliza diacriticos. Por lo tanto:\n  \"Seance\"       NO encuentra  \"Séance\"\n  \"Lim-Dul\"      NO encuentra  \"Lim-Dûl the Necromancer\"\n  \"Aether Vial\"  NO encuentra  \"Æther Vial\"\n  \"Jotun Grunt\"  NO encuentra  \"Jötun Grunt\"\ny al reves tambien: quien tenga la reimpresion sin acento no la encuentra tecleando el nombre viejo.\n\nPOR QUE IMPORTA: el usuario teclea sin acentos — no tiene Æ en el teclado y no va a poner el circunflejo\nde Lim-Dûl. La app le responde la grilla vacia con \"Ninguna carta coincide\", o sea le dice que NO TIENE\nuna carta que si tiene. Pega en los flujos de negocio 2 (buscar en colecciones) y 3 (quitar o vender),\nque son prioritarios. MTG tiene bastantes cartas asi: Æther*, Jötun, Lim-Dûl, Séance, Márton Stromgald,\nDandân, Ifh-Biff Efreet, Khabál Ghoul, Ashiok/Aetherling y toda la familia Aether/Æther.\n\nDONDE SE ARREGLA — UN SOLO PUNTO, verificado: src/utils/collectionFilters.ts solo arma la consulta y\ndelega el texto al servidor (linea 132), asi que la comparacion vive unicamente en el helper de arriba.\nNo hay punto paralelo del lado del cliente. La busqueda GLOBAL (Scryfall) no esta afectada: la resuelve\nScryfall, que ya normaliza.\n\nOJO CON EL ARREGLO, dos trampas:\n  1. NFD + quitar marcas combinantes resuelve é->e, ö->o, û->u, PERO NO resuelve Æ->AE ni ø, ß, etc.\n     La ligadura necesita mapeo explicito.\n  2. Normalizar solo la consulta no alcanza: hay que normalizar LOS DOS LADOS (la consulta y c.n).\nY hace falta decidir si se normaliza al vuelo en cada busqueda sobre 59k nombres (costo de CPU en una\nfuncion que YA se moria por recursos, ver TASK-187) o si se guarda un nombre normalizado en el indice.\nEsa decision se toma antes de implementar.\n\nCOMO SE VERIFICO, y por que no hay evidencia de navegador: se intento medir por la interfaz TRES veces\ny las tres el instrumento resulto invalido — (a) la primera agarraba el buscador del HEADER en vez del\nde la coleccion y devolvia 48 filas constantes para todo; (b) la segunda no distinguia \"cero porque no\nla tenes\" de \"cero porque queryCardIndex se murio\" (TASK-187), y NINGUNA ronda salio limpia; (c) la\ntercera, ya con TASK-187 parcheado, devolvio dom=0 y paginated=50 para todo, control incluido. Se dejo\nde insistir por el camino de la UI: la pregunta es sobre una funcion pura y se responde leyendola.\nLa evidencia es el codigo citado arriba, que no admite otra lectura.\n\nPARA CERRARLO hace falta un test unitario sobre filterIndexCards con nombres acentuados — es\ndeterministico y no depende de la interfaz.",
+  "acceptance_criteria": [
+    "Buscar sin acentos encuentra la carta acentuada: \"Seance\"->Séance, \"Lim-Dul\"->Lim-Dûl, \"Jotun\"->Jötun",
+    "La ligadura Æ funciona en los dos sentidos: \"Aether Vial\" encuentra \"Æther Vial\" y viceversa",
+    "Buscar CON acentos sigue funcionando igual que antes (no se rompe lo que ya andaba)",
+    "Tests unitarios sobre filterIndexCards que cubran acento simple, ligadura, y los dos sentidos",
+    "Queda decidido y documentado si se normaliza al vuelo o se persiste un nombre normalizado en el indice, considerando el costo de CPU de TASK-187"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "busqueda",
+    "flujo-2",
+    "flujo-3",
+    "i18n"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T04:45:00.000Z",
+  "updated_at": "2026-08-11T04:45:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

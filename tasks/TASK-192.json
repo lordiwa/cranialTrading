@@ -1,0 +1,28 @@
+{
+  "key": "TASK-192",
+  "title": "Un precio con tipo inesperado revienta y BORRA la grilla de resultados, y el payload malo queda cacheado 24 h",
+  "description": "Encontrado por el agente D6 del wargaming (TASK-186) el 2026-08-11, 2 de 2. Codigo VERIFICADO por el orquestador.\n\nEL CODIGO, src/services/mtgjson.ts:650 — formatPrice solo se protege contra null y undefined, y despues llama a .toFixed(2) a ciegas. Si MTGJSON sirve el precio como STRING ('12.50' en vez de 12.50), tira TypeError: e.toFixed is not a function y DESAPARECE LA GRILLA ENTERA de resultados — indistinguible de 'esa carta no existe'.\n\nEL AGRAVANTE, y es lo que lo vuelve grave de verdad: con el upstream YA SANO el cliente NO vuelve a pedir el archivo — cero peticiones — porque el cache en IndexedDB tiene TTL de 24 h. O sea que un fallo TRANSITORIO del tercero deja la app rota UN DIA ENTERO, y la unica salida es que el usuario borre los datos del sitio. El usuario no tiene forma de saber eso.\n\nALCANCE MEDIDO CON DATOS REALES: mutando en vuelo la respuesta real de MTGJSON (84.803 precios convertidos a string), el mismo crash llega a /collection: 15 errores de render en 15 s. Ahi la grilla no se vacia, pero todas las cartas quedan en 'CK: -'.\n\nNo hay NINGUNA validacion del payload de un tercero. Cualquier valor no numerico produce el mismo crash.\n\nEvidencia: scratchpad/d6/ — d6-lab-string.png, d6-poison-fase1.png, d6-poison-fase2.png, d6-a4-mutate.png.\n\nSEVERIDAD ALTA: flujo de negocio 1 (revisar precios), persistente y silencioso. Alcanzabilidad media porque requiere que MTGJSON cambie el tipo — pero no hay nada que lo impida y el costo de validar es minimo.",
+  "acceptance_criteria": [
+    "formatPrice no lanza excepcion con ningun valor de entrada (string, NaN, objeto, array)",
+    "Un precio malformado degrada SOLO ese precio; la grilla de resultados sigue mostrandose",
+    "Un payload de precios invalido NO se cachea, o se invalida el cache al detectar el error",
+    "Test unitario sobre formatPrice con valores no numericos (sin red)"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "precios",
+    "flujo-1",
+    "robustez"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T02:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

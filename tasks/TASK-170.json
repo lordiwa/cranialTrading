@@ -17,9 +17,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "at": "2026-08-11T01:10:00.000Z",
+      "author": "orchestrator",
+      "body": "CORRECCION DEL DIAGNOSTICO — el agente D5 del wargaming (TASK-186) FALSO la premisa de este ticket el 2026-08-11, con reproducibilidad 2 de 2.\n\nLA PREMISA ERA FALSA: el 404 NO se debe a las mayusculas en la URL. Medido: /@rafael_m, /@Rafael_M y /@RAFAEL_M resuelven las TRES. El casing de la URL no importa, porque resolveUsernameToUid ya normaliza a minusculas antes de buscar.\n\nLA CAUSA REAL son las mayusculas en el username ALMACENADO. Hay 3 usuarios de 232 en dev guardados con mayuscula: RafaMoose, Arcanis y Choma. Quedan inalcanzables por DOS motivos que se suman: (1) no tienen documento en el indice /usernames — /usernames/rafamoose da 404; y (2) el camino de respaldo legacy compara where('username','==','rafamoose') contra el valor guardado 'RafaMoose', y no matchea. Por eso fallan en TODAS las variantes de casing de la URL, no solo en la de mayusculas.\n\nVerificado en navegador: /@rafael_m pinta 41 cartas en cualquier casing; /@RafaMoose y /@rafamoose pintan '404 - Usuario no encontrado'.\n\nCONSECUENCIA PARA EL ARREGLO: normalizar la URL, que es lo que este ticket pedia, NO ARREGLA NADA. El arreglo correcto es backfill del indice /usernames para esos 3 usuarios, y guardar y consultar por un campo usernameLower en vez de comparar contra el valor con casing original.\n\nALCANCE: 3 usuarios de 232 en dev. Uno de ellos, RafaMoose, tiene 615 cartas publicas y su perfil es inalcanzable — flujo de negocio prioritario numero 2. Falta medir cuantos usuarios afectados hay en produccion."
+    }
+  ],
   "created_at": "2026-08-09T04:29:27.495Z",
-  "updated_at": "2026-08-09T04:29:27.495Z",
+  "updated_at": "2026-08-11T01:10:00.000Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

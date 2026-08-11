@@ -1,0 +1,31 @@
+{
+  "key": "TASK-204",
+  "title": "La paginacion server-side no ahorra NADA: cada pagina cuesta ~9 s sin importar que pidas, y recorrer la coleccion lleva ~6 horas",
+  "description": "Medido por el agente D1 del wargaming (TASK-186) DESPUES del parche de memoria de TASK-187.\nTodo remedido desde cero tras el parche: ninguna cifra viene de antes.\n\nPREDICADO QUE SE ROMPIO: \"el costo de una pagina depende del tamanio de la pagina, no del tamanio de\nla coleccion\". Eso es lo unico que hace util a una paginacion del lado del servidor. No se cumple.\n\nMEDIDO 2 de 2, con varianza minima, en CUATRO EJES INDEPENDIENTES — todos dan PLANO:\n  por pageSize:      1 -> 11,3/10,8 s | 10 -> 9,4/9,5 s | 50 -> 9,9/9,5 s | 100 -> 9,7/9,6 s\n                     PEDIR UNA CARTA CUESTA LO MISMO QUE PEDIR CIEN.\n  por profundidad:   page 0 -> 9,7/9,2 s | page 600 -> 9,0/9,5 s | page 1183 -> 9,6/9,1 s\n  por selectividad:  sin filtro (59.203 resultados) -> 9,0/9,1 s | combo (1.110) -> 9,7/8,5 s\n                     SIN RESULTADOS (0) -> 8,6/8,9 s. Devolver cero cuesta lo mismo que devolver todo.\n  por campo de orden: name / price / dateAdded / quantity, todos entre 8,5 y 9,3 s.\n\nCONTROL NEGATIVO DECISIVO: la misma llamada contra una CUENTA VACIA responde en 262 ms y 271 ms.\nNo es la red, no es el arranque en frio de la funcion, no es el cliente: es leer el card_index\nde ESTE usuario, entero, EN CADA PETICION.\n\nRELACION CON TASK-187, y por que es un ticket aparte: comparten la raiz (functions/index.js:1490\nhace indexRef.get() y trae los 30 chunks completos). Pero 187 era \"se muere\" y ya esta parcheado\nsubiendo la memoria a 2 GiB. ESTO NO LO ARREGLA EL PARCHE: la funcion dejo de morirse pero sigue\nleyendo los ~30 MB en cada request. Con el crash tapado, este es ahora el problema principal.\n\nCONSECUENCIA EN LA INTERFAZ REAL, medida aparte (uiscroll.mjs, 2 de 2):\n  pageSize del cliente = 50 (src/stores/collection.ts:1821).\n  Al llegar al fondo, cada lote tarda 9-12 s y aporta ~28 cartas nuevas.\n  Corrida a: 146 cartas distintas en 7 lotes. Corrida b: 151 en 7 lotes, 178 s, 7 llamadas.\n  Ritmo sostenido ~2,8 cartas por segundo -> RECORRER LAS 59.203 SON ~6 HORAS.\nBuscar una carta que no se pueda acotar con el filtro de texto es, en la practica, imposible.\n\nCIERRA OTRO HALLAZGO: en su ronda 1, D1 habia observado que \"recorrer la coleccion avanza ~1,3 cartas\ndistintas por pantalla\" y lo dejo sin reportar por sospechar de su propia automatizacion. NO era\nartefacto: su bucle esperaba 2 s entre scrolls y la pagina tarda 9-12 s en traer el lote. Es este\nmismo defecto visto desde la UI. Queda cerrado contra este ticket.\n\nLO QUE SI FUNCIONA, verificado por enumeracion completa con el id correcto (no por muestreo) — util\npara no romperlo al arreglar: determinismo (misma consulta dos veces da el mismo conjunto en las\npaginas 0, 1, 17 y 300); integridad (paginas 0..29 = 1.500 recogidas, 1.500 distintas, 0 duplicadas);\ntotal honesto (rarity=m declara 4.044 y enumera 4.044; el combo declara 1.110 y enumera 1.110);\nfiltros combinados correctos (0 incumplen status, 0 color, 0 rareza); paginas profundas sanas\n(page 1184 devuelve las 3 ultimas con hasMore=false, 1183x50+3 = 59.203 exacto); y el tope de\npageSize en 100 se declara honestamente en la respuesta.\n\nFlujos de negocio #1 y #3.",
+  "acceptance_criteria": [
+    "El costo de una peticion deja de depender del tamanio total de la coleccion — pedir una pagina no puede implicar leer el indice entero",
+    "Medido en los mismos cuatro ejes que este ticket (pageSize, profundidad, selectividad, campo de orden) y contra el control de cuenta vacia (262 ms)",
+    "Se preserva TODO lo que hoy funciona y esta enumerado arriba: determinismo, integridad sin duplicados, total honesto, filtros combinados correctos, ultima pagina exacta",
+    "Recorrer la coleccion por scroll deja de tardar horas — medir cartas nuevas por segundo antes y despues",
+    "Verificado con la cuenta de 59k, no con una chica"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "wargaming",
+    "rendimiento",
+    "cloud-functions",
+    "paginacion",
+    "flujo-1",
+    "flujo-3"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:30:00.000Z",
+  "updated_at": "2026-08-11T05:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "recorded-uat"
+}

@@ -1,0 +1,28 @@
+{
+  "key": "TASK-195",
+  "title": "Scryfall caido: la seccion de resultados DESAPARECE sin ningun mensaje — el usuario concluye que la carta no existe",
+  "description": "Encontrado por el agente D6 del wargaming (TASK-186) el 2026-08-11, 2 de 2 con HTTP 500, e igual con JSON invalido.\n\nQUE PASA: al fallar Scryfall queda el panel de filtros y NADA MAS. Ni mensaje de error, ni 'no se encontraron cartas', ni boton de reintentar. Con JSON invalido ademas queda un 'LOADING......' colgado para siempre.\n\nPOR QUE IMPORTA: Scryfall tiene caidas reales; no es una hipotesis. Y el usuario no puede distinguir 'el servicio esta caido' de 'esa carta no existe'. Va a concluir lo segundo y se va a ir. Es el flujo de negocio numero 1.\n\nLO QUE SI ANDA BIEN, para no romperlo al arreglar: Scryfall LENTO (30 s) no rompe nada — la app espera y muestra bien, sin timeout ni error. MTGJSON que nunca responde deja 'CK: -' sin spinner infinito. Cartas sin image_uris, sin prices, con card_faces vacio o con prices.usd numerico no rompen.\n\nEvidencia: scratchpad/d6/lab-down.log, lab-badjson.log, d6-lab-down.png, d6-lab-badjson.png.",
+  "acceptance_criteria": [
+    "Un fallo de Scryfall muestra un mensaje de error explicito, distinto de 'no se encontraron cartas'",
+    "Hay un camino de reintento visible para el usuario",
+    "Un JSON invalido no deja un indicador de carga colgado indefinidamente",
+    "Scryfall lento sigue funcionando como hoy (no introducir un timeout que rompa el caso de 30 s)"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "flujo-1",
+    "scryfall",
+    "ux-error"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T02:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

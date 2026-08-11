@@ -1,0 +1,29 @@
+{
+  "key": "TASK-199",
+  "title": "La primera visita a /collection descarga ~160 MB de precios: 36 minutos a 600 Kbps antes del primer precio",
+  "description": "Medido por el agente D1 del wargaming (TASK-186), 3 corridas independientes:\n  162,86 MB / 408 peticiones | 162,86 MB / 407 | 159,13 MB / 405\nEs un .json.gz de mtgjson.com POR CADA SET que el usuario posee.\n\nHONESTIDAD SOBRE EL ALCANCE, que el propio D1 marco: es costo de CACHE FRIA, no de cada visita. La\nsegunda y tercera visita en el mismo perfil bajan 0 MB de mtgjson (2,9 MB totales). Aun asi es critico:\nla PRIMERA vez es la que decide si el usuario se queda, y a 600 Kbps son ~36 minutos hasta el primer precio.\n\nLO QUE LO HACE DISTINTO de TASK-171 y TASK-174, ya cerrados: aquellos sacaron mtgjson del ARRANQUE y\nquitaron la descarga quintuplicada. Esto es el volumen que sigue bajando /collection en frio, y ESCALA\nCON LA AMPLITUD de la coleccion (cuantos sets distintos posee), no con su tamanio. Un usuario con pocas\ncartas pero muy variadas paga lo mismo.\n\nCONTEXTO DE MERCADO QUE LO VUELVE GRAVE: la app se lanza donde la conectividad normal es 4G lenta y la\nmetrica es BYTES, no segundos en fibra. 160 MB no es viable ahi. Flujo de negocio #1, el prioritario.\n\nNO CONTAMINADO por TASK-187: es una CDN de terceros, no pasa por queryCardIndex.",
+  "acceptance_criteria": [
+    "La primera visita a /collection deja de descargar el dataset de precios completo de cada set poseido",
+    "Se muestra un precio util antes de haber descargado todo",
+    "Medido con estrangulamiento a 600 Kbps, no en localhost ni en fibra",
+    "El costo no escala con la cantidad de sets distintos que posee el usuario"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "wargaming",
+    "rendimiento",
+    "precios",
+    "flujo-1",
+    "4g-lenta"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:00:00.000Z",
+  "updated_at": "2026-08-11T05:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "recorded-uat"
+}

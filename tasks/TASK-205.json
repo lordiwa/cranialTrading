@@ -1,0 +1,28 @@
+{
+  "key": "TASK-205",
+  "title": "\"Select all\" ignora TODOS los filtros menos el estado: el usuario opera sobre un conjunto que no es el que ve",
+  "description": "Encontrado por el agente D1 del wargaming (TASK-186), 4 de 4 corridas identicas.\nVERIFICADO EN EL CODIGO por el orquestador.\n\nMEDIDO:\n  filtro que declara 204 resultados -> \"Select all\" dice 155 selected\n  filtro que declara  71 resultados -> \"Select all\" dice  94 selected  (MAS que el total filtrado)\n\nLA CAUSA, src/stores/collection.ts:1772 — la firma misma lo delata:\n    const selectAllFilteredIds = (filters?: { status?: string }): string[] => {\n        let filtered = cards.value\n        ... solo aplica status ('all' | 'owned' | 'available' | CardStatus) ...\n        return filtered.map(c => c.id)\n    }\nColor, rareza, precio, tipo, coste de mana y busqueda de texto NO se aplican — ni siquiera se pueden\npasar. Ademas opera sobre cards.value (el array LOCAL), lo que explica que a veces seleccione MAS\ncartas que las que el filtro declara.\n\nPOR QUE ES GRAVE: el usuario filtra, ve N cartas, aprieta \"Select all\", y despues aplica una accion\nmasiva sobre un conjunto DISTINTO del que tiene delante — puede tocar cartas que no queria y dejar\nsin tocar las que si. Es flujo de negocio #3 (quitar cartas o ponerlas a la venta).\n\nSe agrava combinado con TASK-206 (la accion masiva se aplica a medias y en silencio): el usuario no\nsolo opera sobre el conjunto equivocado, sino que tampoco se entera de cuanto se aplico.",
+  "acceptance_criteria": [
+    "\"Select all\" selecciona exactamente las cartas que el filtro activo declara, con todos los filtros aplicados",
+    "El conteo que muestra la interfaz coincide con el total filtrado",
+    "Funciona igual cuando el conjunto filtrado excede lo cargado localmente (no puede depender de cards.value)",
+    "Tests unitarios que cubran filtros combinados: estado + color + rareza + precio"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "bulk",
+    "flujo-3",
+    "coleccion"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:45:00.000Z",
+  "updated_at": "2026-08-11T05:45:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

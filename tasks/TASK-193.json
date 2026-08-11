@@ -1,0 +1,28 @@
+{
+  "key": "TASK-193",
+  "title": "Precios negativos, absurdos y viejos se muestran como precios validos de hoy",
+  "description": "Encontrado por el agente D6 del wargaming (TASK-186) el 2026-08-11, 2 de 2 en cada caso. Codigo VERIFICADO.\n\nQUE SE MUESTRA AL USUARIO:\n  precio -7.5            -> 'CK $-7.50'\n  precio 999999999999    -> 'CK $999999999999.00'\n  precios fechados 2019  -> 'CK $4.25', IDENTICO a uno fresco, sin ninguna marca de antiguedad\n  precio null            -> 'N/A'  (el unico correcto)\n\nCAUSA: formatPrice (src/services/mtgjson.ts:650) solo filtra null y undefined; no valida rango ni signo. Y getLatestPrice toma la fecha mas alta del payload SIN MIRAR CUAL ES: no existe ninguna nocion de frescura. Combinado con el cache de 24 h, un AllPricesToday obsoleto se muestra un dia entero como si fuera el precio actual.\n\nESTE ES EL CASO 'PEOR QUE NO MOSTRAR PRECIO'. El usuario no puede distinguir un precio real de uno equivocado, y revisar precios es la prioridad de negocio numero uno. Un precio equivocado presentado con la misma confianza que uno bueno es peor que un 'N/A' honesto.\n\nSEGUNDO DEFECTO DE LA MISMA FAMILIA (era R6 en el informe de D6): cuando la fuente de precios falla (503, 429 o JSON invalido) la carta queda en 'CK: -', INDISTINGUIBLE de 'esta carta no tiene precio'. No hay ninguna senal de que hubo un fallo. Ademas useCollectionTotals.ts:180 cachea el null del fallo transitorio, asi que la carta queda sin precio TODA LA SESION aunque el upstream se recupere a los dos segundos.\n\nEvidencia: scratchpad/d6/ — lab-negative.log, lab-huge.log, lab-stale.log, lab-nullprice.log y sus capturas.",
+  "acceptance_criteria": [
+    "Un precio negativo o fuera de rango razonable no se muestra como precio valido",
+    "Un precio con fecha vieja se marca como desactualizado o no se muestra",
+    "Un fallo de la fuente de precios se distingue visualmente de 'esta carta no tiene precio'",
+    "Un null cacheado por fallo transitorio se reintenta cuando el upstream se recupera, no dura toda la sesion",
+    "Test unitario sobre formatPrice y getLatestPrice con negativos, absurdos y fechas viejas"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "precios",
+    "flujo-1"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T02:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

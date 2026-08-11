@@ -1,0 +1,25 @@
+{
+  "key": "TASK-188",
+  "title": "CRITICO: el email de todos los usuarios se descarga sin sesion desde la coleccion /users — en PROD y en dev",
+  "description": "Encontrado por el agente D5 del wargaming (TASK-186) el 2026-08-11 y VERIFICADO INDEPENDIENTEMENTE por el orquestador antes de ticketear.\n\nQUE PASA: una sola peticion HTTP anonima, sin token y sin cuenta, devuelve HTTP 200 con los documentos de la coleccion /users, y cada documento incluye el campo email con dato real.\n\nMEDIDO EN LOS DOS ENTORNOS:\n  cranial-trading      (PRODUCCION) -> 134 usuarios enumerables sin sesion, HTTP 200\n  cranial-trading-dev  (DEV)        -> 232 usuarios enumerables sin sesion, HTTP 200\nCampos que devuelve cada documento: createdAt, email, location, username. El email viene poblado (verificado por largo y presencia de '@', SIN bajar los valores).\n\nCAUSA, en firestore.rules linea 9:\n  match /users/{userId} { allow read: if true; }\nLas reglas de Firestore NO filtran por campo. Si el documento es legible, se leen TODOS sus campos. El perfil publico solo necesita username, location y avatarUrl, pero el email vive en el mismo documento y se va con ellos.\n\nPOR QUE NO LO ATRAPO TASK-169: ese ticket saco el email de public_cards y lo movio a contact_info con sesion obligatoria, y ESE ARREGLO AGUANTA — D5 lo reverifico, public_cards devuelve 0 documentos con email. Pero nadie miro la coleccion /users, que es la que la app lee para pintar CUALQUIER perfil publico. Es la misma clase de defecto que TASK-087 y TASK-169, en una tercera coleccion.\n\nRESTRICCION DE PRODUCTO QUE NO SE PUEDE ROMPER: mirar el perfil de otro usuario SIN estar logueado tiene que seguir funcionando. Es requisito explicito de Rafael y fue lo que forzo el diseno de TASK-169. O sea que la solucion NO es cerrar la lectura de /users.\n\nCAMINOS POSIBLES (a decidir con Rafael):\n  A) Sacar el campo email del documento /users. Ya esta duplicado en contact_info, que exige sesion. Es el camino que TASK-169 ya recorrio para public_cards. Requiere migracion de datos en los dos entornos.\n  B) Partir /users en un documento publico (username, location, avatarUrl) y uno privado (email, resto). Mas limpio a largo plazo, mas caro, toca mas codigo.\n\nORDEN DE EJECUCION OBLIGATORIO, aprendido en TASK-169: el codigo se despliega PRIMERO y la limpieza de datos va DESPUES. Si se limpian los datos antes, el codigo viejo vuelve a escribir el campo.\n\nOJO: las reglas de Firestore se despliegan A MANO. El CI solo despliega hosting.\n\nVERIFICACION EXIGIDA, en las dos direcciones y en los DOS entornos: (1) peticion anonima a /users -> 0 documentos con campo email; (2) ver el perfil publico de otro usuario SIN login -> sigue funcionando igual. Merece un test de regresion que haga la peticion REST anonima, porque esta es la tercera vez que aparece la misma clase de fuga."
+  ,
+  "acceptance_criteria": [
+    "Una peticion REST anonima a la coleccion /users devuelve 0 documentos con el campo email, en dev Y en produccion",
+    "Ver el perfil publico de otro usuario SIN estar logueado sigue funcionando exactamente igual",
+    "La migracion de datos corre DESPUES de desplegar el codigo, nunca antes",
+    "Las reglas de Firestore quedan desplegadas a mano en los dos entornos (el CI no las despliega)",
+    "Queda un test de regresion que verifica la ausencia del campo por peticion anonima"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": ["seguridad", "privacidad", "wargaming", "produccion"],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T01:10:00.000Z",
+  "updated_at": "2026-08-11T01:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

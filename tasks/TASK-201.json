@@ -1,0 +1,28 @@
+{
+  "key": "TASK-201",
+  "title": "Ver el perfil ajeno de un vendedor con 60 cartas publicas descarga 33,5 MB",
+  "description": "Medido por el agente D1 del wargaming (TASK-186): mtgjson = 33,52 MB EXACTO en las 2 corridas,\n45 MB totales, entrando a /@rafael_m, cuya pestania declara \"Public collection 60\".\n\n60 cartas publicas, 33,5 MB de descarga. Es la PRIMERA pantalla que ve un comprador cuando mira a un\nvendedor — flujo de negocio #2. A 600 Kbps son varios minutos de pantalla vacia para ver 60 cartas.\n\nMismo mecanismo que TASK-199 (un archivo de precios por set), pero aca es mucho mas indefendible: la\ncantidad de datos a mostrar es minuscula y conocida de antemano. Para 60 cartas alcanzaria con pedir\nlos precios de esas 60.\n\nNO CONTAMINADO por TASK-187.",
+  "acceptance_criteria": [
+    "Ver un perfil ajeno descarga un volumen proporcional a las cartas publicas que muestra, no al catalogo",
+    "Medido con estrangulamiento a 600 Kbps",
+    "No se rompe la vista del perfil SIN sesion, que es un requisito explicito de Rafael"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "rendimiento",
+    "perfil-publico",
+    "flujo-2",
+    "4g-lenta"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:00:00.000Z",
+  "updated_at": "2026-08-11T05:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "recorded-uat"
+}

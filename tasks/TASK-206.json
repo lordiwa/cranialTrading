@@ -1,0 +1,28 @@
+{
+  "key": "TASK-206",
+  "title": "La accion masiva se aplica A MEDIAS y en SILENCIO: la escritura se agota y el usuario cree que se hizo",
+  "description": "Encontrado por el agente D1 del wargaming (TASK-186) durante el turno serializado de bulk.\n\nPASOS: filtro de 204 cartas -> \"Select all\" (declara 155) -> accion FOR TRADE -> confirmar.\n\nQUE PASA:\n  en consola: FirebaseError: [code=resource-exhausted]: \"Write stream exhausted maximum allowed\n              queued writes\", mas un HTTP 400 en el canal Write de Firestore\n  en la interfaz: NADA. Ni toast, ni error, ni indicacion de que se aplico parcialmente.\n  resultado: el indice paso a mostrar 71 en trade, no 155.\n\nEl usuario cierra la pantalla convencido de que puso 155 cartas a la venta. No las puso.\n\nSALVEDAD HONESTA que declaro el propio D1: no midio Firestore inmediatamente despues del bulk, sino\nrecien al empezar a revertir, asi que el numero exacto que llego a escribirse NO esta confirmado.\nLo que SI esta medido y no depende de eso: la interfaz declaro 155, la escritura se agoto a mitad,\ny el usuario no recibio ninguna senial.\n\nMOTOR DEL PROBLEMA: ver TASK-207 — batchUpdateCards devuelve ok: true aunque se le agote la cola.\n\nHIPOTESIS NO MEDIDA, marcada como tal: D1 sospecha que esto EMPEORA con el volumen, porque el fallo\nes agotamiento de la cola de escrituras y 155 cartas ya alcanzaron para dispararlo. NO se midio a\nescala real (las 59.203) — eso queda explicitamente sin atacar.\n\nFlujo de negocio #3.",
+  "acceptance_criteria": [
+    "Una accion masiva que no se aplica entera se lo dice al usuario, con cuantas se aplicaron y cuantas no",
+    "Las escrituras se trocean para no agotar la cola de Firestore",
+    "Se ofrece reintentar lo que falto, sin repetir lo ya aplicado",
+    "Probado con un conjunto grande, no con 10 cartas"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "wargaming",
+    "bulk",
+    "flujo-3",
+    "perdida-silenciosa"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:45:00.000Z",
+  "updated_at": "2026-08-11T05:45:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

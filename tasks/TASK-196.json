@@ -1,0 +1,28 @@
+{
+  "key": "TASK-196",
+  "title": "Import de Moxfield con formato inesperado ofrece el boton 'IMPORT NAN CARDS'",
+  "description": "Encontrado por el agente D6 del wargaming (TASK-186) el 2026-08-11, 2 de 2. Codigo VERIFICADO por el orquestador.\n\nQUE PASA: un mazo de Moxfield valido salvo por UNA carta sin el campo quantity produce 'Mainboard: NaN | Sideboard: 0', el resumen dice 'NaN CARDS', y el boton queda HABILITADO diciendo literalmente 'IMPORT NAN CARDS'. Sin ningun error.\n\nCAUSA, verificada en ImportDeckModal.vue:117 — la suma no tiene guarda: reduce((sum, item) => sum + item.quantity, 0). Lo llamativo es que DOS LINEAS DESPUES si se protege el nombre con item.card?.name ?? ''. La guarda existe en la cabeza de quien lo escribio, pero no se aplico a la cantidad.\n\nSEGUNDO PUNTO, NO VERIFICADO — D6 lo dejo explicitamente sin atacar por prudencia: services/moxfield.ts:93 hace item.card.set.toUpperCase() sin guarda. Una carta sin set deberia reventar A MITAD del import. No lo probo porque escribe en la cuenta compartida y un fallo a mitad dejaria estado parcial que no sabia limpiar. Es el pendiente mas obvio del import y hay que verificarlo al arreglar esto.\n\nLO QUE SI ANDA BIEN: Moxfield con 403 dice 'Deck is private'; con 500 muestra el texto del proxy. Los caminos de error HTTP estan cubiertos; falta validar la FORMA de una respuesta 200.\n\nOJO AL ARREGLAR: toca el mismo flujo de import que TASK-189 (el retomar mutilado). Conviene mirarlos juntos.",
+  "acceptance_criteria": [
+    "Un mazo de Moxfield con campos faltantes muestra un error claro, nunca 'NaN'",
+    "El boton de importar queda deshabilitado si el conteo no es un numero valido",
+    "Una carta sin el campo set no revienta a mitad del import (verificar moxfield.ts:93)",
+    "Los casos 403 y 500 siguen comportandose como hoy"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "wargaming",
+    "import",
+    "moxfield",
+    "flujo-4"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T02:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

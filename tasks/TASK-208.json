@@ -1,0 +1,41 @@
+{
+  "key": "TASK-208",
+  "title": "El card_index diverge de Firestore y NO converge solo: la app muestra un inventario que no existe",
+  "description": "Encontrado por el agente D1 del wargaming (TASK-186). Es la comparacion mejor controlada de toda\nla corrida: dos fuentes leidas en el MISMO instante, y la autoritativa leida documento por documento.\n\nMEDIDO EN EL MISMO INSTANTE:\n  Firestore (documentos reales, por REST con mascara de campo): 189 sale / 15 trade\n  queryCardIndex (lo que ve la app):                            146 sale / 58 trade\n  DIVERGEN EN 43 CARTAS.\n\nY LO PEOR: despues de dejar Firestore en 204 sale / 0 trade — verificado documento por documento —\nel indice SIGUE en 146/58 tras 4 verificaciones repartidas en mas de 15 minutos.\n\nESTO NO ES EL LAG CONOCIDO DE TASK-176. Ahi el indice tarda 10-58 s pero CONVERGE. Aca no converge:\nse quedo divergente indefinidamente. Es un estado estable e incorrecto.\n\nCONSECUENCIA: la grilla se arma con el indice, asi que el usuario ve 58 cartas con un estado que no\ntienen. Su inventario en pantalla no es su inventario real. Si pone cartas a la venta y el indice\ndice otra cosa, lo que ven los compradores tambien es falso.\n\nCOMO SE LLEGO A ESE ESTADO: una accion masiva parcialmente aplicada (TASK-206). O sea que 206 no\nsolo pierde escrituras en silencio: deja el indice en un estado del que no sale solo.\n\nESTADO ACTUAL DE LA CUENTA DE DEV: los documentos estan BIEN (204 en sale, verificados uno por uno).\nEl indice esta MAL (58 marcadas trade). Las 58 estan acotadas al filtro White + Mythic + >=10 USD e\nidentificadas. Requiere un rebuild del card_index para repararse.",
+  "acceptance_criteria": [
+    "El indice converge con Firestore despues de cualquier escritura, incluida una parcial o fallida",
+    "Existe una deteccion de divergencia que no dependa de que alguien la note a mano",
+    "Reproducido: provocar una escritura parcial y verificar que el indice termina coincidiendo",
+    "Reparada la cuenta de dev que quedo divergente por este hallazgo"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "wargaming",
+    "card-index",
+    "datos-inconsistentes",
+    "flujo-3",
+    "reproduccion-viva",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "at": "2026-08-11T05:50:00.000Z",
+      "author": "orchestrator",
+      "body": "DECISION DE RAFAEL 2026-08-11: **LA CUENTA DE DEV SE DEJA DIVERGENTE A PROPOSITO**, como\nreproduccion viva de este defecto para quien lo vaya a arreglar. NO reconstruir el card_index\nhasta que este ticket se trabaje.\n\nESTADO EXACTO EN QUE QUEDA LA CUENTA (la de E2E, uid jV6gJqf3csPA4vRfO2k9Vb5ejYo2, entorno dev):\n  Firestore (la verdad):  204 cartas en status \"sale\", verificadas documento por documento.\n  card_index (lo que ve la app): 58 de esas cartas figuran como \"trade\".\n  Las 58 estan acotadas al filtro: status sale + color White + rareza Mythic + precio >= 10 USD.\n  No converge solo: 4 verificaciones en mas de 15 minutos y sigue igual.\n\nCOMO REPARARLA CUANDO SE DECIDA: un rebuild del card_index (buildCardIndex). Tardo ~81 s la vez\nanterior que se reparo esta misma cuenta (TASK-168).\n\n=== ADVERTENCIA PARA CUALQUIERA QUE TOQUE ESTA CUENTA ===\n1. Esta cuenta es la que usa el CI de develop. Las 58 cartas con estado equivocado en el indice\n   PUEDEN ensuciar resultados de E2E — sobre todo specs de coleccion que filtren por estado.\n   Si aparece un rojo raro en E2E relacionado con sale/trade, mirar aca ANTES de diagnosticar.\n2. NO \"arreglar\" el indice porque parezca corrupto. Esta asi a proposito y por decision explicita.\n   Reconstruirlo destruye la reproduccion.\n3. La divergencia se provoco con una accion masiva parcialmente aplicada (TASK-206). Si se pierde\n   la reproduccion, se puede volver a provocar por ese camino."
+    },
+    {
+      "at": "2026-08-11T07:20:00.000Z",
+      "author": "orchestrator",
+      "body": "NUMEROS DE PROPAGACION medidos por D1 en el ataque de concurrencia — tiempo hasta que el\ncard_index refleja el cambio de UNA sola carta:\n    sacarla del conjunto:  29 s  y  26 s\n    volver a meterla:     106 s  y 135 s\n  (y en el ataque anterior: 48 s y 152 s)\n\nLos cuatro estan por encima o cerca del techo de la ventana de 10-58 s que documenta TASK-176, y hay\nuna ASIMETRIA consistente en las dos corridas: sacar es 4-5 veces mas rapido que meter. Esa asimetria\nno esta explicada por ningun ticket actual y puede ser una pista para TASK-176."
+    }
+  ],
+  "created_at": "2026-08-11T05:45:00.000Z",
+  "updated_at": "2026-08-11T07:20:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

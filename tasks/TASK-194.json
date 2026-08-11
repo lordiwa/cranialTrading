@@ -1,0 +1,28 @@
+{
+  "key": "TASK-194",
+  "title": "Con Firestore caido la app afirma '0 CARDS' y '$0 COLLECTION VALUE' como si fueran datos reales",
+  "description": "Encontrado por el agente D6 del wargaming (TASK-186) el 2026-08-11, 2 corridas.\n\nMEDIDO, muestreando el DOM cada 700 ms durante 70 s con firestore.googleapis.com abortado:\n  - El texto de error es visible SOLO entre 0,8 y 4,4 s. Es un toast que se auto-descarta a los 4 s.\n  - 'COLLECTION VALUE $0' y '0 CARDS' aparecen en 96 de 100 muestras, desde 1,5 s hasta 70,3 s Y SIGUE.\n  - Tambien: '0 FOR SALE', 'ALL 0', 'DECKS 0', 'BINDERS 0', y el pie entero COLLECTION/WISHLIST/FOR SALE/TRADE/TOTAL $0.00.\n\nO sea: el aviso del error dura 4 segundos y la MENTIRA dura indefinidamente. A un usuario con 59.199 cartas se le afirma, en verde y grande, que su coleccion vale $0.\n\nMATIZ IMPORTANTE: la grilla SI es honesta — muestra 'Loading collection...' indefinidamente. El problema son todos los numeros que la rodean, que tratan el estado 'no pude cargar' como si fuera el estado 'no hay nada'. Un cero es una afirmacion; la ausencia de dato no es cero.\n\nALCANCE: alcanzabilidad ALTA. No hace falta que Firestore se caiga del todo — cualquier red mala produce lo mismo, y el mercado objetivo es 4G lenta.\n\nEvidencia: scratchpad/d6/d6-a11-down.png y d6-a11-down-run2.png.\n\nNOTA SOBRE TASK-187: D6 intento reproducir el sintoma de TASK-187 ('Ninguna carta coincide' con la grilla vacia) provocando el fallo y NO LO LOGRO — 0 de 91 muestras en 127 s de 503. Su propia hipotesis se refuto: collectionStore.loading suprime ese mensaje. El dano real de un backend caido esta aca, en los contadores, no en la grilla.",
+  "acceptance_criteria": [
+    "Un fallo de carga NO se presenta como el numero cero en contadores ni en totales",
+    "Los contadores y totales muestran estado de error o de carga mientras no haya datos, y lo mantienen mientras dure el fallo",
+    "El aviso de error persiste mientras el error persiste, en vez de auto-descartarse a los 4 s",
+    "Verificado con Firestore abortado durante al menos 70 s"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "flujo-1",
+    "robustez",
+    "ux-error"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T02:10:00.000Z",
+  "updated_at": "2026-08-11T02:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

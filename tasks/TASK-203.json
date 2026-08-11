@@ -1,0 +1,28 @@
+{
+  "key": "TASK-203",
+  "title": "Con 263 mazos y 104 carpetas no hay forma de llegar a uno: sin buscador y con 22 pantallas de scroll horizontal",
+  "description": "Medido por el agente D1 del wargaming (TASK-186), 2 corridas con cifras identicas.\nVERIFICADO EN EL CODIGO por el orquestador.\n\nEl selector es una sola fila horizontal, sin virtualizar y SIN BUSCADOR:\n  src/views/DeckView.vue:1011    <div class=\"flex gap-2 overflow-x-auto ...\">\n  src/views/BinderView.vue:658   <div class=\"flex gap-2 overflow-x-auto ...\">\nLos unicos inputs de esas vistas son de cartas, no de mazos ni carpetas.\n\nMEDIDO: 263 mazos = 11.115 px = 9,7 pantallas de scroll horizontal.\n        104 carpetas = 25.203 px = 22 pantallas.\nPara abrir un mazo hay que arrastrar a ciegas hasta encontrarlo de vista.\n\nPAR PARALELO (Regla 6): el arreglo va SI O SI en las dos vistas, mazos y carpetas, en el mismo cambio.\n\nFlujo de negocio #4. NO CONTAMINADO por TASK-187: es puro DOM.",
+  "acceptance_criteria": [
+    "Se puede llegar a un mazo o carpeta por nombre sin recorrer la fila entera",
+    "El arreglo esta aplicado a DeckView y a BinderView en el mismo cambio (par paralelo, Regla 6)",
+    "Funciona con 263 mazos y 104 carpetas sin degradar el render"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "wargaming",
+    "usabilidad",
+    "mazos",
+    "carpetas",
+    "flujo-4"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:00:00.000Z",
+  "updated_at": "2026-08-11T05:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "recorded-uat"
+}

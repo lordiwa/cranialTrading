@@ -1,0 +1,27 @@
+{
+  "key": "TASK-200",
+  "title": "La misma pantalla muestra DOS valores distintos de la coleccion, ~17% aparte (243.713 arriba vs 208.923 abajo)",
+  "description": "Medido por el agente D1 del wargaming (TASK-186) con el cargador de precios al 100%, 2 corridas:\n  corrida a: showcase COLLECTION VALUE 243.713 vs pie de grilla TOTAL 208.923,67\n  corrida b: showcase COLLECTION VALUE 243.558 vs pie de grilla TOTAL 208.768,27\n  delta ~34.790 en las dos.\n\nNO LO EXPLICA LA WISHLIST: el pie declara Unique 59208 / Cards 197053, o sea que esta contando TODO,\ny aun asi da el numero MENOR. Son dos agregaciones distintas del mismo dato conviviendo en pantalla.\n\nPOR QUE IMPORTA: el valor de la coleccion es el numero por el que el usuario entra (flujo #1). Que la\napp se contradiga a si misma en la misma pantalla destruye la confianza en todos los demas numeros.\nAdemas NO SE SABE CUAL DE LOS DOS ES EL CORRECTO — averiguarlo es parte del trabajo.\n\nNO CONTAMINADO por TASK-187: la agregacion es del lado del cliente.",
+  "acceptance_criteria": [
+    "Los dos totales de la pantalla coinciden, o se explica visiblemente por que difieren",
+    "Queda documentado cual era el correcto y por que el otro estaba mal",
+    "Test unitario sobre la funcion de agregacion que fije el criterio"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "precios",
+    "flujo-1",
+    "datos-inconsistentes"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:00:00.000Z",
+  "updated_at": "2026-08-11T05:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

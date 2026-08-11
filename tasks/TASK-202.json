@@ -1,0 +1,27 @@
+{
+  "key": "TASK-202",
+  "title": "Un vendedor con 3.187 cartas a la venta solo expone 432, y la pantalla muestra tres numeros que no coinciden",
+  "description": "Medido por el agente D1 del wargaming (TASK-186), 2 corridas identicas:\n  la cabecera dice 3.187 FOR SALE\n  la pestania dice 60\n  el scroll alcanza EXACTAMENTE 432 cartas distintas y se detiene, sin error en consola\n  la altura de la pagina se congela en 54.304 px y no crece con 2 minutos extra de empujones al fondo.\nTres numeros en una misma pantalla y ninguno coincide con otro.\n\nIMPACTO DE NEGOCIO: si un vendedor pone 3.187 cartas a la venta y el comprador solo puede ver 432,\nel 86% de su inventario es invisible. Flujo #2.\n\nSALVEDAD QUE DECLARO EL PROPIO D1, y hay que resolverla ANTES de arreglar: no descarto que el disparador\nde \"cargar mas\" sea un centinela que su scroll automatizado no llegaba a intersectar. El techo de 432\nesta solido 2 de 2, pero la CAUSA puede ser el mecanismo de carga y no un limite real.\nPRIMER PASO: reproducirlo a mano en un navegador de verdad antes de tocar codigo.\n\nNO usa queryCardIndex (va por getUserPublicCardsPage/Firestore), asi que no se atribuye a TASK-187 —\npero es el unico hallazgo de D1 donde el mismo dice que no puede jurarlo al 100%.",
+  "acceptance_criteria": [
+    "Reproducido a mano en un navegador real antes de cambiar nada, para separar limite real de centinela de scroll",
+    "Un comprador puede llegar a las 3.187 cartas a la venta, o se le dice claramente cuantas hay y por que no ve mas",
+    "Los numeros de la pantalla (cabecera, pestania, cartas visibles) son coherentes entre si"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "perfil-publico",
+    "flujo-2",
+    "paginacion"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T05:00:00.000Z",
+  "updated_at": "2026-08-11T05:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "recorded-uat"
+}

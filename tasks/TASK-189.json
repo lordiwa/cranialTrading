@@ -1,0 +1,30 @@
+{
+  "key": "TASK-189",
+  "title": "Una importacion interrumpida no se puede retomar NUNCA: el estado que se guarda esta mutilado por diseno",
+  "description": "Encontrado por el agente D3 del wargaming (TASK-186) el 2026-08-11 y VERIFICADO EN EL CODIGO por el orquestador.\n\nEL MECANISMO, leido en el codigo y confirmado linea por linea:\n  src/composables/useCollectionImport.ts:114 — saveImportState es el UNICO escritor de la clave cranial_deck_import_progress, y SIEMPRE descarta cards y cardMeta antes de guardar. El comentario lo dice explicito: \"Don't persist cards/cardMeta arrays - they're too large for localStorage\". Escribe cards: [] y cardMeta: [] siempre.\n  El llamador (:483) SI le pasa cardMeta lleno. O sea que la intencion era persistirlo y la implementacion lo tira.\n  resumeImport depende exactamente de esos dos campos: la rama 'saving' (:1010) exige savedState.cards.length > 0, que por construccion NUNCA puede ser cierto; y las ramas que mapean sobre savedState.cardMeta (:993 y :1030) siempre reciben un array vacio, asi que bulkItems queda en [].\n\nO sea: alguien esquivo un problema de cuota de localStorage y con eso mato el retomar, en silencio. No es un bug de borde — el camino de retomar esta muerto SIEMPRE.\n\nQUE VE EL USUARIO, medido 2 de 2: toast \"Import incomplete. Deck may be empty.\", se borra el estado persistido, el mazo queda vacio, y NO hay ningun camino de reintento. Las cartas que ya se habian creado quedan sueltas en la coleccion.\n\nFUGA ENTRE VISTAS (2 de 2): la clave de localStorage es global y BinderView comparte loadImportState() sin distinguir el tipo. Con un import de MAZO a medias, entrar a /binders dispara el resume de ese import de mazo y muestra el mismo toast. Ademas los imports de CARPETA nunca llaman a saveImportState (handleImportBinder, :655): si se cortan, no dejan rastro ni aviso de ningun tipo.\n\nBOMBA LATENTE, honestidad del agente: con status 'allocating' el toast dice '\"...\" completed with 0 cards' — reporta EXITO habiendo asignado cero. Pero ese estado solo lo escribe resumeImport en su propia rama 'saving', que es inalcanzable, asi que en produccion probablemente no se llegue hoy. Se registra como bomba latente, no como camino real.\n\nSALVEDAD DE METODO, declarada por el agente: el estado se SEMBRO en localStorage con la forma exacta que deja saveImportState; no se corto una importacion real. Como saveImportState es el unico escritor y siempre mutila igual, cualquier interrupcion real deja exactamente esa forma — pero la salvedad queda dicha.\n\nNO DESTRUCTIVO, verificado: bulkAllocateCardsToDeck corta en items.length === 0 (src/stores/decks.ts:748), o sea cero escrituras a Firestore.\n\nCONTEXTO DE MERCADO QUE SUBE LA SEVERIDAD: la app se lanza donde la conectividad es 4G lenta y el 80% de los usuarios tiene mas de 25.000 cartas. Un import grande cortandose a la mitad no es un caso raro en ese entorno: es lo esperable.",
+  "acceptance_criteria": [
+    "Una importacion interrumpida se puede retomar y las cartas terminan asignadas al mazo, o falla con un aviso claro y un camino de reintento",
+    "El estado persistido contiene lo suficiente para retomar (o el retomar se reconstruye sin depender de lo que no se puede persistir)",
+    "Un import de mazo a medias NO dispara el resume al entrar a /binders, y viceversa",
+    "Los imports de carpeta persisten estado igual que los de mazo, o se documenta explicitamente por que no",
+    "Ningun camino reporta exito habiendo asignado cero cartas",
+    "Test unitario sobre saveImportState/resumeImport que exija que un estado persistido sea retomable"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "wargaming",
+    "import",
+    "mazos",
+    "carpetas"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T01:55:00.000Z",
+  "updated_at": "2026-08-11T01:55:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd-tier"
+}

@@ -1444,7 +1444,12 @@ function paginateResults(cards, page, pageSize, mode) {
  *   { cards, total, page, pageSize, hasMore }
  */
 exports.queryCardIndex = onCall(
-  { maxInstances: 10, timeoutSeconds: 30, memory: '512MiB' },
+  // PARCHE 2026-08-11 (TASK-187): con 512MiB la funcion moria por OOM ("Memory limit of
+  // 512 MiB exceeded with 521 MiB used" / "signal 6") en CASI TODAS las busquedas de una
+  // cuenta de ~59k cartas, porque lee el indice entero y lo filtra y ordena en RAM para
+  // devolver 50 filas. Esto NO es el arreglo: solo corre el techo mas arriba y desbloquea
+  // la medicion. El arreglo de fondo es dejar de traer el indice completo.
+  { maxInstances: 10, timeoutSeconds: 60, memory: '2GiB' },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Must be logged in');

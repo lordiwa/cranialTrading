@@ -1,0 +1,29 @@
+{
+  "key": "TASK-222",
+  "title": "Escritura angosta del card_index concurrente con el rebuild de la Cloud Function puede borrar cartas del disco",
+  "description": "Encontrado por el reviewer de TASK-219 (MEDIUM-1). Es una ventana NUEVA, abierta por el cambio de\nTASK-219: antes cada persist reescribia las 30 porciones, asi que no habia forma de escribir UNA\nporcion de un layout viejo encima de uno nuevo.\n\nLA VENTANA, acotada: el indice cargado esta COMPLETO pero es de una VERSION VIEJA. Ahi conviven dos\ncosas: indexKnownComplete = true (o sea que la escritura angosta esta activa) Y un rebuild de la\nCloud Function disparado en background (src/stores/collection.ts ~:619-633).\n\nQUE PUEDE PASAR: si la Cloud Function termina con OTRO reparto de cartas por porcion y despues el\ncliente escribe UNA sola porcion con el reparto VIEJO encima, las cartas que la Cloud Function habia\npuesto en ese slot desaparecen del disco. En memoria del cliente esas cartas viven en otra posicion,\nque nunca se escribe.\n\nSUELE auto-sanarse en la carga siguiente (la deteccion de duplicados dispara otro rebuild), PERO NO\nESTA GARANTIZADO. Y el archivo es src/stores/collection.ts, el de TASK-168, donde ya se destruyeron\nchunks con cartas reales una vez.\n\nMITIGACION BARATA QUE PROPONE EL REVIEWER: en el .then del rebuild (~:627), llamar markAllChunksDirty()\ny poner _lastWrittenTotalChunks = null. O sea: cuando la Cloud Function reconstruye, el cliente se\nolvida de lo que creia saber del disco y la proxima escritura vuelve a ser completa.\n\nACLARACION IMPORTANTE PARA NO INFLAR EL ALCANCE: cuando el rebuild se dispara porque el indice esta\nINCOMPLETO, indexKnownComplete = false ya fuerza la reescritura completa y la ventana no existe. El\nunico caso expuesto es indice completo pero de version vieja.\n\nNO MEDIDO: sale de leer el codigo en la revision, no de provocarlo. La reproduccion exige hacer\ncoincidir un rebuild de la Cloud Function con una escritura angosta del cliente.",
+  "acceptance_criteria": [
+    "Reproducido de verdad: se provoca la coincidencia (rebuild de la Cloud Function con otro reparto + escritura angosta del cliente con el reparto viejo) y se verifica que cartas desaparecen del disco. Si NO se logra reproducir, se registra eso y no se declara arreglado un defecto que no se probo que exista",
+    "Aplicada la mitigacion: tras un rebuild de la Cloud Function, la siguiente escritura del cliente es completa",
+    "Verificado que la ventana acotada del enunciado es la unica: con indice incompleto, indexKnownComplete=false ya fuerza reescritura completa",
+    "Verificado POR MUTACION que el candado nuevo detecta el defecto"
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "card-index",
+    "carrera",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-219"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T23:34:44.867Z",
+  "updated_at": "2026-08-11T23:34:44.867Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

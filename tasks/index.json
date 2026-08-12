@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T23:24:58.415Z",
+  "generated_at": "2026-08-12T00:20:40.327Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1200,6 +1200,24 @@
       "title": "Los 4 candados de pérdida de datos de TASK-185 se ponen rojos bajo carga y verdes en reposo",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-221",
+      "title": "updateCard y batchUpdateCards durante la ventana de carga tiran el efecto sobre el índice en silencio",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-222",
+      "title": "Escritura angosta del card_index concurrente con el rebuild de la Cloud Function puede borrar cartas del disco",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-223",
+      "title": "Que cambiar el estado y borrar funcionen SIEMPRE: curar el índice cuando el documento ya no existe",
+      "status": "in_progress",
+      "priority": "critical"
     }
   ]
 }

@@ -1,0 +1,30 @@
+{
+  "key": "TASK-223",
+  "title": "Que cambiar el estado y borrar funcionen SIEMPRE: curar el índice cuando el documento ya no existe",
+  "description": "PEDIDO DIRECTO DE RAFAEL (2026-08-11): \"lo que necesito es que cada estado cambie al estado y que\nborrar borre\". No quiere un mensaje de error mejor; quiere que la operacion funcione.\n\n=== LO QUE PASA HOY, MEDIDO EN EL NAVEGADOR ===\nCambiando el estado de una carta por el menu de click derecho, la consola tira:\n  code: not-found\n  message: No document to update: .../users/{uid}/cards/02ujJ7QWoFpYcEFcLK08\nLa UI cambia al instante y despues revierte. El contador no se mueve.\n\nCAUSA: la grilla se arma con el card_index, no con los documentos. El indice lista cartas cuyo\ndocumento YA NO EXISTE — CARTAS FANTASMA. Cualquier updateDoc/deleteDoc sobre una de esas falla.\nPor eso Rafael ve \"a veces funciona pero mayormente no\": no es aleatorio, depende de QUE carta toco.\n\nNO ES REGRESION NUESTRA, verificado: el cuerpo de updateCard es byte a byte identico al de af22c3c,\nantes de los commits 80e2eee y f6b68a3. Ninguna linea de esa funcion cambio.\n\n=== LO QUE HAY QUE HACER ===\nQue la app SE CURE SOLA. Cuando una mutacion sobre una carta responde `not-found`, eso es informacion\ndura y confiable: el documento no existe. La reaccion correcta NO es revertir la UI y mostrar un\nerror, es SACAR esa carta del indice, persistir, y refrescar la grilla. El fantasma desaparece en el\nacto y la proxima vez ya no esta.\n\nPUNTOS PARALELOS — REGLA 6, van TODOS en el mismo cambio, no \"el otro despues\":\n  - updateCard (el camino del cambio de estado individual)\n  - deleteCard (borrar una carta que ya no tiene documento tiene que TERMINAR BIEN, no fallar:\n    el objetivo del usuario ya esta cumplido, la carta no existe)\n  - batchUpdateCards y batchDeleteCards (los caminos masivos; una carta fantasma en el lote NO puede\n    abortar el lote entero ni dejarlo a medias)\n\n=== LO QUE NO SE TOCA ===\n- El guard indexKnownComplete y el borrado de huerfanos de TASK-168. Sacar UNA carta del indice no es\n  lo mismo que decidir que un chunk es huerfano.\n- El formato en disco, buildCardIndex, el debounce de 2 s.\n- El baile _persistGen/_pendingMembershipRefresh/_persistRunning/_persistRerunRequested.\n- NO se ataca la causa de que aparezcan fantasmas: eso es TASK-208 y va aparte. Este ticket hace que\n  la app SOBREVIVA a un fantasma, no que dejen de existir.\n\n=== CUIDADO, EL RIESGO REAL DE ESTE TICKET ===\nSacar cartas del indice es una operacion DESTRUCTIVA sobre el inventario del usuario. Un not-found\nmal interpretado borra del indice una carta que SI existe. Por eso: solo se reacciona al codigo\n`not-found` EXACTO de Firestore, nunca a un error generico, nunca a un timeout, nunca a\npermission-denied, y NUNCA a un fallo de red. Cualquier otro codigo se comporta como hoy.",
+  "acceptance_criteria": [
+    "Un cambio de estado sobre una carta fantasma (documento inexistente) NO deja error al usuario: la carta se saca del indice y desaparece de la grilla",
+    "Borrar una carta fantasma TERMINA BIEN y la carta desaparece de la grilla, en vez de fallar o quedarse",
+    "Los caminos masivos (batchUpdateCards y batchDeleteCards) sobreviven a una carta fantasma dentro del lote: el resto del lote se aplica y el fantasma se saca del indice",
+    "SOLO se reacciona al codigo not-found exacto. Verificado con un test por cada uno de los otros codigos (permission-denied, unavailable, deadline-exceeded, resource-exhausted y un error generico sin codigo): NINGUNO saca la carta del indice",
+    "Verificado POR MUTACION que los candados nuevos detectan el defecto: desactivando la cura, los tests nuevos se ponen rojos",
+    "Suite unitaria completa verde y npx vite build --mode development OK"
+  ],
+  "status": "in_progress",
+  "priority": "critical",
+  "labels": [
+    "card-index",
+    "flujo-3",
+    "cartas-fantasma",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T00:20:37.091Z",
+  "updated_at": "2026-08-12T00:20:40.327Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

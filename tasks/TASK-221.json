@@ -1,0 +1,31 @@
+{
+  "key": "TASK-221",
+  "title": "updateCard y batchUpdateCards durante la ventana de carga tiran el efecto sobre el índice en silencio",
+  "description": "Encontrado por el reviewer de TASK-219 (MEDIUM-2), FUERA del diff. Es PRE-EXISTENTE y quedaba\nfuera del alcance declarado de TASK-185, que solo cubrio addCard y deleteCard.\n\nQUE PASA: si un cambio de estado llega mientras la coleccion todavia esta cargando, el documento de\nla carta SI se actualiza en Firestore, pero el gate `if (updatedCard)` de src/stores/collection.ts\n(~:1280) descarta el efecto sobre el card_index sin avisar ni dejar error. Tras recargar, el indice\nsigue mostrando el estado VIEJO de esa carta.\n\nES LA MISMA VENTANA Y LA MISMA CLASE QUE TASK-185: la grilla se pinta con paginatedCards en menos de\nun segundo, pero cards.value / cardIndexRaw recien se llenan al terminar de leer las 30 porciones.\nCualquier mutacion que caiga en el medio y busque la carta en una estructura todavia vacia se\nconvierte en un no-op silencioso.\n\nPOR QUE IMPORTA MAS DE LO QUE SUENA: poner cartas a la venta es el flujo prioritario Nro 3 de Rafael.\nY con 59k cartas la ventana de carga NO es un instante — es justo donde el usuario hace click apenas\nve la grilla.\n\nTASK-185 dejo el mecanismo hecho (encolar la mutacion y reproducirla cuando la carga termina,\n_pendingIndexAdds/_pendingIndexDeletes + applyPendingIndexMutations). Este ticket es extenderlo a las\nactualizaciones de campo. OJO: la revision de TASK-219 encontro que ese mismo replay tiene un HIGH\nabierto (corre aunque la carga haya fallado) — ESTE TICKET NO SE EMPIEZA hasta que ese arreglo este\ncerrado, o se construye sobre un mecanismo roto.",
+  "acceptance_criteria": [
+    "Reproducido primero: un cambio de estado durante la ventana de carga deja el indice con el estado viejo tras recargar, demostrado con un test que falla antes del arreglo",
+    "updateCard y batchUpdateCards encolan su efecto sobre el indice cuando la carga esta en vuelo, y se reproduce al terminar, igual que addCard/deleteCard en TASK-185",
+    "El documento de la carta se sigue escribiendo en Firestore como hoy — no se retrasa la escritura real, solo el efecto sobre el indice",
+    "Si la carga FALLA, el replay no persiste un indice vacio (misma condicion que el HIGH-2 de TASK-219)",
+    "Verificado POR MUTACION: desactivando el encolado nuevo, los tests nuevos se ponen rojos"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "flujo-3",
+    "datos-inconsistentes",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-219"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-11T23:34:25.755Z",
+  "updated_at": "2026-08-11T23:34:25.755Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

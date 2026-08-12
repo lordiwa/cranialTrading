@@ -14,10 +14,58 @@
       "label": "Sacar preloadPriceData del arranque global — /inicio no muestra ni un precio y baja AllPricesToday.json.gz igual"
     },
     {
+      "id": "task-172",
+      "type": "task",
+      "ref": "tasks/TASK-172.json",
+      "label": "El iframe de reCAPTCHA de Google se carga en cada arranque aunque nadie use el login con Google"
+    },
+    {
       "id": "task-174",
       "type": "task",
       "ref": "tasks/TASK-174.json",
       "label": "La descarga de precios se dispara 5 veces en paralelo: 27,4 MB en una sola carga de la colección"
+    },
+    {
+      "id": "task-178",
+      "type": "task",
+      "ref": "tasks/TASK-178.json",
+      "label": "El tiempo de arranque en 4G lenta lo domina el bundle de la app, no los datos: ~7 s para bajar 360 KB"
+    },
+    {
+      "id": "task-182",
+      "type": "task",
+      "ref": "tasks/TASK-182.json",
+      "label": "/inicio deja de exigir sesión: el hero se pinta sin esperar a Firebase Auth y el buscador funciona sin cuenta"
+    },
+    {
+      "id": "task-183",
+      "type": "task",
+      "ref": "tasks/TASK-183.json",
+      "label": "El header no se monta en el primer render de /inicio — se lleva puestos los stores, los iconos y el avatar"
+    },
+    {
+      "id": "task-184",
+      "type": "task",
+      "ref": "tasks/TASK-184.json",
+      "label": "Los dos modales globales metían Firebase entero en el arranque de /inicio"
+    },
+    {
+      "id": "task-188",
+      "type": "task",
+      "ref": "tasks/TASK-188.json",
+      "label": "CRITICO: el email de todos los usuarios se descarga sin sesion desde la coleccion /users — en PROD y en dev"
+    },
+    {
+      "id": "task-192",
+      "type": "task",
+      "ref": "tasks/TASK-192.json",
+      "label": "Un precio con tipo inesperado revienta y BORRA la grilla de resultados, y el payload malo queda cacheado 24 h"
+    },
+    {
+      "id": "task-196",
+      "type": "task",
+      "ref": "tasks/TASK-196.json",
+      "label": "Import de Moxfield con formato inesperado ofrece el boton 'IMPORT NAN CARDS'"
     },
     {
       "id": "task-211",
@@ -42,6 +90,12 @@
       "type": "task",
       "ref": "tasks/TASK-214.json",
       "label": "queryCardIndex acepta un userId del cliente sin comprobarlo — pero el agujero de fondo es que firestore.rules deja leer cualquier card_index"
+    },
+    {
+      "id": "task-215",
+      "type": "task",
+      "ref": "tasks/TASK-215.json",
+      "label": "Once subcolecciones mas de /users/{userId} son legibles por cualquier usuario registrado — TASK-214 cierra 1 puerta de 12"
     }
   ],
   "edges": []

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-12T00:20:40.327Z",
+  "generated_at": "2026-08-12T02:21:57.799Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1216,8 +1216,20 @@
     {
       "key": "TASK-223",
       "title": "Que cambiar el estado y borrar funcionen SIEMPRE: curar el índice cuando el documento ya no existe",
-      "status": "in_progress",
+      "status": "todo",
       "priority": "critical"
+    },
+    {
+      "key": "TASK-224",
+      "title": "Revisar el ticket huérfano de public/tasks/ (Design→app v2 F0) y re-alojarlo o descartarlo",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-225",
+      "title": "Sacar cranial-design/ a su propio repositorio (hoy son 174 archivos sin rastrear dentro del repo de la app)",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

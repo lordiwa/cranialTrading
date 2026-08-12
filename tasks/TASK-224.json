@@ -1,0 +1,27 @@
+{
+  "key": "TASK-224",
+  "title": "Revisar el ticket huérfano de public/tasks/ (Design→app v2 F0) y re-alojarlo o descartarlo",
+  "description": "Aparecio sin rastrear en el arbol durante la limpieza previa al push del 2026-08-12.\n\n=== QUE ES ===\npublic/tasks/ son 2 archivos: index.json (una foto del tablero kanban, generated_at 2026-07-13T16:16:28Z)\ny TASK-001.json. Contiene UN solo ticket:\n\n  TASK-001 — \"Design->app v2 F0: tokens + tipografia base (Space Grotesk display, capas surface, tokens v2)\"\n  status: todo, priority: high\n\nSu descripcion referencia cranial-design/prototype/DESIGN-DIRECTION.md §2-3 y el shell canonico\n_shell-reference.html. Alcance declarado: fuente display Space Grotesk (500/600/700) self-hosted en\npublic/Fonts/ siguiendo el patron de Open Sans (@font-face + preload en index.html, NO el <link> de\nGoogle Fonts del proto), mas capas de superficie y tokens v2. Se declara ADITIVA para F1-F4: no\ncambia layouts.\n\n=== EL PROBLEMA, Y POR QUE NO SE RESOLVIO SOLO ===\nLa numeracion CHOCA y no se puede deducir a que store pertenece:\n  - tasks/TASK-001.json (store principal): NO EXISTE.\n  - cranial-design/tasks/TASK-001.json: existe pero es OTRA COSA — \"Set up project CI\".\nO sea que public/tasks/TASK-001.json es una tercera cosa con una clave ya ocupada en el unico store\ndonde encajaria por contenido.\n\n=== EL SEGUNDO PROBLEMA: ESTA EN public/ ===\nVite copia public/ entero al bundle. Cualquier cosa que quede ahi se PUBLICA en el sitio. Tickets\ninternos publicados no tienen sentido y exponen trabajo interno. Hoy no llega a produccion solo\nporque el directorio esta SIN RASTREAR y el CI construye desde un checkout limpio — o sea que la\nproteccion es accidental, no deliberada.\n\n=== ESTADO AL ABRIR ESTE TICKET ===\nSe dejo el directorio SIN RASTREAR a proposito (decision de Rafael 2026-08-12: \"mira los que hayan\nque puedan ser validos dejalos y crea un ticket para luego de revisarlos\"). No se borro nada.\nEl contenido vive solo en el disco de Rafael: si se pierde la maquina, se pierde.\n\n=== LO QUE HAY QUE DECIDIR ===\n1. El trabajo que describe (Space Grotesk + tokens v2) sigue siendo valido y deseado?\n2. Si lo es: se re-aloja en cranial-design/tasks/ con una clave LIBRE, o en el store principal si es\n   trabajo sobre la app (toca public/Fonts/ e index.html, o sea que suena a la app, no al prototipo).\n3. public/tasks/ se borra en cualquier caso: nada interno deberia vivir bajo public/.\n\nNO SE TOCA hasta que Rafael revise el contenido.",
+  "acceptance_criteria": [
+    "Decidido y registrado si el trabajo de TASK-001 (Space Grotesk + tokens v2) sigue vigente",
+    "Si sigue vigente, el ticket queda re-alojado en el store correcto con una clave que NO choca con ninguna existente, verificado leyendo el store destino",
+    "public/tasks/ eliminado del disco, y verificado que ningun codigo de la app lee esa ruta (grep de 'tasks/' bajo src/ y public/)",
+    "Verificado que nada bajo public/ contiene tickets ni estado interno del proyecto"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "limpieza",
+    "cranial-design",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T02:21:10.001Z",
+  "updated_at": "2026-08-12T02:21:10.001Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

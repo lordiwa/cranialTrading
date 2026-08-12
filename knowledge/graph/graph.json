@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "nodes": [
+    {
+      "id": "task-145",
+      "type": "task",
+      "ref": "tasks/TASK-145.json",
+      "label": "La grilla de Coleccion no es observable por los E2E: el locator devuelve 1 carta sobre 41.093"
+    },
+    {
+      "id": "task-171",
+      "type": "task",
+      "ref": "tasks/TASK-171.json",
+      "label": "Sacar preloadPriceData del arranque global — /inicio no muestra ni un precio y baja AllPricesToday.json.gz igual"
+    },
+    {
+      "id": "task-174",
+      "type": "task",
+      "ref": "tasks/TASK-174.json",
+      "label": "La descarga de precios se dispara 5 veces en paralelo: 27,4 MB en una sola carga de la colección"
+    },
+    {
+      "id": "task-211",
+      "type": "task",
+      "ref": "tasks/TASK-211.json",
+      "label": "buildCardIndex acepta un userId del cliente sin verificarlo: cualquier usuario logueado reescribe el card_index de cualquier otro"
+    },
+    {
+      "id": "task-212",
+      "type": "task",
+      "ref": "tasks/TASK-212.json",
+      "label": "card-index-fixture: la herramienta sobrevende su propia seguridad y --restore puede crear divergencia nueva"
+    },
+    {
+      "id": "task-213",
+      "type": "task",
+      "ref": "tasks/TASK-213.json",
+      "label": "migrateUserCards tiene el mismo agujero de autorizacion que TASK-211, es DESTRUCTIVO, y no lo llama nadie"
+    },
+    {
+      "id": "task-214",
+      "type": "task",
+      "ref": "tasks/TASK-214.json",
+      "label": "queryCardIndex acepta un userId del cliente sin comprobarlo — pero el agujero de fondo es que firestore.rules deja leer cualquier card_index"
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,26 @@
+{
+  "key": "TASK-225",
+  "title": "Sacar cranial-design/ a su propio repositorio (hoy son 174 archivos sin rastrear dentro del repo de la app)",
+  "description": "DECISION DE RAFAEL 2026-08-12: cranial-design va a su PROPIO repositorio, no se commitea dentro del\nrepo de la app.\n\n=== QUE ES ===\n174 archivos, 2,4 MB, sin rastrear en la raiz del repo de la app. Es un proyecto Hivemind COMPLETO y\nautonomo: tiene su propio PROJECT.md, tasks/, state/, .claude/agents/, .claude/settings.json,\n.claude/workflows/ y auditorias del prototipo (cranial-design/audit/*.md). No es una carpeta de\nassets: es otro proyecto con su propio ciclo de vida.\n\n=== POR QUE NO VA EN ESTE REPO ===\nMezcla dos proyectos en un mismo historial, arrastra 2,4 MB que ningun build de la app usa, y su\ntasks/ tiene su PROPIA numeracion TASK-NNN que choca conceptualmente con la del store principal\n(ejemplo real encontrado: cranial-design/tasks/TASK-001.json es \"Set up project CI\", mientras que el\nTASK-001 que aparecio en public/tasks/ es \"Design->app v2 F0\" — ver TASK-224).\n\n=== EL RIESGO HOY, Y NO ES TEORICO ===\nAl estar SIN RASTREAR, este trabajo vive UNICAMENTE en el disco de Rafael. No hay copia en ningun\nremoto. Si se pierde la maquina, se pierden 174 archivos de trabajo de diseño, incluidas las\nauditorias y el estado de sesion del sub-proyecto. Esto es lo que hace que el ticket valga la pena\naunque su prioridad sea baja: no es prolijidad, es la unica copia.\n\n=== ALCANCE ===\n1. Crear el repositorio propio y subir cranial-design/ con su historial si se puede, o como commit\n   inicial si no.\n2. Agregar cranial-design/ a .gitignore del repo de la app (se hace en esta misma tanda para que\n   deje de aparecer como sin rastrear y no se commitee por accidente).\n3. Verificar que ningun build, script o import de la app referencie rutas dentro de cranial-design/.\n4. Recien despues, decidir si se borra del disco local o queda como copia de trabajo.\n\nNO SE BORRA NADA hasta que exista el repo nuevo y este verificado que subio completo.",
+  "acceptance_criteria": [
+    "Existe un repositorio propio con los 174 archivos de cranial-design/ subidos, verificado contando archivos en el remoto contra el disco",
+    "cranial-design/ figura en el .gitignore del repo de la app y ya no aparece en git status",
+    "Verificado por grep que ningun archivo de src/, functions/, scripts/, vite.config ni package.json referencia rutas dentro de cranial-design/",
+    "El build de la app (npx vite build --mode development) sigue verde despues del cambio"
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "limpieza",
+    "cranial-design"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T02:21:57.799Z",
+  "updated_at": "2026-08-12T02:21:57.799Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

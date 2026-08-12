@@ -57,3 +57,11 @@ public/*.jpeg
 
 # fixture de divergencia de card_index (scripts/card-index-fixture.mjs)
 .card-index-fixture.json
+
+# Sub-proyecto de diseño: va a su PROPIO repositorio (TASK-225).
+# OJO: hoy vive SOLO en el disco local, sin copia en ningun remoto.
+cranial-design/
+
+# Foto del tablero kanban que quedo bajo public/ (TASK-224).
+# Nada interno debe vivir en public/: Vite lo copiaria al sitio publicado.
+public/tasks/

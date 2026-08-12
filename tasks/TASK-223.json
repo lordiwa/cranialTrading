@@ -10,7 +10,7 @@
     "Verificado POR MUTACION que los candados nuevos detectan el defecto: desactivando la cura, los tests nuevos se ponen rojos",
     "Suite unitaria completa verde y npx vite build --mode development OK"
   ],
-  "status": "in_progress",
+  "status": "todo",
   "priority": "critical",
   "labels": [
     "card-index",
@@ -22,9 +22,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:21:25.865Z",
+      "body": "Vuelve a todo: el developer se freno antes de escribir la primera linea. VERIFICADO en los cinco lugares donde podria haber quedado trabajo, los cinco vacios:\n\n1. Arbol principal: `git status --porcelain` sin un solo archivo modificado.\n2. Commits de TODAS las ramas: `git log --all --grep=223` devuelve unicamente 348fadb, y solo porque ese commit CREO tasks/TASK-223.json. En los 7 commits sin pushear, src/ lo tocaron nada mas que 80e2eee y f6b68a3, los dos de TASK-219.\n3. Los 9 worktrees de agentes: los nueve con `git status` limpio (0 cambios), y sus tips son todos del 2026-07-16 — huerfanos viejos, nada de esta sesion.\n4. Stash: 4 entradas, todas anteriores (task-105, task-117, y dos de ramas viejas).\n5. Codigo: `git grep TASK-223` sobre src/, functions/, tests/ y e2e/ no devuelve nada.\n\nNo se perdio trabajo — nunca llego a existir. El ticket queda intacto y listo para retomarse.\n\nCONTEXTO NUEVO QUE LO REFUERZA (medido 2026-08-12): dos corridas de card-index-fixture --status separadas por varios minutos dieron resultado IDENTICO sobre la cuenta de 59k: 2 fantasmas (a8HiqJEJQZzeKMSao7lG, hXWlz2ozBX5AzsIQQQVO) y 1 invisible (quEpipOARRfvcT6lpVPL), las tres \"Lightning Bolt\". O sea que la divergencia NO converge sola, y ningun mecanismo actual la repara: el indice parece sano (contiguo, sin duplicados, sin truncar) asi que no dispara rebuild. Esas tres cartas son exactamente el caso que este ticket cura al primer toque."
+    }
+  ],
   "created_at": "2026-08-12T00:20:37.091Z",
-  "updated_at": "2026-08-12T00:20:40.327Z",
+  "updated_at": "2026-08-12T02:21:29.495Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

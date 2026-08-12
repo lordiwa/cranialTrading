@@ -83,7 +83,10 @@ vi.mock('@/stores/toast', () => ({
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore } from '@/stores/collection'
+import { queryCardIndex } from '@/services/cloudFunctions'
 import { makeCard } from '../helpers/fixtures'
+
+const mockQueryCardIndex = vi.mocked(queryCardIndex)
 
 /** A Firestore-shaped error carrying an exact `.code`, the only signal the cure may react to. */
 const firestoreError = (code: string, message = `simulated ${code}`): Error & { code: string } => {
@@ -112,6 +115,7 @@ describe('collection store: ghost card cure (TASK-223)', () => {
     mockSetDoc.mockReset().mockResolvedValue(undefined)
     mockCommit.mockReset().mockResolvedValue(undefined)
     mockAddDoc.mockReset().mockResolvedValue({ id: 'card-1' })
+    mockQueryCardIndex.mockReset()
   })
 
   describe('updateCard — AC1', () => {
@@ -158,6 +162,41 @@ describe('collection store: ghost card cure (TASK-223)', () => {
         expect(mockSetDoc).toHaveBeenCalled()
         const [, chunkData] = mockSetDoc.mock.calls[0]
         expect((chunkData.cards as Array<{ i: string }>).find(c => c.i === 'ghost-1')).toBeUndefined()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not resurrect the ghost via the deferred re-query: cureGhostCard sets _pendingMembershipRefresh through the SAME gen/timer-gated path proven for deleteCard (TASK-113/116) — the debounced persist (which excludes the ghost) always settles before refreshCurrentPage() runs, so queryCardIndex is never called against the still-stale server chunk', async () => {
+      vi.useFakeTimers()
+      try {
+        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+        const store = useCollectionStore()
+        const card = makeCard({ id: 'ghost-1' })
+        store.cards = [card] as any
+        store.paginatedCards = [card] as any
+        store.cardIndexRaw = [{ i: 'ghost-1', s: 's1', n: 'Ghost', st: 'collection', q: 1, p: 0, cm: 0, co: [], r: 'c', t: '', f: false, sc: '', pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true }] as any
+        mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
+
+        await store.updateCard('ghost-1', { status: 'sale' })
+        // Local cure already applied — the ghost is gone from the grid right away.
+        expect(store.paginatedCards).toEqual([])
+
+        // Before the debounced persist (2s) fires, the deferred re-query must
+        // NOT have run yet — same ordering guarantee TASK-113 established for
+        // deleteCard, reused here via the identical _pendingMembershipRefresh +
+        // gen-token mechanism (see _runPersistLoop's finally block).
+        await vi.advanceTimersByTimeAsync(0)
+        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+        expect(store.paginatedCards).toEqual([])
+
+        // Persist debounce fires and settles (writes the chunk WITHOUT the
+        // ghost) — only THEN does the deferred re-query run.
+        await vi.advanceTimersByTimeAsync(2100)
+        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
+        // The mocked server response (as it would look once the just-completed
+        // write landed) carries no cards — the ghost does not come back.
+        expect(store.paginatedCards).toEqual([])
       } finally {
         vi.useRealTimers()
       }

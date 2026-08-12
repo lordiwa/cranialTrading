@@ -47,13 +47,14 @@ const mockDeleteDoc = vi.fn().mockResolvedValue(undefined)
 const mockSetDoc = vi.fn().mockResolvedValue(undefined)
 const mockCommit = vi.fn().mockResolvedValue(undefined)
 const mockAddDoc = vi.fn().mockResolvedValue({ id: 'card-1' })
+const mockGetDocs = vi.fn().mockResolvedValue({ empty: true, docs: [] })
 
 vi.mock('firebase/firestore', () => ({
   addDoc: (...args: unknown[]) => mockAddDoc(...args),
   collection: vi.fn(),
   deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
   doc: vi.fn((...args: unknown[]) => ({ path: args.join('/') })),
-  getDocs: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
+  getDocs: (...args: unknown[]) => mockGetDocs(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   Timestamp: { now: () => ({ seconds: 0, nanoseconds: 0 }) },
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
@@ -75,14 +76,22 @@ vi.mock('@/stores/auth', () => ({
   })),
 }))
 
+// A single shared mock fn: the factory below used to create a NEW `vi.fn()`
+// on every useToastStore() call. The store calls useToastStore() once
+// internally (at store setup); a test calling useToastStore() again to grab
+// `.show` got a DIFFERENT mock object with its own separate, always-empty
+// call history — `expect(toastStore.show).not.toHaveBeenCalled()` was
+// vacuously true no matter what the store actually did. Hoisting one shared
+// mockToastShow and always returning it fixes that.
+const mockToastShow = vi.fn()
 vi.mock('@/stores/toast', () => ({
   useToastStore: vi.fn(() => ({
-    show: vi.fn(),
+    show: mockToastShow,
   })),
 }))
 
 import { setActivePinia, createPinia } from 'pinia'
-import { useCollectionStore } from '@/stores/collection'
+import { useCollectionStore, type IndexCard } from '@/stores/collection'
 import { queryCardIndex } from '@/services/cloudFunctions'
 import { makeCard } from '../helpers/fixtures'
 
@@ -96,6 +105,40 @@ const firestoreError = (code: string, message = `simulated ${code}`): Error & { 
 }
 
 const OTHER_CODES = ['permission-denied', 'unavailable', 'deadline-exceeded', 'resource-exhausted']
+
+/** Minimal IndexCard — only the fields loadFromIndex/indexToCard actually read. */
+function makeIndexCard(id: string): IndexCard {
+  return {
+    i: id, s: `scryfall-${id}`, n: `Card ${id}`, st: 'collection', q: 1, p: 0,
+    cm: 0, co: [], r: 'c', t: 'Creature', f: false, sc: 'tst', e: 'Test Set',
+    pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: 0, cn: 'NM', pb: false,
+  } as IndexCard
+}
+
+/**
+ * Put a collection load IN FLIGHT (same technique as
+ * collection.mutateBeforeIndexLoad.test.ts, TASK-185) and hand back the
+ * release valve. Reproduces the real window: paginatedCards is already
+ * painted from the server query, cardIndexRaw/cards.value are still empty.
+ */
+function startGatedLoad(store: ReturnType<typeof useCollectionStore>, chunkCards: IndexCard[]) {
+  let release!: () => void
+  const gate = new Promise<void>((res) => { release = res })
+  mockGetDocs.mockImplementationOnce(async () => {
+    await gate
+    return {
+      empty: false,
+      docs: [{ id: 'chunk_0', ref: {}, data: () => ({ cards: chunkCards, count: chunkCards.length, version: 3 }) }],
+    }
+  })
+  const loadPromise = store.loadCollection()
+  return {
+    finish: async () => {
+      release()
+      await loadPromise
+    },
+  }
+}
 
 describe('collection store: ghost card cure (TASK-223)', () => {
   beforeEach(() => {
@@ -115,7 +158,9 @@ describe('collection store: ghost card cure (TASK-223)', () => {
     mockSetDoc.mockReset().mockResolvedValue(undefined)
     mockCommit.mockReset().mockResolvedValue(undefined)
     mockAddDoc.mockReset().mockResolvedValue({ id: 'card-1' })
+    mockGetDocs.mockReset().mockResolvedValue({ empty: true, docs: [] })
     mockQueryCardIndex.mockReset()
+    mockToastShow.mockReset()
   })
 
   describe('updateCard — AC1', () => {
@@ -134,8 +179,6 @@ describe('collection store: ghost card cure (TASK-223)', () => {
     })
 
     it('does not show the generic updateError toast for a not-found ghost', async () => {
-      const { useToastStore } = await import('@/stores/toast')
-      const toastStore = useToastStore()
       const store = useCollectionStore()
       const card = makeCard({ id: 'ghost-1' })
       store.cards = [card] as any
@@ -143,17 +186,24 @@ describe('collection store: ghost card cure (TASK-223)', () => {
 
       await store.updateCard('ghost-1', { status: 'sale' })
 
-      expect(toastStore.show).not.toHaveBeenCalled()
+      expect(mockToastShow).not.toHaveBeenCalled()
     })
 
     it('persists the cured index to Firestore (debounced)', async () => {
       vi.useFakeTimers()
       try {
         const store = useCollectionStore()
-        const card = makeCard({ id: 'ghost-1' })
-        store.cards = [card] as any
-        // Seed cardIndexRaw the same way real sessions populate it.
-        store.cardIndexRaw = [{ i: 'ghost-1', s: 's1', n: 'Ghost', st: 'collection', q: 1, p: 0, cm: 0, co: [], r: 'c', t: '', f: false, sc: '', pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true }] as any
+        // cardIndexRaw is NOT exposed on the store's return object — a direct
+        // `store.cardIndexRaw = [...]` assignment is a silent no-op (dead
+        // write to a stray property, not the real internal ref). Seed it for
+        // real the only way a test can: run an actual (gated) load through
+        // loadFromIndex, same technique as the HIGH-1 in-flight-load tests
+        // below. Without this the assertion below passed for the WRONG
+        // reason — the real (still-empty) cardIndexRaw trivially "doesn't
+        // contain ghost-1" regardless of whether the cure did anything.
+        const load = startGatedLoad(store, [makeIndexCard('ghost-1')])
+        await load.finish()
+        mockSetDoc.mockClear() // ignore any chunk write the load itself may have caused
         mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
 
         await store.updateCard('ghost-1', { status: 'sale' })
@@ -283,6 +333,108 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       expect(store.cards.find((c: any) => c.id === 'ghost-1')).toBeUndefined()
       expect(store.paginatedCards.find((c: any) => c.id === 'ghost-1')).toBeUndefined()
     })
+
+    it('MEDIUM-1: persists the cured index and defers a corrective re-query (membership changed) — same as deleteCard/batchDeleteCards', async () => {
+      vi.useFakeTimers()
+      try {
+        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+        const store = useCollectionStore()
+        // cardIndexRaw is not exposed on the store — seed it for real via an
+        // actual (gated) load, same as the HIGH-1 tests below. A direct
+        // `store.cardIndexRaw = [...]` assignment is a silent no-op.
+        const load = startGatedLoad(store, [makeIndexCard('good-1'), makeIndexCard('ghost-1')])
+        await load.finish()
+        mockSetDoc.mockClear()
+        store.paginatedCards = [makeCard({ id: 'good-1' }), makeCard({ id: 'ghost-1' })] as any
+        mockCommit.mockRejectedValueOnce(firestoreError('not-found'))
+        mockUpdateDoc
+          .mockResolvedValueOnce(undefined) // good-1
+          .mockRejectedValueOnce(firestoreError('not-found')) // ghost-1
+
+        await store.batchUpdateCards(['good-1', 'ghost-1'], { status: 'sale' })
+
+        // Not yet re-queried — deferred until the debounced persist settles
+        // (same TASK-113/116 gate every other cure path reuses).
+        await vi.advanceTimersByTimeAsync(0)
+        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(2100)
+        expect(mockSetDoc).toHaveBeenCalled()
+        const [, chunkData] = mockSetDoc.mock.calls[0]
+        expect((chunkData.cards as Array<{ i: string }>).map(c => c.i)).toEqual(['good-1'])
+        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('batchUpdateCards ghost cure during an in-flight load (TASK-223 HIGH-1 fix)', () => {
+    // Reviewer HIGH-1: the ghost branch used to write cardIndexRaw.value and
+    // call persistIndexToFirestore() UNCONDITIONALLY, never consulting
+    // _indexLoadInFlight (TASK-185) the way cureGhostCard/deleteCard already
+    // do. During the multi-second load window cardIndexRaw is empty, so that
+    // persist would set chunk_0 = {cards: [], count: 0} over the real cards
+    // stored there — a NEW clobber door this ticket had not previously had.
+    it('does not persist over the real index while the load is still in flight — queues the ghost instead', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const load = startGatedLoad(store, [makeIndexCard('good-1'), makeIndexCard('ghost-1')])
+        store.paginatedCards = [makeCard({ id: 'good-1' }), makeCard({ id: 'ghost-1' })] as any
+        mockCommit.mockRejectedValueOnce(firestoreError('not-found'))
+        mockUpdateDoc
+          .mockResolvedValueOnce(undefined) // good-1
+          .mockRejectedValueOnce(firestoreError('not-found')) // ghost-1
+
+        const ok = await store.batchUpdateCards(['good-1', 'ghost-1'], { status: 'sale' })
+        await vi.advanceTimersByTimeAsync(2100) // past the persist debounce, in case anything got scheduled
+
+        // Pre-fix: this would have set chunk_0 to a near-empty array over the
+        // real cards actually stored there.
+        expect(mockSetDoc).not.toHaveBeenCalled()
+        // AC5 gap found while mutation-testing this test itself: `mockSetDoc`
+        // not being called is ALSO true if the whole cure is disabled and the
+        // ghost's not-found rethrows out of batchUpdateCards entirely (caught
+        // by the outer try/catch, which also persists nothing) — that path
+        // returns `false` and never reaches the queue-not-persist branch at
+        // all, so the assertion above passed for the wrong reason too. These
+        // two assertions are the actual discriminator: only the correct
+        // "queued, not thrown" behavior returns true and clears the ghost
+        // from paginatedCards optimistically.
+        expect(ok).toBe(true)
+        expect(store.paginatedCards.find((c: any) => c.id === 'ghost-1')).toBeUndefined()
+
+        await load.finish()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('the ghost cure IS applied once the load finishes — replayed against the real index, not lost', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const load = startGatedLoad(store, [makeIndexCard('good-1'), makeIndexCard('ghost-1')])
+        store.paginatedCards = [makeCard({ id: 'good-1' }), makeCard({ id: 'ghost-1' })] as any
+        mockCommit.mockRejectedValueOnce(firestoreError('not-found'))
+        mockUpdateDoc
+          .mockResolvedValueOnce(undefined)
+          .mockRejectedValueOnce(firestoreError('not-found'))
+
+        await store.batchUpdateCards(['good-1', 'ghost-1'], { status: 'sale' })
+        await load.finish()
+
+        expect(store.cards.map((c: any) => c.id)).toEqual(['good-1'])
+
+        await vi.advanceTimersByTimeAsync(2100)
+        expect(mockSetDoc).toHaveBeenCalled()
+        const [, chunkData] = mockSetDoc.mock.calls[0]
+        expect((chunkData.cards as Array<{ i: string }>).map(c => c.i)).toEqual(['good-1'])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   describe('batchDeleteCards — AC3', () => {
@@ -296,7 +448,16 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       // already gone — Firestore delete is idempotent, so the objective (both
       // docs absent) is already true; this must not be treated as a failure
       // requiring restore.
-      mockCommit.mockRejectedValueOnce(firestoreError('not-found'))
+      //
+      // PERSISTENT reject (not .mockRejectedValueOnce): commitBatchWithRetry
+      // has its own internal retry loop (up to 3 attempts). With only ONE
+      // rejection queued, disabling the not-found short-circuit would still
+      // pass this test — attempt 2 would silently hit the default resolved
+      // mock and "succeed" by retry luck, never proving the fix did anything
+      // (team-lead review finding, MEDIUM-2). Persistent reject means EVERY
+      // attempt sees not-found, so only the short-circuit (not exhausted
+      // retries) can produce success here.
+      mockCommit.mockRejectedValue(firestoreError('not-found'))
 
       const result = await store.batchDeleteCards(['good-1', 'ghost-1'])
 
@@ -371,6 +532,19 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       expect(store.cards.find((c: any) => c.id === 'card-1')?.status).toBe('collection')
     })
 
+    it('batchUpdateCards: a generic error with no code at all does NOT cure (AC4/LOW-1)', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'collection' })
+      store.cards = [card] as any
+      mockCommit.mockRejectedValueOnce(new Error('some transient failure'))
+
+      const ok = await store.batchUpdateCards(['card-1'], { status: 'sale' })
+
+      expect(ok).toBe(false)
+      expect(store.cards.find((c: any) => c.id === 'card-1')).toBeDefined()
+      expect(store.cards.find((c: any) => c.id === 'card-1')?.status).toBe('collection')
+    })
+
     it.each(OTHER_CODES)('batchDeleteCards: %s does NOT cure — reports failure and restores the card', async (code) => {
       vi.useFakeTimers()
       try {
@@ -382,6 +556,27 @@ describe('collection store: ghost card cure (TASK-223)', () => {
         // (up to 2 retries at 500ms apart, or a single 30s resource-exhausted
         // drain wait) — fake-timer-advance past the slowest case either way.
         mockCommit.mockRejectedValue(firestoreError(code))
+
+        const resultPromise = store.batchDeleteCards(['card-1'])
+        await vi.advanceTimersByTimeAsync(31000)
+        const result = await resultPromise
+
+        expect(result.success).toBe(false)
+        expect(result.failed).toBe(1)
+        expect(store.cards.find((c: any) => c.id === 'card-1')).toBeDefined()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('batchDeleteCards: a generic error with no code at all does NOT cure (AC4/LOW-1)', async () => {
+      vi.useFakeTimers()
+      try {
+        const store = useCollectionStore()
+        const card = makeCard({ id: 'card-1' })
+        store.cards = [card] as any
+        store.paginatedCards = [card] as any
+        mockCommit.mockRejectedValue(new Error('some transient failure'))
 
         const resultPromise = store.batchDeleteCards(['card-1'])
         await vi.advanceTimersByTimeAsync(31000)

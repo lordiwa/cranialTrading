@@ -1513,18 +1513,37 @@ export const useCollectionStore = defineStore('collection', () => {
             }
 
             // TASK-223: cure every ghost discovered in this run — removed from
-            // every in-memory place, and (unlike the updatedCards map above)
-            // this SHRINKS the array, so it's a full rewrite (markAllChunksDirty),
-            // same as any other delete-shaped index change.
+            // every in-memory place. cards.value/cardsById/paginatedCards.value
+            // are always safe to patch immediately (mirrors cureGhostCard /
+            // deleteCard). The index itself is NOT touched directly here —
+            // reviewer HIGH-1: during the TASK-185 in-flight-load window
+            // cardIndexRaw is empty and indexKnownComplete is false, so writing
+            // straight to cardIndexRaw.value would force _runPersistLoop into a
+            // full rewrite with totalChunks=1 and clobber chunk_0's real cards.
+            // Route each ghost through the SAME _indexLoadInFlight gate
+            // cureGhostCard/deleteCard already use (syncIndexOrQueue) instead of
+            // inventing a second mechanism — queued ghosts are replayed by
+            // applyPendingIndexMutations() once the load's real index lands.
+            let ghostAppliedNow = false
             if (ghostCardIds.size > 0) {
                 cards.value = cards.value.filter(c => !ghostCardIds.has(c.id))
                 for (const id of ghostCardIds) cardsById.delete(id)
                 paginatedCards.value = paginatedCards.value.filter(c => !ghostCardIds.has(c.id))
-                cardIndexRaw.value = cardIndexRaw.value.filter(ic => !ghostCardIds.has(ic.i))
-                markAllChunksDirty()
+                for (const id of ghostCardIds) {
+                    // syncIndexOrQueue's 'delete' path only reads card.id — see
+                    // its TASK-185 doc comment — a minimal fake Card is enough
+                    // (same technique cureGhostCard already uses).
+                    if (syncIndexOrQueue({ id } as Card, 'delete')) ghostAppliedNow = true
+                }
+                // Membership changed (a card is now gone) — defer a corrective
+                // re-query the same way deleteCard/batchDeleteCards already do
+                // (MEDIUM-1); status-only updates above intentionally do NOT do
+                // this (TASK-120 AC4 precedent, unchanged), but removing a card
+                // is a membership change, not a field patch.
+                _pendingMembershipRefresh = true
             }
 
-            if (updatedCards.length > 0 || ghostCardIds.size > 0) {
+            if (updatedCards.length > 0 || ghostAppliedNow) {
                 persistIndexToFirestore()
             }
 

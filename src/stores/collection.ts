@@ -40,6 +40,18 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
             await batch.commit()
             return true
         } catch (error: unknown) {
+            // TASK-223: both call sites of commitBatchWithRetry are DELETE-only
+            // batches (users/{uid}/cards and public_cards cleanup). A real
+            // Firestore delete never throws not-found for a missing doc — it's
+            // idempotent — so a not-found here can only mean the objective
+            // (that document being gone) was already true before this batch
+            // ran. Treat it as done rather than retrying (retrying would just
+            // hit the same not-found again) or reporting it as a failure that
+            // restores an already-deleted card (TASK-223 AC3).
+            if (isNotFoundError(error)) {
+                logSanitizedError('Batch commit hit not-found — treating as already deleted (TASK-223)', error, 'warn')
+                return true
+            }
             logSanitizedError(`Batch commit failed (attempt ${attempt + 1}/${maxRetries + 1})`, error, 'warn')
             const msg = error instanceof Error ? error.message : String(error)
             if (msg.includes('permission') || msg.includes('Permission')) {
@@ -58,6 +70,19 @@ const commitBatchWithRetry = async (batchFn: () => ReturnType<typeof writeBatch>
         }
     }
     return false
+}
+
+/**
+ * TASK-223: true only for the EXACT Firestore error code 'not-found' — the
+ * one signal solid enough to justify silently curing a card_index entry
+ * (removing a "ghost" whose document is gone). Never matched on message
+ * text, and never on any other code (permission-denied, unavailable,
+ * deadline-exceeded, resource-exhausted, a network failure, or a plain
+ * Error with no code at all) — those must keep behaving exactly as before
+ * (rollback + error shown to the user).
+ */
+function isNotFoundError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'not-found'
 }
 
 /** Strip undefined values from an object (Firestore rejects undefined) */
@@ -1203,6 +1228,27 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /**
+     * TASK-223: remove a "ghost" card — one whose Firestore document no
+     * longer exists — from every place it lives in memory (cards.value,
+     * cardsById, paginatedCards.value) plus the persisted card_index. Only
+     * ever called after a mutation's error resolves EXACT via isNotFoundError;
+     * that is the one signal solid enough to justify deleting an entry from a
+     * user's inventory without the user having asked for a delete.
+     *
+     * Reuses syncIndexOrQueue's existing 'delete' path (id-only, see its
+     * TASK-185 doc comment) rather than duplicating the queue-vs-immediate
+     * decision — a minimal fake Card carrying only `id` is all that path reads.
+     */
+    function cureGhostCard(cardId: string): void {
+        cards.value = cards.value.filter(c => c.id !== cardId)
+        cardsById.delete(cardId)
+        paginatedCards.value = paginatedCards.value.filter(c => c.id !== cardId)
+        if (syncIndexOrQueue({ id: cardId } as Card, 'delete')) {
+            persistIndexToFirestore()
+        }
+    }
+
+    /**
      * Add a new card to collection
      */
     const addCard = async (cardData: Omit<Card, 'id' | 'updatedAt'>): Promise<string | null> => {
@@ -1344,6 +1390,16 @@ export const useCollectionStore = defineStore('collection', () => {
 
             return true
         } catch (error) {
+            if (isNotFoundError(error)) {
+                // TASK-223: the doc is gone — the optimistic patch above
+                // applied a status this card will never actually carry.
+                // Self-heal instead of reverting-then-erroring: remove the
+                // ghost everywhere and persist, so it just vanishes from the
+                // grid rather than flashing back with an error toast.
+                cureGhostCard(cardId)
+                _pendingMembershipRefresh = true
+                return true
+            }
             // Rollback on failure
             if (index > -1 && snapshot) {
                 const rollbackCards = [...cards.value]
@@ -1380,21 +1436,49 @@ export const useCollectionStore = defineStore('collection', () => {
 
             const cleanUpdates = stripUndefined(updates as Record<string, unknown>)
 
+            // TASK-223: cards that turn out to be ghosts (Firestore doc gone)
+            // inside this run — cured after the loop, excluded from the normal
+            // "updated" bookkeeping below.
+            const ghostCardIds = new Set<string>()
+
             for (const chunk of chunks) {
                 const batch = writeBatch(db)
                 for (const cardId of chunk) {
                     const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
                     batch.update(cardRef, { ...cleanUpdates, updatedAt: Timestamp.now() })
                 }
-                await batch.commit()
+                try {
+                    await batch.commit()
+                } catch (error: unknown) {
+                    if (!isNotFoundError(error)) throw error
+                    // TASK-223: a writeBatch is atomic — one ghost card in the
+                    // chunk aborts the WHOLE chunk, and Firestore doesn't say
+                    // which doc caused it. Retry the chunk one card at a time
+                    // so the rest of the lot still lands instead of failing
+                    // wholesale (AC3).
+                    for (const cardId of chunk) {
+                        const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
+                        try {
+                            // eslint-disable-next-line no-await-in-loop
+                            await updateDoc(cardRef, { ...cleanUpdates, updatedAt: Timestamp.now() })
+                        } catch (innerError: unknown) {
+                            if (!isNotFoundError(innerError)) throw innerError
+                            ghostCardIds.add(cardId)
+                        }
+                    }
+                }
                 completedSteps++
                 onProgress?.(Math.round((completedSteps / totalSteps) * 100))
             }
 
+            const survivingCardIds = ghostCardIds.size > 0
+                ? cardIds.filter(id => !ghostCardIds.has(id))
+                : cardIds
+
             // Save which cards were previously public-eligible (sale/trade)
             // Only these could have public_cards docs that need cleanup
             const previouslyPublicIds = new Set<string>()
-            for (const cardId of cardIds) {
+            for (const cardId of survivingCardIds) {
                 const card = cards.value.find(c => c.id === cardId)
                 if (card && (card.status === 'sale' || card.status === 'trade')) {
                     previouslyPublicIds.add(cardId)
@@ -1402,11 +1486,11 @@ export const useCollectionStore = defineStore('collection', () => {
             }
 
             // Update local state
-            const updatedCards = applyLocalCardUpdates(cardIds, updates)
+            const updatedCards = applyLocalCardUpdates(survivingCardIds, updates)
 
             // Also patch the paginated grid — CollectionView renders paginatedCards
             // (fed by the server-side card_index), not cards.value directly.
-            applyPaginatedCardUpdates(cardIds, updates)
+            applyPaginatedCardUpdates(survivingCardIds, updates)
 
             // Sync index — batchUpdateCards previously never touched cardIndexRaw,
             // leaving card_index (and therefore paginatedCards on reload) stale
@@ -1426,6 +1510,21 @@ export const useCollectionStore = defineStore('collection', () => {
                     markChunkDirty(i)
                     return cardToIndex(updated)
                 })
+            }
+
+            // TASK-223: cure every ghost discovered in this run — removed from
+            // every in-memory place, and (unlike the updatedCards map above)
+            // this SHRINKS the array, so it's a full rewrite (markAllChunksDirty),
+            // same as any other delete-shaped index change.
+            if (ghostCardIds.size > 0) {
+                cards.value = cards.value.filter(c => !ghostCardIds.has(c.id))
+                for (const id of ghostCardIds) cardsById.delete(id)
+                paginatedCards.value = paginatedCards.value.filter(c => !ghostCardIds.has(c.id))
+                cardIndexRaw.value = cardIndexRaw.value.filter(ic => !ghostCardIds.has(ic.i))
+                markAllChunksDirty()
+            }
+
+            if (updatedCards.length > 0 || ghostCardIds.size > 0) {
                 persistIndexToFirestore()
             }
 
@@ -1526,7 +1625,15 @@ export const useCollectionStore = defineStore('collection', () => {
         // Sync with Firebase in background
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
-            await deleteDoc(cardRef)
+            try {
+                await deleteDoc(cardRef)
+            } catch (error) {
+                if (!isNotFoundError(error)) throw error
+                // TASK-223: the doc is already gone — deleteCard's entire
+                // objective (the card not existing) is already true. Fall
+                // through to the same success path below instead of the
+                // restore-on-failure branch; there is nothing to roll back.
+            }
 
             // Sync index — queued instead if the index is still loading, so the
             // persist can't write an empty cardIndexRaw over chunk_0 (TASK-185).

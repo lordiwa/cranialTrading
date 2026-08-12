@@ -8,7 +8,7 @@
     "Una carta sin el campo set no revienta a mitad del import (verificar moxfield.ts:93)",
     "Los casos 403 y 500 siguen comportandose como hoy"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "wargaming",
@@ -30,10 +30,20 @@
       "at": "2026-08-11T11:15:00.000Z",
       "author": "orchestrator",
       "body": "UAT EN NAVEGADOR — HECHO, Y ENCONTRO UN DEFECTO DE MI PROPIO CAMBIO. Lo unico que lo detecto fue mirar la pantalla; ningun test unitario lo habria visto.\n\nMETODO: se intercepto window.fetch para el proxy de Moxfield y se sirvieron mazos malformados sinteticos. NO se importo nada — solo se analizo. El stub se restauro al terminar.\n\nCASO 1, mazo parcialmente malo (una carta sin quantity, una sin set): 'Mainboard: 6 | Sideboard: 0', '6 CARTAS', aviso 'Se descartaron 1 carta(s)...' visible con color, y boton 'IMPORTAR 6 CARTAS'. Ningun NaN. El conteo es correcto: 4 + 2, con la carta sin quantity descartada.\n\nCASO 2, mazo 100% ilegible: aparecio el mensaje de error nuevo... PERO TAMBIEN SEGUIA EN PANTALLA EL PREVIEW DEL INTENTO ANTERIOR — 'Mainboard: 6', '6 CARTAS', el aviso viejo de descartes, y un boton 'IMPORTAR 6 CARTAS' que habria importado el mazo VIEJO. Ademas el nombre del formulario ya se habia pisado con el del mazo fallido. O sea: la pantalla contaba dos historias contradictorias a la vez, que es EXACTAMENTE la clase de defecto que este ticket viene a arreglar.\n\nDOS CAUSAS, las dos arregladas:\n  a) handleParse no limpiaba preview.value al fallar. Precede a este ticket: pasaba igual con un mazo privado (403) analizado despues de uno bueno. Agregado preview.value = null junto a los otros resets.\n  b) parseMoxfieldInput validaba DESPUES de escribir moxfieldDeckData, deckNameInput, deckFormat y commanderName. La comprobacion se movio ANTES de todo efecto secundario.\n\nREVERIFICADO tras el arreglo: caso 2 muestra SOLO el error, sin preview, sin boton, sin nombre pisado. Caso 1 sigue funcionando igual (se reprobo despues del reordenamiento, para descartar que arreglar uno rompiera el otro).\n\nSin errores en consola. 1688 tests unitarios verdes, type-check limpio, build OK.\n\nLECCION, y vale para toda la Familia F: los tests unitarios probaron las funciones puras y estaban todos verdes mientras la pantalla mentia. El defecto vivia en el ESTADO de la vista, no en el calculo."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:40:43.683Z",
+      "body": "[CLOSE-EXCEPTION] Cierre historico de saneamiento: trabajo implementado y verificado por UAT en navegador en una sesion anterior; quedo en in_review sin cierre formal."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:40:43.683Z",
+      "body": "Cierre de saneamiento 2026-08-12. El ticket SUBESTIMABA el alcance: no era una suma sin guarda sino TRES, y moxfieldToCardList tenia el mismo bloque COPIADO TRES VECES sin guardas. Se unificaron en un solo pushBoard. Quedo verificado ademas que item.card.set.toUpperCase() SI lanza y aborta el import entero. EL UAT EN NAVEGADOR ENCONTRO UN DEFECTO PROPIO QUE 1688 TESTS VERDES NO VIERON: al analizar un mazo ilegible aparecia el error nuevo PERO seguia en pantalla el preview del intento anterior, con un boton IMPORTAR 6 CARTAS que habria importado el mazo VIEJO. Dos causas: handleParse no limpiaba preview.value al fallar (defecto PREVIO al ticket) y la validacion corria DESPUES de escribir el nombre del mazo. Las dos arregladas y reverificadas en ambos sentidos."
     }
   ],
   "created_at": "2026-08-11T02:10:00.000Z",
-  "updated_at": "2026-08-11T11:15:00.000Z",
+  "updated_at": "2026-08-12T02:40:43.683Z",
   "jira_key": null,
-  "verification_tier": "tdd-tier"
+  "verification_tier": "tdd"
 }

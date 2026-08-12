@@ -10,7 +10,7 @@
     "npm run test:unit verde y npx vite build --mode development exitoso",
     "Sin regresión en e2e/specs/auth/"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "high",
   "labels": [
     "perf",
@@ -26,10 +26,20 @@
       "author": "reviewer",
       "at": "2026-08-10T16:20:09.130Z",
       "body": "Revisión con profundidad FULL (90 líneas cambiadas, por debajo del umbral de 150, pero toca superficie de autenticación, lo que fuerza FULL). Veredicto: PASS. Sin hallazgos HIGH ni MEDIUM.\n\nTodo lo reportado por el Developer fue re-ejecutado por el reviewer, no aceptado de palabra:\n- npm run test:unit: 1609/1609 verdes. npx vite build --mode development: OK. npx playwright test e2e/specs/auth: 15/15, lo que cubre además el AC3 (login con email y contraseña).\n- El lock de regresión NO es vacuo: se reprodujo el rojo revirtiendo a mano la línea en src/services/firebase.ts, y firebase.initializeAuth.test.ts falla exactamente donde debe. Archivo restaurado y verificado limpio.\n- El cambio ELIMINA la carga eager, no la mueve: grep de browserPopupRedirectResolver en todo src/ da sólo stores/auth.ts:547 (vía el import dinámico) y el comentario de firebase.ts. Ningún módulo de arranque lo importa estáticamente. Además, cero usos de signInWithRedirect / getRedirectResult / linkWithPopup / reauthenticateWithPopup: no había ningún flujo de redirect dependiendo del resolver global.\n- AC1: el reviewer remidió sobre /inicio (no /login) con el dist recién compilado servido en preview — 14 peticiones de la app, AMBOS chunks de firebase cargados (o sea initializeAuth sí corrió), y CERO a recaptcha/gapi/gstatic/rum. El \"antes\" es el waterfall de producción que Rafael documentó en el ticket.\n- El arreglo del mock en auth.errorLogging.test.ts es necesario y NO enmascara nada: los argumentos se evalúan antes de la llamada, así que sin el export el acceso tiraba el error sintético de Vitest antes de que signInWithPopup rechazara — el test habría fallado por el error equivocado, no pasado en falso. Los tres caminos del catch siguen ejerciendo los códigos reales.\n- AC4: verificado más fuerte que lo que reportó el Developer — dist/index.html sólo hace modulepreload de index y vendor, y el entry referencia los chunks de firebase únicamente dentro del mapa de preload de import() dinámico, sin ningún import estático. Firebase sigue fuera del grafo estático que dejó TASK-132.\n\nLOW (no accionable ahora), src/stores/auth.ts:547: la app no tiene ningún camino de redirect. Si alguna vez se agrega login por redirect (por ejemplo como respaldo en móviles donde el popup se bloquea), habrá que pasarle el resolver también ahí. El comentario en firebase.ts ya lo deja documentado.\n\nPENDIENTE HUMANO, no es hallazgo: AC2 — login con Google de punta a punta con una cuenta real. Es el único punto donde este cambio puede romperse en el mundo real y ningún agente lo cubrió."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:40:54.485Z",
+      "body": "[CLOSE-EXCEPTION] Cierre de saneamiento: el unico AC pendiente era el UAT humano del login con Google, que Rafael confirmo explicitamente el 2026-08-12 ('si sirve google'). El ticket quedo en in_review por falta de ese veredicto."
+    },
+    {
+      "author": "uat",
+      "at": "2026-08-12T02:40:54.485Z",
+      "body": "1. Probar el login con Google en la app desplegada, esperando que funcione con normalidad. Observado: Rafael confirma textualmente 2026-08-12 que el login con Google SIRVE. Verdict: PASS\n\nOverall result: PASS"
     }
   ],
   "created_at": "2026-08-10T15:56:14.496Z",
-  "updated_at": "2026-08-10T16:20:09.130Z",
+  "updated_at": "2026-08-12T02:40:54.485Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

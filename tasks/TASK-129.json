@@ -22,10 +22,18 @@
   "depends_on": [
     "TASK-128"
   ],
-  "linked_commits": ["eedc0bb", "114a69c", "e753a33"],
+  "linked_commits": [
+    "eedc0bb",
+    "114a69c",
+    "e753a33"
+  ],
   "linked_prs": [],
   "comments": [
-    "2026-07-17 orquestador: CERRADO tras ciclo review completo (rev-129: REQUEST_CHANGES → fix → APPROVE). TDD real (25 tests RED primero + 9 del fix batch = 1408 unit). Implementado: guard extraído a src/router/authGuard.ts (factory inyectable) — (a) rutas sin flags resuelven sin esperar auth, (b) requiresGuest optimista con last-known en localStorage ('ct_auth_last_known', solo strings 'authenticated'/'guest'), (c) requiresAuth byte-idéntico (verificado por diff contra código viejo). App.vue era un SEGUNDO gate (v-if authStore.loading tapaba todo) — unificado vía shouldBlockOnAuthLoading compartida. HIGH del review (loader inalcanzable por META vacío de START_LOCATION → shell en blanco en entradas requiresAuth frías) y MEDIUM (redirect diferido secuestraba navegación posterior del usuario) arreglados en e753a33 con tests de regresión c/u. VERIFICADO: E2E completa 2 veces (125 passed pre-fix, passed limpio post-fix), harness por orquestador independiente: FCP 896 / APPRENDER 2574 FAST3G sin drift. RESIDUAL LOW documentado: si auth resuelve ANTES de que confirme la navegación a /login (chunk lento), el redirect legítimo se salta y el usuario autenticado ve /login una vez (fail-safe, sin loop; el próximo cold load redirige bien) — recordar si llega un reporte así. AC4 (APPRENDER ≤1400) FALLÓ honestamente: 2545→2574 sin movimiento — causa raíz: chunk firebase 486KB/115KB gz eager en toda ruta (la espera de auth estaba escondida detrás de la descarga); target transferido a TASK-132."
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T16:05:00.000Z",
+      "body": "2026-07-17 orquestador: CERRADO tras ciclo review completo (rev-129: REQUEST_CHANGES → fix → APPROVE). TDD real (25 tests RED primero + 9 del fix batch = 1408 unit). Implementado: guard extraído a src/router/authGuard.ts (factory inyectable) — (a) rutas sin flags resuelven sin esperar auth, (b) requiresGuest optimista con last-known en localStorage ('ct_auth_last_known', solo strings 'authenticated'/'guest'), (c) requiresAuth byte-idéntico (verificado por diff contra código viejo). App.vue era un SEGUNDO gate (v-if authStore.loading tapaba todo) — unificado vía shouldBlockOnAuthLoading compartida. HIGH del review (loader inalcanzable por META vacío de START_LOCATION → shell en blanco en entradas requiresAuth frías) y MEDIUM (redirect diferido secuestraba navegación posterior del usuario) arreglados en e753a33 con tests de regresión c/u. VERIFICADO: E2E completa 2 veces (125 passed pre-fix, passed limpio post-fix), harness por orquestador independiente: FCP 896 / APPRENDER 2574 FAST3G sin drift. RESIDUAL LOW documentado: si auth resuelve ANTES de que confirme la navegación a /login (chunk lento), el redirect legítimo se salta y el usuario autenticado ve /login una vez (fail-safe, sin loop; el próximo cold load redirige bien) — recordar si llega un reporte así. AC4 (APPRENDER ≤1400) FALLÓ honestamente: 2545→2574 sin movimiento — causa raíz: chunk firebase 486KB/115KB gz eager en toda ruta (la espera de auth estaba escondida detrás de la descarga); target transferido a TASK-132."
+    }
   ],
   "created_at": "2026-07-17T13:42:17.833Z",
   "updated_at": "2026-07-17T16:05:00.000Z",

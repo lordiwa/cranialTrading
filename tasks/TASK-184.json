@@ -10,7 +10,7 @@
     "El header aparece también en una pestaña abierta en segundo plano",
     "Sin regresión en la suite E2E"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "perf",
@@ -25,9 +25,20 @@
     "46fa9da"
   ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:39:45.840Z",
+      "body": "[CLOSE-EXCEPTION] Cierre historico de saneamiento: trabajo shippeado, desplegado y verificado por el humano en v1.57.0 en una sesion anterior; el ticket quedo en in_review sin comentario de reviewer registrado por el MCP."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:39:45.840Z",
+      "body": "Cierre de saneamiento 2026-08-12. Shippeado y verificado en v1.57.0: los dos modales globales se difieren. La causa era AppContainer -> WelcomeModal -> useTour -> import ESTATICO de firebase/firestore, que metia 162 KB en el grafo del chunk de la ruta. Medido: 5560 -> 3228 ms. Firebase ahora se pide DESPUES del hero. Rafael lo confirmo en su celular."
+    }
+  ],
   "created_at": "2026-08-10T22:10:00.000Z",
-  "updated_at": "2026-08-10T22:10:00.000Z",
+  "updated_at": "2026-08-12T02:39:45.840Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

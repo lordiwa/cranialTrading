@@ -20,12 +20,12 @@
   "linked_prs": [],
   "comments": [
     {
-      "author": "deep-review",
+      "author": "reviewer",
       "at": "2026-06-28T04:04:56.707Z",
       "body": "## Deep review (código, read-only) — HP1 Onboarding\n\nAclaración: `/my-page` = la landing actual `/saved-matches` (error de nombre en el test, NO divergencia de ruta).\n\n**TC-01 — Registro + tour: ❌ FAIL.** Tras \"Crear Cuenta\" el usuario NO llega a la landing: queda parado en la pantalla \"Verifica tu email\" (`RegisterView.vue:44-46` solo hace `registered=true`; la navegación a la app ocurre solo en `handleCheckVerification` tras verificar, `:53-61`). Por tanto el modal \"Iniciar Tour\" no aparece \"inmediatamente\". Además el `WelcomeModal` solo se monta dentro de `AppContainer.vue:18` y `RegisterView` no usa ese contenedor → ni está en el DOM tras registrarse. Secundario: el form pide un 4º campo obligatorio **Location** que el test no menciona (`RegisterView.vue:33,155`). El \"backend 201\" en realidad es Firebase Auth `createUserWithEmailAndPassword` (`auth.ts:130`).\n\n**TC-02 — Saltar tour: ⚠️ PARTIAL.** \"Saltar\" funciona y tras F5 no reaparece EN EL MISMO NAVEGADOR (`WelcomeModal.vue:35-42` → `markTourCompleted` → `localStorage['cranial_tour_completed_<uid>']`, `useTour.ts:40-53`). Pero el flag vive SOLO en localStorage, no en Firestore → reaparece en otro dispositivo/incógnito/storage borrado. No existe botón \"X\", solo el link \"Saltar\".\n\n**Decisiones de producto pendientes:** (1) ¿flag de onboarding server-side (Firestore) en vez de localStorage? (2) ¿el tour va antes o después de la verificación de email?"
     },
     {
-      "author": "resolution",
+      "author": "orchestrator",
       "at": "2026-06-28T04:09:07.904Z",
       "body": "## Resolución (Rafael, 2026-06-27)\n\n- **`/my-page` = la landing `/saved-matches`** — error de nombre en el test, NO bug.\n- **TC-01 (tour vs email): el flujo actual es correcto.** El tour arranca DESPUÉS de verificar el email. → **Acción: reescribir TC-01** para incluir el paso de verificación de email antes del tour (no exigir \"modal inmediatamente tras Crear Cuenta\"). Mencionar también el 4º campo obligatorio Location.\n- **TC-02 (flag de tour): se mueve a Firestore.** → cubierto por **TASK-082** (persistir flag de onboarding server-side). Tras esa tarea, \"no reaparece\" se cumplirá también cross-device.\n\nSin trabajo de código en esta QA task más allá de TASK-082; pendiente solo reescribir el wording de TC-01."
     }

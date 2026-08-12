@@ -9,7 +9,7 @@
     "La propuesta resultante se presenta a Rafael ANTES de implementar: puede haber varias salidas (diferir precios, renderizar la grilla sin precios y rellenarlos despues, paginar mas chico) y la eleccion es suya",
     "El metodo de medicion queda documentado para poder repetirlo y comparar el despues"
   ],
-  "status": "in_progress",
+  "status": "todo",
   "priority": "high",
   "labels": [
     "perf",
@@ -32,13 +32,13 @@
       "body": "VERIFICACION QUE CIERRA LA UNICA DUDA DECLARADA SOBRE LA OPCION 1 (2026-08-08). Se leyo queryPage (collection.ts:1518-1555) para comprobar si tenia precondiciones ocultas que justificaran el gate.\n\nNO LAS TIENE. Su unica precondicion es authStore.user (linea 1523). Llama a la Cloud Function queryCardIndex y mapea la respuesta con indexToCard. NO lee cards.value, NO lee cardIndexRaw, NO depende de ningun estado que ponga loadCollection.\n\nCONCLUSION: desacoplar triggerPaginationQuery() de loadCollection() no tiene dependencia de datos que lo impida. Lo unico que seguiria llegando tarde son los contadores de los chips de estado y los totales, que se derivan del indice completo — pero eso ya pasa hoy; el cambio solo evita que la GRILLA los espere.\n\nQueda pendiente de implementacion la eleccion de Rafael, y verificar que el orden de arranque garantice authStore.user antes de initView (hoy lo garantiza el guard de ruta mas el gate de App.vue sobre authStore.loading)."
     },
     {
-      "author": "rafael",
+      "author": "orchestrator",
       "at": "2026-08-08T22:50:39.788568Z",
-      "body": "DECISION DE RAFAEL 2026-08-08: se implementan LAS DOS opciones — desacoplar triggerPaginationQuery() de loadCollection() Y diferir/trocear la carga de precios (preloadSetMappings). El AC2 (medicion en la cuenta chica de 5,6k) se deja PARA EL FINAL: Rafael abrira un navegador e iniciara sesion el mismo, y desde ahi se mide. No se descarta el AC, se pospone."
+      "body": "[COMENTARIO DE RAFAEL] DECISION DE RAFAEL 2026-08-08: se implementan LAS DOS opciones — desacoplar triggerPaginationQuery() de loadCollection() Y diferir/trocear la carga de precios (preloadSetMappings). El AC2 (medicion en la cuenta chica de 5,6k) se deja PARA EL FINAL: Rafael abrira un navegador e iniciara sesion el mismo, y desde ahi se mide. No se descarta el AC, se pospone."
     }
   ],
   "created_at": "2026-08-08T05:43:29.694Z",
-  "updated_at": "2026-08-08T22:50:39.788568Z",
+  "updated_at": "2026-08-12T02:43:12.324Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

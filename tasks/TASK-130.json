@@ -21,10 +21,16 @@
   "depends_on": [
     "TASK-129"
   ],
-  "linked_commits": ["0f6a91c"],
+  "linked_commits": [
+    "0f6a91c"
+  ],
   "linked_prs": [],
   "comments": [
-    "2026-07-17 orquestador: CERRADO con review APPROVE (rev-130). Open Sans 523KB TTF → ~55KB woff2 (4 pesos subseteados pyftsubset, Latin-1 + extras tipográficos; acentos ES/PT verificados por cmap; mapeo de pesos verificado por OS/2 usWeightClass). Preconnects a identitytoolkit+firestore. LoginView lazy→static (verificado: firebase NO vuelve al entry — habilitado por TASK-132; sin ciclos; solo /login cambió). RESULTADO (FAST3G preview, 2 corridas estables): APPRENDER 1709→1348-1349 (AC intermedio ≤1400 CUMPLIDO), DCL 1099→1015, FCP 822, LOAD artefact desapareció (LOAD=DCL ~1015, AC ≤1200 CUMPLIDO). Goal final ≤1066: gap ~283ms — piso de FCP ~820ms domina (red+CSS, no JS); decisión al cierre de tanda con medición contra dev. Review resolvió el riesgo de glifos DEFINITIVAMENTE: comparó cmap del subset vs TTF viejo extraído de git — flechas/checks/estrellas nunca estuvieron en Open Sans (fallback de sistema siempre), único drop real '≥' en aria-label no pintado (INFO). E2E targeted 9/9; unit 1419; suite completa al cierre de tanda. Observación del review para TASK-131: ~32 TTFs sin referencia (~4-5MB) siguen en public/Fonts/Open-Sans/."
+    {
+      "author": "orchestrator",
+      "at": "2026-07-17T13:42:37.496Z",
+      "body": "2026-07-17 orquestador: CERRADO con review APPROVE (rev-130). Open Sans 523KB TTF → ~55KB woff2 (4 pesos subseteados pyftsubset, Latin-1 + extras tipográficos; acentos ES/PT verificados por cmap; mapeo de pesos verificado por OS/2 usWeightClass). Preconnects a identitytoolkit+firestore. LoginView lazy→static (verificado: firebase NO vuelve al entry — habilitado por TASK-132; sin ciclos; solo /login cambió). RESULTADO (FAST3G preview, 2 corridas estables): APPRENDER 1709→1348-1349 (AC intermedio ≤1400 CUMPLIDO), DCL 1099→1015, FCP 822, LOAD artefact desapareció (LOAD=DCL ~1015, AC ≤1200 CUMPLIDO). Goal final ≤1066: gap ~283ms — piso de FCP ~820ms domina (red+CSS, no JS); decisión al cierre de tanda con medición contra dev. Review resolvió el riesgo de glifos DEFINITIVAMENTE: comparó cmap del subset vs TTF viejo extraído de git — flechas/checks/estrellas nunca estuvieron en Open Sans (fallback de sistema siempre), único drop real '≥' en aria-label no pintado (INFO). E2E targeted 9/9; unit 1419; suite completa al cierre de tanda. Observación del review para TASK-131: ~32 TTFs sin referencia (~4-5MB) siguen en public/Fonts/Open-Sans/."
+    }
   ],
   "created_at": "2026-07-17T13:42:37.496Z",
   "updated_at": "2026-07-17T13:42:37.496Z",

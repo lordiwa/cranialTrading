@@ -8,7 +8,7 @@
     "Si la causa resulta ser trabajo diferible, se propone el cambio en un ticket aparte — este ticket es de diagnóstico, no de implementación a ciegas",
     "Si la sospecha de preloadPriceData resulta FALSA, queda escrito en el ticket que se falsó, para que nadie la vuelva a proponer"
   ],
-  "status": "in_progress",
+  "status": "todo",
   "priority": "high",
   "labels": [
     "perf",
@@ -33,7 +33,7 @@
     }
   ],
   "created_at": "2026-08-08T18:45:00.000Z",
-  "updated_at": "2026-08-10T17:16:53.491Z",
+  "updated_at": "2026-08-12T02:41:59.976Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[EXPLICIT]"

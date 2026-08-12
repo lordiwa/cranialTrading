@@ -1,0 +1,26 @@
+{
+  "key": "TASK-228",
+  "title": "public_cards es una SEGUNDA copia derivada con el mismo defecto que card_index: la escribe el cliente, sin dueño y sin reconciliación",
+  "description": "HALLAZGO DEL 2026-08-12, durante el rediseño del card_index. NO es parte de ese rediseño: el plan\ndelimita su alcance a card_index a proposito, y esto queda afuera. Se abre para que no se lea como\nresuelto.\n\n=== EL DEFECTO, QUE ES EL MISMO DE SIEMPRE ===\npublic_cards es una copia derivada de las cartas publicas del usuario, y tiene las cuatro propiedades\nque hacen que card_index diverja:\n  - ES UNA COPIA DERIVADA: puede desincronizarse de users/{uid}/cards.\n  - NO TIENE DUENIO: la escribe EL CLIENTE, y ademas DIRECTO a Firestore, sin pasar por ninguna Cloud\n    Function (src/services/publicCards.ts:133-148, syncCardToPublic). Se llama desde addCard\n    (collection.ts:1240) y updateCard (:1332), y en masa desde syncAllToPublic (:1906).\n  - SIN ATOMICIDAD: cada escritura es su propio fire-and-forget con su propio catch. No comparte\n    debounce ni batching con el card_index — son caminos INDEPENDIENTES que corren uno al lado del\n    otro en las mismas funciones.\n  - NADA LA RECONCILIA: no existe ningun proceso que la compare contra los documentos y corrija.\n\n=== POR QUE IMPORTA ===\nLa consumen ~15 archivos de src/, y no es cosmetica: de ahi salen los PERFILES PUBLICOS y los\nMATCHES. Concretamente SavedMatchesView.vue, UserProfileView.vue, LoginView.vue, CollectionView.vue,\nstores/auth.ts, services/publicCardSearch.ts, services/contactInfo.ts, components/matches/MatchCard.vue,\ncomposables/usePublicProfileCards.ts, utils/publicCardMapping.ts, components/user/UserProfileHoverCard.vue,\ncomponents/landing/LandingSellers.vue, utils/loginCardSearch.ts, utils/publicSyncFilter.ts.\n\nSi diverge, un comprador ve en el perfil de un vendedor cartas que ya no estan a la venta, o no ve\nlas que si estan. Es la misma clase de mentira que las cartas fantasma, pero mirando hacia AFUERA:\nla ve otra persona, no el dueño de la coleccion.\n\nTASK-202 ya reporta un sintoma compatible SIN diagnosticar: un vendedor con 3.187 cartas a la venta\nexpone solo 432. NO SE AFIRMA que la causa sea esta — hay que medirlo. Pero es el primer lugar donde\nmirar.\n\n=== LO QUE HAY QUE HACER PRIMERO, Y NO ES ARREGLAR ===\nMEDIR la divergencia, igual que se hizo con card_index: contar cuantas cartas deberian estar en\npublic_cards segun los documentos, cuantas hay, y QUE FORMA tiene la diferencia. Sin ese numero no se\nsabe si esto es un problema real o una preocupacion teorica.\n\n=== NO SE TOCA ===\nNada, hasta tener la medicion. Este ticket es de investigacion primero.",
+  "acceptance_criteria": [
+    "MEDIDO: cuantas cartas deberian estar en public_cards segun users/{uid}/cards, cuantas hay realmente, y la FORMA de la diferencia (faltantes, sobrantes, con datos viejos). Sobre las dos cuentas grandes de dev",
+    "Determinado con evidencia si TASK-202 (vendedor con 3.187 cartas que expone 432) tiene esta causa o es otra cosa",
+    "Con el numero en la mano, decidido y registrado si hace falta arreglo y de que tipo. Si la divergencia es cero, se cierra sin tocar codigo y se deja escrito el metodo de medicion"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "public-cards",
+    "copia-derivada",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T02:44:21.313Z",
+  "updated_at": "2026-08-12T02:44:21.313Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

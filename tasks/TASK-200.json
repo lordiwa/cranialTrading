@@ -23,5 +23,5 @@
   "created_at": "2026-08-11T05:00:00.000Z",
   "updated_at": "2026-08-11T05:00:00.000Z",
   "jira_key": null,
-  "verification_tier": "tdd-tier"
+  "verification_tier": "tdd"
 }

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-226",
+  "title": "buildCardIndex no tiene lock ni transacción: dos rebuilds simultáneos del mismo usuario pueden borrarse un chunk entre sí",
+  "description": "HALLAZGO DEL 2026-08-12, fuera del alcance del ticket que lo encontro. RIESGO VIVO HOY, no del rediseño.\n\n=== EL DEFECTO ===\nfunctions/index.js:955-1102 (buildCardIndex) NO tiene ningun lock, ninguna transaccion y ninguna\nclave de idempotencia. `maxInstances: 3` (:956) limita cuantas instancias corren EN TOTAL, por cuota\ny costo — NO impide que dos invocaciones para el MISMO usuario corran a la vez. No hay ni un chequeo\nni un semaforo por userId.\n\nSi dos invocaciones del mismo usuario corren en paralelo:\n  1. Cada una hace su propio Phase 1 (lectura completa de users/{uid}/cards) por separado, asi que\n     pueden ver SNAPSHOTS DISTINTOS si hubo una mutacion entre medio.\n  2. Los .set() de chunks (:1070-1075) son escrituras planas sin condicion — sin create(), sin\n     transaccion. El ultimo .set() que llegue por chunk gana, sin importar de que corrida viene.\n     RESULTADO: un indice FRANKENSTEIN, con unos chunks del snapshot A y otros del B, inconsistente\n     aunque cada corrida por separado sea correcta.\n  3. PEOR: la limpieza de chunks obsoletos (:1078-1090) usa el totalChunks que calculo CADA\n     invocacion. Si A calculo 30 y B calculo 29 (porque leyo menos cartas), B BORRA el chunk 29 que\n     A acaba de escribir.\n\n=== POR QUE IMPORTA MAS DE LO QUE PARECE ===\nEl punto 3 es LA MISMA CLASE DE FALLA DE TASK-168, el ticket con antecedente de PERDIDA DE DATOS\nREAL en este proyecto: decidir que algo es \"obsoleto\" sobre una lectura incompleta y borrarlo.\nAquella vez se destruyeron chunks con cartas reales. TASK-168 puso candados EN EL CLIENTE\n(indexKnownComplete, borrado descendente y en serie). EL SERVIDOR NUNCA LOS TUVO.\n\n=== QUE TAN ALCANZABLE ES ===\nbuildCardIndex se dispara desde varios lugares del cliente: al terminar un import\n(collection.ts:1869) y cada vez que loadFromIndex detecta el indice incompleto, corrupto o de version\nvieja (:650-664). O sea que DOS PESTANIAS del mismo usuario cargando a la vez con un indice\nsospechoso disparan dos rebuilds concurrentes — no hace falta nada raro.\nNO MEDIDO: no se ejecuto el ataque. Sale de leer el codigo. La reproduccion es barata (invocar la\nfuncion dos veces casi a la vez sobre una cuenta de prueba) y DEBE hacerse antes de arreglar.\n\n=== NO SE TOCA ===\nEl formato en disco. El comportamiento de una sola invocacion. Los candados del cliente de TASK-168.",
+  "acceptance_criteria": [
+    "REPRODUCIDO PRIMERO: dos invocaciones concurrentes de buildCardIndex sobre una cuenta de prueba producen un indice observablemente inconsistente (chunks de dos snapshots distintos, o un chunk borrado por la otra corrida). Con evidencia, antes de tocar codigo",
+    "Dos invocaciones concurrentes del mismo usuario ya no pueden dejar el indice mezclado: la segunda espera, se rechaza, o se descarta de forma explicita y registrada",
+    "La limpieza de chunks obsoletos NO puede borrar un chunk escrito por otra corrida en vuelo",
+    "Verificado POR MUTACION que el candado nuevo detecta el defecto: desactivandolo, la prueba de concurrencia vuelve a fallar",
+    "Una invocacion sola sigue comportandose exactamente igual que hoy, verificado contra una cuenta de prueba"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "perdida-de-datos",
+    "no-reparar-sin-leer",
+    "flujo-3"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T02:43:35.460Z",
+  "updated_at": "2026-08-12T02:43:35.460Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

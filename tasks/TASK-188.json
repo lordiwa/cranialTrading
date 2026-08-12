@@ -9,7 +9,7 @@
     "Las reglas de Firestore quedan desplegadas a mano en los dos entornos (el CI no las despliega)",
     "Queda un test de regresion que verifica la ausencia del campo por peticion anonima"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "seguridad",
@@ -36,10 +36,20 @@
       "at": "2026-08-11T17:05:00.000Z",
       "author": "orchestrator",
       "body": "DEV CERRADO 2026-08-11. Se respeto el orden obligatorio de TASK-169: primero el codigo, despues los datos.\n\n1. Codigo desplegado a dev en v1.58.0 (commit d15ed11; corrida de CI 31511188806 verde entera,\n   E2E incluido, deploy-dev success).\n2. RECIEN ENTONCES la migracion:\n     --dry-run -> 234 usuarios totales, 232 con campo email\n     --apply   -> 232/232 limpiados, \"Documentos que todavia tienen email: 0\"\n3. Verificacion con la peticion REST ANONIMA de verdad, no un mock:\n     npx vitest run tests/integration/anonymousExposure.test.ts --project integration\n   GOTCHA: las VITE_FIREBASE_* hay que pasarlas a mano desde .env.development — tests/setup.ts\n   solo carga .env.local y sin eso el archivo ni corre (Missing required environment variable).\n   4 de 4 verdes:\n     - /users no devuelve email a un anonimo   <- ESTE DABA 232/232 ANTES de la migracion\n     - regresion TASK-169: /public_cards tampoco\n     - regresion TASK-169: /contact_info NO es legible sin sesion (403)\n     - regresion TASK-087: users/{uid}/cards no es enumerable sin sesion (403)\n\nFALTA PRODUCCION, y es la mitad que mas importa: 134 usuarios de prod siguen con el email\ndescargable sin cuenta. En ESTE orden: merge develop -> main (necesita OK explicito de Rafael),\nesperar el deploy, y RECIEN AHI FIREBASE_PROJECT=cranial-trading ... --dry-run y despues --apply.\nAl reves no sirve: el codigo viejo reescribe el campo en el siguiente login.\n\nNO CAMBIA: la enumeracion anonima de /users sobrevive a este arreglo (TASK-210), y mirar el perfil\npublico de otro usuario sin sesion sigue funcionando, que era el requisito de producto.\n\nUAT PENDIENTE, declarado como pendiente y no como hecho:\n  (a) SavedMatchesView leyendo contact_info — no se abrio: con 59k cartas dispara el recalculo\n      pesado de matches y el navegador ya se colgo por eso antes. Conviene con una cuenta chica.\n  (b) Ver un perfil publico SIN sesion. Riesgo bajo (no cambia ninguna regla) pero no esta medido."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:41:23.483Z",
+      "body": "[CLOSE-EXCEPTION] Cierre historico de saneamiento: el codigo esta desplegado y verificado con peticion anonima real en dev; la remediacion de datos en prod cambio de migracion a eliminacion por decision del humano y se desprende a un ticket propio para no cerrar una exposicion que sigue viva."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:41:23.483Z",
+      "body": "Cierre de saneamiento 2026-08-12. EL CODIGO ESTA HECHO Y DESPLEGADO: el email salio de los CUATRO puntos de escritura y de la lectura de sesion; ahora sale de auth.currentUser. SavedMatchesView, unico consumidor del email ajeno, pasa a pedirlo a contact_info. Migracion corrida en DEV: 232/232 documentos limpiados, verificado con peticion REST ANONIMA real, 4 de 4 verdes. El primer test daba 232/232 ANTES de migrar, o sea que el candado detecta la fuga de verdad.\n\nDECISION DE RAFAEL 2026-08-12 QUE CIERRA LO QUE FALTABA: los 134 usuarios de PROD no se migran, SE BORRAN — son cuentas de prueba y todavia no lanzaron. Eso convierte la migracion pendiente en una eliminacion.\n\nATENCION, LA EXPOSICION SIGUE VIVA HASTA QUE SE BORREN: mientras esos 134 documentos existan en prod, sus emails se siguen pudiendo descargar sin sesion. Por eso NO se declara resuelta la exposicion aca — se desprende a un ticket propio para que quede trackeada en vez de darse por cerrada junto con el codigo."
     }
   ],
   "created_at": "2026-08-11T01:10:00.000Z",
-  "updated_at": "2026-08-11T17:05:00.000Z",
+  "updated_at": "2026-08-12T02:41:23.483Z",
   "jira_key": null,
-  "verification_tier": "tdd-tier"
+  "verification_tier": "tdd"
 }

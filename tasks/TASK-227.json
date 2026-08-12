@@ -1,0 +1,29 @@
+{
+  "key": "TASK-227",
+  "title": "Borrar las 134 cuentas de prueba de PROD: hasta que no se borren, sus emails se siguen descargando sin sesión",
+  "description": "DECISION DE RAFAEL 2026-08-12: \"no hace falta migrar se pueden borrar\". Desprendido de TASK-188 al\ncerrarlo, para que la exposicion quede trackeada en vez de darse por resuelta junto con el codigo.\n\n=== POR QUE EXISTE ESTE TICKET ===\nTASK-188 arreglo el CODIGO: el email salio de los cuatro puntos de escritura y de la lectura de\nsesion, y ahora sale de auth.currentUser. Eso impide que se sigan escribiendo emails nuevos.\nPERO LOS 134 DOCUMENTOS QUE YA ESTABAN EN PROD SIGUEN AHI, con el campo email adentro. Y /users es\nde lectura publica A PROPOSITO (el perfil de otro usuario se abre sin sesion, es requisito de\nproducto) y las reglas de Firestore NO filtran por campo.\n\nO sea: hoy, en produccion, una sola peticion anonima sigue bajando los emails de esas 134 cuentas.\nEl codigo arreglado no cambia eso — solo evita que crezca.\n\n=== POR QUE SE BORRAN Y NO SE MIGRAN ===\nRafael confirmo que todavia no lanzaron: las 134 son cuentas de prueba, no usuarios reales. Borrarlas\nes mas simple y mas seguro que limpiarles un campo, y elimina la exposicion de raiz en vez de\nreducirla.\n\n=== EL ORDEN IMPORTA, Y YA NOS MORDIO ANTES ===\nLeccion de TASK-169: la limpieza de datos va DESPUES de desplegar el codigo, nunca antes, o el codigo\nviejo vuelve a escribir el campo. EL CODIGO YA ESTA DESPLEGADO, asi que esa condicion se cumple.\nPero verificarlo antes de borrar, no asumirlo.\n\n=== CUIDADO: ESTO ES DESTRUCTIVO Y ES PRODUCCION ===\n- Confirmar con Rafael la LISTA EXACTA antes de borrar, no solo el conteo. Si entre las 134 hay una\n  cuenta que el usa de verdad, se pierde.\n- Decidir explicitamente si se borra solo el documento de /users o tambien las subcolecciones\n  (cards, decks, binders, preferences, savedMatches, savedContacts, priceHistory...) y la cuenta de\n  Firebase Auth. Un documento borrado con subcolecciones vivas deja huerfanos invisibles.\n- Las reglas de Firestore se despliegan A MANO en este proyecto — el CI solo despliega hosting.\n\n=== VERIFICACION QUE DECIDE ===\nLa misma peticion REST ANONIMA que se uso en dev, contra PROD, antes y despues. En dev dio 232/232\ndocumentos con email antes y 0 despues. El \"antes\" es lo que prueba que el instrumento detecta la\nfuga de verdad; sin ese numero, un cero despues no significa nada.",
+  "acceptance_criteria": [
+    "MEDIDO ANTES con peticion REST ANONIMA contra PROD: cuantos documentos de /users tienen el campo email. Sin ese numero el 'despues' no prueba nada",
+    "Rafael confirmo la LISTA EXACTA de cuentas a borrar, no solo el conteo, y confirmo que ninguna esta en uso real",
+    "Decidido y registrado explicitamente si se borran tambien subcolecciones y la cuenta de Firebase Auth, para no dejar huerfanos invisibles",
+    "MEDIDO DESPUES con la misma peticion anonima: cero documentos con email en PROD",
+    "Verificado que un perfil publico legitimo se sigue abriendo SIN sesion — el requisito de producto que TASK-169 exigio mantener"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "seguridad",
+    "privacidad",
+    "produccion",
+    "no-reparar-sin-leer"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T02:43:59.013Z",
+  "updated_at": "2026-08-12T02:43:59.013Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

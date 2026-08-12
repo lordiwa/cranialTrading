@@ -20,12 +20,12 @@
   "linked_prs": [],
   "comments": [
     {
-      "author": "deep-review",
+      "author": "reviewer",
       "at": "2026-06-28T04:04:56.866Z",
       "body": "## Deep review (código, read-only) — HP2 Login\n\nAclaración: `/my-page` = la landing actual `/saved-matches` (error de nombre en el test).\n\n**Veredicto general: ⚠️ PARTIAL** (con la corrección de nombre, el redirect ahora PASA).\n\n- **Auth + redirect: PASS.** `/login` y botón \"Ingresar\" existen (`LoginView.vue:132-151`), auth vía `signInWithEmailAndPassword` (`auth.ts:165`). Redirect: `router.push(returnUrl || '/dashboard')` (`LoginView.vue:50`) → `/dashboard` → `/saved-matches` (`router/index.ts:43-45`). Inmediato.\n- **Datos personalizados: PASS.** Avatar vía `UserPopover`/`getAvatarUrl` (`auth.ts:638-645`), stats vía `SavedMatchesView`/`getTotalUserCount`.\n- **BUG #1 (el más importante) — el tour reaparece para usuarios existentes: FAIL.** `WelcomeModal` se gatea solo en localStorage (`WelcomeModal.vue:18-22` → `isTourCompleted()`, `useTour.ts:31-38`), NO en un flag de \"usuario nuevo\". Un usuario existente que entra en un navegador limpio (escenario típico de QA en máquina nueva) verá \"Iniciar Tour\" → viola \"sin alertas de onboarding\". Mismo root cause que TASK-078 TC-02.\n- **BUG #2 — login solo acepta email, no username** (`LoginView.vue:133-137`, `type=\"email\"`), aunque el test dice \"Email/Usuario\". Pendiente confirmar si username-login es requisito real o redacción suelta.\n\n**Decisión pendiente:** flag de onboarding server-side (arregla BUG #1). Confirmar requisito de login por username."
     },
     {
-      "author": "resolution",
+      "author": "orchestrator",
       "at": "2026-06-28T04:09:11.667Z",
       "body": "## Resolución (Rafael, 2026-06-27)\n\n- **`/my-page` = `/saved-matches`** — error de nombre. El redirect tras login ya es correcto → sub-claim PASS.\n- **Login por username: NO es requisito.** El \"Email/Usuario\" del test es redacción suelta; login por email es lo correcto. → **Acción: ajustar el wording de TC-03** a \"Email\" (sin cambio de código).\n- **Bug del tour para usuarios existentes: se arregla con el flag en Firestore** → **TASK-082**. Una vez hecho, un usuario existente en navegador limpio ya no verá \"Iniciar Tour\".\n\nSin código propio en esta QA task; depende de TASK-082 + ajuste de wording."
     }

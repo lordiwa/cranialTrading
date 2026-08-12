@@ -9,7 +9,7 @@
     "Ningun test de `collection-crud.spec.ts` puede terminar en verde por un `return` temprano: se elimina el patron `if (cardCount === 0) return`, o bien la precondicion de que haya cartas se asevera explicitamente con un `expect` que enrojezca si no se cumple",
     "El estado de partida queda declarado en el test (A4): que cantidad tenia la carta antes, y se restaura o se declara el estado nuevo, para no dejar deriva no acotada en la cuenta compartida de dev"
   ],
-  "status": "blocked",
+  "status": "todo",
   "priority": "high",
   "labels": [
     "cobertura-real",
@@ -41,7 +41,7 @@
     }
   ],
   "created_at": "2026-08-08T05:22:31.291Z",
-  "updated_at": "2026-08-08T21:53:41.663800Z",
+  "updated_at": "2026-08-12T02:42:01.047Z",
   "jira_key": null,
   "verification_tier": "tdd",
   "marker": "[EXPLICIT]"

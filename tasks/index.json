@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-12T02:21:57.799Z",
+  "generated_at": "2026-08-12T02:44:21.313Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -754,7 +754,7 @@
     {
       "key": "TASK-146",
       "title": "UC-07 (editar y borrar una carta) no tiene cobertura real — demostrado con mutacion",
-      "status": "blocked",
+      "status": "todo",
       "priority": "high"
     },
     {
@@ -796,7 +796,7 @@
     {
       "key": "TASK-153",
       "title": "La grilla de Coleccion tarda 20-27 segundos en mostrar la primera fila con 41.000 cartas",
-      "status": "in_progress",
+      "status": "todo",
       "priority": "high"
     },
     {
@@ -808,7 +808,7 @@
     {
       "key": "TASK-155",
       "title": "Editar una carta y recargar enseguida puede perder la actualizacion del indice: el debounce de card_index muere con el contexto",
-      "status": "in_progress",
+      "status": "todo",
       "priority": "high"
     },
     {
@@ -874,7 +874,7 @@
     {
       "key": "TASK-166",
       "title": "Tramo E de /inicio: ~7 segundos entre que el perfil llega y el buscador queda usable, sin causa identificada",
-      "status": "in_progress",
+      "status": "todo",
       "priority": "high"
     },
     {
@@ -910,7 +910,7 @@
     {
       "key": "TASK-172",
       "title": "El iframe de reCAPTCHA de Google se carga en cada arranque aunque nadie use el login con Google",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -928,7 +928,7 @@
     {
       "key": "TASK-175",
       "title": "Los recuadros grises de carga en la colección: feos, y además la grilla salta y pisa el título de sección",
-      "status": "in_progress",
+      "status": "todo",
       "priority": "medium"
     },
     {
@@ -946,7 +946,7 @@
     {
       "key": "TASK-178",
       "title": "El tiempo de arranque en 4G lenta lo domina el bundle de la app, no los datos: ~7 s para bajar 360 KB",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -970,19 +970,19 @@
     {
       "key": "TASK-182",
       "title": "/inicio deja de exigir sesión: el hero se pinta sin esperar a Firebase Auth y el buscador funciona sin cuenta",
-      "status": "in_review",
+      "status": "done",
       "priority": "critical"
     },
     {
       "key": "TASK-183",
       "title": "El header no se monta en el primer render de /inicio — se lleva puestos los stores, los iconos y el avatar",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
       "key": "TASK-184",
       "title": "Los dos modales globales metían Firebase entero en el arranque de /inicio",
-      "status": "in_review",
+      "status": "done",
       "priority": "critical"
     },
     {
@@ -1006,7 +1006,7 @@
     {
       "key": "TASK-188",
       "title": "CRITICO: el email de todos los usuarios se descarga sin sesion desde la coleccion /users — en PROD y en dev",
-      "status": "in_review",
+      "status": "done",
       "priority": "critical"
     },
     {
@@ -1030,7 +1030,7 @@
     {
       "key": "TASK-192",
       "title": "Un precio con tipo inesperado revienta y BORRA la grilla de resultados, y el payload malo queda cacheado 24 h",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -1054,7 +1054,7 @@
     {
       "key": "TASK-196",
       "title": "Import de Moxfield con formato inesperado ofrece el boton 'IMPORT NAN CARDS'",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -1168,7 +1168,7 @@
     {
       "key": "TASK-215",
       "title": "Once subcolecciones mas de /users/{userId} son legibles por cualquier usuario registrado — TASK-214 cierra 1 puerta de 12",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -1230,6 +1230,24 @@
       "title": "Sacar cranial-design/ a su propio repositorio (hoy son 174 archivos sin rastrear dentro del repo de la app)",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-226",
+      "title": "buildCardIndex no tiene lock ni transacción: dos rebuilds simultáneos del mismo usuario pueden borrarse un chunk entre sí",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-227",
+      "title": "Borrar las 134 cuentas de prueba de PROD: hasta que no se borren, sus emails se siguen descargando sin sesión",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-228",
+      "title": "public_cards es una SEGUNDA copia derivada con el mismo defecto que card_index: la escribe el cliente, sin dueño y sin reconciliación",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

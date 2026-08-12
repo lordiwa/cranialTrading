@@ -19,12 +19,12 @@
   "linked_prs": [],
   "comments": [
     {
-      "author": "deep-review",
+      "author": "reviewer",
       "at": "2026-06-28T04:04:57.052Z",
       "body": "## Deep review (código, read-only) — HP4 Notificación de match\n\n**Veredicto general: ⚠️ PARTIAL** (funciona para cartas en venta; bugs en trade y no-real-time).\n\n- **Botón \"ME INTERESA\" + handler: PASS.** `cards.grid.interested` = \"ME INTERESA\" (`CollectionGridCardFull.vue:559-574`) → `UserProfileView.handleInterest` (`:355-439`). Gateado a logueado: `canShowInterest = authStore.user && !isOwnProfile` (`:58-60`); anónimo no lo ve (ve cart mode).\n- **Record creado para el dueño: PASS.** `addDoc` a `shared_matches` con `receiverId = dueño` (`UserProfileView.vue:405-430`); el dueño lo lee en `stores/matches.ts:277-298`.\n- **Dueño notificado: PARTIAL.** Hay aviso in-app: badge + dropdown en nav Matches (`MatchNotificationsDropdown.vue`), desktop y mobile. PERO: **no es real-time** — carga one-shot con `getDocs` al montar el header, sin `onSnapshot`. Un dueño ya dentro de la app NO ve el aviso hasta recargar. No hay email/push.\n- **Carta específica identificada: PARTIAL.** El doc siempre guarda identidad de carta (`scryfallId`/`name`, `:389-400`). Pero **BUG en cartas de trade**: el texto del dropdown sale \"@sender tiene la carta **?** que buscas\" — nombre perdido + redacción invertida (`MatchNotificationsDropdown.vue:69-76` vs `matches.ts:243-251`). Para cartas en venta (VENDO) el texto es correcto.\n\n**Bugs claros e independientes del spec:** (1) notificación de trade muestra \"?\"; (2) matches no real-time (sin `onSnapshot`); (3) lógica de envío duplicada entre `UserProfileView.handleInterest` y `composables/useSendInterest.ts`, ya divergida en payloads. (4) Riesgo: dedup de `handleInterest` (`:367-372`) requiere índice compuesto Firestore — verificar que exista en dev."
     },
     {
-      "author": "resolution",
+      "author": "orchestrator",
       "at": "2026-06-28T04:09:23.829Z",
       "body": "## Resolución (Rafael, 2026-06-27)\n\nEl happy path funciona para cartas en venta. Bugs/follow-ups derivados:\n- **Bug del \"?\" en cartas de trade** → tarea creada **TASK-083** (fix + regresión).\n- **No real-time (sin `onSnapshot`)** y **sin email/push**: pendientes de decisión de scope (¿queremos notificación en vivo / externa?). NO creado como tarea aún — proponer si se quiere.\n- **Duplicación `UserProfileView.handleInterest` vs `composables/useSendInterest.ts`**: tech-debt; consolidar en el composable único. NO creado aún — proponer si se quiere.\n- **Riesgo índice compuesto Firestore** para el dedup de `handleInterest`: verificar que exista en `cranial-trading-dev`.\n\nEsta QA task pasa para venta una vez resuelto TASK-083; el resto son mejoras/decisiones abiertas."
     }

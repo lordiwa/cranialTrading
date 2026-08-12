@@ -10,7 +10,7 @@
     "Medición antes y después a 600 Kbps, 3 corridas, con baseline espalda con espalda tomado DESPUÉS de TASK-182",
     "Sin regresión en la suite E2E"
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "high",
   "labels": [
     "perf",
@@ -30,10 +30,20 @@
       "author": "orchestrator",
       "at": "2026-08-10T21:30:00.000Z",
       "body": "2026-08-10 — HECHO Y MEDIDO. Commit 53f61e4. AppHeader sale a su propio chunk de 9,19 KB comprimidos y se importa dos frames después del montaje. /inicio en frío a 600 Kbps, 3 corridas: 5879 ms antes contra 5560 ms después, ~320 ms. Acumulado con TASK-182 contra el mismo baseline: 6849 -> 5560 ms, ~1290 ms, ~19%.\n\nLAS DOS MITADES SON OBLIGATORIAS: import estático con montaje diferido igual DESCARGA el header en el arranque, porque un módulo ES se evalúa entero; import dinámico con montaje inmediato igual lo pide en el camino crítico. TASK-178 fase 2 se revirtió por el mismo error en el otro sentido.\n\nEL SALTO DE LAYOUT, y cómo el primer intento lo falló: la primera versión levantaba una bandera a los dos frames y dejaba que un defineAsyncComponent tomara el lugar. La bandera se ponía en verdadero a los ~32 ms, el chunk todavía no había llegado, el componente asíncrono no renderizaba nada, y el espacio reservado se derrumbaba — medido en 118 px de salto en escritorio y 57 px en móvil. Ahora el cambio lo dispara que el módulo esté RESUELTO, nunca un temporizador, y el placeholder replica la estructura real del header (fila 1 siempre, fila de navegación de escritorio sólo cuando corresponde la barra de logueado, decidido por el mismo predicado utils/authChrome que usa el header, para que no puedan discrepar). Remedido en logueado e invitado a 1400 px y 390 px: 0 px de salto en los cuatro casos.\n\nPENDIENTE: AppContainer lo usan 11 vistas. La suite E2E es la verificación de las otras 10 y tiene que estar verde antes de que esto salga a ningún lado."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:40:22.713Z",
+      "body": "[CLOSE-EXCEPTION] Cierre historico de saneamiento: trabajo shippeado y verificado en v1.57.0 en una sesion anterior; el ticket quedo en in_review sin comentario de reviewer registrado por el MCP."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T02:40:22.713Z",
+      "body": "Cierre de saneamiento 2026-08-12. Shippeado en v1.57.0: AppHeader sale a su propio chunk (9,19 KB) y se monta despues del primer pintado. Medido: 5879 -> 5560 ms. Durante el trabajo se atraparon dos defectos propios antes de shippear: el predicado leia authStore.user (la navegacion se pintaba y desaparecia, 3 de 3) y el diferimiento usaba solo requestAnimationFrame, que NO dispara en pestania de fondo. Los dos corregidos y reverificados."
     }
   ],
   "created_at": "2026-08-10T20:10:00.000Z",
-  "updated_at": "2026-08-10T21:30:00.000Z",
+  "updated_at": "2026-08-12T02:40:22.713Z",
   "jira_key": null,
-  "verification_tier": "tdd-tier"
+  "verification_tier": "tdd"
 }

@@ -167,35 +167,67 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       }
     })
 
-    it('does not resurrect the ghost via the deferred re-query: cureGhostCard sets _pendingMembershipRefresh through the SAME gen/timer-gated path proven for deleteCard (TASK-113/116) — the debounced persist (which excludes the ghost) always settles before refreshCurrentPage() runs, so queryCardIndex is never called against the still-stale server chunk', async () => {
+    it('reuses the SAME gen/timer-gated ordering as deleteCard/addCard (TASK-113/116): refreshCurrentPage() cannot run until the cure\'s own persist write has actually resolved', async () => {
+      // NOTE (team-lead review, TASK-223 hand-off point 1, two iterations):
+      // v1 mocked queryCardIndex to unconditionally return an empty page —
+      // that only proved queryCardIndex was called at the right TIME, never
+      // capable of failing from an actual resurrection. v2 tied the mocked
+      // response to whatever setDoc last wrote, but let the write and the
+      // query race on NATURAL microtask scheduling — verified LIVE (by
+      // deliberately firing refreshCurrentPage() before the write, the same
+      // mutation AC5 uses) that this is NOT reliable: queryPage() does
+      // `await import(...)` before calling queryCardIndex, an extra
+      // microtask hop that let the write "win" the race even with the
+      // ordering guard disabled — a false negative that stayed green.
+      //
+      // This version gates mockSetDoc behind a promise WE control (same
+      // technique as the "stale in-flight persist" tests below and in
+      // collection.paginatedSync.test.ts, TASK-116 PEDIDO #2). While the gate
+      // is held closed the write CANNOT have resolved, so if queryCardIndex
+      // fires anyway, it is provably premature — no race, no ambiguity.
       vi.useFakeTimers()
       try {
-        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
         const store = useCollectionStore()
         const card = makeCard({ id: 'ghost-1' })
         store.cards = [card] as any
         store.paginatedCards = [card] as any
-        store.cardIndexRaw = [{ i: 'ghost-1', s: 's1', n: 'Ghost', st: 'collection', q: 1, p: 0, cm: 0, co: [], r: 'c', t: '', f: false, sc: '', pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true }] as any
+        const seededIndexCard = { i: 'ghost-1', s: 's1', n: 'Ghost', st: 'collection', q: 1, p: 0, cm: 0, co: [], r: 'c', t: '', f: false, sc: '', pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true }
+        store.cardIndexRaw = [seededIndexCard] as any
+
+        let resolveSetDoc!: () => void
+        const setDocGate = new Promise<void>((res) => { resolveSetDoc = res })
+        // "Server" = whatever the write last landed. Starts WITH the ghost —
+        // the pre-cure state — and only updates once the gate is released.
+        let serverChunk: Array<{ i: string }> = [seededIndexCard]
+        mockSetDoc.mockImplementation(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+          await setDocGate
+          serverChunk = data.cards
+        })
+        mockQueryCardIndex.mockImplementation(async () => ({
+          cards: serverChunk,
+          total: serverChunk.length,
+          page: 0,
+          pageSize: 50,
+          hasMore: false,
+        }))
         mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
 
         await store.updateCard('ghost-1', { status: 'sale' })
         // Local cure already applied — the ghost is gone from the grid right away.
         expect(store.paginatedCards).toEqual([])
 
-        // Before the debounced persist (2s) fires, the deferred re-query must
-        // NOT have run yet — same ordering guarantee TASK-113 established for
-        // deleteCard, reused here via the identical _pendingMembershipRefresh +
-        // gen-token mechanism (see _runPersistLoop's finally block).
-        await vi.advanceTimersByTimeAsync(0)
+        // Debounce fires — persist starts and blocks on the (still-closed) setDoc
+        // gate. The write provably has NOT landed yet, so the deferred re-query
+        // must not have run either.
+        await vi.advanceTimersByTimeAsync(2000)
         expect(mockQueryCardIndex).not.toHaveBeenCalled()
         expect(store.paginatedCards).toEqual([])
 
-        // Persist debounce fires and settles (writes the chunk WITHOUT the
-        // ghost) — only THEN does the deferred re-query run.
-        await vi.advanceTimersByTimeAsync(2100)
+        // Release the gate — the write lands (server no longer has the ghost) —
+        // only THEN does the deferred re-query run.
+        resolveSetDoc()
+        await vi.advanceTimersByTimeAsync(0)
         expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-        // The mocked server response (as it would look once the just-completed
-        // write landed) carries no cards — the ghost does not come back.
         expect(store.paginatedCards).toEqual([])
       } finally {
         vi.useRealTimers()

@@ -986,6 +986,14 @@ exports.buildCardIndex = onCall(
       'colors', 'rarity', 'type_line', 'foil', 'setCode', 'edition', 'power',
       'toughness', 'full_art', 'produced_mana', 'keywords', 'legalities',
       'createdAt', 'condition', 'public', 'image',
+      // TASK-232 HIGH (verification-round finding): without this, the Phase 1
+      // projected read strips chunkId off every card, so allRawCards[i].data.chunkId
+      // is always undefined and the "only rewrite what actually drifted" comparison
+      // below is always true — every card, every rebuild, unconditionally. Measured
+      // consequence at 59k cards: 59,083 doc writes / 119 serial batch commits per
+      // rebuild instead of ~0 on a re-run, pushing an already 89-105s operation
+      // toward (or past) the 300s timeout.
+      'chunkId',
     ];
 
     // Phase 1: Read all user cards
@@ -1132,8 +1140,14 @@ exports.buildCardIndex = onCall(
         // eslint-disable-next-line no-await-in-loop
         await batch.commit();
       }
-      logger.info(`[buildCardIndex] Re-aligned chunkId on ${chunkIdFixes.length} card doc(s) that had drifted from this rebuild's actual placement`);
     }
+    // Unconditional (team-lead review): a log line that only appears when
+    // there's something to report is indistinguishable from "the whole
+    // block didn't run" — the exact "verification tool affirms success over
+    // an empty read" class this ticket family keeps running into (the
+    // backfill --status false positive, the fixture false positive). An
+    // explicit "0 doc(s)" is a claim; an absent line is not.
+    logger.info(`[buildCardIndex] Re-aligned chunkId on ${chunkIdFixes.length} card doc(s) that had drifted from this rebuild's actual placement`);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info(`[buildCardIndex] Done: ${allIndexCards.length} cards → ${totalChunks} chunks in ${elapsed}s`);
@@ -1414,21 +1428,27 @@ exports.applyCardIndexDelta = onCall(
     // Round 2: deletes whose believed chunk didn't have them — escalate to
     // a fresh fallback scan + a second (disjoint-chunk) transaction round.
     if (round1.notFoundDeleteIds.length > 0) {
+      // Snapshot each chunk's entry-array LENGTH before the scan appends
+      // anything — scanAndAssign mutates the SHARED `byChunk` map (used by
+      // round 1 too), and the wrong chunk round 1 already tried still has
+      // its OLD (now-stale) entry sitting in that array. Filtering by id
+      // alone would pick that stale entry back up too — a redundant
+      // transaction re-processing a chunk with nothing left to change (the
+      // team-lead review's LOW finding). Comparing against the pre-scan
+      // length isolates exactly what THIS scan just appended.
+      const preScanLengths = new Map([...byChunk.entries()].map(([k, v]) => [k, v.length]));
       const round2Chunk = new Map();
-      const stillMissing = await scanAndAssign(round1.notFoundDeleteIds, "chunkId pointed at the wrong chunk");
-      // scanAndAssign mutates the SHARED `byChunk` map (used by round 1
-      // too) — pull out only the entries it just added for round 2 so
-      // round-1 chunks aren't re-processed.
+      await scanAndAssign(round1.notFoundDeleteIds, "chunkId pointed at the wrong chunk");
       for (const [chunkNum, entries] of byChunk) {
-        const newlyAdded = entries.filter(e => round1.notFoundDeleteIds.includes(e.cardId) && !stillMissing.has(e.cardId));
+        const newlyAdded = entries.slice(preScanLengths.get(chunkNum) ?? 0);
         if (newlyAdded.length > 0) round2Chunk.set(chunkNum, newlyAdded);
       }
       if (round2Chunk.size > 0) {
         const round2 = await applyChunkTransactions(round2Chunk);
         appliedCount += round2.appliedCount;
       }
-      // stillMissing after the scan genuinely has no entry anywhere —
-      // consistent, not a phantom, not a skip.
+      // Anything the scan still could not locate genuinely has no entry
+      // anywhere in the index — consistent, not a phantom, not a skip.
     }
 
     const uniqueSkipped = [...new Set(skippedIds)];

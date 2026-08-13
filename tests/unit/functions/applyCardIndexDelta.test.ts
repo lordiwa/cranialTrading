@@ -10,6 +10,26 @@
  * meaningfully invokable here. Same static-source-assertion approach as
  * that file and bulkImportCardsChunkId.test.ts: these fail if the
  * documented invariants drift out of the source.
+ *
+ * HONEST LIMIT OF THIS TECHNIQUE (team-lead verification round, TASK-232):
+ * a source-text regex proves a LINE is present, never that the MECHANISM
+ * behaves as claimed at runtime. Measured directly on this file: the
+ * "buildCardIndex only rewrites docs whose chunkId actually drifted" test
+ * stayed GREEN while the projected Phase 1 read (`INDEX_FIELDS`) omitted
+ * `chunkId` entirely — meaning `allRawCards[i].data.chunkId` was always
+ * `undefined`, the drift comparison was always true, and the real behavior
+ * was "every card, every rebuild" while the assertion below claimed the
+ * opposite. Neither `chunkIdFixes.push(...)` nor `allRawCards[i].data.chunkId`
+ * ever stopped appearing in the source — the bug lived in a DIFFERENT part
+ * of the file (the read projection) that no assertion here was checking.
+ * The team-lead's synthetic probe of the round-2 escalation logic (inverting
+ * `!stillMissing.has` to `stillMissing.has`, which makes located phantoms
+ * never actually get deleted) also left all 15 tests green with the text
+ * otherwise untouched. Read every "it" below as "this exact line has not
+ * been deleted or trivially inverted" — not as "this behaves correctly
+ * against real Firestore data". Treat any change here that removes or
+ * reorders a matched line as a signal to re-derive the assertion, not
+ * evidence the underlying mechanism still works.
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -133,6 +153,12 @@ describe('buildCardIndex — self-corrects drifted chunkId on every rebuild (TAS
     // not an unconditional batch-write of the whole collection — that would
     // turn every rebuild into a full second write pass over every card doc.
     expect(source).toMatch(/if\s*\(chunkIdFixes\.length > 0\)\s*\{/)
+  })
+
+  it('reads chunkId in the Phase 1 projected query — without this, data.chunkId is always undefined and the drift comparison above is vacuously always true (the actual HIGH found in the first cut of this fix)', () => {
+    const fieldsMatch = source.match(/const INDEX_FIELDS = \[([\s\S]*?)\];/)
+    expect(fieldsMatch).not.toBeNull()
+    expect(fieldsMatch![1]).toMatch(/['"]chunkId['"]/)
   })
 
   it('batches the chunkId rewrites (bounded per-commit size), not one write per card', () => {

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-12T02:44:21.313Z",
+  "generated_at": "2026-08-13T16:04:50.319Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1216,7 +1216,7 @@
     {
       "key": "TASK-223",
       "title": "Que cambiar el estado y borrar funcionen SIEMPRE: curar el índice cuando el documento ya no existe",
-      "status": "todo",
+      "status": "done",
       "priority": "critical"
     },
     {
@@ -1246,6 +1246,36 @@
     {
       "key": "TASK-228",
       "title": "public_cards es una SEGUNDA copia derivada con el mismo defecto que card_index: la escribe el cliente, sin dueño y sin reconciliación",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-229",
+      "title": "INVESTIGAR (sin codear): la app satura el stream de escrituras de Firestore — resource-exhausted en la cuenta de 59k",
+      "status": "in_progress",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-230",
+      "title": "card_index: cada carta guarda su chunk en su propio documento (solo datos, nadie lo lee todavia)",
+      "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-231",
+      "title": "La app no puede enterarse de que una escritura no llego: detectar por tiempo y avisar antes de que el usuario cierre",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-232",
+      "title": "El cliente deja de ser el escritor del card_index: la escritura del indice se mueve al servidor",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-233",
+      "title": "Achicar el chunk del card_index: 818 KB por documento es lo que satura el stream de escrituras",
       "status": "todo",
       "priority": "high"
     }

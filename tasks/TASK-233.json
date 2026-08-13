@@ -1,0 +1,33 @@
+{
+  "key": "TASK-233",
+  "title": "Achicar el chunk del card_index: 818 KB por documento es lo que satura el stream de escrituras",
+  "description": "ARREGLO A de la investigacion TASK-229 (recomendacion registrada en su comentario, no abierta hasta ahora). Rafael lo autorizo el 2026-08-13 junto con el arreglo B, con la dependencia explicita de que B (TASK-232) va PRIMERO.\n\n=== ADVERTENCIA DE ALCANCE: ESTE TICKET PUEDE TERMINAR RECORTADO O CERRADO SIN CODIGO ===\nSUPUESTO (declarado como tal): si TASK-232 saca al navegador de escritor del indice, el volumen\nque hoy satura desaparece y achicar el chunk puede dejar de ser necesario. La PRIMERA tarea de\neste ticket es MEDIR de nuevo con TASK-232 ya en su lugar y decidir con ese dato si se ejecuta,\nse recorta o se cierra. No arrancar a codear antes de esa medicion.\n\n=== EL DATO QUE ORIGINA EL TICKET (MEDIDO en TASK-229, 2026-08-12) ===\n- Los chunks pesan 818 KB de promedio (max 836); el indice completo 23,97 MB, en ~30 porciones.\n- 500 escrituras chicas: 500/500 llegan. 30 escrituras de 800 KB: reproducen el error exacto de\n  saturacion. El disparador es VOLUMEN, no cantidad.\n- Un cambio suelto escribe 1 porcion de 30 (TASK-219 ya funciona). Lo que satura es tocar cartas\n  REPARTIDAS: ensucia muchas porciones a la vez.\n\n=== EL OBSTACULO ESTRUCTURAL, Y POR QUE NO ALCANZA CON BAJAR UN NUMERO ===\nMEDIDO/LEIDO en TASK-229 y TASK-230: el card_index se arma POR POSICION — la carta N vive en el\nchunk floor(N/2000) (src/stores/collection.ts:525). Un alta o una baja DESPLAZA todo lo que\nsigue, asi que ensucia todas las porciones posteriores SIN IMPORTAR CUAN CHICAS SEAN. Bajar el\ntamano de chunk sin romper la relacion posicional multiplica la cantidad de documentos sucios en\nvez de reducir el volumen escrito.\nPor eso este ticket depende de TASK-230: el chunkId PEGAJOSO es lo que permite que una carta se\nquede en su porcion aunque cambien las de al lado.\n\nLEIDO: hay TRES lugares que asumen la relacion posicional, y son el mismo patron repetido —\nsrc/stores/collection.ts:525, collection.ts:1084/1187 y functions/index.js:1063-1068. Los tres\ntienen que cambiar juntos (Regla 6 del proyecto: cambio paralelo = cambio atomico).\n\n=== RIESGO CONOCIDO A NO REPETIR ===\nUna revision fresca de 2026-08-12 advirtio que un reconciliador puede FABRICAR cartas invisibles\nsi el backfill de chunkId esta incompleto (misma clase que TASK-168). El veredicto de\nscripts/backfill-card-chunk-id.mjs tiene que dar EXIT CODE 0 en el entorno donde se trabaje\nANTES de que ningun camino lea el campo.\n\n=== LO QUE ESTE TICKET NO HACE ===\nNo mueve la escritura al servidor (eso es TASK-232). No agrega el detector por tiempo\n(TASK-231). No toca la persistencia de la cola local (spike en TASK-231).",
+  "acceptance_criteria": [
+    "MEDIDO PRIMERO, ANTES DE CODEAR: con TASK-232 ya en su lugar, se repite la medicion de volumen de TASK-229 y queda escrito en el ticket si achicar el chunk sigue haciendo falta. Si no hace falta, el ticket se cierra con ese dato y sin codigo — es un resultado valido",
+    "Si se ejecuta: el nuevo tamano de chunk esta JUSTIFICADO POR ESCRITO contra el dato medido, no elegido a ojo. Queda registrado que volumen escribe una tanda de mutaciones repartidas antes y despues",
+    "La relacion posicional se rompe de verdad: una carta se queda en su porcion aunque se agreguen o borren cartas anteriores. Cubierto por un test que agrega y borra cartas al principio de la coleccion y verifica que las porciones posteriores NO se ensucian",
+    "Los TRES lugares que asumen la posicion cambian juntos: src/stores/collection.ts:525, collection.ts:1084/1187 y functions/index.js:1063-1068. Verificado por grep de que no queda ningun calculo posicional suelto",
+    "El veredicto de scripts/backfill-card-chunk-id.mjs da EXIT CODE 0 en el entorno donde se trabaja ANTES de que ningun camino lea el campo — para no fabricar cartas invisibles (clase TASK-168)",
+    "MEDIDO en la cuenta de 59k de dev: la busqueda por nombre en la coleccion sigue funcionando igual (es substring y es la espina dorsal de la app), y el conteo total del indice coincide exactamente con los documentos",
+    "La suite unitaria completa sigue verde, npx vite build --mode development limpio, y los candados de perdida de datos de TASK-185/219/223 siguen verdes"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card_index",
+    "plan-v4",
+    "perf"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-230",
+    "TASK-232"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-13T16:04:50.319Z",
+  "updated_at": "2026-08-13T16:04:50.319Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-12T15:21:56.458Z",
+      "body": "DECISIONES DE RAFAEL 2026-08-12 (resuelven AC2 y AC3):\n\nAC2 — LISTA EXACTA: Rafael descarta el gate de la lista. Textual: \"podemos borrar todas no hace falta preservar cuentas\". No hay cuentas a preservar entre las 134. PENDIENTE MENOR, no bloqueante: verificar por lectura si la cuenta personal de Rafael en PROD esta entre las 134, para decirselo antes de ejecutar — no para excluirla, sino para que sepa que la va a perder.\n\nAC3 — ALCANCE DEL BORRADO, decidido: TODO. Por cada una de las 134 se borra:\n  - el documento /users/{uid}\n  - TODAS sus subcolecciones (cards, decks, binders, preferences, savedMatches, savedContacts, priceHistory y cualquier otra que exista)\n  - la cuenta de Firebase Auth\nRazon dada y aceptada: es la unica opcion que no deja huerfanos invisibles NI cuentas que puedan volver a loguearse y recrear el documento de /users.\n\nQUEDA ABIERTO: los AC1, AC4 y AC5 (medicion anonima antes, medicion anonima despues, y verificar que un perfil publico legitimo se sigue abriendo sin sesion).\n\nNO SE EJECUTA TODAVIA. Dos razones: (1) el orden acordado pone TASK-223 primero, que esta in_progress ahora mismo; (2) es un borrado irreversible en PRODUCCION y necesita OK explicito de ejecucion de Rafael en el momento, no solo la decision de alcance registrada aca."
+    }
+  ],
   "created_at": "2026-08-12T02:43:59.013Z",
-  "updated_at": "2026-08-12T02:43:59.013Z",
+  "updated_at": "2026-08-12T15:21:56.458Z",
   "jira_key": null,
   "verification_tier": "uat-only"
 }

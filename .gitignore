@@ -58,6 +58,11 @@ public/*.jpeg
 # fixture de divergencia de card_index (scripts/card-index-fixture.mjs)
 .card-index-fixture.json
 
+# estado de cursor del backfill de chunkId (scripts/backfill-card-chunk-id.mjs,
+# TASK-230) — progreso de una corrida local por-maquina, no aporta nada versionado.
+# El nombre incluye el projectId (dev/prod nunca comparten archivo — HIGH-1).
+.backfill-card-chunk-id-state.*.json
+
 # Sub-proyecto de diseño: va a su PROPIO repositorio (TASK-225).
 # OJO: hoy vive SOLO en el disco local, sin copia en ningun remoto.
 cranial-design/

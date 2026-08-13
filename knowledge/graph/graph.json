@@ -96,6 +96,12 @@
       "type": "task",
       "ref": "tasks/TASK-215.json",
       "label": "Once subcolecciones mas de /users/{userId} son legibles por cualquier usuario registrado — TASK-214 cierra 1 puerta de 12"
+    },
+    {
+      "id": "task-223",
+      "type": "task",
+      "ref": "tasks/TASK-223.json",
+      "label": "Que cambiar el estado y borrar funcionen SIEMPRE: curar el índice cuando el documento ya no existe"
     }
   ],
   "edges": []

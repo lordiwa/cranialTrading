@@ -463,6 +463,15 @@ exports.bulkImportCards = onCall(
     const createdIds = [];
     const BATCH_SIZE = 500;
 
+    // TASK-230: sticky chunkId, written once at creation and never
+    // recalculated — NOT read anywhere yet, see the ticket for why. position
+    // continues from the account's EXISTING card count so a second import
+    // call into a non-empty collection doesn't collide chunkId with cards a
+    // prior call (or addCard) already created; it then increments once per
+    // card across the WHOLE `cards` array, not per BATCH_SIZE chunk, so
+    // chunkId stays a single monotonic sequence over this entire call.
+    let position = (await colRef.count().get()).data().count;
+
     for (let i = 0; i < cards.length; i += BATCH_SIZE) {
       const chunk = cards.slice(i, i + BATCH_SIZE);
       const batch = db.batch();
@@ -481,8 +490,12 @@ exports.bulkImportCards = onCall(
           }
         }
 
+        const chunkId = Math.floor(position / INDEX_CHUNK_SIZE);
+        position += 1;
+
         batch.set(ref, {
           ...userFields,
+          chunkId,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });

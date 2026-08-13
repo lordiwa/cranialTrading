@@ -1,0 +1,33 @@
+{
+  "key": "TASK-230",
+  "title": "card_index: cada carta guarda su chunk en su propio documento (solo datos, nadie lo lee todavia)",
+  "description": "PREREQUISITO DESBLOQUEANTE. Sale de la investigacion de TASK-229. Es el punto 2 del plan v4 del\ncard_index, recortado a la rebanada mas chica y segura que existe: SOLO ESCRIBIR EL DATO.\n\n=== POR QUE ESTE TICKET Y POR QUE AHORA ===\nMEDIDO en TASK-229: el card_index se arma POR POSICION — la carta N vive en el chunk\nfloor(N/2000) (src/stores/collection.ts:525). De ahi salen los dos problemas que bloquean todo\nlo demas:\n (a) un alta o una baja DESPLAZA todo lo que sigue, asi que ensucia todos los chunks\n     posteriores sin importar cuan chicos sean; y\n (b) LEIDO en functions/index.js: el servidor NO tiene ningun camino para tocar un chunk suelto\n     — solo sabe reconstruir el indice entero (buildCardIndex, MEDIDO 89-105 s con 59k cartas).\nMientras la carta no sepa a que chunk pertenece, ni achicar el chunk ni mover la escritura al\nservidor son implementables. Los dos arreglos candidatos dependen de ESTE dato.\n\nPOR QUE AHORA Y NO DESPUES — MEDIDO 2026-08-12 con Admin SDK:\n  prod: 134 usuarios, 10 con cartas, 6.535 documentos de carta en total, la mayor coleccion 3.564.\n  dev : 244 usuarios, 6 con cartas, 121.294 documentos, dos cuentas de ~59k.\nEl backfill HOY son 6.535 documentos en prod. Despues del lanzamiento son millones. Ademas la\nmayor coleccion de prod son 2 chunks, o sea que hoy NADIE en produccion puede tocar el bug —\npero por el dato de mercado del proyecto (80% con 25k+ cartas, 30% con 100k+) rompe para casi\ntodos el dia del lanzamiento.\n\n=== ALCANCE EXACTO ===\nSe agrega un campo (nombre propuesto: chunkId) al documento de cada carta en users/{uid}/cards/.\nSe escribe al CREAR la carta y NO se vuelve a calcular nunca (pegajoso).\nNADIE LO LEE EN ESTE TICKET. No cambia ningun comportamiento. No se toca como se arma ni como se\nescribe el indice. Esa es la razon de partirlo asi: el dato queda puesto y verificado antes de\nque nada dependa de el.\n\nLEIDO (researcher, 2026-08-12) — solo hay DOS caminos que crean documentos de carta, no nueve:\n  1. src/stores/collection.ts:1259  addCard()            cliente, 1 documento\n  2. functions/index.js:445         bulkImportCards      servidor, batch, max 5000 por llamada\nLos dos tienen que escribir el campo. Es la Regla 6 del proyecto: cambio paralelo = cambio atomico.\n\nLEIDO: hay TRES lugares que asumen la relacion posicional, y son el mismo patron repetido —\ncollection.ts:525, collection.ts:1084/1187 y functions/index.js:1063-1068. Este ticket NO los\ntoca; se listan para que el ticket siguiente sepa donde mirar.\n\n=== DECISION DE DISENIO QUE SE ASUME (corregir si Rafael dice otra cosa) ===\n[ASSUMED] El backfill le asigna a cada carta existente el chunk que HOY le corresponde por\nposicion, o sea reproduce exactamente el reparto actual. Los dos caminos de creacion escriben el\nmismo valor que hoy daria el calculo posicional.\nCONSECUENCIA ACEPTADA Y DECLARADA: como el campo es pegajoso y la posicion no, despues de altas y\nbajas el chunkId va a DIVERGIR del reparto posicional. Es deliberado — es justamente lo que hace\nutil al campo — y la reconciliacion es problema del ticket siguiente, no de este. Mientras nadie\nlea el campo, esa divergencia no tiene ningun efecto.\n\n=== EL RIESGO QUE HAY QUE NO REPETIR ===\nH4 del plan v4, que es la clase exacta de TASK-168 (perdida de datos real): un backfill\nincompleto deja cartas sin el campo, y un consumidor futuro que pregunte \"where chunkId == N\"\nno las veria y podria concluir que no deberian estar. ESTE TICKET NO CIERRA ESE RIESGO — lo\nEVITA, porque nadie lee el campo todavia. El ticket que empiece a leerlo tiene que tratar\n\"carta sin chunkId\" como SE AGREGA, nunca como se quita.\n\nLEIDO: no hay precedente reutilizable de backfill por-cuenta sobre decenas de miles de\ndocumentos. scripts/backfill-cardnamelower.cjs opera sobre public_cards (coleccion global, no\npor usuario) y no es reanudable por cursor; dedup-backfill-usernames.mjs si enumera usuarios pero\nsolo cuenta cartas. El script de este ticket hay que escribirlo, y es la mayor parte del trabajo.",
+  "acceptance_criteria": [
+    "Los DOS caminos de creacion escriben el campo: src/stores/collection.ts addCard() y functions/index.js bulkImportCards. Verificado con un test por cada camino",
+    "Existe un script de backfill en scripts/ que es REANUDABLE por cursor (no re-lee desde cero al reintentar) e IDEMPOTENTE (correrlo dos veces no cambia nada la segunda vez), y que recorre las cuentas de a una",
+    "El script imprime, por cuenta y al final, cuantas cartas tenian ya el campo, cuantas se escribieron y cuantas quedaron SIN el campo. Un backfill incompleto tiene que ser visible, no silencioso",
+    "MEDIDO tras correr el backfill en dev: 0 cartas sin chunkId en las 6 cuentas con cartas (121.294 documentos), y el valor coincide con el chunk posicional actual en una muestra verificada contra el card_index real",
+    "MEDIDO tras correr el backfill en prod: 0 cartas sin chunkId en las 10 cuentas con cartas (6.535 documentos)",
+    "NINGUN camino de lectura consulta el campo. Verificado por grep: la unica escritura son los 2 caminos de creacion mas el script; cero lecturas en src/ y functions/",
+    "SIN CAMBIO DE COMPORTAMIENTO: la suite unitaria completa sigue verde y npx vite build sigue limpio. El card_index se sigue armando y escribiendo exactamente igual que antes"
+  ],
+  "status": "in_review",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "prerequisito",
+    "migracion-de-datos",
+    "no-reparar-sin-leer",
+    "escala"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T20:17:53.425Z",
+  "updated_at": "2026-08-12T20:50:56.112Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[INFERRED:strong]"
+}

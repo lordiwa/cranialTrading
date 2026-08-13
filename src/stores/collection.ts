@@ -6,6 +6,7 @@ import {
     collection,
     deleteDoc,
     doc,
+    getCountFromServer,
     getDocs,
     setDoc,
     Timestamp,
@@ -1258,8 +1259,35 @@ export const useCollectionStore = defineStore('collection', () => {
         try {
             const colRef = collection(db, 'users', authStore.user.id, 'cards')
             const cleanData = stripUndefined(cardData as Record<string, unknown>)
+            // TASK-230: sticky chunkId, written once at creation and never
+            // recalculated — NOT read anywhere yet, see the ticket for why.
+            // Deliberately queries the server's real doc count (matching the
+            // bulkImportCards server path) instead of using
+            // cards.value.length: cards.value is only fully populated at the
+            // END of loadFromIndex (TASK-185's `_indexLoadInFlight` window —
+            // see the comment above syncIndexOrQueue), so during that window
+            // its .length undercounts and would write a wrong, permanently-
+            // sticky chunkId. getCountFromServer sidesteps client load state
+            // entirely — same pattern already used in
+            // src/services/publicCards.ts and src/services/stats.ts.
+            //
+            // If the count query itself fails (offline, degraded network —
+            // TASK-229 measured this app's central failure mode as writes
+            // that don't land under exactly these conditions, and the target
+            // market is slow 4G), chunkId is OMITTED rather than guessed or
+            // defaulted: a missing field is safely backfillable later, but a
+            // wrong sticky value never self-corrects. The add must not gain
+            // a hard network dependency it didn't have before this ticket.
+            let chunkId: number | undefined
+            try {
+                const cardCountSnap = await getCountFromServer(colRef)
+                chunkId = Math.floor(cardCountSnap.data().count / INDEX_CHUNK_SIZE)
+            } catch (countError) {
+                logSanitizedError('[TASK-230] Could not read server card count, omitting chunkId', countError)
+            }
             const docRef = await addDoc(colRef, {
                 ...cleanData,
+                ...(chunkId !== undefined ? { chunkId } : {}),
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
             })

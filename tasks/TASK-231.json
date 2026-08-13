@@ -1,0 +1,32 @@
+{
+  "key": "TASK-231",
+  "title": "La app no puede enterarse de que una escritura no llego: detectar por tiempo y avisar antes de que el usuario cierre",
+  "description": "Sale de la investigacion de TASK-229. Es la red de seguridad barata: NO arregla la causa, hace\nque deje de ser SILENCIOSA.\n\n=== EL HECHO MEDIDO QUE OBLIGA A UN MECANISMO NUEVO ===\nMEDIDO en TASK-229 (local contra dev, cuenta de 59.081 cartas, Firestore SDK 11.10.0): cuando el\nwrite stream se satura, las promesas de escritura NO RECHAZAN — quedan PENDIENTES hasta 145 s.\nCon el error resource-exhausted impreso tres veces en consola, el arnes de medicion conto CERO\nrechazos.\n\nEsto es mas grave que un catch mal escrito, y es la razon de que este ticket exista:\n - LEIDO src/stores/collection.ts:1192-1207: el catch del persist del indice solo hace\n   logSanitizedError a consola. Pero MEDIDO: ese catch NI SIQUIERA CORRE.\n - LEIDO src/stores/collection.ts:1363: el updateDoc de la carta SI esta await-eado y SI tiene\n   rollback y toast. Pero MEDIDO: bajo saturacion ese await NUNCA VUELVE, asi que el rollback y\n   el toast no se disparan.\nNO HAY NINGUN PUNTO DEL CODIGO donde se hubiera podido poner el manejo de este error. Por eso no\nalcanza con \"mejorar el catch\": hace falta un detector POR TIEMPO, que es la unica senial\ndisponible cuando la promesa no se asienta.\n\n=== LA OTRA MITAD: LO ENCOLADO MUERE CON LA PESTANIA ===\nMEDIDO: con la pestania abierta, la cola drena sola (29 cambios convergieron en ~4 min).\nSi la pestania se cierra dentro de esa ventana, se pierde: 15 de 30 escrituras encoladas\ndesaparecieron para siempre, y quedaron 29 cartas divergentes que NO se movieron en 5 minutos.\nLEIDO src/services/firestore.ts:11-13: la app usa memoryLocalCache(), asi que la cola de\nmutaciones vive solo en RAM.\nO sea que el momento peligroso es exacto y avisable: hay escrituras pendientes Y el usuario se va.\n\n=== ALCANCE ===\n1. Un detector por tiempo sobre las escrituras del camino de mutacion de cartas: si una\n   escritura no se asento en N segundos, la app lo sabe. N a definir con la medicion de\n   TASK-229 como referencia (la ultima escritura de una tanda saturada tardo 145 s, asi que el\n   umbral no puede ser tan corto que grite en cada tanda normal ni tan largo que no sirva).\n2. Que el usuario se entere de que hay guardados en vuelo, y sobre todo un aviso antes de\n   cerrar/recargar si quedan pendientes. Es lo unico que convierte \"perdida permanente\" en\n   \"esperar unos segundos\".\n3. NO se toca la causa (el tamano de los chunks ni quien escribe el indice). Eso es TASK-230 y\n   lo que venga despues.\n\n=== LO QUE SE DESCARTO Y POR QUE (no reproponerlo sin leer esto) ===\nSe evaluo persistir la cola de escrituras cambiando memoryLocalCache por persistentLocalCache.\nDos de las tres objeciones se cayeron al medirlas:\n - MEDIDO por el researcher (build real, revertido): el chunk de firebase pesa 696.44 kB /\n   162.75 kB gzip IDENTICO con los dos modos. El costo en bytes es ~0, lo que importa en un\n   mercado de 4G lenta.\n - LEIDO en el SDK: el default es 40 MB con recoleccion LRU, asi que NO cachea la coleccion\n   entera como se habia supuesto.\nPero queda la objecion que manda, y es historica y deliberada:\n - LEIDO git: persistentLocalCache ERA el default de esta app. Se saco el 2026-03-10 en dos\n   pasos. f36c19f intento convivir con la corrupcion de IndexedDB (detector de errores\n   sincronos + recarga + borrado en segundo plano). 5964701 se rindio, cita textual: \"replace\n   persistent Firestore cache with memoryLocalCache to eliminate reload loop... permanently\n   removes the dependency on IndexedDB entirely\" — el detector tenia una carrera que provocaba\n   un bucle de recargas QUE INTERRUMPIA LA CARGA DE DATOS.\n - LEIDO en el SDK: no existe una tercera opcion. Es binario: o todo en RAM (MemoryMutationQueue)\n   o todo en IndexedDB (IndexedDbMutationQueue). No hay forma de persistir SOLO la cola.\nVolver a persistente es REVERTIR UNA DECISION DELIBERADA sin haber entendido nunca la causa de\naquella corrupcion. Si se quiere, es un spike de investigacion aparte, no un ticket de arreglo.",
+  "acceptance_criteria": [
+    "Existe un detector por TIEMPO (no por catch) que determina que una escritura del camino de mutacion de cartas no se asento dentro del umbral elegido. Cubierto por un test que simula una promesa que nunca se asienta — no una que rechaza",
+    "El umbral elegido esta justificado por escrito contra el dato medido en TASK-229 (una tanda saturada tardo hasta 145 s en drenar), y no grita en una operacion normal. Verificado con un caso normal que NO dispara el aviso",
+    "El usuario recibe un aviso claro cuando hay escrituras pendientes sin asentar, en el idioma correspondiente. Las claves i18n existen en en.json, es.json y pt.json (Regla 3 del proyecto)",
+    "Si el usuario intenta cerrar o recargar con escrituras pendientes, la app lo advierte antes. Verificado a mano en el navegador contra la cuenta grande de dev",
+    "NO se toca el tamano del chunk, ni quien escribe el card_index, ni el modo de cache de Firestore. El diff no incluye src/services/firestore.ts",
+    "La suite unitaria completa sigue verde y npx vite build sigue limpio"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "perdida-silenciosa",
+    "flujo-3",
+    "ux",
+    "escala"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-12T20:18:33.331Z",
+  "updated_at": "2026-08-12T20:18:33.331Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[INFERRED:strong]"
+}

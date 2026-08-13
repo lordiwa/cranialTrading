@@ -72,6 +72,7 @@ vi.mock('firebase/firestore', () => ({
   collection: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
   deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
   doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
+  getCountFromServer: vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   Timestamp: { now: () => ({ seconds: 0, nanoseconds: 0 }) },

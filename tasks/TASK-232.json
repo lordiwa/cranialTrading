@@ -1,0 +1,32 @@
+{
+  "key": "TASK-232",
+  "title": "El cliente deja de ser el escritor del card_index: la escritura del indice se mueve al servidor",
+  "description": "ARREGLO B de la investigacion TASK-229 (recomendacion registrada en su comentario, no abierta hasta ahora). Es el punto 3 del plan v4 del card_index. Rafael lo autorizo el 2026-08-13 junto con el arreglo A, con la dependencia explicita de que B va PRIMERO.\n\n=== POR QUE B ANTES QUE A ===\nSUPUESTO (declarado como tal, decide el orden de trabajo, no una accion tecnica): si el servidor\npasa a ser el escritor del indice, el volumen que hoy sale del navegador desaparece, y buena\nparte de lo que el arreglo A resuelve deja de importar. Por eso A queda detras de B y\nposiblemente recortado. Si al terminar B la medicion muestra que el chunk de 818 KB sigue\ndoliendo por otra via, A se ejecuta completo.\n\n=== LA CAUSA, MEDIDA EN TASK-229 (2026-08-12, cuenta de 59.081 cartas, dev, HEAD bde3f7e) ===\n1. MEDIDO: los chunks del card_index pesan 818 KB de promedio (max 836); el indice completo\n   23,97 MB.\n2. MEDIDO: 500 escrituras chicas llegan 500/500. 30 escrituras de 800 KB reproducen el mensaje\n   exacto que reporto Rafael (\"Write stream exhausted maximum allowed queued writes\" +\n   \"maximum backoff\"). El disparador es VOLUMEN, no cantidad.\n3. MEDIDO — EL HALLAZGO CENTRAL: bajo saturacion las promesas NO RECHAZAN, quedan PENDIENTES\n   hasta 145 s. El catch del persist ni siquiera corre; el await del updateDoc (que SI tiene\n   rollback y toast) nunca vuelve. No hay punto del codigo donde se hubiera podido manejar.\n4. MEDIDO: 29 cambios de estado repartidos -> 20 cartas divergentes al minuto, 8 a los 2 min,\n   0 a los 4 min. Con la pestania abierta CONVERGE.\n5. MEDIDO: si la pestania muere dentro de esa ventana la perdida es PERMANENTE — 29 divergentes\n   sin moverse a los 5 min; de 30 escrituras encoladas, 15 perdidas para siempre.\n   Causa LEIDA: src/services/firestore.ts:11-13 usa memoryLocalCache(), la cola vive solo en\n   memoria.\n\nMientras el navegador sea el escritor, TODA esa clase sigue viva: es el cliente el que tiene la\ncola fragil, el que muere con la pestania y el que sube decenas de MB por 4G lenta.\n\n=== QUE HABILITA TASK-230 ===\nLEIDO (functions/index.js): hoy el servidor NO tiene ningun camino para tocar un chunk suelto —\nsolo sabe reconstruir el indice entero (buildCardIndex, MEDIDO 89-105 s con 59k cartas). Con el\ncampo chunkId pegajoso que escribe TASK-230, el servidor puede ubicar la carta en su porcion sin\nrecorrer la coleccion entera. Por eso este ticket depende de 230 y no al reves.\n\n=== ALCANCE A DEFINIR ANTES DE CODEAR (parte del ticket) ===\nHay que elegir y dejar escrito el mecanismo antes de escribir codigo:\n - onCall que recibe el delta y actualiza la porcion, o trigger de Firestore sobre\n   users/{uid}/cards/{cardId}. LEIDO (researcher 2026-08-12): hoy hay CERO triggers de Firestore\n   en todo el repo — elegir trigger es introducir una clase de infraestructura nueva.\n - Que hace el cliente mientras tanto: sigue con su parche optimista, y como se entera de que el\n   servidor confirmo.\n - Concurrencia: TASK-226 ya registra que buildCardIndex no tiene lock ni transaccion. Dos\n   escritores sobre la misma porcion es exactamente el problema que ese ticket describe.\n - Costo: cada mutacion pasa a ser una invocacion de funcion. Estimarlo antes, no despues.\n\n=== LO QUE ESTE TICKET NO HACE ===\nNo toca el tamano del chunk (eso es el arreglo A). No toca la persistencia de la cola local\n(descartado como arreglo, anotado como spike en TASK-231). No agrega el detector por tiempo\n(TASK-231).\n\n=== TICKETS DE LA MISMA FAMILIA ===\nTASK-229 (la investigacion que lo midio), TASK-208 (el sintoma: el indice diverge),\nTASK-206/207 (la version masiva), TASK-176 (el E2E rojo que es el mismo defecto),\nTASK-219 (escritura angosta, ya funciona), TASK-230 (el prerequisito), TASK-231 (avisar al\nusuario), TASK-226 (buildCardIndex sin lock), TASK-222 (escritura angosta concurrente con el\nrebuild).",
+  "acceptance_criteria": [
+    "DECIDIDO Y ESCRITO en el ticket, antes de codear: el mecanismo elegido (onCall con delta vs trigger de Firestore), que hace el cliente mientras tanto, como se resuelve la concurrencia con buildCardIndex (TASK-226), y el costo estimado por mutacion",
+    "El servidor puede actualizar UNA porcion del card_index sin reconstruir el indice entero, usando el campo chunkId de TASK-230. Cubierto por un test que verifica que las demas porciones quedan byte-identicas",
+    "Un cambio de estado y un borrado desde el camino normal del usuario NO producen ninguna escritura del card_index desde el navegador. Verificado por grep de los escritores en src/ y MEDIDO contando peticiones al canal Write durante la operacion",
+    "MEDIDO en la cuenta de 59k de dev: se repite el experimento de TASK-229 (29 cambios de estado repartidos) y quedan 0 cartas divergentes al minuto, no 20",
+    "MEDIDO: cerrar la pestania inmediatamente despues de una tanda de cambios NO deja divergencia permanente. Es el escenario que hoy pierde datos para siempre",
+    "La suite unitaria completa sigue verde y npx vite build --mode development sigue limpio",
+    "Los candados de perdida de datos de TASK-185/219/223 siguen verdes: este cambio no puede reabrir ninguno de ellos"
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "card_index",
+    "plan-v4",
+    "perdida-silenciosa"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-230"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-13T16:04:19.772Z",
+  "updated_at": "2026-08-13T16:04:19.772Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

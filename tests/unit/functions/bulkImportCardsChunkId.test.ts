@@ -66,4 +66,39 @@ describe('bulkImportCards — sticky chunkId on creation (TASK-230)', () => {
     const beforeOuterLoop = source.slice(0, outerLoopIdx)
     expect(beforeOuterLoop).toMatch(/let\s+\w+\s*=\s*\(await\s+colRef\.count\(\)\.get\(\)\)/)
   })
+
+  it('ties the increment to the chunkId calculation itself, per card — a vacuous lock otherwise (TASK-230 MED-A)', () => {
+    // The test above only asserts WHERE the counter variable is declared —
+    // it never checked that it is ever incremented. Deleting `position += 1`
+    // entirely leaves it green: every card in the whole call (all 5000)
+    // would then get chunkId = floor(existingCount / INDEX_CHUNK_SIZE), the
+    // SAME chunkId, and no test here would notice.
+    //
+    // This backreference ties the increment to the chunkId assignment: the
+    // captured counter name from `chunkId = Math.floor(<name> / ...)` must
+    // reappear as `<name> += 1` within the following ~40 characters — i.e.
+    // right after computing chunkId for THIS card, inside the per-card
+    // `for (const card of chunk)` loop, not somewhere unrelated in the file.
+    expect(source).toMatch(
+      /const\s+chunkId\s*=\s*Math\.floor\(\s*(\w+)\s*\/\s*INDEX_CHUNK_SIZE\s*\);[\s\S]{0,40}\1\s*\+=\s*1/
+    )
+  })
+
+  it('computes chunkId INSIDE the per-card loop, not once above it for the whole 500-card chunk (TASK-230 review M3)', () => {
+    // The backreference test above ties `position += 1` to the SAME
+    // chunkId assignment, but a backreference can't see loop nesting: moving
+    // BOTH lines together — `const chunkId = Math.floor(...)` AND
+    // `position += 1` — up above `for (const card of chunk)` keeps them
+    // exactly as adjacent as they are today, so that test would still pass,
+    // while the real defect this whole candado exists to catch would be
+    // live: chunkId (and position) would advance once per 500-card BATCH
+    // instead of once per card, freezing chunkId for the entire chunk.
+    //
+    // Guard directly against that: the chunkId assignment must appear AFTER
+    // the per-card loop opens, i.e. textually inside it.
+    const perCardLoopIdx = source.indexOf('for (const card of chunk)')
+    expect(perCardLoopIdx).toBeGreaterThan(-1)
+    const chunkIdIdx = source.indexOf('const chunkId = Math.floor(')
+    expect(chunkIdIdx).toBeGreaterThan(perCardLoopIdx)
+  })
 })

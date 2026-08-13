@@ -150,6 +150,12 @@ async function processAccount(uid, state) {
   if (state) state[uid] = st;
 
   if (state && st.done) {
+    // MED-B (TASK-230): `st.done` came from the STATE FILE, persisted by a
+    // PREVIOUS invocation — this call has not read a single document for
+    // this account. Mark it so main()'s verdict can't fold this account's
+    // stale totals into "0 cartas sin chunkId medidas en esta corrida"; see
+    // computeVerdict's `unverified` flag in backfillCardChunkIdHelpers.mjs.
+    st.resumedFromCache = true;
     return st;
   }
 
@@ -267,6 +273,7 @@ async function main() {
   let totalFailed = 0;
   let accountsWithCards = 0;
   let accountsIncomplete = 0;
+  let accountsResumedFromCache = 0;
 
   for (const uid of uids) {
     // eslint-disable-next-line no-await-in-loop
@@ -279,12 +286,14 @@ async function main() {
     totalWritten += st.written;
     totalFailed += st.failed;
     if (!st.done) accountsIncomplete += 1;
+    if (st.resumedFromCache) accountsResumedFromCache += 1;
 
     const label = accountStatusLabel(mode, st);
-    console.log(`${uid}: ya tenian=${st.alreadyHad}  ${RUN ? 'escritas' : 'a-escribir'}=${st.written}  sin-campo=${accountMissingCount(mode, st)}  [${label}]`);
+    const cacheNote = st.resumedFromCache ? ' (resuelta por cursor persistido — no medida esta corrida)' : '';
+    console.log(`${uid}: ya tenian=${st.alreadyHad}  ${RUN ? 'escritas' : 'a-escribir'}=${st.written}  sin-campo=${accountMissingCount(mode, st)}  [${label}]${cacheNote}`);
   }
 
-  const { totalMissing, clean } = computeVerdict(mode, { totalWritten, totalFailed, accountsIncomplete });
+  const { totalMissing, clean, unverified } = computeVerdict(mode, { totalWritten, totalFailed, accountsIncomplete, accountsResumedFromCache });
 
   console.log('');
   console.log('TOTAL');
@@ -309,9 +318,26 @@ async function main() {
     console.log('');
     console.log(`AVISO: ${totalMissing} carta(s) todavia NO tienen chunkId — correr \`--run\` para escribirlas.`);
   }
+  if (accountsResumedFromCache > 0) {
+    console.log('');
+    console.log(`AVISO: ${accountsResumedFromCache} cuenta(s) se resolvieron por el cursor persistido de una corrida`);
+    console.log('anterior (state file) — esta corrida NO volvio a leer sus documentos, asi que sus');
+    console.log('totales de arriba son los de esa corrida anterior, no una medicion nueva.');
+  }
 
   console.log('');
-  console.log(clean ? 'VEREDICTO: 0 cartas sin chunkId.' : 'VEREDICTO: backfill incompleto — ver AVISOs arriba.');
+  if (unverified) {
+    // MED-B (TASK-230): NEVER print the unqualified "VEREDICTO: 0 cartas sin
+    // chunkId" here — some accounts above were resolved from a stale
+    // persisted cursor, not measured this call, so that claim would be a
+    // measurement this invocation never took. `--status` is the instrument
+    // that actually measures (stateless, always from position 0).
+    console.log('VEREDICTO: sin faltantes medidos EN ESTA CORRIDA, pero hay cuenta(s) resueltas por cursor');
+    console.log('persistido y no re-medidas — este veredicto NO cubre esas cuentas. Correr `--status`');
+    console.log('(stateless, mide siempre desde cero) para confirmarlas.');
+  } else {
+    console.log(clean ? 'VEREDICTO: 0 cartas sin chunkId.' : 'VEREDICTO: backfill incompleto — ver AVISOs arriba.');
+  }
   process.exitCode = clean ? 0 : 1;
 }
 

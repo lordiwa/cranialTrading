@@ -39,6 +39,7 @@ describe('computeVerdict', () => {
     expect(computeVerdict('run', { totalWritten: 121294, totalFailed: 0, accountsIncomplete: 0 })).toEqual({
       totalMissing: 0,
       clean: true,
+      unverified: false,
     })
   })
 
@@ -61,5 +62,35 @@ describe('computeVerdict', () => {
   it('not clean when any account is incomplete, even with zero missing counted so far', () => {
     expect(computeVerdict('status', { totalWritten: 0, totalFailed: 0, accountsIncomplete: 1 }).clean).toBe(false)
     expect(computeVerdict('run', { totalWritten: 0, totalFailed: 0, accountsIncomplete: 1 }).clean).toBe(false)
+  })
+
+  describe('accountsResumedFromCache — MED-B (TASK-230): a --run over a state file left by a completed run must not claim a measurement it never took', () => {
+    it('RUN mode: unverified and not clean when some accounts were resolved from a persisted cursor, even with zero failures and nothing incomplete', () => {
+      const verdict = computeVerdict('run', {
+        totalWritten: 121294,
+        totalFailed: 0,
+        accountsIncomplete: 0,
+        accountsResumedFromCache: 1,
+      })
+      expect(verdict.unverified).toBe(true)
+      expect(verdict.clean).toBe(false)
+    })
+
+    it('RUN mode: verified and clean when no account was resumed from cache (accountsResumedFromCache defaults to 0 — existing callers unaffected)', () => {
+      const verdict = computeVerdict('run', { totalWritten: 121294, totalFailed: 0, accountsIncomplete: 0 })
+      expect(verdict.unverified).toBe(false)
+      expect(verdict.clean).toBe(true)
+    })
+
+    it('STATUS mode: accountsResumedFromCache never makes it unverified — --status is stateless and this scenario cannot occur there, but the pure function must not falsely flag it either', () => {
+      const verdict = computeVerdict('status', {
+        totalWritten: 0,
+        totalFailed: 0,
+        accountsIncomplete: 0,
+        accountsResumedFromCache: 5,
+      })
+      expect(verdict.unverified).toBe(false)
+      expect(verdict.clean).toBe(true)
+    })
   })
 })

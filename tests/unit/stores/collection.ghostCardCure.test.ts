@@ -22,6 +22,7 @@ vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: vi.fn(),
   buildCardIndex: vi.fn(),
+  applyCardIndexDelta: vi.fn().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 }),
   loadCollectionChunk: vi.fn(),
   loadCardPage: vi.fn(),
 }))
@@ -92,10 +93,11 @@ vi.mock('@/stores/toast', () => ({
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore, type IndexCard } from '@/stores/collection'
-import { queryCardIndex } from '@/services/cloudFunctions'
+import { applyCardIndexDelta, queryCardIndex } from '@/services/cloudFunctions'
 import { makeCard } from '../helpers/fixtures'
 
 const mockQueryCardIndex = vi.mocked(queryCardIndex)
+const mockApplyCardIndexDelta = vi.mocked(applyCardIndexDelta)
 
 /** A Firestore-shaped error carrying an exact `.code`, the only signal the cure may react to. */
 const firestoreError = (code: string, message = `simulated ${code}`): Error & { code: string } => {
@@ -160,6 +162,7 @@ describe('collection store: ghost card cure (TASK-223)', () => {
     mockAddDoc.mockReset().mockResolvedValue({ id: 'card-1' })
     mockGetDocs.mockReset().mockResolvedValue({ empty: true, docs: [] })
     mockQueryCardIndex.mockReset()
+    mockApplyCardIndexDelta.mockReset().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 })
     mockToastShow.mockReset()
   })
 
@@ -189,99 +192,72 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       expect(mockToastShow).not.toHaveBeenCalled()
     })
 
-    it('persists the cured index to Firestore (debounced)', async () => {
-      vi.useFakeTimers()
-      try {
-        const store = useCollectionStore()
-        // cardIndexRaw is NOT exposed on the store's return object — a direct
-        // `store.cardIndexRaw = [...]` assignment is a silent no-op (dead
-        // write to a stray property, not the real internal ref). Seed it for
-        // real the only way a test can: run an actual (gated) load through
-        // loadFromIndex, same technique as the HIGH-1 in-flight-load tests
-        // below. Without this the assertion below passed for the WRONG
-        // reason — the real (still-empty) cardIndexRaw trivially "doesn't
-        // contain ghost-1" regardless of whether the cure did anything.
-        const load = startGatedLoad(store, [makeIndexCard('ghost-1')])
-        await load.finish()
-        mockSetDoc.mockClear() // ignore any chunk write the load itself may have caused
-        mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
+    it('TASK-232: cures the index via applyCardIndexDelta instead of a client card_index write', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'ghost-1' })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+      mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
 
-        await store.updateCard('ghost-1', { status: 'sale' })
-        await vi.advanceTimersByTimeAsync(2100)
+      await store.updateCard('ghost-1', { status: 'sale' })
+      // cureGhostCard fires the delta fire-and-forget, behind the lazy
+      // dynamic import wrapper (an extra, not-precisely-countable microtask
+      // hop) — wait for it rather than guessing a tick count.
+      await vi.waitFor(() => expect(mockApplyCardIndexDelta).toHaveBeenCalled())
 
-        expect(mockSetDoc).toHaveBeenCalled()
-        const [, chunkData] = mockSetDoc.mock.calls[0]
-        expect((chunkData.cards as Array<{ i: string }>).find(c => c.i === 'ghost-1')).toBeUndefined()
-      } finally {
-        vi.useRealTimers()
-      }
+      expect(mockSetDoc).not.toHaveBeenCalled()
+      expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'ghost-1', action: 'delete' }])
     })
 
-    it('reuses the SAME gen/timer-gated ordering as deleteCard/addCard (TASK-113/116): refreshCurrentPage() cannot run until the cure\'s own persist write has actually resolved', async () => {
+    it('reuses the SAME "wait for the server call to settle before refreshing" discipline as deleteCard/addCard (TASK-113/116), now anchored on applyCardIndexDelta instead of setDoc', async () => {
       // NOTE (team-lead review, TASK-223 hand-off point 1, two iterations):
       // v1 mocked queryCardIndex to unconditionally return an empty page —
       // that only proved queryCardIndex was called at the right TIME, never
       // capable of failing from an actual resurrection. v2 tied the mocked
-      // response to whatever setDoc last wrote, but let the write and the
-      // query race on NATURAL microtask scheduling — verified LIVE (by
-      // deliberately firing refreshCurrentPage() before the write, the same
-      // mutation AC5 uses) that this is NOT reliable: queryPage() does
-      // `await import(...)` before calling queryCardIndex, an extra
-      // microtask hop that let the write "win" the race even with the
-      // ordering guard disabled — a false negative that stayed green.
+      // response to whatever the write last landed, but let the write and
+      // the query race on NATURAL microtask scheduling — verified LIVE that
+      // this is NOT reliable: queryPage() does `await import(...)` before
+      // calling queryCardIndex, an extra microtask hop that let the write
+      // "win" the race even with the ordering guard disabled — a false
+      // negative that stayed green.
       //
-      // This version gates mockSetDoc behind a promise WE control (same
-      // technique as the "stale in-flight persist" tests below and in
-      // collection.paginatedSync.test.ts, TASK-116 PEDIDO #2). While the gate
-      // is held closed the write CANNOT have resolved, so if queryCardIndex
-      // fires anyway, it is provably premature — no race, no ambiguity.
-      vi.useFakeTimers()
-      try {
-        const store = useCollectionStore()
-        const card = makeCard({ id: 'ghost-1' })
-        store.cards = [card] as any
-        store.paginatedCards = [card] as any
-        const seededIndexCard = { i: 'ghost-1', s: 's1', n: 'Ghost', st: 'collection', q: 1, p: 0, cm: 0, co: [], r: 'c', t: '', f: false, sc: '', pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true }
-        store.cardIndexRaw = [seededIndexCard] as any
+      // TASK-232: the write moved from a debounced client setDoc to
+      // applyCardIndexDelta, and the ordering guarantee moved with it —
+      // cureGhostCard chains refreshCurrentPage() off THAT call's own
+      // settlement (.finally()), not off a shared gen-token/debounce timer.
+      // This version gates the MOCKED applyCardIndexDelta behind a promise
+      // WE control. While the gate is held closed the delta CANNOT have
+      // resolved, so if queryCardIndex fires anyway, it is provably
+      // premature — no race, no ambiguity.
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'ghost-1' })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
 
-        let resolveSetDoc!: () => void
-        const setDocGate = new Promise<void>((res) => { resolveSetDoc = res })
-        // "Server" = whatever the write last landed. Starts WITH the ghost —
-        // the pre-cure state — and only updates once the gate is released.
-        let serverChunk: Array<{ i: string }> = [seededIndexCard]
-        mockSetDoc.mockImplementation(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
-          await setDocGate
-          serverChunk = data.cards
-        })
-        mockQueryCardIndex.mockImplementation(async () => ({
-          cards: serverChunk,
-          total: serverChunk.length,
-          page: 0,
-          pageSize: 50,
-          hasMore: false,
-        }))
-        mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
+      let resolveDelta!: () => void
+      const deltaGate = new Promise<void>((res) => { resolveDelta = res })
+      mockApplyCardIndexDelta.mockImplementationOnce(async () => {
+        await deltaGate
+        return { applied: 1, skipped: 0, skippedIds: [], fallbackUsed: 1 }
+      })
+      mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+      mockUpdateDoc.mockRejectedValueOnce(firestoreError('not-found'))
 
-        await store.updateCard('ghost-1', { status: 'sale' })
-        // Local cure already applied — the ghost is gone from the grid right away.
-        expect(store.paginatedCards).toEqual([])
+      await store.updateCard('ghost-1', { status: 'sale' })
+      // Local cure already applied — the ghost is gone from the grid right away.
+      expect(store.paginatedCards).toEqual([])
 
-        // Debounce fires — persist starts and blocks on the (still-closed) setDoc
-        // gate. The write provably has NOT landed yet, so the deferred re-query
-        // must not have run either.
-        await vi.advanceTimersByTimeAsync(2000)
-        expect(mockQueryCardIndex).not.toHaveBeenCalled()
-        expect(store.paginatedCards).toEqual([])
+      // Wait until the (gated-closed) delta call has actually been INVOKED —
+      // it provably has NOT resolved yet (the gate is still held), so the
+      // deferred re-query must not have run either.
+      await vi.waitFor(() => expect(mockApplyCardIndexDelta).toHaveBeenCalled())
+      expect(mockQueryCardIndex).not.toHaveBeenCalled()
 
-        // Release the gate — the write lands (server no longer has the ghost) —
-        // only THEN does the deferred re-query run.
-        resolveSetDoc()
-        await vi.advanceTimersByTimeAsync(0)
-        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-        expect(store.paginatedCards).toEqual([])
-      } finally {
-        vi.useRealTimers()
-      }
+      // Release the gate — the delta call resolves — only THEN does the
+      // deferred re-query run.
+      resolveDelta()
+      await vi.waitFor(() => expect(mockQueryCardIndex).toHaveBeenCalledTimes(1))
+      expect(store.paginatedCards).toEqual([])
     })
   })
 
@@ -334,38 +310,52 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       expect(store.paginatedCards.find((c: any) => c.id === 'ghost-1')).toBeUndefined()
     })
 
-    it('MEDIUM-1: persists the cured index and defers a corrective re-query (membership changed) — same as deleteCard/batchDeleteCards', async () => {
-      vi.useFakeTimers()
-      try {
-        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
-        const store = useCollectionStore()
-        // cardIndexRaw is not exposed on the store — seed it for real via an
-        // actual (gated) load, same as the HIGH-1 tests below. A direct
-        // `store.cardIndexRaw = [...]` assignment is a silent no-op.
-        const load = startGatedLoad(store, [makeIndexCard('good-1'), makeIndexCard('ghost-1')])
-        await load.finish()
-        mockSetDoc.mockClear()
-        store.paginatedCards = [makeCard({ id: 'good-1' }), makeCard({ id: 'ghost-1' })] as any
-        mockCommit.mockRejectedValueOnce(firestoreError('not-found'))
-        mockUpdateDoc
-          .mockResolvedValueOnce(undefined) // good-1
-          .mockRejectedValueOnce(firestoreError('not-found')) // ghost-1
+    it('MEDIUM-1 (TASK-232): cures via applyCardIndexDelta and defers a corrective re-query (membership changed) — same discipline as deleteCard/batchDeleteCards, no client card_index write', async () => {
+      const store = useCollectionStore()
+      const load = startGatedLoad(store, [makeIndexCard('good-1'), makeIndexCard('ghost-1')])
+      await load.finish()
+      mockSetDoc.mockClear()
+      mockApplyCardIndexDelta.mockClear()
+      mockQueryCardIndex.mockClear()
+      store.paginatedCards = [makeCard({ id: 'good-1' }), makeCard({ id: 'ghost-1' })] as any
+      mockCommit.mockRejectedValueOnce(firestoreError('not-found'))
+      mockUpdateDoc
+        .mockResolvedValueOnce(undefined) // good-1
+        .mockRejectedValueOnce(firestoreError('not-found')) // ghost-1
 
-        await store.batchUpdateCards(['good-1', 'ghost-1'], { status: 'sale' })
+      let resolveDelta!: () => void
+      const deltaGate = new Promise<void>((res) => { resolveDelta = res })
+      // Gate the GHOST's delta call specifically (the 2nd applyCardIndexDelta
+      // invocation: good-1's update patch happens first, inside the
+      // per-chunk loop, before the ghost-handling block runs).
+      let deltaCallCount = 0
+      mockApplyCardIndexDelta.mockImplementation(async (mutations) => {
+        deltaCallCount++
+        if (mutations.some(m => m.action === 'delete')) {
+          await deltaGate
+        }
+        return { applied: mutations.length, skipped: 0, skippedIds: [], fallbackUsed: 0 }
+      })
+      mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
 
-        // Not yet re-queried — deferred until the debounced persist settles
-        // (same TASK-113/116 gate every other cure path reuses).
-        await vi.advanceTimersByTimeAsync(0)
-        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+      await store.batchUpdateCards(['good-1', 'ghost-1'], { status: 'sale' })
 
-        await vi.advanceTimersByTimeAsync(2100)
-        expect(mockSetDoc).toHaveBeenCalled()
-        const [, chunkData] = mockSetDoc.mock.calls[0]
-        expect((chunkData.cards as Array<{ i: string }>).map(c => c.i)).toEqual(['good-1'])
-        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-      } finally {
-        vi.useRealTimers()
-      }
+      expect(mockSetDoc).not.toHaveBeenCalled()
+      // good-1's update patch is awaited inline inside batchUpdateCards, so
+      // it's already landed by the time the call above resolves.
+      expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'good-1', action: 'update' }])
+
+      // The ghost-1 delete patch is fire-and-forget behind the lazy dynamic
+      // import wrapper — wait for it to actually be invoked.
+      await vi.waitFor(() => expect(deltaCallCount).toBe(2))
+      expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'ghost-1', action: 'delete' }])
+
+      // Not yet re-queried — deferred until the ghost's delta call settles
+      // (still gated closed).
+      expect(mockQueryCardIndex).not.toHaveBeenCalled()
+
+      resolveDelta()
+      await vi.waitFor(() => expect(mockQueryCardIndex).toHaveBeenCalledTimes(1))
     })
   })
 

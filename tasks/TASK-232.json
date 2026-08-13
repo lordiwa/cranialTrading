@@ -11,7 +11,7 @@
     "La suite unitaria completa sigue verde y npx vite build --mode development sigue limpio",
     "Los candados de perdida de datos de TASK-185/219/223 siguen verdes: este cambio no puede reabrir ninguno de ellos"
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "critical",
   "labels": [
     "card_index",
@@ -26,7 +26,7 @@
   "linked_prs": [],
   "comments": [],
   "created_at": "2026-08-13T16:04:19.772Z",
-  "updated_at": "2026-08-13T16:04:19.772Z",
+  "updated_at": "2026-08-13T17:15:58.670Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

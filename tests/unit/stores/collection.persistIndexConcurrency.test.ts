@@ -35,6 +35,7 @@ vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: vi.fn(),
   buildCardIndex: vi.fn(),
+  applyCardIndexDelta: vi.fn().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 }),
   loadCollectionChunk: vi.fn(),
   loadCardPage: vi.fn(),
 }))

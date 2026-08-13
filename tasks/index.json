@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-13T16:04:50.319Z",
+  "generated_at": "2026-08-13T17:15:58.670Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1270,7 +1270,7 @@
     {
       "key": "TASK-232",
       "title": "El cliente deja de ser el escritor del card_index: la escritura del indice se mueve al servidor",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "critical"
     },
     {

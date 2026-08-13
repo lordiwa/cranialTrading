@@ -29,7 +29,7 @@ import { getCardsByIds } from '../services/scryfallCache'
 import { buildEnrichmentPatch } from '../utils/cardEnrichment'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
-import type { QueryCardIndexRequest } from '../services/cloudFunctions'
+import type { CardIndexDeltaMutation, QueryCardIndexRequest } from '../services/cloudFunctions'
 
 /**
  * Commit a Firestore batch with retry logic (skips retries for permission errors)
@@ -103,6 +103,33 @@ const chunkArray = <T>(arr: T[], size: number): T[][] => {
         chunks.push(arr.slice(i, i + size))
     }
     return chunks
+}
+
+/**
+ * TASK-232: lazy wrapper around the applyCardIndexDelta Cloud Function —
+ * every other cloudFunctions usage in this store is a dynamic import (see
+ * loadFromIndex/buildCardIndex/queryCardIndex call sites below) rather than
+ * a static one, specifically so importing this store never eagerly calls
+ * `getFunctions(getApp())` (src/services/cloudFunctions.ts's module-top-level
+ * init) before Firebase itself is guaranteed initialized. A static import
+ * broke exactly that in tests that import the store without mocking
+ * cloudFunctions (module load blew up with "No Firebase App '[DEFAULT]'").
+ */
+const applyCardIndexDelta = async (mutations: CardIndexDeltaMutation[]) => {
+    const { applyCardIndexDelta: call } = await import('../services/cloudFunctions')
+    const response = await call(mutations)
+    // TASK-232 gap #2 (team-lead review): a mutation the server could NOT
+    // resolve (missing/unreadable chunkId, update target not found in its
+    // chunk) is reported back in `skipped`/`skippedIds` rather than thrown —
+    // applyCardIndexDelta itself did not fail. Every call site funnels
+    // through this one wrapper, so logging here — once — makes a skip
+    // visible (console.warn, picked up by whatever the app's log pipeline
+    // already captures) instead of a silently stale/missing card_index
+    // entry with no trace anywhere the client can see.
+    if (response.skipped > 0) {
+        console.warn(`[IndexSync] applyCardIndexDelta could not resolve ${response.skipped} mutation(s) — card_index left stale/unindexed for: ${response.skippedIds.join(', ')}`)
+    }
+    return response
 }
 
 const deletePublicCardBatches = async (
@@ -1060,6 +1087,78 @@ export const useCollectionStore = defineStore('collection', () => {
         }, 2000)
     }
 
+    // ------------------------------------------------------------------
+    // TASK-232: card_index writes for status-change/delete mutations move
+    // server-side (applyCardIndexDelta, functions/index.js) — the client's
+    // fragile memoryLocalCache()-backed write queue (TASK-229's measured
+    // root cause: under saturation, chunk-write promises never settle, so
+    // no catch ever runs and the UI is left with an unreverted optimistic
+    // patch and no error) is no longer in the path for these mutations at
+    // all. addCard, the TASK-185 in-flight-load replay
+    // (applyPendingIndexMutations), and deleteAllCards are OUT of this
+    // ticket's scope and keep writing chunks the old way (see TASK-232
+    // ticket for why).
+    //
+    // queueCardIndexDelta/scheduleCardIndexDeltaFlush debounce single-card
+    // updateCard calls the same 2s window persistIndexToFirestore used, so
+    // a burst of edits coalesces into one Cloud Function call instead of
+    // one per card. Bulk paths (batchUpdateCards, deleteCard,
+    // batchDeleteCards) already batch internally and call
+    // applyCardIndexDelta directly — no debounce needed there.
+    // ------------------------------------------------------------------
+    const _pendingServerDeltas = new Map<string, 'update' | 'delete'>()
+    let _serverDeltaTimer: ReturnType<typeof setTimeout> | null = null
+    let _serverDeltaRunning = false
+    let _serverDeltaRerunRequested = false
+
+    function queueCardIndexDelta(cardId: string, action: 'update' | 'delete'): void {
+        _pendingServerDeltas.set(cardId, action)
+    }
+
+    function scheduleCardIndexDeltaFlush(): void {
+        if (_serverDeltaTimer) clearTimeout(_serverDeltaTimer)
+        _serverDeltaTimer = setTimeout(() => {
+            _serverDeltaTimer = null
+            _runServerDeltaFlush()
+        }, 2000)
+    }
+
+    function _runServerDeltaFlush(): void {
+        if (_serverDeltaRunning) {
+            _serverDeltaRerunRequested = true
+            return
+        }
+        if (_pendingServerDeltas.size === 0) return
+        _serverDeltaRunning = true
+        const batch = [..._pendingServerDeltas.entries()].map(([cardId, action]) => ({ cardId, action }))
+        _pendingServerDeltas.clear()
+
+        void (async () => {
+            try {
+                const chunks = chunkArray(batch, 500)
+                for (const chunk of chunks) {
+                    // eslint-disable-next-line no-await-in-loop
+                    await applyCardIndexDelta(chunk)
+                }
+            } catch (err) {
+                // TASK-232: the card documents themselves are already correct —
+                // updateCard already succeeded before queuing this. A failed
+                // delta leaves card_index stale for these cards until a later
+                // mutation touches them again or the next buildCardIndex
+                // rebuild — it does NOT roll back the mutation and does NOT
+                // retry (retrying here risks a loop against a persistently
+                // failing call).
+                logSanitizedError('[IndexSync] applyCardIndexDelta failed — card_index left stale for this batch', err, 'warn')
+            } finally {
+                _serverDeltaRunning = false
+                if (_serverDeltaRerunRequested) {
+                    _serverDeltaRerunRequested = false
+                    _runServerDeltaFlush()
+                }
+            }
+        })()
+    }
+
     function _doPersistIndex() {
         if (_persistRunning) {
             // A write loop is already in flight — do not start a second one
@@ -1239,13 +1338,34 @@ export const useCollectionStore = defineStore('collection', () => {
      * Reuses syncIndexOrQueue's existing 'delete' path (id-only, see its
      * TASK-185 doc comment) rather than duplicating the queue-vs-immediate
      * decision — a minimal fake Card carrying only `id` is all that path reads.
+     *
+     * TASK-232: when NOT queued (index already loaded), the server-side
+     * removal goes through applyCardIndexDelta instead of the old
+     * persistIndexToFirestore full-array client rewrite. The ghost's doc is
+     * already gone (that's what makes it a ghost) — applyCardIndexDelta's
+     * fallback scan (functions/index.js) locates and removes the entry by
+     * id across every chunk instead of skipping, so this still cures the
+     * server's card_index, not just the local one. Fire-and-forget, with
+     * the deferred grid re-query chained off its OWN settlement (no
+     * debounce/gen-token needed here — unlike the old mechanism, there is
+     * only ever one ghost-cure delta in flight for a given call).
+     * Queued (index load in flight, TASK-185): unchanged — replayed by
+     * applyPendingIndexMutations() via the old full-rewrite path once the
+     * real index lands; that narrow multi-second window is explicitly out
+     * of this ticket's scope.
      */
     function cureGhostCard(cardId: string): void {
         cards.value = cards.value.filter(c => c.id !== cardId)
         cardsById.delete(cardId)
         paginatedCards.value = paginatedCards.value.filter(c => c.id !== cardId)
         if (syncIndexOrQueue({ id: cardId } as Card, 'delete')) {
-            persistIndexToFirestore()
+            void applyCardIndexDelta([{ cardId, action: 'delete' }])
+                .catch((err: unknown) => {
+                    logSanitizedError('[IndexSync] applyCardIndexDelta failed curing ghost card — card_index left stale for this card', err, 'warn')
+                })
+                .finally(() => {
+                    refreshCurrentPage().catch(() => {})
+                })
         }
     }
 
@@ -1393,12 +1513,16 @@ export const useCollectionStore = defineStore('collection', () => {
                 updatedAt: Timestamp.now(),
             })
 
-            // Sync index
+            // Sync index — LOCAL in-memory only (syncIndexLocal). The
+            // Firestore card_index chunk write moves server-side (TASK-232):
+            // queue+debounce the same 2s window the old client persist used,
+            // so a burst of edits coalesces into one applyCardIndexDelta call.
             // eslint-disable-next-line security/detect-object-injection
             const updatedCard = cards.value[index]
             if (updatedCard) {
                 syncIndexLocal(updatedCard, 'update')
-                persistIndexToFirestore()
+                queueCardIndexDelta(cardId, 'update')
+                scheduleCardIndexDeltaFlush()
 
                 // Sync to public collection (non-blocking, log-only on failure)
                 const userInfo = getUserInfo()
@@ -1412,9 +1536,8 @@ export const useCollectionStore = defineStore('collection', () => {
 
             // NOTE: no refreshCurrentPage() here (removed — see TASK-113).
             // The optimistic patch above already keeps paginatedCards in sync;
-            // an immediate re-query would hit the server card_index before the
-            // debounced persistIndexToFirestore() (2s) has written, reading back
-            // the pre-update value and reverting the patch we just applied.
+            // a re-query before the server has caught up would read back the
+            // pre-update value and revert the patch we just applied.
 
             return true
         } catch (error) {
@@ -1424,8 +1547,12 @@ export const useCollectionStore = defineStore('collection', () => {
                 // Self-heal instead of reverting-then-erroring: remove the
                 // ghost everywhere and persist, so it just vanishes from the
                 // grid rather than flashing back with an error toast.
+                // TASK-232: cureGhostCard now chains its own deferred
+                // refreshCurrentPage() off the server delta call's
+                // settlement — no need to set _pendingMembershipRefresh here
+                // (that flag is only consumed by the OLD addCard/
+                // applyPendingIndexMutations persist-loop mechanism).
                 cureGhostCard(cardId)
-                _pendingMembershipRefresh = true
                 return true
             }
             // Rollback on failure
@@ -1475,6 +1602,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
                     batch.update(cardRef, { ...cleanUpdates, updatedAt: Timestamp.now() })
                 }
+                let chunkGhosts: Set<string> | null = null
                 try {
                     await batch.commit()
                 } catch (error: unknown) {
@@ -1484,6 +1612,7 @@ export const useCollectionStore = defineStore('collection', () => {
                     // which doc caused it. Retry the chunk one card at a time
                     // so the rest of the lot still lands instead of failing
                     // wholesale (AC3).
+                    chunkGhosts = new Set<string>()
                     for (const cardId of chunk) {
                         const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
                         try {
@@ -1492,9 +1621,26 @@ export const useCollectionStore = defineStore('collection', () => {
                         } catch (innerError: unknown) {
                             if (!isNotFoundError(innerError)) throw innerError
                             ghostCardIds.add(cardId)
+                            chunkGhosts.add(cardId)
                         }
                     }
                 }
+
+                // TASK-232: patch card_index server-side for this chunk's
+                // successfully-updated docs, right after their write lands —
+                // same ≤500-per-call granularity as the writeBatch above, no
+                // extra debounce needed since batchUpdateCards is already one
+                // bulk operation. Ghosts (doc gone) are excluded here — they
+                // go through the fallback-scan removal path below instead.
+                const chunkSurvivors = chunkGhosts ? chunk.filter(id => !chunkGhosts.has(id)) : chunk
+                if (chunkSurvivors.length > 0) {
+                    try {
+                        await applyCardIndexDelta(chunkSurvivors.map(cardId => ({ cardId, action: 'update' as const })))
+                    } catch (deltaError: unknown) {
+                        logSanitizedError('[IndexSync] applyCardIndexDelta failed for a batchUpdateCards chunk — those card_index entries left stale', deltaError, 'warn')
+                    }
+                }
+
                 completedSteps++
                 onProgress?.(Math.round((completedSteps / totalSteps) * 100))
             }
@@ -1520,23 +1666,17 @@ export const useCollectionStore = defineStore('collection', () => {
             // (fed by the server-side card_index), not cards.value directly.
             applyPaginatedCardUpdates(survivingCardIds, updates)
 
-            // Sync index — batchUpdateCards previously never touched cardIndexRaw,
-            // leaving card_index (and therefore paginatedCards on reload) stale
-            // indefinitely. Single O(n+k) pass over cardIndexRaw (not per-card
-            // syncIndexLocal, which is O(n) findIndex + full-array copy EACH call —
-            // with select-all on a 59k-card index that's a guaranteed multi-second
-            // freeze / Mali crash). Same shape as batchDeleteCards' index rebuild.
+            // Sync LOCAL in-memory cardIndexRaw only — the Firestore write for
+            // these cards already happened above, per-chunk, via
+            // applyCardIndexDelta (TASK-232). Single O(n+k) pass, not per-card
+            // syncIndexLocal (O(n) findIndex + full-array copy EACH call —
+            // with select-all on a 59k-card index that's a guaranteed
+            // multi-second freeze / Mali crash).
             if (updatedCards.length > 0) {
                 const updatedById = new Map(updatedCards.map(c => [c.id, c]))
-                // TASK-219: this map preserves length and order — only the
-                // positions whose id is in updatedById actually change content,
-                // so only their chunks need rewriting. `.map`'s own index arg
-                // gives us the position for free, no extra pass needed.
-                cardIndexRaw.value = cardIndexRaw.value.map((ic, i) => {
+                cardIndexRaw.value = cardIndexRaw.value.map((ic) => {
                     const updated = updatedById.get(ic.i)
-                    if (!updated) return ic
-                    markChunkDirty(i)
-                    return cardToIndex(updated)
+                    return updated ? cardToIndex(updated) : ic
                 })
             }
 
@@ -1546,13 +1686,18 @@ export const useCollectionStore = defineStore('collection', () => {
             // deleteCard). The index itself is NOT touched directly here —
             // reviewer HIGH-1: during the TASK-185 in-flight-load window
             // cardIndexRaw is empty and indexKnownComplete is false, so writing
-            // straight to cardIndexRaw.value would force _runPersistLoop into a
-            // full rewrite with totalChunks=1 and clobber chunk_0's real cards.
-            // Route each ghost through the SAME _indexLoadInFlight gate
-            // cureGhostCard/deleteCard already use (syncIndexOrQueue) instead of
-            // inventing a second mechanism — queued ghosts are replayed by
+            // straight to cardIndexRaw.value would force a full rewrite with
+            // totalChunks=1 and clobber chunk_0's real cards. Route each ghost
+            // through the SAME _indexLoadInFlight gate cureGhostCard/deleteCard
+            // already use (syncIndexOrQueue) instead of inventing a second
+            // mechanism — queued ghosts are replayed by
             // applyPendingIndexMutations() once the load's real index lands.
-            let ghostAppliedNow = false
+            //
+            // TASK-232: when NOT queued, removal goes through
+            // applyCardIndexDelta (whose fallback scan locates a ghost by id
+            // across every chunk, since its doc is already gone — same as
+            // cureGhostCard) instead of the old full-array client rewrite.
+            const ghostIdsAppliedNow: string[] = []
             if (ghostCardIds.size > 0) {
                 cards.value = cards.value.filter(c => !ghostCardIds.has(c.id))
                 for (const id of ghostCardIds) cardsById.delete(id)
@@ -1561,7 +1706,9 @@ export const useCollectionStore = defineStore('collection', () => {
                     // syncIndexOrQueue's 'delete' path only reads card.id — see
                     // its TASK-185 doc comment — a minimal fake Card is enough
                     // (same technique cureGhostCard already uses).
-                    if (syncIndexOrQueue({ id } as Card, 'delete')) ghostAppliedNow = true
+                    if (syncIndexOrQueue({ id } as Card, 'delete')) {
+                        ghostIdsAppliedNow.push(id)
+                    }
                 }
                 // Membership changed (a card is now gone) — defer a corrective
                 // re-query the same way deleteCard/batchDeleteCards already do
@@ -1571,8 +1718,17 @@ export const useCollectionStore = defineStore('collection', () => {
                 _pendingMembershipRefresh = true
             }
 
-            if (updatedCards.length > 0 || ghostAppliedNow) {
-                persistIndexToFirestore()
+            if (ghostIdsAppliedNow.length > 0) {
+                void applyCardIndexDelta(ghostIdsAppliedNow.map(cardId => ({ cardId, action: 'delete' as const })))
+                    .catch((err: unknown) => {
+                        logSanitizedError('[IndexSync] applyCardIndexDelta failed curing ghost cards in batchUpdateCards', err, 'warn')
+                    })
+                    .finally(() => {
+                        if (_pendingMembershipRefresh) {
+                            _pendingMembershipRefresh = false
+                            refreshCurrentPage().catch(() => {})
+                        }
+                    })
             }
 
             // Only sync cards that transition to/from public state
@@ -1672,21 +1828,51 @@ export const useCollectionStore = defineStore('collection', () => {
         // Sync with Firebase in background
         try {
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
+
+            // TASK-232: resolve+remove the card_index entry server-side BEFORE
+            // deleting the card doc — applyCardIndexDelta reads chunkId off the
+            // doc itself, so the doc must still exist when this runs. Best-effort:
+            // a failure here does NOT block the actual delete below (the card
+            // document, the source of truth, must still go away when the user
+            // asks) — it just leaves that one entry stale in card_index until a
+            // later mutation or rebuild touches it.
+            try {
+                await applyCardIndexDelta([{ cardId, action: 'delete' }])
+            } catch (deltaError: unknown) {
+                logSanitizedError('[IndexSync] applyCardIndexDelta failed for delete — card_index left stale for this card', deltaError, 'warn')
+            }
+
             try {
                 await deleteDoc(cardRef)
             } catch (error) {
-                if (!isNotFoundError(error)) throw error
-                // TASK-223: the doc is already gone — deleteCard's entire
-                // objective (the card not existing) is already true. Fall
-                // through to the same success path below instead of the
-                // restore-on-failure branch; there is nothing to roll back.
+                if (isNotFoundError(error)) {
+                    // TASK-223: the doc is already gone — deleteCard's entire
+                    // objective (the card not existing) is already true. Fall
+                    // through to the same success path below instead of the
+                    // restore-on-failure branch; there is nothing to roll back.
+                } else {
+                    // TASK-232 gap #1: the delta above may have already
+                    // removed the card_index entry, but the doc delete itself
+                    // just failed for real — the card still exists. Without
+                    // this, it becomes an invisible card (document alive,
+                    // index entry gone). Compensate: re-insert its entry
+                    // (allowInsert:true — the doc still exists with its real
+                    // chunkId, so this is grounded in a fresh server read,
+                    // not a guess) before the outer catch restores the UI.
+                    try {
+                        await applyCardIndexDelta([{ cardId, action: 'update', allowInsert: true }])
+                    } catch (restoreError: unknown) {
+                        logSanitizedError('[IndexSync] Failed to restore card_index entry after a failed delete — card may be invisible until the next rebuild', restoreError)
+                    }
+                    throw error
+                }
             }
 
-            // Sync index — queued instead if the index is still loading, so the
-            // persist can't write an empty cardIndexRaw over chunk_0 (TASK-185).
-            if (syncIndexOrQueue(deletedCard, 'delete')) {
-                persistIndexToFirestore()
-            }
+            // Sync LOCAL in-memory index — queued instead if the index is still
+            // loading (TASK-185). No Firestore write here: the call above
+            // already patched (or best-effort attempted) the server's
+            // card_index directly.
+            syncIndexOrQueue(deletedCard, 'delete')
 
             // Remove from public collection (non-blocking, log-only on failure)
             removeCardFromPublic(cardId, authStore.user.id)
@@ -1695,12 +1881,11 @@ export const useCollectionStore = defineStore('collection', () => {
                 })
 
             // Re-query the server card_index for the definitive membership/order
-            // (fills the gap left by the deleted card, corrects total/hasMore) —
-            // deferred until the debounced persist above has actually written;
-            // an immediate call here would hit the still-stale server index and
-            // bring the just-deleted card back (TASK-113's race, recurring for
-            // addCard/deleteCard — see _doPersistIndex).
-            _pendingMembershipRefresh = true
+            // (fills the gap left by the deleted card, corrects total/hasMore).
+            // Safe to call directly now — unlike the old debounced client
+            // persist, applyCardIndexDelta above was already awaited, so the
+            // server index has already caught up (or the failure was logged).
+            refreshCurrentPage().catch(() => {})
 
             return true
         } catch (error) {
@@ -1826,6 +2011,21 @@ export const useCollectionStore = defineStore('collection', () => {
         const totalBatches = Math.ceil(cardIds.length / BATCH_SIZE) + Math.ceil(publicCardIds.length / BATCH_SIZE)
         let completedBatches = 0
 
+        // Phase 0 (TASK-232): resolve+remove card_index entries server-side
+        // BEFORE deleting the card docs in Phase 1 — applyCardIndexDelta
+        // reads each doc's own chunkId, so the docs must still exist when
+        // this runs. Batched into groups of ≤500 mutations per call. If a
+        // specific card's Phase 1 delete then fails for real, its entry is
+        // restored below (gap #1 compensation) — same as deleteCard.
+        for (const chunk of chunkArray(cardIds, 500)) {
+            try {
+                // eslint-disable-next-line no-await-in-loop
+                await applyCardIndexDelta(chunk.map(cardId => ({ cardId, action: 'delete' as const })))
+            } catch (deltaError: unknown) {
+                logSanitizedError('[IndexSync] applyCardIndexDelta failed for a batchDeleteCards chunk — those card_index entries left stale', deltaError, 'warn')
+            }
+        }
+
         // Phase 1: Delete user cards in batches
         for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
             const chunk = cardIds.slice(i, i + BATCH_SIZE)
@@ -1880,23 +2080,43 @@ export const useCollectionStore = defineStore('collection', () => {
             console.warn(`Batch delete: ${totalDeleted} deleted, ${totalFailed} failed`)
         }
 
-        // Sync index via the same debounced persist + deferred-refresh pattern
-        // established by addCard/deleteCard (TASK-113/116) — replaces the prior
-        // ad-hoc "delete every card_index chunk without rewriting" logic, which
-        // left surviving cards missing from the persisted index. persistIndexToFirestore
-        // writes fresh chunks reflecting the current cardIndexRaw AND deletes any
-        // now-orphaned trailing chunks (see _doPersistIndex).
-        cardIndexRaw.value = cards.value.map(cardToIndex)
-        // TASK-219: rebuilt from cards.value in cards.value's own order, which
-        // is not guaranteed to match the prior index order/positions — full
-        // rewrite, not a narrow diff.
-        markAllChunksDirty()
-        persistIndexToFirestore()
+        // TASK-232 gap #1 compensation: any id whose Phase 1 doc delete
+        // permanently failed still has its card document — but Phase 0 above
+        // already removed its card_index entry. Re-insert it (allowInsert:
+        // true — the doc still exists with its real chunkId, a fresh server
+        // read, not a guess) so it doesn't become an invisible card.
+        if (failedIds.size > 0) {
+            for (const chunk of chunkArray([...failedIds], 500)) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    await applyCardIndexDelta(chunk.map(cardId => ({ cardId, action: 'update' as const, allowInsert: true })))
+                } catch (restoreError: unknown) {
+                    logSanitizedError('[IndexSync] Failed to restore card_index entries after a partially-failed batch delete — those cards may be invisible until the next rebuild', restoreError)
+                }
+            }
+        }
 
-        // Re-query the server card_index for the definitive membership/order,
-        // deferred until the debounced persist above has actually written (same
-        // race TASK-113 fixed for updateCard, TASK-116 for addCard/deleteCard).
-        _pendingMembershipRefresh = true
+        // Sync LOCAL in-memory index only — no Firestore write here, Phase 0
+        // above already patched the server's card_index directly.
+        const survivingDeletedIds = failedIds.size > 0
+            ? [...idsToDelete].filter(id => !failedIds.has(id))
+            : [...idsToDelete]
+        if (survivingDeletedIds.length > 0) {
+            const survivingSet = new Set(survivingDeletedIds)
+            cardIndexRaw.value = cardIndexRaw.value.filter(ic => !survivingSet.has(ic.i))
+        }
+
+        // Re-query the server card_index for the definitive membership/order
+        // — only when membership actually changed (totalDeleted > 0). A
+        // batch that failed entirely (all ids restored above) has nothing
+        // to correct; querying anyway would be a wasted round trip. Safe to
+        // call directly now — unlike the old debounced client persist, the
+        // Phase 0 delta calls above were already awaited, so the server
+        // index has already caught up (or the failure was logged) by the
+        // time we get here.
+        if (totalDeleted > 0) {
+            refreshCurrentPage().catch(() => {})
+        }
 
         return { success: totalFailed === 0, deleted: totalDeleted, failed: totalFailed }
     }

@@ -42,6 +42,7 @@ const mockLoadCollectionChunk = vi.fn()
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: (...args: unknown[]) => mockQueryCardIndex(...args),
   buildCardIndex: (...args: unknown[]) => mockBuildCardIndex(...args),
+  applyCardIndexDelta: vi.fn().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 }),
   loadCollectionChunk: (...args: unknown[]) => mockLoadCollectionChunk(...args),
   loadCardPage: vi.fn(),
 }))

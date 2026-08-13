@@ -21,6 +21,7 @@ vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: vi.fn(),
   buildCardIndex: vi.fn(),
+  applyCardIndexDelta: vi.fn().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 }),
   loadCollectionChunk: vi.fn(),
   loadCardPage: vi.fn(),
 }))
@@ -88,10 +89,11 @@ vi.mock('@/stores/toast', () => ({
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore } from '@/stores/collection'
-import { queryCardIndex } from '@/services/cloudFunctions'
+import { applyCardIndexDelta, queryCardIndex } from '@/services/cloudFunctions'
 import { makeCard } from '../helpers/fixtures'
 
 const mockQueryCardIndex = vi.mocked(queryCardIndex)
+const mockApplyCardIndexDelta = vi.mocked(applyCardIndexDelta)
 
 describe('collection store: paginatedCards sync on toggle (TASK-113 regression)', () => {
   beforeEach(() => {
@@ -105,6 +107,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
     // fires after any addCard/deleteCard's debounced persist flushes) doesn't
     // hit an unmocked resolved value in tests that don't care about its result.
     mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+    mockApplyCardIndexDelta.mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 })
   })
 
   describe('updateCard', () => {
@@ -179,57 +182,47 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       expect(store.paginatedCards.find((c: any) => c.id === 'card-2')?.public).toBe(false)
     })
 
-    it('syncs the updated cards into the card_index (debounced persist fires)', async () => {
-      vi.useFakeTimers()
-      try {
-        const store = useCollectionStore()
+    it('TASK-232: syncs the updated cards via applyCardIndexDelta — no client card_index write', async () => {
+      const store = useCollectionStore()
 
-        // Seed cardIndexRaw the way it exists for real users who hit this bug:
-        // the cards already live in a previously-built card_index. addCard's
-        // syncIndexLocal('add') is the only way to populate it from the public API.
-        // Each call must resolve a DISTINCT id — addCard uses docRef.id (from
-        // addDoc), not the input card's stripped id, to build the stored card.
-        mockAddDoc
-          .mockResolvedValueOnce({ id: 'card-1' })
-          .mockResolvedValueOnce({ id: 'card-2' })
-          .mockResolvedValueOnce({ id: 'card-3' })
-        for (const id of ['card-1', 'card-2', 'card-3']) {
-          const { id: _id, updatedAt: _updatedAt, ...cardData } = makeCard({ id, status: 'collection' })
-          // eslint-disable-next-line no-await-in-loop
-          await store.addCard(cardData as any)
-        }
-        await vi.advanceTimersByTimeAsync(2100) // flush addCard's own debounced persists
-        mockSetDoc.mockClear()
-
-        store.paginatedCards = store.cards as any
-
-        // 2+ cards updated in the SAME batch call (PEDIDO #2 — H1 regression):
-        // the fix must patch card_index in a single O(n+k) pass over cardIndexRaw,
-        // not one syncIndexLocal() call per card (each of which does an O(n)
-        // findIndex + full-array copy — with select-all on a 59k-card index that
-        // was a guaranteed multi-second freeze / Mali crash).
-        await store.batchUpdateCards(['card-1', 'card-2'], { status: 'sale' })
-
-        // Before the debounce fires, no index chunk should have been written yet
-        expect(mockSetDoc).not.toHaveBeenCalled()
-
-        await vi.advanceTimersByTimeAsync(2100)
-
-        expect(mockSetDoc).toHaveBeenCalled()
-        const [, chunkData] = mockSetDoc.mock.calls[0]
-        const persisted = chunkData.cards as Array<{ i: string; st: string }>
-
-        // Both cards in the batch landed correctly in the persisted index
-        expect(persisted.find(c => c.i === 'card-1')?.st).toBe('sale')
-        expect(persisted.find(c => c.i === 'card-2')?.st).toBe('sale')
-        // The untouched third card must survive the rewrite unchanged — proves the
-        // single-pass map preserves entries not present in the batch, rather than
-        // dropping/corrupting them.
-        expect(persisted.find(c => c.i === 'card-3')?.st).toBe('collection')
-        expect(persisted).toHaveLength(3)
-      } finally {
-        vi.useRealTimers()
+      // Seed cardIndexRaw the way it exists for real users who hit this bug:
+      // the cards already live in a previously-built card_index. addCard's
+      // syncIndexLocal('add') is the only way to populate it from the public API.
+      // Each call must resolve a DISTINCT id — addCard uses docRef.id (from
+      // addDoc), not the input card's stripped id, to build the stored card.
+      mockAddDoc
+        .mockResolvedValueOnce({ id: 'card-1' })
+        .mockResolvedValueOnce({ id: 'card-2' })
+        .mockResolvedValueOnce({ id: 'card-3' })
+      for (const id of ['card-1', 'card-2', 'card-3']) {
+        const { id: _id, updatedAt: _updatedAt, ...cardData } = makeCard({ id, status: 'collection' })
+        // eslint-disable-next-line no-await-in-loop
+        await store.addCard(cardData as any)
       }
+      mockSetDoc.mockClear()
+      mockApplyCardIndexDelta.mockClear()
+
+      store.paginatedCards = store.cards as any
+
+      // 2+ cards updated in the SAME batch call (PEDIDO #2 — H1 regression):
+      // the fix must patch card_index in a single applyCardIndexDelta call,
+      // not one per card.
+      await store.batchUpdateCards(['card-1', 'card-2'], { status: 'sale' })
+
+      expect(mockSetDoc).not.toHaveBeenCalled()
+      expect(mockApplyCardIndexDelta).toHaveBeenCalledTimes(1)
+      const [mutations] = mockApplyCardIndexDelta.mock.calls[0]
+
+      // Both cards in the batch are in the delta — the untouched third card
+      // is NOT (proves the delta only carries what actually changed, rather
+      // than re-sending the whole index).
+      expect(mutations).toEqual(
+        expect.arrayContaining([
+          { cardId: 'card-1', action: 'update' },
+          { cardId: 'card-2', action: 'update' },
+        ])
+      )
+      expect(mutations).toHaveLength(2)
     })
   })
 
@@ -251,32 +244,21 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       expect(mockQueryCardIndex).not.toHaveBeenCalled()
     })
 
-    it('deleteCard still defers a correcting re-query until AFTER the debounced index persist flushes', async () => {
-      vi.useFakeTimers()
-      try {
-        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
-        const store = useCollectionStore()
-        const card = makeCard({ id: 'card-1' })
-        store.cards = [card] as any
-        store.paginatedCards = [card] as any
+    it('TASK-232: deleteCard triggers the corrective re-query directly — no more debounce to wait for (the index delta is already awaited before the doc delete)', async () => {
+      mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1' })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
 
-        await store.deleteCard('card-1')
-        // Flush any dangling un-awaited microtasks (e.g. a fire-and-forget
-        // refreshCurrentPage() started synchronously) WITHOUT crossing the 2s
-        // persist debounce — this is what makes an immediate (un-deferred) call
-        // observable here rather than by scheduling luck.
-        await vi.advanceTimersByTimeAsync(0)
-        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+      await store.deleteCard('card-1')
 
-        // Persist debounce (2s) fires and flushes — only THEN is the deferred
-        // re-query allowed to run, per the ticket's design (re-query is still
-        // conceptually necessary for membership/order, just no longer racing).
-        await vi.advanceTimersByTimeAsync(2100)
-
-        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-      } finally {
-        vi.useRealTimers()
-      }
+      // No debounce left to wait out — applyCardIndexDelta was already
+      // awaited (before deleteDoc), so the server index has already caught
+      // up by the time deleteCard resolves. The re-query itself is fired
+      // fire-and-forget (not awaited by deleteCard), behind the lazy
+      // dynamic-import wrapper — wait for it rather than guessing ticks.
+      await vi.waitFor(() => expect(mockQueryCardIndex).toHaveBeenCalledTimes(1))
     })
 
     it('deleteCard restores the paginatedCards entry (not just cards.value) if the Firestore delete fails', async () => {
@@ -391,30 +373,20 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       expect(store.paginatedCards.map((c: any) => c.id)).toEqual(['card-2'])
     })
 
-    it('defers a correcting re-query until AFTER the debounced index persist flushes (bulk delete)', async () => {
-      vi.useFakeTimers()
-      try {
-        mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
-        const store = useCollectionStore()
-        const card1 = makeCard({ id: 'card-1' })
-        const card2 = makeCard({ id: 'card-2' })
-        store.cards = [card1, card2] as any
-        store.paginatedCards = [card1, card2] as any
+    it('TASK-232: triggers the corrective re-query directly — no more debounce to wait for (the index delta batch is already awaited before Phase 1 deletes the docs)', async () => {
+      mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
+      const store = useCollectionStore()
+      const card1 = makeCard({ id: 'card-1' })
+      const card2 = makeCard({ id: 'card-2' })
+      store.cards = [card1, card2] as any
+      store.paginatedCards = [card1, card2] as any
 
-        await store.batchDeleteCards(['card-1', 'card-2'])
-        // Flush any dangling un-awaited microtasks WITHOUT crossing the 2s
-        // persist debounce — an immediate (un-deferred) re-query would be
-        // observable here rather than by scheduling luck.
-        await vi.advanceTimersByTimeAsync(0)
-        expect(mockQueryCardIndex).not.toHaveBeenCalled()
+      await store.batchDeleteCards(['card-1', 'card-2'])
 
-        // Persist debounce (2s) fires and flushes — only THEN is the deferred
-        // re-query allowed to run.
-        await vi.advanceTimersByTimeAsync(2100)
-        expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-      } finally {
-        vi.useRealTimers()
-      }
+      // No debounce left to wait out — applyCardIndexDelta was already
+      // awaited (Phase 0, before Phase 1's doc deletes), so the server
+      // index has already caught up by the time batchDeleteCards resolves.
+      await vi.waitFor(() => expect(mockQueryCardIndex).toHaveBeenCalledTimes(1))
     })
 
     it('restores the paginatedCards AND cards.value entries for cards whose Firestore delete permanently fails (symmetric rollback)', async () => {
@@ -550,6 +522,17 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM', pb: true, df: false,
     })
 
+    // TASK-232: these two locks used to drive the race via TWO deleteCard
+    // calls. deleteCard no longer goes through the debounced client
+    // persist/gen-token mechanism at all (it awaits applyCardIndexDelta
+    // directly and refreshes right after) — but the mechanism itself
+    // (_doPersistIndex/_runPersistLoop's gen-token + _persistRunning guard,
+    // and the deferred _pendingMembershipRefresh consumption) is still live
+    // code: addCard (out of TASK-232's scope) still drives it. Re-pointed to
+    // TWO ADDITIONAL addCard calls per the team-lead's "re-apuntalar, no
+    // borrar" rule — same race (a slow, now-stale persist must not consume
+    // the deferred refresh ahead of the persist that reflects the newest
+    // state), same protection, different trigger.
     it('a slow persist-1 (in flight when persist-2 starts) must not fire the deferred refresh with its own stale snapshot', async () => {
       vi.useFakeTimers()
       try {
@@ -575,11 +558,11 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         mockSetDoc
           .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
             await firstSetDocGate
-            serverChunk = data.cards // persist-1's write commits (STALE — still has card-B)
+            serverChunk = data.cards // persist-1's write commits (STALE — missing card-D)
           })
           .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
             await secondSetDocGate
-            serverChunk = data.cards // persist-2's write commits (correct — empty)
+            serverChunk = data.cards // persist-2's write commits (correct — has card-D)
           })
         mockQueryCardIndex.mockImplementation(async () => ({
           cards: serverChunk,
@@ -589,16 +572,19 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
           hasMore: false,
         }))
 
-        // persist-1: delete card-A schedules its debounced persist
-        await store.deleteCard('card-A')
-        await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, snapshot still has card-B, blocks on setDoc
+        // persist-1: add card-C schedules its debounced persist
+        mockAddDoc.mockResolvedValueOnce({ id: 'card-C' })
+        const { id: _idC, updatedAt: _uC, ...cardCData } = makeCard({ id: 'ignored-c', name: 'Card C' })
+        await store.addCard(cardCData as any)
+        await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, snapshot missing card-D, blocks on setDoc
 
-        // While persist-1 is still in flight (blocked on its setDoc), delete card-B —
+        // While persist-1 is still in flight (blocked on its setDoc), add card-D —
         // this is the ~30-sequential-setDoc multi-second window from the real 59k-card
         // case: a mutation lands and re-schedules the debounce WHILE persist-1 hasn't
         // finished writing yet.
-        await store.deleteCard('card-B')
-        expect(store.paginatedCards).toEqual([]) // optimistic removal already correct locally
+        mockAddDoc.mockResolvedValueOnce({ id: 'card-D' })
+        const { id: _idD, updatedAt: _uD, ...cardDData } = makeCard({ id: 'ignored-d', name: 'Card D' })
+        await store.addCard(cardDData as any)
 
         await vi.advanceTimersByTimeAsync(2100) // timer-2 fires — persist-2 starts, blocks on its own setDoc
 
@@ -606,7 +592,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         // deferred-refresh flag using its own (stale) server read.
         resolveFirstSetDoc()
         await vi.advanceTimersByTimeAsync(0)
-        expect(store.paginatedCards).toEqual([]) // must NOT have reverted to include card-B
+        expect(mockQueryCardIndex).not.toHaveBeenCalled() // must NOT have fired off the stale persist
 
         // Let persist-2 (the CURRENT one) finish — it must be the one to consume the
         // flag and issue the corrective, now-accurate re-query.
@@ -614,7 +600,6 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         await vi.advanceTimersByTimeAsync(0)
 
         expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-        expect(store.paginatedCards).toEqual([])
       } finally {
         vi.useRealTimers()
       }
@@ -648,7 +633,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         mockSetDoc
           .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
             await firstSetDocGate
-            serverChunk = data.cards // persist-1's write commits (STALE — still has card-B)
+            serverChunk = data.cards // persist-1's write commits (STALE — missing card-D)
           })
           .mockImplementation(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
             serverChunk = data.cards // persist-2+ resolve immediately with correct data
@@ -661,14 +646,17 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
           hasMore: false,
         }))
 
-        await store.deleteCard('card-A')
+        mockAddDoc.mockResolvedValueOnce({ id: 'card-C' })
+        const { id: _idC, updatedAt: _uC, ...cardCData } = makeCard({ id: 'ignored-c', name: 'Card C' })
+        await store.addCard(cardCData as any)
         await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, blocks on setDoc
 
         // Second mutation lands DURING persist-1's writes — this SCHEDULES timer-2
         // but does NOT fire it (matches PEDIDO #3's exact gap: the mutation falls
         // in the last <2s of persist-1's writes, so timer-2 is still pending).
-        await store.deleteCard('card-B')
-        expect(store.paginatedCards).toEqual([])
+        mockAddDoc.mockResolvedValueOnce({ id: 'card-D' })
+        const { id: _idD, updatedAt: _uD, ...cardDData } = makeCard({ id: 'ignored-d', name: 'Card D' })
+        await store.addCard(cardDData as any)
 
         // Resolve persist-1's setDoc gate NOW — BEFORE advancing past timer-2's
         // debounce window. gen still matches _persistGen (persist-2 hasn't STARTED
@@ -677,16 +665,14 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         resolveFirstSetDoc()
         await vi.advanceTimersByTimeAsync(0)
 
-        // Must NOT have refreshed/reverted: a timer is still PENDING (_indexPersistTimer
+        // Must NOT have refreshed: a timer is still PENDING (_indexPersistTimer
         // !== null), which must also supersede a stale persist.
         expect(mockQueryCardIndex).not.toHaveBeenCalled()
-        expect(store.paginatedCards).toEqual([])
 
         // Now let timer-2 actually fire and persist-2 run to completion.
         await vi.advanceTimersByTimeAsync(2100)
 
         expect(mockQueryCardIndex).toHaveBeenCalledTimes(1)
-        expect(store.paginatedCards).toEqual([])
       } finally {
         vi.useRealTimers()
       }

@@ -18,6 +18,16 @@
  * rerun that re-snapshots cardIndexRaw once the in-flight loop settles —
  * guaranteeing the final Firestore state always reflects the newest local
  * data, regardless of how the underlying network requests happen to resolve.
+ *
+ * TASK-232: this used to drive the race via TWO updateCard calls.
+ * updateCard no longer writes card_index chunks from the browser at all
+ * (see collection.dirtyChunkWrites.test.ts) — but the serialization
+ * mechanism this test locks (_doPersistIndex/_runPersistLoop's
+ * gen-token/_persistRunning guard) is still live code: addCard (out of
+ * TASK-232's scope) still drives it. Re-pointed to two addCard calls per
+ * the team-lead's "re-apuntalar, no borrar" rule — the race and the
+ * property under test (newest snapshot always wins, regardless of network
+ * resolution order) are identical, only the trigger changed.
  */
 
 // Mock Firebase BEFORE any imports that use it
@@ -31,6 +41,7 @@ vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: vi.fn(),
   buildCardIndex: vi.fn(),
+  applyCardIndexDelta: vi.fn().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 }),
   loadCollectionChunk: vi.fn(),
   loadCardPage: vi.fn(),
 }))
@@ -145,16 +156,22 @@ describe('collection store: serialize card_index persist (TASK-123 regression)',
         })
       })
 
-      // Mutation 1: status -> 'sale'. Its debounced persist fires and starts
-      // writing (blocks on the mocked setDoc).
-      await store.updateCard('card-1', { status: 'sale' })
+      // Mutation 1: add card-2. Its debounced persist fires and starts
+      // writing (blocks on the mocked setDoc) — the snapshot at this point
+      // is [card-1, card-2].
+      mockAddDoc.mockResolvedValueOnce({ id: 'card-2' })
+      const { id: _id2, updatedAt: _u2, ...cardData2 } = makeCard({ id: 'ignored-2' })
+      await store.addCard(cardData2 as any)
       await vi.advanceTimersByTimeAsync(2000)
       expect(pending.length).toBeGreaterThanOrEqual(1)
 
       // Mutation 2 lands WHILE the first write is still in flight — the
       // ~30-sequential-setDoc multi-second window from the real 59k-card
-      // case. Its own debounced persist then fires too.
-      await store.updateCard('card-1', { status: 'trade' })
+      // case. Its own debounced persist then fires too, with the NEWER
+      // snapshot [card-1, card-2, card-3].
+      mockAddDoc.mockResolvedValueOnce({ id: 'card-3' })
+      const { id: _id3, updatedAt: _u3, ...cardData3 } = makeCard({ id: 'ignored-3' })
+      await store.addCard(cardData3 as any)
       await vi.advanceTimersByTimeAsync(2100)
 
       // Drain every write, always resolving the MOST RECENTLY ISSUED
@@ -178,11 +195,13 @@ describe('collection store: serialize card_index persist (TASK-123 regression)',
         await vi.advanceTimersByTimeAsync(0)
       }
 
-      // The final persisted state must reflect the NEWEST mutation ('trade'),
-      // never the stale intermediate one ('sale') — regardless of how many
-      // separate write loops ran or in what order their writes resolved.
+      // The final persisted state must reflect the NEWEST snapshot (all
+      // three cards), never the stale intermediate one (missing card-3) —
+      // regardless of how many separate write loops ran or in what order
+      // their writes resolved.
       expect(serverChunk).not.toBeNull()
-      expect((serverChunk as unknown as Array<{ i: string; st: string }>).find(c => c.i === 'card-1')?.st).toBe('trade')
+      const finalIds = (serverChunk as unknown as Array<{ i: string; st: string }>).map(c => c.i).sort()
+      expect(finalIds).toEqual(['card-1', 'card-2', 'card-3'])
     } finally {
       vi.useRealTimers()
     }

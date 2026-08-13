@@ -1115,6 +1115,238 @@ exports.buildCardIndex = onCall(
 );
 
 // ============================================================
+// APPLY CARD INDEX DELTA — TASK-232
+// Patches ONLY the card_index chunk(s) a status-change or delete actually
+// touches, using the sticky `chunkId` field TASK-230 wrote onto each card
+// document — no full-index rebuild, no client-side chunk write.
+// ============================================================
+
+/**
+ * applyCardIndexDelta — TASK-232. Moves card_index chunk writes for
+ * status-change and delete mutations off the browser and onto the server.
+ * See TASK-232's ticket comments for the full decision write-up; summary:
+ *
+ *   - onCall with an explicit delta, NOT a Firestore trigger on
+ *     users/{uid}/cards/{cardId} — a trigger would also fire for
+ *     bulkImportCards' up-to-5000-per-call writes, amplifying exactly the
+ *     write-volume problem this exists to kill.
+ *   - chunkId is resolved SERVER-SIDE from each card's own document, never
+ *     trusted from the client (the client only says WHICH card and WHAT
+ *     action, never WHERE).
+ *   - Concurrency with buildCardIndex (TASK-226, not resolved here): each
+ *     affected chunk is patched inside its own runTransaction. buildCardIndex
+ *     writes chunks with a plain .set() with no transaction — that does NOT
+ *     eliminate the race, but a plain .set() landing on a chunk this
+ *     transaction has already read IS a version conflict Firestore detects
+ *     at commit time, forcing a retry against the now-fresh document. A
+ *     rebuild that lands mid-delta therefore re-applies the delta on top of
+ *     the rebuilt chunk (correct, slower) instead of being silently
+ *     clobbered. A delta landing mid-rebuild — after buildCardIndex has
+ *     read all cards but before it writes chunk_c — is NOT covered: its own
+ *     .set() has no transaction to conflict against and can still overwrite
+ *     this function's patch with an older snapshot. That specific order is
+ *     TASK-226's open problem, unchanged by this ticket.
+ *
+ * mutations: Array<{ cardId: string, action: 'update'|'delete', allowInsert?: boolean }>
+ *   - 'update': the card doc must already carry the NEW values — the client
+ *     calls this AFTER its own updateDoc/batch.update. Only patches an
+ *     entry that already exists in its chunk; never fabricates a new one
+ *     UNLESS allowInsert is true (see below) — TASK-232 gap #1.
+ *   - 'delete': the client calls this BEFORE deleting the card doc, because
+ *     chunkId can only be read while the doc still exists. If the doc is
+ *     already gone, or has no chunkId, this does a bounded FALLBACK scan of
+ *     every chunk to locate the entry by id instead of skipping — skipping
+ *     would leave a phantom (an index entry with no card behind it),
+ *     exactly the class of bug this function must not introduce. Measured
+ *     2026-08-13: prod's 6,535 pre-TASK-230-backfill docs have no chunkId,
+ *     so this is the NORMAL case there today, not an edge case — the prod
+ *     backfill (TASK-230 AC5) is a hard prerequisite for this fallback to
+ *     stay rare rather than be the common path.
+ *   - allowInsert: only meant for the deleteCard/batchDeleteCards
+ *     COMPENSATION call after a delete-delta already succeeded but the
+ *     actual Firestore doc delete then failed (TASK-232 gap #1: without
+ *     this, that card's document survives but its index entry doesn't —
+ *     an invisible card). The doc still exists with its real chunkId at
+ *     that point, so re-inserting its entry is grounded in a fresh read,
+ *     not a guess.
+ *
+ * Never silent: every mutation this call could not resolve is reported back
+ * in `skippedIds`, and logged server-side. A "0 written, 0 error" result
+ * here is not possible for a mutation this function actually looked at.
+ */
+exports.applyCardIndexDelta = onCall(
+  { maxInstances: 10, timeoutSeconds: 60, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in");
+    }
+    const userId = request.auth.uid;
+
+    const rawMutations = Array.isArray(request.data?.mutations) ? request.data.mutations : [];
+    if (rawMutations.length === 0) {
+      throw new HttpsError("invalid-argument", "mutations must be a non-empty array");
+    }
+    if (rawMutations.length > 500) {
+      throw new HttpsError("invalid-argument", "mutations cannot exceed 500 per call");
+    }
+
+    // Validate shape and dedupe by cardId — last mutation for a given id
+    // wins (this is "apply the current state", not an event log).
+    const byId = new Map();
+    for (const m of rawMutations) {
+      if (!m || typeof m.cardId !== "string" || !m.cardId) continue;
+      if (m.action !== "update" && m.action !== "delete") continue;
+      byId.set(m.cardId, {
+        action: m.action,
+        allowInsert: m.action === "update" && m.allowInsert === true,
+      });
+    }
+    const cardIds = [...byId.keys()];
+    if (cardIds.length === 0) {
+      throw new HttpsError("invalid-argument", "No valid mutations after validation");
+    }
+
+    // Resolve chunkId + (for updates) fresh field values from each card's
+    // own document — never trust a client-supplied chunkId or field
+    // payload for what goes into the index.
+    const cardRefs = cardIds.map((id) => db.collection(`users/${userId}/cards`).doc(id));
+    const cardSnaps = await db.getAll(...cardRefs);
+
+    const byChunk = new Map(); // chunkNumber -> [{ cardId, action, data, allowInsert }]
+    const deleteFallbackIds = [];
+    const skippedIds = [];
+
+    cardSnaps.forEach((snap, i) => {
+      const cardId = cardIds[i];
+      const { action, allowInsert } = byId.get(cardId);
+
+      if (action === "update") {
+        if (!snap.exists) {
+          skippedIds.push(cardId);
+          return;
+        }
+        const data = snap.data();
+        if (typeof data.chunkId !== "number") {
+          // TASK-230: no sticky chunkId on this doc yet. Never fabricate a
+          // location for it — skip and leave the index entry stale until
+          // the next buildCardIndex rebuild.
+          skippedIds.push(cardId);
+          return;
+        }
+        if (!byChunk.has(data.chunkId)) byChunk.set(data.chunkId, []);
+        byChunk.get(data.chunkId).push({ cardId, action, data, allowInsert });
+        return;
+      }
+
+      // action === 'delete'
+      if (snap.exists) {
+        const data = snap.data();
+        if (typeof data.chunkId === "number") {
+          if (!byChunk.has(data.chunkId)) byChunk.set(data.chunkId, []);
+          byChunk.get(data.chunkId).push({ cardId, action, data, allowInsert: false });
+          return;
+        }
+      }
+      // Doc gone, or doc exists with no chunkId — resolve by scanning
+      // instead of skipping (TASK-232 gap #2: skipping here is exactly how
+      // a phantom index entry gets left behind).
+      deleteFallbackIds.push(cardId);
+    });
+
+    let fallbackUsed = 0;
+    if (deleteFallbackIds.length > 0) {
+      fallbackUsed = deleteFallbackIds.length;
+      const indexSnapshot = await db.collection(`users/${userId}/card_index`).get();
+      const wantedIds = new Set(deleteFallbackIds);
+      for (const chunkDoc of indexSnapshot.docs) {
+        const m = /^chunk_(\d+)$/.exec(chunkDoc.id);
+        if (!m) continue;
+        const chunkNum = parseInt(m[1], 10);
+        const data = chunkDoc.data();
+        const cardsArr = Array.isArray(data.cards) ? data.cards : [];
+        for (const c of cardsArr) {
+          if (wantedIds.has(c.i)) {
+            if (!byChunk.has(chunkNum)) byChunk.set(chunkNum, []);
+            byChunk.get(chunkNum).push({ cardId: c.i, action: "delete", data: null, allowInsert: false });
+            wantedIds.delete(c.i);
+          }
+        }
+      }
+      // Anything still in wantedIds genuinely has no entry anywhere in the
+      // index — already consistent (not a phantom), nothing to do. Not
+      // added to skippedIds: skipped means "could not act", this means
+      // "nothing to act on".
+      logger.info(
+        `[applyCardIndexDelta] Fallback scan for user ${userId}: ${deleteFallbackIds.length} delete(s) needed a full-index scan (missing doc or chunkId) — ${deleteFallbackIds.length - wantedIds.size} located and removed, ${wantedIds.size} already absent.`
+      );
+    }
+
+    // Patch each affected chunk inside its own transaction (see concurrency
+    // note above). Chunks are independent — safe to run concurrently.
+    const chunkNumbers = [...byChunk.keys()];
+    const results = await Promise.all(
+      chunkNumbers.map(async (chunkNum) => {
+        const chunkRef = db.collection(`users/${userId}/card_index`).doc(`chunk_${chunkNum}`);
+        const entries = byChunk.get(chunkNum);
+
+        return db.runTransaction(async (tx) => {
+          const chunkSnap = await tx.get(chunkRef);
+          const existingCards = chunkSnap.exists && Array.isArray(chunkSnap.data().cards)
+            ? chunkSnap.data().cards
+            : [];
+          const byIndexId = new Map(existingCards.map((c, idx) => [c.i, idx]));
+          const nextCards = existingCards.slice();
+          let applied = 0;
+          const notFound = [];
+
+          for (const { cardId, action, data, allowInsert } of entries) {
+            const existingIdx = byIndexId.get(cardId);
+            if (action === "delete") {
+              if (existingIdx === undefined) continue; // already absent — consistent, not an error
+              nextCards[existingIdx] = null; // filtered out below
+              applied++;
+            } else if (existingIdx === undefined) {
+              if (allowInsert) {
+                nextCards.push(toIndexCard(cardId, data));
+                applied++;
+              } else {
+                notFound.push(cardId);
+              }
+            } else {
+              nextCards[existingIdx] = toIndexCard(cardId, data);
+              applied++;
+            }
+          }
+
+          const filteredCards = nextCards.filter((c) => c !== null);
+          tx.set(chunkRef, {
+            cards: filteredCards,
+            count: filteredCards.length,
+            version: INDEX_VERSION,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          return { applied, notFound };
+        });
+      })
+    );
+
+    let appliedCount = 0;
+    for (const r of results) {
+      appliedCount += r.applied;
+      skippedIds.push(...r.notFound);
+    }
+    const uniqueSkipped = [...new Set(skippedIds)];
+    if (uniqueSkipped.length > 0) {
+      logger.warn(
+        `[applyCardIndexDelta] ${uniqueSkipped.length} mutation(s) skipped for user ${userId} (missing doc/chunkId, or update target not found in its chunk): ${uniqueSkipped.join(", ")}`
+      );
+    }
+
+    return { applied: appliedCount, skipped: uniqueSkipped.length, skippedIds: uniqueSkipped, fallbackUsed };
+  }
+);
+
+// ============================================================
 // LOAD CARD PAGE — Fetch full cards by IDs with scryfall_cache join
 // Used for paginated grid display (50 cards at a time)
 // ============================================================

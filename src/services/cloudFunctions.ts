@@ -161,6 +161,44 @@ export async function buildCardIndex(): Promise<BuildCardIndexResponse> {
 }
 
 /**
+ * TASK-232: apply a batch of card_index deltas server-side. Replaces the
+ * browser writing card_index chunks directly for status-change/delete
+ * mutations — see functions/index.js's applyCardIndexDelta doc comment for
+ * the full mechanism (chunkId resolved server-side, fallback scan for
+ * missing chunkId on delete, allowInsert compensation for a failed delete).
+ */
+export interface CardIndexDeltaMutation {
+  cardId: string
+  action: 'update' | 'delete'
+  /**
+   * Only for the deleteCard/batchDeleteCards compensation call after a
+   * delete-delta already succeeded but the actual doc delete then failed —
+   * lets the server re-insert an entry it just removed instead of skipping
+   * (the doc still exists, with its real chunkId, at that point).
+   */
+  allowInsert?: boolean
+}
+
+export interface ApplyCardIndexDeltaResponse {
+  applied: number
+  skipped: number
+  skippedIds: string[]
+  fallbackUsed: number
+}
+
+export async function applyCardIndexDelta(
+  mutations: CardIndexDeltaMutation[]
+): Promise<ApplyCardIndexDeltaResponse> {
+  const callable = httpsCallable<{ mutations: CardIndexDeltaMutation[] }, ApplyCardIndexDeltaResponse>(
+    functions,
+    'applyCardIndexDelta',
+    { timeout: 60000 }
+  )
+  const result = await callable({ mutations })
+  return result.data
+}
+
+/**
  * Load full card objects by IDs with scryfall_cache join.
  * Used for paginated grid display (50-200 cards at a time).
  */

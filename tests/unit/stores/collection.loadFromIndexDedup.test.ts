@@ -29,6 +29,7 @@ const mockBuildCardIndex = vi.fn().mockResolvedValue({ totalCards: 0, chunks: 0 
 vi.mock('@/services/cloudFunctions', () => ({
   queryCardIndex: vi.fn(),
   buildCardIndex: (...args: unknown[]) => mockBuildCardIndex(...args),
+  applyCardIndexDelta: vi.fn().mockResolvedValue({ applied: 0, skipped: 0, skippedIds: [], fallbackUsed: 0 }),
   loadCollectionChunk: vi.fn(),
   loadCardPage: vi.fn(),
 }))
@@ -58,6 +59,7 @@ vi.mock('firebase/firestore', () => ({
   collection: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
   deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
   doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
+  getCountFromServer: vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   Timestamp: { now: () => ({ seconds: 0, nanoseconds: 0 }) },
@@ -82,6 +84,20 @@ vi.mock('@/stores/toast', () => ({
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore, type IndexCard } from '@/stores/collection'
+import { makeCard } from '../helpers/fixtures'
+
+/**
+ * TASK-232: these orphan-cleanup tests used to trigger _runPersistLoop via
+ * updateCard — updateCard no longer writes card_index chunks from the
+ * browser at all (see collection.dirtyChunkWrites.test.ts). _runPersistLoop
+ * itself is still live code (addCard, out of TASK-232's scope, still uses
+ * it) — re-pointed to addCard here per the team-lead's "re-apuntalar, no
+ * borrar" rule for a still-live mechanism.
+ */
+function newCardPayload() {
+  const { id: _id, updatedAt: _u, ...cardData } = makeCard({ id: 'ignored' })
+  return cardData
+}
 
 /** Minimal IndexCard — only the fields loadFromIndex/indexToCard actually read. */
 function makeIndexCard(id: string): IndexCard {
@@ -233,7 +249,7 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
         snapshotOf([chunkDoc('chunk_0', []), chunkDoc('chunk_2', [])])
       )
 
-      await store.updateCard('a', { status: 'sale' })
+      await store.addCard(newCardPayload() as never)
       await vi.advanceTimersByTimeAsync(2000)
       await vi.advanceTimersByTimeAsync(0)
 
@@ -292,7 +308,7 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
         snapshotOf([chunkDoc('chunk_0', []), chunkDoc('chunk_1', []), chunkDoc('chunk_2', [])])
       )
 
-      await store.updateCard('c0', { status: 'sale' })
+      await store.addCard(newCardPayload() as never)
       await vi.advanceTimersByTimeAsync(2000)
       await vi.advanceTimersByTimeAsync(0)
 
@@ -327,7 +343,7 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
         ])
       )
 
-      await store.updateCard('a', { status: 'sale' })
+      await store.addCard(newCardPayload() as never)
       await vi.advanceTimersByTimeAsync(2000)
       await vi.advanceTimersByTimeAsync(0)
 
@@ -361,7 +377,7 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
       )
       mockSetDoc.mockRejectedValue(new Error('network died mid-write'))
 
-      await store.updateCard('a', { status: 'sale' })
+      await store.addCard(newCardPayload() as never)
       await vi.advanceTimersByTimeAsync(2000)
       await vi.advanceTimersByTimeAsync(0)
 

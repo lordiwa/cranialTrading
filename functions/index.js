@@ -1102,6 +1102,39 @@ exports.buildCardIndex = onCall(
       logger.info(`[buildCardIndex] Deleted ${staleRefs.length} stale chunks`);
     }
 
+    // TASK-232 HIGH-1 (team-lead review): re-align the sticky `chunkId`
+    // TASK-230 wrote on each card doc with the chunk THIS rebuild is
+    // actually putting it in. Without this, chunkId drifts permanently the
+    // moment a rebuild's position-by-documentId order disagrees with
+    // whatever assigned chunkId at creation time (bulkImportCards' creation
+    // order, or an earlier rebuild's own drift compounding) — and
+    // applyCardIndexDelta trusts chunkId to locate a card's chunk. A
+    // DELETE whose chunkId points at the wrong chunk finds nothing there
+    // and (pre-fix) silently concluded "already absent" — a phantom, with
+    // no log anywhere. Only the cards whose chunkId is actually WRONG are
+    // rewritten (comparing against the position this rebuild just computed
+    // for them) — bounded to however much has drifted, not every card on
+    // every rebuild.
+    const chunkIdFixes = [];
+    for (let i = 0; i < allRawCards.length; i++) {
+      const correctChunkId = Math.floor(i / INDEX_CHUNK_SIZE);
+      if (allRawCards[i].data.chunkId !== correctChunkId) {
+        chunkIdFixes.push({ id: allRawCards[i].id, chunkId: correctChunkId });
+      }
+    }
+    if (chunkIdFixes.length > 0) {
+      const FIX_BATCH = 500;
+      for (let i = 0; i < chunkIdFixes.length; i += FIX_BATCH) {
+        const batch = db.batch();
+        for (const fix of chunkIdFixes.slice(i, i + FIX_BATCH)) {
+          batch.update(colRef.doc(fix.id), { chunkId: fix.chunkId });
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await batch.commit();
+      }
+      logger.info(`[buildCardIndex] Re-aligned chunkId on ${chunkIdFixes.length} card doc(s) that had drifted from this rebuild's actual placement`);
+    }
+
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info(`[buildCardIndex] Done: ${allIndexCards.length} cards → ${totalChunks} chunks in ${elapsed}s`);
 
@@ -1253,11 +1286,27 @@ exports.applyCardIndexDelta = onCall(
       deleteFallbackIds.push(cardId);
     });
 
+    // TASK-232 HIGH-1 (team-lead review): the chunkId a card's OWN document
+    // carries is not guaranteed to match where its entry actually lives —
+    // bulkImportCards assigns chunkId by creation order, buildCardIndex
+    // assigns chunks by documentId order, and any position-based rewrite
+    // (a full rebuild) can leave chunkId stale for cards it re-partitions
+    // without touching their sticky field (buildCardIndex now
+    // self-corrects this going forward, but existing drift predates that
+    // fix and a delta call can still land on an unrewritten doc). A DELETE
+    // whose believed chunk does NOT actually contain the entry must not be
+    // read as "already absent" — that is exactly how a phantom (index says
+    // present, no document backs it — the INVERSE here: index entry
+    // survives untouched somewhere else while this call wrongly concludes
+    // there's nothing to do) gets left behind silently. scanAndAssign runs
+    // the same full-index fallback search used for missing/unreadable
+    // chunkId, reused for this escalation too.
     let fallbackUsed = 0;
-    if (deleteFallbackIds.length > 0) {
-      fallbackUsed = deleteFallbackIds.length;
+    const scanAndAssign = async (ids, reason) => {
+      if (ids.length === 0) return new Set();
+      fallbackUsed += ids.length;
       const indexSnapshot = await db.collection(`users/${userId}/card_index`).get();
-      const wantedIds = new Set(deleteFallbackIds);
+      const wantedIds = new Set(ids);
       for (const chunkDoc of indexSnapshot.docs) {
         const m = /^chunk_(\d+)$/.exec(chunkDoc.id);
         if (!m) continue;
@@ -1277,64 +1326,111 @@ exports.applyCardIndexDelta = onCall(
       // added to skippedIds: skipped means "could not act", this means
       // "nothing to act on".
       logger.info(
-        `[applyCardIndexDelta] Fallback scan for user ${userId}: ${deleteFallbackIds.length} delete(s) needed a full-index scan (missing doc or chunkId) — ${deleteFallbackIds.length - wantedIds.size} located and removed, ${wantedIds.size} already absent.`
+        `[applyCardIndexDelta] Fallback scan for user ${userId} (${reason}): ${ids.length} delete(s) — ${ids.length - wantedIds.size} located and removed, ${wantedIds.size} already absent.`
       );
-    }
+      return wantedIds;
+    };
+
+    await scanAndAssign(deleteFallbackIds, "missing doc or chunkId");
 
     // Patch each affected chunk inside its own transaction (see concurrency
     // note above). Chunks are independent — safe to run concurrently.
-    const chunkNumbers = [...byChunk.keys()];
-    const results = await Promise.all(
-      chunkNumbers.map(async (chunkNum) => {
-        const chunkRef = db.collection(`users/${userId}/card_index`).doc(`chunk_${chunkNum}`);
-        const entries = byChunk.get(chunkNum);
+    // Returns the delete cardIds that were NOT found in their believed
+    // chunk (round 1) — these need the fallback scan too, not a silent
+    // "already absent".
+    const applyChunkTransactions = async (chunkMap) => {
+      const chunkNumbers = [...chunkMap.keys()];
+      const results = await Promise.all(
+        chunkNumbers.map(async (chunkNum) => {
+          const chunkRef = db.collection(`users/${userId}/card_index`).doc(`chunk_${chunkNum}`);
+          const entries = chunkMap.get(chunkNum);
 
-        return db.runTransaction(async (tx) => {
-          const chunkSnap = await tx.get(chunkRef);
-          const existingCards = chunkSnap.exists && Array.isArray(chunkSnap.data().cards)
-            ? chunkSnap.data().cards
-            : [];
-          const byIndexId = new Map(existingCards.map((c, idx) => [c.i, idx]));
-          const nextCards = existingCards.slice();
-          let applied = 0;
-          const notFound = [];
+          return db.runTransaction(async (tx) => {
+            const chunkSnap = await tx.get(chunkRef);
+            const existingCards = chunkSnap.exists && Array.isArray(chunkSnap.data().cards)
+              ? chunkSnap.data().cards
+              : [];
+            const byIndexId = new Map(existingCards.map((c, idx) => [c.i, idx]));
+            const nextCards = existingCards.slice();
+            let applied = 0;
+            const notFoundUpdates = [];
+            const notFoundDeletes = [];
 
-          for (const { cardId, action, data, allowInsert } of entries) {
-            const existingIdx = byIndexId.get(cardId);
-            if (action === "delete") {
-              if (existingIdx === undefined) continue; // already absent — consistent, not an error
-              nextCards[existingIdx] = null; // filtered out below
-              applied++;
-            } else if (existingIdx === undefined) {
-              if (allowInsert) {
-                nextCards.push(toIndexCard(cardId, data));
+            for (const { cardId, action, data, allowInsert } of entries) {
+              const existingIdx = byIndexId.get(cardId);
+              if (action === "delete") {
+                if (existingIdx === undefined) {
+                  // Not where its chunkId said it would be — do NOT treat
+                  // as "already absent" (TASK-232 HIGH-1). Escalate to the
+                  // fallback scan after this round instead of concluding
+                  // silently.
+                  notFoundDeletes.push(cardId);
+                  continue;
+                }
+                nextCards[existingIdx] = null; // filtered out below
                 applied++;
+              } else if (existingIdx === undefined) {
+                if (allowInsert) {
+                  nextCards.push(toIndexCard(cardId, data));
+                  applied++;
+                } else {
+                  notFoundUpdates.push(cardId);
+                }
               } else {
-                notFound.push(cardId);
+                nextCards[existingIdx] = toIndexCard(cardId, data);
+                applied++;
               }
-            } else {
-              nextCards[existingIdx] = toIndexCard(cardId, data);
-              applied++;
             }
-          }
 
-          const filteredCards = nextCards.filter((c) => c !== null);
-          tx.set(chunkRef, {
-            cards: filteredCards,
-            count: filteredCards.length,
-            version: INDEX_VERSION,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            const filteredCards = nextCards.filter((c) => c !== null);
+            tx.set(chunkRef, {
+              cards: filteredCards,
+              count: filteredCards.length,
+              version: INDEX_VERSION,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return { applied, notFoundUpdates, notFoundDeletes };
           });
-          return { applied, notFound };
-        });
-      })
-    );
+        })
+      );
 
-    let appliedCount = 0;
-    for (const r of results) {
-      appliedCount += r.applied;
-      skippedIds.push(...r.notFound);
+      let appliedCount = 0;
+      const notFoundUpdateIds = [];
+      const notFoundDeleteIds = [];
+      for (const r of results) {
+        appliedCount += r.applied;
+        notFoundUpdateIds.push(...r.notFoundUpdates);
+        notFoundDeleteIds.push(...r.notFoundDeletes);
+      }
+      return { appliedCount, notFoundUpdateIds, notFoundDeleteIds };
+    };
+
+    // Round 1: the fast path (own doc's chunkId) plus whatever the initial
+    // fallback scan above already resolved into byChunk.
+    const round1 = await applyChunkTransactions(byChunk);
+    let appliedCount = round1.appliedCount;
+    skippedIds.push(...round1.notFoundUpdateIds);
+
+    // Round 2: deletes whose believed chunk didn't have them — escalate to
+    // a fresh fallback scan + a second (disjoint-chunk) transaction round.
+    if (round1.notFoundDeleteIds.length > 0) {
+      const round2Chunk = new Map();
+      const stillMissing = await scanAndAssign(round1.notFoundDeleteIds, "chunkId pointed at the wrong chunk");
+      // scanAndAssign mutates the SHARED `byChunk` map (used by round 1
+      // too) — pull out only the entries it just added for round 2 so
+      // round-1 chunks aren't re-processed.
+      for (const [chunkNum, entries] of byChunk) {
+        const newlyAdded = entries.filter(e => round1.notFoundDeleteIds.includes(e.cardId) && !stillMissing.has(e.cardId));
+        if (newlyAdded.length > 0) round2Chunk.set(chunkNum, newlyAdded);
+      }
+      if (round2Chunk.size > 0) {
+        const round2 = await applyChunkTransactions(round2Chunk);
+        appliedCount += round2.appliedCount;
+      }
+      // stillMissing after the scan genuinely has no entry anywhere —
+      // consistent, not a phantom, not a skip.
     }
+
     const uniqueSkipped = [...new Set(skippedIds)];
     if (uniqueSkipped.length > 0) {
       logger.warn(

@@ -102,6 +102,12 @@
       "type": "task",
       "ref": "tasks/TASK-223.json",
       "label": "Que cambiar el estado y borrar funcionen SIEMPRE: curar el índice cuando el documento ya no existe"
+    },
+    {
+      "id": "task-230",
+      "type": "task",
+      "ref": "tasks/TASK-230.json",
+      "label": "card_index: cada carta guarda su chunk en su propio documento (solo datos, nadie lo lee todavia)"
     }
   ],
   "edges": []

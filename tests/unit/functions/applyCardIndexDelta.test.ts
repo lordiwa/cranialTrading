@@ -99,4 +99,44 @@ describe('applyCardIndexDelta — server-side card_index chunk patching (TASK-23
   it('logs (not just returns) when mutations are skipped — server-side visibility, not just a client-side field', () => {
     expect(source).toMatch(/logger\.warn\(/)
   })
+
+  it('TASK-232 HIGH-1: a delete NOT found in its believed chunk is escalated to the fallback scan — never treated as "already absent"', () => {
+    // The card's own chunkId (bulkImportCards' creation-order assignment,
+    // or drift from an earlier position-based rewrite) is not guaranteed
+    // to match the chunk its entry actually lives in. Silently concluding
+    // "not there -> already deleted" when it's really "wrong chunk" leaves
+    // the real entry behind forever — a phantom no different from gap #2's
+    // missing-chunkId case. The delete branch must collect these into a
+    // separate bucket (not just `continue`) and a later scan/re-apply pass
+    // must exist to resolve them.
+    expect(source).toMatch(/notFoundDeletes\.push\(cardId\)/)
+    expect(source).not.toMatch(/if\s*\(existingIdx === undefined\) continue; \/\/ already absent/)
+    // The escalation must actually be consumed by a second pass, not just
+    // collected and discarded — look for a second call site that re-applies
+    // the scan/transaction machinery.
+    const scanCallSites = source.match(/scanAndAssign\(/g) ?? []
+    const applyCallSites = source.match(/applyChunkTransactions\(/g) ?? []
+    expect(scanCallSites.length).toBeGreaterThanOrEqual(2)
+    expect(applyCallSites.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('buildCardIndex — self-corrects drifted chunkId on every rebuild (TASK-232 HIGH-1)', () => {
+  const source = extractOnCallSource('buildCardIndex')
+
+  it('compares each card doc\'s chunkId against the chunk this rebuild is actually placing it in', () => {
+    expect(source).toMatch(/allRawCards\[i\]\.data\.chunkId\s*!==\s*correctChunkId/)
+  })
+
+  it('only rewrites docs whose chunkId actually drifted — not every card on every rebuild', () => {
+    // The fix must be conditioned on a real mismatch (chunkIdFixes.length),
+    // not an unconditional batch-write of the whole collection — that would
+    // turn every rebuild into a full second write pass over every card doc.
+    expect(source).toMatch(/if\s*\(chunkIdFixes\.length > 0\)\s*\{/)
+  })
+
+  it('batches the chunkId rewrites (bounded per-commit size), not one write per card', () => {
+    expect(source).toMatch(/FIX_BATCH/)
+    expect(source).toMatch(/batch\.update\(colRef\.doc\(fix\.id\),\s*\{\s*chunkId:\s*fix\.chunkId\s*\}\)/)
+  })
 })

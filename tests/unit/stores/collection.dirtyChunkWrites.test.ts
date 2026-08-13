@@ -301,55 +301,72 @@ describe('collection store: update/delete mutations write ZERO card_index chunks
       }
     })
 
-    // AC2's SHRINK sub-case ("totalChunks went down since the last write ->
-    // the orphan-cleanup getDocs still runs") had exactly two live triggers
-    // before TASK-232: batchDeleteCards' full rewrite, and the TASK-185
-    // in-flight queued-delete replay (applyPendingIndexMutations). TASK-232
-    // removed the first (batchDeleteCards no longer drives _runPersistLoop
-    // at all). Rather than fake this sub-case with an addCard-only setup
-    // that cannot actually shrink membership, it is left to the ONE
-    // remaining live trigger: collection.mutateBeforeIndexLoad.test.ts's
-    // TASK-185 window already exercises applyPendingIndexMutations'
-    // markAllChunksDirty()+persistIndexToFirestore() path end-to-end
-    // (queued delete replayed once the load finishes, chunk rewritten). A
-    // stub test asserting nothing here would be exactly the "verde vacío"
-    // class this project's culture explicitly forbids — omitted instead.
-
-    it('HIGH-1: a failed chunk write is not lost — it is retried by the next persist', async () => {
+    // AC2 SHRINK (team-lead HIGH-2, review of the first cut of this file):
+    // batchDeleteCards no longer calls persistIndexToFirestore itself
+    // (TASK-232), but it STILL shrinks cardIndexRaw locally (in-memory
+    // filter, no Firestore write — see batchDeleteCards' "Sync LOCAL
+    // in-memory index only" block). That local shrink is real and live: the
+    // NEXT addCard-triggered persist computes totalChunks off the
+    // now-smaller cardIndexRaw, which can fall below
+    // _lastWrittenTotalChunks — exactly the condition the orphan-cleanup
+    // guard exists to catch. My first cut of this file wrongly concluded
+    // there was no live shrink trigger left and omitted this case; there is
+    // one, it just moved from "batchDeleteCards' own persist" to "the next
+    // addCard's persist inheriting a locally-shrunk cardIndexRaw".
+    it('AC2: totalChunks SHRANK since the last write (via batchDeleteCards shrinking cardIndexRaw locally) -> the next persist still runs the cleanup', async () => {
       vi.useFakeTimers()
       try {
-        const store = await loadLargeIndex(60001)
-        mockSetDoc.mockClear()
+        const store = await loadLargeIndex(2001)
         mockGetDocs.mockClear()
         mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
 
-        mockSetDoc.mockRejectedValueOnce(new Error('network blip'))
+        // Baseline addCard persist: 2001 -> 2002 cards, still 2 chunks.
+        // Establishes _lastWrittenTotalChunks = 2.
         mockAddDoc.mockResolvedValueOnce({ id: 'new-card-1' })
         const { id: _id1, updatedAt: _u1, ...cardData1 } = makeCard({ id: 'ignored-1' })
         await store.addCard(cardData1 as never)
         await vi.advanceTimersByTimeAsync(2100)
-        // The write was attempted (and threw) — this alone doesn't prove
-        // retry; the assertion below does.
-        expect(mockSetDoc).toHaveBeenCalled()
-
+        expect(mockGetDocs).toHaveBeenCalledTimes(1) // baseline cleanup read
+        mockGetDocs.mockClear()
         mockSetDoc.mockClear()
-        mockSetDoc.mockResolvedValue(undefined)
 
-        // A second, unrelated addCard triggers another full rewrite —
-        // because addCard always marks everything dirty, this alone doesn't
-        // distinguish "retried" from "coincidentally rewritten again". The
-        // discriminator is that chunk_0 (the one that failed) is present
-        // among the chunks written THIS time too, proving nothing was
-        // permanently dropped by the earlier failure.
+        // Shrink via batchDeleteCards: 2002 -> 1997 cards. No client
+        // card_index write here (TASK-232) — cardIndexRaw shrinks locally.
+        await store.batchDeleteCards(['card-0', 'card-1', 'card-2', 'card-3', 'card-4'])
+        expect(mockSetDoc).not.toHaveBeenCalled() // confirms TASK-232 holds: still zero client writes
+        mockGetDocs.mockClear()
+
+        // Next addCard: 1997 -> 1998 cards -> ceil(1998/2000) = 1 chunk,
+        // down from the baseline's 2 -> the cleanup getDocs MUST fire.
         mockAddDoc.mockResolvedValueOnce({ id: 'new-card-2' })
         const { id: _id2, updatedAt: _u2, ...cardData2 } = makeCard({ id: 'ignored-2' })
         await store.addCard(cardData2 as never)
         await vi.advanceTimersByTimeAsync(2100)
 
-        expect(writtenChunkNumbers()).toContain(0)
+        expect(mockGetDocs).toHaveBeenCalled()
       } finally {
         vi.useRealTimers()
       }
     })
+
+    // HIGH-1 "failed chunk write is not lost, merges into the next persist"
+    // (the `_dirtyChunks` snapshot/merge-back logic in _runPersistLoop's
+    // catch block) is DELIBERATELY NOT TESTED here — a reviewer in fresh
+    // context (TASK-232 review) measured that the version of this test that
+    // used to live here was VACUOUS: it drove the scenario via addCard,
+    // and addCard always calls markAllChunksDirty() first — so
+    // `dirtySnapshot` at the merge-back site is always `null`, the `if`
+    // branch (not the `else` that actually merges a narrow set) is the only
+    // one ever taken, and "chunk 0 appears in the next full rewrite" is
+    // true unconditionally regardless of whether the merge-back code exists
+    // at all. Deleting the mechanism is out of this ticket's scope (it's
+    // still correct if a narrow-dirty caller returns — see TASK-176) and
+    // cheap to leave in place; a test that cannot fail when the thing it
+    // claims to protect is broken is worse than no test, so it was removed
+    // instead of kept green for the wrong reason. Making it "real" again
+    // would require a live caller that narrows `_dirtyChunks` to a proper
+    // subset before a persist fails — none exists post-TASK-232 (updateCard/
+    // batchUpdateCards no longer reach _runPersistLoop at all). Restore this
+    // lock if/when TASK-176 (or similar) reintroduces one.
   })
 })

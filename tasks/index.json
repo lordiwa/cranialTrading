@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-13T17:15:58.670Z",
+  "generated_at": "2026-08-13T18:29:55.577Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1258,7 +1258,7 @@
     {
       "key": "TASK-230",
       "title": "card_index: cada carta guarda su chunk en su propio documento (solo datos, nadie lo lee todavia)",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {

@@ -18,6 +18,7 @@ const {onSchedule} = require("firebase-functions/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const cheerio = require("cheerio");
+const { mapWithConcurrency } = require("./lib/concurrency");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -1221,8 +1222,37 @@ exports.buildCardIndex = onCall(
  * in `skippedIds`, and logged server-side. A "0 written, 0 error" result
  * here is not possible for a mutation this function actually looked at.
  */
+// TASK-232 OOM fix (dev finding, 2026-08-13): 256MiB was measured OOMing —
+// 'Memory limit of 256 MiB exceeded with 257 MiB used' — on 29 mutations
+// spread across 29 of a 59,083-card account's 30 card_index chunks
+// (~818KB JSON each, ~24MB raw for the whole index). The prior code
+// Promise.all'd every distinct chunk a call touched with no concurrency
+// cap, so a call spread across most/all of an account's chunks held all
+// of them parsed in memory at once, on top of the ~150-200MB Node +
+// firebase-admin baseline a 256MiB container leaves almost no room for.
+// Fixed two ways together, not one or the other:
+//   1. applyChunkTransactions now runs chunk transactions through
+//      mapWithConcurrency (limit below) instead of an unbounded
+//      Promise.all, so peak resident chunk data is bounded by the
+//      concurrency limit, not by how many distinct chunks the mutation
+//      set happens to touch. Chunks remain fully independent (each still
+//      its own runTransaction) — only the concurrency is capped, not the
+//      atomicity documented above.
+//   2. Memory raised to 1GiB: even with (1) bounding the transaction
+//      step, scanAndAssign's fallback (delete mutations whose own doc
+//      has no chunkId, or whose believed chunk didn't have them) reads
+//      the ENTIRE card_index collection in one query snapshot — that
+//      part scales with account size and is NOT bounded by (1). Sized
+//      one tier below buildCardIndex/queryCardIndex's 2GiB (those hold
+//      the full index AND rebuild/rewrite it; this only reads it) and
+//      matching loadCollectionChunk's 1GiB, which moves comparable data
+//      volumes. Until TASK-230 AC5's prod chunkId backfill lands,
+//      scanAndAssign is the COMMON path there (prod's 6,535 pre-backfill
+//      docs have no chunkId), so this must hold up at prod scale, not
+//      just the 59k dev account this was measured against.
+const CHUNK_TX_CONCURRENCY = 6;
 exports.applyCardIndexDelta = onCall(
-  { maxInstances: 10, timeoutSeconds: 60, memory: "256MiB" },
+  { maxInstances: 10, timeoutSeconds: 60, memory: "1GiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Must be logged in");
@@ -1354,8 +1384,14 @@ exports.applyCardIndexDelta = onCall(
     // "already absent".
     const applyChunkTransactions = async (chunkMap) => {
       const chunkNumbers = [...chunkMap.keys()];
-      const results = await Promise.all(
-        chunkNumbers.map(async (chunkNum) => {
+      // TASK-232 OOM fix: bounded concurrency instead of Promise.all over
+      // every distinct chunk (see comment on the exports.applyCardIndexDelta
+      // declaration above) — chunks stay independent transactions, only how
+      // many are held in memory at once changes.
+      const results = await mapWithConcurrency(
+        chunkNumbers,
+        CHUNK_TX_CONCURRENCY,
+        async (chunkNum) => {
           const chunkRef = db.collection(`users/${userId}/card_index`).doc(`chunk_${chunkNum}`);
           const entries = chunkMap.get(chunkNum);
 
@@ -1405,7 +1441,7 @@ exports.applyCardIndexDelta = onCall(
             });
             return { applied, notFoundUpdates, notFoundDeletes };
           });
-        })
+        }
       );
 
       let appliedCount = 0;

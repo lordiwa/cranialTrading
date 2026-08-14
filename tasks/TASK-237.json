@@ -1,0 +1,31 @@
+{
+  "key": "TASK-237",
+  "title": "Un cambio de estado se PIERDE si el usuario recarga o navega dentro de los 2 s del debounce (regresión de TASK-232, VIVA EN PROD)",
+  "description": "MEDIDO EN PRODUCCION el 2026-08-14, con control negativo, sobre la cuenta de Rafael (3.565 cartas en el indice).\n\nREPRO EXACTA (la aporto Rafael, y se reprodujo tal cual): filtrar por color negro y coste 3, pasar 3 cartas a \"cambio\", recargar el sitio. Los filtros se conservan en la URL y en el panel, pero las cartas cambiadas NO aparecen.\n\nEXPERIMENTO CONTROLADO. Mismo codigo, misma cuenta, misma accion; la UNICA diferencia es cuanto se espera antes de recargar:\n  Corpses of the Lost — se esperan 3,5 s antes de recargar -> el indice queda en \"trade\". SE GUARDO.\n  Dreadmobile         — se recarga inmediatamente          -> el indice queda en \"sale\".  SE PERDIO.\n\nCAUSA, LEIDA: src/stores/collection.ts:1118-1124, scheduleCardIndexDeltaFlush() usa un setTimeout de 2000 ms y hace clearTimeout en cada mutacion, o sea un debounce de cola que se REINICIA con cada cambio. Si el usuario recarga, navega o cierra antes de que venza, _runServerDeltaFlush() nunca corre y la llamada a applyCardIndexDelta NUNCA SALE.\n\nPOR QUE ES PERMANENTE: desde TASK-232 el cliente ya no escribe el card_index en el camino de mutacion, y este camino no reintenta (a proposito, para no lazar contra una llamada que falla siempre). Si el flush no sale, no queda NADIE que escriba esa entrada. Solo la corrige una mutacion posterior sobre la misma carta o un buildCardIndex completo.\n\nDESCARTADO POR MEDICION (no es esto): no es falta de chunkId ni un fallo del servidor. Llamando a applyCardIndexDelta directamente con esas mismas 3 cartas devolvio {\"applied\":3,\"skipped\":0,\"skippedIds\":[],\"fallbackUsed\":0}. La funcion anda; el problema es que el cliente no la llama.\n\nNO ES ESPECIFICO DEL ESTADO \"cambio\". Rafael pregunto si convenia eliminar el estado trade para simplificar. NO lo arreglaria: el defecto es del camino de envio y afecta por igual a venta, coleccion y cualquier cambio de estado. Eliminar trade seria mucho mas trabajo (tipos, filtros, 3 archivos de i18n, TODA la funcionalidad de matches que se apoya en VENDO/BUSCO, E2E, y los datos ya existentes con status trade en prod) y dejaria el bug intacto.\n\nPOR QUE NO LO VIO EL AC5 DE TASK-232: el orquestador dio AC5 por aprobado tras disparar una tanda y matar la pestania a los 4 SEGUNDOS — por encima del debounce de 2 s. La prueba paso sin ejercitar el mecanismo. Fue suerte de timing, no verificacion. Queda registrado como correccion en TASK-232.\n\nESTADO DE LOS DATOS DE PROD (Rafael pidio NO revertir): Ninja's Blades, Magus of the Bridge y Raven Eagle quedaron consistentes en trade (se aplicaron a mano al diagnosticar). Corpses of the Lost quedo consistente en trade. Dreadmobile quedo con documento=trade e indice=sale — INCONSISTENTE A PROPOSITO, es la evidencia viva del defecto.",
+  "acceptance_criteria": [
+    "AC1: reproducir el defecto en un test antes de arreglarlo: una mutacion seguida de la destruccion del contexto ANTES de los 2 s no debe perder la escritura del indice.",
+    "AC2: lo pendiente se envia al salir de la pagina (visibilitychange / pagehide, con fetch keepalive o equivalente) en vez de morir con el timer. OJO: un beforeunload con una llamada normal NO alcanza, el navegador la cancela.",
+    "AC3: revisar si el debounce de 2000 ms sigue siendo el valor correcto, y justificar el valor elegido con un numero (que problema resuelve: coalescer tandas grandes). Si se baja, decir cuanto sube el volumen de llamadas.",
+    "AC4: red de seguridad al cargar: detectar que el indice no coincide con los documentos y corregirlo, para que una perdida no quede permanente aunque el AC2 falle. Puede ser ticket aparte si es grande, pero hay que decidirlo explicitamente.",
+    "AC5: VERIFICAR CON CONTROL NEGATIVO Y EN EL NAVEGADOR, no solo con tests: cambiar una carta y recargar INMEDIATAMENTE (por debajo del debounce) debe conservar el cambio. La verificacion tiene que incluir el caso rapido, que es el que fallo.",
+    "AC6: la misma prueba, con el mismo control negativo, repetida en PRODUCCION despues de desplegar."
+  ],
+  "status": "in_progress",
+  "priority": "critical",
+  "labels": [
+    "card-index",
+    "collection",
+    "bug",
+    "regresion",
+    "prod"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-14T02:16:33.541Z",
+  "updated_at": "2026-08-14T02:20:16.172Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

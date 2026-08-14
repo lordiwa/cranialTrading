@@ -15,6 +15,13 @@ vi.mock('firebase/app', () => ({
   getApp: () => ({}),
 }))
 
+// TASK-237: cloudFunctions.ts now also wires onIdTokenChanged (to keep a
+// cached ID token ready for sendCardIndexDeltaBeacon's unload-time fetch) —
+// stub it so it doesn't fail against the plain mocked auth object below.
+vi.mock('firebase/auth', () => ({
+  onIdTokenChanged: () => () => {},
+}))
+
 vi.mock('@/services/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-user-id' } },

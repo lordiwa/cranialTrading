@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef } from 'vue'
 import { backgroundSafeDelay } from '../utils/backgroundSafeDelay'
 import { defineStore } from 'pinia'
 import {
@@ -1115,12 +1115,79 @@ export const useCollectionStore = defineStore('collection', () => {
         _pendingServerDeltas.set(cardId, action)
     }
 
+    // TASK-237 AC3: 2000ms is unchanged. Its job is to coalesce a burst of
+    // separate updateCard calls (the repro is exactly this — flipping the
+    // status pill on 3 cards in a row in CollectionGridCardFull.vue, each a
+    // standalone updateCard/queueCardIndexDelta call) into ONE
+    // applyCardIndexDelta invocation instead of one per card. Now that AC2
+    // below flushes on pagehide/visibilitychange regardless of where the
+    // timer is in its countdown, the debounce no longer has any bearing on
+    // whether a delta survives a reload — that risk is fully owned by AC2
+    // (plus AC4's reconciliation as backstop). So there is no longer a
+    // safety reason to shorten it, only a call-volume one, and shortening it
+    // would trade call volume for nothing: a user tapping through several
+    // cards at a normal skim pace (roughly 1/s) would blow through anything
+    // under ~1000-1500ms and turn most bursts back into one call per card,
+    // for zero reduction in loss risk. Left at 2000ms.
     function scheduleCardIndexDeltaFlush(): void {
         if (_serverDeltaTimer) clearTimeout(_serverDeltaTimer)
         _serverDeltaTimer = setTimeout(() => {
             _serverDeltaTimer = null
             _runServerDeltaFlush()
         }, 2000)
+    }
+
+    // TASK-237 AC2: last-chance delivery when the page is torn down
+    // (reload/navigate/close) before the debounce above elapses. Without
+    // this, "recargar inmediatamente" permanently loses the pending delta —
+    // TASK-232 took the client out of the card_index write path entirely,
+    // so nothing else is left to converge it (see the AC3 comment above and
+    // the ticket for the measured Corpses of the Lost / Dreadmobile
+    // control-negative pair).
+    //
+    // visibilitychange->hidden fires for tab switches, app backgrounding,
+    // and unloads alike (not just unloads) — flushing early there is
+    // harmless (idempotent re-application at worst) and is the ONLY
+    // reliable signal on mobile Safari, which does not fire pagehide
+    // reliably for all dismissal paths. pagehide is kept too as the
+    // desktop-reload/navigate signal. A plain beforeunload + normal
+    // httpsCallable was explicitly ruled out (TASK-237's known trap): the
+    // browser cancels an in-flight fetch once unload starts, so the call
+    // must be built by hand with keepalive (see
+    // services/cloudFunctions.ts's sendCardIndexDeltaBeacon).
+    function flushPendingCardIndexDeltasOnUnload(): void {
+        if (_pendingServerDeltas.size === 0) return
+        if (_serverDeltaTimer) {
+            clearTimeout(_serverDeltaTimer)
+            _serverDeltaTimer = null
+        }
+        const batch = [..._pendingServerDeltas.entries()].map(([cardId, action]) => ({ cardId, action }))
+        _pendingServerDeltas.clear()
+        void (async () => {
+            try {
+                const { sendCardIndexDeltaBeacon } = await import('../services/cloudFunctions')
+                sendCardIndexDeltaBeacon(batch)
+            } catch (err) {
+                // Best-effort by design — see the doc comment above the
+                // scheduleCardIndexDeltaFlush AC3 note and
+                // sendCardIndexDeltaBeacon's own doc comment. Logged so a
+                // real failure is at least visible, never silently retried.
+                logSanitizedError('[IndexSync] flushPendingCardIndexDeltasOnUnload failed to reach the beacon — outcome unknown, not retried', err, 'warn')
+            }
+        })()
+    }
+
+    const _handleVisibilityHidden = () => {
+        if (document.visibilityState === 'hidden') flushPendingCardIndexDeltasOnUnload()
+    }
+    const _handlePageHide = () => { flushPendingCardIndexDeltasOnUnload() }
+    if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+        document.addEventListener('visibilitychange', _handleVisibilityHidden)
+        window.addEventListener('pagehide', _handlePageHide)
+        onScopeDispose(() => {
+            document.removeEventListener('visibilitychange', _handleVisibilityHidden)
+            window.removeEventListener('pagehide', _handlePageHide)
+        })
     }
 
     function _runServerDeltaFlush(): void {

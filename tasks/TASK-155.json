@@ -31,10 +31,15 @@
       "author": "orchestrator",
       "at": "2026-08-08T22:50:39.788568Z",
       "body": "[COMENTARIO DE RAFAEL] DECISION DE RAFAEL 2026-08-08: opcion 2, batchear/paralelizar la escritura de los 21 chunks. Es la unica que ataca la ventana de 100-200+ s. Las otras cuatro salidas (acortar debounce, flush en pagehide, marcar el flag en updateCard, avisar al usuario) quedan FUERA de alcance por ahora. ADVERTENCIA TRASLADADA AL IMPLEMENTADOR: writeBatch tiene limite de 10 MiB y un intento anterior sobre este mismo codigo fallo cinco veces por chocar contra el."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-14T02:17:35.129Z",
+      "body": "CONFIRMADO EN PRODUCCION EL 2026-08-14. El AC1 de este ticket (\"establecer si esto le pasa a un usuario real o solo al test\") queda RESPONDIDO: le pasa a un usuario real. Lo encontro Rafael usando la app.\n\nEste ticket describio el mecanismo exacto el 2026-08-08, como SOSPECHA FUERTE sin confirmar: \"si la pagina se recarga antes de que ese temporizador dispare, el contexto JS se destruye y el temporizador muere con el: la actualizacion del indice NO llega nunca. No es que tarde — se pierde.\" Estaba en lo cierto, palabra por palabra.\n\nMedicion con control negativo en prod (misma cuenta, misma accion, solo cambia la espera):\n  esperar 3,5 s antes de recargar -> el indice queda en trade. SE GUARDA.\n  recargar inmediatamente         -> el indice queda en sale.  SE PIERDE.\n\nLO QUE CAMBIO DESDE QUE SE ABRIO ESTE TICKET, Y LO EMPEORA: TASK-232 saco al cliente de escritor del card_index en el camino de mutacion. Cuando se abrio este ticket, el debounce que moria con el contexto al menos tenia un escritor detras que podia converger; hoy, si el flush no sale, NO QUEDA NADIE que escriba esa entrada, y solo la corrige una mutacion posterior sobre la misma carta o un buildCardIndex completo. La ventana dejo de ser \"se ve viejo un rato\" y paso a ser perdida permanente.\n\nSe abrio TASK-237 (critical) con la medicion, la repro exacta de Rafael, el control negativo y los AC del arreglo, incluida la exigencia de verificar POR DEBAJO del debounce. Este ticket queda como el antecedente diagnostico: no se cierra por estar arreglado, sino que su continuacion es TASK-237.\n\nNOTA DE PROCESO, cara: este ticket existia hace 6 dias, con el mecanismo correcto escrito, y estuvo abierto todo el tiempo en que TASK-232 rediseño justo ese camino. Nadie lo leyo al planificar TASK-232. Si se hubiera leido, el AC5 de TASK-232 se habria escrito para probar POR DEBAJO del debounce y el defecto no habria llegado a produccion."
     }
   ],
   "created_at": "2026-08-08T07:18:36.798Z",
-  "updated_at": "2026-08-12T02:43:12.955Z",
+  "updated_at": "2026-08-14T02:17:35.129Z",
   "jira_key": null,
   "verification_tier": "uat-only",
   "marker": "[INFERRED:strong]"

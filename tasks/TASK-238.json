@@ -1,0 +1,37 @@
+{
+  "key": "TASK-238",
+  "title": "AC4 de TASK-237 spin-off: red de seguridad al cargar — detectar y reparar divergencia card_index vs documentos",
+  "description": "TASK-237 (AC4) pedía una red de seguridad al cargar la colección: detectar que el card_index no coincide con los documentos reales y corregirlo, para que una perdida de la escritura del indice (por ejemplo, si el AC2 de TASK-237 -- el beacon de keepalive en pagehide/visibilitychange -- llegase a fallar) no quede permanente.\n\nSE DECIDE EXPLICITAMENTE separarlo de TASK-237 en vez de implementarlo ahi, porque es un mecanismo de reconciliacion de otro orden de tamano que un guard de UI:\n  - Comparar indice vs documentos reales para TODA la coleccion en cada carga es caro a la escala real de este proyecto ([[project_market_collection_sizes]]: 80% de las cuentas tiene 25k+ cartas, 30% tiene 100k+). Hacerlo bien implica decidir DONDE corre (cliente vs Cloud Function), CUANDO (cada carga completa es probablemente demasiado seguido), y CON QUE COSTO (lecturas de Firestore, tiempo de carga -- ver [[project_inicio_boot_budget]] y [[project_firestore_measurement_traps]]).\n  - Repara divergencias de CUALQUIER causa, no solo la de TASK-237 -- overlap parcial con el patron ya conocido de card_index ([[project_card_index_persist_race_pattern]], [[project_ghost_cards_index_lag]]) que merece diseño propio, no un apendice del arreglo de debounce.\n  - TASK-237 ya cierra la causa raiz medida (AC1-AC3): el mecanismo de perdida permanente descrito en el ticket deja de poder dispararse con el beacon de unload. TASK-238 es defensa en profundidad para el residual (fallos de red del beacon, casos no cubiertos, futuros mecanismos de perdida no previstos), no el arreglo del bug medido.\n\nCONTEXTO DE TASK-237: causa leida en src/stores/collection.ts (scheduleCardIndexDeltaFlush, debounce de 2000 ms que moria con el contexto JS al recargar/navegar/cerrar antes de vencer), medida en produccion con control negativo (Corpses of the Lost SE GUARDA esperando 3.5s; Dreadmobile SE PIERDE recargando de inmediato). Arreglada con un flush best-effort en pagehide/visibilitychange via fetch keepalive (services/cloudFunctions.ts sendCardIndexDeltaBeacon) -- ver el commit de TASK-237 para el mecanismo completo.",
+  "acceptance_criteria": [
+    "Decidir donde vive la comparacion (cliente al cargar la coleccion, o una Cloud Function programada/bajo demanda) con una justificacion de costo a la escala real (25k-100k+ cartas)",
+    "Definir la frecuencia/disparador (cada carga completa, muestreo, boton manual, cron) balanceando deteccion temprana contra el presupuesto de arranque ([[project_inicio_boot_budget]])",
+    "Detectar divergencia: al menos el caso central de TASK-237 (documento con un status que el card_index todavia no refleja) y el caso ya conocido de card_index perdiendo chunks ([[project_card_index_self_duplication]])",
+    "Reparar sin duplicar trabajo con el buildCardIndex completo existente ni con la cura de ghost cards de TASK-223 -- decidir si esto los reemplaza, los complementa, o los subsume",
+    "Test-first: reproducir la divergencia con datos de prueba antes de escribir la deteccion/reparacion (tier tdd)"
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "collection",
+    "reconciliation",
+    "spin-off-task-237"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-237"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "developer",
+      "at": "2026-08-14T02:30:00.000Z",
+      "body": "Spin-off explicito del AC4 de TASK-237, decidido por el developer al implementar TASK-237 AC1-AC3 (instruccion del ticket: \"si te parece que es grande y merece ticket propio, DECILO y no lo hagas\"). Razon en la descripcion de este ticket. TASK-237 queda con AC1-AC3 resueltos (test-first, flush en pagehide/visibilitychange con fetch keepalive, debounce de 2000ms revisado y justificado sin cambios) mas AC5/AC6 (verificacion en navegador y en produccion) a cargo del orquestador/team-lead segun sus instrucciones originales."
+    }
+  ],
+  "created_at": "2026-08-14T02:30:00.000Z",
+  "updated_at": "2026-08-14T02:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1221,6 +1221,23 @@ exports.buildCardIndex = onCall(
  * Never silent: every mutation this call could not resolve is reported back
  * in `skippedIds`, and logged server-side. A "0 written, 0 error" result
  * here is not possible for a mutation this function actually looked at.
+ *
+ * NOT ATOMIC across chunks, and this claim does NOT cover a hard crash.
+ * "Never silent" above only holds for a call that returns (normally or via
+ * a thrown HttpsError) — chunk transactions are independent BY DESIGN (see
+ * "Chunks are independent — safe to run concurrently" below), so if the
+ * invocation is killed mid-batch (OOM, or the 60s timeout) some chunks can
+ * already be committed while others were never attempted, and nothing is
+ * returned to the client at all — there is no partial response to read
+ * `applied`/`skippedIds` from. MEASURED 2026-08-13: a 29-mutation call that
+ * OOM'd left 10 applied, 19 not, with the client's only signal being a
+ * generic rejection carrying no count. The mapWithConcurrency bound above
+ * (TASK-232) makes hitting this rarer by removing OOM as a cause for wide
+ * chunk spreads, but does not add atomicity or a way to report progress
+ * from a killed invocation — a genuine platform-level kill happens before
+ * any response can be constructed, by construction, regardless of what
+ * this function's own code does. Making a mid-batch crash's outcome
+ * visible (not necessarily atomic) is open — see TASK-232 hand-off notes.
  */
 // TASK-232 OOM fix (dev finding, 2026-08-13): 256MiB was measured OOMing —
 // 'Memory limit of 256 MiB exceeded with 257 MiB used' — on 29 mutations

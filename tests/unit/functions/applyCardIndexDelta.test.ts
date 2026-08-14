@@ -139,6 +139,20 @@ describe('applyCardIndexDelta — server-side card_index chunk patching (TASK-23
     expect(scanCallSites.length).toBeGreaterThanOrEqual(2)
     expect(applyCallSites.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('TRIPWIRE, not a behavior test (TASK-232 OOM fix, review round MED-2): applyChunkTransactions still calls the bounded mapWithConcurrency helper, not a bare unbounded Promise.all', () => {
+    // tests/unit/functions/concurrency.test.ts proves mapWithConcurrency
+    // ITSELF bounds concurrency by EXECUTING it — real coverage. This test
+    // proves nothing about behavior; it only catches someone reverting the
+    // call site back to `Promise.all(chunkNumbers.map(...))` (silently
+    // reopening the OOM this ticket fixed) WITHOUT reintroducing
+    // mapWithConcurrency somewhere else first. A source-text match can't
+    // tell a real revert from a cosmetic rename, so treat a failure here as
+    // "go re-read applyChunkTransactions", not as proof either way on its
+    // own — same honest-limit caveat as every other test in this file.
+    expect(source).toMatch(/mapWithConcurrency\(/)
+    expect(source).not.toMatch(/await Promise\.all\(\s*chunkNumbers/)
+  })
 })
 
 describe('buildCardIndex — self-corrects drifted chunkId on every rebuild (TASK-232 HIGH-1)', () => {

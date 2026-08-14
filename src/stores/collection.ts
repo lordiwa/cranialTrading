@@ -1143,12 +1143,21 @@ export const useCollectionStore = defineStore('collection', () => {
             } catch (err) {
                 // TASK-232: the card documents themselves are already correct —
                 // updateCard already succeeded before queuing this. A failed
-                // delta leaves card_index stale for these cards until a later
-                // mutation touches them again or the next buildCardIndex
-                // rebuild — it does NOT roll back the mutation and does NOT
-                // retry (retrying here risks a loop against a persistently
-                // failing call).
-                logSanitizedError('[IndexSync] applyCardIndexDelta failed — card_index left stale for this batch', err, 'warn')
+                // delta does NOT roll back the mutation and does NOT retry
+                // (retrying here risks a loop against a persistently failing
+                // call) — card_index is left to a later mutation or the next
+                // buildCardIndex rebuild to correct.
+                // TASK-232 dev finding, 2026-08-13: a rejection here does NOT
+                // mean none of this batch applied. applyChunkTransactions
+                // patches each chunk in its own independent transaction, so a
+                // mid-batch crash (OOM/timeout) can leave SOME chunks
+                // committed and others not — measured 10/29 applied on one
+                // OOM'd call. There is no way to learn the real split from
+                // here: a hard crash kills the invocation before it can
+                // report progress. Logged at 'error' (not 'warn') and worded
+                // as unknown-partial rather than uniformly "stale" — that
+                // wording was actively misleading given the measurement.
+                logSanitizedError(`[IndexSync] applyCardIndexDelta failed for a flush of ${batch.length} — outcome unknown, some or all of these card_index entries may be applied, stale, or mid-way; not retried (see TASK-232 comment above)`, err, 'error')
             } finally {
                 _serverDeltaRunning = false
                 if (_serverDeltaRerunRequested) {
@@ -1361,7 +1370,11 @@ export const useCollectionStore = defineStore('collection', () => {
         if (syncIndexOrQueue({ id: cardId } as Card, 'delete')) {
             void applyCardIndexDelta([{ cardId, action: 'delete' }])
                 .catch((err: unknown) => {
-                    logSanitizedError('[IndexSync] applyCardIndexDelta failed curing ghost card — card_index left stale for this card', err, 'warn')
+                    // TASK-232 dev finding, 2026-08-13: a crash can happen
+                    // after the server-side transaction commits but before
+                    // the response reaches this catch — "left stale" was an
+                    // unverified assumption, not a known outcome.
+                    logSanitizedError(`[IndexSync] applyCardIndexDelta failed curing ghost card ${cardId} — outcome unknown, may be applied or stale; not retried`, err, 'error')
                 })
                 .finally(() => {
                     refreshCurrentPage().catch(() => {})
@@ -1637,7 +1650,11 @@ export const useCollectionStore = defineStore('collection', () => {
                     try {
                         await applyCardIndexDelta(chunkSurvivors.map(cardId => ({ cardId, action: 'update' as const })))
                     } catch (deltaError: unknown) {
-                        logSanitizedError('[IndexSync] applyCardIndexDelta failed for a batchUpdateCards chunk — those card_index entries left stale', deltaError, 'warn')
+                        // TASK-232 dev finding, 2026-08-13: outcome unknown on
+                        // failure, not "left stale" — see _runServerDeltaFlush's
+                        // comment for why (mid-batch crash can leave some
+                        // chunks committed).
+                        logSanitizedError(`[IndexSync] applyCardIndexDelta failed for a batchUpdateCards chunk of ${chunkSurvivors.length} — outcome unknown, some or all of these card_index entries may be applied, stale, or mid-way; not retried`, deltaError, 'error')
                     }
                 }
 
@@ -1721,7 +1738,7 @@ export const useCollectionStore = defineStore('collection', () => {
             if (ghostIdsAppliedNow.length > 0) {
                 void applyCardIndexDelta(ghostIdsAppliedNow.map(cardId => ({ cardId, action: 'delete' as const })))
                     .catch((err: unknown) => {
-                        logSanitizedError('[IndexSync] applyCardIndexDelta failed curing ghost cards in batchUpdateCards', err, 'warn')
+                        logSanitizedError(`[IndexSync] applyCardIndexDelta failed curing ${ghostIdsAppliedNow.length} ghost card(s) in batchUpdateCards — outcome unknown, may be applied or stale; not retried`, err, 'error')
                     })
                     .finally(() => {
                         if (_pendingMembershipRefresh) {
@@ -1839,7 +1856,10 @@ export const useCollectionStore = defineStore('collection', () => {
             try {
                 await applyCardIndexDelta([{ cardId, action: 'delete' }])
             } catch (deltaError: unknown) {
-                logSanitizedError('[IndexSync] applyCardIndexDelta failed for delete — card_index left stale for this card', deltaError, 'warn')
+                // TASK-232 dev finding, 2026-08-13: outcome unknown on
+                // failure, not "left stale" — a crash can land after the
+                // server-side transaction commits but before this catch runs.
+                logSanitizedError(`[IndexSync] applyCardIndexDelta failed for delete of card ${cardId} — outcome unknown, may be applied or stale; not retried`, deltaError, 'error')
             }
 
             try {
@@ -2022,7 +2042,12 @@ export const useCollectionStore = defineStore('collection', () => {
                 // eslint-disable-next-line no-await-in-loop
                 await applyCardIndexDelta(chunk.map(cardId => ({ cardId, action: 'delete' as const })))
             } catch (deltaError: unknown) {
-                logSanitizedError('[IndexSync] applyCardIndexDelta failed for a batchDeleteCards chunk — those card_index entries left stale', deltaError, 'warn')
+                // TASK-232 dev finding, 2026-08-13: outcome unknown on
+                // failure, not "left stale" — applyChunkTransactions commits
+                // each affected chunk independently, so a mid-batch crash
+                // (OOM/timeout) can leave some of this chunk's deletes
+                // applied and others not.
+                logSanitizedError(`[IndexSync] applyCardIndexDelta failed for a batchDeleteCards chunk of ${chunk.length} — outcome unknown, some or all of these card_index entries may be applied, stale, or mid-way; not retried`, deltaError, 'error')
             }
         }
 

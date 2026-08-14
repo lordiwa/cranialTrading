@@ -1,0 +1,29 @@
+{
+  "key": "TASK-235",
+  "title": "Un deploy de functions puede quedar ACTIVE pero NO INVOCABLE — verificación obligatoria post-deploy",
+  "description": "MEDIDO el 2026-08-13, en vivo: applyCardIndexDelta figuraba desplegada, ACTIVE, y con la columna de memoria en 256 (no en '---', que era la señal que teníamos por buena). Nunca ejecutó ni una vez. Cloud Run rechazaba toda invocación con 403 antes de llegar al código de la función: le faltaba el binding de invoker que toda callable de Firebase necesita.\n\nCausa LEÍDA en el audit log: el CreateFunction de las 19:16 falló con \"Build failed: EXPIRED\", el UpdateFunction de las 19:32 falló con \"CANCELLED\", y sólo el de las 19:47 quedó ACTIVE. El binding lo aplica el CLI después de un create exitoso; en ese camino roto quedó sin aplicar. Es la saturación de la cola de Cloud Build que ya está en la memoria del proyecto, con una consecuencia nueva.\n\nCosto real: TASK-232 se dio por desplegado y verificado, y el bug siguió vivo un día entero. Peor que antes, porque el cliente ya no escribe el índice y el escritor nuevo estaba tapiado: 29 divergentes que NO convergen (antes convergían en 4 min).\n\nEl discriminador es barato y no necesita gcloud (que no corre en esta máquina): una llamada SIN autenticar al endpoint. 401 con cuerpo JSON del framework = la petición llega al código. 403 con HTML de Cloud Run = IAM la rechaza antes, la función es inútil. Desde el navegador el síntoma es engañoso: 'Failed to fetch', porque el 403 de IAM no trae cabeceras CORS.",
+  "acceptance_criteria": [
+    "AC1: existe un script (o modo de uno existente) que, dada una lista de callables y un proyecto, las invoca SIN autenticar y reporta por cada una: 401 = invocable, 403 = NO invocable, cualquier otra = no determinado. Nunca afirma éxito sobre una respuesta que no entendió.",
+    "AC2: sale con código distinto de 0 si alguna callable da 403, para que sirva de gate.",
+    "AC3: la lista de callables se deriva de functions/index.js, no se mantiene a mano en un segundo lugar que pueda quedar desincronizado.",
+    "AC4: queda documentado en CLAUDE.md y en la memoria del proyecto que functions:list y la columna de memoria NO prueban invocabilidad, con el 401-vs-403 como la señal que sí.",
+    "AC5: verificado POR MUTACIÓN contra una función realmente sin binding (o simulando la respuesta 403), no sólo contra el camino feliz."
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "deploy",
+    "functions",
+    "verificacion",
+    "proceso"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-13T22:56:55.779Z",
+  "updated_at": "2026-08-13T22:56:55.779Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

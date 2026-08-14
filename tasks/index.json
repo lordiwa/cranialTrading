@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-13T20:04:49.607Z",
+  "generated_at": "2026-08-14T00:30:05.842Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1276,6 +1276,24 @@
     {
       "key": "TASK-233",
       "title": "Achicar el chunk del card_index: 818 KB por documento es lo que satura el stream de escrituras",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-234",
+      "title": "addCard sigue escribiendo el card_index desde el cliente — agregar cartas no está cubierto por TASK-232",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-235",
+      "title": "Un deploy de functions puede quedar ACTIVE pero NO INVOCABLE — verificación obligatoria post-deploy",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-236",
+      "title": "functions/ no tiene harness de ejecución: los candados son assertions sobre texto fuente y son vacuos",
       "status": "todo",
       "priority": "high"
     }

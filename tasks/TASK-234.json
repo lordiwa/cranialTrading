@@ -1,0 +1,29 @@
+{
+  "key": "TASK-234",
+  "title": "addCard sigue escribiendo el card_index desde el cliente — agregar cartas no está cubierto por TASK-232",
+  "description": "TASK-232 movió al servidor la escritura del card_index para los caminos de MUTACIÓN (cambio de estado y borrado), vía la callable applyCardIndexDelta. addCard quedó afuera: sigue escribiendo los chunks del índice desde el navegador, con el mismo patrón fire-and-forget cuyo catch muere con la pestaña (LEÍDO, src/stores/collection.ts; el mapeo de los 7 escritores del índice está en el informe de researcher de TASK-229).\n\nConsecuencia: agregar una carta puede dejar la misma divergencia que TASK-232 vino a cerrar — el documento existe y el índice no lo muestra (familia \"solo en documentos\"), o queda con datos viejos. No está medido para addCard; el mecanismo sí está leído y es el mismo.\n\nContexto de por qué aparece ahora: durante la medición de TASK-232 (2026-08-13) quedó explícito que el arreglo NO cubre \"todos los lugares\". public_cards es TASK-228; addCard es este ticket.",
+  "acceptance_criteria": [
+    "AC1: MEDIR primero, contra la cuenta de dev de 59k, si addCard produce divergencia real: agregar N cartas, medir con scripts/card-index-fixture.mjs --status al minuto y a los 5 min. Si no diverge, decirlo y cerrar sin código es resultado válido.",
+    "AC2: si diverge, addCard deja de escribir el card_index desde el cliente y pasa por la callable applyCardIndexDelta (o su equivalente para insert), igual que hicieron las mutaciones en TASK-232.",
+    "AC3: el camino de insert del servidor resuelve el chunkId como lo hace el resto (server-side), no por posición del cliente.",
+    "AC4: candado de regresión que discrimine — verificado POR MUTACIÓN, no por assertion sobre texto fuente (ver los cuatro candados vacíos medidos el 2026-08-13).",
+    "AC5: re-medición post-arreglo con el mismo procedimiento del AC1: 0 divergentes al minuto.",
+    "AC6: verificar que la callable quede INVOCABLE tras el deploy (403 de Cloud Run vs 401 del framework), no sólo desplegada."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "collection",
+    "bug"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-13T22:56:40.563Z",
+  "updated_at": "2026-08-13T22:56:40.563Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

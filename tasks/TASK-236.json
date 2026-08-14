@@ -1,0 +1,28 @@
+{
+  "key": "TASK-236",
+  "title": "functions/ no tiene harness de ejecución: los candados son assertions sobre texto fuente y son vacuos",
+  "description": "MEDIDO el 2026-08-13: cuatro candados vacíos en un solo día, todos de la misma técnica — tests que hacen assertions sobre el TEXTO FUENTE de functions/index.js en vez de ejecutar la función.\n\nEl caso decisivo no es teórico: el test llamado \"only rewrites docs whose chunkId actually drifted — not every card on every rebuild\" estaba VERDE mientras el código hacía exactamente lo contrario (era el HIGH-3 de TASK-232, que encontró un reviewer LEYENDO dos líneas separadas por 14, no un test). Además el reviewer demostró la vacuidad por mutación: rompió el comportamiento dejando el texto intacto (if (false && ...)) y los 11 tests siguieron pasando.\n\nConclusión: functions/ no tiene cobertura real, tiene la apariencia de tenerla. Es la superficie donde ahora vive la lógica del card_index (applyCardIndexDelta, buildCardIndex, bulkImportCards) — o sea, el corazón del bug que más caro nos salió.\n\nEstaba como pregunta abierta pendiente de decisión de Rafael; se ticketea el 2026-08-13 por pedido explícito suyo.",
+  "acceptance_criteria": [
+    "AC1: existe una forma de EJECUTAR las funciones de functions/ en test (emulador de Firestore, o inyección del cliente de Firestore, o el mecanismo que el researcher determine), no de leer su código como string.",
+    "AC2: al menos applyCardIndexDelta y buildCardIndex tienen candados que ejercitan comportamiento real contra datos de prueba.",
+    "AC3: cada candado nuevo se verifica POR MUTACIÓN: se rompe el comportamiento a propósito y el test tiene que ponerse rojo. La corrida roja se adjunta como evidencia.",
+    "AC4: se re-apuntan o se retiran los candados de texto fuente existentes; no se borra ninguno cuyo mecanismo siga vivo sin dejar cobertura equivalente.",
+    "AC5: el candado de HIGH-3 de TASK-232 ('only rewrites what drifted') queda reescrito de modo que la mutación que lo dejó verde ahora lo ponga rojo — es el caso de prueba del ticket."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "testing",
+    "functions",
+    "deuda-tecnica"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-13T22:57:12.587Z",
+  "updated_at": "2026-08-13T22:57:12.587Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

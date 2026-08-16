@@ -1,0 +1,29 @@
+{
+  "key": "TASK-239",
+  "title": "Los call sites DIRECTOS de applyCardIndexDelta no pasan por la cola y siguen perdiendo el delta si el contexto muere mid-RTT (misma familia que TASK-237)",
+  "description": "HALLAZGO DEL REVIEWER rev-task237-r3 (LEIDO por el, sobre el codigo, en la revision FULL de aa2957f..943d483). Lo marco explicitamente FUERA DEL ALCANCE de TASK-237 y NO bloqueante, pero es la MISMA CLASE de bug.\n\nQUE ARREGLA TASK-237 Y QUE NO. TASK-237 cerro la ventana para UN camino: updateCard -> queueCardIndexDelta -> debounce de 2000 ms -> _runServerDeltaFlush. Ese camino ahora sobrevive al teardown por dos vias: el flush de unload (pagehide + visibilitychange->hidden con fetch keepalive) y el merge de _inFlightServerDeltas, que recupera hasta el batch que ya estaba en vuelo.\n\nPERO hay call sites que llaman a applyCardIndexDelta DIRECTO, sin pasar nunca por _pendingServerDeltas. Como el flush de unload solo puede recuperar lo que esta en ese Map (o en _inFlightServerDeltas), estos NO estan cubiertos por nada: si el usuario recarga, navega o cierra mientras esa llamada esta en vuelo, el navegador la cancela igual que en el bug original, y no queda nadie que escriba la entrada.\n\nCALL SITES IDENTIFICADOS (src/stores/collection.ts, referencias del reviewer sobre el arbol en 943d483 — RE-VERIFICAR las lineas antes de codear, se mueven):\n - deleteCard (:1547) — ADEMAS es `void`, fire-and-forget, o sea ni siquiera espera el resultado. Es el peor de los cuatro.\n - deleteCard (:2033)\n - batchDeleteCards (:2219)\n - batchUpdateCards (:2293)\n - limpieza de cartas fantasma (:1915)\n\nPOR QUE LOS DELETES SON PEORES QUE LOS UPDATES. Un update perdido deja el indice con un valor viejo, que una mutacion posterior sobre esa misma carta corrige. Un DELETE perdido deja un FANTASMA: la carta ya no existe como documento pero el indice la sigue mostrando, y nunca mas hay una mutacion sobre esa carta que lo corrija, porque la carta ya no esta. Solo lo arregla un buildCardIndex completo. Es exactamente la familia de project_ghost_cards_index_lag.\n\nMITIGACION QUE YA EXISTE (por que NO es critical). Los cinco son flujos con feedback de UI: el usuario ve un spinner / un toast / la carta desaparecer, o sea es menos probable que recargue justo en esa ventana que en el caso de TASK-237, donde el debounce de 2 s corria invisible y el usuario no tenia ninguna senial de que hubiera algo pendiente. La ventana es el RTT, no 2 s + RTT.\n\nRELACION CON TASK-238. TASK-238 (reconciliacion al cargar) seria un backstop que cubre esto TAMBIEN, sin tocar estos call sites. Hay que decidir explicitamente si esto se absorbe ahi o se arregla por separado; el reviewer lo dejo abierto a proposito.\n\nNO MEDIDO: nadie reprodujo todavia una perdida por esta via en un navegador. El hallazgo es por LECTURA del codigo. AC1 existe justamente para no arreglar a ciegas.",
+  "acceptance_criteria": [
+    "AC1: MEDIR primero, no arreglar a ciegas. Reproducir la perdida en al menos UNO de los cinco call sites (preferentemente deleteCard, que es fire-and-forget) matando el contexto durante el RTT, con CONTROL NEGATIVO: el mismo borrado dejando que la llamada termine tiene que quedar consistente. Sin el control, la prueba no discrimina. Si NO se puede reproducir, decirlo y cerrar el ticket sin codigo es un resultado valido.",
+    "AC2: decidir EXPLICITAMENTE y por escrito si esto se absorbe en TASK-238 (reconciliacion al cargar, que lo cubriria como backstop sin tocar estos call sites) o se arregla por separado enrutando estos call sites por la misma cola/beacon que TASK-237. Registrar la razon de la decision, no solo la decision.",
+    "AC3: si se arregla por codigo, el delete perdido NO debe dejar un fantasma permanente en el indice — verificarlo por mutacion, no por lectura.",
+    "AC4: si se enruta por la cola, verificar que no se rompe el feedback de UI existente (spinner/toast/desaparicion de la carta): hoy estos call sites esperan el resultado y la UI depende de eso. deleteCard:1547 es la excepcion, ya es `void`."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "collection",
+    "bug",
+    "prod"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-16T17:51:37.342Z",
+  "updated_at": "2026-08-16T17:51:37.342Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[INFERRED:strong]"
+}

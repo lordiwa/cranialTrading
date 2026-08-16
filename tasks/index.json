@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T02:20:16.172Z",
+  "generated_at": "2026-08-16T18:24:54.591Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1300,12 +1300,18 @@
     {
       "key": "TASK-237",
       "title": "Un cambio de estado se PIERDE si el usuario recarga o navega dentro de los 2 s del debounce (regresión de TASK-232, VIVA EN PROD)",
-      "status": "in_progress",
+      "status": "in_review",
       "priority": "critical"
     },
     {
       "key": "TASK-238",
       "title": "AC4 de TASK-237 spin-off: red de seguridad al cargar — detectar y reparar divergencia card_index vs documentos",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-239",
+      "title": "Los call sites DIRECTOS de applyCardIndexDelta no pasan por la cola y siguen perdiendo el delta si el contexto muere mid-RTT (misma familia que TASK-237)",
       "status": "todo",
       "priority": "high"
     }

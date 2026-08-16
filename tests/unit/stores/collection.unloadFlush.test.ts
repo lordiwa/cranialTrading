@@ -273,6 +273,29 @@ describe('collection store: TASK-237 M-2 — visibilitychange->hidden must flush
     await new Promise((resolve) => { setTimeout(resolve, 50) })
 
     expect(mockSendCardIndexDeltaBeacon).not.toHaveBeenCalled()
+
+    // Drain the real 2000ms debounce this test's updateCard scheduled
+    // (scheduleCardIndexDeltaFlush) instead of leaving it to fire on its own
+    // real-time schedule after the test returns. onScopeDispose (triggered by
+    // trackStore's afterEach $dispose()) removes the pagehide/visibilitychange
+    // listeners but does NOT clear this timer — it is a plain closure-local
+    // setTimeout, not tied to the effect scope — so without this wait it
+    // survives store disposal and phantom-fires ~2s later, landing inside
+    // whichever later test happens to be running by then and satisfying THAT
+    // test's own applyCardIndexDelta/beacon expectations for the wrong
+    // reason. Measured: this contaminated the M-3 "in-flight" test below
+    // (reviewer-caught, TASK-237 review round r4) — that test's
+    // `expect(mockApplyCardIndexDelta).toHaveBeenCalledTimes(1)` wait was
+    // satisfied by this phantom timer ~120ms before that test's own 2000ms
+    // debounce could have fired it, so the beacon merge path it exists to
+    // prove (_inFlightServerDeltas) was never actually exercised in the
+    // full-file run. Waiting for this test's own timer to fire for real (it
+    // has nothing pending to flush by now — the debounce's own
+    // applyCardIndexDelta call handles that) drains it deterministically
+    // before the test ends.
+    await vi.waitFor(() => {
+      expect(mockApplyCardIndexDelta).toHaveBeenCalledTimes(1)
+    }, { timeout: 3000, interval: 50 })
   })
 })
 

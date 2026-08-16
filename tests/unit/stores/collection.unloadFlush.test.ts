@@ -248,19 +248,29 @@ describe('collection store: TASK-237 M-2 — visibilitychange->hidden must flush
   })
 
   it('does NOT flush on a visibilitychange that leaves the tab visible (e.g. regaining focus)', async () => {
-    vi.useFakeTimers()
-
+    // Real timers throughout — mirrors the M-1 test below (same file): under
+    // fake timers the beacon reference preload kicked off by
+    // queueCardIndexDelta (a dynamic import()) never gets a chance to
+    // resolve within the test, so "the beacon was not called" would hold
+    // even with the visibilityState guard deleted from production code —
+    // the assertion wouldn't be discriminating between "guarded correctly"
+    // and "nothing could fire regardless". Real timers plus a 50ms real
+    // wait (same as M-1) let the preload actually settle first, so this
+    // negative assertion means something.
     const store = trackStore(useCollectionStore())
     const card = makeCard({ id: 'card-1', status: 'collection' })
     store.cards = [card] as any
     store.paginatedCards = [card] as any
 
-    await store.updateCard('card-1', { status: 'trade' })
-    await vi.advanceTimersByTimeAsync(500)
+    const ok = await store.updateCard('card-1', { status: 'trade' })
+    expect(ok).toBe(true)
 
+    await new Promise((resolve) => { setTimeout(resolve, 50) })
+
+    mockSendCardIndexDeltaBeacon.mockClear()
     setVisibilityState('visible')
     document.dispatchEvent(new Event('visibilitychange'))
-    await vi.advanceTimersByTimeAsync(0)
+    await new Promise((resolve) => { setTimeout(resolve, 50) })
 
     expect(mockSendCardIndexDeltaBeacon).not.toHaveBeenCalled()
   })

@@ -8,6 +8,7 @@ import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/
 import { getApp } from 'firebase/app'
 import { onIdTokenChanged } from 'firebase/auth'
 import { auth } from './firebase'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 // Initialize functions with the Firebase app
 const functions = getFunctions(getApp())
@@ -37,6 +38,13 @@ onIdTokenChanged(auth, (user) => {
   void user.getIdToken().then((token) => {
     if (generation !== _tokenGeneration) return // superseded by a later auth change — discard
     _cachedIdToken = token
+  }).catch((err: unknown) => {
+    // Best-effort refresh, same as the rest of this cache's error handling:
+    // a rejection here (network down, revoked token) just leaves
+    // _cachedIdToken at its previous value — not retried, the next
+    // onIdTokenChanged callback (or the current in-flight token's own
+    // natural expiry) will get another chance.
+    logSanitizedError('[cloudFunctions] Failed to refresh cached ID token', err, 'warn')
   })
 })
 

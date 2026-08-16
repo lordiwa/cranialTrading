@@ -1245,10 +1245,16 @@ export const useCollectionStore = defineStore('collection', () => {
         // rejects a call outright above 500 mutations
         // (functions/index.js applyCardIndexDelta) — chunk the same way
         // _runServerDeltaFlush already does so an oversized pending batch
-        // doesn't get dropped entirely. Each chunk is its own keepalive
-        // fetch, so each is independently subject to the browser's 64 KiB
-        // keepalive body budget — see sendCardIndexDeltaBeacon's doc
-        // comment.
+        // doesn't get dropped entirely. The chunks are NOT independently
+        // subject to the browser's 64 KiB keepalive body budget — per the
+        // Fetch spec that budget is SHARED across all in-flight keepalive
+        // requests, and the loop below fires every chunk synchronously, so
+        // they are concurrent, not sequential. At ~45-60 bytes per mutation,
+        // two chunks (~1000 cards) already approach the limit; from the 3rd
+        // chunk onward the fetch can be silently rejected by the browser
+        // (swallowed by sendCardIndexDeltaBeacon's `.catch(() => {})`) —
+        // see sendCardIndexDeltaBeacon's doc comment. That scenario is
+        // tracked in TASK-238, not addressed here.
         const chunks = chunkArray(batch, 500)
 
         if (_sendCardIndexDeltaBeaconRef) {

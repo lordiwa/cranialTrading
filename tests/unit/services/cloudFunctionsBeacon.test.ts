@@ -102,4 +102,45 @@ describe('sendCardIndexDeltaBeacon', () => {
     mockFetch.mockRejectedValue(new Error('network gone'))
     expect(() => sendCardIndexDeltaBeacon([{ cardId: 'card-1', action: 'update' }])).not.toThrow()
   })
+
+  /**
+   * TASK-237 LOW-2: a getIdToken() call from an EARLIER onIdTokenChanged
+   * (login) can still be in flight when a LATER onIdTokenChanged(null)
+   * (logout) fires and clears the cache — without a generation guard, that
+   * stale getIdToken() result repopulates _cachedIdToken with a token that
+   * belongs to nobody currently signed in.
+   */
+  it('discards a stale getIdToken() result that resolves after a later logout (generation guard)', async () => {
+    let resolveStaleToken: ((token: string) => void) | undefined
+    const staleTokenPromise = new Promise<string>((resolve) => { resolveStaleToken = resolve })
+
+    // Login fires; its getIdToken() call is still pending.
+    mockIdTokenListenerBox.current?.({ getIdToken: () => staleTokenPromise })
+
+    // Logout fires BEFORE that getIdToken() call settles — this is the
+    // generation bump that should make the stale resolution below a no-op.
+    mockIdTokenListenerBox.current?.(null)
+
+    // The stale getIdToken() now resolves, late.
+    resolveStaleToken?.('stale-token-from-logged-out-user')
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    sendCardIndexDeltaBeacon([{ cardId: 'card-1', action: 'update' }])
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(init.headers.Authorization).toBeUndefined()
+  })
+
+  it('still caches a token from a getIdToken() call that resolves BEFORE any later auth change (control negative for the generation guard)', async () => {
+    mockIdTokenListenerBox.current?.({ getIdToken: async () => 'still-valid-token' })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    sendCardIndexDeltaBeacon([{ cardId: 'card-1', action: 'update' }])
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(init.headers.Authorization).toBe('Bearer still-valid-token')
+  })
 })

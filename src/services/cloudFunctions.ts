@@ -19,12 +19,25 @@ const functions = getFunctions(getApp())
 // so the token has to already be sitting here, synchronously, by the time
 // the page starts tearing down.
 let _cachedIdToken: string | null = null
+
+// TASK-237 LOW-2: a generation counter guards against a stale getIdToken()
+// resolving AFTER a later onIdTokenChanged(null) logout has already cleared
+// the cache — without this, the in-flight promise from the earlier (now
+// logged-out) user's token fetch repopulates _cachedIdToken with a token
+// that no longer belongs to anyone signed in. Every callback invocation
+// (login or logout) bumps the generation; a getIdToken() result is only
+// written back if its own generation is still current when it resolves.
+let _tokenGeneration = 0
 onIdTokenChanged(auth, (user) => {
+  const generation = ++_tokenGeneration
   if (!user) {
     _cachedIdToken = null
     return
   }
-  void user.getIdToken().then((token) => { _cachedIdToken = token })
+  void user.getIdToken().then((token) => {
+    if (generation !== _tokenGeneration) return // superseded by a later auth change — discard
+    _cachedIdToken = token
+  })
 })
 
 /**

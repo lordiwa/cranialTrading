@@ -1110,9 +1110,57 @@ export const useCollectionStore = defineStore('collection', () => {
     let _serverDeltaTimer: ReturnType<typeof setTimeout> | null = null
     let _serverDeltaRunning = false
     let _serverDeltaRerunRequested = false
+    // TASK-237 M-3: the batch a _runServerDeltaFlush call is currently
+    // awaiting applyCardIndexDelta for — invisible to _pendingServerDeltas
+    // (already pulled out) but still recoverable if the page tears down
+    // before that call lands. See flushPendingCardIndexDeltasOnUnload.
+    let _inFlightServerDeltas: Map<string, 'update' | 'delete'> | null = null
+
+    // TASK-237 M-1: a cached reference to sendCardIndexDeltaBeacon, resolved
+    // ahead of time by _preloadSendCardIndexDeltaBeacon so the unload
+    // handler (flushPendingCardIndexDeltasOnUnload) never has to await a
+    // dynamic import() on the critical unload path — a pagehide/
+    // visibilitychange handler is not guaranteed to get scheduled time after
+    // an await, so resolving this reference has to happen well before the
+    // page starts tearing down, not during it.
+    type SendBeaconFn = (mutations: CardIndexDeltaMutation[]) => boolean
+    let _sendCardIndexDeltaBeaconRef: SendBeaconFn | null = null
+    // The in-flight preload promise itself, kept around (not just a boolean
+    // flag) so that if the unload handler runs BEFORE this settles, it can
+    // chain off this exact same promise instead of starting a second,
+    // concurrent import() of the same module — two independent import()
+    // calls racing the same specifier is what caused a real, reproduced
+    // failure in this ticket's own test suite (a duplicate in-flight import
+    // resolved against the real un-mocked module instead of the test's
+    // mock). One shared promise avoids that class of bug in tests and
+    // avoids a redundant module fetch/eval in production.
+    let _sendCardIndexDeltaBeaconPromise: Promise<SendBeaconFn | null> | null = null
+
+    function _preloadSendCardIndexDeltaBeacon(): Promise<SendBeaconFn | null> {
+        if (_sendCardIndexDeltaBeaconRef) return Promise.resolve(_sendCardIndexDeltaBeaconRef)
+        if (_sendCardIndexDeltaBeaconPromise) return _sendCardIndexDeltaBeaconPromise
+        _sendCardIndexDeltaBeaconPromise = import('../services/cloudFunctions')
+            .then(({ sendCardIndexDeltaBeacon }) => {
+                _sendCardIndexDeltaBeaconRef = sendCardIndexDeltaBeacon
+                return sendCardIndexDeltaBeacon
+            })
+            .catch((err: unknown) => {
+                logSanitizedError('[IndexSync] failed to preload sendCardIndexDeltaBeacon — unload flush will fall back to a just-in-time import()', err, 'warn')
+                return null
+            })
+            .finally(() => {
+                _sendCardIndexDeltaBeaconPromise = null
+            })
+        return _sendCardIndexDeltaBeaconPromise
+    }
 
     function queueCardIndexDelta(cardId: string, action: 'update' | 'delete'): void {
         _pendingServerDeltas.set(cardId, action)
+        // Kick off the beacon-reference preload the moment there's anything
+        // worth flushing on unload — realistically seconds before any
+        // conceivable pagehide/visibilitychange, so the reference is almost
+        // always warm by the time it's needed.
+        void _preloadSendCardIndexDeltaBeacon()
     }
 
     // TASK-237 AC3: 2000ms is unchanged. Its job is to coalesce a burst of
@@ -1156,25 +1204,77 @@ export const useCollectionStore = defineStore('collection', () => {
     // must be built by hand with keepalive (see
     // services/cloudFunctions.ts's sendCardIndexDeltaBeacon).
     function flushPendingCardIndexDeltasOnUnload(): void {
-        if (_pendingServerDeltas.size === 0) return
+        // TASK-237 M-3: merge in whatever _runServerDeltaFlush currently has
+        // in flight — it already pulled its batch out of
+        // _pendingServerDeltas, which would otherwise make it invisible
+        // here. If the page tears down while that call is still in the air,
+        // the browser cancels the non-keepalive fetch httpsCallable built
+        // for it (the same trap AC2 routes around for the debounce timer),
+        // so without this merge that batch would be lost exactly like the
+        // original bug, just on a narrower window (debounce elapsed, RTT
+        // still pending — real seconds on slow 4G, the target market per
+        // project_target_market_slow_4g). In-flight entries are merged
+        // first so a newer edit to the same cardId already sitting in
+        // _pendingServerDeltas (queued while the call was in flight)
+        // overwrites it — last-mutation-wins, matching the server's own
+        // dedup (functions/index.js applyCardIndexDelta's byId map).
+        const merged = new Map<string, 'update' | 'delete'>()
+        if (_inFlightServerDeltas) {
+            for (const [cardId, action] of _inFlightServerDeltas) merged.set(cardId, action)
+        }
+        for (const [cardId, action] of _pendingServerDeltas) merged.set(cardId, action)
+        if (merged.size === 0) return
         if (_serverDeltaTimer) {
             clearTimeout(_serverDeltaTimer)
             _serverDeltaTimer = null
         }
-        const batch = [..._pendingServerDeltas.entries()].map(([cardId, action]) => ({ cardId, action }))
+        const batch = [...merged.entries()].map(([cardId, action]) => ({ cardId, action }))
         _pendingServerDeltas.clear()
-        void (async () => {
-            try {
-                const { sendCardIndexDeltaBeacon } = await import('../services/cloudFunctions')
-                sendCardIndexDeltaBeacon(batch)
-            } catch (err) {
-                // Best-effort by design — see the doc comment above the
-                // scheduleCardIndexDeltaFlush AC3 note and
-                // sendCardIndexDeltaBeacon's own doc comment. Logged so a
-                // real failure is at least visible, never silently retried.
-                logSanitizedError('[IndexSync] flushPendingCardIndexDeltasOnUnload failed to reach the beacon — outcome unknown, not retried', err, 'warn')
+        // Deliberately NOT clearing _inFlightServerDeltas here: the original
+        // in-flight applyCardIndexDelta call may still land successfully.
+        // Resending its entries via the beacon risks, at worst, a harmless
+        // duplicate re-application — applyCardIndexDelta dedupes by cardId
+        // and re-reads each card's CURRENT document state rather than
+        // replaying a client-supplied payload (functions/index.js, byId map
+        // + db.getAll()), so applying the same delta twice is a no-op, not
+        // corruption. Losing the entry outright by NOT resending it would
+        // not be a no-op. Given that asymmetry (safe-to-duplicate vs.
+        // unsafe-to-lose), resend-on-uncertainty is the chosen default.
+
+        // TASK-237 LOW-1: the beacon is one fetch per call and the server
+        // rejects a call outright above 500 mutations
+        // (functions/index.js applyCardIndexDelta) — chunk the same way
+        // _runServerDeltaFlush already does so an oversized pending batch
+        // doesn't get dropped entirely. Each chunk is its own keepalive
+        // fetch, so each is independently subject to the browser's 64 KiB
+        // keepalive body budget — see sendCardIndexDeltaBeacon's doc
+        // comment.
+        const chunks = chunkArray(batch, 500)
+
+        if (_sendCardIndexDeltaBeaconRef) {
+            // M-1: the expected path — a delta was queued earlier in this
+            // page's life, so _preloadSendCardIndexDeltaBeacon already
+            // resolved this reference. The whole handler runs synchronously
+            // through to fetch(), with no await/dynamic import() standing
+            // between the unload signal and the network request.
+            for (const chunk of chunks) _sendCardIndexDeltaBeaconRef(chunk)
+            return
+        }
+
+        // Fallback only: the preload above hasn't resolved YET (or was never
+        // triggered — defensive; queueCardIndexDelta is the only call site
+        // today). Chains off the SAME in-flight promise
+        // _preloadSendCardIndexDeltaBeacon already started rather than
+        // calling import() a second time — see the doc comment on that
+        // promise variable for why a second concurrent import() of the same
+        // specifier is unsafe, not just wasteful.
+        void _preloadSendCardIndexDeltaBeacon().then((send) => {
+            if (!send) {
+                // Preload itself already logged the failure.
+                return
             }
-        })()
+            for (const chunk of chunks) send(chunk)
+        })
     }
 
     const _handleVisibilityHidden = () => {
@@ -1197,6 +1297,11 @@ export const useCollectionStore = defineStore('collection', () => {
         }
         if (_pendingServerDeltas.size === 0) return
         _serverDeltaRunning = true
+        // TASK-237 M-3: snapshot what's about to go in flight BEFORE
+        // clearing _pendingServerDeltas, so flushPendingCardIndexDeltasOnUnload
+        // can still recover it if the page tears down while this call is
+        // awaiting applyCardIndexDelta.
+        _inFlightServerDeltas = new Map(_pendingServerDeltas)
         const batch = [..._pendingServerDeltas.entries()].map(([cardId, action]) => ({ cardId, action }))
         _pendingServerDeltas.clear()
 
@@ -1226,6 +1331,10 @@ export const useCollectionStore = defineStore('collection', () => {
                 // wording was actively misleading given the measurement.
                 logSanitizedError(`[IndexSync] applyCardIndexDelta failed for a flush of ${batch.length} — outcome unknown, some or all of these card_index entries may be applied, stale, or mid-way; not retried (see TASK-232 comment above)`, err, 'error')
             } finally {
+                // TASK-237 M-3: this call is no longer in flight (settled,
+                // one way or another) — nothing left here for
+                // flushPendingCardIndexDeltasOnUnload to recover.
+                _inFlightServerDeltas = null
                 _serverDeltaRunning = false
                 if (_serverDeltaRerunRequested) {
                     _serverDeltaRerunRequested = false

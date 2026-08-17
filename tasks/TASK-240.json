@@ -10,7 +10,7 @@
     "AC5: BARRER LO YA ACUMULADO — pero solo lo de ESTE defecto. Borrar los documentos huerfanos que este mecanismo dejo (hoy: tres Lightning Bolt de Marvel Super Heroes Commander, ids VIaujcMtjQw1RDOoL33e, gBOsQM3djwYi2nK7JcC9, 24CyD7f3iMSbaiQIH5PF) y verificar por lectura que docs y entradas vuelven a coincidir. NO TOCAR el resto del estado sucio de esa cuenta: los 3 DIVERGENTES (Angel's Herald, Vectis Gloves, Skyblade's Boon) y el FANTASMA (Digsite Conservator, 1VW9ESktlPC1XxnuIYTE) estan puestos A PROPOSITO como casos de prueba vivos de TASK-238 y borrarlos destruye la unica reproduccion falsable que existe.",
     "AC6: REVISAR LOS OTROS CLEANUPS DE LA MISMA FORMA antes de dar esto por cerrado. Este patron (mutador con cleanup best-effort envuelto en try/catch mudo) no es exclusivo de 'add card': CLAUDE.md documenta el mismo arreglo en deck-crud.spec.ts 'create new deck' y binders.spec.ts 'create new binder'. Verificar POR MEDICION — no por lectura — si sus cleanups efectivamente borran, con el mismo metodo de snapshot antes/despues y control negativo. Si alguno tampoco borra, decirlo; arreglarlo puede ser este ticket o uno propio, pero no puede quedar sin medir."
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "high",
   "labels": [
     "e2e",
@@ -23,9 +23,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-17T04:14:38.959Z",
+      "body": "2026-08-17 — ALCANCE ACOTADO POR RAFAEL: \"que deje de crear cosas que no borra\". El objetivo del ticket es UNO: que todo lo que el test cree, lo borre. El test tiene que SEGUIR CREANDO — es lo que prueba — pero no puede dejar residuo.\n\nDOS COSAS DESCARTADAS POR LECTURA, PARA QUE EL DEVELOPER NO LAS PERSIGA:\n (a) NO es un locator muerto como en TASK-146. El test hermano 'delete card' (:154-168) usa\n     EXACTAMENTE los mismos tres pasos — deleteButtonInGrid(0) -> confirmAction() ->\n     waitForToast('success') — con aserciones reales, y el CI esta verde, o sea ese test pasa.\n     Los tres pasos funcionan. El fallo viene del ESTADO DE LA PAGINA, no de los locators.\n (b) El fallo ocurre ANTES del click de confirmar. Razon: no se borro NADA. Si hubiera fallado en\n     waitForToast (que corre DESPUES de confirmar), el borrado igual habria ocurrido. Eso deja dos\n     candidatos: el click en deleteButtonInGrid, o que el modal de confirmacion no aparezca.\n     SOSPECHOSO NATURAL (hipotesis, NO medido): un overlay interceptando el click. El cleanup corre\n     justo despues del add, con el toast y el cierre del modal todavia en vuelo — el propio\n     comentario del test admite que espera 4500 ms a ojo por eso. Playwright falla el click por\n     actionability y el catch se lo traga. NO DARLO POR CIERTO: el AC1 pide medirlo.\n\nEL OBSTACULO DE FONDO, QUE CAMBIA EL AC3 (leer antes de planificar):\nLA CARTA QUE EL TEST CREA NO SE PUEDE BORRAR DESDE LA UI. No entra al card_index (TASK-234) -> la\ngrilla se arma y ordena desde el indice -> la carta es INVISIBLE -> no hay boton que clickear. Un\ncleanup por UI esta condenado por construccion mientras TASK-234 siga abierta, y arreglar el click no\nalcanza. El camino que queda es un TEARDOWN CON firebase-admin que borre por id FUERA de la interfaz.\nEs factible: las credenciales ADC ya estan en disco, es lo mismo que uso el orquestador para auditar\n(applicationDefault(), projectId cranial-trading-dev). OJO: firebase-admin no resuelve si el script\ncorre fuera de la raiz del repo.\n\nESTO SUBE LA ESTIMACION de esa parte respecto de lo que se dijo al abrir el ticket. Se registra aca\npara que no se lea como un arreglo de locator de cinco minutos."
+    }
+  ],
   "created_at": "2026-08-17T03:58:49.221Z",
-  "updated_at": "2026-08-17T03:58:49.221Z",
+  "updated_at": "2026-08-17T04:14:38.959Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

@@ -143,22 +143,50 @@ test.describe('Collection CRUD', () => {
 
     const beforeIds = new Set(before.cardDocIds);
     let created: string[] = [];
+    let foreign: string[] = [];
     let bumped: string[] = [];
     const deadline = Date.now() + 30_000;
     for (;;) {
-      // docQuantities(), NOT snapshot() (round 4, MEDIUM-2): `created` needs
-      // ids and `bumped` needs quantities; neither reads card_index. A full
+      // docFields(), NOT snapshot() (round 4, MEDIUM-2): `created` needs ids and
+      // names, `bumped` needs quantities; none of it reads card_index. A full
       // snapshot here re-read every chunk — multi-megabyte on the CI account —
       // up to 15 times inside a test that is already close to its timeout.
-      const now = await admin.docQuantities();
-      created = Object.keys(now).filter((id) => !beforeIds.has(id));
-      // Restricted to the print candidates for the same reason the doc scope
-      // is: an unrelated card whose quantity moved during our run moved because
-      // SOMEONE ELSE moved it, and treating that as "ours" is what put a third
-      // party's write on this teardown's restore list.
-      bumped = printCandidates.filter((id) => id in now && now[id] !== before.quantities[id]);
+      const now = await admin.docFields();
+      // A DOCUMENT THAT APPEARED IS NOT A DOCUMENT I CREATED (round 5, HIGH-2).
+      // This filter used to end here, and the result went straight into an admin
+      // DELETE. "Everything that appeared in a shared account during my run" is
+      // the account's diff, not this run's identity, and the two differ exactly
+      // when a second writer is present — which is the normal case here: a
+      // nightly run and a push-to-develop run share this account, and two
+      // documents appeared in it on 2026-08-17 at 07:10:21Z and 07:13:24Z with
+      // no test running at all. Had a run been in flight, this line would have
+      // deleted both and gone green, because lock 1 only counts documents and
+      // the count would have come back to `before`.
+      //
+      // So the set is intersected with the IDENTITY of the print the test added:
+      // the name it searched for, the same identity `printCandidates` uses. An
+      // appearance outside that name is somebody else's and is never deleted —
+      // it is reported loudly below and left alone, which reds lock 1 rather
+      // than destroying a stranger's document.
+      const appeared = Object.keys(now.quantities).filter((id) => !beforeIds.has(id));
+      created = appeared.filter((id) => (now.names[id] ?? '').toLowerCase() === addedName);
+      foreign = appeared.filter((id) => (now.names[id] ?? '').toLowerCase() !== addedName);
+      // Restricted to the print candidates for the same reason: an unrelated
+      // card whose quantity moved during our run moved because SOMEONE ELSE
+      // moved it, and treating that as "ours" is what put a third party's write
+      // on this teardown's restore list.
+      bumped = printCandidates.filter((id) => id in now.quantities && now.quantities[id] !== before.quantities[id]);
       if (created.length > 0 || bumped.length > 0 || Date.now() > deadline) break;
       await collectionPage.page.waitForTimeout(2000);
+    }
+
+    if (foreign.length > 0) {
+      // Never deleted, always announced. If this run really did add a card and
+      // it is in here, the cause is a name mismatch between the search term and
+      // the document's `name` field, and the correct outcome is still a red on
+      // lock 1 (with these ids in its message) — not an admin delete aimed at a
+      // document whose provenance this test cannot establish.
+      console.warn(`[cleanup][add card] WARNING: ${foreign.length} card document(s) appeared during this run that are NOT "${SEARCH_TERMS.common}" and are therefore NOT this test's to delete: [${foreign.join(', ')}]. Left untouched — investigate a concurrent writer, or a name mismatch on the added print.`);
     }
 
     if (created.length === 0 && bumped.length === 0) {
@@ -166,7 +194,6 @@ test.describe('Collection CRUD', () => {
       // "the add reported success but 30s later the account is unchanged" is a
       // finding either way, and this file's history is one of findings that
       // were never printed anywhere.
-      // eslint-disable-next-line no-console
       console.warn('[cleanup][add card] WARNING: no new card document and no quantity change appeared within 30s of the success toast — nothing to undo, and the add may not have persisted.');
     }
 
@@ -177,9 +204,15 @@ test.describe('Collection CRUD', () => {
     //    document half was kept broad in round 3), narrow enough that it cannot
     //    reach a card of any other name.
     //  - indexScope = `bumped` only. Narrower still, because an index write
-    //    compares an entry against a DOCUMENT, and this account holds 25+
-    //    Lightning Bolt rows whose entries may legitimately disagree with their
-    //    documents already (TASK-208/234 drift, TASK-238 fixtures). Measured on
+    //    compares an entry against a DOCUMENT, and doc/entry disagreement is a
+    //    pre-existing, legitimate state on this account (TASK-208/234 drift,
+    //    TASK-238's deliberate fixtures) — so "every row sharing this name",
+    //    which spans every print/condition/foil/status of the card, is the
+    //    wrong granularity for a write that could "repair" one of those. That
+    //    argument does not depend on a row count. (Round 5, LOW: this comment
+    //    used to say "this account holds 25+ Lightning Bolt rows". MEASURED
+    //    FALSE 2026-08-17 — there are exactly TWO, and neither has a card_index
+    //    entry. The conclusion stands; the number did not.) Measured on
     //    2026-08-17: an untouched bystander at doc=1 with a seeded entry at q=8
     //    came back rewritten to 1 when this half was broad.
     // `created` is deliberately in neither: those documents are gone by now, and
@@ -189,17 +222,22 @@ test.describe('Collection CRUD', () => {
       indexScope: bumped,
     });
     // eslint-disable-next-line no-console
-    console.log(`[cleanup][add card] created=[${created.join(', ')}] docsDeleted=${deleted.docsDeleted} indexEntriesRemoved=${deleted.indexEntriesRemoved} passes=${deleted.passes} printCandidates=${printCandidates.length} bumped=[${bumped.join(', ')}] quantitiesRestored=[${restored.join(', ')}]`);
+    console.log(`[cleanup][add card] created=[${created.join(', ')}] foreign=[${foreign.join(', ')}] docsDeleted=${deleted.docsDeleted} indexEntriesRemoved=${deleted.indexEntriesRemoved} passes=${deleted.passes} printCandidates=${printCandidates.length} bumped=[${bumped.join(', ')}] quantitiesRestored=[${restored.join(', ')}]`);
 
     // ---------- THE LOCKS (AC4) ----------
     // All three read straight from Firestore, never from the UI, so none of
     // them can be satisfied by an optimistic patch or a false success toast.
     const after = await admin.snapshot();
 
-    // 1. No leaked document.
+    // 1. No leaked document. `foreign` is in the message because it is the one
+    //    way this can red without this test having leaked anything: a document
+    //    of another name appeared mid-run and was deliberately NOT deleted
+    //    (round 5, HIGH-2). That is a red worth having — it names a concurrent
+    //    writer instead of quietly destroying its document to keep the count
+    //    tidy — but the reader has to be able to tell the two cases apart.
     expect(
       after.cardDocCount,
-      `[cleanup][add card] LEAK: the account has ${after.cardDocCount} card docs, was ${before.cardDocCount}. created=[${created.join(', ')}]`,
+      `[cleanup][add card] LEAK: the account has ${after.cardDocCount} card docs, was ${before.cardDocCount}. created=[${created.join(', ')}] foreign(NOT deleted, not ours)=[${foreign.join(', ')}]`,
     ).toBe(before.cardDocCount);
 
     // 2. Nothing this run created may survive anywhere — doc OR index entry.
@@ -634,18 +672,43 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
     // card by the locks that count documents.
     const markerRef = admin.db.doc(`users/${admin.uid}/e2e_teardown_state/merge-fixture`);
 
+    // Transactional, re-reading the chunk INSIDE the transaction, and writing
+    // `count` alongside `cards` — i.e. the same shape as its two siblings in
+    // helpers/admin.ts (`syncIndexQuantities`, `stripIndexEntries`), for the
+    // same reason they give (round 5, MEDIUM-1).
+    //
+    // The previous version read every chunk once, outside any transaction, and
+    // then wrote back a mapped copy of that STALE array. A chunk here is 256
+    // entries; losing that race does not lose one field, it reverts every
+    // concurrent change to all 256 in one write — manufacturing exactly the
+    // unindexed-document and phantom states this ticket exists to stop — and
+    // it left `count` untouched, so a chunk whose length had changed
+    // underneath came out with `count` disagreeing with `cards.length`. Round 4
+    // hung a SECOND call site on this function (the self-heal below), which put
+    // all crash recovery on top of it, so unifying it is not cosmetic.
+    //
+    // Note this is a unification with an existing pattern, not a new mechanism:
+    // no behaviour is added, the unsafe write is replaced by the safe one its
+    // siblings already use.
     const writeIndexQuantity = async (id: string, q: number): Promise<string[]> => {
       const changes: string[] = [];
       const chunks = await admin.db.collection(`users/${admin.uid}/card_index`).get();
       for (const chunk of chunks.docs) {
-        const entries = chunk.data().cards;
-        if (!Array.isArray(entries)) continue;
-        const hit = entries.find((e: { i?: string; q?: number }) => String(e?.i) === id);
-        if (hit === undefined || Number(hit.q) === q) continue;
-        await chunk.ref.update({
-          cards: entries.map((e: { i?: string }) => (String(e?.i) === id ? { ...e, q } : e)),
+        // Assigned, not accumulated, inside the transaction: Firestore may run
+        // the callback more than once on contention.
+        let chunkChanged: string[] = [];
+        await admin.db.runTransaction(async (tx) => {
+          chunkChanged = [];
+          const fresh = await tx.get(chunk.ref);
+          const entries = fresh.data()?.cards;
+          if (!Array.isArray(entries)) return;
+          const hit = entries.find((e: { i?: string; q?: number }) => String(e?.i) === id);
+          if (hit === undefined || Number(hit.q) === q) return;
+          const next = entries.map((e: { i?: string }) => (String(e?.i) === id ? { ...e, q } : e));
+          chunkChanged.push(`idx ${id}:${Number(hit.q)}->${q}`);
+          tx.update(chunk.ref, { cards: next, count: next.length });
         });
-        changes.push(`idx ${id}:${Number(hit.q)}->${q}`);
+        changes.push(...chunkChanged);
       }
       return changes;
     };
@@ -668,12 +731,49 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
       return changes;
     };
 
+    // THE SELF-HEAL ONLY FIRES ON THE DAMAGE IT IS THE CURE FOR (round 5,
+    // HIGH-1). Round 4 shipped this as an unconditional `repair(target,
+    // originalQ)`, which is not "undo a crashed run" — it is "force this card to
+    // a number written down at some unbounded point in the past". MEASURED by
+    // the reviewer: a stale marker {target 0kaj…, originalQ 9, mergedQ 10} met a
+    // live card sitting COHERENTLY at doc=3 / idx=3, and this block rewrote a
+    // real card to 9 on BOTH sides — a state it had never been in — and the run
+    // reported `2 passed`. There is no age limit on a marker and no lock in this
+    // test that looks at the healed card, so that write was invisible.
+    //
+    // The discriminator was already on disk and was being thrown away: the
+    // marker records `mergedQ` (written at :703 below) and the destructure took
+    // only `target` and `originalQ`. A crash between the seed and the `finally`
+    // leaves the document at `mergedQ` BY CONSTRUCTION — that is the whole
+    // damage this heals. So: repair only when the live document is actually
+    // sitting at `mergedQ`. Anything else (already clean, moved on by another
+    // writer, a pre-round-5 marker with no `mergedQ` at all) means this marker
+    // no longer describes reality — say so loudly and DISCARD IT WITHOUT
+    // WRITING. Discarding is safe in the direction that matters: the seed only
+    // ever moves a card by +1 and the marker is deleted either way, so a
+    // discarded marker cannot cause the unbounded growth the marker exists to
+    // prevent — the next run re-reads the live value as its own `originalQ`.
+    //
+    // This is a condition over data the marker already carries. No new
+    // mechanism, no new document, no new field.
     const stale = await markerRef.get();
     if (stale.exists) {
-      const { target: staleTarget, originalQ: staleQ } = stale.data() as { target: string; originalQ: number };
-      const healed = await repair(staleTarget, staleQ);
-      // eslint-disable-next-line no-console
-      console.log(`[teardown contract] SELF-HEAL: a previous run died before its cleanup. marker=${JSON.stringify(stale.data())} repaired=[${healed.join(', ')}]`);
+      const marker = stale.data() as { target?: string; originalQ?: number; mergedQ?: number };
+      const staleTarget = marker.target ?? '';
+      const liveDoc = staleTarget ? await admin.db.doc(`users/${admin.uid}/cards/${staleTarget}`).get() : null;
+      const liveQ = liveDoc?.exists ? Number(liveDoc.get('quantity')) : undefined;
+      const { originalQ: staleOriginalQ, mergedQ: staleMergedQ } = marker;
+      const healable = staleTarget !== ''
+        && typeof staleOriginalQ === 'number'
+        && typeof staleMergedQ === 'number'
+        && liveQ === staleMergedQ;
+      if (healable && typeof staleOriginalQ === 'number') {
+        const healed = await repair(staleTarget, staleOriginalQ);
+        // eslint-disable-next-line no-console
+        console.log(`[teardown contract] SELF-HEAL: a previous run died before its cleanup and its card is still at mergedQ. marker=${JSON.stringify(stale.data())} liveQ=${liveQ} repaired=[${healed.join(', ')}]`);
+      } else {
+        console.warn(`[teardown contract] STALE MARKER DISCARDED WITHOUT WRITING: the live document does not match the crash state this marker describes, so repairing from it would invent a state the card was never in. marker=${JSON.stringify(stale.data())} liveQ=${liveQ ?? '<no document>'}`);
+      }
       await markerRef.delete();
     }
 

@@ -85,19 +85,32 @@ export type AccountSnapshot = {
   indexEntryCount: number;
 };
 
+/**
+ * The card-documents half of a snapshot: quantity AND name per id, no
+ * card_index chunks. `name` is here and not deferred to snapshot() because a
+ * polling caller has to answer "is this new document MINE?" on every
+ * iteration, and the only answer that survives a concurrent writer is the
+ * IDENTITY of the print the run added (TASK-240 round 5, HIGH-2). Adding the
+ * field to the same `.select()` keeps the round-4 saving intact — this still
+ * reads zero chunks.
+ */
+export interface DocFields {
+  quantities: Record<string, number>;
+  names: Record<string, string>;
+}
+
 export type TestAdmin = {
   uid: string;
   db: Firestore;
   snapshot(): Promise<AccountSnapshot>;
   /**
-   * id -> quantity for every card document, and NOTHING else. The cheap half
-   * of snapshot(): no card_index chunks. Exposed because callers that poll
-   * (TASK-240 round 4, MEDIUM-2) were paying a whole-account chunk read every
-   * 2s for data they never looked at — on the CI account (41k+ cards, ~30
-   * chunks) that is multi-megabyte per iteration, up to 15 iterations, inside
-   * a 90s test.
+   * The cheap half of snapshot(): card documents only, no card_index chunks.
+   * Exposed because callers that poll (TASK-240 round 4, MEDIUM-2) were paying
+   * a whole-account chunk read every 2s for data they never looked at — on the
+   * CI account (41k+ cards, ~30 chunks) that is multi-megabyte per iteration,
+   * up to 15 iterations, inside a 90s test.
    */
-  docQuantities(): Promise<Record<string, number>>;
+  docFields(): Promise<DocFields>;
   /** Count of docs in an arbitrary user subcollection (decks, binders, …). */
   subcollectionIds(name: string): Promise<string[]>;
   /**
@@ -200,12 +213,21 @@ async function build(): Promise<TestAdmin | null> {
    * chunk as well costs an extra multi-megabyte read per pass on the CI
    * account (41k+ entries) for data that pass did not use. See the cost note
    * on restoreQuantities.
+   *
+   * `name` rides along in the same projection (round 5, HIGH-2). It costs
+   * nothing here — still one indexed `.select()` over the cards collection,
+   * still zero chunks — and it is what lets a caller bound a set to the print
+   * it added instead of to "whatever appeared in the account".
    */
-  const readDocQuantities = async (): Promise<Record<string, number>> => {
-    const cardsSnap = await db.collection(`users/${uid}/cards`).select('quantity').get();
+  const readDocFields = async (): Promise<DocFields> => {
+    const cardsSnap = await db.collection(`users/${uid}/cards`).select('quantity', 'name').get();
     const quantities: Record<string, number> = {};
-    cardsSnap.docs.forEach((d) => { quantities[d.id] = Number(d.get('quantity') ?? 0); });
-    return quantities;
+    const names: Record<string, string> = {};
+    cardsSnap.docs.forEach((d) => {
+      quantities[d.id] = Number(d.get('quantity') ?? 0);
+      names[d.id] = String(d.get('name') ?? '');
+    });
+    return { quantities, names };
   };
 
   const snapshot = async (): Promise<AccountSnapshot> => {
@@ -258,6 +280,16 @@ async function build(): Promise<TestAdmin | null> {
    * `q` of the named ids is touched — every other entry (TASK-238's fixtures
    * among them) is passed through byte-for-byte, and `count` stays in sync
    * because the app maintains both.
+   *
+   * ONE FIELD OUTSIDE THAT PROMISE, named so it is not a surprise (round 5,
+   * LOW): `count` is written as `next.length`, so a chunk that arrives with
+   * `count` ALREADY disagreeing with `cards.length` is silently normalized on
+   * any chunk this function rewrites — a write to a field the run did not
+   * touch. Judged benign and kept: `count` is derived data the app itself
+   * always writes as `cards.length`, so the normalized value is the only one
+   * the app could have produced, and writing back the stale wrong `count`
+   * alongside a corrected `cards` array would be worse. It is deliberately NOT
+   * a repair pass: only chunks that already needed a `q` write are affected.
    *
    * THAT LAST SENTENCE IS ONLY AS TRUE AS `wanted`. It described this function
    * read in isolation and was false of its caller: restoreQuantities used to
@@ -340,13 +372,22 @@ async function build(): Promise<TestAdmin | null> {
    * that same document, so restricting it to the run's own print is enough. The
    * index half compares an entry against a DOCUMENT, and doc/entry disagreement
    * is a pre-existing condition here (TASK-208/234, plus TASK-238's deliberate
-   * fixtures) — on an account with 25+ rows for the card the spec adds, "same
-   * print" would still be wide enough to "repair" a fixture. It therefore stays
-   * at the ids the run OBSERVED changing, plus any id whose document this call
-   * restored itself: having written the document, this call owns the entry's
-   * agreement with it. Note that this is the path by which the document half
-   * feeds the index half — which is exactly why the document half could not
-   * stay global.
+   * fixtures), so a set that is merely "the same NAME" is still the wrong
+   * granularity for it: name-scope spans every print/condition/foil/status row
+   * of that card, and any of those rows may be legitimately divergent already.
+   * It therefore stays at the ids the run OBSERVED changing, plus any id whose
+   * document this call restored itself: having written the document, this call
+   * owns the entry's agreement with it. Note that this is the path by which the
+   * document half feeds the index half — which is exactly why the document half
+   * could not stay global.
+   *
+   * (Round 5, LOW — the earlier wording here justified the gap with "an account
+   * with 25+ rows for the card the spec adds". MEASURED FALSE on 2026-08-17:
+   * this account holds exactly TWO Lightning Bolt rows, and neither has a
+   * card_index entry at all. The conclusion is unchanged and stands on the
+   * granularity argument above, which does not depend on how many rows happen
+   * to exist today; the number was decoration, and a wrong number in
+   * load-bearing prose is how a future round talks itself into widening this.)
    *
    * COST (round 3). A pass used to take a full snapshot(): every card document
    * AND every card_index chunk, multi-megabyte on the CI account, paid even
@@ -354,23 +395,25 @@ async function build(): Promise<TestAdmin | null> {
    * leaks the document, so the loop reads documents only and leaves the chunk
    * read to syncIndexQuantities, which skips it entirely when `wanted` is empty.
    *
-   * GRACE PERIOD, and the round-3 contradiction it resolves (round 4,
-   * MEDIUM-1). Round 3 also made the loop demand only ONE clean pass when the
-   * index allow-list was empty — which is the `created=[] && bumped=[]` path,
-   * the very case the spec flags with "no new card document and no quantity
-   * change appeared within 30s". On that path the loop returned after a single
-   * read with no sleep, so a write landing a second later was a permanent leak
-   * nothing would see. That directly contradicted the reason given for keeping
-   * the document half global ("catch a merge that landed after the caller
-   * stopped polling"): the same change removed the window in which such a merge
-   * could be caught. Resolved in the one direction that is coherent — the
-   * window is real and it is kept: whenever ANYTHING is in scope on either
-   * side, there is a late write this call could still catch, so it requires two
-   * consecutive clean passes with a sleep between them. One pass is used only
-   * when both scopes are empty, where by construction this function may write
-   * nothing at all and waiting could not change any outcome. The saving from
-   * round 3 is kept where it was actually earned: the extra pass is now a
-   * documents-only read, not a whole-account snapshot.
+   * GRACE PERIOD — UNCONDITIONAL (round 5, MEDIUM-2; supersedes rounds 3 and
+   * 4). Two consecutive clean passes with a sleep between them, always, whether
+   * or not either scope has anything in it.
+   *
+   * Rounds 3 and 4 both tried to make the second pass conditional on the scopes
+   * being non-empty, reasoning that with nothing in scope this function can
+   * write nothing, so waiting changes no outcome. That is true OF THIS
+   * FUNCTION and false OF ITS CALLER, which is what matters: in the 'add card'
+   * spec this call is the last thing before the final snapshot, so its sleep is
+   * also the only grace the LOCKS get before they read the account. MEASURED
+   * 2026-08-17: today `printCandidates=2` there, so the condition happened to
+   * hold and the window happened to exist — but it existed by accident of the
+   * account's contents, not by design. Sweep the two orphan Lightning Bolt rows
+   * (TASK-240 AC5, pending) and `printCandidates` becomes 0, both scopes empty,
+   * one pass, no sleep — and a document landing a second after that snapshot
+   * leaks past lock 1 with nothing to catch it. A grace window whose existence
+   * depends on how many rows of one card an account happens to hold is not a
+   * grace window. The round-3 saving is kept where it was actually earned: the
+   * extra pass is a documents-only read, not a whole-account snapshot.
    */
   const restoreQuantities = async (
     expected: Record<string, number>,
@@ -383,14 +426,15 @@ async function build(): Promise<TestAdmin | null> {
     // It can only grow with ids from `allowDoc`, so the caller's document scope
     // bounds BOTH halves.
     const allowIndex = new Set(scope.indexScope);
-    // Fixed before the loop on purpose: `allowIndex` can only grow via a
-    // document write, which requires a non-empty `allowDoc`, so the two-pass
-    // requirement can never be missed by evaluating this early.
-    const needed = allowDoc.size > 0 || allowIndex.size > 0 ? 2 : 1;
+    // Not derived from the scopes (round 5, MEDIUM-2): the sleep between the
+    // two passes is the caller's grace window as much as this function's retry,
+    // so it must not switch off because the account happened to contain nothing
+    // in scope. See the GRACE PERIOD note above.
+    const needed = 2;
     let consecutiveClean = 0;
     let passes = 0;
     while (consecutiveClean < needed && passes < 8) {
-      const current = await readDocQuantities();
+      const { quantities: current } = await readDocFields();
       const wanted = new Map<string, number>();
       const docChanges: string[] = [];
       for (const id of allowDoc) {
@@ -420,6 +464,17 @@ async function build(): Promise<TestAdmin | null> {
       // is not going to restore that document, so writing the snapshot value
       // into the entry would MANUFACTURE the doc/index divergence the whole
       // exercise is about.
+      //
+      // UNREACHABLE FROM BOTH OF TODAY'S CALL SITES, and kept anyway (round 5,
+      // LOW). 'add card' passes indexScope=`bumped` ⊆ printCandidates =
+      // docScope, and the teardown-contract test passes the same single id to
+      // both, so `allowIndex \ allowDoc` is empty in each. It is not dead code
+      // by accident: `restoreQuantities` takes the two scopes independently, so
+      // a caller that names an entry without naming its document is a legal use
+      // of this signature, and deleting the branch would silently turn that call
+      // into "the index half is ignored" — a worse trap than an unexercised
+      // branch. Flagged here rather than left looking live. If a third call site
+      // ever makes the sets differ, this branch is the one with no test.
       for (const id of allowIndex) {
         if (wanted.has(id) || !(id in current)) continue;
         wanted.set(id, current[id]);
@@ -495,5 +550,5 @@ async function build(): Promise<TestAdmin | null> {
     return { docsDeleted, indexEntriesRemoved, passes };
   };
 
-  return { uid, db, snapshot, docQuantities: readDocQuantities, subcollectionIds, deleteCards, restoreQuantities };
+  return { uid, db, snapshot, docFields: readDocFields, subcollectionIds, deleteCards, restoreQuantities };
 }

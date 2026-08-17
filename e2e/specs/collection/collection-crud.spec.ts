@@ -1,18 +1,8 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import { test, expect } from '../../fixtures/test';
 import { adminUnavailableReason, getTestAdmin } from '../../helpers/admin';
 import { findIncoherent } from '../../helpers/coherence';
 import { SEARCH_TERMS } from '../../helpers/test-data';
-
-// TASK-146: deliberately obscure, not SEARCH_TERMS.common ("Lightning Bolt")
-// or another format staple — this CI account has 25+ pre-existing entries for
-// Lightning Bolt alone (and a dozen-plus for "Giant Growth", tried first —
-// see git history), which is exactly the ambiguity the "edit card" fixture
-// below needs to avoid: it must be the ONLY match for its own name, both
-// right after adding it and again after a full page reload, so re-finding it
-// needs no identity/edition disambiguation at all. Femeref Knight (Mirage) is
-// a real, virtually never-played card — verified empirically to have zero
-// pre-existing matches in this account before relying on it here.
-const EDIT_FIXTURE_CARD_NAME = 'Femeref Knight';
 
 test.describe('Collection CRUD', () => {
   // The default 45s test timeout (playwright.config.ts) is shared by the
@@ -608,16 +598,16 @@ test.describe('Collection CRUD', () => {
   });
 });
 
-// TASK-240 round 3, MEDIUM-2 — the merge branch, exercised deterministically.
+// TASK-240 — the merge branch, exercised deterministically, ON A CARD THIS
+// TEST OWNS.
 //
 // THE PROBLEM THIS SOLVES. 'add card' above only reaches the merge path when
 // the account already holds a row for the exact print AddCardModal picked
 // (scryfallId+edition+condition+foil+status). It adds Lightning Bolt, this
-// account holds none, and the teardown now returns it to none on every run —
-// so `bumped` is empty every time. Measured over the round-2 and round-3 runs:
-// always `bumped=[]`. Lock 4's quantity-divergence branch — the one AC4 is
-// really about, and the one that caught a real regression last round — was
-// therefore latent: present, never executed in CI.
+// account holds none, and the teardown returns it to none on every run — so
+// `bumped` is empty every time. Measured across every round so far: always
+// `bumped=[]`. Lock 4's quantity-divergence branch — the one AC4 is really
+// about — was therefore latent: present, never executed in CI.
 //
 // WHY NOT JUST MAKE THE UI MERGE. Two adds in one test would merge only if the
 // first card reached `card_index` between them: AddCardModal's merge check runs
@@ -625,26 +615,51 @@ test.describe('Collection CRUD', () => {
 // just-added card frequently never gets there (TASK-234). So the "deterministic"
 // version would be nondeterministic in the opposite direction, silently falling
 // back to creating a second document — and it would add a second full add-card
-// UI round trip to a test whose worst path is already close to its timeout
-// (MEDIUM-3). Seeding a matching row up front has the same dependency, on the
-// same broken subsystem.
+// UI round trip to a test whose worst path is already close to its timeout.
 //
-// WHAT THIS DOES INSTEAD. Puts the account into the exact post-merge state
-// (document and entry both at N+1) out of band, runs the real teardown against
-// real Firestore, and asserts both halves came back — with the same predicate
-// the E2E lock uses. No UI, no page load, no dependency on TASK-234. The
-// predicate's own branches are covered separately and offline by
-// tests/unit/e2e/coherence.test.ts.
+// WHY THIS NO LONGER BORROWS A REAL CARD (round 6 — a REMOVAL: it deletes a
+// mechanism rather than patching it for a third time). Rounds 3-5 put the
+// account's own data into the post-merge state; the target was a real card
+// picked as `.sort()[0]` over the coherent ids. Borrowing means the test has to
+// remember what to give back if the process dies, which is why rounds 4 and 5
+// grew a marker document, a self-heal block, a `repair()` and a
+// `writeIndexQuantity()`. Both of those rounds shipped a HIGH inside that same
+// mechanism:
+//   - round 4: the self-heal was unconditional, so a stale marker rewrote a real
+//     card (Vectis Gloves) to a quantity it had never held, on BOTH sides, and
+//     the run reported `2 passed`.
+//   - round 5: the `mergedQ` guard fixed that and opened the next door — the
+//     discard branch deleted the marker WITHOUT repairing, so a crash inside
+//     `repair()` (which writes the document first and the entry second) left a
+//     real card permanently divergent with its only record destroyed, green.
+//     Measured by the reviewer on Vectis Gloves: `divergent=1`,
+//     `0kajFWujShPA7iaQuBer doc=3 idx=4`, `2 passed`. And because `target` was
+//     chosen only among COHERENT cards, no later run would ever pick it again —
+//     the mechanism hid its own damage.
+// Every one of those failure modes is downstream of one decision: the fixture
+// was somebody else's data. So the loan is gone. This test SEEDS ITS OWN
+// throwaway card — document plus card_index entry, by admin — walks it to the
+// post-merge state, asserts `restoreQuantities` brings both sides back, and
+// deletes it by id. There is no original value to remember, so there is no
+// marker, no self-heal, no `repair()` and no `writeIndexQuantity()`.
 //
-// WHAT THIS DOES AND DOES NOT PROVE (TASK-240 round 4, MEDIUM-4 — the earlier
-// wording here claimed it covered "the retry loop, the transaction, and the
-// debounce window", and that was oversold). There is no browser page in this
-// test, so there is no debounced client rewriting the chunk from stale memory —
-// which is the entire reason the retry loop exists. Measured: `restored=[doc,
-// idx]` on the first effective pass, no contention, no retry. What it DOES
-// prove, and what is worth having, is that a settled post-merge state is
-// restored on BOTH sides against real Firestore, through the real transaction
-// path, with the real scope the spec passes.
+// CRASH RECOVERY WITHOUT A MARKER. A death at any point leaves an ORPHAN OF
+// KNOWN IDENTITY: a document and/or an index entry carrying FIXTURE_CARD_NAME,
+// a string that belongs to nothing else in this account or in any other spec
+// (deliberately not a real card name — `preferences-crud.spec.ts` also adds
+// "Lightning Bolt"). The next run sweeps by that identity before it seeds. That
+// is the same identity rule round 5 applied to the 'add card' teardown, now on
+// data that is 100% ours, so it can delete rather than merely report.
+//
+// WHAT THIS DOES AND DOES NOT PROVE. There is no browser page here, so there is
+// no debounced client rewriting the chunk from stale memory — which is the
+// entire reason `restoreQuantities`' retry loop exists; that loop is not under
+// test. What IS proved, against real Firestore and through the real transaction
+// path with the real scope shape the spec passes, is that a settled post-merge
+// state comes back on BOTH sides. The coherence predicate's own branches are
+// covered offline by tests/unit/e2e/coherence.test.ts.
+const FIXTURE_CARD_NAME = 'ZZZ E2E Teardown Contract Fixture (TASK-240)';
+
 test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
   test.setTimeout(90_000);
 
@@ -653,193 +668,172 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
     test.skip(admin === null, `TASK-240: no admin teardown available — ${adminUnavailableReason()}`);
     if (!admin) return;
 
-    // ---------- crash recovery (TASK-240 round 4, MEDIUM-3) ----------
-    // The `finally` below is the only thing that undoes the seeded merge, and a
-    // Playwright TEST TIMEOUT does not run it: Playwright abandons the body and
-    // tears the worker down. The borrowed card would be left at doc=N+1 /
-    // idx=N+1 — COHERENT, therefore invisible to every lock in this suite and
-    // to any audit that looks for divergence — and because the target is chosen
-    // deterministically (`.sort()[0]`), the next run would read N+1 as its
-    // `originalQ` and bump it again. Unbounded growth on a real card, produced
-    // by the test written to prevent exactly that.
-    //
-    // So the intended restore state is written to a MARKER DOCUMENT before
-    // anything is seeded, and repaired from that marker at the start of the
-    // next run. A process that dies at ANY point between the seed and the
-    // `finally` — timeout, SIGKILL, machine reboot — self-heals on the next
-    // run, because the marker is what survives, not the in-memory `finally`.
-    // Its own subcollection, never `cards`, so it can never be mistaken for a
-    // card by the locks that count documents.
-    const markerRef = admin.db.doc(`users/${admin.uid}/e2e_teardown_state/merge-fixture`);
+    const cardsRef = admin.db.collection(`users/${admin.uid}/cards`);
+    const indexRef = admin.db.collection(`users/${admin.uid}/card_index`);
 
-    // Transactional, re-reading the chunk INSIDE the transaction, and writing
-    // `count` alongside `cards` — i.e. the same shape as its two siblings in
-    // helpers/admin.ts (`syncIndexQuantities`, `stripIndexEntries`), for the
-    // same reason they give (round 5, MEDIUM-1).
-    //
-    // The previous version read every chunk once, outside any transaction, and
-    // then wrote back a mapped copy of that STALE array. A chunk here is 256
-    // entries; losing that race does not lose one field, it reverts every
-    // concurrent change to all 256 in one write — manufacturing exactly the
-    // unindexed-document and phantom states this ticket exists to stop — and
-    // it left `count` untouched, so a chunk whose length had changed
-    // underneath came out with `count` disagreeing with `cards.length`. Round 4
-    // hung a SECOND call site on this function (the self-heal below), which put
-    // all crash recovery on top of it, so unifying it is not cosmetic.
-    //
-    // Note this is a unification with an existing pattern, not a new mechanism:
-    // no behaviour is added, the unsafe write is replaced by the safe one its
-    // siblings already use.
-    const writeIndexQuantity = async (id: string, q: number): Promise<string[]> => {
-      const changes: string[] = [];
-      const chunks = await admin.db.collection(`users/${admin.uid}/card_index`).get();
+    /**
+     * Every id carrying the fixture's name, on EITHER side. Both sides are
+     * scanned because the two halves are seeded and deleted in sequence, so a
+     * crash can leave a document with no entry (died between the two seeds) or
+     * an entry with no document (died inside `deleteCards`, which deletes the
+     * document first and then strips entries until two passes come back clean).
+     * `deleteCards` takes ids and removes both halves, so the union is exactly
+     * what it needs.
+     */
+    const fixtureIds = async (): Promise<string[]> => {
+      const [docs, chunks] = await Promise.all([
+        cardsRef.where('name', '==', FIXTURE_CARD_NAME).select().get(),
+        indexRef.get(),
+      ]);
+      const ids = new Set(docs.docs.map((d) => d.id));
+      chunks.forEach((chunk) => {
+        const entries = chunk.data().cards;
+        if (!Array.isArray(entries)) return;
+        for (const e of entries) {
+          if (String(e?.n) === FIXTURE_CARD_NAME) ids.add(String(e?.i));
+        }
+      });
+      return [...ids];
+    };
+
+    // Recovery, by identity, before anything is seeded. Unconditional and
+    // DELETING: unlike the 'add card' teardown — which only reports a document
+    // it cannot prove is its own — everything answering to this name was
+    // written by this test, so there is no provenance question to get wrong.
+    const orphans = await fixtureIds();
+    if (orphans.length > 0) {
+      const swept = await admin.deleteCards(orphans);
+      console.warn(`[teardown contract] SWEPT ORPHANED FIXTURE from a run that died before its cleanup: ids=[${orphans.join(', ')}] docsDeleted=${swept.docsDeleted} indexEntriesRemoved=${swept.indexEntriesRemoved} passes=${swept.passes}`);
+    }
+
+    const fixtureRef = cardsRef.doc();
+    const fixtureId = fixtureRef.id;
+    const originalQ = 1;
+    const mergedQ = 2;
+
+    /**
+     * Writes the fixture's card_index entry at `q` — appending it the first
+     * time, updating it in place afterwards. Transactional, re-reading the
+     * chunk INSIDE the transaction and writing `count` alongside `cards`: the
+     * same shape as its siblings in helpers/admin.ts (`syncIndexQuantities`,
+     * `stripIndexEntries`), for the same reason. A chunk here holds 256
+     * entries, live and rewritten wholesale by the client, so a stale-read
+     * rewrite would not lose one field — it would revert every concurrent
+     * change to all 256.
+     */
+    const writeFixtureEntry = async (q: number): Promise<void> => {
+      const chunks = await indexRef.get();
+      expect(
+        chunks.size,
+        '[teardown contract] the account has no card_index chunk to seed the fixture entry into',
+      ).toBeGreaterThan(0);
       for (const chunk of chunks.docs) {
         // Assigned, not accumulated, inside the transaction: Firestore may run
         // the callback more than once on contention.
-        let chunkChanged: string[] = [];
+        let updated = false;
         await admin.db.runTransaction(async (tx) => {
-          chunkChanged = [];
+          updated = false;
           const fresh = await tx.get(chunk.ref);
           const entries = fresh.data()?.cards;
           if (!Array.isArray(entries)) return;
-          const hit = entries.find((e: { i?: string; q?: number }) => String(e?.i) === id);
-          if (hit === undefined || Number(hit.q) === q) return;
-          const next = entries.map((e: { i?: string }) => (String(e?.i) === id ? { ...e, q } : e));
-          chunkChanged.push(`idx ${id}:${Number(hit.q)}->${q}`);
+          if (!entries.some((e: { i?: string }) => String(e?.i) === fixtureId)) return;
+          const next = entries.map((e: { i?: string }) => (String(e?.i) === fixtureId ? { ...e, q } : e));
           tx.update(chunk.ref, { cards: next, count: next.length });
+          updated = true;
         });
-        changes.push(...chunkChanged);
+        if (updated) return;
       }
-      return changes;
+      const first = chunks.docs[0];
+      await admin.db.runTransaction(async (tx) => {
+        const fresh = await tx.get(first.ref);
+        const entries = fresh.data()?.cards;
+        if (!Array.isArray(entries)) throw new Error(`[teardown contract] ${first.id} has no cards array to append the fixture entry to`);
+        // The compact shape the app writes (src/stores/collection.ts,
+        // cardToIndex). Only `i`, `n` and `q` are read by anything here — `i`
+        // to find it, `n` to sweep it after a crash, `q` because it IS the
+        // quantity — but the rest are present so the entry cannot be told apart
+        // from a real one by whatever reads the chunk next.
+        const entry = {
+          i: fixtureId, s: `e2e-teardown-${fixtureId}`, n: FIXTURE_CARD_NAME, st: 'collection',
+          q, p: 0, cm: 0, co: [], r: '', t: '', f: false, sc: 'E2E', e: 'E2E Teardown Fixture',
+          pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM',
+          pb: false, df: false,
+        };
+        tx.update(first.ref, { cards: [...entries, entry], count: entries.length + 1 });
+      });
     };
 
-    // Deliberately NOT admin.restoreQuantities: this is the seeder's repair
-    // path AND the crash-recovery path, and both have to work while the thing
-    // under test is broken. Found by mutation, not by reasoning — the first
-    // version of this test repaired with restoreQuantities, so the run that
-    // proved the lock reddens also left the borrowed card at doc=1 /
-    // card_index q=2 and it had to be fixed by hand. A cleanup that only works
-    // when the code is already correct is not a cleanup.
-    const repair = async (id: string, q: number): Promise<string[]> => {
-      const changes: string[] = [];
-      const doc = await admin.db.doc(`users/${admin.uid}/cards/${id}`).get();
-      if (doc.exists && Number(doc.get('quantity')) !== q) {
-        await doc.ref.update({ quantity: q, updatedAt: new Date() });
-        changes.push(`doc ${id}:${Number(doc.get('quantity'))}->${q}`);
-      }
-      changes.push(...await writeIndexQuantity(id, q));
-      return changes;
-    };
-
-    // THE SELF-HEAL ONLY FIRES ON THE DAMAGE IT IS THE CURE FOR (round 5,
-    // HIGH-1). Round 4 shipped this as an unconditional `repair(target,
-    // originalQ)`, which is not "undo a crashed run" — it is "force this card to
-    // a number written down at some unbounded point in the past". MEASURED by
-    // the reviewer: a stale marker {target 0kaj…, originalQ 9, mergedQ 10} met a
-    // live card sitting COHERENTLY at doc=3 / idx=3, and this block rewrote a
-    // real card to 9 on BOTH sides — a state it had never been in — and the run
-    // reported `2 passed`. There is no age limit on a marker and no lock in this
-    // test that looks at the healed card, so that write was invisible.
-    //
-    // The discriminator was already on disk and was being thrown away: the
-    // marker records `mergedQ` (written at :703 below) and the destructure took
-    // only `target` and `originalQ`. A crash between the seed and the `finally`
-    // leaves the document at `mergedQ` BY CONSTRUCTION — that is the whole
-    // damage this heals. So: repair only when the live document is actually
-    // sitting at `mergedQ`. Anything else (already clean, moved on by another
-    // writer, a pre-round-5 marker with no `mergedQ` at all) means this marker
-    // no longer describes reality — say so loudly and DISCARD IT WITHOUT
-    // WRITING. Discarding is safe in the direction that matters: the seed only
-    // ever moves a card by +1 and the marker is deleted either way, so a
-    // discarded marker cannot cause the unbounded growth the marker exists to
-    // prevent — the next run re-reads the live value as its own `originalQ`.
-    //
-    // This is a condition over data the marker already carries. No new
-    // mechanism, no new document, no new field.
-    const stale = await markerRef.get();
-    if (stale.exists) {
-      const marker = stale.data() as { target?: string; originalQ?: number; mergedQ?: number };
-      const staleTarget = marker.target ?? '';
-      const liveDoc = staleTarget ? await admin.db.doc(`users/${admin.uid}/cards/${staleTarget}`).get() : null;
-      const liveQ = liveDoc?.exists ? Number(liveDoc.get('quantity')) : undefined;
-      const { originalQ: staleOriginalQ, mergedQ: staleMergedQ } = marker;
-      const healable = staleTarget !== ''
-        && typeof staleOriginalQ === 'number'
-        && typeof staleMergedQ === 'number'
-        && liveQ === staleMergedQ;
-      if (healable && typeof staleOriginalQ === 'number') {
-        const healed = await repair(staleTarget, staleOriginalQ);
-        // eslint-disable-next-line no-console
-        console.log(`[teardown contract] SELF-HEAL: a previous run died before its cleanup and its card is still at mergedQ. marker=${JSON.stringify(stale.data())} liveQ=${liveQ} repaired=[${healed.join(', ')}]`);
-      } else {
-        console.warn(`[teardown contract] STALE MARKER DISCARDED WITHOUT WRITING: the live document does not match the crash state this marker describes, so repairing from it would invent a state the card was never in. marker=${JSON.stringify(stale.data())} liveQ=${liveQ ?? '<no document>'}`);
-      }
-      await markerRef.delete();
-    }
-
-    // Taken AFTER the self-heal on purpose: a snapshot of a still-damaged
-    // account would bake the previous run's leftover into this run's baseline.
-    const before = await admin.snapshot();
-
-    // A card that is currently COHERENT and not duplicated. Coherence is the
-    // selection criterion on purpose: a divergent card may be one of TASK-238's
-    // deliberate fixtures, and this test must not borrow one of those. Sorted
-    // so the choice is reproducible across runs rather than "whatever came back
-    // first".
-    const target = before.cardDocIds
-      .filter((id) => before.indexQuantities[id] !== undefined
-        && before.indexQuantities[id] === before.quantities[id]
-        && !before.duplicateIndexEntryIds.includes(id))
-      .sort()[0];
-    test.skip(target === undefined, 'TASK-240: no coherent card available to borrow for the merge fixture');
-    if (target === undefined) return;
-
-    const originalQ = before.quantities[target];
-    const mergedQ = originalQ + 1;
-
-    // BEFORE any mutation, and awaited: if the process dies after this line the
-    // next run knows exactly what to put back; if it dies before it, nothing
-    // has been changed yet. There is no ordering in between.
-    await markerRef.set({ target, originalQ, mergedQ, at: new Date().toISOString() });
+    // `Timestamp.now()`, not `new Date()` — the same form helpers/admin.ts and
+    // the app itself use for this field (round 6, LOW: the two used to differ).
+    await fixtureRef.set({
+      name: FIXTURE_CARD_NAME,
+      scryfallId: `e2e-teardown-${fixtureId}`,
+      edition: 'E2E Teardown Fixture',
+      setCode: 'E2E',
+      condition: 'NM',
+      foil: false,
+      status: 'collection',
+      quantity: originalQ,
+      price: 0,
+      public: false,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+    await writeFixtureEntry(originalQ);
 
     try {
+      // The pre-merge baseline, read back from Firestore rather than assumed:
+      // this is the value `restoreQuantities` will be asked to restore to.
+      const before = await admin.snapshot();
+      expect(
+        [before.quantities[fixtureId], before.indexQuantities[fixtureId]],
+        `[teardown contract] the fixture ${fixtureId} was not seeded on both sides`,
+      ).toEqual([originalQ, originalQ]);
+
       // The post-merge state, as the app leaves it: updateCard bumps the
       // document, and the card_index persist eventually carries the same value.
-      await admin.db.doc(`users/${admin.uid}/cards/${target}`).update({ quantity: mergedQ, updatedAt: new Date() });
-      await writeIndexQuantity(target, mergedQ);
+      await fixtureRef.update({ quantity: mergedQ, updatedAt: Timestamp.now() });
+      await writeFixtureEntry(mergedQ);
 
       const seeded = await admin.snapshot();
       expect(
-        [seeded.quantities[target], seeded.indexQuantities[target]],
-        `[teardown contract] the merge fixture did not take on ${target}`,
+        [seeded.quantities[fixtureId], seeded.indexQuantities[fixtureId]],
+        `[teardown contract] the merge fixture did not take on ${fixtureId}`,
       ).toEqual([mergedQ, mergedQ]);
 
       // The real teardown call, with the real scope shape the spec passes.
       const restored = await admin.restoreQuantities(before.quantities, {
-        docScope: [target],
-        indexScope: [target],
+        docScope: [fixtureId],
+        indexScope: [fixtureId],
       });
       // eslint-disable-next-line no-console
-      console.log(`[teardown contract] target=${target} ${originalQ}->${mergedQ} restored=[${restored.join(', ')}]`);
+      console.log(`[teardown contract] fixture=${fixtureId} ${originalQ}->${mergedQ} restored=[${restored.join(', ')}]`);
 
       const after = await admin.snapshot();
       // Same predicate as lock 4 in 'add card', now on its merge branch: the
       // document SURVIVES and its entry has to agree with it.
       expect(
-        findIncoherent([target], before, after),
+        findIncoherent([fixtureId], before, after),
         '[teardown contract] doc and card_index disagree after restoring a merged add',
       ).toEqual([]);
-      expect(after.quantities[target], '[teardown contract] document quantity not restored').toBe(originalQ);
-      expect(after.indexQuantities[target], '[teardown contract] card_index quantity not restored').toBe(originalQ);
+      expect(after.quantities[fixtureId], '[teardown contract] document quantity not restored').toBe(originalQ);
+      expect(after.indexQuantities[fixtureId], '[teardown contract] card_index quantity not restored').toBe(originalQ);
     } finally {
-      // Unconditional: an assertion failure above must not leave the borrowed
-      // card at N+1. Writes only when something is actually off, so a clean run
-      // is a no-op. The marker is deleted LAST — if this block itself dies
-      // halfway, the marker is still there and the next run finishes the job.
-      const changed = await repair(target, originalQ);
+      // Unconditional, and a deletion rather than a repair: the fixture is this
+      // test's own document, so there is no state to put back — the account is
+      // correct only when the card is gone from both sides. An assertion
+      // failure above must still reach this.
+      const removed = await admin.deleteCards([fixtureId]);
       // eslint-disable-next-line no-console
-      console.log(`[teardown contract] fixture cleanup: repaired=[${changed.join(', ')}]`);
-      await markerRef.delete();
+      console.log(`[teardown contract] fixture cleanup: id=${fixtureId} docsDeleted=${removed.docsDeleted} indexEntriesRemoved=${removed.indexEntriesRemoved} passes=${removed.passes}`);
     }
+
+    // Outside the `finally` on purpose: a real assertion, so a fixture this
+    // test failed to remove REDS instead of being announced to nobody — and it
+    // cannot mask a failure from the block above, which fails first.
+    expect(
+      await fixtureIds(),
+      '[teardown contract] LEAK: the fixture survives as a document or a card_index entry',
+    ).toEqual([]);
   });
 });

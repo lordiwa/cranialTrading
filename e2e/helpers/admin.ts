@@ -111,8 +111,6 @@ export type TestAdmin = {
    * up to 15 iterations, inside a 90s test.
    */
   docFields(): Promise<DocFields>;
-  /** Count of docs in an arbitrary user subcollection (decks, binders, …). */
-  subcollectionIds(name: string): Promise<string[]>;
   /**
    * Deletes the given card docs AND strips their card_index entries. Both
    * halves matter: deleting the doc alone would manufacture exactly the
@@ -488,11 +486,6 @@ async function build(): Promise<TestAdmin | null> {
     return restored;
   };
 
-  const subcollectionIds = async (name: string): Promise<string[]> => {
-    const snap = await db.collection(`users/${uid}/${name}`).select().get();
-    return snap.docs.map((d) => d.id);
-  };
-
   /**
    * One stripping pass: removes `doomed` ids from every card_index chunk,
    * transactionally. A transaction, not a plain update, because the chunk is
@@ -550,5 +543,5 @@ async function build(): Promise<TestAdmin | null> {
     return { docsDeleted, indexEntriesRemoved, passes };
   };
 
-  return { uid, db, snapshot, docFields: readDocFields, subcollectionIds, deleteCards, restoreQuantities };
+  return { uid, db, snapshot, docFields: readDocFields, deleteCards, restoreQuantities };
 }

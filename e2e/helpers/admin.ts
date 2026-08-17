@@ -524,10 +524,18 @@ async function build(): Promise<TestAdmin | null> {
     // loop below re-strips until two consecutive passes find nothing, which
     // spans the debounce window rather than guessing a sleep long enough to
     // cover it.
+    // Counted by what was actually there, not by how many ids were passed:
+    // deleting a missing document succeeds in Firestore, so the unconditional
+    // increment reported `docsDeleted=1` for an index-entry-only orphan that had
+    // no document at all. This line is the ONLY evidence that a crash recovery
+    // happened, so it may not overstate one.
     let docsDeleted = 0;
     for (const id of ids) {
-      await db.doc(`users/${uid}/cards/${id}`).delete();
-      docsDeleted++;
+      const ref = db.doc(`users/${uid}/cards/${id}`);
+      if ((await ref.get()).exists) {
+        await ref.delete();
+        docsDeleted++;
+      }
     }
 
     let indexEntriesRemoved = 0;

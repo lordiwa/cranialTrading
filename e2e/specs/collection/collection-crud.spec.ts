@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { test, expect } from '../../fixtures/test';
 import { adminUnavailableReason, getTestAdmin } from '../../helpers/admin';
+import { INDEX_CHUNK_SIZE, pickAppendChunk } from '../../helpers/chunk-append';
 import { findIncoherent } from '../../helpers/coherence';
 import { SEARCH_TERMS } from '../../helpers/test-data';
 
@@ -699,7 +700,22 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
     // Recovery, by identity, before anything is seeded. Unconditional and
     // DELETING: unlike the 'add card' teardown — which only reports a document
     // it cannot prove is its own — everything answering to this name was
-    // written by this test, so there is no provenance question to get wrong.
+    // written by THIS TEST, so no real card can ever be swept.
+    //
+    // What it was written by is not the same as what RUN it was written by, and
+    // the difference is not academic (round 7, MEDIUM-2). Within one run there
+    // is no overlap: `workers: 1` and `fullyParallel: false` in
+    // playwright.config.ts serialise everything. Across runs there is — the
+    // nightly cron and a push-to-develop full suite both target this account and
+    // can overlap, which is the exact concurrency that produced round 4's HIGH.
+    // If they do, the later run's sweep deletes the earlier run's LIVE fixture:
+    // that run then reds somewhere below, and its own leak assertion reports the
+    // other run's fixture id. The name is deliberately shared rather than
+    // per-run, so the cost of that is a flake and a misattributed id in a
+    // fixture-only document — never a real card, and never a card_index entry
+    // belonging to one. A per-run name would trade this for a prefix scan that
+    // has to stay correct on both sides forever; the accepted price is stated
+    // here instead.
     const orphans = await fixtureIds();
     if (orphans.length > 0) {
       const swept = await admin.deleteCards(orphans);
@@ -743,11 +759,29 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
         });
         if (updated) return;
       }
-      const first = chunks.docs[0];
+      // THE LAST chunk, by parsed chunk number — never `docs[0]`, and never a
+      // lexicographic sort (round 7, HIGH-1: `chunk_10` sorts before `chunk_2`,
+      // and an unordered `.get()` is already in that order, so `docs[0]` is
+      // always `chunk_0`). Every chunk but the last holds exactly
+      // INDEX_CHUNK_SIZE entries, so appending anywhere else overflows a full
+      // chunk and desynchronises the offsets the client's dirty-chunk persist
+      // slices by — which loses a REAL card's entry. `pickAppendChunk` also
+      // refuses a full last chunk; its branches are pinned in
+      // tests/unit/e2e/chunk-append.test.ts, because this account has one chunk
+      // and cannot exercise any of them.
+      const target = pickAppendChunk(
+        chunks.docs.map((d) => {
+          const entries = d.data().cards;
+          return { id: d.id, size: Array.isArray(entries) ? entries.length : 0, ref: d.ref };
+        }),
+      );
       await admin.db.runTransaction(async (tx) => {
-        const fresh = await tx.get(first.ref);
+        const fresh = await tx.get(target.ref);
         const entries = fresh.data()?.cards;
-        if (!Array.isArray(entries)) throw new Error(`[teardown contract] ${first.id} has no cards array to append the fixture entry to`);
+        if (!Array.isArray(entries)) throw new Error(`[teardown contract] ${target.id} has no cards array to append the fixture entry to`);
+        // Re-checked inside the transaction against the value read there: the
+        // size `pickAppendChunk` decided on came from a read outside it.
+        if (entries.length >= INDEX_CHUNK_SIZE) throw new Error(`[teardown contract] ${target.id} filled to ${entries.length} between the read and the transaction; appending would overflow it`);
         // The compact shape the app writes (src/stores/collection.ts,
         // cardToIndex). Only `i`, `n` and `q` are read by anything here — `i`
         // to find it, `n` to sweep it after a crash, `q` because it IS the
@@ -759,29 +793,35 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
           pw: '', to: '', fa: false, pm: [], kw: [], lg: [], ca: Date.now(), cn: 'NM',
           pb: false, df: false,
         };
-        tx.update(first.ref, { cards: [...entries, entry], count: entries.length + 1 });
+        tx.update(target.ref, { cards: [...entries, entry], count: entries.length + 1 });
       });
     };
 
-    // `Timestamp.now()`, not `new Date()` — the same form helpers/admin.ts and
-    // the app itself use for this field (round 6, LOW: the two used to differ).
-    await fixtureRef.set({
-      name: FIXTURE_CARD_NAME,
-      scryfallId: `e2e-teardown-${fixtureId}`,
-      edition: 'E2E Teardown Fixture',
-      setCode: 'E2E',
-      condition: 'NM',
-      foil: false,
-      status: 'collection',
-      quantity: originalQ,
-      price: 0,
-      public: false,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
-    await writeFixtureEntry(originalQ);
-
+    // INSIDE the `try` (round 7, MEDIUM-1). `writeFixtureEntry` can throw three
+    // ways — no chunk, no cards array, a Firestore transaction failure — and
+    // seeding outside the `try` meant the document written just above survived
+    // every one of them, with the `finally` never entered and the leak
+    // assertion never reached. `deleteCards` on a document that was never
+    // created is a harmless no-op, so there is no cost to covering the seed.
     try {
+      // `Timestamp.now()`, not `new Date()` — the same form helpers/admin.ts and
+      // the app itself use for this field (round 6, LOW: the two used to differ).
+      await fixtureRef.set({
+        name: FIXTURE_CARD_NAME,
+        scryfallId: `e2e-teardown-${fixtureId}`,
+        edition: 'E2E Teardown Fixture',
+        setCode: 'E2E',
+        condition: 'NM',
+        foil: false,
+        status: 'collection',
+        quantity: originalQ,
+        price: 0,
+        public: false,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      await writeFixtureEntry(originalQ);
+
       // The pre-merge baseline, read back from Firestore rather than assumed:
       // this is the value `restoreQuantities` will be asked to restore to.
       const before = await admin.snapshot();

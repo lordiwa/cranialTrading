@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-17T03:59:10.845Z",
+      "body": "2026-08-17 — ESTE TICKET YA TIENE REPRODUCCION DETERMINISTICA, EN UN COMANDO. No hace falta buscarla.\n\nMEDIDO por el orquestador con control negativo, en cranial-trading-dev, cuenta rafael@remoose.com\n(uid jV6gJqf3csPA4vRfO2k9Vb5ejYo2 — que ademas resulta ser LA CUENTA DEL E2E: .env.local trae\nTEST_USER_A_EMAIL=rafael@remoose.com):\n\n  BASE                                                  docs=259  entradas=258  AUSENTES=2\n  CONTROL   (--grep \"collection page loads\", read-only) docs=259  entradas=258  AUSENTES=2\n  TRATAMIENTO (--grep \"add card\")                       docs=260  entradas=258  AUSENTES=3\n\nDiff exacto: UN documento creado, 24CyD7f3iMSbaiQIH5PF, Lightning Bolt (Marvel Super Heroes\nCommander), status=collection, enIndice=NO. Re-auditado despues: SIGUE ausente, no es lag de\nescritura del indice. El control salio identico al base, asi que el cambio lo produjo ese test y no\nel mero hecho de correr E2E.\n\nO sea: agregar una carta por la UI deja un documento que NUNCA entra al card_index. Como la grilla se\narma y ordena desde el indice, esa carta queda INVISIBLE para el usuario — existe y no la puede ver\nni encontrar. Ese es el sintoma de usuario de este ticket, ahora con numeros.\n\nREPRODUCIRLO (2 min): snapshot de solo lectura docs vs card_index -> correr el test 'add card' ->\nsnapshot otra vez -> diffear por id de documento. Base de partida del script: audit239.mjs del\nscratchpad (firebase-admin con applicationDefault(); correrlo DESDE LA RAIZ del repo porque afuera no\nresuelve firebase-admin).\n\nY NO ES SOLO DE LABORATORIO: el run CI/CD 31986524986 (2026-08-17, 01:58:07Z -> 02:07:40Z) dejo DOS\nLightning Bolt sin entrada de indice, creadas 02:02:20Z y 02:05:17Z, dentro de esa ventana. El CI\nreproduce este defecto solo, en cada push a develop.\n\nSE ABRIO TASK-240 por un defecto DISTINTO que aparecio midiendo esto (el cleanup de ese test E2E no\nborra nada y su fallo es invisible). TASK-240 NO arregla este ticket: cuando se arregle, la carta\nseguira sin entrar al indice — solo dejara de acumularse basura en la cuenta compartida. El arreglo\nde fondo sigue siendo este.\n\nDATOS: las tres Lightning Bolt huerfanas (VIaujcMtjQw1RDOoL33e, gBOsQM3djwYi2nK7JcC9,\n24CyD7f3iMSbaiQIH5PF) quedan en la cuenta como evidencia; su limpieza esta pedida en el AC5 de\nTASK-240."
+    }
+  ],
   "created_at": "2026-08-13T22:56:40.563Z",
-  "updated_at": "2026-08-13T22:56:40.563Z",
+  "updated_at": "2026-08-17T03:59:10.845Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

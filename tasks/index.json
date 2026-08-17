@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T03:25:50.126Z",
+  "generated_at": "2026-08-17T03:59:10.845Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1307,12 +1307,18 @@
       "key": "TASK-238",
       "title": "AC4 de TASK-237 spin-off: red de seguridad al cargar — detectar y reparar divergencia card_index vs documentos",
       "status": "todo",
-      "priority": "high"
+      "priority": "critical"
     },
     {
       "key": "TASK-239",
       "title": "Los call sites DIRECTOS de applyCardIndexDelta no pasan por la cola y siguen perdiendo el delta si el contexto muere mid-RTT (misma familia que TASK-237)",
       "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-240",
+      "title": "El cleanup del test E2E \"add card\" no borra nada y su fallo es invisible: cada corrida deja un documento sin entrada de card_index, acumulandose sin techo en la cuenta compartida",
+      "status": "todo",
       "priority": "high"
     }
   ]

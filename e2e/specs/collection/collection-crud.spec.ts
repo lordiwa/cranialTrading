@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/test';
+import { adminUnavailableReason, getTestAdmin } from '../../helpers/admin';
 import { SEARCH_TERMS } from '../../helpers/test-data';
 
 // TASK-146: deliberately obscure, not SEARCH_TERMS.common ("Lightning Bolt")
@@ -32,7 +33,67 @@ test.describe('Collection CRUD', () => {
     await expect(collectionPage.statusFilters).toBeVisible();
   });
 
+  // TASK-240 — this test's cleanup is an ADMIN TEARDOWN, not a UI delete, and
+  // it REDDENS. Both of those are deliberate reversals of earlier decisions;
+  // the reasons are measured, and recorded here so they are not undone by
+  // someone reading only the old comments.
+  //
+  // WHY NOT THE UI (reverses "delete whatever is at grid index 0"). Measured
+  // 2026-08-17 over three runs with a full before/after Firestore snapshot
+  // diffed BY DOCUMENT ID:
+  //   - run A (cleanup exactly as it shipped): all three UI steps —
+  //     deleteButtonInGrid(0).click(), confirmAction(), waitForToast('success')
+  //     — completed without throwing, and ZERO documents were deleted. The
+  //     account went 260 -> 261 docs. So the old try/catch was not swallowing
+  //     an exception at all; there was nothing to swallow. Both standing
+  //     hypotheses (a dead locator like TASK-146, an overlay intercepting the
+  //     click) are refuted by that run.
+  //   - The real defect is the TARGET. `card_index` is what the grid is built
+  //     and sorted from, and a freshly added card frequently never reaches it
+  //     (TASK-234). When it doesn't, the created card is not on screen at all,
+  //     grid index 0 is a BYSTANDER, and the cleanup deletes that instead. Run
+  //     B measured exactly this: index 0 was "Angel's Herald" — one of
+  //     TASK-238's deliberately-dirty fixtures — and the cleanup removed its
+  //     card_index entry while its document survived. The cleanup was not
+  //     merely failing to clean; it was corrupting unrelated data.
+  //   - run C, with the delete guarded to fire only when index 0 really was
+  //     the just-added printing, deleted the doc and its index entry cleanly.
+  //     So the UI delete path itself works. It just cannot be aimed at the
+  //     right card while TASK-234 is open.
+  //   - Secondary measured hazard, which is why even a correctly-aimed UI
+  //     delete is the wrong tool here: `deleteCard` awaits a Cloud Function
+  //     (applyCardIndexDelta) BEFORE deleteDoc, while the success toast fires
+  //     without awaiting either. With 0s of grace after the toast nothing
+  //     landed; with 3s only the index half landed (doc alive, entry gone —
+  //     manufacturing a TASK-238-style invisible card); it took ~20s for both
+  //     halves. A teardown whose correctness depends on an unobservable
+  //     20-second window is not a teardown.
+  // Deleting by document id, out of band, is correct whether or not the index
+  // write landed, and cannot hit a bystander.
+  //
+  // WHY IT REDDENS (reverses "leak, don't redden"). That call was made when
+  // the cleanup ran through flaky UI, where a failure was as likely to mean
+  // "CI timing hiccup" as "real bug", and reddening would have punished a test
+  // that had already passed its real assertions. It cost this project two
+  // silent failures: TASK-146's dead locator, and this one. The tradeoff is
+  // gone now — an admin delete by id has no overlays, no virtualized grid and
+  // no toast timing, so a failure here means the account really did keep a
+  // document, which is the exact defect the ticket is about. "Warn but stay
+  // green" was also tried, implicitly, for two rounds: nobody read the output.
+  // The lock below is therefore a real assertion, and it is falsifiable —
+  // removing the deleteCards() call makes it fail (TASK-240 AC4).
   test('add card: open modal → search → select → save → card appears', async ({ collectionPage, commonPage }) => {
+    // No credentials => no teardown => this test does not run. It creates a
+    // real document in a shared account; a run that cannot delete what it
+    // creates is precisely the failure mode being fixed, so skipping loudly
+    // beats leaking quietly. (CI supplies GOOGLE_APPLICATION_CREDENTIALS from
+    // the FIREBASE_SERVICE_ACCOUNT_DEV secret — see .github/workflows/test.yml.)
+    const admin = await getTestAdmin();
+    test.skip(admin === null, `TASK-240: no admin teardown available — ${adminUnavailableReason()}`);
+    if (!admin) return;
+
+    const before = await admin.snapshot();
+
     await collectionPage.openAddCardModal();
     await collectionPage.addModal.searchInput.waitFor({ state: 'visible' });
     await collectionPage.addModal.searchInput.fill(SEARCH_TERMS.common);
@@ -51,47 +112,87 @@ test.describe('Collection CRUD', () => {
 
     await commonPage.waitForToast('success');
 
-    // Cleanup — net-zero doc count, not literal-fixture deletion: the shared
-    // CI collection already has 25+ pre-existing "Lightning Bolt" entries
-    // (different printings), and card_index writes are eventually consistent
-    // (optimistic patch + deferred refresh — see the card_index persist race
-    // pattern), so there's no reliable UI signal within a single test to pick
-    // out exactly the doc we just created; a name-filtered search can't tell
-    // it apart from the pre-existing duplicates either. Deleting whatever
-    // card is at grid index 0 — the exact same delete path the "delete card"
-    // test below uses — keeps the doc count net-zero for this run instead:
-    // the collection composition rotates by one card per run rather than
-    // growing without bound, which is the failure mode actually being
-    // guarded against.
+    // ---------- teardown ----------
+    // Poll rather than snapshot once: the success toast is not proof the write
+    // reached the server (measured above), and a doc that lands AFTER the
+    // teardown would leak while the lock still went green. The page is still
+    // open here, so the client keeps flushing while we wait.
     //
-    // Best-effort by design ("leak, don't redden"): the whole block is
-    // wrapped in try/catch so a stuck toast overlay or CI-only timing hiccup
-    // here never fails the test above it, which already passed its real
-    // assertions. At worst this leaves one extra card in the shared CI
-    // collection for a later run's cleanup to rotate back out.
-    try {
-      // Toasts use v-show (display:none, not DOM removal) and the
-      // success-toast locator is a known CI flake source (matches stale,
-      // already-hidden toasts — see CLAUDE.md's E2E flake notes), so don't
-      // wait on that locator here. Just wait out the documented ~4s
-      // auto-dismiss window so the toast isn't still overlaying the grid
-      // when clickCardInGrid(0) runs below.
-      await collectionPage.page.waitForTimeout(4500);
-      const cardCount = await collectionPage.getCardCount();
-      if (cardCount > 0) {
-        // TASK-146: this used to open the detail modal and look for a
-        // deleteButton there — CardDetailModal.vue's v2 redesign has no such
-        // button, so that locator never matched and this cleanup silently
-        // no-op'd on every run (a real leak, not the accepted one-card leak
-        // the comment above describes). The delete affordance lives on the
-        // grid card itself; confirm goes through the separate ConfirmModal.
-        await collectionPage.deleteButtonInGrid(0).click();
-        await commonPage.confirmAction();
-        await commonPage.waitForToast('success');
-      }
-    } catch {
-      // Swallow — accepted leak of at most one card this run.
+    // Two possible outcomes, both of which have to be undone. The add creates
+    // a NEW doc only when the account has no row for this exact print;
+    // otherwise AddCardModal merges into the existing row and bumps its
+    // quantity (SCRUM-35 bug #1). Measured on 2026-08-17: both happen across
+    // consecutive runs of this very test. A teardown that watched only for new
+    // documents would print "nothing to clean" on merge runs while leaving +1
+    // quantity behind on every one of them.
+    const beforeIds = new Set(before.cardDocIds);
+    let created: string[] = [];
+    let bumped: string[] = [];
+    const deadline = Date.now() + 30_000;
+    for (;;) {
+      const now = await admin.snapshot();
+      created = now.cardDocIds.filter((id) => !beforeIds.has(id));
+      bumped = Object.keys(before.quantities).filter((id) => id in now.quantities && now.quantities[id] !== before.quantities[id]);
+      if (created.length > 0 || bumped.length > 0 || Date.now() > deadline) break;
+      await collectionPage.page.waitForTimeout(2000);
     }
+
+    if (created.length === 0 && bumped.length === 0) {
+      // Not fatal on its own — the locks below are what decide. Loud because
+      // "the add reported success but 30s later the account is unchanged" is a
+      // finding either way, and this file's history is one of findings that
+      // were never printed anywhere.
+      // eslint-disable-next-line no-console
+      console.warn('[cleanup][add card] WARNING: no new card document and no quantity change appeared within 30s of the success toast — nothing to undo, and the add may not have persisted.');
+    }
+
+    const deleted = await admin.deleteCards(created);
+    const restored = await admin.restoreQuantities(before.quantities);
+    // eslint-disable-next-line no-console
+    console.log(`[cleanup][add card] created=[${created.join(', ')}] docsDeleted=${deleted.docsDeleted} indexEntriesRemoved=${deleted.indexEntriesRemoved} passes=${deleted.passes} quantitiesRestored=[${restored.join(', ')}]`);
+
+    // ---------- THE LOCKS (AC4) ----------
+    // All three read straight from Firestore, never from the UI, so none of
+    // them can be satisfied by an optimistic patch or a false success toast.
+    const after = await admin.snapshot();
+
+    // 1. No leaked document.
+    expect(
+      after.cardDocCount,
+      `[cleanup][add card] LEAK: the account has ${after.cardDocCount} card docs, was ${before.cardDocCount}. created=[${created.join(', ')}]`,
+    ).toBe(before.cardDocCount);
+
+    // 2. Nothing this run created may survive anywhere — doc OR index entry.
+    //    The second half is not pedantry: an index entry whose document is
+    //    gone is a PHANTOM, the damage class TASK-238 tracks, and an earlier
+    //    version of this teardown manufactured one by stripping the index
+    //    before the client had finished writing it.
+    const leftovers = created.filter((id) => after.cardDocIds.includes(id) || after.indexEntryIds.includes(id));
+    expect(
+      leftovers,
+      `[cleanup][add card] LEAK: ids created by this run still present as doc or card_index entry: [${leftovers.join(', ')}]`,
+    ).toEqual([]);
+
+    // 3. No quantity drift on pre-existing cards (the merge path).
+    const drifted = Object.keys(before.quantities)
+      .filter((id) => id in after.quantities && after.quantities[id] !== before.quantities[id])
+      .map((id) => `${id}: ${before.quantities[id]} -> ${after.quantities[id]}`);
+    expect(
+      drifted,
+      `[cleanup][add card] DRIFT: pre-existing cards changed quantity and were not restored: [${drifted.join('; ')}]`,
+    ).toEqual([]);
+
+    // Deliberately NOT asserted: a global before/after equality on
+    // `card_index` entry COUNT. TASK-240 AC4 asks for one, and it was written
+    // first and then removed on evidence: measured 2026-08-17, the app itself
+    // rebuilt this account's whole card_index during a run of this spec —
+    // 258 entries became 261, five previously-unindexed docs gained entries
+    // and two phantoms disappeared, none of it attributable to the cleanup.
+    // A global index count therefore reds out for reasons that are not leaks,
+    // which is how tests get quarantined and stop meaning anything. Lock 2
+    // covers what the cleanup is actually accountable for: its OWN entries.
+    // eslint-disable-next-line no-console
+    console.log(`[cleanup][add card] card_index entries ${before.indexEntryCount} -> ${after.indexEntryCount} (informational; see the comment above)`);
   });
 
   // TASK-146 AC2 — SCOPE NARROWED, criterion not honestly met today; tracked

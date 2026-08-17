@@ -87,6 +87,25 @@ jobs:
             echo "::error::Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD secrets"
             exit 1
           fi
+      # TASK-240: admin credentials for E2E TEARDOWN (e2e/helpers/admin.ts).
+      # The "add card" spec creates a real document in the shared dev account
+      # and can only delete it by id, out of band — the created card often
+      # never reaches card_index (TASK-234), so it is not on the grid and has
+      # no delete button to click. Without these credentials that spec SKIPS
+      # itself rather than leak; the skip is visible in the report.
+      # Same dev service account deploy-dev already uses. Deliberately NOT
+      # provided on main: main runs `--grep @smoke` against the production
+      # bundle, this spec is not @smoke, and a dev-scoped admin must never be
+      # in scope for a prod-configured run.
+      - name: Provide admin credentials for E2E teardown (develop only)
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_DEV not set — mutating specs with admin teardown will skip"
+            exit 0
+          fi
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}' > "$RUNNER_TEMP/sa-dev.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa-dev.json" >> "$GITHUB_ENV"
       # develop runs the full suite against the dev project — that IS the gate.
       # main only ever fast-forwards an already-green develop, so re-running the
       # full suite there re-tests identical code; the one thing it would add is

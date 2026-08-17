@@ -61,6 +61,20 @@ jobs:
             exit 1
           fi
 
+      # TASK-240: admin credentials for E2E teardown (e2e/helpers/admin.ts).
+      # Nightly runs the mutating specs too, so the "add card" spec needs a way
+      # to delete the document it creates — by id, out of band, because a
+      # freshly added card often never reaches card_index (TASK-234) and so is
+      # not on the grid at all. Without this it SKIPS itself rather than leak.
+      - name: Provide admin credentials for E2E teardown
+        run: |
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_DEV not set — mutating specs with admin teardown will skip"
+            exit 0
+          fi
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}' > "$RUNNER_TEMP/sa-dev.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa-dev.json" >> "$GITHUB_ENV"
+
       # E2E_BASE_URL makes playwright.config.ts point at the deployed dev site
       # and skip the local webServer entirely (see playwright.config.ts).
       # npm run e2e:nightly (package.json) owns the actual flags — see it for

@@ -182,6 +182,39 @@ test.describe('Collection CRUD', () => {
       `[cleanup][add card] DRIFT: pre-existing cards changed quantity and were not restored: [${drifted.join('; ')}]`,
     ).toEqual([]);
 
+    // 4. Document <-> card_index coherence, INCLUDING the quantity, over the
+    //    cards THIS run touched. Locks 1-3 are all blind to the merge path's
+    //    real damage: lock 1 compares document counts (a merge changes none),
+    //    lock 2 only looks at ids in `created` (empty on a merge), and lock 3
+    //    compares documents against documents — precisely the one half that
+    //    restoreQuantities already fixed. Measured 2026-08-17: with teardown
+    //    writing only the document, a merge run finished GREEN and left
+    //    doc.q=1 / idx.q=2 on a real card, permanently.
+    //    Scoped to `created ∪ bumped` on purpose. It is immune to the app's
+    //    own index rebuilds (see the note below) because it never looks at a
+    //    card this run did not touch.
+    const touched = [...new Set([...created, ...bumped])];
+    const incoherent = touched.flatMap((id) => {
+      const docQ = after.quantities[id];
+      const idxQ = after.indexQuantities[id];
+      if (docQ === undefined) {
+        // Document gone (the `created` path, post-delete): no entry may remain.
+        return idxQ === undefined ? [] : [`${id}: document deleted but card_index entry survives with q=${idxQ}`];
+      }
+      if (idxQ === undefined) {
+        // No entry and none before either => TASK-234, not ours. One that
+        // existed before and is gone now => we made an invisible card.
+        return before.indexQuantities[id] === undefined
+          ? []
+          : [`${id}: card_index entry vanished (was q=${before.indexQuantities[id]}) while the document survives with quantity=${docQ}`];
+      }
+      return idxQ === docQ ? [] : [`${id}: doc.quantity=${docQ} but card_index q=${idxQ}`];
+    });
+    expect(
+      incoherent,
+      `[cleanup][add card] DIVERGENCE: document and card_index disagree for cards this run touched: [${incoherent.join('; ')}]`,
+    ).toEqual([]);
+
     // Deliberately NOT asserted: a global before/after equality on
     // `card_index` entry COUNT. TASK-240 AC4 asks for one, and it was written
     // first and then removed on evidence: measured 2026-08-17, the app itself

@@ -126,14 +126,37 @@ test.describe('Collection CRUD', () => {
     // consecutive runs of this very test. A teardown that watched only for new
     // documents would print "nothing to clean" on merge runs while leaving +1
     // quantity behind on every one of them.
+    //
+    // The rows this teardown is ALLOWED to write (TASK-240 round 4, HIGH-1).
+    // A merged add can only ever land on a row of the exact print the modal
+    // saved: AddCardModal matches on scryfallId+edition+condition+foil+status.
+    // The test does not know which print the first search result was, but it
+    // knows the name it searched for, and every print of that card shares it —
+    // so the rows of that name are a small superset of the possible merge
+    // targets and, crucially, exclude every OTHER card in the account. The
+    // teardown's document half is bounded to this set; passing the whole
+    // account (the previous round's behaviour) let it revert a card a
+    // CONCURRENT run had legitimately changed — measured by the reviewer, on
+    // this account, index entry included.
+    const addedName = SEARCH_TERMS.common.toLowerCase();
+    const printCandidates = before.cardDocIds.filter((id) => (before.names[id] ?? '').toLowerCase() === addedName);
+
     const beforeIds = new Set(before.cardDocIds);
     let created: string[] = [];
     let bumped: string[] = [];
     const deadline = Date.now() + 30_000;
     for (;;) {
-      const now = await admin.snapshot();
-      created = now.cardDocIds.filter((id) => !beforeIds.has(id));
-      bumped = Object.keys(before.quantities).filter((id) => id in now.quantities && now.quantities[id] !== before.quantities[id]);
+      // docQuantities(), NOT snapshot() (round 4, MEDIUM-2): `created` needs
+      // ids and `bumped` needs quantities; neither reads card_index. A full
+      // snapshot here re-read every chunk — multi-megabyte on the CI account —
+      // up to 15 times inside a test that is already close to its timeout.
+      const now = await admin.docQuantities();
+      created = Object.keys(now).filter((id) => !beforeIds.has(id));
+      // Restricted to the print candidates for the same reason the doc scope
+      // is: an unrelated card whose quantity moved during our run moved because
+      // SOMEONE ELSE moved it, and treating that as "ours" is what put a third
+      // party's write on this teardown's restore list.
+      bumped = printCandidates.filter((id) => id in now && now[id] !== before.quantities[id]);
       if (created.length > 0 || bumped.length > 0 || Date.now() > deadline) break;
       await collectionPage.page.waitForTimeout(2000);
     }
@@ -148,17 +171,25 @@ test.describe('Collection CRUD', () => {
     }
 
     const deleted = await admin.deleteCards(created);
-    // `bumped` — and ONLY `bumped` — is what this teardown may rewrite in
-    // card_index. Passing the whole account (which is what `expected` is) let
-    // the previous round rewrite the entry of any card whose entry already
-    // disagreed with its document, i.e. exactly TASK-238's fixtures and
-    // TASK-208/234's natural drift. Measured on 2026-08-17: an untouched
-    // bystander at doc=1 with a seeded entry at q=8 came back rewritten to 1.
-    // `created` is deliberately absent: those documents are gone by now, and
-    // their entries are deleteCards' business, not this call's.
-    const restored = await admin.restoreQuantities(before.quantities, bumped);
+    // Two allow-lists, both narrow, neither of them "the account":
+    //  - docScope = the rows of the print this test added. Wide enough to catch
+    //    a merge that landed after the poll above gave up (the reason the
+    //    document half was kept broad in round 3), narrow enough that it cannot
+    //    reach a card of any other name.
+    //  - indexScope = `bumped` only. Narrower still, because an index write
+    //    compares an entry against a DOCUMENT, and this account holds 25+
+    //    Lightning Bolt rows whose entries may legitimately disagree with their
+    //    documents already (TASK-208/234 drift, TASK-238 fixtures). Measured on
+    //    2026-08-17: an untouched bystander at doc=1 with a seeded entry at q=8
+    //    came back rewritten to 1 when this half was broad.
+    // `created` is deliberately in neither: those documents are gone by now, and
+    // their entries are deleteCards' business.
+    const restored = await admin.restoreQuantities(before.quantities, {
+      docScope: printCandidates,
+      indexScope: bumped,
+    });
     // eslint-disable-next-line no-console
-    console.log(`[cleanup][add card] created=[${created.join(', ')}] docsDeleted=${deleted.docsDeleted} indexEntriesRemoved=${deleted.indexEntriesRemoved} passes=${deleted.passes} quantitiesRestored=[${restored.join(', ')}]`);
+    console.log(`[cleanup][add card] created=[${created.join(', ')}] docsDeleted=${deleted.docsDeleted} indexEntriesRemoved=${deleted.indexEntriesRemoved} passes=${deleted.passes} printCandidates=${printCandidates.length} bumped=[${bumped.join(', ')}] quantitiesRestored=[${restored.join(', ')}]`);
 
     // ---------- THE LOCKS (AC4) ----------
     // All three read straight from Firestore, never from the UI, so none of
@@ -183,6 +214,13 @@ test.describe('Collection CRUD', () => {
     ).toEqual([]);
 
     // 3. No quantity drift on pre-existing cards (the merge path).
+    //    Deliberately kept GLOBAL even though the teardown's write scope is now
+    //    narrow (HIGH-1): this assertion is the net UNDER that narrowing. If the
+    //    teardown ever again writes a document outside its allow-list, or fails
+    //    to restore one inside it, this is what says so. The cost is a possible
+    //    red when a genuinely concurrent run changes an unrelated card — that is
+    //    a real, investigable event, and it is strictly better than the silent
+    //    overwrite the previous round shipped.
     const drifted = Object.keys(before.quantities)
       .filter((id) => id in after.quantities && after.quantities[id] !== before.quantities[id])
       .map((id) => `${id}: ${before.quantities[id]} -> ${after.quantities[id]}`);
@@ -558,8 +596,17 @@ test.describe('Collection CRUD', () => {
 // real Firestore, and asserts both halves came back — with the same predicate
 // the E2E lock uses. No UI, no page load, no dependency on TASK-234. The
 // predicate's own branches are covered separately and offline by
-// tests/unit/e2e/coherence.test.ts; this is the part that needs a real
-// database: the retry loop, the transaction, and the debounce window.
+// tests/unit/e2e/coherence.test.ts.
+//
+// WHAT THIS DOES AND DOES NOT PROVE (TASK-240 round 4, MEDIUM-4 — the earlier
+// wording here claimed it covered "the retry loop, the transaction, and the
+// debounce window", and that was oversold). There is no browser page in this
+// test, so there is no debounced client rewriting the chunk from stale memory —
+// which is the entire reason the retry loop exists. Measured: `restored=[doc,
+// idx]` on the first effective pass, no contention, no retry. What it DOES
+// prove, and what is worth having, is that a settled post-merge state is
+// restored on BOTH sides against real Firestore, through the real transaction
+// path, with the real scope the spec passes.
 test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
   test.setTimeout(90_000);
 
@@ -568,6 +615,70 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
     test.skip(admin === null, `TASK-240: no admin teardown available — ${adminUnavailableReason()}`);
     if (!admin) return;
 
+    // ---------- crash recovery (TASK-240 round 4, MEDIUM-3) ----------
+    // The `finally` below is the only thing that undoes the seeded merge, and a
+    // Playwright TEST TIMEOUT does not run it: Playwright abandons the body and
+    // tears the worker down. The borrowed card would be left at doc=N+1 /
+    // idx=N+1 — COHERENT, therefore invisible to every lock in this suite and
+    // to any audit that looks for divergence — and because the target is chosen
+    // deterministically (`.sort()[0]`), the next run would read N+1 as its
+    // `originalQ` and bump it again. Unbounded growth on a real card, produced
+    // by the test written to prevent exactly that.
+    //
+    // So the intended restore state is written to a MARKER DOCUMENT before
+    // anything is seeded, and repaired from that marker at the start of the
+    // next run. A process that dies at ANY point between the seed and the
+    // `finally` — timeout, SIGKILL, machine reboot — self-heals on the next
+    // run, because the marker is what survives, not the in-memory `finally`.
+    // Its own subcollection, never `cards`, so it can never be mistaken for a
+    // card by the locks that count documents.
+    const markerRef = admin.db.doc(`users/${admin.uid}/e2e_teardown_state/merge-fixture`);
+
+    const writeIndexQuantity = async (id: string, q: number): Promise<string[]> => {
+      const changes: string[] = [];
+      const chunks = await admin.db.collection(`users/${admin.uid}/card_index`).get();
+      for (const chunk of chunks.docs) {
+        const entries = chunk.data().cards;
+        if (!Array.isArray(entries)) continue;
+        const hit = entries.find((e: { i?: string; q?: number }) => String(e?.i) === id);
+        if (hit === undefined || Number(hit.q) === q) continue;
+        await chunk.ref.update({
+          cards: entries.map((e: { i?: string }) => (String(e?.i) === id ? { ...e, q } : e)),
+        });
+        changes.push(`idx ${id}:${Number(hit.q)}->${q}`);
+      }
+      return changes;
+    };
+
+    // Deliberately NOT admin.restoreQuantities: this is the seeder's repair
+    // path AND the crash-recovery path, and both have to work while the thing
+    // under test is broken. Found by mutation, not by reasoning — the first
+    // version of this test repaired with restoreQuantities, so the run that
+    // proved the lock reddens also left the borrowed card at doc=1 /
+    // card_index q=2 and it had to be fixed by hand. A cleanup that only works
+    // when the code is already correct is not a cleanup.
+    const repair = async (id: string, q: number): Promise<string[]> => {
+      const changes: string[] = [];
+      const doc = await admin.db.doc(`users/${admin.uid}/cards/${id}`).get();
+      if (doc.exists && Number(doc.get('quantity')) !== q) {
+        await doc.ref.update({ quantity: q, updatedAt: new Date() });
+        changes.push(`doc ${id}:${Number(doc.get('quantity'))}->${q}`);
+      }
+      changes.push(...await writeIndexQuantity(id, q));
+      return changes;
+    };
+
+    const stale = await markerRef.get();
+    if (stale.exists) {
+      const { target: staleTarget, originalQ: staleQ } = stale.data() as { target: string; originalQ: number };
+      const healed = await repair(staleTarget, staleQ);
+      // eslint-disable-next-line no-console
+      console.log(`[teardown contract] SELF-HEAL: a previous run died before its cleanup. marker=${JSON.stringify(stale.data())} repaired=[${healed.join(', ')}]`);
+      await markerRef.delete();
+    }
+
+    // Taken AFTER the self-heal on purpose: a snapshot of a still-damaged
+    // account would bake the previous run's leftover into this run's baseline.
     const before = await admin.snapshot();
 
     // A card that is currently COHERENT and not duplicated. Coherence is the
@@ -586,29 +697,16 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
     const originalQ = before.quantities[target];
     const mergedQ = originalQ + 1;
 
-    // Deliberately NOT admin.restoreQuantities: this is the seeder AND the
-    // repair path, and both have to work while the thing under test is broken.
-    // Found by mutation, not by reasoning — the first version of this test
-    // repaired with restoreQuantities, so the run that proved the lock reddens
-    // also left the borrowed card at doc=1 / card_index q=2 and it had to be
-    // fixed by hand. A cleanup that only works when the code is already correct
-    // is not a cleanup.
-    const writeIndexQuantity = async (q: number) => {
-      const chunks = await admin.db.collection(`users/${admin.uid}/card_index`).get();
-      for (const chunk of chunks.docs) {
-        const entries = chunk.data().cards;
-        if (!Array.isArray(entries) || !entries.some((e: { i?: string }) => String(e?.i) === target)) continue;
-        await chunk.ref.update({
-          cards: entries.map((e: { i?: string }) => (String(e?.i) === target ? { ...e, q } : e)),
-        });
-      }
-    };
+    // BEFORE any mutation, and awaited: if the process dies after this line the
+    // next run knows exactly what to put back; if it dies before it, nothing
+    // has been changed yet. There is no ordering in between.
+    await markerRef.set({ target, originalQ, mergedQ, at: new Date().toISOString() });
 
     try {
       // The post-merge state, as the app leaves it: updateCard bumps the
       // document, and the card_index persist eventually carries the same value.
-      await admin.db.doc(`users/${admin.uid}/cards/${target}`).update({ quantity: mergedQ });
-      await writeIndexQuantity(mergedQ);
+      await admin.db.doc(`users/${admin.uid}/cards/${target}`).update({ quantity: mergedQ, updatedAt: new Date() });
+      await writeIndexQuantity(target, mergedQ);
 
       const seeded = await admin.snapshot();
       expect(
@@ -616,8 +714,11 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
         `[teardown contract] the merge fixture did not take on ${target}`,
       ).toEqual([mergedQ, mergedQ]);
 
-      // The real teardown call, with the real scope the spec passes.
-      const restored = await admin.restoreQuantities(before.quantities, [target]);
+      // The real teardown call, with the real scope shape the spec passes.
+      const restored = await admin.restoreQuantities(before.quantities, {
+        docScope: [target],
+        indexScope: [target],
+      });
       // eslint-disable-next-line no-console
       console.log(`[teardown contract] target=${target} ${originalQ}->${mergedQ} restored=[${restored.join(', ')}]`);
 
@@ -633,14 +734,12 @@ test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
     } finally {
       // Unconditional: an assertion failure above must not leave the borrowed
       // card at N+1. Writes only when something is actually off, so a clean run
-      // is a no-op.
-      const now = await admin.snapshot();
-      if (now.quantities[target] !== originalQ) {
-        await admin.db.doc(`users/${admin.uid}/cards/${target}`).update({ quantity: originalQ });
-      }
-      if (now.indexQuantities[target] !== undefined && now.indexQuantities[target] !== originalQ) {
-        await writeIndexQuantity(originalQ);
-      }
+      // is a no-op. The marker is deleted LAST — if this block itself dies
+      // halfway, the marker is still there and the next run finishes the job.
+      const changed = await repair(target, originalQ);
+      // eslint-disable-next-line no-console
+      console.log(`[teardown contract] fixture cleanup: repaired=[${changed.join(', ')}]`);
+      await markerRef.delete();
     }
   });
 });

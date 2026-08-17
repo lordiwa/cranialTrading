@@ -61,11 +61,30 @@ describe('findIncoherent (E2E teardown lock)', () => {
         expect(findIncoherent(['a'], before, after)).toEqual([])
     })
 
-    it('reports a duplicated index entry instead of picking one of them', () => {
+    it('reports a NEWLY duplicated index entry instead of picking one of them', () => {
         const before = view({ a: 1 }, { a: 1 })
         const after = view({ a: 1 }, { a: 1 }, ['a'])
         expect(findIncoherent(['a'], before, after)).toEqual([
-            'a: appears in MORE THAN ONE card_index entry — coherence for it cannot be decided',
+            'a: newly appears in MORE THAN ONE card_index entry — coherence for it cannot be decided',
+        ])
+    })
+
+    // TASK-240 round 4, LOW. An id already duplicated in `before` is
+    // pre-existing corruption, not the run's doing — and syncIndexQuantities
+    // rewrites EVERY entry matching an id, so all of its copies really are
+    // restored to the same q. Reddening on it failed the run for damage that
+    // did not happen.
+    it('passes an id that was ALREADY duplicated before the run', () => {
+        const before = view({ a: 1 }, { a: 1 }, ['a'])
+        const after = view({ a: 1 }, { a: 1 }, ['a'])
+        expect(findIncoherent(['a'], before, after)).toEqual([])
+    })
+
+    it('still reports a quantity divergence on an already-duplicated id', () => {
+        const before = view({ a: 1 }, { a: 1 }, ['a'])
+        const after = view({ a: 1 }, { a: 2 }, ['a'])
+        expect(findIncoherent(['a'], before, after)).toEqual([
+            'a: doc.quantity=1 but card_index q=2',
         ])
     })
 

@@ -9,7 +9,7 @@
  *  - Its most important branch — "the document survived and its entry
  *    disagrees", the actual merge damage — only fires in E2E when a run really
  *    merges. Living here, every branch is covered deterministically by
- *    tests/unit/e2e-coherence.spec.ts on every `npm run test:unit`, with no
+ *    tests/unit/e2e/coherence.test.ts on every `npm run test:unit`, with no
  *    account, no credentials and no timing. That is the difference between a
  *    lock whose main branch is exercised and one that is merely present.
  *
@@ -47,13 +47,21 @@ export function findIncoherent(
   after: CoherenceView,
 ): string[] {
   const duplicated = new Set(after.duplicateIndexEntryIds ?? []);
+  const duplicatedBefore = new Set(before.duplicateIndexEntryIds ?? []);
   return touched.flatMap((id) => {
     // Reported rather than silently resolved: with two entries for one id,
     // `indexQuantities[id]` is whichever chunk happened to be read last, so
     // every verdict below would be a coin flip. TASK-168 makes this a real
     // corruption class, not a hypothetical.
-    if (duplicated.has(id)) {
-      return [`${id}: appears in MORE THAN ONE card_index entry — coherence for it cannot be decided`];
+    //
+    // Only when the duplication is NEW, though. An id already duplicated in
+    // `before` is pre-existing corruption, not this run's doing, and — the part
+    // that made the old unconditional check actively wrong — it is restored
+    // CORRECTLY anyway: syncIndexQuantities rewrites EVERY entry matching the
+    // id, so all of its copies land on the same `q`. Reddening on it failed a
+    // run for damage that did not happen and that the run did not cause.
+    if (duplicated.has(id) && !duplicatedBefore.has(id)) {
+      return [`${id}: newly appears in MORE THAN ONE card_index entry — coherence for it cannot be decided`];
     }
     const docQ = after.quantities[id];
     const idxQ = after.indexQuantities[id];

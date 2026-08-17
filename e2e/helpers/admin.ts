@@ -29,7 +29,7 @@
  */
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 /** The ONLY project this module is allowed to write to. */
 const DEV_PROJECT_ID = 'cranial-trading-dev';
@@ -46,6 +46,19 @@ export type AccountSnapshot = {
    * every time — the same unbounded accumulation in a different field.
    */
   quantities: Record<string, number>;
+  /**
+   * id -> the card's `name` / `scryfallId` fields. Present so a caller can
+   * bound a teardown to THE PRINT IT ADDED instead of to the whole account.
+   * TASK-240 round 4, HIGH-1: restoreQuantities' document half used to run over
+   * every id in the snapshot, and "it only writes ids whose quantity changed"
+   * is not a safety property — it assumes a single writer, which this project
+   * does not have (a nightly run and a push-to-develop run share this account).
+   * Measured 2026-08-17 by the reviewer: a third party bumped an untouched card
+   * to 8 after `before` was taken and the teardown reverted it to 1, index
+   * entry included. Scoping needs an identity, so the snapshot carries one.
+   */
+  names: Record<string, string>;
+  scryfallIds: Record<string, string>;
   /** Ids referenced by card_index entries (the `i` field of each entry). */
   indexEntryIds: string[];
   /**
@@ -76,6 +89,15 @@ export type TestAdmin = {
   uid: string;
   db: Firestore;
   snapshot(): Promise<AccountSnapshot>;
+  /**
+   * id -> quantity for every card document, and NOTHING else. The cheap half
+   * of snapshot(): no card_index chunks. Exposed because callers that poll
+   * (TASK-240 round 4, MEDIUM-2) were paying a whole-account chunk read every
+   * 2s for data they never looked at — on the CI account (41k+ cards, ~30
+   * chunks) that is multi-megabyte per iteration, up to 15 iterations, inside
+   * a 90s test.
+   */
+  docQuantities(): Promise<Record<string, number>>;
   /** Count of docs in an arbitrary user subcollection (decks, binders, …). */
   subcollectionIds(name: string): Promise<string[]>;
   /**
@@ -88,12 +110,26 @@ export type TestAdmin = {
    * Restores pre-existing docs' quantities to the given snapshot values —
    * BOTH the document and its card_index entry. Returns what it changed.
    *
-   * `indexScope` is the ONLY set of ids whose card_index entry this call may
-   * rewrite (plus any id whose document it restores itself — see the
-   * implementation). It is required, not optional, precisely so a caller
-   * cannot get an account-wide index rewrite by passing only `expected`.
+   * `expected` says WHAT the values should be. `scope` says WHICH ids this
+   * call is allowed to write, and there is no id outside it that this call can
+   * touch on either side:
+   *  - `docScope` — the only documents whose `quantity` may be rewritten.
+   *  - `indexScope` — the only card_index entries whose `q` may be rewritten,
+   *    plus any id whose document this call restored itself (having written the
+   *    document, it owns the entry's agreement with it).
+   *
+   * Both are required and neither defaults to "everything", so a caller cannot
+   * obtain an account-wide rewrite by passing only `expected`. That is a
+   * COMPILE-TIME guard only, and a weak one here: tsconfig.json excludes `e2e`
+   * and `npm run type-check` is `vue-tsc` over `src`, so nothing in CI
+   * type-checks this call site. What actually holds the line is that both sets
+   * are consulted as allow-lists at runtime — an omitted or empty scope writes
+   * nothing, which fails safe.
    */
-  restoreQuantities(expected: Record<string, number>, indexScope: Iterable<string>): Promise<string[]>;
+  restoreQuantities(
+    expected: Record<string, number>,
+    scope: { docScope: Iterable<string>; indexScope: Iterable<string> },
+  ): Promise<string[]>;
 };
 
 let cached: TestAdmin | null | undefined;
@@ -173,10 +209,18 @@ async function build(): Promise<TestAdmin | null> {
   };
 
   const snapshot = async (): Promise<AccountSnapshot> => {
-    const [quantities, indexSnap] = await Promise.all([
-      readDocQuantities(),
+    const [cardsSnap, indexSnap] = await Promise.all([
+      db.collection(`users/${uid}/cards`).select('quantity', 'name', 'scryfallId').get(),
       db.collection(`users/${uid}/card_index`).get(),
     ]);
+    const quantities: Record<string, number> = {};
+    const names: Record<string, string> = {};
+    const scryfallIds: Record<string, string> = {};
+    cardsSnap.docs.forEach((d) => {
+      quantities[d.id] = Number(d.get('quantity') ?? 0);
+      names[d.id] = String(d.get('name') ?? '');
+      scryfallIds[d.id] = String(d.get('scryfallId') ?? '');
+    });
     const cardDocIds = Object.keys(quantities);
     const indexEntryIds: string[] = [];
     const indexQuantities: Record<string, number> = {};
@@ -196,6 +240,8 @@ async function build(): Promise<TestAdmin | null> {
     return {
       cardDocIds,
       quantities,
+      names,
+      scryfallIds,
       indexEntryIds,
       indexQuantities,
       duplicateIndexEntryIds: [...duplicates],
@@ -274,54 +320,88 @@ async function build(): Promise<TestAdmin | null> {
    * re-checked in the same loop even though `updateCard` writes it
    * undebounced: it costs nothing, and it is read from the same read.
    *
-   * WHY THE TWO HALVES HAVE DIFFERENT SCOPES, and why the index half is the
-   * narrow one. The document half is deliberately global over `expected`: it
-   * only writes an id whose CURRENT quantity differs from the value that same
-   * id had in the snapshot, so an untouched card can never match, and keeping
-   * it global is what catches a merge that landed after the caller stopped
-   * polling — narrowing it would turn a repairable +1 into a red test that
-   * ALSO leaves the +1 behind. The index half has no such self-limit: it
-   * compares an entry against a DOCUMENT, and doc/entry disagreement is a
-   * pre-existing condition in this project (TASK-208/234, and TASK-238's
-   * deliberate fixtures). Left global it rewrote innocent third parties —
-   * measured 2026-08-17. So it is restricted to `indexScope` (the ids the run
-   * actually touched) plus any id whose document THIS call just restored,
-   * which is the complete set of cards whose entry this teardown can be
-   * responsible for.
+   * WHY BOTH HALVES ARE SCOPED, AND WHY THE SCOPES DIFFER (TASK-240 round 4,
+   * HIGH-1). The document half used to run over every id in `expected`, i.e.
+   * the whole account, defended by "it only writes an id whose CURRENT quantity
+   * differs from the snapshot, so an untouched card can never match". That
+   * defence is false as written. The real predicate is "a card whose quantity
+   * did not CHANGE", and it only implies "untouched" under a single-writer
+   * assumption this project does not have: CLAUDE.md schedules a nightly run
+   * against the same dev account that a push-to-develop run can overlap.
+   * MEASURED by the reviewer on 2026-08-17 — a third party set an untouched
+   * card to 8 after `before` was taken, and this function put it back to 1,
+   * document AND card_index entry, silently. So `docScope` is now an allow-list
+   * too, and the caller is expected to fill it with the ids that could
+   * plausibly be the run's own doing (for the 'add card' spec: the rows of the
+   * exact print it added — see that spec).
    *
-   * COST, and why it matters (TASK-240 round 3, MEDIUM-3). A pass used to take
-   * a full snapshot(): every card document AND every card_index chunk. On the
-   * CI account (41k+ cards) the chunk read is multi-megabyte and was being
-   * paid on every pass even when no index write was possible. A timeout here
-   * lands MID-TEARDOWN and leaks the document, which is the defect this whole
-   * ticket exists to stop, so the loop now (a) reads documents only, leaving
-   * the chunk read to syncIndexQuantities, which skips it entirely when
-   * `wanted` is empty, and (b) requires only ONE clean pass when nothing is in
-   * the index allow-list — i.e. when no merge happened, the common case. There
-   * is nothing debounced to wait out on that path: the only writer that lands
-   * late is the card_index persist, and it can only matter for a card whose
-   * quantity changed.
+   * The two scopes still differ, and the index one is the narrower. The
+   * document half compares a document against a value the CALLER recorded from
+   * that same document, so restricting it to the run's own print is enough. The
+   * index half compares an entry against a DOCUMENT, and doc/entry disagreement
+   * is a pre-existing condition here (TASK-208/234, plus TASK-238's deliberate
+   * fixtures) — on an account with 25+ rows for the card the spec adds, "same
+   * print" would still be wide enough to "repair" a fixture. It therefore stays
+   * at the ids the run OBSERVED changing, plus any id whose document this call
+   * restored itself: having written the document, this call owns the entry's
+   * agreement with it. Note that this is the path by which the document half
+   * feeds the index half — which is exactly why the document half could not
+   * stay global.
+   *
+   * COST (round 3). A pass used to take a full snapshot(): every card document
+   * AND every card_index chunk, multi-megabyte on the CI account, paid even
+   * when no index write was possible. A timeout here lands MID-TEARDOWN and
+   * leaks the document, so the loop reads documents only and leaves the chunk
+   * read to syncIndexQuantities, which skips it entirely when `wanted` is empty.
+   *
+   * GRACE PERIOD, and the round-3 contradiction it resolves (round 4,
+   * MEDIUM-1). Round 3 also made the loop demand only ONE clean pass when the
+   * index allow-list was empty — which is the `created=[] && bumped=[]` path,
+   * the very case the spec flags with "no new card document and no quantity
+   * change appeared within 30s". On that path the loop returned after a single
+   * read with no sleep, so a write landing a second later was a permanent leak
+   * nothing would see. That directly contradicted the reason given for keeping
+   * the document half global ("catch a merge that landed after the caller
+   * stopped polling"): the same change removed the window in which such a merge
+   * could be caught. Resolved in the one direction that is coherent — the
+   * window is real and it is kept: whenever ANYTHING is in scope on either
+   * side, there is a late write this call could still catch, so it requires two
+   * consecutive clean passes with a sleep between them. One pass is used only
+   * when both scopes are empty, where by construction this function may write
+   * nothing at all and waiting could not change any outcome. The saving from
+   * round 3 is kept where it was actually earned: the extra pass is now a
+   * documents-only read, not a whole-account snapshot.
    */
   const restoreQuantities = async (
     expected: Record<string, number>,
-    indexScope: Iterable<string>,
+    scope: { docScope: Iterable<string>; indexScope: Iterable<string> },
   ): Promise<string[]> => {
     const restored: string[] = [];
+    const allowDoc = new Set(scope.docScope);
     // Grows as the loop restores documents: an id we ourselves wrote is an id
     // whose entry we are now accountable for, even if the caller didn't name it.
-    const allowIndex = new Set(indexScope);
+    // It can only grow with ids from `allowDoc`, so the caller's document scope
+    // bounds BOTH halves.
+    const allowIndex = new Set(scope.indexScope);
+    // Fixed before the loop on purpose: `allowIndex` can only grow via a
+    // document write, which requires a non-empty `allowDoc`, so the two-pass
+    // requirement can never be missed by evaluating this early.
+    const needed = allowDoc.size > 0 || allowIndex.size > 0 ? 2 : 1;
     let consecutiveClean = 0;
     let passes = 0;
-    for (;;) {
-      const needed = allowIndex.size > 0 ? 2 : 1;
-      if (consecutiveClean >= needed || passes >= 8) break;
+    while (consecutiveClean < needed && passes < 8) {
       const current = await readDocQuantities();
       const wanted = new Map<string, number>();
       const docChanges: string[] = [];
-      for (const [id, q] of Object.entries(expected)) {
-        if (!(id in current)) continue;
+      for (const id of allowDoc) {
+        if (!(id in expected) || !(id in current)) continue;
+        const q = expected[id];
         if (current[id] !== q) {
-          await db.doc(`users/${uid}/cards/${id}`).update({ quantity: q });
+          // `updatedAt` alongside `quantity` because every write the app makes
+          // pairs them (src/stores/collection.ts updateCard/batchUpdateCards);
+          // a teardown that moves a quantity without moving the timestamp
+          // leaves a document the app itself could never have produced.
+          await db.doc(`users/${uid}/cards/${id}`).update({ quantity: q, updatedAt: Timestamp.now() });
           docChanges.push(`${id}:${current[id]}->${q}`);
           allowIndex.add(id);
         }
@@ -334,11 +414,21 @@ async function build(): Promise<TestAdmin | null> {
         // whole-account chunk read.
         if (allowIndex.has(id)) wanted.set(id, q);
       }
+      // Ids the caller put in `indexScope` but NOT in `docScope`: their entry is
+      // this call's business even though their document is not. Synced to the
+      // document's CURRENT value, deliberately not to `expected[id]` — this call
+      // is not going to restore that document, so writing the snapshot value
+      // into the entry would MANUFACTURE the doc/index divergence the whole
+      // exercise is about.
+      for (const id of allowIndex) {
+        if (wanted.has(id) || !(id in current)) continue;
+        wanted.set(id, current[id]);
+      }
       const idxChanges = await syncIndexQuantities(wanted);
       restored.push(...docChanges, ...idxChanges);
       passes++;
       consecutiveClean = docChanges.length + idxChanges.length === 0 ? consecutiveClean + 1 : 0;
-      if (consecutiveClean < (allowIndex.size > 0 ? 2 : 1)) await new Promise((r) => setTimeout(r, 4000));
+      if (consecutiveClean < needed) await new Promise((r) => setTimeout(r, 4000));
     }
     return restored;
   };
@@ -405,5 +495,5 @@ async function build(): Promise<TestAdmin | null> {
     return { docsDeleted, indexEntriesRemoved, passes };
   };
 
-  return { uid, db, snapshot, subcollectionIds, deleteCards, restoreQuantities };
+  return { uid, db, snapshot, docQuantities: readDocQuantities, subcollectionIds, deleteCards, restoreQuantities };
 }

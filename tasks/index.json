@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T02:01:19.221Z",
+  "generated_at": "2026-08-17T03:25:50.126Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1312,7 +1312,7 @@
     {
       "key": "TASK-239",
       "title": "Los call sites DIRECTOS de applyCardIndexDelta no pasan por la cola y siguen perdiendo el delta si el contexto muere mid-RTT (misma familia que TASK-237)",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "high"
     }
   ]

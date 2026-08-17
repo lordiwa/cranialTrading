@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T04:14:38.959Z",
+  "generated_at": "2026-08-17T04:56:44.184Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1318,7 +1318,7 @@
     {
       "key": "TASK-240",
       "title": "El cleanup del test E2E \"add card\" no borra nada y su fallo es invisible: cada corrida deja un documento sin entrada de card_index, acumulandose sin techo en la cuenta compartida",
-      "status": "in_progress",
+      "status": "in_review",
       "priority": "high"
     }
   ]

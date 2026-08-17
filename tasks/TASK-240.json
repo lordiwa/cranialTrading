@@ -10,7 +10,7 @@
     "AC5: BARRER LO YA ACUMULADO — pero solo lo de ESTE defecto. Borrar los documentos huerfanos que este mecanismo dejo (hoy: tres Lightning Bolt de Marvel Super Heroes Commander, ids VIaujcMtjQw1RDOoL33e, gBOsQM3djwYi2nK7JcC9, 24CyD7f3iMSbaiQIH5PF) y verificar por lectura que docs y entradas vuelven a coincidir. NO TOCAR el resto del estado sucio de esa cuenta: los 3 DIVERGENTES (Angel's Herald, Vectis Gloves, Skyblade's Boon) y el FANTASMA (Digsite Conservator, 1VW9ESktlPC1XxnuIYTE) estan puestos A PROPOSITO como casos de prueba vivos de TASK-238 y borrarlos destruye la unica reproduccion falsable que existe.",
     "AC6: REVISAR LOS OTROS CLEANUPS DE LA MISMA FORMA antes de dar esto por cerrado. Este patron (mutador con cleanup best-effort envuelto en try/catch mudo) no es exclusivo de 'add card': CLAUDE.md documenta el mismo arreglo en deck-crud.spec.ts 'create new deck' y binders.spec.ts 'create new binder'. Verificar POR MEDICION — no por lectura — si sus cleanups efectivamente borran, con el mismo metodo de snapshot antes/despues y control negativo. Si alguno tampoco borra, decirlo; arreglarlo puede ser este ticket o uno propio, pero no puede quedar sin medir."
   ],
-  "status": "in_progress",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "e2e",
@@ -31,7 +31,7 @@
     }
   ],
   "created_at": "2026-08-17T03:58:49.221Z",
-  "updated_at": "2026-08-17T04:14:38.959Z",
+  "updated_at": "2026-08-17T04:56:44.184Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]"

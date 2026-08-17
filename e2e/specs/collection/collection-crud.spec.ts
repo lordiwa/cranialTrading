@@ -1,5 +1,6 @@
 import { test, expect } from '../../fixtures/test';
 import { adminUnavailableReason, getTestAdmin } from '../../helpers/admin';
+import { findIncoherent } from '../../helpers/coherence';
 import { SEARCH_TERMS } from '../../helpers/test-data';
 
 // TASK-146: deliberately obscure, not SEARCH_TERMS.common ("Lightning Bolt")
@@ -147,7 +148,15 @@ test.describe('Collection CRUD', () => {
     }
 
     const deleted = await admin.deleteCards(created);
-    const restored = await admin.restoreQuantities(before.quantities);
+    // `bumped` — and ONLY `bumped` — is what this teardown may rewrite in
+    // card_index. Passing the whole account (which is what `expected` is) let
+    // the previous round rewrite the entry of any card whose entry already
+    // disagreed with its document, i.e. exactly TASK-238's fixtures and
+    // TASK-208/234's natural drift. Measured on 2026-08-17: an untouched
+    // bystander at doc=1 with a seeded entry at q=8 came back rewritten to 1.
+    // `created` is deliberately absent: those documents are gone by now, and
+    // their entries are deleteCards' business, not this call's.
+    const restored = await admin.restoreQuantities(before.quantities, bumped);
     // eslint-disable-next-line no-console
     console.log(`[cleanup][add card] created=[${created.join(', ')}] docsDeleted=${deleted.docsDeleted} indexEntriesRemoved=${deleted.indexEntriesRemoved} passes=${deleted.passes} quantitiesRestored=[${restored.join(', ')}]`);
 
@@ -190,26 +199,26 @@ test.describe('Collection CRUD', () => {
     //    restoreQuantities already fixed. Measured 2026-08-17: with teardown
     //    writing only the document, a merge run finished GREEN and left
     //    doc.q=1 / idx.q=2 on a real card, permanently.
-    //    Scoped to `created ∪ bumped` on purpose. It is immune to the app's
-    //    own index rebuilds (see the note below) because it never looks at a
-    //    card this run did not touch.
+    //    Scoped to `created ∪ bumped` on purpose, and to keep the branches
+    //    honest the predicate itself lives in helpers/coherence.ts, where
+    //    tests/unit/e2e/coherence.test.ts covers every one of them — including
+    //    the merge branch, which only fires here on a run that really merged.
+    //
+    //    ON REBUILDS, precisely. Scoping makes it immune to the app rebuilding
+    //    OTHER cards' entries, and a completed rebuild of a touched card is
+    //    also fine: a rebuild derives `q` from the document, so it lands on
+    //    idx==doc, which SATISFIES this lock. What is NOT immune is a snapshot
+    //    taken mid-rebuild: buildCardIndex writes chunks with plain,
+    //    untransacted .set()s, one chunk at a time (functions/index.js), so on
+    //    a MULTI-CHUNK account a read between two of those writes can see a
+    //    touched card's entry missing and trip the "entry vanished" branch. No
+    //    tolerance is added for it: this account is one chunk today (measured
+    //    2026-08-17), a tolerance would blunt the very branch that catches a
+    //    teardown-manufactured invisible card, and the honest fix is the
+    //    already-known bug that the app rebuilds the whole index on every page
+    //    load. If this ever reds on the CI account, that is the first suspect.
     const touched = [...new Set([...created, ...bumped])];
-    const incoherent = touched.flatMap((id) => {
-      const docQ = after.quantities[id];
-      const idxQ = after.indexQuantities[id];
-      if (docQ === undefined) {
-        // Document gone (the `created` path, post-delete): no entry may remain.
-        return idxQ === undefined ? [] : [`${id}: document deleted but card_index entry survives with q=${idxQ}`];
-      }
-      if (idxQ === undefined) {
-        // No entry and none before either => TASK-234, not ours. One that
-        // existed before and is gone now => we made an invisible card.
-        return before.indexQuantities[id] === undefined
-          ? []
-          : [`${id}: card_index entry vanished (was q=${before.indexQuantities[id]}) while the document survives with quantity=${docQ}`];
-      }
-      return idxQ === docQ ? [] : [`${id}: doc.quantity=${docQ} but card_index q=${idxQ}`];
-    });
+    const incoherent = findIncoherent(touched, before, after);
     expect(
       incoherent,
       `[cleanup][add card] DIVERGENCE: document and card_index disagree for cards this run touched: [${incoherent.join('; ')}]`,
@@ -225,7 +234,7 @@ test.describe('Collection CRUD', () => {
     // which is how tests get quarantined and stop meaning anything. Lock 2
     // covers what the cleanup is actually accountable for: its OWN entries.
     // eslint-disable-next-line no-console
-    console.log(`[cleanup][add card] card_index entries ${before.indexEntryCount} -> ${after.indexEntryCount} (informational; see the comment above)`);
+    console.log(`[cleanup][add card] card_index entries ${before.indexEntryCount} -> ${after.indexEntryCount} (informational; see the comment above) duplicateIndexEntryIds=[${after.duplicateIndexEntryIds.join(', ')}]`);
   });
 
   // TASK-146 AC2 — SCOPE NARROWED, criterion not honestly met today; tracked
@@ -520,5 +529,118 @@ test.describe('Collection CRUD', () => {
     await commonPage.cancelAction();
 
     expect(await collectionPage.totalCardCount()).toBe(totalBefore);
+  });
+});
+
+// TASK-240 round 3, MEDIUM-2 — the merge branch, exercised deterministically.
+//
+// THE PROBLEM THIS SOLVES. 'add card' above only reaches the merge path when
+// the account already holds a row for the exact print AddCardModal picked
+// (scryfallId+edition+condition+foil+status). It adds Lightning Bolt, this
+// account holds none, and the teardown now returns it to none on every run —
+// so `bumped` is empty every time. Measured over the round-2 and round-3 runs:
+// always `bumped=[]`. Lock 4's quantity-divergence branch — the one AC4 is
+// really about, and the one that caught a real regression last round — was
+// therefore latent: present, never executed in CI.
+//
+// WHY NOT JUST MAKE THE UI MERGE. Two adds in one test would merge only if the
+// first card reached `card_index` between them: AddCardModal's merge check runs
+// against `collectionStore.cards`, which is built FROM the index, and a
+// just-added card frequently never gets there (TASK-234). So the "deterministic"
+// version would be nondeterministic in the opposite direction, silently falling
+// back to creating a second document — and it would add a second full add-card
+// UI round trip to a test whose worst path is already close to its timeout
+// (MEDIUM-3). Seeding a matching row up front has the same dependency, on the
+// same broken subsystem.
+//
+// WHAT THIS DOES INSTEAD. Puts the account into the exact post-merge state
+// (document and entry both at N+1) out of band, runs the real teardown against
+// real Firestore, and asserts both halves came back — with the same predicate
+// the E2E lock uses. No UI, no page load, no dependency on TASK-234. The
+// predicate's own branches are covered separately and offline by
+// tests/unit/e2e/coherence.test.ts; this is the part that needs a real
+// database: the retry loop, the transaction, and the debounce window.
+test.describe('Collection CRUD — teardown contract (TASK-240)', () => {
+  test.setTimeout(90_000);
+
+  test('teardown restores a merged add on BOTH sides (doc and card_index)', async () => {
+    const admin = await getTestAdmin();
+    test.skip(admin === null, `TASK-240: no admin teardown available — ${adminUnavailableReason()}`);
+    if (!admin) return;
+
+    const before = await admin.snapshot();
+
+    // A card that is currently COHERENT and not duplicated. Coherence is the
+    // selection criterion on purpose: a divergent card may be one of TASK-238's
+    // deliberate fixtures, and this test must not borrow one of those. Sorted
+    // so the choice is reproducible across runs rather than "whatever came back
+    // first".
+    const target = before.cardDocIds
+      .filter((id) => before.indexQuantities[id] !== undefined
+        && before.indexQuantities[id] === before.quantities[id]
+        && !before.duplicateIndexEntryIds.includes(id))
+      .sort()[0];
+    test.skip(target === undefined, 'TASK-240: no coherent card available to borrow for the merge fixture');
+    if (target === undefined) return;
+
+    const originalQ = before.quantities[target];
+    const mergedQ = originalQ + 1;
+
+    // Deliberately NOT admin.restoreQuantities: this is the seeder AND the
+    // repair path, and both have to work while the thing under test is broken.
+    // Found by mutation, not by reasoning — the first version of this test
+    // repaired with restoreQuantities, so the run that proved the lock reddens
+    // also left the borrowed card at doc=1 / card_index q=2 and it had to be
+    // fixed by hand. A cleanup that only works when the code is already correct
+    // is not a cleanup.
+    const writeIndexQuantity = async (q: number) => {
+      const chunks = await admin.db.collection(`users/${admin.uid}/card_index`).get();
+      for (const chunk of chunks.docs) {
+        const entries = chunk.data().cards;
+        if (!Array.isArray(entries) || !entries.some((e: { i?: string }) => String(e?.i) === target)) continue;
+        await chunk.ref.update({
+          cards: entries.map((e: { i?: string }) => (String(e?.i) === target ? { ...e, q } : e)),
+        });
+      }
+    };
+
+    try {
+      // The post-merge state, as the app leaves it: updateCard bumps the
+      // document, and the card_index persist eventually carries the same value.
+      await admin.db.doc(`users/${admin.uid}/cards/${target}`).update({ quantity: mergedQ });
+      await writeIndexQuantity(mergedQ);
+
+      const seeded = await admin.snapshot();
+      expect(
+        [seeded.quantities[target], seeded.indexQuantities[target]],
+        `[teardown contract] the merge fixture did not take on ${target}`,
+      ).toEqual([mergedQ, mergedQ]);
+
+      // The real teardown call, with the real scope the spec passes.
+      const restored = await admin.restoreQuantities(before.quantities, [target]);
+      // eslint-disable-next-line no-console
+      console.log(`[teardown contract] target=${target} ${originalQ}->${mergedQ} restored=[${restored.join(', ')}]`);
+
+      const after = await admin.snapshot();
+      // Same predicate as lock 4 in 'add card', now on its merge branch: the
+      // document SURVIVES and its entry has to agree with it.
+      expect(
+        findIncoherent([target], before, after),
+        '[teardown contract] doc and card_index disagree after restoring a merged add',
+      ).toEqual([]);
+      expect(after.quantities[target], '[teardown contract] document quantity not restored').toBe(originalQ);
+      expect(after.indexQuantities[target], '[teardown contract] card_index quantity not restored').toBe(originalQ);
+    } finally {
+      // Unconditional: an assertion failure above must not leave the borrowed
+      // card at N+1. Writes only when something is actually off, so a clean run
+      // is a no-op.
+      const now = await admin.snapshot();
+      if (now.quantities[target] !== originalQ) {
+        await admin.db.doc(`users/${admin.uid}/cards/${target}`).update({ quantity: originalQ });
+      }
+      if (now.indexQuantities[target] !== undefined && now.indexQuantities[target] !== originalQ) {
+        await writeIndexQuantity(originalQ);
+      }
+    }
   });
 });

@@ -1308,7 +1308,15 @@ exports.applyCardIndexDelta = onCall(
 
     const byChunk = new Map(); // chunkNumber -> [{ cardId, action, data, allowInsert }]
     const deleteFallbackIds = [];
+    const updateFallbackIds = [];
     const skippedIds = [];
+    // URGENT PROD FIX (2026-08-18): cardId -> { action, data, allowInsert }
+    // for every mutation whose own document was readable, regardless of
+    // whether its chunkId resolved a usable chunk. scanAndAssign (below)
+    // needs this to re-attach the RIGHT action/data when it locates an
+    // entry by scanning — before this fix it hard-coded 'delete', which is
+    // why it could only ever be used for the delete fallback.
+    const idToEntry = new Map();
 
     cardSnaps.forEach((snap, i) => {
       const cardId = cardIds[i];
@@ -1320,11 +1328,14 @@ exports.applyCardIndexDelta = onCall(
           return;
         }
         const data = snap.data();
+        idToEntry.set(cardId, { action, data, allowInsert });
         if (typeof data.chunkId !== "number") {
-          // TASK-230: no sticky chunkId on this doc yet. Never fabricate a
-          // location for it — skip and leave the index entry stale until
-          // the next buildCardIndex rebuild.
-          skippedIds.push(cardId);
+          // TASK-230: no sticky chunkId on this doc yet. Used to skip
+          // outright here — now resolved the same way a missing-chunkId
+          // DELETE already was: a full-index fallback scan instead of
+          // leaving the index permanently stale (URGENT PROD FIX, see
+          // updateFallbackIds below).
+          updateFallbackIds.push(cardId);
           return;
         }
         if (!byChunk.has(data.chunkId)) byChunk.set(data.chunkId, []);
@@ -1335,11 +1346,14 @@ exports.applyCardIndexDelta = onCall(
       // action === 'delete'
       if (snap.exists) {
         const data = snap.data();
+        idToEntry.set(cardId, { action, data, allowInsert: false });
         if (typeof data.chunkId === "number") {
           if (!byChunk.has(data.chunkId)) byChunk.set(data.chunkId, []);
           byChunk.get(data.chunkId).push({ cardId, action, data, allowInsert: false });
           return;
         }
+      } else {
+        idToEntry.set(cardId, { action, data: null, allowInsert: false });
       }
       // Doc gone, or doc exists with no chunkId — resolve by scanning
       // instead of skipping (TASK-232 gap #2: skipping here is exactly how
@@ -1362,6 +1376,13 @@ exports.applyCardIndexDelta = onCall(
     // there's nothing to do) gets left behind silently. scanAndAssign runs
     // the same full-index fallback search used for missing/unreadable
     // chunkId, reused for this escalation too.
+    // URGENT PROD FIX (2026-08-18): scanAndAssign used to hard-code
+    // `action: "delete"` for every id it located, which is why it could
+    // only ever serve the delete fallback — an UPDATE whose chunkId was
+    // stale or missing had no equivalent path and went straight to
+    // skippedIds (see updateFallbackIds/notFoundUpdateIds below). It now
+    // looks up each id's real action/data/allowInsert from idToEntry so the
+    // SAME full-index scan serves both mutation kinds.
     let fallbackUsed = 0;
     const scanAndAssign = async (ids, reason) => {
       if (ids.length === 0) return new Set();
@@ -1376,23 +1397,33 @@ exports.applyCardIndexDelta = onCall(
         const cardsArr = Array.isArray(data.cards) ? data.cards : [];
         for (const c of cardsArr) {
           if (wantedIds.has(c.i)) {
-            if (!byChunk.has(chunkNum)) byChunk.set(chunkNum, []);
-            byChunk.get(chunkNum).push({ cardId: c.i, action: "delete", data: null, allowInsert: false });
+            const entry = idToEntry.get(c.i);
+            if (entry) {
+              if (!byChunk.has(chunkNum)) byChunk.set(chunkNum, []);
+              byChunk.get(chunkNum).push({ cardId: c.i, action: entry.action, data: entry.data, allowInsert: entry.allowInsert });
+            }
             wantedIds.delete(c.i);
           }
         }
       }
       // Anything still in wantedIds genuinely has no entry anywhere in the
-      // index — already consistent (not a phantom), nothing to do. Not
-      // added to skippedIds: skipped means "could not act", this means
-      // "nothing to act on".
+      // index. For a delete this means already consistent (not a phantom),
+      // nothing to do — not added to skippedIds: skipped means "could not
+      // act", this means "nothing to act on". For an update the caller
+      // (below) still needs to know, since a real document exists with no
+      // index entry at all to patch — that IS unresolved and must be
+      // reported, not silently dropped.
       logger.info(
-        `[applyCardIndexDelta] Fallback scan for user ${userId} (${reason}): ${ids.length} delete(s) — ${ids.length - wantedIds.size} located and removed, ${wantedIds.size} already absent.`
+        `[applyCardIndexDelta] Fallback scan for user ${userId} (${reason}): ${ids.length} mutation(s) — ${ids.length - wantedIds.size} located, ${wantedIds.size} not found anywhere in the index.`
       );
       return wantedIds;
     };
 
-    await scanAndAssign(deleteFallbackIds, "missing doc or chunkId");
+    const initialStillMissing = await scanAndAssign([...deleteFallbackIds, ...updateFallbackIds], "missing doc or chunkId");
+    for (const id of initialStillMissing) {
+      const entry = idToEntry.get(id);
+      if (entry && entry.action === "update") skippedIds.push(id);
+    }
 
     // Patch each affected chunk inside its own transaction (see concurrency
     // note above). Chunks are independent — safe to run concurrently.
@@ -1476,11 +1507,19 @@ exports.applyCardIndexDelta = onCall(
     // fallback scan above already resolved into byChunk.
     const round1 = await applyChunkTransactions(byChunk);
     let appliedCount = round1.appliedCount;
-    skippedIds.push(...round1.notFoundUpdateIds);
 
-    // Round 2: deletes whose believed chunk didn't have them — escalate to
-    // a fresh fallback scan + a second (disjoint-chunk) transaction round.
-    if (round1.notFoundDeleteIds.length > 0) {
+    // Round 2: mutations whose believed chunk didn't actually have them —
+    // escalate to a fresh fallback scan + a second (disjoint-chunk)
+    // transaction round. URGENT PROD FIX (2026-08-18): this used to be
+    // delete-only (round1.notFoundDeleteIds) with round1.notFoundUpdateIds
+    // pushed straight to skippedIds a few lines above, no scan attempted —
+    // exactly the mechanism behind the live prod bug (status-change updates
+    // silently no-op'd, HTTP 200, applied:0, skipped:1). The card's own
+    // chunkId can be stale for the SAME reason on either action (TASK-230
+    // LOW-2 / TASK-232 HIGH-1: append-order chunkId vs rank-order
+    // rebuild/backfill), so both need the same escalation.
+    const staleIds = [...round1.notFoundUpdateIds, ...round1.notFoundDeleteIds];
+    if (staleIds.length > 0) {
       // Snapshot each chunk's entry-array LENGTH before the scan appends
       // anything — scanAndAssign mutates the SHARED `byChunk` map (used by
       // round 1 too), and the wrong chunk round 1 already tried still has
@@ -1491,7 +1530,7 @@ exports.applyCardIndexDelta = onCall(
       // length isolates exactly what THIS scan just appended.
       const preScanLengths = new Map([...byChunk.entries()].map(([k, v]) => [k, v.length]));
       const round2Chunk = new Map();
-      await scanAndAssign(round1.notFoundDeleteIds, "chunkId pointed at the wrong chunk");
+      const stillMissing = await scanAndAssign([...round1.notFoundUpdateIds, ...round1.notFoundDeleteIds], "chunkId pointed at the wrong chunk");
       for (const [chunkNum, entries] of byChunk) {
         const newlyAdded = entries.slice(preScanLengths.get(chunkNum) ?? 0);
         if (newlyAdded.length > 0) round2Chunk.set(chunkNum, newlyAdded);
@@ -1499,9 +1538,19 @@ exports.applyCardIndexDelta = onCall(
       if (round2Chunk.size > 0) {
         const round2 = await applyChunkTransactions(round2Chunk);
         appliedCount += round2.appliedCount;
+        // Round 2 itself is not re-escalated to a Round 3 — same accepted
+        // design limit as before this fix — but any of ITS own not-founds
+        // must still be reported, not silently dropped.
+        skippedIds.push(...round2.notFoundUpdateIds);
       }
-      // Anything the scan still could not locate genuinely has no entry
-      // anywhere in the index — consistent, not a phantom, not a skip.
+      // Anything the scan still could not locate anywhere in the index:
+      // for a delete that's already consistent (not a phantom, not a
+      // skip). For an update it means a real document exists with no index
+      // entry to patch at all — genuinely unresolved, must be reported.
+      for (const id of stillMissing) {
+        const entry = idToEntry.get(id);
+        if (entry && entry.action === "update") skippedIds.push(id);
+      }
     }
 
     const uniqueSkipped = [...new Set(skippedIds)];

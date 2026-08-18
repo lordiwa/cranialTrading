@@ -1320,10 +1320,25 @@ export const useCollectionStore = defineStore('collection', () => {
         void (async () => {
             try {
                 const chunks = chunkArray(batch, 500)
+                // URGENT PROD FIX (2026-08-18): applyCardIndexDelta can
+                // resolve normally (no throw, HTTP 200) while reporting
+                // `skipped > 0` — MEASURED live in prod, a single-card
+                // status change returned { applied: 0, skipped: 1 }. Before
+                // this fix that response was discarded entirely: the
+                // document write had already succeeded, the caller had
+                // already returned true, and nothing ever told the user the
+                // grid was left showing the old status. A toast here is
+                // best-effort visibility (this flush runs seconds after the
+                // triggering updateCard call already returned) — it cannot
+                // turn updateCard's own return value false in hindsight,
+                // but it stops the failure from being completely silent.
+                let anySkipped = false
                 for (const chunk of chunks) {
                     // eslint-disable-next-line no-await-in-loop
-                    await applyCardIndexDelta(chunk)
+                    const response = await applyCardIndexDelta(chunk)
+                    if (response.skipped > 0) anySkipped = true
                 }
+                if (anySkipped) toastStore.show(t('collection.messages.indexSyncSkipped'), 'info')
             } catch (err) {
                 // TASK-232: the card documents themselves are already correct —
                 // updateCard already succeeded before queuing this. A failed
@@ -1797,6 +1812,13 @@ export const useCollectionStore = defineStore('collection', () => {
             // "updated" bookkeeping below.
             const ghostCardIds = new Set<string>()
 
+            // URGENT PROD FIX (2026-08-18): applyCardIndexDelta below can
+            // resolve with skipped > 0 (index entry not patched) without
+            // throwing — same silent-success shape measured in prod for the
+            // single-card path. Tracked here so the user gets ONE toast at
+            // the end of the bulk op instead of nothing.
+            let indexSyncSkippedCount = 0
+
             for (const chunk of chunks) {
                 const batch = writeBatch(db)
                 for (const cardId of chunk) {
@@ -1836,7 +1858,8 @@ export const useCollectionStore = defineStore('collection', () => {
                 const chunkSurvivors = chunkGhosts ? chunk.filter(id => !chunkGhosts.has(id)) : chunk
                 if (chunkSurvivors.length > 0) {
                     try {
-                        await applyCardIndexDelta(chunkSurvivors.map(cardId => ({ cardId, action: 'update' as const })))
+                        const deltaResponse = await applyCardIndexDelta(chunkSurvivors.map(cardId => ({ cardId, action: 'update' as const })))
+                        indexSyncSkippedCount += deltaResponse.skipped
                     } catch (deltaError: unknown) {
                         // TASK-232 dev finding, 2026-08-13: outcome unknown on
                         // failure, not "left stale" — see _runServerDeltaFlush's
@@ -1948,6 +1971,14 @@ export const useCollectionStore = defineStore('collection', () => {
                 batchSyncCardsToPublic(cardsToSync, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl, progressCb)
                     .catch((err: unknown) => { logSanitizedError('[PublicSync] Batch sync failed (non-fatal)', err) })
             }
+
+            // URGENT PROD FIX (2026-08-18): see indexSyncSkippedCount above —
+            // the Firestore documents are correct at this point (that's what
+            // "return true" below means), but if the server reported any
+            // card_index entries as skipped the grid can still show the old
+            // state until a later mutation or rebuild corrects it. One toast
+            // for the whole bulk op, not one per skipped card.
+            if (indexSyncSkippedCount > 0) toastStore.show(t('collection.messages.indexSyncSkipped'), 'info')
 
             return true
         } catch (error) {

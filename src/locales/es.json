@@ -683,6 +683,7 @@
       "loadError": "Error al cargar colección",
       "addError": "Error al agregar carta",
       "updateError": "Error al actualizar carta",
+      "indexSyncSkipped": "Se guardó el estado, pero la grilla puede tardar en reflejarlo",
       "deleteError": "Error al eliminar carta",
       "allDeleted": "Todas las cartas fueron eliminadas",
       "deleteAllError": "Error al eliminar cartas",

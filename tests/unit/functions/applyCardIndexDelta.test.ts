@@ -140,6 +140,37 @@ describe('applyCardIndexDelta — server-side card_index chunk patching (TASK-23
     expect(applyCallSites.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('URGENT PROD FIX (2026-08-18, right-click and bulk status-change both broken): an UPDATE not found in its believed chunk is escalated to the fallback scan too — not silently added straight to skippedIds', () => {
+    // MEDIDO en produccion (v1.58.4): updateCard/batchUpdateCards resolve
+    // `true`, the Firestore document write lands correctly, and
+    // applyCardIndexDelta itself returns HTTP 200 — yet the card_index entry
+    // never changes and reverts on reload. Root cause traced by reading this
+    // exact function: chunkId is STICKY on each card doc (TASK-230) but the
+    // chunk a card's entry actually lives in can drift (append-order
+    // chunkId vs rank-order rebuild/backfill — TASK-230 LOW-2, TASK-232
+    // HIGH-1). HIGH-1's fix only escalated the DELETE case
+    // (notFoundDeletes -> round 2 scanAndAssign); the UPDATE case
+    // (notFoundUpdates) was left going straight into `skippedIds` right
+    // after round 1, with zero attempt to locate the entry elsewhere in the
+    // index — a silent, permanent, "200 OK" no-op for exactly the status-
+    // change path every user actually exercises (right-click one card,
+    // "select all" -> bulk status change).
+    //
+    // Before this fix: `skippedIds.push(...round1.notFoundUpdateIds)`
+    // appears immediately after round1 with NO scan escalation in between —
+    // this assertion is INVERTED on purpose (a `not.toMatch`) so it is RED
+    // while that unconditional push exists, and turns GREEN only once
+    // notFoundUpdateIds are folded into the same round-2 scan+re-apply the
+    // delete path already gets.
+    expect(source).not.toMatch(/skippedIds\.push\(\.\.\.round1\.notFoundUpdateIds\)/)
+
+    // Positive requirement: round1's notFoundUpdateIds must reach
+    // scanAndAssign (the same full-index fallback used for deletes) before
+    // anything is finally declared skipped.
+    expect(source).toMatch(/notFoundUpdateIds/)
+    expect(source).toMatch(/scanAndAssign\(\s*\[\s*\.\.\.round1\.notFoundUpdateIds\s*,\s*\.\.\.round1\.notFoundDeleteIds\s*\]/)
+  })
+
   it('TRIPWIRE, not a behavior test (TASK-232 OOM fix, review round MED-2): applyChunkTransactions still calls the bounded mapWithConcurrency helper, not a bare unbounded Promise.all', () => {
     // tests/unit/functions/concurrency.test.ts proves mapWithConcurrency
     // ITSELF bounds concurrency by EXECUTING it — real coverage. This test

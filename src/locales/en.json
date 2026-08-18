@@ -683,6 +683,7 @@
       "loadError": "Error loading collection",
       "addError": "Error adding card",
       "updateError": "Error updating card",
+      "indexSyncSkipped": "Status saved, but the grid may take a moment to update",
       "deleteError": "Error deleting card",
       "allDeleted": "All cards were deleted",
       "deleteAllError": "Error deleting cards",

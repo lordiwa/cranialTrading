@@ -1,0 +1,31 @@
+{
+  "key": "TASK-245",
+  "title": "El cambio masivo de estado BORRA los metadatos de todas las cartas que toca en el card_index",
+  "description": "MEDIDO POR EL ORQUESTADOR EN DEV, 2026-08-18, sobre la cuenta de 59.081 cartas, inmediatamente\ndespues de que Rafael hiciera \"seleccionar todos\" sobre el filtro de tierras y cambiara ~6750 cartas\nde sale a collection.\n\n  cartas que quedaron en collection ............ 6787\n  de esas, SIN type_line ....................... 6787   <-- EL 100%\n  CONTROL, las que NO se tocaron (sale) ........ 52234, de las cuales solo 269 sin tipo (0,5%)\n  tierras visibles en el indice ................ 7129 ANTES -> 376 DESPUES\n\n7129 - 376 = 6753, que coincide con la cantidad que Rafael cambio. No es una muestra ni una\ncoincidencia: es el 100% de lo tocado, y el grupo de control quedo intacto.\n\nO SEA: cambiar el estado de una carta le BORRA del indice el type_line (y aparentemente el resto de\nlos metadatos: cmc, colors, rarity). El estado nuevo SI persiste — eso funciona. Lo que se pierde es\ntodo lo demas.\n\nCONSECUENCIA PARA EL USUARIO, y es grave: despues de un cambio masivo de estado, las cartas\nafectadas desaparecen de TODO filtro por tipo, mana, color y rareza. Exactamente el mismo sintoma\nque Rafael reporto como \"el filtro de tierras no sirve\" (TASK-243) — pero por una causa distinta y\npor un camino distinto.\n\nESTO PUEDE SER LA CAUSA REAL DE TASK-208 (\"el card_index diverge de Firestore y NO converge solo\").\nAquel ticket documento el sintoma y lo atribuyo a una accion masiva parcialmente aplicada\n(TASK-206). Esta medicion sugiere un mecanismo mas simple y mas destructivo: la accion masiva se\naplica ENTERA, pero escribe la entrada del indice sin los metadatos. NO LO DOY POR CONFIRMADO —\nhay que medirlo.\n\nLO QUE NO SE, Y ES LO PRIMERO QUE HAY QUE AVERIGUAR:\n 1. Si este defecto lo INTRODUJO el arreglo de hoy (commit 0abf5cb, applyCardIndexDelta escalando\n    al scan de respaldo tambien en UPDATE) o si YA EXISTIA. Las dos son plausibles. Es la pregunta\n    que decide si el arreglo de hoy puede ir a produccion o no.\n 2. Si el DOCUMENTO de Firestore conserva los metadatos o si tambien se perdieron ahi. Esto decide\n    si se repara con un rebuild del indice o si es perdida real de datos. (El orquestador no pudo\n    medirlo: el navegador se congela con 59k cartas.)\n 3. Si el camino de UNA SOLA carta (click derecho) tiene el mismo defecto o solo el masivo.\n\nCONTEXTO OPERATIVO: por esto NO se promovio el arreglo del cambio de estado a produccion. La cuenta\nde produccion de Rafael acaba de ser reparada (tierras 27 -> 424, TASK-243) y un cambio masivo de\nestado ahi la volveria a romper.",
+  "acceptance_criteria": [
+    "AC1 — Determinar POR MEDICION si el defecto existe en el codigo ANTERIOR al commit 0abf5cb o si lo introdujo ese commit. Sin esta respuesta no se puede decidir si 0abf5cb va a produccion.",
+    "AC2 — Determinar POR MEDICION si el documento de Firestore conserva type_line/cmc/colors/rarity despues de un cambio de estado, o si tambien se pierden ahi. Decide entre 'reparable con rebuild' y 'perdida real'.",
+    "AC3 — Identificar el punto exacto (file:line) donde la entrada del card_index se escribe sin los metadatos, y por que.",
+    "AC4 — Arreglarlo: un cambio de estado debe modificar SOLO el estado y preservar todos los demas campos de la entrada del indice.",
+    "AC5 — Cubrir los DOS caminos: una sola carta (click derecho) y masivo (seleccionar todos). Confirmar cada uno por separado; pueden diferir.",
+    "AC6 — Candado de regresion que se pone ROJO con el defecto presente: cambiar el estado de una entrada del indice y verificar que type_line/cmc/colors/rarity siguen ahi. Si no se puede plantar en rojo primero, decirlo explicitamente en vez de escribir una assertion vacua.",
+    "AC7 — Verificado en dev con la medicion de arriba repetida: tras un cambio masivo, las cartas afectadas conservan su tipo, y el conteo de tierras NO baja. Con control negativo (un grupo no tocado que debe quedar igual)."
+  ],
+  "status": "in_progress",
+  "priority": "critical",
+  "labels": [
+    "card_index",
+    "perdida-de-datos",
+    "fallo-mudo",
+    "bloquea-produccion"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-18T20:55:34.995Z",
+  "updated_at": "2026-08-18T20:55:38.654Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

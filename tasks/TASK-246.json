@@ -1,0 +1,30 @@
+{
+  "key": "TASK-246",
+  "title": "El boton de borrar todo no borra carpetas ni mazos, y deja el estado inconsistente",
+  "description": "REPORTADO POR RAFAEL 2026-08-18: \"el boton de configuracion que borra todo no borra carpetas ni\ndecks\".\n\nEs un defecto por si mismo, pero ademas BLOQUEA UN PLAN OPERATIVO CONCRETO: Rafael quiere vaciar la\ncuenta de dev (y despues las de produccion, que confirmo que son todas de prueba o de amigos que\ninvito a probar) para reprobar cada funcionalidad en limpio. Si la herramienta de limpieza no limpia\ntodo, el estado resultante es PEOR que el actual: mazos y carpetas que siguen existiendo pero\napuntan a cartas que ya no existen. O sea, se prueba en limpio y lo que se encuentra son fallos\nprovocados por la propia limpieza incompleta.\n\nNO MEDIDO TODAVIA (lo reporto Rafael, no lo verifique yo): que exactamente borra hoy y que deja.\nPrimer paso es reproducirlo y dejar escrito el inventario real de lo que borra y lo que no.\n\nCONTEXTO DE ESTRUCTURA (LEIDO, de CLAUDE.md): bajo /users/{userId}/ cuelgan al menos cards,\ndecks, preferences, savedMatches y savedContacts. Ademas hay binders (carpetas), el card_index, y\npublic_cards, que es una SEGUNDA copia derivada (TASK-228). Un borrado que se llame \"borrar todo\"\ntiene que ser explicito sobre cada una de esas colecciones: cual borra, cual no, y por que.\n\nOJO CON DOS COSAS AL DISEÑAR EL ARREGLO:\n - public_cards es una copia derivada que vive fuera del arbol del usuario. Si se borran las cartas\n   y no se borra esa copia, el inventario del usuario sigue visible para los compradores. Eso es\n   peor que no borrar nada.\n - el card_index tambien es derivado. Borrar cartas sin borrar o reconstruir el indice deja\n   exactamente la clase de divergencia que este proyecto viene sufriendo (TASK-208).",
+  "acceptance_criteria": [
+    "AC1 — MEDIDO y escrito: inventario de que borra hoy el boton y que no, coleccion por coleccion (cards, decks, binders, preferences, savedMatches, savedContacts, card_index, public_cards). Reproducido, no leido del codigo.",
+    "AC2 — El borrado alcanza TODO lo que el usuario entiende por 'lo mio': como minimo cartas, mazos y carpetas. Verificado por medicion en una cuenta de prueba, contando documentos antes y despues.",
+    "AC3 — Las copias derivadas (card_index y public_cards) quedan consistentes con el borrado: o borradas, o reconstruidas vacias. Verificado por medicion, no por lectura del codigo.",
+    "AC4 — La UI dice con precision que va a borrar, antes de borrarlo. Un boton que dice 'borrar todo' y borra la mitad es peor que uno que enumera lo que toca.",
+    "AC5 — Candado de regresion que falla si alguna de las colecciones queda fuera del borrado. Tiene que ejercitar el borrado de verdad, no afirmar sobre el texto fuente.",
+    "AC6 — Confirmado que tras el borrado la cuenta puede volver a usarse normalmente: importar, crear un mazo y una carpeta, sin arrastrar restos del estado anterior."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "borrado",
+    "consistencia",
+    "herramienta-de-limpieza",
+    "prod"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-18T20:56:48.555Z",
+  "updated_at": "2026-08-18T20:56:48.555Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

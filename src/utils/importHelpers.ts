@@ -194,7 +194,9 @@ export const buildRawMoxfieldCard = (
     condition,
     foil: isFoil,
     price: 0,
-    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
+    // TASK-241: grid thumbnail — Scryfall's native `thumb` WEBP variant (146x204,
+    // replaces `small`) instead of `normal` JPG (488x680, ~6.7x heavier).
+    image: card.scryfallId ? `https://cards.scryfall.io/thumb/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.webp` : '',
     status: status ?? 'collection',
     public: makePublic,
     updatedAt: new Date(),
@@ -260,7 +262,9 @@ export const buildRawCsvCard = (
     condition: card.condition,
     foil: card.foil,
     price: card.price ?? 0,
-    image: card.scryfallId ? `https://cards.scryfall.io/normal/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.jpg` : '',
+    // TASK-241: grid thumbnail — Scryfall's native `thumb` WEBP variant (146x204,
+    // replaces `small`) instead of `normal` JPG (488x680, ~6.7x heavier).
+    image: card.scryfallId ? `https://cards.scryfall.io/thumb/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.webp` : '',
     status: status ?? 'collection',
     public: makePublic,
     updatedAt: new Date(),

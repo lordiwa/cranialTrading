@@ -223,14 +223,20 @@ function indexToCard(ic: IndexCard): Card {
         produced_mana: ic.pm,
         keywords: ic.kw,
         legalities,
-        // Construct image from scryfallId — dual-faced cards get card_faces JSON
+        // Construct image from scryfallId — dual-faced cards get card_faces JSON.
+        // TASK-241: the grid only ever renders a thumbnail, so it requests Scryfall's
+        // `thumb` variant (146x204 WEBP, same dimensions as the retired `small` JPG but
+        // smaller and already WebP — no proxy needed, see TASK-241 hand-off) instead of
+        // `normal` (488x680 JPG, ~6.7x heavier). Both `.normal` and `.small` keys below
+        // point at the same thumb URL because CollectionGridCardCompact/Full only ever
+        // read `.normal` — see src/stores/collection.ts callers.
         image: ic.s
           ? (ic.df
             ? JSON.stringify({ card_faces: [
-                { image_uris: { normal: `https://cards.scryfall.io/normal/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg`, small: `https://cards.scryfall.io/small/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg` } },
-                { image_uris: { normal: `https://cards.scryfall.io/normal/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg`, small: `https://cards.scryfall.io/small/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg` } },
+                { image_uris: { normal: `https://cards.scryfall.io/thumb/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp`, small: `https://cards.scryfall.io/thumb/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp` } },
+                { image_uris: { normal: `https://cards.scryfall.io/thumb/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp`, small: `https://cards.scryfall.io/thumb/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp` } },
               ] })
-            : `https://cards.scryfall.io/normal/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.jpg`)
+            : `https://cards.scryfall.io/thumb/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp`)
           : '',
         createdAt: new Date(ic.ca),
         updatedAt: new Date(ic.ca),

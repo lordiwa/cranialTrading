@@ -9,6 +9,7 @@ import HelpTooltip from '../ui/HelpTooltip.vue'
 import { useContactsStore } from '../../stores/contacts'
 import { type MatchCard as MatchCardType, type SimpleMatch } from '../../stores/matches'
 import { useToastStore } from '../../stores/toast'
+import { isDisplayableImageUrl } from '../../utils/cardImageUrl'
 import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
 import { getAvatarUrlForUser } from '../../utils/avatar'
@@ -233,8 +234,8 @@ const handleSaveContact = async () => {
         <p class="text-[9px] md:text-[10px] font-bold uppercase tracking-[.12em] text-silver-30 mb-1.5">{{ t('matches.card.youOffer') }}</p>
         <div class="relative aspect-[63/88] rounded-md border border-line overflow-hidden bg-gradient-to-br from-[#101c12] via-[#060a07] to-[#0c130d]">
           <img
-              v-if="giveCard?.image?.startsWith('http')"
-              :src="giveCard.image"
+              v-if="isDisplayableImageUrl(giveCard?.image)"
+              :src="giveCard?.image"
               alt=""
               class="absolute inset-0 w-full h-full object-cover"
           />
@@ -252,8 +253,8 @@ const handleSaveContact = async () => {
         <p class="text-[9px] md:text-[10px] font-bold uppercase tracking-[.12em] text-silver-30 mb-1.5">{{ t('matches.card.youReceive') }}</p>
         <div class="relative aspect-[63/88] rounded-md border border-line overflow-hidden bg-gradient-to-br from-[#0d1626] via-[#060a12] to-[#0a1220]">
           <img
-              v-if="receiveCard?.image?.startsWith('http')"
-              :src="receiveCard.image"
+              v-if="isDisplayableImageUrl(receiveCard?.image)"
+              :src="receiveCard?.image"
               alt=""
               class="absolute inset-0 w-full h-full object-cover"
           />

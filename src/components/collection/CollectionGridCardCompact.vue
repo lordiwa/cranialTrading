@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
-import { scryfallFallbackUrl } from '../../utils/cardImageUrl'
+import { isDisplayableImageUrl, scryfallFallbackUrl } from '../../utils/cardImageUrl'
 import type { Card } from '../../types/card'
 
 const props = withDefaults(defineProps<{
@@ -93,10 +93,7 @@ const effectiveCardImage = computed(() => fallbackSrc.value ?? getCardImage(prop
 // True when card has a real image URL (not empty, not whitespace). Our own
 // proxy URLs are same-origin relative paths (/img/...), not absolute http(s)
 // URLs, so both shapes are accepted here.
-const hasImage = computed(() => {
-  const img = effectiveCardImage.value
-  return img.length > 0 && (img.startsWith('http') || img.startsWith('/img/'))
-})
+const hasImage = computed(() => isDisplayableImageUrl(effectiveCardImage.value))
 
 // v2 redesign — status badge (dot + pill, DESIGN-DIRECTION.md §5). Pure CSS dot
 // (span, not svg) per the Mali GPU rule: this card is rendered inside a virtualized grid.

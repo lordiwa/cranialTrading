@@ -9,7 +9,7 @@ import { useCollectionStore } from '../../stores/collection'
 import { useMarketStore } from '../../stores/market'
 import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
-import { scryfallFallbackUrl } from '../../utils/cardImageUrl'
+import { isDisplayableImageUrl, scryfallFallbackUrl } from '../../utils/cardImageUrl'
 import ContextMenu from '../ui/ContextMenu.vue'
 import SvgIcon from '../ui/SvgIcon.vue'
 import type { Card, CardStatus } from '../../types/card'
@@ -254,10 +254,7 @@ const effectiveCardImage = computed(() => fallbackSrc.value ?? getCardImage(prop
 // True when card has a real image URL (not empty, not whitespace). Our own
 // proxy URLs are same-origin relative paths (/img/...), not absolute http(s)
 // URLs, so both shapes are accepted here.
-const hasImage = computed(() => {
-  const img = effectiveCardImage.value
-  return img.length > 0 && (img.startsWith('http') || img.startsWith('/img/'))
-})
+const hasImage = computed(() => isDisplayableImageUrl(effectiveCardImage.value))
 
 // Track image loading state for showing spinner overlay
 const imageLoaded = ref(false)

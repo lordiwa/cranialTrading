@@ -45,3 +45,26 @@ export function scryfallFallbackUrl(url: string | undefined | null): string | nu
   if (!variant || !face || !scryfallId) return null
   return `https://cards.scryfall.io/${variant}/${face}/${scryfallId.charAt(0)}/${scryfallId.charAt(1)}/${scryfallId}.webp`
 }
+
+/**
+ * DESIGN DECISION (TASK-241, 2026-08-18, written down per Rafael's request):
+ * cardImageProxyUrl returns a RELATIVE path (/img/...), not an absolute URL,
+ * on purpose:
+ *   - same-origin — no CORS, and it resolves correctly against whichever
+ *     Firebase Hosting deploy is currently serving the app (dev vs prod)
+ *     without the frontend needing to know its own deployed origin;
+ *   - works unmodified against a local dev server IF/when `/img/**` is also
+ *     proxied there (see firebase.json's hosting rewrite).
+ * The trade-off, in full: it breaks any consumer that validates "is this a
+ * real image URL" by checking startsWith('http') — MatchCard.vue regressed
+ * exactly this way (2026-08-18 audit) before this helper existed. The
+ * chosen fix is NOT to make the proxy URL absolute; it's to give every
+ * consumer that needs to answer "is this displayable" ONE shared check
+ * instead of each one growing its own ad hoc validation — that duplication
+ * (CollectionGridCard{Compact,Full} checked one shape, MatchCard checked a
+ * narrower one) is exactly how the regression got in.
+ */
+export function isDisplayableImageUrl(url: string | undefined | null): boolean {
+  if (!url) return false
+  return url.startsWith('http') || url.startsWith('/img/')
+}

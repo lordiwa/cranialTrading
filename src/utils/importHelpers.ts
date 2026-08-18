@@ -7,6 +7,7 @@
 
 import type { CardCondition, CardStatus } from '../types/card'
 import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
+import { cardImageProxyUrl } from '../utils/cardImageUrl'
 
 // ============================================================
 // Shared interfaces (moved here from CollectionView.vue)
@@ -194,9 +195,10 @@ export const buildRawMoxfieldCard = (
     condition,
     foil: isFoil,
     price: 0,
-    // TASK-241: grid thumbnail — Scryfall's native `thumb` WEBP variant (146x204,
-    // replaces `small`) instead of `normal` JPG (488x680, ~6.7x heavier).
-    image: card.scryfallId ? `https://cards.scryfall.io/thumb/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.webp` : '',
+    // TASK-241 AC2/AC3/AC9 (proxy re-scope): OUR OWN cardImageProxyUrl instead of
+    // cards.scryfall.io directly — see src/stores/collection.ts's indexToCard
+    // for the full rationale (request-count, not bytes; AC1 already fixed bytes).
+    image: card.scryfallId ? cardImageProxyUrl(card.scryfallId, 'thumb', 'front') : '',
     status: status ?? 'collection',
     public: makePublic,
     updatedAt: new Date(),
@@ -262,9 +264,10 @@ export const buildRawCsvCard = (
     condition: card.condition,
     foil: card.foil,
     price: card.price ?? 0,
-    // TASK-241: grid thumbnail — Scryfall's native `thumb` WEBP variant (146x204,
-    // replaces `small`) instead of `normal` JPG (488x680, ~6.7x heavier).
-    image: card.scryfallId ? `https://cards.scryfall.io/thumb/front/${card.scryfallId.charAt(0)}/${card.scryfallId.charAt(1)}/${card.scryfallId}.webp` : '',
+    // TASK-241 AC2/AC3/AC9 (proxy re-scope): OUR OWN cardImageProxyUrl instead of
+    // cards.scryfall.io directly — see src/stores/collection.ts's indexToCard
+    // for the full rationale (request-count, not bytes; AC1 already fixed bytes).
+    image: card.scryfallId ? cardImageProxyUrl(card.scryfallId, 'thumb', 'front') : '',
     status: status ?? 'collection',
     public: makePublic,
     updatedAt: new Date(),

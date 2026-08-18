@@ -18,6 +18,7 @@ const {onSchedule} = require("firebase-functions/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const cheerio = require("cheerio");
+const { parseImagePath, storagePath: cardImageStoragePath, scryfallUrl: cardImageScryfallUrl, createThrottle } = require("./lib/cardImage");
 const { mapWithConcurrency } = require("./lib/concurrency");
 
 // Initialize Firebase Admin SDK
@@ -1885,3 +1886,95 @@ exports.queryCardIndex = onCall(
     }
   }
 );
+
+// ============================================================
+// CARD IMAGE PROXY/CACHE — TASK-241 (reopened 2026-08-18)
+//
+// AC1 (bytes) already shipped: the grid requests Scryfall's `thumb`/`grid`
+// WEBP variants instead of `normal`/`small` JPG. This section addresses the
+// re-scoped problem — Rafael's argument is REQUEST COUNT to Scryfall, not
+// bytes: a grid load fires one Scryfall request per card, every time, and
+// Scryfall is measured slow FOR HIM specifically (84 KB in 30s = 2.8 KB/s,
+// vs 0.62s for the same file from elsewhere) — so cutting the request count
+// down to "once per card, ever" is the fix, not shrinking each request.
+//
+// GET /img/{variant}/{face}/{scryfallId}.webp (variant: thumb|grid, face:
+// front|back — see functions/lib/cardImage.js for the shared, unit-tested
+// URL/path helpers). Cache hit: served straight from Firebase Storage with
+// a long Cache-Control (AC4). Cache miss: fetched from Scryfall exactly
+// once (throttled — AC6), stored, then served; every later request for the
+// same (variant, face, scryfallId) is a Storage hit and never touches
+// Scryfall again (AC3/AC9). Any internal failure degrades to a 302 redirect
+// straight to the Scryfall CDN URL (AC7) — the browser's own onerror
+// fallback (src/utils/cardImageUrl.ts's scryfallFallbackUrl) is the second
+// layer, for when our own domain/function can't be reached at all.
+// ============================================================
+
+const CARD_IMAGE_STORAGE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+// AC6: identify ourselves — Scryfall's own good-citizenship guidance
+// (scryfall.com/docs/api/http-concerns) asks embedders to be identifiable.
+const CARD_IMAGE_USER_AGENT = 'CranialTrading/1.0 (+https://cranial-trading.web.app; contact: srparca@gmail.com)';
+// AC6: never burst — 100ms floor between our OWN calls to Scryfall's image
+// CDN from this function instance (see createThrottle's own doc comment in
+// functions/lib/cardImage.js for the per-instance-only caveat).
+const cardImageFillThrottle = createThrottle(100);
+
+exports.cardImage = onRequest({ cors: true }, async (request, response) => {
+  const parsed = parseImagePath(request.path);
+  if (!parsed) {
+    response.status(400).json({ error: 'Invalid image request' });
+    return;
+  }
+
+  const objectPath = cardImageStoragePath(parsed);
+  const scryfallSrc = cardImageScryfallUrl(parsed);
+
+  try {
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(objectPath);
+    const [exists] = await file.exists();
+
+    if (exists) {
+      // AC3/AC9 cache hit — served from Storage, Scryfall is never called.
+      response.set('Content-Type', 'image/webp');
+      response.set('Cache-Control', CARD_IMAGE_STORAGE_CACHE_CONTROL);
+      file.createReadStream()
+        .on('error', (err) => {
+          logger.error('[cardImage] Storage read failed after exists()=true, degrading to Scryfall', err);
+          if (!response.headersSent) response.redirect(302, scryfallSrc);
+        })
+        .pipe(response);
+      return;
+    }
+
+    // Cache miss — fetch from Scryfall exactly once (AC3), throttled (AC6).
+    await cardImageFillThrottle();
+    const scryfallRes = await fetch(scryfallSrc, {
+      headers: { 'User-Agent': CARD_IMAGE_USER_AGENT },
+    });
+
+    if (!scryfallRes.ok) {
+      logger.warn(`[cardImage] Scryfall returned ${scryfallRes.status} for ${scryfallSrc}`);
+      response.redirect(302, scryfallSrc); // AC7 degradation
+      return;
+    }
+
+    const buf = Buffer.from(await scryfallRes.arrayBuffer());
+
+    // Best-effort persist — a failed write must not fail the response the
+    // user is waiting on; the next request just re-fetches from Scryfall.
+    file.save(buf, {
+      contentType: 'image/webp',
+      metadata: { cacheControl: CARD_IMAGE_STORAGE_CACHE_CONTROL },
+    }).catch((err) => logger.error('[cardImage] Storage save failed (served the response anyway)', err));
+
+    response.set('Content-Type', 'image/webp');
+    response.set('Cache-Control', CARD_IMAGE_STORAGE_CACHE_CONTROL);
+    response.status(200).send(buf);
+  } catch (err) {
+    // AC7 degradation — our proxy is unavailable for any reason; the card
+    // still renders by falling all the way back to Scryfall directly.
+    logger.error('[cardImage] Unexpected error, degrading to direct Scryfall URL', err);
+    response.redirect(302, scryfallSrc);
+  }
+});

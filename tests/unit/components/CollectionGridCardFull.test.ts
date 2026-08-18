@@ -186,4 +186,35 @@ describe('CollectionGridCardFull', () => {
     // v-if="!readonly && !isBeingDeleted" on the delete button
     expect(wrapper.html()).not.toContain('cards.grid.delete')
   })
+
+  // TASK-241 AC7: our own /img/ proxy is a NEW single point of failure that
+  // did not exist before this ticket — if it fails, the grid must not go
+  // blank. scryfallFallbackUrl itself is unit-tested in isolation
+  // (tests/unit/utils/cardImageUrl.test.ts); this proves the component
+  // actually WIRES it into the rendered <img>'s src on a real load failure.
+  it('falls back to the direct Scryfall URL when our own proxy image fails to load (AC7)', async () => {
+    const card = makeCard({ image: '/img/thumb/front/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp' })
+    const wrapper = mount(CollectionGridCardFull, { props: { card } })
+
+    const img = wrapper.find('img')
+    expect(img.attributes('src')).toBe('/img/thumb/front/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp')
+
+    await img.trigger('error')
+
+    expect(wrapper.find('img').attributes('src')).toBe(
+      'https://cards.scryfall.io/thumb/front/a/2/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp'
+    )
+  })
+
+  it('does not attempt a fallback (and keeps showing) a non-proxy image URL on error', async () => {
+    const card = makeCard({ image: 'https://example.com/bolt.jpg' })
+    const wrapper = mount(CollectionGridCardFull, { props: { card } })
+
+    const img = wrapper.find('img')
+    await img.trigger('error')
+
+    // No proxy URL to rewrite — src is unchanged, the card just falls
+    // through to the existing "failed to load" overlay path.
+    expect(wrapper.find('img').attributes('src')).toBe('https://example.com/bolt.jpg')
+  })
 })

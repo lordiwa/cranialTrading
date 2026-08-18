@@ -1,12 +1,14 @@
 /**
- * Regression lock for TASK-241 AC1.
+ * Regression lock for TASK-241 AC1 + AC2/AC9 (proxy re-scope, 2026-08-18).
  *
- * indexToCard used to build grid-thumbnail image URLs from Scryfall's `normal`
- * variant (488x680 JPG, ~98 KB measured on the reported card) even though the
- * grid only ever renders a small tile. Scryfall's `thumb` variant (146x204
- * WEBP, ~10.5 KB measured on the same card) is the same use case at ~10x
- * fewer bytes with no proxy/infra needed. If a future edit reintroduces
- * `/normal/` (or any non-`thumb` path) into the constructed image URL, this
+ * indexToCard used to build grid-thumbnail image URLs directly against
+ * Scryfall's `normal` variant (488x680 JPG). AC1 first fixed the BYTES by
+ * switching to `thumb` (146x204 WEBP). The ticket was then reopened: Rafael's
+ * argument is REQUEST COUNT to Scryfall, not bytes — so the URL now goes
+ * through OUR OWN proxy (/img/thumb/{face}/{id}.webp, see
+ * src/utils/cardImageUrl.ts + functions/lib/cardImage.js), never
+ * cards.scryfall.io directly. If a future edit reintroduces a direct
+ * cards.scryfall.io URL (or `/normal/`) into the constructed image URL, this
  * test reddens.
  */
 
@@ -113,14 +115,14 @@ function snapshotOf(docs: ReturnType<typeof chunkDoc>[]) {
   return { empty: docs.length === 0, docs, size: docs.length }
 }
 
-describe('collection store: grid thumbnail image URL (TASK-241 AC1)', () => {
+describe('collection store: grid thumbnail image URL (TASK-241 AC1/AC2/AC9)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     mockGetDocs.mockResolvedValue(snapshotOf([]))
   })
 
-  it('single-faced card: requests the Scryfall thumb WEBP variant, never normal', async () => {
+  it('single-faced card: requests OUR OWN proxy URL, never cards.scryfall.io directly', async () => {
     mockGetDocs.mockResolvedValue(snapshotOf([chunkDoc('chunk_0', [makeIndexCard()])]))
 
     const store = useCollectionStore()
@@ -128,13 +130,12 @@ describe('collection store: grid thumbnail image URL (TASK-241 AC1)', () => {
 
     expect(store.cards).toHaveLength(1)
     const image = store.cards[0].image
-    expect(image).toBe(
-      'https://cards.scryfall.io/thumb/front/a/2/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp'
-    )
+    expect(image).toBe('/img/thumb/front/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp')
+    expect(image).not.toContain('cards.scryfall.io')
     expect(image).not.toContain('/normal/')
   })
 
-  it('dual-faced card: both faces request thumb WEBP, never normal', async () => {
+  it('dual-faced card: both faces request OUR OWN proxy URL, never cards.scryfall.io directly', async () => {
     mockGetDocs.mockResolvedValue(
       snapshotOf([chunkDoc('chunk_0', [makeIndexCard({ df: true })])])
     )
@@ -146,11 +147,12 @@ describe('collection store: grid thumbnail image URL (TASK-241 AC1)', () => {
       card_faces: { image_uris: { normal?: string; small?: string } }[]
     }
     expect(parsed.card_faces[0].image_uris.normal).toBe(
-      'https://cards.scryfall.io/thumb/front/a/2/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp'
+      '/img/thumb/front/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp'
     )
     expect(parsed.card_faces[1].image_uris.normal).toBe(
-      'https://cards.scryfall.io/thumb/back/a/2/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp'
+      '/img/thumb/back/a268697b-22b0-4e1b-a5b6-d9be95025e57.webp'
     )
+    expect(store.cards[0].image).not.toContain('cards.scryfall.io')
     expect(store.cards[0].image).not.toContain('/normal/')
   })
 })

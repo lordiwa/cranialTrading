@@ -27,6 +27,7 @@ import {
 import { t } from '../composables/useI18n'
 import { getCardsByIds } from '../services/scryfallCache'
 import { buildEnrichmentPatch } from '../utils/cardEnrichment'
+import { cardImageProxyUrl } from '../utils/cardImageUrl'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
 import type { CardIndexDeltaMutation, QueryCardIndexRequest } from '../services/cloudFunctions'
@@ -224,19 +225,25 @@ function indexToCard(ic: IndexCard): Card {
         keywords: ic.kw,
         legalities,
         // Construct image from scryfallId — dual-faced cards get card_faces JSON.
-        // TASK-241: the grid only ever renders a thumbnail, so it requests Scryfall's
-        // `thumb` variant (146x204 WEBP, same dimensions as the retired `small` JPG but
-        // smaller and already WebP — no proxy needed, see TASK-241 hand-off) instead of
-        // `normal` (488x680 JPG, ~6.7x heavier). Both `.normal` and `.small` keys below
-        // point at the same thumb URL because CollectionGridCardCompact/Full only ever
-        // read `.normal` — see src/stores/collection.ts callers.
+        // TASK-241 AC1: the grid only ever renders a thumbnail, so it requests
+        // Scryfall's `thumb` variant (146x204 WEBP, replaces `small`) instead of
+        // `normal` (488x680 JPG, ~6.7x heavier).
+        // TASK-241 AC2/AC3/AC9 (proxy re-scope): the URL itself is now OUR OWN
+        // cardImageProxyUrl (Cloud Function `cardImage` + Firebase Storage cache,
+        // see functions/lib/cardImage.js), not cards.scryfall.io directly — the
+        // problem this ticket was reopened for is REQUEST COUNT to Scryfall, not
+        // bytes (AC1 already fixed bytes). Routing through our own domain means
+        // a repeat grid load only ever calls Scryfall once per (variant, face,
+        // scryfallId), ever. Both `.normal` and `.small` keys below point at the
+        // same proxy URL because CollectionGridCardCompact/Full only ever read
+        // `.normal` — see src/stores/collection.ts callers.
         image: ic.s
           ? (ic.df
             ? JSON.stringify({ card_faces: [
-                { image_uris: { normal: `https://cards.scryfall.io/thumb/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp`, small: `https://cards.scryfall.io/thumb/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp` } },
-                { image_uris: { normal: `https://cards.scryfall.io/thumb/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp`, small: `https://cards.scryfall.io/thumb/back/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp` } },
+                { image_uris: { normal: cardImageProxyUrl(ic.s, 'thumb', 'front'), small: cardImageProxyUrl(ic.s, 'thumb', 'front') } },
+                { image_uris: { normal: cardImageProxyUrl(ic.s, 'thumb', 'back'), small: cardImageProxyUrl(ic.s, 'thumb', 'back') } },
               ] })
-            : `https://cards.scryfall.io/thumb/front/${ic.s.charAt(0)}/${ic.s.charAt(1)}/${ic.s}.webp`)
+            : cardImageProxyUrl(ic.s, 'thumb', 'front'))
           : '',
         createdAt: new Date(ic.ca),
         updatedAt: new Date(ic.ca),

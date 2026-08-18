@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useI18n } from '../../composables/useI18n'
+import { scryfallFallbackUrl } from '../../utils/cardImageUrl'
 import type { Card } from '../../types/card'
 
 const props = withDefaults(defineProps<{
@@ -81,10 +82,20 @@ const getCardImage = (card: Card): string => {
   return card.image ?? ''
 }
 
-// True when card has a real image URL (not empty, not whitespace)
+// TASK-241 AC7: if our own image proxy (relative /img/... URL) fails to
+// load, fall back to hitting Scryfall directly so the card still renders
+// instead of going blank. Reset whenever the underlying image/face changes.
+const fallbackSrc = ref<string | null>(null)
+watch(() => props.card.image, () => { fallbackSrc.value = null })
+watch(cardFaceIndex, () => { fallbackSrc.value = null })
+const effectiveCardImage = computed(() => fallbackSrc.value ?? getCardImage(props.card))
+
+// True when card has a real image URL (not empty, not whitespace). Our own
+// proxy URLs are same-origin relative paths (/img/...), not absolute http(s)
+// URLs, so both shapes are accepted here.
 const hasImage = computed(() => {
-  const img = getCardImage(props.card)
-  return img.length > 0 && img.startsWith('http')
+  const img = effectiveCardImage.value
+  return img.length > 0 && (img.startsWith('http') || img.startsWith('/img/'))
 })
 
 // v2 redesign — status badge (dot + pill, DESIGN-DIRECTION.md §5). Pure CSS dot
@@ -107,7 +118,20 @@ const badgeInfo = computed(() => {
 // Track image loading state for showing spinner overlay
 const imageLoaded = ref(false)
 const onImageLoad = () => { imageLoaded.value = true }
-const onImageError = () => { imageLoaded.value = false }
+// TASK-241 AC7: first failure on our own proxy URL swaps to the Scryfall
+// direct-fallback URL (via fallbackSrc/effectiveCardImage above) instead of
+// giving up — only marks the card as failed-to-load if the fallback ALSO
+// fails, or if the URL wasn't one of ours to begin with.
+const onImageError = () => {
+  if (fallbackSrc.value === null) {
+    const fb = scryfallFallbackUrl(getCardImage(props.card))
+    if (fb) {
+      fallbackSrc.value = fb
+      return
+    }
+  }
+  imageLoaded.value = false
+}
 watch(() => props.card.image, () => { imageLoaded.value = false })
 
 // Lazy fetch CK prices when card scrolls into viewport
@@ -156,7 +180,7 @@ onUnmounted(() => {
       </span>
       <template v-if="hasImage">
         <img
-            :src="getCardImage(card)"
+            :src="effectiveCardImage"
             :alt="card.name"
             loading="lazy"
             class="w-full h-full object-cover"

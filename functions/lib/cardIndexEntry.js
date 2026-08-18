@@ -125,4 +125,29 @@ function isDualFaced(cache) {
   return cache.card_faces.filter((f) => f.image_uris).length > 1;
 }
 
-module.exports = { toIndexCard, mergeScryfallMetadata, isDualFaced };
+/**
+ * THE definition of a card_index entry: user document + its scryfall_cache
+ * document in, compact entry out. Both writers of the index (buildCardIndex
+ * and applyCardIndexDelta) go through this, so they cannot disagree.
+ *
+ * TASK-245 review round (MEDIUM-3): `df` is taken from the cache
+ * UNCONDITIONALLY — including `false` when there is no cache document. The
+ * delta path used to fall back to toIndexCard's `image`-JSON heuristic in
+ * that case while buildCardIndex wrote `false`, so a card with no cache doc
+ * but a dual-faced `image` JSON got df=false from a rebuild and df=true from
+ * a later status change: the exact two-writers-disagree defect this ticket
+ * exists to kill, in miniature. The cache is the authority for face count
+ * (it is what buildCardIndex has always used); the `image` heuristic inside
+ * toIndexCard now only applies where nothing calls this function.
+ *
+ * @param {string} id card document id
+ * @param {object} data user card document fields
+ * @param {object|null|undefined} cache scryfall_cache document fields
+ */
+function buildIndexEntry(id, data, cache) {
+  const entry = toIndexCard(id, mergeScryfallMetadata(data, cache));
+  entry.df = isDualFaced(cache);
+  return entry;
+}
+
+module.exports = { toIndexCard, mergeScryfallMetadata, isDualFaced, buildIndexEntry };

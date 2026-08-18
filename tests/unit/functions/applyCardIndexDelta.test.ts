@@ -187,11 +187,13 @@ describe('applyCardIndexDelta — server-side card_index chunk patching (TASK-23
     // planted RED first); the end-to-end proof is TASK-245 AC7's in-dev
     // measurement.
     expect(source).toMatch(/fetchScryfallCacheMap\(/)
-    expect(source).toMatch(/mergeScryfallMetadata\(raw, cache\)/)
+    // Entries are built by the SAME shared helper buildCardIndex uses, and
+    // the cache travels with each mutation so the fallback-scan and round-2
+    // paths write the same complete entry as the fast path.
+    expect(source).toMatch(/buildIndexEntry\(cardId, data, cache\)/)
+    expect(source).toMatch(/cache: entry\.cache/)
     // No entry may be built straight from a snapshot's raw data again.
-    expect(source).not.toMatch(/toIndexCard\(cardId, snap\.data\(\)\)/)
-    expect(source).not.toMatch(/nextCards\.push\(toIndexCard\(/)
-    expect(source).not.toMatch(/nextCards\[existingIdx\] = toIndexCard\(/)
+    expect(source).not.toMatch(/toIndexCard\(/)
   })
 
   it('TRIPWIRE, not a behavior test (TASK-232 OOM fix, review round MED-2): applyChunkTransactions still calls the bounded mapWithConcurrency helper, not a bare unbounded Promise.all', () => {

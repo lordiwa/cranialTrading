@@ -32,6 +32,7 @@ import {
   toIndexCard,
   mergeScryfallMetadata,
   isDualFaced,
+  buildIndexEntry,
 } from '../../../functions/lib/cardIndexEntry.js'
 
 /** A user card document as it exists on the older accounts: no Scryfall metadata. */
@@ -94,7 +95,13 @@ describe('card_index entry building — Scryfall metadata join (TASK-245)', () =
     expect(entry.r).toBe('u')
   })
 
-  it('a status change alters ONLY st — every other index field is byte-identical (AC4/AC6)', () => {
+  // NOTE (review round LOW): this test PASSES with the metadata-join defect
+  // planted — with no merge, both sides come out equally blank and still
+  // compare equal. It locks "toIndexCard is a pure function of its input,
+  // status is not entangled with anything else"; it is NOT the sensor for
+  // this ticket's bug. That sensor is the "preserves Scryfall metadata"
+  // block above, which is what actually went red.
+  it('toIndexCard is a pure function of status — flipping st changes st and nothing else', () => {
     const before = toIndexCard('card-1', mergeScryfallMetadata({ ...userDocWithoutMetadata, status: 'sale' }, cacheEntry))
     const after = toIndexCard('card-1', mergeScryfallMetadata({ ...userDocWithoutMetadata, status: 'collection' }, cacheEntry))
 
@@ -134,6 +141,40 @@ describe('card_index entry building — Scryfall metadata join (TASK-245)', () =
     const doc = { ...userDocWithoutMetadata, cmc: 0 }
     const merged = mergeScryfallMetadata(doc, { ...cacheEntry, cmc: 5 })
     expect(merged.cmc).toBe(0)
+  })
+
+  describe('buildIndexEntry — THE shared entry builder both writers use (review round MEDIUM-3)', () => {
+    const dualCache = { ...cacheEntry, card_faces: [{ image_uris: {} }, { image_uris: {} }] }
+
+    it('does the merge itself — same result as toIndexCard(mergeScryfallMetadata(...))', () => {
+      const viaHelper = buildIndexEntry('card-1', userDocWithoutMetadata, cacheEntry)
+      const viaParts = toIndexCard('card-1', mergeScryfallMetadata(userDocWithoutMetadata, cacheEntry))
+      expect(viaHelper).toEqual({ ...viaParts, df: false })
+      expect(viaHelper.t).toBe('Basic Land — Forest')
+    })
+
+    it('takes df from the CACHE, not from the image JSON — the two writers must agree', () => {
+      // A card whose image JSON says dual-faced but which has no cache doc:
+      // buildCardIndex has always written df=false for it. The delta path
+      // must write false too, or a rebuild and a status change disagree.
+      const imageSaysDual = {
+        ...userDocWithoutMetadata,
+        image: JSON.stringify({ card_faces: [{ image_uris: {} }, { image_uris: {} }] }),
+      }
+      expect(toIndexCard('card-5', imageSaysDual).df).toBe(true) // raw heuristic
+      expect(buildIndexEntry('card-5', imageSaysDual, null).df).toBe(false) // cache is the authority
+      expect(buildIndexEntry('card-5', imageSaysDual, cacheEntry).df).toBe(false)
+      expect(buildIndexEntry('card-5', imageSaysDual, dualCache).df).toBe(true)
+    })
+
+    it('is idempotent — re-running it over an already-merged document changes nothing', () => {
+      // The delta path builds entries from the document it read; nothing may
+      // depend on that document being "raw" vs already carrying metadata.
+      const merged = mergeScryfallMetadata(userDocWithoutMetadata, cacheEntry)
+      expect(buildIndexEntry('card-1', merged, cacheEntry)).toEqual(
+        buildIndexEntry('card-1', userDocWithoutMetadata, cacheEntry)
+      )
+    })
   })
 
   describe('isDualFaced (shared dual-face detection, previously inline in buildCardIndex)', () => {

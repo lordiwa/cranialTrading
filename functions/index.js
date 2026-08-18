@@ -24,7 +24,7 @@ const { mapWithConcurrency } = require("./lib/concurrency");
 // scryfall_cache join that feeds it), shared by buildCardIndex and
 // applyCardIndexDelta — the two used to disagree, which is what blanked
 // type_line/cmc/colors/rarity on every status change.
-const { toIndexCard, mergeScryfallMetadata, isDualFaced } = require("./lib/cardIndexEntry");
+const { isDualFaced, buildIndexEntry } = require("./lib/cardIndexEntry");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -1033,10 +1033,11 @@ exports.buildCardIndex = onCall(
     // Phase 3: Build index cards with accurate df flag and cache-merged metadata
     const allIndexCards = allRawCards.map(({ id, data }) => {
       const cache = data.scryfallId ? scryfallCacheMap.get(data.scryfallId) : null;
-      const ic = toIndexCard(id, mergeScryfallMetadata(data, cache));
-      // Override df with accurate scryfall_cache detection
-      ic.df = dualFacedIds.has(data.scryfallId);
-      return ic;
+      // buildIndexEntry sets df from the cache (isDualFaced) — identical to
+      // the dualFacedIds lookup this used to do, since dualFacedIds is built
+      // from the SAME map with the SAME predicate. dualFacedIds now only
+      // feeds the count in the log line above.
+      return buildIndexEntry(id, data, cache);
     });
 
     logger.info(`[buildCardIndex] Read ${allIndexCards.length} cards, writing index chunks...`);
@@ -1307,12 +1308,12 @@ exports.applyCardIndexDelta = onCall(
           skippedIds.push(cardId);
           return;
         }
-        const raw = snap.data();
-        const cache = cacheFor(raw);
-        // Merged here, once, so EVERY downstream writer of this entry (fast
-        // path, fallback scan, round-2 escalation) writes the same complete
-        // entry — TASK-245.
-        const data = mergeScryfallMetadata(raw, cache);
+        const data = snap.data();
+        // The card's scryfall_cache doc travels WITH the mutation, so every
+        // downstream writer of this entry (fast path, fallback scan, round-2
+        // escalation) hands buildIndexEntry the same pair and writes the same
+        // complete entry — TASK-245.
+        const cache = cacheFor(data);
         idToEntry.set(cardId, { action, data, cache, allowInsert });
         if (typeof data.chunkId !== "number") {
           // TASK-230: no sticky chunkId on this doc yet. Used to skip
@@ -1439,18 +1440,11 @@ exports.applyCardIndexDelta = onCall(
             const notFoundUpdates = [];
             const notFoundDeletes = [];
 
-            // TASK-245: `data` here is ALREADY merged with scryfall_cache
-            // (see the join right after the db.getAll above) — never build
-            // an entry from a raw snap.data() again. `cache` additionally
-            // gives the same authoritative dual-face detection
-            // buildCardIndex uses; when there is no cache doc the entry
-            // keeps toIndexCard's image-JSON heuristic, unchanged.
-            const entryFor = (cardId, data, cache) => {
-              const ic = toIndexCard(cardId, data);
-              if (cache) ic.df = isDualFaced(cache);
-              return ic;
-            };
-
+            // TASK-245: entries are built by lib/cardIndexEntry's
+            // buildIndexEntry — the SAME function buildCardIndex uses, so the
+            // two writers of the index cannot disagree. It does the
+            // scryfall_cache merge itself; `cache` comes from the join right
+            // after the db.getAll above.
             for (const { cardId, action, data, cache, allowInsert } of entries) {
               const existingIdx = byIndexId.get(cardId);
               if (action === "delete") {
@@ -1466,13 +1460,13 @@ exports.applyCardIndexDelta = onCall(
                 applied++;
               } else if (existingIdx === undefined) {
                 if (allowInsert) {
-                  nextCards.push(entryFor(cardId, data, cache));
+                  nextCards.push(buildIndexEntry(cardId, data, cache));
                   applied++;
                 } else {
                   notFoundUpdates.push(cardId);
                 }
               } else {
-                nextCards[existingIdx] = entryFor(cardId, data, cache);
+                nextCards[existingIdx] = buildIndexEntry(cardId, data, cache);
                 applied++;
               }
             }

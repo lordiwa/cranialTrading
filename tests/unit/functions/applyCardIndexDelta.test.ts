@@ -171,6 +171,29 @@ describe('applyCardIndexDelta — server-side card_index chunk patching (TASK-23
     expect(source).toMatch(/scanAndAssign\(\s*\[\s*\.\.\.round1\.notFoundUpdateIds\s*,\s*\.\.\.round1\.notFoundDeleteIds\s*\]/)
   })
 
+  it('TASK-245: builds every index entry from a scryfall_cache-MERGED document, never from the raw snap.data()', () => {
+    // The defect this locks: `toIndexCard(cardId, data)` where `data` was
+    // the raw user document. On accounts whose card docs predate
+    // USER_CARD_FIELDS copying Scryfall metadata onto them, those docs have
+    // no type_line/cmc/colors/rarity at all — so every status change wrote
+    // an entry with t='', cm=0, co=[], r=''. Measured in dev 2026-08-18:
+    // 6787/6787 cards touched by one bulk status change lost type_line;
+    // lands visible in the index 7129 -> 376.
+    //
+    // TRIPWIRE ONLY — same honest limit as every other assertion in this
+    // file: it proves the join is written here, not that it runs correctly
+    // against real Firestore data. The EXECUTION lock for the merge logic
+    // itself is tests/unit/functions/cardIndexEntry.test.ts (which was
+    // planted RED first); the end-to-end proof is TASK-245 AC7's in-dev
+    // measurement.
+    expect(source).toMatch(/fetchScryfallCacheMap\(/)
+    expect(source).toMatch(/mergeScryfallMetadata\(raw, cache\)/)
+    // No entry may be built straight from a snapshot's raw data again.
+    expect(source).not.toMatch(/toIndexCard\(cardId, snap\.data\(\)\)/)
+    expect(source).not.toMatch(/nextCards\.push\(toIndexCard\(/)
+    expect(source).not.toMatch(/nextCards\[existingIdx\] = toIndexCard\(/)
+  })
+
   it('TRIPWIRE, not a behavior test (TASK-232 OOM fix, review round MED-2): applyChunkTransactions still calls the bounded mapWithConcurrency helper, not a bare unbounded Promise.all', () => {
     // tests/unit/functions/concurrency.test.ts proves mapWithConcurrency
     // ITSELF bounds concurrency by EXECUTING it — real coverage. This test

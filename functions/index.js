@@ -20,6 +20,11 @@ const admin = require("firebase-admin");
 const cheerio = require("cheerio");
 const { parseImagePath, storagePath: cardImageStoragePath, scryfallUrl: cardImageScryfallUrl, createThrottle } = require("./lib/cardImage");
 const { mapWithConcurrency } = require("./lib/concurrency");
+// TASK-245: single definition of a card_index entry (and of the
+// scryfall_cache join that feeds it), shared by buildCardIndex and
+// applyCardIndexDelta — the two used to disagree, which is what blanked
+// type_line/cmc/colors/rarity on every status change.
+const { toIndexCard, mergeScryfallMetadata, isDualFaced } = require("./lib/cardIndexEntry");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -902,59 +907,42 @@ const INDEX_VERSION = 3; // Bump when index format changes — client auto-rebui
 // v3 (2026-04-27): added `e` (edition / set_name) — fixes SCRUM-35 duplicate bug where stale `sc` uppercase clobbered set_name canon
 
 /**
- * Extract compact index fields from a full card document.
- * Uses short keys to minimize doc size (~170 bytes per card).
+ * toIndexCard / mergeScryfallMetadata / isDualFaced moved to
+ * ./lib/cardIndexEntry.js (TASK-245) — dependency-free so vitest can
+ * EXECUTE them (tests/unit/functions/cardIndexEntry.test.ts) instead of
+ * only asserting on this file's source text, and so there is exactly ONE
+ * definition of an index entry for both writers of the index.
  */
-function toIndexCard(id, data) {
-  // Compact legalities: only store format names where card is legal
-  let lg = [];
-  if (data.legalities && typeof data.legalities === 'object') {
-    lg = Object.entries(data.legalities)
-      .filter(([, v]) => v === 'legal')
-      .map(([k]) => k);
-  }
 
-  // Compact rarity: first char
-  const rarity = data.rarity ? data.rarity.charAt(0) : '';
-
-  // Compact createdAt: timestamp in ms
-  let ca = 0;
-  if (data.createdAt) {
-    if (typeof data.createdAt.toMillis === 'function') {
-      ca = data.createdAt.toMillis();
-    } else if (data.createdAt._seconds) {
-      ca = data.createdAt._seconds * 1000;
+/**
+ * Batch-read scryfall_cache documents for a set of scryfallIds.
+ * db.getAll supports up to ~10k refs per call, so this batches.
+ *
+ * TASK-245: shared by buildCardIndex (full rebuild) and
+ * applyCardIndexDelta (per-mutation patch). The user card documents on
+ * older accounts carry NO Scryfall metadata (type_line/cmc/colors/rarity
+ * live only here), so any writer of a card_index entry MUST do this join
+ * — applyCardIndexDelta did not, and blanked those fields on every card a
+ * status change touched.
+ *
+ * @param {string[]} scryfallIds
+ * @returns {Promise<Map<string, object>>} scryfallId -> cache doc data
+ */
+async function fetchScryfallCacheMap(scryfallIds) {
+  const map = new Map();
+  const CACHE_BATCH = 5000;
+  for (let i = 0; i < scryfallIds.length; i += CACHE_BATCH) {
+    const batch = scryfallIds.slice(i, i + CACHE_BATCH);
+    const refs = batch.map(id => db.collection(SCRYFALL_CACHE_COLLECTION).doc(id));
+    if (refs.length === 0) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const cacheDocs = await db.getAll(...refs);
+    for (const cDoc of cacheDocs) {
+      if (!cDoc.exists) continue;
+      map.set(cDoc.id, cDoc.data());
     }
   }
-
-  return {
-    i: id,
-    s: data.scryfallId || '',
-    n: data.name || '',
-    st: data.status || 'collection',
-    q: data.quantity || 1,
-    p: data.price || 0,
-    cm: data.cmc ?? 0,
-    co: data.colors || [],
-    r: rarity,
-    t: data.type_line || '',
-    f: !!data.foil,
-    sc: data.setCode || '',
-    e: data.edition || '',
-    pw: data.power || '',
-    to: data.toughness || '',
-    fa: !!data.full_art,
-    pm: data.produced_mana || [],
-    kw: data.keywords || [],
-    lg,
-    ca,
-    cn: data.condition || 'NM',
-    pb: data.public !== false,
-    df: (() => {
-      try { return !!(JSON.parse(data.image || '').card_faces?.length > 1); }
-      catch { return false; }
-    })(),
-  };
+  return map;
 }
 
 /**
@@ -1027,31 +1015,17 @@ exports.buildCardIndex = onCall(
     // Phase 2: Batch-read scryfall_cache for two purposes:
     //   1. Detect dual-faced cards accurately (dualFacedIds)
     //   2. Merge Scryfall metadata (cmc/type_line/colors/etc) into the index —
-    //      USER_CARD_FIELDS strips those from user docs, so the cache is the
+    //      cards created before USER_CARD_FIELDS started copying those fields
+    //      onto the user doc have them ONLY here, so the cache is the
     //      authoritative source. Without this merge, reloads show cmc=0 for every
-    //      imported card even though bulkImportCards just wrote the cache.
+    //      such card even though bulkImportCards wrote the cache.
+    //      TASK-245: applyCardIndexDelta now does the SAME join — see
+    //      fetchScryfallCacheMap and lib/cardIndexEntry.js.
     const uniqueScryfallIds = [...new Set(allRawCards.map(c => c.data.scryfallId).filter(Boolean))];
+    const scryfallCacheMap = await fetchScryfallCacheMap(uniqueScryfallIds); // scryfallId -> cache doc data
     const dualFacedIds = new Set();
-    const scryfallCacheMap = new Map(); // scryfallId → cache doc data
-
-    // db.getAll supports up to ~10k refs per call; batch if needed
-    const CACHE_BATCH = 5000;
-    for (let i = 0; i < uniqueScryfallIds.length; i += CACHE_BATCH) {
-      const batch = uniqueScryfallIds.slice(i, i + CACHE_BATCH);
-      const refs = batch.map(id => db.collection(SCRYFALL_CACHE_COLLECTION).doc(id));
-      if (refs.length === 0) continue;
-      const cacheDocs = await db.getAll(...refs);
-      for (const cDoc of cacheDocs) {
-        if (!cDoc.exists) continue;
-        const cData = cDoc.data();
-        scryfallCacheMap.set(cDoc.id, cData);
-        if (cData.card_faces && cData.card_faces.length > 1) {
-          const facesWithImages = cData.card_faces.filter(f => f.image_uris);
-          if (facesWithImages.length > 1) {
-            dualFacedIds.add(cDoc.id);
-          }
-        }
-      }
+    for (const [cacheId, cData] of scryfallCacheMap) {
+      if (isDualFaced(cData)) dualFacedIds.add(cacheId);
     }
 
     logger.info(`[buildCardIndex] Found ${dualFacedIds.size} dual-faced cards out of ${uniqueScryfallIds.length} unique scryfallIds (cache hits: ${scryfallCacheMap.size})`);
@@ -1059,22 +1033,7 @@ exports.buildCardIndex = onCall(
     // Phase 3: Build index cards with accurate df flag and cache-merged metadata
     const allIndexCards = allRawCards.map(({ id, data }) => {
       const cache = data.scryfallId ? scryfallCacheMap.get(data.scryfallId) : null;
-      const merged = cache
-        ? {
-            ...data,
-            cmc: data.cmc ?? cache.cmc,
-            type_line: data.type_line || cache.type_line,
-            colors: (data.colors && data.colors.length > 0) ? data.colors : cache.colors,
-            rarity: data.rarity || cache.rarity,
-            power: data.power || cache.power,
-            toughness: data.toughness || cache.toughness,
-            full_art: data.full_art ?? cache.full_art,
-            produced_mana: (data.produced_mana && data.produced_mana.length > 0) ? data.produced_mana : cache.produced_mana,
-            keywords: (data.keywords && data.keywords.length > 0) ? data.keywords : cache.keywords,
-            legalities: data.legalities || cache.legalities,
-          }
-        : data;
-      const ic = toIndexCard(id, merged);
+      const ic = toIndexCard(id, mergeScryfallMetadata(data, cache));
       // Override df with accurate scryfall_cache detection
       ic.df = dualFacedIds.has(data.scryfallId);
       return ic;
@@ -1307,11 +1266,31 @@ exports.applyCardIndexDelta = onCall(
     const cardRefs = cardIds.map((id) => db.collection(`users/${userId}/cards`).doc(id));
     const cardSnaps = await db.getAll(...cardRefs);
 
-    const byChunk = new Map(); // chunkNumber -> [{ cardId, action, data, allowInsert }]
+    // TASK-245: join scryfall_cache BEFORE building any index entry, the
+    // same join buildCardIndex does. Without it this function wrote each
+    // touched entry from the raw user document alone — and on older
+    // accounts those documents carry no type_line/cmc/colors/rarity at all
+    // (they exist only in scryfall_cache), so every status change blanked
+    // them. Measured in dev 2026-08-18: 6787/6787 cards touched by one bulk
+    // status change lost type_line; lands visible in the index 7129 -> 376.
+    // Only UPDATEs need it — a delete removes the entry, it doesn't rebuild
+    // one — and mutations are capped at 500 per call, so this is a single
+    // getAll of <=500 refs.
+    const updateScryfallIds = new Set();
+    cardSnaps.forEach((snap, i) => {
+      const m = byId.get(cardIds[i]);
+      if (!m || m.action !== "update" || !snap.exists) return;
+      const sid = snap.data().scryfallId;
+      if (sid) updateScryfallIds.add(sid);
+    });
+    const scryfallCacheMap = await fetchScryfallCacheMap([...updateScryfallIds]);
+    const cacheFor = (raw) => (raw && raw.scryfallId ? scryfallCacheMap.get(raw.scryfallId) || null : null);
+
+    const byChunk = new Map(); // chunkNumber -> [{ cardId, action, data, cache, allowInsert }]
     const deleteFallbackIds = [];
     const updateFallbackIds = [];
     const skippedIds = [];
-    // URGENT PROD FIX (2026-08-18): cardId -> { action, data, allowInsert }
+    // URGENT PROD FIX (2026-08-18): cardId -> { action, data, cache, allowInsert }
     // for every mutation whose own document was readable, regardless of
     // whether its chunkId resolved a usable chunk. scanAndAssign (below)
     // needs this to re-attach the RIGHT action/data when it locates an
@@ -1328,8 +1307,13 @@ exports.applyCardIndexDelta = onCall(
           skippedIds.push(cardId);
           return;
         }
-        const data = snap.data();
-        idToEntry.set(cardId, { action, data, allowInsert });
+        const raw = snap.data();
+        const cache = cacheFor(raw);
+        // Merged here, once, so EVERY downstream writer of this entry (fast
+        // path, fallback scan, round-2 escalation) writes the same complete
+        // entry — TASK-245.
+        const data = mergeScryfallMetadata(raw, cache);
+        idToEntry.set(cardId, { action, data, cache, allowInsert });
         if (typeof data.chunkId !== "number") {
           // TASK-230: no sticky chunkId on this doc yet. Used to skip
           // outright here — now resolved the same way a missing-chunkId
@@ -1340,21 +1324,21 @@ exports.applyCardIndexDelta = onCall(
           return;
         }
         if (!byChunk.has(data.chunkId)) byChunk.set(data.chunkId, []);
-        byChunk.get(data.chunkId).push({ cardId, action, data, allowInsert });
+        byChunk.get(data.chunkId).push({ cardId, action, data, cache, allowInsert });
         return;
       }
 
       // action === 'delete'
       if (snap.exists) {
         const data = snap.data();
-        idToEntry.set(cardId, { action, data, allowInsert: false });
+        idToEntry.set(cardId, { action, data, cache: null, allowInsert: false });
         if (typeof data.chunkId === "number") {
           if (!byChunk.has(data.chunkId)) byChunk.set(data.chunkId, []);
-          byChunk.get(data.chunkId).push({ cardId, action, data, allowInsert: false });
+          byChunk.get(data.chunkId).push({ cardId, action, data, cache: null, allowInsert: false });
           return;
         }
       } else {
-        idToEntry.set(cardId, { action, data: null, allowInsert: false });
+        idToEntry.set(cardId, { action, data: null, cache: null, allowInsert: false });
       }
       // Doc gone, or doc exists with no chunkId — resolve by scanning
       // instead of skipping (TASK-232 gap #2: skipping here is exactly how
@@ -1401,7 +1385,7 @@ exports.applyCardIndexDelta = onCall(
             const entry = idToEntry.get(c.i);
             if (entry) {
               if (!byChunk.has(chunkNum)) byChunk.set(chunkNum, []);
-              byChunk.get(chunkNum).push({ cardId: c.i, action: entry.action, data: entry.data, allowInsert: entry.allowInsert });
+              byChunk.get(chunkNum).push({ cardId: c.i, action: entry.action, data: entry.data, cache: entry.cache, allowInsert: entry.allowInsert });
             }
             wantedIds.delete(c.i);
           }
@@ -1455,7 +1439,19 @@ exports.applyCardIndexDelta = onCall(
             const notFoundUpdates = [];
             const notFoundDeletes = [];
 
-            for (const { cardId, action, data, allowInsert } of entries) {
+            // TASK-245: `data` here is ALREADY merged with scryfall_cache
+            // (see the join right after the db.getAll above) — never build
+            // an entry from a raw snap.data() again. `cache` additionally
+            // gives the same authoritative dual-face detection
+            // buildCardIndex uses; when there is no cache doc the entry
+            // keeps toIndexCard's image-JSON heuristic, unchanged.
+            const entryFor = (cardId, data, cache) => {
+              const ic = toIndexCard(cardId, data);
+              if (cache) ic.df = isDualFaced(cache);
+              return ic;
+            };
+
+            for (const { cardId, action, data, cache, allowInsert } of entries) {
               const existingIdx = byIndexId.get(cardId);
               if (action === "delete") {
                 if (existingIdx === undefined) {
@@ -1470,13 +1466,13 @@ exports.applyCardIndexDelta = onCall(
                 applied++;
               } else if (existingIdx === undefined) {
                 if (allowInsert) {
-                  nextCards.push(toIndexCard(cardId, data));
+                  nextCards.push(entryFor(cardId, data, cache));
                   applied++;
                 } else {
                   notFoundUpdates.push(cardId);
                 }
               } else {
-                nextCards[existingIdx] = toIndexCard(cardId, data);
+                nextCards[existingIdx] = entryFor(cardId, data, cache);
                 applied++;
               }
             }

@@ -1,0 +1,33 @@
+{
+  "key": "TASK-241",
+  "title": "Cache propia de imagenes de cartas: proxy bajo demanda a WebP en Firebase Storage",
+  "description": "PEDIDO EXPLICITO DE RAFAEL (2026-08-18), tras medirlo contra produccion. No es una propuesta del orquestador: Rafael lo pidio dos veces y la segunda zanjo la discusion.\n\nSINTOMA MEDIDO POR RAFAEL EN PROD: una imagen de carta tarda 30 s en bajar de Scryfall, y en una vista con 27 cartas las 27 imagenes no cargan. Su medicion: 84 KB en 30 s = 2,8 KB/s. Scryfall se le pone lento de forma sostenida, no puntual.\n\nMEDIDO POR EL ORQUESTADOR sobre la URL exacta que reporto Rafael\n(https://cards.scryfall.io/normal/front/a/2/a268697b-22b0-4e1b-a5b6-d9be95025e57.jpg):\n - normal = 98.197 B | small = 14.706 B | large = 145.756 B\n - Cache-Control: public, max-age=31556952 (1 anio), Server: ScryfallEdgeCDN, Age: 3.068.575\n - Scryfall NO negocia formato: con Accept: image/webp devuelve image/jpeg igual.\n - NO existe variante .webp (404). El JPEG no comprime en transito (br/gzip no cambia el tamanio).\n - Desde la maquina del orquestador esa imagen baja en 0,62 s. O sea el problema esta entre\n   Scryfall y el usuario, no en el origen.\nCONCLUSION: WebP solo es posible con infraestructura propia. Confirmado, no supuesto.\n\nMEDIDO TAMBIEN: src/stores/collection.ts:233 arma la miniatura de la grilla HARDCODEADA a `normal`\n(98 KB) cuando `small` (14,7 KB) alcanza para un pulgar. 6,7x de desperdicio por carta, hoy, sin\ntocar ninguna infraestructura. La cuenta de Rafael tiene 5761 cartas (leido de su consola:\n\"Loaded card_index: 5761 cards from 3 chunks\").\n\nDISENIO ELEGIDO: proxy BAJO DEMANDA, no descarga masiva previa.\nMotivo: una descarga masiva de ~110k impresiones exige un pipeline de horas, mantenerse al dia con\ncada set nuevo, y almacenar imagenes que nadie va a pedir. El proxy bajo demanda se auto-puebla solo\ncon lo que los usuarios realmente miran, y a partir de la segunda vez sirve desde nuestra propia\ninfraestructura. Si mas adelante hace falta precalentar los sets populares, se hace encima de esto.\n\nCamino: la app pide la imagen a NUESTRA URL -> si esta en Firebase Storage, se sirve de ahi con\nCache-Control largo -> si no esta, se trae de Scryfall una sola vez, se convierte a WebP, se guarda,\ny se sirve. La conversion nunca esta en el camino critico de una segunda visita.\n\nRESPETAR LAS REGLAS DE SCRYFALL: su guia pide un intervalo de 50-100 ms entre peticiones y un\nUser-Agent identificable. El proxy debe cumplirlo en el camino de relleno (cache miss), y NUNCA\ndisparar una rafaga. Verificar la politica vigente antes de implementar; si prohibe el rehosting,\nfrenar y avisar a Rafael antes de seguir.\n\nFUERA DE ALCANCE (para no mezclar): los ~24 MB de card_index que se bajan al entrar a /collection\n(TASK-199, TASK-204). Son la otra mitad de la lentitud y tienen ticket propio.",
+  "acceptance_criteria": [
+    "AC1 — La grilla deja de pedir `normal` para las miniaturas. src/stores/collection.ts:233 (y todo call site paralelo que arme la URL del CDN: importHelpers.ts:197 y :263, y las ramas de doble cara en collection.ts:230-231) sirve la variante chica. MEDIR y dejar escrito el peso por carta antes y despues, sobre la misma carta.",
+    "AC2 — Existe una URL propia que devuelve la imagen de una carta dada su scryfallId y una variante (small/normal), y responde 200 con Content-Type image/webp.",
+    "AC3 — Cache miss: si la imagen no esta almacenada, se trae de Scryfall UNA sola vez, se convierte a WebP, se persiste en Firebase Storage, y se devuelve. La segunda peticion de la misma imagen NO vuelve a tocar Scryfall — demostrado por medicion, no por lectura del codigo.",
+    "AC4 — La respuesta lleva Cache-Control publico y largo, de modo que el navegador no repita la peticion. Verificado leyendo las cabeceras reales de la respuesta desplegada.",
+    "AC5 — MEDICION COMPARATIVA con control negativo, sobre la MISMA carta: bytes y tiempo de (a) Scryfall normal, (b) Scryfall small, (c) nuestra WebP. Sin las tres columnas no se puede afirmar que la cache sirvio de algo.",
+    "AC6 — El camino de relleno respeta el intervalo entre peticiones que pide Scryfall y manda un User-Agent identificable. Nunca una rafaga concurrente contra su CDN.",
+    "AC7 — Degradacion: si nuestra cache falla o no responde, la carta sigue mostrandose cayendo a la URL de Scryfall. Una cache caida no puede dejar la grilla sin imagenes.",
+    "AC8 — Queda escrito el costo estimado de egress y almacenamiento con los numeros reales del proyecto (5761 cartas es la cuenta de Rafael; el 80% del mercado tiene 25k+ y el 30% 100k+), para que la decision de seguir o no sea informada."
+  ],
+  "status": "in_progress",
+  "priority": "high",
+  "labels": [
+    "performance",
+    "images",
+    "scryfall",
+    "infra",
+    "pedido-de-rafael"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-18T18:34:29.539Z",
+  "updated_at": "2026-08-18T18:34:39.217Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

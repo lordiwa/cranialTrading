@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T15:34:01.679Z",
+  "generated_at": "2026-08-18T19:15:04.622Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1319,6 +1319,30 @@
       "key": "TASK-240",
       "title": "El cleanup del test E2E \"add card\" no borra nada y su fallo es invisible: cada corrida deja un documento sin entrada de card_index, acumulandose sin techo en la cuenta compartida",
       "status": "in_review",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-241",
+      "title": "Cache propia de imagenes de cartas: proxy bajo demanda a WebP en Firebase Storage",
+      "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-242",
+      "title": "queryCardIndex subcuenta en silencio: no detecta chunks faltantes y el cliente si",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-243",
+      "title": "La importacion deja el 47% de las cartas sin metadatos y no hay forma de reanudarla",
+      "status": "in_progress",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-244",
+      "title": "Scryfall no encuentra planos, esquemas ni fichas: falta include:extras en ~15 consultas",
+      "status": "todo",
       "priority": "high"
     }
   ]

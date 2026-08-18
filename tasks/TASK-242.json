@@ -1,0 +1,32 @@
+{
+  "key": "TASK-242",
+  "title": "queryCardIndex subcuenta en silencio: no detecta chunks faltantes y el cliente si",
+  "description": "HALLAZGO DEL RESEARCHER (2026-08-18), trazado por lectura de codigo con file:line. Es la razon de que\nla familia de \"el inventario miente\" (TASK-208, TASK-202) sea INVISIBLE para el usuario y para\nnosotros: no hay ninguna senal cuando pasa.\n\nHAY DOS CAMINOS QUE LEEN EL card_index Y SOLO UNO ESTA INSTRUMENTADO:\n\n - CAMINO CLIENTE - src/stores/collection.ts:676-679 (loadFromIndex, puesto por TASK-168):\n   SI detecta chunks faltantes, loguea un warning y deshabilita el cleanup de huerfanos para no\n   empeorar las cosas. Se comporta bien.\n\n - CLOUD FUNCTION queryCardIndex - functions/index.js:1806-1819:\n   NO tiene ninguna deteccion. Hace indexRef.get(), expande lo que haya con expandIndexCards\n   (linea 1600), filtra (1616-1683), ordena y pagina (1719-1733). El `total` que devuelve sale de\n   cards.length sobre lo que logro leer. Si a la cuenta le faltan chunks, devuelve un total\n   subcontado SIN log, SIN error y SIN ninguna marca en la respuesta.\n\nY LA QUE IMPORTA ES LA SEGUNDA: queryCardIndex es la que arma la grilla de verdad, via\nqueryPage (stores/collection.ts:2606-2652). El camino instrumentado es el que NO se usa para pintar\nla pantalla.\n\nCONSECUENCIA MEDIDA EN PROD (2026-08-18, cuenta de Rafael): filtro de tierras sobre 5761 cartas\ndevuelve 27, deberian ser del orden de 1500-2000, y la consola no muestra ni un solo error. Rafael\nno tenia forma de saber que estaba viendo un inventario incompleto. Nosotros tampoco.\n\nESTE TICKET NO ARREGLA LA DIVERGENCIA. Eso es TASK-208 (y TASK-238 para la reparacion al cargar).\nEste ticket la hace VISIBLE. Sin esto, cualquier arreglo de 208 se verifica a ciegas: no habria\nforma de distinguir \"ya no diverge\" de \"sigue divergiendo y no nos enteramos\".\n\nCONTEXTO DE POR QUE ESTO ES CARO DE NO TENER: este proyecto ya perdio tiempo dos veces por\nsilencios de la misma forma (TASK-146 y TASK-240, ambos fallos mudos que se descubrieron tarde). La\npolitica del repo para este tipo de defecto es explicita: ponerse en rojo antes que seguir en verde\nmintiendo.",
+  "acceptance_criteria": [
+    "AC1 — queryCardIndex detecta que la lectura del card_index esta incompleta (huecos en la numeracion de chunks, o el conteo declarado no cuadra con lo leido) antes de filtrar y paginar.",
+    "AC2 — Cuando detecta que esta incompleta, lo registra del lado servidor con suficiente detalle para diagnosticar: uid, que chunks vio, cuales esperaba, cuantas cartas expandio.",
+    "AC3 — La respuesta de la funcion lleva una marca explicita de que el resultado es parcial, para que el cliente pueda distinguir 'hay 27 tierras' de 'pude leer 27 tierras de un indice roto'. Un total subcontado nunca mas viaja indistinguible de un total correcto.",
+    "AC4 — La app hace algo visible con esa marca: el usuario se entera de que lo que ve no es su inventario completo. No hace falta una pantalla elaborada, si hace falta que no sea silencioso.",
+    "AC5 — Candado de regresion que falla si se quita la deteccion. El candado tiene que probar el comportamiento con un indice al que le falta un chunk, no solo que exista una funcion. Si no se puede ejecutar la funcion de verdad, decirlo explicitamente y NO escribir una assertion sobre el texto fuente haciendola pasar por prueba (TASK-236: functions/ no tiene harness y sus candados actuales son vacuos por esto mismo).",
+    "AC6 — Verificado contra un caso real: reproducir un indice con un chunk faltante y comprobar que la deteccion se enciende, MAS un control negativo con un indice sano donde NO se enciende. Sin el control negativo la deteccion no esta probada, solo observada."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card_index",
+    "observabilidad",
+    "fallo-mudo",
+    "cloud-functions"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-236"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-18T18:36:21.181Z",
+  "updated_at": "2026-08-18T18:36:21.181Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-244",
+  "title": "Scryfall no encuentra planos, esquemas ni fichas: falta include:extras en ~15 consultas",
+  "description": "REPORTADO POR RAFAEL 2026-08-18 desde la consola de dev, y MEDIDO por el orquestador contra la API\nreal de Scryfall en el mismo momento.\n\nSINTOMA: la consola escupe \"No se encontraron cartas\" para cartas que existen perfectamente. Rafael\npego cuatro: Tember City, Horizon Boughs, Tazeem, Mirrored Depths. Las cuatro son cartas de\nPlanechase (tipo Plane), no cartas normales.\n\nCAUSA, MEDIDA CONTRA LA API REAL (4 de 4, sin excepciones):\n\n  carta             sin include:extras   CON include:extras\n  Tazeem                   404                  200\n  Tember City              404                  200\n  Horizon Boughs           404                  200\n  Mirrored Depths          404                  200\n\nScryfall EXCLUYE POR DEFECTO de /cards/search los llamados \"extras\": planos (Plane), fenomenos\n(Phenomenon), esquemas (Scheme), fichas (Token), emblemas y demas. Hay que pedirlos explicitamente\ncon `include:extras` en la query. La app nunca lo hace.\n\nVERIFICADO POR GREP: `include:extras` NO APARECE en ningun lado de src/ ni de functions/. Cero\nocurrencias.\n\nDONDE: la consulta que coincide EXACTAMENTE con la URL del log de Rafael es\nsrc/services/scryfall.ts:128\n  `${SCRYFALL_API}/cards/search?q=${encodedQuery}&unique=prints&order=released&dir=desc`\n\nPERO NO ES UNA SOLA. Hay ~15 sitios con la misma forma de consulta y todos tienen el mismo agujero:\n  src/services/scryfall.ts:128, 292, 350, 362, 374, 389, 401, 416, 428, 440, 452, 464, 483\n  src/composables/useDiscoveryPanel.ts:105, 127\n  src/stores/search.ts:107\nEs EXACTAMENTE el caso de la Regla 6 de CLAUDE.md (cambios paralelos = cambio atomico): arreglar uno\nsolo hace que el bug vuelva por otra puerta. Hay que decidir sitio por sitio si corresponde incluir\nextras, y aplicar la decision a todos en el mismo paso.\n\nCUIDADO, NO ES UN BUSCAR-Y-REEMPLAZAR CIEGO: incluir extras en TODAS las consultas puede ensuciar\nresultados donde el usuario NO quiere fichas ni emblemas (por ejemplo el buscador general, donde\naparecerian fichas mezcladas con cartas reales). Hay que separar los casos:\n - Buscar UNA carta concreta por nombre exacto (el caso roto que reporto Rafael): SI, tiene que\n   incluir extras — si el usuario tiene esa carta, existe.\n - Buscador/descubrimiento general: decidir a proposito, y dejar escrito el porque.\n\nIMPACTO SOSPECHADO Y NO MEDIDO (SUPUESTO, verificar): esto podria explicar parte de las cartas que\nquedan sin metadatos en las colecciones. Si algun camino de importacion o enriquecimiento resuelve\npor NOMBRE en vez de por scryfallId, toda carta de tipo extra fallaria en silencio. TASK-243 midio\n2472 cartas sin entrada en scryfall_cache en la cuenta de Rafael; cuantas de esas son extras es un\nnumero que NO se midio. Medirlo antes de atribuir nada — puede ser cero.",
+  "acceptance_criteria": [
+    "AC1 — Buscar por nombre exacto una carta de tipo extra (plano, esquema, ficha, emblema) la encuentra. Verificado con las cuatro que reporto Rafael: Tember City, Horizon Boughs, Tazeem, Mirrored Depths.",
+    "AC2 — Los ~15 sitios de consulta listados en la descripcion quedan revisados TODOS en el mismo cambio, con una decision explicita por sitio (incluye extras / no incluye) y el porque escrito. No se acepta arreglar solo el de la linea 128.",
+    "AC3 — El buscador general no queda inundado de fichas y emblemas mezclados con cartas reales. Verificado buscando un termino comun y comparando los resultados antes y despues.",
+    "AC4 — Candado de regresion que se pone ROJO sin el arreglo: una consulta por nombre exacto de una carta extra que hoy devuelve 404. Si no se puede plantar en rojo primero, decirlo explicitamente en vez de escribir una assertion vacua.",
+    "AC5 — MEDIDO: cuantas de las 2472 cartas sin scryfall_cache de la cuenta de Rafael (TASK-243) son cartas de tipo extra. Puede ser cero; el punto es que quede medido y no supuesto, para saber si esto contribuye o no a esa familia."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "scryfall",
+    "busqueda",
+    "instancias-paralelas",
+    "prod"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-18T19:15:04.622Z",
+  "updated_at": "2026-08-18T19:15:04.622Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

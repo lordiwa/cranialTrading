@@ -108,6 +108,12 @@
       "type": "task",
       "ref": "tasks/TASK-230.json",
       "label": "card_index: cada carta guarda su chunk en su propio documento (solo datos, nadie lo lee todavia)"
+    },
+    {
+      "id": "task-245",
+      "type": "task",
+      "ref": "tasks/TASK-245.json",
+      "label": "El cambio masivo de estado BORRA los metadatos de todas las cartas que toca en el card_index"
     }
   ],
   "edges": []

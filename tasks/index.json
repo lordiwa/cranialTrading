@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-18T20:56:48.555Z",
+  "generated_at": "2026-08-19T02:18:12.840Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1348,7 +1348,7 @@
     {
       "key": "TASK-245",
       "title": "El cambio masivo de estado BORRA los metadatos de todas las cartas que toca en el card_index",
-      "status": "in_progress",
+      "status": "done",
       "priority": "critical"
     },
     {

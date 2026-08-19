@@ -7,7 +7,7 @@
  * Firestore permission errors on non-existent documents.
  */
 import { makeCard } from '../helpers/fixtures'
-import { getCardsNeedingPublicSync } from '../../../src/utils/publicSyncFilter'
+import { getCardsNeedingPublicSync, isPossiblyPublicCard } from '../../../src/utils/publicSyncFilter'
 import type { Card } from '../../../src/types/card'
 
 describe('getCardsNeedingPublicSync', () => {
@@ -95,5 +95,58 @@ describe('getCardsNeedingPublicSync', () => {
 
     const result = getCardsNeedingPublicSync(updatedCards, previouslyPublicIds)
     expect(result).toHaveLength(1)
+  })
+})
+
+/**
+ * TASK-247 tanda 2c review round 4 (MEDIUM-1): the permissive
+ * `public !== false` semantics were already load-bearing INSIDE
+ * getCardsNeedingPublicSync above, but lived only as an inline expression —
+ * extracted here so stores/collection.ts's updateCard/deleteCard guards
+ * (which decide whether to even CALL syncCardToPublic/removeCardFromPublic
+ * at all) can share the exact same predicate instead of a third, drifted
+ * copy. Deliberately NOT the same predicate as publicCards.ts's
+ * isPublicCard (`public === true`, strict) — that one gates the actual
+ * publish/write decision (TASK-085's whitelist: a card must be explicitly
+ * opted in to be written to the anonymous-readable public_cards), and
+ * must stay strict. isPossiblyPublicCard answers a different, permissive
+ * question: "could this card be affected by the public-sync machinery at
+ * all" — used only to decide whether it's worth even looking, matching how
+ * card_index / functions/lib/cardIndexEntry.js already hydrate a missing
+ * `public` field (`pb: card.public !== false`). Measured against
+ * production (2026-08-19, team-lead review): of 7,374 sale/trade cards,
+ * 7 have no `public` field at all across 2 real accounts — legacy data
+ * that exists right now, not a hypothetical.
+ */
+describe('isPossiblyPublicCard', () => {
+  it('treats a sale card with public undefined (legacy data, no field at all) as possibly public', () => {
+    const card = makeCard({ status: 'sale' }) // makeCard's fixture never sets `public`
+    expect(card.public).toBeUndefined()
+
+    expect(isPossiblyPublicCard(card)).toBe(true)
+  })
+
+  it('treats a trade card with public undefined as possibly public', () => {
+    const card = makeCard({ status: 'trade' })
+    expect(isPossiblyPublicCard(card)).toBe(true)
+  })
+
+  it('excludes a sale card explicitly marked private (public === false)', () => {
+    const card = makeCard({ status: 'sale', public: false })
+    expect(isPossiblyPublicCard(card)).toBe(false)
+  })
+
+  it('includes a sale card explicitly marked public (public === true)', () => {
+    const card = makeCard({ status: 'sale', public: true })
+    expect(isPossiblyPublicCard(card)).toBe(true)
+  })
+
+  it('excludes a collection-status card regardless of the public field', () => {
+    expect(isPossiblyPublicCard(makeCard({ status: 'collection', public: true }))).toBe(false)
+    expect(isPossiblyPublicCard(makeCard({ status: 'collection' }))).toBe(false)
+  })
+
+  it('excludes a wishlist-status card regardless of the public field', () => {
+    expect(isPossiblyPublicCard(makeCard({ status: 'wishlist', public: true }))).toBe(false)
   })
 })

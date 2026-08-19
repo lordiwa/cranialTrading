@@ -19,7 +19,6 @@ import { useToastStore } from './toast'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import {
     batchSyncCardsToPublic,
-    isPublicCard,
     removeCardFromPublic,
     scheduleIndexReconcile,
     syncAllUserCards,
@@ -31,7 +30,7 @@ import { getCardsByIds } from '../services/scryfallCache'
 import { buildEnrichmentPatch } from '../utils/cardEnrichment'
 import { cardImageProxyUrl } from '../utils/cardImageUrl'
 import { logSanitizedError } from '../utils/logSanitizedError'
-import { getCardsNeedingPublicSync } from '../utils/publicSyncFilter'
+import { getCardsNeedingPublicSync, isPossiblyPublicCard } from '../utils/publicSyncFilter'
 import type { CardIndexDeltaMutation, QueryCardIndexRequest } from '../services/cloudFunctions'
 
 /**
@@ -1769,10 +1768,16 @@ export const useCollectionStore = defineStore('collection', () => {
                 // after it (may need one written/updated). Skipping the
                 // call entirely when neither is true means publicCards.ts's
                 // own reconcile trigger never fires for a private card's
-                // ordinary edit either — see isPublicCard's doc comment for
-                // why this decision belongs here, not inside publicCards.ts.
+                // ordinary edit either.
+                // Round 4 (MEDIUM-1): uses the PERMISSIVE isPossiblyPublicCard
+                // (`public !== false`), not publicCards.ts's strict
+                // isPublicCard (`public === true`) — see that function's doc
+                // comment. A strict guard here skipped this call for legacy
+                // cards with no `public` field at all (measured: 7 of 7,374
+                // real sale/trade cards), recreating the HIGH-2 ghost-card
+                // bug this call exists to prevent.
                 const userInfo = getUserInfo()
-                if (userInfo && ((existingCard && isPublicCard(existingCard)) || isPublicCard(updatedCard))) {
+                if (userInfo && ((existingCard && isPossiblyPublicCard(existingCard)) || isPossiblyPublicCard(updatedCard))) {
                     syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl)
                         .catch((err: unknown) => {
                             logSanitizedError('[PublicSync] Error syncing card update', err)
@@ -2144,12 +2149,11 @@ export const useCollectionStore = defineStore('collection', () => {
             syncIndexOrQueue(deletedCard, 'delete')
 
             // Remove from public collection (non-blocking, log-only on failure).
-            // TASK-247 tanda 2c review round 3 (MED-A): only call this when
-            // the deleted card actually WAS public — see updateCard's own
-            // isPublicCard guard above for the full rationale. A card that
-            // never had a public_cards doc has nothing to delete and needs
-            // no reconcile.
-            if (isPublicCard(deletedCard)) {
+            // TASK-247 tanda 2c review round 3 (MED-A), permissive guard as
+            // of round 4 (MEDIUM-1) — see updateCard's own isPossiblyPublicCard
+            // guard above for the full rationale. A card that never had a
+            // public_cards doc has nothing to delete and needs no reconcile.
+            if (isPossiblyPublicCard(deletedCard)) {
                 removeCardFromPublic(cardId, authStore.user.id)
                     .catch((err: unknown) => {
                         logSanitizedError('[PublicSync] Error removing card', err)

@@ -236,6 +236,17 @@ export function buildPublicCardDoc(
  * converge on. `scheduleIndexReconcile` is exported so
  * deletePublicCardBatches can still participate in the same shared window
  * instead of getting its own, uncoordinated one.
+ *
+ * Review round 4 (LOW-1), an honesty correction to this comment rather
+ * than a behavior change: the trailing call does NOT re-arm a fresh
+ * window when it fires. Under SUSTAINED editing (not a single burst — new
+ * edits keep arriving right as each window closes), the cadence is a
+ * leading+trailing PAIR roughly every RECONCILE_DEBOUNCE_MS, not "one call
+ * per window" — e.g. calls land near t=0, 2.0, 2.1, 4.1, 4.2... This is
+ * still bounded well below the pre-debounce one-per-edit rate (still
+ * capped by the in-flight guard too), so it was left as-is rather than
+ * adding re-arming complexity for a case that's already a large
+ * improvement over the original bug.
  */
 export const RECONCILE_DEBOUNCE_MS = 2000
 
@@ -346,6 +357,37 @@ export function scheduleIndexReconcile(): void {
 }
 
 /**
+ * TASK-247 tanda 2c review round 4 (MEDIUM-2): syncAllUserCards's own
+ * immediate-reconcile guarantee, restored. It used to call
+ * triggerIndexReconcileNow() directly; round 3 (MED-B) switched it to the
+ * shared scheduleIndexReconcile() for consistency, which regressed the
+ * guarantee — if an earlier edit's coalescing window was still open,
+ * syncAllUserCards's own call became `_reconcileTrailingPending` instead
+ * of firing, silently waiting out whatever was left of that window (up to
+ * RECONCILE_DEBOUNCE_MS) with no unload flush and no server-side safety
+ * net. That's HIGH-A's exact tab-close failure mode, reintroduced on the
+ * one path (an explicit, user-initiated "sync all" the user is told
+ * succeeded via a toast right after) the original code kept immediate on
+ * purpose.
+ *
+ * This cancels any open window outright — not just fires alongside it —
+ * so a stale trailing call from an EARLIER edit doesn't also fire
+ * redundantly once that window would have elapsed; syncAllUserCards's own
+ * call already reconciles everything that trailing call would have
+ * covered (it just rebuilt the ENTIRE public set). Still routes through
+ * triggerIndexReconcileNow's in-flight guard — a currently-running
+ * reconcile is queued, not dropped or raced against.
+ */
+function flushIndexReconcileNow(): void {
+  if (_reconcileWindowTimer) {
+    clearTimeout(_reconcileWindowTimer)
+    _reconcileWindowTimer = null
+  }
+  _reconcileTrailingPending = false
+  triggerIndexReconcileNow()
+}
+
+/**
  * Sync a single card to public_cards collection
  * Only syncs cards with status 'trade' or 'sale' AND public: true
  */
@@ -368,7 +410,25 @@ export async function syncCardToPublic(
     // contact_info/{userId}, que exige estar logueado para leerse.
     await setDoc(publicCardRef, buildPublicCardDoc(card, userId, username, userLocation, userAvatarUrl))
   } else {
-    // Remove from public if not public or status changed
+    // Remove from public if not public or status changed.
+    //
+    // TASK-247 tanda 2c review round 4 (LOW-2), known limitation, left
+    // undocumented until now rather than fixed: this swallows EVERY
+    // deleteDoc failure, not just "doc doesn't exist" (Firestore's delete
+    // is idempotent, so that specific case is expected and fine) — a real
+    // failure (permission-denied, unavailable, ...) is silently discarded
+    // too, and MED-A's isPossiblyPublicCard guard (stores/collection.ts)
+    // means the NEXT edit to a card that's still private won't retry this
+    // delete either, unlike before MED-A when every edit unconditionally
+    // re-attempted it. A genuinely orphaned public_cards doc from a
+    // swallowed real failure now persists until the user runs "sync all"
+    // (syncAllUserCards, which unconditionally rebuilds the whole set) or
+    // edits the card while it's actually public again. Not fixed here:
+    // distinguishing "not-found" from a real failure needs the same
+    // isNotFoundError() check collection.ts's deleteCard already uses
+    // (functions/index.js's card-doc delete path), which is a NEW,
+    // separate change to this function's error handling, not a natural
+    // fit for this round's scope.
     await deleteDoc(publicCardRef).catch(() => { /* doc may not exist */ })
   }
   scheduleIndexReconcile()
@@ -526,23 +586,18 @@ export async function syncAllUserCards(
     }
     await batch.commit()
   }
-  // TASK-247 tanda 2c review round 3 (MED-B): this used to call
-  // triggerIndexReconcileNow() directly, bypassing scheduleIndexReconcile
-  // entirely, on the reasoning that a one-shot bulk action needs no
-  // debounce. That reasoning stopped being safe once scheduleIndexReconcile
-  // gained the leading+trailing design above: calling triggerIndexReconcileNow
-  // directly here never cleared a coalescing window some earlier single-card
-  // edit had already opened, so (a) that window's own trailing call would
-  // still fire ~2s later as a redundant second full sweep, and (b) the
-  // comment's claim that "the toast reflects a reconcile that has actually
-  // started" was false whenever triggerIndexReconcileNow's own in-flight
-  // guard queued this call instead of sending it (e.g. that earlier edit's
-  // leading call was still in flight). Routing through the same shared
-  // scheduleIndexReconcile as every other writer fixes both: it still fires
-  // immediately in the common case (no window open), and when one IS open
-  // it correctly coalesces into that window's single trailing call instead
-  // of firing a redundant, uncoordinated second sweep.
-  scheduleIndexReconcile()
+  // TASK-247 tanda 2c: syncAllUserCards is only ever called from the
+  // explicit, user-initiated "sync all" action (stores/collection.ts's
+  // syncAllToPublic, which awaits it and only then shows a success toast).
+  // Round 3 (MED-B) briefly routed this through the shared
+  // scheduleIndexReconcile() for consistency with every other writer, but
+  // that let an already-open coalescing window (from an earlier, unrelated
+  // single-card edit) silently defer THIS call instead of sending it —
+  // regressing back into HIGH-A's exact tab-close loss window on the one
+  // path the original code kept immediate on purpose. flushIndexReconcileNow
+  // (see its own doc comment) restores that guarantee: it cancels any open
+  // window and fires immediately, rather than being coalesced into one.
+  flushIndexReconcileNow()
 }
 
 /**

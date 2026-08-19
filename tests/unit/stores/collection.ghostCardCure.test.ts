@@ -372,6 +372,46 @@ describe('collection store: ghost card cure (TASK-223)', () => {
 
       expect(mockRemoveCardFromPublic).toHaveBeenCalledTimes(1)
     })
+
+    /**
+     * TASK-247 tanda 2c review round 4 (MEDIUM-1): the guard above used
+     * isPublicCard (`public === true`, strict) — correct for the actual
+     * publish decision inside publicCards.ts, but wrong here. Measured
+     * against production: 7 of 7,374 real sale/trade cards have no
+     * `public` field at all (legacy data). Depending on which load path
+     * hydrated that card locally (server-side card_index always coerces a
+     * missing field to `pb: card.public !== false` → true; the raw
+     * Firestore-doc fallback loader does not coerce anything and leaves it
+     * `undefined`), the SAME card could read as public or not — a strict
+     * `=== true` guard skips removeCardFromPublic/syncCardToPublic
+     * whenever the local copy happens to be `undefined`, recreating
+     * exactly the HIGH-2 ghost-card bug this whole review chain exists to
+     * close, just gated behind which loader happened to run. These lock
+     * the permissive isPossiblyPublicCard (`public !== false`) instead.
+     */
+    it('MEDIUM-1 regression lock: deleteCard DOES call removeCardFromPublic for a sale card with public undefined (legacy data, no field at all)', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'sale' }) // no `public` field — makeCard never sets one
+      expect(card.public).toBeUndefined()
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.deleteCard('card-1')
+
+      expect(mockRemoveCardFromPublic).toHaveBeenCalledTimes(1)
+    })
+
+    it('MEDIUM-1 regression lock: updateCard DOES call syncCardToPublic for a sale card with public undefined (legacy data, no field at all)', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'sale' }) // no `public` field
+      expect(card.public).toBeUndefined()
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.updateCard('card-1', { quantity: 3 })
+
+      expect(mockSyncCardToPublic).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('batchUpdateCards — AC3', () => {

@@ -372,13 +372,51 @@ describe('reconcilePublicCardIndex trigger', () => {
     expect(reconcileCallableMock).not.toHaveBeenCalled()
   })
 
-  it('syncAllUserCards triggers a reconcile through the same shared leading+trailing mechanism as every other writer', async () => {
+  it('syncAllUserCards triggers a reconcile immediately when no window is open', async () => {
     const cards = [makeCard({ id: 'c1', name: 'Time Walk', status: 'sale', public: true })]
 
     await syncAllUserCards(cards, 'user-1', 'alice')
     await vi.advanceTimersByTimeAsync(0)
 
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * TASK-247 tanda 2c review round 4 (MEDIUM-2): syncAllUserCards used to
+   * call triggerIndexReconcileNow() directly (guaranteed RTT-only loss
+   * window, no debounce). Round 3 (MED-B) switched it to the shared
+   * scheduleIndexReconcile() for consistency — but that regressed the
+   * guarantee: if an earlier edit's coalescing window was still open,
+   * syncAllUserCards's own reconcile became `_reconcileTrailingPending`
+   * instead of firing, waiting out whatever was left of that window with
+   * no unload flush and no server-side safety net — HIGH-A's exact tab-
+   * close failure mode, reintroduced on the one path the original code
+   * kept immediate on purpose. The OLD test here ("through the same shared
+   * leading+trailing mechanism") passed identically before and after this
+   * regression because it never opened a window first — a vacuous sensor
+   * for this specific property, called out by review. This one does.
+   */
+  it('MEDIUM-2 regression lock: syncAllUserCards STILL fires immediately even when an earlier edit already opened a coalescing window', async () => {
+    // Open a window: this fires its own leading call immediately.
+    const priorEdit = makeCard({ id: 'prior', name: 'Lightning Bolt', status: 'sale', public: true })
+    await syncCardToPublic(priorEdit, 'user-1', 'alice')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(1) // the prior edit's leading call
+
+    // The window from that edit is still open (RECONCILE_DEBOUNCE_MS hasn't
+    // elapsed) when syncAllUserCards runs.
+    const cards = [makeCard({ id: 'c1', name: 'Time Walk', status: 'sale', public: true })]
+    await syncAllUserCards(cards, 'user-1', 'alice')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Must have fired its OWN immediate call — not merely queued the window's trailing slot.
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(2)
+
+    // And the window it flushed must not ALSO fire a redundant trailing
+    // call once it would have elapsed — syncAllUserCards's flush cancels
+    // the pending window outright rather than leaving it dangling.
+    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(2)
   })
 
   it('HIGH-2 regression lock: removeCardFromPublic triggers an immediate reconcile — deletes must not be silently unindexed', async () => {

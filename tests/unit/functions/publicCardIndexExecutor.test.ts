@@ -20,6 +20,8 @@ import {
   chunkOpsIntoBatches,
   planFirestoreBatches,
   chooseApplyStrategy,
+  buildPublicCardsQuerySpec,
+  requiresCollapseConfirmation,
 } from '../../../functions/lib/publicCardIndexExecutor.js'
 
 describe('estimateOpBytes', () => {
@@ -225,5 +227,61 @@ describe('chooseApplyStrategy', () => {
   it('treats a missing/undefined diagnosis as not malformed (defensive default)', () => {
     const plan = { rebuildRequired: false, chunksToWrite: {}, chunksToDelete: [], meta: {} }
     expect(chooseApplyStrategy(plan, undefined)).toBe('noop')
+  })
+})
+
+describe('buildPublicCardsQuerySpec', () => {
+  // TASK-247 tanda 2b HIGH fix, measured against production: public_cards
+  // is a ROOT collection with a `userId` field, NOT a subcollection under
+  // users/{uid}. `users/<uid>/public_cards` measured 0 documents for a
+  // seller with 6,647 real public_cards documents at the root, filtered by
+  // userId. This is the regression lock for that exact bug: it must never
+  // again point at `users/{uid}/public_cards`.
+  it('points at the root public_cards collection, not a subcollection of users/{uid}', () => {
+    const spec = buildPublicCardsQuerySpec('seller-123')
+    expect(spec.collectionPath).toBe('public_cards')
+    expect(spec.collectionPath).not.toContain('users/')
+    expect(spec.collectionPath).not.toContain('/')
+  })
+
+  it('filters by the userId field with equality', () => {
+    const spec = buildPublicCardsQuerySpec('seller-123')
+    expect(spec.whereField).toBe('userId')
+    expect(spec.whereOp).toBe('==')
+    expect(spec.whereValue).toBe('seller-123')
+  })
+
+  it('throws on a missing or non-string userId rather than building a query that would read every seller', () => {
+    expect(() => buildPublicCardsQuerySpec('')).toThrow()
+    expect(() => buildPublicCardsQuerySpec(undefined as unknown as string)).toThrow()
+    expect(() => buildPublicCardsQuerySpec(null as unknown as string)).toThrow()
+  })
+})
+
+describe('requiresCollapseConfirmation', () => {
+  // TASK-247 tanda 2b safety guard, added after the query bug above was
+  // measured live: any executor that can REDUCE a derived copy needs a
+  // check for "the source read came back suspiciously, catastrophically
+  // empty" for an account that already has a real index — see this
+  // function's own header in publicCardIndexExecutor.js for the full
+  // reasoning.
+  it('requires confirmation when 0 docs were read but the current index already has entries', () => {
+    expect(requiresCollapseConfirmation(0, { count: 6647 })).toBe(true)
+  })
+
+  it('does NOT require confirmation when 0 docs were read and there was never an index (new seller)', () => {
+    expect(requiresCollapseConfirmation(0, null)).toBe(false)
+    expect(requiresCollapseConfirmation(0, undefined)).toBe(false)
+    expect(requiresCollapseConfirmation(0, { count: 0 })).toBe(false)
+  })
+
+  it('does NOT require confirmation when real cards were actually read', () => {
+    expect(requiresCollapseConfirmation(6647, { count: 6647 })).toBe(false)
+    expect(requiresCollapseConfirmation(1, { count: 6647 })).toBe(false)
+  })
+
+  it('does NOT require confirmation when the index count itself is not a usable number', () => {
+    expect(requiresCollapseConfirmation(0, { count: NaN })).toBe(false)
+    expect(requiresCollapseConfirmation(0, {})).toBe(false)
   })
 })

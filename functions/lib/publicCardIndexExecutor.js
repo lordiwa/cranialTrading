@@ -212,6 +212,78 @@ function chooseApplyStrategy(plan, diagnosis) {
   return 'rebuild-by-id';
 }
 
+/**
+ * buildPublicCardsQuerySpec — TASK-247 tanda 2b HIGH fix (measured against
+ * production by the orchestrator, not caught by review or by vitest: the
+ * first version of this executor read `users/{uid}/public_cards`, a
+ * subcollection that DOES NOT EXIST. `public_cards` is a ROOT collection
+ * with a `userId` field — measured: `users/<uid>/public_cards` = 0
+ * documents, `public_cards` filtered by `where userId` = 6,647 for the
+ * same seller. The real subcollections under `users/{uid}` are `binders`,
+ * `cardPriceHistory`, `card_index`, `cards`, `matches_eliminados`,
+ * `priceHistory` — `public_cards` is not among them. `functions/index.js`
+ * already had the correct shape one function away: `buildCardIndex`'s
+ * dashboard counter uses `db.collection('public_cards').count()`
+ * (root-level) — this executor just didn't follow that same pattern for
+ * its own read.
+ *
+ * WHY THIS FUNCTION EXISTS: the actual Firestore query can't be
+ * unit-tested without firebase-admin (functions/index.js's
+ * admin.initializeApp() at require() time — same constraint as every other
+ * Cloud Function in this file). But WHICH collection and WHICH filter get
+ * used is a plain data decision, extracted here so it CAN be locked by a
+ * test — this function returns a description of the query, never the
+ * query itself, and never touches Firestore. Both functions/index.js and
+ * scripts/reconcile-public-card-index.mjs build their real
+ * `db.collection(spec.collectionPath).where(spec.whereField, spec.whereOp,
+ * spec.whereValue)` from this SAME spec, so there is exactly one place
+ * that can go stale about where public_cards actually lives.
+ *
+ * @param {string} userId
+ * @returns {{collectionPath: string, whereField: string, whereOp: '==', whereValue: string}}
+ */
+function buildPublicCardsQuerySpec(userId) {
+  if (!userId || typeof userId !== 'string') {
+    throw new Error(`buildPublicCardsQuerySpec: userId must be a non-empty string, got ${JSON.stringify(userId)}`);
+  }
+  return {
+    collectionPath: 'public_cards',
+    whereField: 'userId',
+    whereOp: '==',
+    whereValue: userId,
+  };
+}
+
+/**
+ * requiresCollapseConfirmation — the safety guard the query bug above
+ * demonstrates this project needs, not just this one bug fixed. ANY
+ * executor that can REDUCE a derived copy needs a check for "the source
+ * read came back suspiciously, catastrophically empty" — a read of 0
+ * source documents for a seller whose index ALREADY has entries is not
+ * evidence the seller emptied their account, it is at least as likely
+ * evidence the read itself is broken (wrong collection, wrong filter, a
+ * transient permission/connectivity failure that returns empty instead of
+ * throwing). Applying a full-rebuild plan built from a false "0 real
+ * cards" would silently collapse a healthy N-entry index to nothing — the
+ * exact "índice vaciado" failure family (TASK-208/TASK-238) this whole
+ * ticket exists to close, reintroduced by the piece meant to repair it.
+ *
+ * This does not (and cannot, from pure data alone) distinguish a real
+ * "the seller removed every public card" from a broken read — both look
+ * identical from here. It exists to force that distinction to be made
+ * EXPLICITLY (a human confirming, or an operator passing an explicit
+ * override flag) rather than happening silently as the default path of an
+ * otherwise-ordinary reconciliation run.
+ *
+ * @param {number} docsCount public_cards documents actually read for this seller
+ * @param {{count?: number}|null|undefined} currentMeta the index's current meta document
+ * @returns {boolean} true when applying a rebuild plan as-is would collapse
+ *   a non-empty index to empty and must be blocked pending explicit confirmation
+ */
+function requiresCollapseConfirmation(docsCount, currentMeta) {
+  return docsCount === 0 && !!currentMeta && Number.isFinite(currentMeta.count) && currentMeta.count > 0;
+}
+
 module.exports = {
   BATCH_MAX_OPS,
   BATCH_MAX_BYTES,
@@ -219,4 +291,6 @@ module.exports = {
   chunkOpsIntoBatches,
   planFirestoreBatches,
   chooseApplyStrategy,
+  buildPublicCardsQuerySpec,
+  requiresCollapseConfirmation,
 };

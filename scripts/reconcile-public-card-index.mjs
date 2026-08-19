@@ -44,6 +44,21 @@
  * --dry-run reads and diagnoses only — prints what WOULD be written and
  * exits without touching Firestore. Always run --dry-run before the first
  * real invocation against a seller you haven't reconciled before.
+ *
+ * Prints `proyecto: <projectId>` as its very first line, always, before
+ * touching Firestore — a tool that writes/deletes derived index data must
+ * never let which project it targets depend silently on whichever .env
+ * happened to load. Against `cranial-trading` (production) without
+ * --dry-run, it additionally refuses to run at all unless --yes-production
+ * is also passed.
+ *
+ * --force-empty-index: required to let a run through when the read comes
+ * back with 0 public_cards documents for a seller whose index already has
+ * entries — refused by default (see requiresCollapseConfirmation in
+ * functions/lib/publicCardIndexExecutor.js). This is deliberately a
+ * SEPARATE flag from --dry-run/--yes-production: it must be typed on
+ * purpose after confirming by some other means that the 0-document read is
+ * real and not a broken query.
  */
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldPath } from 'firebase-admin/firestore';
@@ -57,7 +72,12 @@ import {
   planPublicIndexReconciliation,
   DEFAULT_CHUNK_TARGET_SIZE,
 } from '../functions/lib/publicCardIndex.js';
-import { planFirestoreBatches, chooseApplyStrategy } from '../functions/lib/publicCardIndexExecutor.js';
+import {
+  planFirestoreBatches,
+  chooseApplyStrategy,
+  buildPublicCardsQuerySpec,
+  requiresCollapseConfirmation,
+} from '../functions/lib/publicCardIndexExecutor.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -74,13 +94,34 @@ const val = (name, fallback = null) => {
 const dryRun = has('--dry-run');
 const targetUid = val('uid');
 const allSellers = has('--all');
+// TASK-247 tanda 2b safety guard: a rebuild that would collapse a non-empty
+// index to 0 entries (see requiresCollapseConfirmation) is refused by
+// default, in this script exactly like in the callable function — this
+// flag is the ONLY way past that refusal, and it must be typed
+// deliberately, never implied by another flag.
+const forceEmptyIndex = has('--force-empty-index');
 
 if (!targetUid && !allSellers) {
   console.error('Falta --uid=<userId> o --all. Ver la cabecera del archivo para el uso completo.');
   process.exit(1);
 }
 
+// TASK-247 tanda 2b: an admin script that writes and deletes derived index
+// data MUST say which project it's about to touch, every run, unconditionally
+// — this used to resolve FIREBASE_PROJECT || VITE_FIREBASE_PROJECT_ID ||
+// 'cranial-trading-dev' in silence, so which project got written depended on
+// whatever .env happened to be loaded. Printed BEFORE any Firestore call.
 const projectId = process.env.FIREBASE_PROJECT || process.env.VITE_FIREBASE_PROJECT_ID || 'cranial-trading-dev';
+console.log(`proyecto: ${projectId}`);
+if (projectId === 'cranial-trading' && !dryRun && !has('--yes-production')) {
+  console.error(
+    'Este script va a ESCRIBIR/BORRAR en el proyecto de PRODUCCION (cranial-trading). ' +
+      'Repetí el comando agregando --yes-production si es realmente lo que querés, o ' +
+      'agregá --dry-run para solo diagnosticar sin escribir nada.'
+  );
+  process.exit(1);
+}
+
 initializeApp({ credential: applicationDefault(), projectId });
 const db = getFirestore();
 
@@ -110,7 +151,14 @@ async function fetchScryfallCacheMap(scryfallIds) {
 }
 
 async function reconcileOneSeller(userId) {
-  const publicCardsRef = db.collection(`users/${userId}/public_cards`);
+  // HIGH fix (TASK-247 tanda 2b, measured against production): public_cards
+  // is a ROOT collection with a `userId` field, NOT a subcollection of
+  // users/{uid}. See buildPublicCardsQuerySpec's header in
+  // functions/lib/publicCardIndexExecutor.js for the measured detail — this
+  // script and functions/index.js's reconcilePublicCardIndexForUser both
+  // build their query from that SAME spec now.
+  const querySpec = buildPublicCardsQuerySpec(userId);
+  const publicCardsRef = db.collection(querySpec.collectionPath).where(querySpec.whereField, querySpec.whereOp, querySpec.whereValue);
   const indexRef = db.collection(`users/${userId}/public_card_index`);
   const metaRef = indexRef.doc('_meta');
 
@@ -140,6 +188,20 @@ async function reconcileOneSeller(userId) {
     currentChunks.push(doc.data());
   }
   const currentMeta = metaSnapshot.exists ? metaSnapshot.data() : null;
+
+  // SAFETY GUARD (TASK-247 tanda 2b): see requiresCollapseConfirmation's own
+  // header for the reasoning — 0 documents read for a seller whose index
+  // already has entries is refused by default, not silently applied.
+  // --force-empty-index is the one deliberate way past this per invocation.
+  if (requiresCollapseConfirmation(docs.length, currentMeta) && !forceEmptyIndex) {
+    console.error(
+      `[${userId}] RECHAZADO: se leyeron 0 documentos de public_cards pero el indice existente ` +
+        `todavia tiene ${currentMeta.count} entradas. Aplicar el plan tal cual VACIARIA un indice sano. ` +
+        'Si de verdad el vendedor borro todas sus cartas publicas, repeti con --force-empty-index ' +
+        'despues de confirmar por otro medio que la lectura en 0 es real.'
+    );
+    return { userId, strategy: 'refused-collapse', wrote: 0, deleted: 0, refused: true };
+  }
 
   const chunkTargetSize =
     currentMeta && Number.isFinite(currentMeta.chunkTargetSize) && currentMeta.chunkTargetSize > 0

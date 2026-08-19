@@ -32,7 +32,12 @@ const { isDualFaced, buildIndexEntry } = require("./lib/cardIndexEntry");
 // in either module touches Firestore; reconcilePublicCardIndex below is the
 // only thing that does.
 const { buildPublicIndex, diagnosePublicIndex, planPublicIndexReconciliation, DEFAULT_CHUNK_TARGET_SIZE } = require("./lib/publicCardIndex");
-const { planFirestoreBatches, chooseApplyStrategy } = require("./lib/publicCardIndexExecutor");
+const {
+  planFirestoreBatches,
+  chooseApplyStrategy,
+  buildPublicCardsQuerySpec,
+  requiresCollapseConfirmation,
+} = require("./lib/publicCardIndexExecutor");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -1891,8 +1896,10 @@ exports.queryCardIndex = onCall(
 // Server-side executor for the public-profile index designed in tandas
 // 1/2a (functions/lib/publicCardEntry.js, functions/lib/publicCardIndex.js)
 // and its batching/strategy layer (functions/lib/publicCardIndexExecutor.js,
-// this tanda). Reads a seller's users/{uid}/public_cards documents plus
-// their scryfall_cache join, diagnoses the seller's existing
+// this tanda). Reads the root public_cards collection filtered to this
+// seller's userId (see buildPublicCardsQuerySpec — NOT a subcollection of
+// users/{uid}, a HIGH bug measured in an earlier version of this file)
+// plus their scryfall_cache join, diagnoses the seller's existing
 // users/{uid}/public_card_index against them, and — if divergent — writes
 // the repair. AC10: this is the reconciliation this project has never had
 // for card_index (TASK-208/TASK-238) or for public_cards itself
@@ -1965,7 +1972,15 @@ exports.queryCardIndex = onCall(
  * @returns {Promise<{strategy: string, isDivergent: boolean, reason: string, totalChunks: number, count: number}>}
  */
 async function reconcilePublicCardIndexForUser(db, userId) {
-  const publicCardsRef = db.collection(`users/${userId}/public_cards`);
+  // HIGH fix (TASK-247 tanda 2b, measured against production): public_cards
+  // is a ROOT collection with a `userId` field, NOT a subcollection of
+  // users/{uid} — see buildPublicCardsQuerySpec's own header in
+  // publicCardIndexExecutor.js for the full measured detail. Both this
+  // function and scripts/reconcile-public-card-index.mjs build their query
+  // from that SAME spec so there is exactly one place that can go stale
+  // about where public_cards actually lives.
+  const querySpec = buildPublicCardsQuerySpec(userId);
+  const publicCardsRef = db.collection(querySpec.collectionPath).where(querySpec.whereField, querySpec.whereOp, querySpec.whereValue);
   const indexRef = db.collection(`users/${userId}/public_card_index`);
   const metaRef = indexRef.doc('_meta');
 
@@ -1978,7 +1993,10 @@ async function reconcilePublicCardIndexForUser(db, userId) {
   // for this project (ticket header): 6,647 for the largest seller today,
   // well under a single page — cursor pagination mirrors buildCardIndex's
   // own Phase 1 so this doesn't regress if a seller's public inventory
-  // ever approaches the 25k-100k target-market scale.
+  // ever approaches the 25k-100k target-market scale. orderBy(documentId())
+  // on top of the userId equality filter above needs no composite index
+  // (a single equality filter plus an order on the document id itself is
+  // exempt from Firestore's composite-index requirement).
   const docs = [];
   let lastDoc = null;
   const READ_CHUNK = 2000;
@@ -2012,6 +2030,24 @@ async function reconcilePublicCardIndexForUser(db, userId) {
     currentChunks.push(doc.data());
   }
   const currentMeta = metaSnapshot.exists ? metaSnapshot.data() : null;
+
+  // SAFETY GUARD (TASK-247 tanda 2b, added after the query bug above was
+  // measured live): reading 0 public_cards documents for a seller whose
+  // index ALREADY has entries is not evidence the seller emptied their
+  // account — it is at least as likely evidence the read itself is broken.
+  // Refuse to apply a plan that would collapse a healthy index to nothing;
+  // report and stop instead. See requiresCollapseConfirmation's own header
+  // for the full reasoning.
+  if (requiresCollapseConfirmation(docs.length, currentMeta)) {
+    const message =
+      `reconcilePublicCardIndex refused for user ${userId}: read 0 public_cards documents but the ` +
+      `existing index still has ${currentMeta.count} entries. Applying a rebuild as-is would collapse ` +
+      'a non-empty index to empty — this is refused by default rather than applied silently. If the ' +
+      'seller genuinely removed every public card, use scripts/reconcile-public-card-index.mjs with its ' +
+      'explicit override flag after confirming the 0-document read is real.';
+    logger.error(`[reconcilePublicCardIndex] ${message}`);
+    throw new HttpsError('failed-precondition', message);
+  }
 
   // Contract from publicCardIndex.js's header (MEDIUM-2): diagnosis and
   // freshBuild MUST share the exact same chunkTargetSize, resolved here

@@ -14,9 +14,8 @@ import type { Card } from '../types/card'
  * decision (TASK-085's whitelist: a card must be explicitly opted in to be
  * written to the anonymous-readable public_cards collection) and must
  * stay strict for that reason. This one answers a different, permissive
- * question — "should the public-sync machinery even look at this card" —
- * matching how the server-side card_index / functions/lib/cardIndexEntry.js
- * already hydrate a missing `public` field (`pb: card.public !== false`).
+ * question — "should the public-sync machinery even look at this card".
+ *
  * A strict guard here reintroduces the exact ghost-card bug this review
  * chain closed for the delete path (HIGH-2): measured against production,
  * 7 of 7,374 real sale/trade cards have no `public` field at all, and

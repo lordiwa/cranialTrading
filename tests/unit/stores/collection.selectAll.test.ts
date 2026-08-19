@@ -39,8 +39,19 @@ vi.mock('@/services/scryfallCache', () => ({
   getCardsByIds: vi.fn().mockResolvedValue([]),
 }))
 
+// `isPossiblyPublicCard` is in this factory even though nothing in THIS
+// file exercises updateCard/deleteCard yet. Without it, the day someone
+// adds a delete test here, the missing export throws INSIDE those
+// functions' outer try — so the error is swallowed by the catch and shows
+// up as a silent `false` plus an error toast, not as a failing test. A
+// mock factory that is one key short of the real module is a trap that
+// only springs later.
 vi.mock('@/utils/publicSyncFilter', () => ({
   getCardsNeedingPublicSync: vi.fn().mockReturnValue([]),
+  isPossiblyPublicCard: vi.fn(
+    (card: { status?: string; public?: boolean }) =>
+      (card.status === 'sale' || card.status === 'trade') && card.public !== false
+  ),
 }))
 
 import { setActivePinia, createPinia } from 'pinia'

@@ -141,19 +141,33 @@ export interface PublicPreference {
 }
 
 /**
- * Whether a card belongs in public_cards — sale/trade status AND explicitly
- * marked public. TASK-085: whitelist sale/trade explicitly (not a
- * 'collection' blacklist) — public_cards is now readable by anonymous
- * users, so a 'wishlist' card marked public must never slip through as
- * "not collection".
+ * The STRICT predicate — sale/trade status AND `public === true` — and the
+ * one that gates WRITING to public_cards. TASK-085: sale/trade is a
+ * whitelist, not a 'collection' blacklist, because public_cards is readable
+ * by anonymous users and a 'wishlist' card marked public must never slip
+ * through as "not collection". Strict on `public` for the same reason: that
+ * collection only ever receives what was explicitly opted in.
  *
- * Exported (TASK-247 tanda 2c review round 3, MED-A) so stores/collection.ts
- * can decide WHETHER a mutation could even touch the public set — using
- * the OLD and NEW card state it already has (updateCard/deleteCard), not
- * by guessing inside this file's writers, which never see "old" state at
- * all. See collection.ts's updateCard/deleteCard call sites.
+ * NOT to be confused with `isPossiblyPublicCard` (src/utils/publicSyncFilter.ts),
+ * which is PERMISSIVE (`public !== false`) and answers a different question:
+ * should the sync machinery even LOOK at this card. Two predicates, two
+ * jobs — write-gate vs. look-gate.
+ *
+ * That distinction is not academic: choosing the wrong one is exactly the
+ * bug TASK-247 tanda 2c round 4 (MEDIUM-1/HIGH-2) had to fix. A strict guard
+ * on the LOOK question skipped legacy cards carrying no `public` field at
+ * all (measured: 7 of 7,374 real sale/trade cards), orphaning their
+ * public_cards documents — the ghost-card bug.
+ *
+ * Deliberately module-private. Round 3 (MED-A) exported it for
+ * stores/collection.ts's updateCard/deleteCard guards; round 4 replaced
+ * those call sites with `isPossiblyPublicCard` precisely because the strict
+ * predicate was the wrong one there, leaving this export with no consumer
+ * outside this file. An exported strict predicate is what the next reader
+ * reaches for by default, so it stays unexported until something outside
+ * genuinely needs the WRITE gate.
  */
-export function isPublicCard(card: Card): boolean {
+function isPublicCard(card: Card): boolean {
   return (card.status === 'sale' || card.status === 'trade') && card.public === true
 }
 

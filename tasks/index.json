@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-19T04:01:14.003Z",
+  "generated_at": "2026-08-19T05:41:53.292Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1360,7 +1360,7 @@
     {
       "key": "TASK-247",
       "title": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales",
-      "status": "todo",
+      "status": "in_review",
       "priority": "critical"
     }
   ]

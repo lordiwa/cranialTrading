@@ -25,6 +25,14 @@ const { mapWithConcurrency } = require("./lib/concurrency");
 // applyCardIndexDelta — the two used to disagree, which is what blanked
 // type_line/cmc/colors/rarity on every status change.
 const { isDualFaced, buildIndexEntry } = require("./lib/cardIndexEntry");
+// TASK-247 tanda 2b: pure assembly/diagnosis/reconciliation-planning for the
+// public-profile index (tandas 1/2a) plus the pure batching/strategy layer
+// this tanda adds — see functions/lib/publicCardIndex.js and
+// functions/lib/publicCardIndexExecutor.js for the full contracts. Nothing
+// in either module touches Firestore; reconcilePublicCardIndex below is the
+// only thing that does.
+const { buildPublicIndex, diagnosePublicIndex, planPublicIndexReconciliation, DEFAULT_CHUNK_TARGET_SIZE } = require("./lib/publicCardIndex");
+const { planFirestoreBatches, chooseApplyStrategy } = require("./lib/publicCardIndexExecutor");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -1876,6 +1884,249 @@ exports.queryCardIndex = onCall(
     }
   }
 );
+
+// ============================================================
+// RECONCILE PUBLIC CARD INDEX — TASK-247 tanda 2b/5
+//
+// Server-side executor for the public-profile index designed in tandas
+// 1/2a (functions/lib/publicCardEntry.js, functions/lib/publicCardIndex.js)
+// and its batching/strategy layer (functions/lib/publicCardIndexExecutor.js,
+// this tanda). Reads a seller's users/{uid}/public_cards documents plus
+// their scryfall_cache join, diagnoses the seller's existing
+// users/{uid}/public_card_index against them, and — if divergent — writes
+// the repair. AC10: this is the reconciliation this project has never had
+// for card_index (TASK-208/TASK-238) or for public_cards itself
+// (TASK-228) — designed and shipped in the SAME ticket that adds this
+// third derived copy, not deferred.
+//
+// STORAGE LAYOUT: users/{uid}/public_card_index/{chunkId} (chunkId as a
+// string, e.g. "0", "1" — Firestore doc ids are always strings) holds
+// { id: number, entries: object[] } exactly as publicCardIndex.js's
+// buildPublicIndex produces per chunk. users/{uid}/public_card_index/_meta
+// holds the index's { schemaVersion, totalChunks, count, chunkTargetSize }
+// — "_meta" can never collide with a numeric chunk id.
+//
+// AUTHORIZATION (ticket-mandated write-up). This function is SELF-ONLY:
+// `targetUserId = request.auth.uid`, exactly the pattern buildCardIndex and
+// queryCardIndex already use, and there is no client-suppliable userId
+// parameter anywhere in request.data for this function to trust — TASK-214
+// closed exactly that hole for queryCardIndex (a client-supplied userId let
+// any logged-in caller read another user's card_index, which holds the
+// WHOLE inventory, not just what's public) and TASK-211 closed the same
+// shape for buildCardIndex. Reintroducing an optional targetUserId here,
+// even scoped to public_cards only, would be the third occurrence of that
+// exact family.
+//
+// The ticket also asks for an administrative path that CAN target an
+// arbitrary seller (for scheduled/ops-triggered reconciliation across all
+// sellers, not just the one who happens to be viewing their own profile).
+// This project has no admin-claim / role infrastructure yet (grepped:
+// no isAdmin, no custom claims, anywhere in functions/ or src/), and
+// building one is out of this tanda's closed scope. Rather than invent a
+// new HTTP-reachable "trust me, I'm an admin" check with no existing
+// precedent to model it on — the exact shape of mistake TASK-214/TASK-211
+// exist to prevent — the administrative path is a maintenance script
+// (scripts/reconcile-public-card-index.mjs, added alongside this function)
+// using firebase-admin with `gcloud auth application-default login`
+// credentials, the SAME pattern already established by
+// scripts/card-index-fixture.mjs and by the nightly E2E admin teardown
+// (e2e/helpers/admin.ts, GOOGLE_APPLICATION_CREDENTIALS) for exactly this
+// project's existing "an operator with real credentials, not an HTTP
+// caller" administrative access model. The script requires this module's
+// exported `reconcilePublicCardIndexForUser` directly (plain async
+// function, not the onCall wrapper) with its OWN admin.initializeApp() —
+// it never calls the callable Function and never needs request.auth at
+// all, so no arbitrary-userId path is ever exposed over HTTPS.
+// ============================================================
+
+/**
+ * The actual reconciliation, exported separately from the onCall wrapper so
+ * an admin script can invoke it directly (with its own admin SDK
+ * credentials) without going through Cloud Functions HTTPS — see the
+ * AUTHORIZATION note above. `db` is passed in rather than read from the
+ * module-level `db` so a script initializing its own admin app can supply
+ * its own Firestore instance; the onCall wrapper below passes the
+ * module-level `db`.
+ *
+ * NOT covered by vitest (documented per TASK-247 tanda 2b instructions):
+ * this function does real Firestore reads/writes and functions/index.js
+ * cannot be require()'d by vitest (admin.initializeApp() at module load,
+ * no emulator harness — TASK-236, same constraint documented on every
+ * other Cloud Function in this file). Everything decision-shaped this
+ * function depends on — chunk assembly, divergence diagnosis, plan
+ * construction, batch slicing, and strategy selection — is unit-tested in
+ * functions/lib/publicCardIndex.js and
+ * functions/lib/publicCardIndexExecutor.js's own test files; this function
+ * is the untested wiring those tests are meant to make thin enough not to
+ * need its own coverage.
+ *
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {string} userId
+ * @returns {Promise<{strategy: string, isDivergent: boolean, reason: string, totalChunks: number, count: number}>}
+ */
+async function reconcilePublicCardIndexForUser(db, userId) {
+  const publicCardsRef = db.collection(`users/${userId}/public_cards`);
+  const indexRef = db.collection(`users/${userId}/public_card_index`);
+  const metaRef = indexRef.doc('_meta');
+
+  const PUBLIC_CARD_FIELDS = [
+    'scryfallId', 'cardId', 'cardName', 'cardNameLower', 'quantity', 'price',
+    'status', 'foil', 'condition', 'setCode', 'edition', 'updatedAt',
+  ];
+
+  // Phase 1: read every public_cards doc for this seller. Measured ceiling
+  // for this project (ticket header): 6,647 for the largest seller today,
+  // well under a single page — cursor pagination mirrors buildCardIndex's
+  // own Phase 1 so this doesn't regress if a seller's public inventory
+  // ever approaches the 25k-100k target-market scale.
+  const docs = [];
+  let lastDoc = null;
+  const READ_CHUNK = 2000;
+  while (true) {
+    let query = publicCardsRef
+      .select(...PUBLIC_CARD_FIELDS)
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .limit(READ_CHUNK);
+    if (lastDoc) query = query.startAfter(lastDoc);
+    // eslint-disable-next-line no-await-in-loop
+    const snapshot = await query.get();
+    if (snapshot.empty) break;
+    for (const doc of snapshot.docs) docs.push(doc.data());
+    lastDoc = snapshot.docs[snapshot.docs.length - 1];
+    if (snapshot.docs.length < READ_CHUNK) break;
+  }
+
+  // Phase 2: scryfall_cache join (AC9) — same shared helper buildCardIndex
+  // and applyCardIndexDelta already use for card_index.
+  const uniqueScryfallIds = [...new Set(docs.map((d) => d.scryfallId).filter(Boolean))];
+  const scryfallCacheMap = await fetchScryfallCacheMap(uniqueScryfallIds);
+  const cacheByScryfallId = {};
+  for (const [scryfallId, cacheDoc] of scryfallCacheMap) cacheByScryfallId[scryfallId] = cacheDoc;
+
+  // Phase 3: read the existing index (chunks + meta) as it currently
+  // stands in Firestore.
+  const [chunkSnapshot, metaSnapshot] = await Promise.all([indexRef.get(), metaRef.get()]);
+  const currentChunks = [];
+  for (const doc of chunkSnapshot.docs) {
+    if (doc.id === '_meta') continue;
+    currentChunks.push(doc.data());
+  }
+  const currentMeta = metaSnapshot.exists ? metaSnapshot.data() : null;
+
+  // Contract from publicCardIndex.js's header (MEDIUM-2): diagnosis and
+  // freshBuild MUST share the exact same chunkTargetSize, resolved here
+  // once and passed explicitly to both — never left for each call to
+  // resolve on its own.
+  const chunkTargetSize =
+    (currentMeta && Number.isFinite(currentMeta.chunkTargetSize) && currentMeta.chunkTargetSize > 0
+      ? currentMeta.chunkTargetSize
+      : DEFAULT_CHUNK_TARGET_SIZE);
+
+  const diagnosis = diagnosePublicIndex(currentChunks, currentMeta, docs, { chunkTargetSize });
+  const freshBuild = buildPublicIndex(docs, cacheByScryfallId, { chunkTargetSize });
+  const plan = planPublicIndexReconciliation(diagnosis, freshBuild);
+  const strategy = chooseApplyStrategy(plan, diagnosis);
+
+  logger.info(
+    `[reconcilePublicCardIndex] user ${userId}: strategy=${strategy} isDivergent=${diagnosis.isDivergent} ` +
+      `missing=${diagnosis.missing.length} orphaned=${diagnosis.orphaned.length} misplaced=${diagnosis.misplaced.length} ` +
+      `duplicated=${diagnosis.duplicated.length} hasMalformedChunkId=${diagnosis.hasMalformedChunkId} reason="${plan.reason}"`
+  );
+
+  if (strategy === 'noop') {
+    return {
+      strategy,
+      isDivergent: diagnosis.isDivergent,
+      reason: plan.reason,
+      totalChunks: currentMeta ? currentMeta.totalChunks : freshBuild.meta.totalChunks,
+      count: docs.length,
+    };
+  }
+
+  const { writeBatches, metaOp, deleteBatches } = planFirestoreBatches(plan);
+
+  // Ordering (see functions/lib/publicCardIndexExecutor.js header for the
+  // full atomicity write-up): writes first, meta flip second, deletes
+  // last — every intermediate state stays at least as good as the state
+  // before the rebuild started, never a state with fewer live cards
+  // visible than actually exist.
+  for (const batch of writeBatches) {
+    const writer = db.batch();
+    for (const op of batch) writer.set(indexRef.doc(String(op.chunkId)), op.data);
+    // eslint-disable-next-line no-await-in-loop
+    await writer.commit();
+  }
+
+  await metaRef.set(metaOp.data);
+
+  if (strategy === 'wipe-subcollection') {
+    // hasMalformedChunkId: a non-numeric chunk `id` field can't be named by
+    // plan.chunksToDelete (a list of numeric chunk ids), so it can't be
+    // named by deleteBatches either — the only way to remove it is by its
+    // real Firestore document reference. List every doc actually in the
+    // subcollection and delete whichever ones are NOT a valid chunk id in
+    // the new [0, totalChunks) range (and isn't `_meta`, already handled
+    // above) — this also cleans up any in-range doc that happened to have
+    // the malformed content but a numeric-looking path, which the write
+    // phase above may not have targeted if its actual id field disagreed
+    // with its document path.
+    const validChunkDocIds = new Set(
+      Array.from({ length: freshBuild.meta.totalChunks }, (_, i) => String(i))
+    );
+    const allRefs = await indexRef.listDocuments();
+    const staleRefs = allRefs.filter((ref) => ref.id !== '_meta' && !validChunkDocIds.has(ref.id));
+    for (let i = 0; i < staleRefs.length; i += 500) {
+      const batch = db.batch();
+      for (const ref of staleRefs.slice(i, i + 500)) batch.delete(ref);
+      // eslint-disable-next-line no-await-in-loop
+      await batch.commit();
+    }
+    logger.info(`[reconcilePublicCardIndex] user ${userId}: wiped ${staleRefs.length} stale/malformed chunk doc(s)`);
+  } else {
+    for (const batch of deleteBatches) {
+      const writer = db.batch();
+      for (const op of batch) writer.delete(indexRef.doc(String(op.chunkId)));
+      // eslint-disable-next-line no-await-in-loop
+      await writer.commit();
+    }
+  }
+
+  return {
+    strategy,
+    isDivergent: diagnosis.isDivergent,
+    reason: plan.reason,
+    totalChunks: freshBuild.meta.totalChunks,
+    count: docs.length,
+  };
+}
+
+/**
+ * reconcilePublicCardIndex — self-only onCall wrapper. See the
+ * AUTHORIZATION comment block above this section for why there is no
+ * client-suppliable target userId and how an arbitrary-seller
+ * administrative path is provided instead (scripts/reconcile-public-card-index.mjs).
+ */
+exports.reconcilePublicCardIndex = onCall(
+  { maxInstances: 3, timeoutSeconds: 300, memory: '2GiB' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const userId = request.auth.uid;
+    try {
+      return await reconcilePublicCardIndexForUser(db, userId);
+    } catch (error) {
+      if (error.code) throw error; // Re-throw HttpsError
+      logger.error('[reconcilePublicCardIndex] Error:', error);
+      throw new HttpsError('internal', 'Failed to reconcile public card index');
+    }
+  }
+);
+
+// Exported for the admin maintenance script (see AUTHORIZATION note above)
+// — not part of the Cloud Functions deploy surface itself, just a plain
+// export other Node code in this repo can require().
+exports.reconcilePublicCardIndexForUser = reconcilePublicCardIndexForUser;
 
 // ============================================================
 // CARD IMAGE PROXY/CACHE — TASK-241 (reopened 2026-08-18)

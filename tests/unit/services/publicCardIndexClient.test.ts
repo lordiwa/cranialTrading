@@ -59,6 +59,20 @@ function makeRow(overrides: Partial<PublicIndexCard> = {}): PublicIndexCard {
   }
 }
 
+/** A land: no colors of its own, colour comes entirely from produced_mana. */
+function makeLandRow(overrides: Partial<PublicIndexCard> = {}): PublicIndexCard {
+  return makeRow({
+    s: '00000000-0000-4000-8000-00000000000f',
+    i: 'card-swamp',
+    n: 'Swamp',
+    co: [],
+    r: 'c',
+    t: 'Basic Land — Swamp',
+    pm: ['B'],
+    ...overrides,
+  })
+}
+
 function makeResponse(overrides: Record<string, unknown> = {}) {
   return {
     cards: [makeRow()],
@@ -164,6 +178,16 @@ describe('publicIndexCardToCard', () => {
     expect(publicIndexCardToCard(makeRow({ sc: '' })).setCode).toBeUndefined()
   })
 
+  it('carries produced_mana through, so a land keeps its colour client-side', () => {
+    const card = publicIndexCardToCard(makeLandRow())
+    expect(card.produced_mana).toEqual(['B'])
+    expect(card.colors).toEqual([])
+  })
+
+  it('omits produced_mana entirely for a card that does not produce mana', () => {
+    expect(publicIndexCardToCard(makeRow())).not.toHaveProperty('produced_mana')
+  })
+
   it('keeps a split card name intact, // included', () => {
     const card = publicIndexCardToCard(
       makeRow({ n: 'Blightreaper Thallid // Blightsower Thallid' })
@@ -222,8 +246,23 @@ describe('queryUserPublicCardIndex', () => {
   it('carries the facets and indexState through untouched', async () => {
     mockCallable.mockResolvedValue({ data: makeResponse() })
     const page = await queryUserPublicCardIndex('seller-1', {})
-    expect(page.facets.color.B).toBe(1412)
+    expect(page.facets?.color.B).toBe(1412)
     expect(page.indexState.missing).toBe(474)
     expect(page.indexState.totalChunks).toBe(32)
+  })
+
+  it('passes a null facets payload through rather than faking counts', async () => {
+    // Mid-rebuild the server refuses to state counts at all. Substituting {}
+    // here would let a chip render "0" where the honest answer is "unknown".
+    mockCallable.mockResolvedValue({
+      data: makeResponse({
+        total: null,
+        facets: null,
+        indexState: { ...makeResponse().indexState, partial: true },
+      }),
+    })
+    const page = await queryUserPublicCardIndex('seller-1', {})
+    expect(page.facets).toBeNull()
+    expect(page.total).toBeNull()
   })
 })

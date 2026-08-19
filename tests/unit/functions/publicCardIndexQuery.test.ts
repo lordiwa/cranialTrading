@@ -6,7 +6,15 @@
  * it. The regression being closed is measured, not theoretical: the public
  * profile filters and searches over the ~60 documents that happen to already
  * be paginated into memory, so Rafael's profile reports 36 black cards where
- * 1,412 public_cards documents are black.
+ * over a thousand public_cards documents are black.
+ *
+ * A NOTE ON THE NUMBERS. Production card counts are a LIVE count and move
+ * whenever Rafael publishes or unpublishes anything: the black slice measured
+ * 1,412 on 2026-08-18 and 1,443 on 2026-08-19. Any production figure quoted
+ * here is a DATED measurement of what the AC was written against, not a
+ * maintained value — the current ones live in the TASK-247 ticket. The
+ * FIXTURE numbers asserted below are exact and are the fixture's own, not
+ * production's; what has to match production is the SHAPE (see MEDIUM-4).
  *
  * Same dependency-free CommonJS technique as publicCardEntry /
  * publicCardIndex / publicCardIndexReconciler: the query module takes `db` as
@@ -14,16 +22,21 @@
  * real read orchestration (chunk range, `_meta` filtering, mid-rebuild
  * detection) without firebase-admin and without an emulator (TASK-236).
  *
- * THE NATURAL LOCKS. The AC numbers are the assertions — a synthetic index is
- * built to reproduce them exactly, so an implementation that "passes" by
- * counting something else (unique scryfallId = 1,049; copies summed by
- * quantity = 2,658) fails visibly instead of looking right:
- *   AC2  black = 1,412 DOCUMENTS, with the four measured negative controls
- *        (green 1,161 / red 1,619 / white 1,457 / blue 1,354). OR-inclusive
- *        by letter — Rafael's decision, not relitigable: a B/G card counts
- *        under BOTH black and green, and there is no separate 'Multicolor'
- *        bucket. The five controls sum to 7,003 over 6,647 documents, and
- *        that overshoot is the semantics working, not a bug.
+ * THE NATURAL LOCKS. The AC's colour counts are reproduced exactly by a
+ * synthetic index, and the fixture is built so that the three UNITS one could
+ * confuse — documents, unique scryfallId, copies summed by quantity — are
+ * three clearly different numbers. (Round 1 claimed this file reproduced
+ * production's own 1,049 unique ids and 2,658 copies. It never did: it
+ * produced 6,640 and 6,661 against 6,647 documents, a 0.1% spread that no
+ * dedupe bug could ever break. Corrected in round 2, MEDIUM-4 — the fixture
+ * now carries production's ~1.3 documents per id.)
+ *   AC2  black = 1,412 DOCUMENTS, with the four negative controls measured
+ *        alongside it (green 1,161 / red 1,619 / white 1,457 / blue 1,354).
+ *        OR-inclusive by letter — Rafael's decision, not relitigable: a B/G
+ *        card counts under BOTH black and green, and there is no separate
+ *        'Multicolor' bucket. The five controls sum to more than the 6,647
+ *        documents in the fixture, and that overshoot is the semantics
+ *        working, not a bug.
  *   AC3  'blight' = 14 DOCUMENTS across 7 unique names. Includes the split
  *        card 'Blightreaper Thallid // Blightsower Thallid': the `//` is
  *        never tokenized away, and `.includes` returns a boolean, so a name
@@ -46,6 +59,7 @@ import {
   filterPublicIndexEntries,
   sortPublicIndexEntries,
   toPublicIndexCard,
+  computePublicFacets,
   queryPublicCardIndexForUser,
   PUBLIC_INDEX_CARD_FIELDS,
 } from '../../../functions/lib/publicCardIndexQuery.js'
@@ -55,11 +69,18 @@ import { buildPublicIndex } from '../../../functions/lib/publicCardIndex.js'
 //
 // Composition, chosen so the five colour totals and the document total are
 // simultaneously exact (see the header for why the totals overshoot):
+// Colour composition is exact so the AC2 counts land on the nose; identity
+// and quantity are then reshaped by applyRealisticMultiplicity so the
+// documents:ids:copies ratios match production's (MEDIUM-4).
 //   562 mono-B, 311 mono-G, 1457 mono-W, 1354 mono-U, 1619 mono-R,
 //   850 dual B/G, 20 genuinely colourless (co: [] and NO flags — these must
 //   stay reachable by a 'C' chip), 474 with no usable colour source at all
-//   (`cu`, the measured 7.1% gap), of which 17 also have no scryfall_cache
-//   document at all (`x`, also measured).
+//   (`cu`, the measured 7.1% gap), of which 17 also carry `x` (no
+//   scryfall_cache document at all).
+//
+//   Keep the `x` group even though that gap re-measured as ZERO in production
+//   on 2026-08-19: `x` is a live code path in publicCardEntry.js, and this is
+//   now its only coverage. A gap closing is not a gap becoming impossible.
 //     562 + 311 + 1457 + 1354 + 1619 + 850 + 20 + 474 = 6647
 //     B = 562 + 850 = 1412     G = 311 + 850 = 1161
 //     W = 1457     U = 1354     R = 1619
@@ -103,6 +124,37 @@ interface SyntheticEntry {
   fa: boolean
   x?: number
   cu?: number
+  email?: string
+  location?: string
+}
+
+/**
+ * MEDIUM-4 (round 2). Documents, unique scryfallId and copies must be three
+ * clearly DIFFERENT numbers, or the AC2 lock cannot tell them apart.
+ *
+ * MEASURED in production 2026-08-19: 6,647 documents against 5,108 unique
+ * scryfallId — about 1.3 documents per id, ~30% separation, because a real
+ * collection holds the same card in several conditions/printings. The round-1
+ * fixture gave every document its own id except 14, which is 0.1% separation:
+ * a dedupe bug (a stray `new Set()` on the counting path) would have moved
+ * the answer by 30% in production and by a rounding error in the test, and
+ * passed.
+ *
+ * So: 3 of every 13 documents reuse the previous document's scryfallId
+ * (13 documents -> 10 ids = 1.3), and quantity cycles 1..3 so copies land
+ * near 2x documents — production's black slice is 1,412 documents against
+ * 2,658 copies, ~1.9x, the same order.
+ */
+function applyRealisticMultiplicity(entries: SyntheticEntry[], firstIndex: number): void {
+  let idIndex = 1_000_000
+  for (let k = firstIndex; k < entries.length; k++) {
+    const offset = k - firstIndex
+    const reuse = offset > 0 && offset % 13 >= 1 && offset % 13 <= 3
+    if (!reuse) idIndex++
+    const entry = entries[k] as SyntheticEntry
+    entry.s = syntheticScryfallId(idIndex)
+    entry.q = (offset % 3) + 1
+  }
 }
 
 function makeEntry(n: number, colors: string[], overrides: Partial<SyntheticEntry> = {}): SyntheticEntry {
@@ -179,6 +231,11 @@ function buildSyntheticProfile(): SyntheticEntry[] {
   push([], 17, { cu: 1, x: 1 })
   push([], 474 - 17, { cu: 1 })
 
+  // Everything after the 14 blight documents, which keep their own 7-id pool
+  // so the AC3 "14 documents / 7 unique names / 7 unique ids" lock stays
+  // exact.
+  applyRealisticMultiplicity(entries, 14)
+
   return entries
 }
 
@@ -195,6 +252,7 @@ function makeFakeDb(chunkDocs: Record<string, unknown>, metaDoc: Record<string, 
   const reads: string[] = []
   const live: FakeState = { chunkDocs, metaDoc }
   let metaReads = 0
+  let collectionGets = 0
   const readMeta = () => {
     metaReads++
     live.onMetaRead?.(metaReads)
@@ -205,6 +263,12 @@ function makeFakeDb(chunkDocs: Record<string, unknown>, metaDoc: Record<string, 
     live,
     get metaReads() {
       return metaReads
+    },
+    /** Full-collection reads actually issued — the billed unit, and the one
+     * MEDIUM-1 is about. `reads` records collection HANDLES, which the reader
+     * legitimately reuses across two gets. */
+    get collectionGets() {
+      return collectionGets
     },
     collection(path: string) {
       reads.push(path)
@@ -221,6 +285,7 @@ function makeFakeDb(chunkDocs: Record<string, unknown>, metaDoc: Record<string, 
           }
         },
         async get() {
+          collectionGets++
           const docs: Array<{ id: string; data: () => unknown }> = Object.entries(live.chunkDocs).map(
             ([id, data]) => ({ id, data: () => data })
           )
@@ -396,11 +461,21 @@ describe('AC2 — colour filter counts DOCUMENTS, OR-inclusive by letter', () =>
   it('counts DOCUMENTS, not unique scryfallId and not summed quantity', () => {
     const black = filterPublicIndexEntries(PROFILE, { color: ['B'] })
     expect(black).toHaveLength(1412)
-    // The other two numbers AC2 explicitly rules out. Both are genuinely
-    // different in this fixture (see buildSyntheticProfile), so this is a
-    // real lock and not a vacuous assertion.
-    expect(new Set(black.map((e) => e.s)).size).toBe(1405)
-    expect(black.reduce((sum, e) => sum + e.q, 0)).toBe(1426)
+    // The other two numbers AC2 explicitly rules out. Round 2 (MEDIUM-4)
+    // widened the gap between them from 0.5% to production's ~30%: at the old
+    // margin, a dedupe bug on the counting path moved the answer by a rounding
+    // error here and by a third of the collection in production, and passed.
+    const uniqueIds = new Set(black.map((e) => e.s)).size
+    const copies = black.reduce((sum, e) => sum + e.q, 0)
+    expect(uniqueIds).toBe(1081)
+    expect(copies).toBe(2822)
+    // Assert the RELATION too, so the lock survives a future fixture tweak
+    // that changes the absolute values: unique < documents < copies, each
+    // separated by well more than any plausible rounding.
+    expect(uniqueIds).toBeLessThan(black.length)
+    expect(copies).toBeGreaterThan(black.length)
+    expect((black.length - uniqueIds) / black.length).toBeGreaterThan(0.2)
+    expect((copies - black.length) / black.length).toBeGreaterThan(0.2)
   })
 })
 
@@ -418,6 +493,15 @@ describe('AC9 — colour-unknown entries are excluded from colour filters, kept 
 
   it('keeps a genuinely colourless card (co: [] with no flag) reachable', () => {
     const colorless = filterPublicIndexEntries(PROFILE, { color: ['C'] })
+    // `.every` on an empty array is `true`, so the round-1 version of this
+    // test passed just as happily if the filter returned NOTHING — which is
+    // the very defect it was written to catch (the private index's
+    // `if (c.co.length === 0) return false` makes every colourless card
+    // vanish). Name the card that has to come back.
+    const genuine = PROFILE.find((e) => e.co.length === 0 && !e.cu && !e.x) as SyntheticEntry
+    expect(genuine).toBeDefined()
+    expect(colorless).toContain(genuine)
+    expect(colorless).toHaveLength(20)
     expect(colorless.every((e) => e.co.length === 0 && !e.cu && !e.x)).toBe(true)
   })
 
@@ -665,15 +749,26 @@ describe('the response row is the 231-byte grid subset, not the 406-byte entry',
   })
 
   it('never ships an email anywhere in the response', async () => {
-    const db = makeIndexedDb()
+    // The round-1 version searched the response for /email/i over a fixture
+    // where no entry HAD an email — it passed no matter what the projection
+    // did, which is not a test. Plant the field on a real entry so the
+    // assertion can only pass because toPublicIndexCard drops it: a
+    // projection that spread the entry (or added a field later) leaks it.
+    const poisoned = PROFILE.map((e, i) =>
+      i === 0 ? ({ ...e, email: 'seller@example.com', location: 'Quito' } as SyntheticEntry) : e
+    )
+    const db = makeIndexedDb(poisoned)
     const res = await queryPublicCardIndexForUser({
       db,
       userId: 'seller1',
       filters: {},
       page: 0,
       pageSize: 60,
+      sort: { field: 'name', direction: 'asc' },
     })
     expect(JSON.stringify(res)).not.toMatch(/email/i)
+    expect(JSON.stringify(res)).not.toMatch(/seller@example\.com/)
+    expect(JSON.stringify(res)).not.toMatch(/Quito/)
   })
 })
 
@@ -696,38 +791,31 @@ describe('mitigation A — a half-finished rebuild is detected, never silently h
     expect(res.cards.length).toBeGreaterThan(0)
   })
 
-  it('re-reads _meta exactly once before giving up', async () => {
+  it('re-reads the WHOLE index exactly once before giving up', async () => {
+    // Not just _meta: validating a fresh meta against a stale chunk snapshot
+    // is round-2 MEDIUM-1. Both reads are full collection reads.
     const db = makeIndexedDb(PROFILE, { tcOverride: { 0: 999 } })
     await queryPublicCardIndexForUser({ db, userId: 'seller1', filters: {}, page: 0, pageSize: 60 })
+    expect(db.collectionGets).toBe(2)
     expect(db.metaReads).toBe(2)
   })
 
-  it('reads _meta only once when the index is consistent', async () => {
+  it('reads the index only once on the ordinary path', async () => {
+    // The extra read is paid only on a detected mismatch, never routinely.
     const db = makeIndexedDb()
     await queryPublicCardIndexForUser({ db, userId: 'seller1', filters: {}, page: 0, pageSize: 60 })
+    expect(db.collectionGets).toBe(1)
     expect(db.metaReads).toBe(1)
   })
 
-  it('clears partial when the re-read of _meta catches up with the chunks', async () => {
-    const db = makeIndexedDb()
-    // Every chunk already carries the NEW tc; _meta catches up on read #2.
-    for (const key of Object.keys(db.live.chunkDocs)) {
-      ;(db.live.chunkDocs[key] as { tc: number }).tc = 999
-    }
-    const stale = db.live.metaDoc as Record<string, unknown>
-    db.live.onMetaRead = (n) => {
-      if (n >= 2) db.live.metaDoc = { ...stale, totalChunks: 999 }
-    }
-    const res = await queryPublicCardIndexForUser({
-      db,
-      userId: 'seller1',
-      filters: {},
-      page: 0,
-      pageSize: 60,
-    })
-    expect(res.indexState.partial).toBe(false)
-    expect(res.total).toBe(6647)
-  })
+  // The round-1 version of this test ('clears partial when the re-read of
+  // _meta catches up') built its scenario with tc: 999 on a 32-chunk index —
+  // a state no writer can produce, since buildPublicIndex always emits every
+  // chunk in 0..totalChunks-1. That impossible fixture is exactly why it
+  // missed round-2 MEDIUM-1. Its real intent — 'the meta flip landed between
+  // our two reads, so the re-read clears the flag' — is now covered by the
+  // MEDIUM-1 block below, against a snapshot that can actually occur, and
+  // alongside the incomplete case it has to be distinguished from.
 
   it('does not flag a legacy index whose chunks carry no tc at all', async () => {
     const db = makeIndexedDb()
@@ -963,5 +1051,255 @@ describe('argument validation', () => {
         mode: 'ids' as 'cards',
       })
     ).rejects.toThrow()
+  })
+})
+
+// ── ROUND 2 RED ─────────────────────────────────────────────────────────────
+
+describe('MEDIUM-3 RED — lands must keep the colour they PRODUCE', () => {
+  // useCardFilter.ts's passesColorFilter, in the shipped UI today: a card
+  // whose type_line contains 'land' and which has produced_mana passes the
+  // colour filter on ANY produced colour. Lands print no `colors`, so a
+  // colour filter that only reads `co` makes every Swamp in every seller's
+  // profile invisible under "Black" — and lands are a large slice of any
+  // real collection. Migrating the profile onto this index without this is
+  // a regression against behaviour that works today.
+  const swamp = makeEntry(80001, [], {
+    n: 'Swamp',
+    nl: 'swamp',
+    t: 'Basic Land — Swamp',
+    pm: ['B'],
+  })
+  const dual = makeEntry(80002, [], {
+    n: 'Watery Grave',
+    nl: 'watery grave',
+    t: 'Land — Island Swamp',
+    pm: ['U', 'B'],
+  })
+  const wastes = makeEntry(80003, [], { n: 'Wastes', nl: 'wastes', t: 'Basic Land', pm: [] })
+  // The negative control that matters: a NON-land that produces every colour.
+  // Matching produced_mana for non-lands would put Birds of Paradise under
+  // all five chips and blow up every AC2 count.
+  const birds = makeEntry(80004, ['G'], {
+    n: 'Birds of Paradise',
+    nl: 'birds of paradise',
+    t: 'Creature — Bird',
+    pm: ['W', 'U', 'B', 'R', 'G'],
+  })
+  const lands = [swamp, dual, wastes, birds]
+
+  it('a Swamp appears under Black', () => {
+    expect(filterPublicIndexEntries(lands, { color: ['B'] })).toContain(swamp)
+  })
+
+  it('a dual land appears under BOTH colours it produces', () => {
+    expect(filterPublicIndexEntries(lands, { color: ['U'] })).toContain(dual)
+    expect(filterPublicIndexEntries(lands, { color: ['B'] })).toContain(dual)
+  })
+
+  it('a land that produces nothing stays colourless', () => {
+    expect(filterPublicIndexEntries(lands, { color: ['C'] })).toContain(wastes)
+    expect(filterPublicIndexEntries(lands, { color: ['B'] })).not.toContain(wastes)
+  })
+
+  it('a NON-land never matches on produced_mana', () => {
+    expect(filterPublicIndexEntries(lands, { color: ['B'] })).not.toContain(birds)
+    expect(filterPublicIndexEntries(lands, { color: ['G'] })).toContain(birds)
+  })
+
+  it('a land is not counted as colourless once it produces a colour', () => {
+    expect(filterPublicIndexEntries(lands, { color: ['C'] })).not.toContain(swamp)
+  })
+
+  it('the colour facet counts lands under what they produce', () => {
+    const facets = computePublicFacets(lands, {})
+    expect(facets.color.B).toBe(2) // Swamp + Watery Grave
+    expect(facets.color.U).toBe(1) // Watery Grave
+    expect(facets.color.G).toBe(1) // Birds, by its own colors
+    expect(facets.color.C).toBe(1) // Wastes only
+  })
+
+  it('produced_mana reaches the client so the grid can colour a land', () => {
+    const row = toPublicIndexCard(swamp) as Record<string, unknown>
+    expect(row.pm).toEqual(['B'])
+  })
+
+  it('produced_mana is OMITTED entirely when empty, so non-lands pay no bytes', () => {
+    const row = toPublicIndexCard(PROFILE[0] as SyntheticEntry) as Record<string, unknown>
+    expect(row).not.toHaveProperty('pm')
+  })
+})
+
+describe('MEDIUM-1 RED — an INCOMPLETE chunk snapshot must never clear partial', () => {
+  /**
+   * The real shape of the growth window, which the round-1 test missed by
+   * mounting a COMPLETE snapshot: we read the collection while _meta still
+   * said 16, so we hold chunks 0..15 only. The writer then commits the meta
+   * flip to 32. Re-reading _meta alone finds 32, and chunks 0..15 all carry
+   * tc: 32, so a tc-only check calls it consistent and answers with a FIRM
+   * total over HALF the seller's cards — exactly the "reader honoring the
+   * wrong meta sees ~50% of the inventory" failure publicCardIndexExecutor.js
+   * documents, and strictly worse than partial:true, because the client has
+   * no way to know it is being lied to.
+   */
+  function makeGrowingDb(chunkCount: number, tc: number, metaSequence: number[]) {
+    const chunkDocs: Record<string, unknown> = {}
+    for (let id = 0; id < chunkCount; id++) {
+      chunkDocs[String(id)] = { id, tc, entries: [makeEntry(70000 + id, ['B'])] }
+    }
+    const db = makeFakeDb(chunkDocs, {
+      schemaVersion: 1,
+      totalChunks: metaSequence[0],
+      count: 999,
+      chunkTargetSize: 400,
+    })
+    const base = db.live.metaDoc as Record<string, unknown>
+    db.live.onMetaRead = (n) => {
+      const next = metaSequence[Math.min(n, metaSequence.length) - 1]
+      db.live.metaDoc = { ...base, totalChunks: next }
+    }
+    return db
+  }
+
+  it('answers partial when the meta flip reveals chunks we never read', async () => {
+    // 16 chunks in hand, tc says 32, meta catches up to 32 on the re-read.
+    const db = makeGrowingDb(16, 32, [16, 32])
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: {},
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.indexState.partial).toBe(true)
+    expect(res.total).toBeNull()
+  })
+
+  it('answers partial when chunk documents in the advertised range are simply absent', async () => {
+    const db = makeGrowingDb(16, 32, [32, 32])
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: {},
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.indexState.partial).toBe(true)
+    expect(res.total).toBeNull()
+  })
+
+  it('stays firm when the re-read finds a COMPLETE, consistent generation', async () => {
+    const db = makeGrowingDb(32, 32, [16, 32])
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: {},
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.indexState.partial).toBe(false)
+    expect(res.total).toBe(32)
+  })
+})
+
+describe('MEDIUM-2 RED — an unauthenticated 2GiB callable must bound its own work', () => {
+  it('rejects an absurd number of filter values before reading anything', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db,
+        userId: 'seller1',
+        filters: { keywords: Array.from({ length: 5000 }, (_, i) => `kw${i}`) },
+        page: 0,
+        pageSize: 60,
+      })
+    ).rejects.toThrow()
+    expect(db.reads).toEqual([])
+  })
+
+  it('rejects an absurdly long search term before reading anything', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db,
+        userId: 'seller1',
+        filters: { search: 'a'.repeat(10000) },
+        page: 0,
+        pageSize: 60,
+      })
+    ).rejects.toThrow()
+    expect(db.reads).toEqual([])
+  })
+
+  it('rejects a single oversized filter value', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db,
+        userId: 'seller1',
+        filters: { type: ['x'.repeat(5000)] },
+        page: 0,
+        pageSize: 60,
+      })
+    ).rejects.toThrow()
+  })
+
+  it('rejects a filter of the wrong shape', async () => {
+    const db = makeIndexedDb()
+    const bad = [
+      { color: 'B' },
+      { status: { sale: true } },
+      { search: 42 },
+      { minPrice: 'cheap' },
+      { foil: 'yes' },
+    ]
+    for (const filters of bad) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(
+        queryPublicCardIndexForUser({ db, userId: 'seller1', filters: filters as never, page: 0, pageSize: 60 })
+      ).rejects.toThrow()
+    }
+  })
+
+  it('rejects a non-object filters payload', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({ db, userId: 'seller1', filters: 'nope' as never, page: 0, pageSize: 60 })
+    ).rejects.toThrow()
+  })
+
+  it('still accepts a realistic filter set', async () => {
+    const db = makeIndexedDb()
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: { color: ['B', 'G'], search: 'blight', status: ['sale'], rarity: ['common'] },
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.total).toBeGreaterThan(0)
+  })
+})
+
+describe('MEDIUM-4 RED — the fixture must have the SHAPE of a real collection', () => {
+  // Measured in production 2026-08-19: 6,647 documents against 5,108 unique
+  // scryfallId — ~1.3 documents per id, ~30% separation. A fixture where
+  // almost nobody owns two copies of the same card cannot catch a dedupe bug
+  // (a stray Set on the counting path) that moves the answer by 30% in
+  // production and by a rounding error in the test.
+  it('separates documents, unique ids and copies by a wide margin', () => {
+    const docs = PROFILE.length
+    const unique = new Set(PROFILE.map((e) => e.s)).size
+    const copies = PROFILE.reduce((sum, e) => sum + e.q, 0)
+    expect(unique).toBeLessThan(docs)
+    expect(copies).toBeGreaterThan(docs)
+    expect((docs - unique) / docs).toBeGreaterThan(0.2)
+    expect((copies - docs) / docs).toBeGreaterThan(0.2)
+  })
+
+  it('has roughly the production ratio of documents per unique id', () => {
+    const ratio = PROFILE.length / new Set(PROFILE.map((e) => e.s)).size
+    expect(ratio).toBeGreaterThan(1.2)
+    expect(ratio).toBeLessThan(1.45)
   })
 })

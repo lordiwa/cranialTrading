@@ -5,7 +5,15 @@
  * nothing ever read it. The public profile still filters and searches over
  * whatever ~60 documents `getUserPublicCardsPage` happens to have paginated
  * into memory, which is why Rafael's profile reports 36 black cards where
- * 1,412 public_cards documents are black.
+ * over a thousand public_cards documents are black.
+ *
+ * A NOTE ON THE NUMBERS BELOW. Every card count quoted in this file is a LIVE
+ * count against Rafael's production profile and moves whenever he publishes
+ * or unpublishes anything — the black slice measured 1,412 on 2026-08-18 and
+ * 1,443 on 2026-08-19. They are kept as DATED measurements, evidence for why
+ * a decision was made, and are NOT maintained: the current figures live in
+ * the TASK-247 ticket. Where a proportion says the same thing it is used
+ * instead, because a proportion survives the collection growing.
  *
  * Same dependency-free CommonJS technique as publicCardEntry.js /
  * publicCardIndex.js, and the same injected-`db` shape as
@@ -71,10 +79,15 @@
  *
  * A card is black if its `co` array CONTAINS 'B'. A B/G card is therefore
  * black AND green, and there is no separate 'Multicolor' bucket. This is
- * what produces AC2's measured 1,412 documents (against 1,049 unique
- * scryfallId and 2,658 copies-by-quantity — neither of which is the target),
- * and it is why the five colour totals sum to 7,003 over a 6,647-document
- * profile: the overshoot is the semantics working.
+ * The unit is the DOCUMENT — not unique scryfallId (a real collection holds
+ * the same card in several conditions: measured ~1.3 documents per id), and
+ * not copies summed by quantity (~1.9x the document count). All three differ,
+ * and AC2 names the document count.
+ *
+ * A consequence worth stating out loud: the five colour totals SUM TO MORE
+ * than the number of documents in the profile, because every multicolour card
+ * is counted under each of its colours. That overshoot is the semantics
+ * working, not a double-count bug.
  *
  * The researcher's contract recommended implementing BOTH this and
  * `useCardFilter`'s category semantics ('Multicolor' as its own bucket,
@@ -93,8 +106,11 @@
  * That module's header already ruled: a flagged entry is EXCLUDED from any
  * colour-filtered result (it must never silently count as "colorless" just
  * because `co` is `[]`) but stays INCLUDED in an unfiltered listing and in
- * search. Measured scope: 474 of 6,647 (7.1%) have no usable colour source,
- * 17 scryfallId have no `scryfall_cache` document at all. `indexState.missing`
+ * search. Measured scope (2026-08-18): 7.1% of entries have no usable colour
+ * source at all, plus a small handful of scryfallId with no `scryfall_cache`
+ * document — that second gap re-measured as ZERO on 2026-08-19. The `x` code
+ * path stays regardless: a gap closing is not the same as a gap being
+ * impossible. `indexState.missing`
  * reports the count so the UI can say "474 cards with no colour data" instead
  * of letting them vanish.
  *
@@ -108,7 +124,7 @@
  *
  * Firestore has no substring operator — only prefix (`>= term`, `<= term +
  * ''`), which is what `searchUserPublicCards` does today and why
- * 'blight' returns 9 documents instead of 14 (it cannot reach
+ * a search for 'blight' misses most of its matches (it cannot reach
  * `Marauding Blight-Priest`, `Hooded Blightfang`, `Lithoform Blight`…). The
  * three real options are in-memory filtering, an n-gram inverted index, or an
  * external search service; the latter two are their own tickets. So this
@@ -129,20 +145,21 @@
  *
  * `searchUserPublicCards`'s comment claims 50 name-prefix matches "covers the
  * realistic case". Under substring it is measurably false — 'island',
- * 'goblin', 'elf', or any tribal term passes 50 easily in a 6,647-card
- * profile. More to the point, a cap makes `total` lie, and `total` lying IS
+ * 'goblin', 'elf', or any tribal term passes 50 easily in a profile of a few
+ * thousand cards. More to the point, a cap makes `total` lie, and `total` lying IS
  * TASK-247. So `total` is always computed over the whole collection and only
  * DELIVERY is paginated: `pageSize` defaults to 60 (matching
  * usePublicProfileCards's DEFAULT_PAGE_SIZE, so the scroll doesn't change)
- * and clamps to [1, 120] — 120 rows x ~231 B is 27.7 KB, ~370 ms at the
+ * and clamps to [1, 120] — 120 rows x ~222 B is ~27 KB, ~355 ms at the
  * 600 Kbps this project budgets against; 200 rows would cross into
  * noticeable.
  *
  * ── BYTES: THE 13-FIELD ROW, NOT THE 22-FIELD ENTRY ──
  *
  * A full index entry is ~406 B; the subset the grid actually renders is
- * ~231 B. Shipping 1,412 full entries would be 573 KB = ~7.6 s at 600 Kbps,
- * 3.5x this project's ENTIRE 160 KB boot budget, in one call. So the wire
+ * ~222 B. Shipping every entry of one colour as a full entry would be well
+ * over half a megabyte — several seconds at 600 Kbps, multiples of this
+ * project's ENTIRE 160 KB boot budget, in a single call. So the wire
  * row is 13 fields and three things deliberately do not travel:
  *   1. `image` — derived client-side from `s` via cardImageProxyUrl
  *      (TASK-241), saving ~90 B per row.
@@ -170,7 +187,8 @@
  * different generations; re-read `_meta` once (the flip may simply have
  * landed between the two reads) and, if it still disagrees, answer with
  * `indexState.partial = true` and `total: null`. Refusing to name a total is
- * the point: a `total` that says 1,412 when the truth might be 700 is
+ * the point: a `total` that names the full colour count when the truth might
+ * be half of it is
  * exactly the failure this ticket exists to end. Chunks with no `tc` at all
  * (an index written before this tanda) are not flagged — absence is not
  * disagreement.
@@ -210,7 +228,10 @@ const MIN_SEARCH_LEN = 2;
 /** `_meta.reconcileLeaseAt` is considered live for this long — RECONCILE_LEASE_STALE_MS. */
 const RECONCILE_LEASE_STALE_MS = 10 * 60 * 1000;
 
-/** The 13 fields that actually travel to the browser (~231 B/row measured). */
+/**
+ * The 13 fields that ALWAYS travel to the browser (222 B/row measured on a
+ * realistic entry).
+ */
 const PUBLIC_INDEX_CARD_FIELDS = [
   's',
   'i',
@@ -227,11 +248,36 @@ const PUBLIC_INDEX_CARD_FIELDS = [
   't',
 ];
 
+/**
+ * Fields that travel ONLY when they carry something — see toPublicIndexCard.
+ * `pm` (produced_mana) is here rather than in the always-list because it is
+ * empty for every card that is not a land, and an empty array still costs 8
+ * bytes on the wire. MEASURED (2026-08-19, realistic row): always-shipping
+ * `pm` costs +8 B on every row = +480 B on a 60-row page; shipping it only
+ * when non-empty costs +11 B for a mono-colour land, +15 B for a dual, +27 B
+ * for a five-colour land — about +234 B on a 60-row page at ~30% lands, which
+ * is 3.1 ms at the 600 Kbps this project budgets against, against a ~13.9 KB
+ * page. Omitting it when empty is free and strictly better, so that is what
+ * this does.
+ */
+const PUBLIC_INDEX_CARD_OPTIONAL_FIELDS = ['pm'];
+
 const COLOR_LETTERS = ['W', 'U', 'B', 'R', 'G'];
 /** The pseudo-letter for "genuinely colourless", distinct from "colour unknown". */
 const COLORLESS_LETTER = 'C';
 
-const RARITY_INITIAL = { common: 'c', uncommon: 'u', rare: 'r', mythic: 'm' };
+/**
+ * A Map, not an object literal: the lookup key comes straight from the
+ * client, and an object lookup answers for inherited keys too ('constructor',
+ * '__proto__', 'toString'), handing back a function where a letter was
+ * expected. A Map only ever answers for keys actually put in it.
+ */
+const RARITY_INITIAL = new Map([
+  ['common', 'c'],
+  ['uncommon', 'u'],
+  ['rare', 'r'],
+  ['mythic', 'm'],
+]);
 
 const VALID_SORT_FIELDS = ['name', 'price', 'edition', 'quantity', 'dateAdded'];
 const VALID_MODES = ['cards', 'facets'];
@@ -258,6 +304,113 @@ function invalidArgument(message) {
   const error = new Error(message);
   error.invalidArgument = true;
   return error;
+}
+
+/**
+ * Caps on what an ANONYMOUS caller can ask this 2 GiB / 60 s function to do.
+ * There is no auth here, so there is no per-user rate limit to fall back on:
+ * every array filter is iterated once per index entry, so an unbounded array
+ * multiplies CPU by its own length across every entry in the seller's index
+ * (a few thousand on the production profile, up to ~100k at the market
+ * ceiling). This
+ * is a COST problem, not a data-leak one — but it is Rafael's cost, charged by
+ * a caller who never had to log in. Rejected before a single Firestore read.
+ *
+ * The numbers are generous against real use: the colour vocabulary has 6
+ * values, `useCardFilter`'s format list is ~15, its keyword list ~40, and the
+ * longest legitimate search term is a full card name.
+ */
+const MAX_FILTER_VALUES = 50;
+const MAX_FILTER_VALUE_LENGTH = 100;
+const MAX_SEARCH_LENGTH = 100;
+const MAX_PAGE = 100000;
+
+/** name -> what a legitimate value looks like. Anything absent is rejected. */
+const FILTER_SPECS = {
+  search: { kind: 'string', maxLength: MAX_SEARCH_LENGTH },
+  status: { kind: 'stringArray' },
+  color: { kind: 'stringArray' },
+  rarity: { kind: 'stringArray' },
+  type: { kind: 'stringArray' },
+  edition: { kind: 'stringArray' },
+  keywords: { kind: 'stringArray' },
+  formats: { kind: 'stringArray' },
+  condition: { kind: 'stringArray' },
+  manaValue: { kind: 'manaValueArray' },
+  foil: { kind: 'boolean' },
+  fullArt: { kind: 'boolean' },
+  minPrice: { kind: 'number' },
+  maxPrice: { kind: 'number' },
+  powerMin: { kind: 'number' },
+  powerMax: { kind: 'number' },
+  toughnessMin: { kind: 'number' },
+  toughnessMax: { kind: 'number' },
+};
+
+/**
+ * Validates the shape AND the size of every filter. Unknown keys are rejected
+ * rather than ignored: silently dropping a filter the caller believes is
+ * applied is how a client ends up showing an unfiltered grid and calling it
+ * filtered, which is this ticket's own failure mode in miniature.
+ *
+ * @param {*} filters
+ */
+function assertValidFilters(filters) {
+  if (filters === undefined || filters === null) return {};
+  if (typeof filters !== 'object' || Array.isArray(filters)) {
+    throw invalidArgument('filters must be an object');
+  }
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === null) continue;
+    if (!Object.prototype.hasOwnProperty.call(FILTER_SPECS, key)) {
+      throw invalidArgument(`unknown filter "${key}"`);
+    }
+    // eslint-disable-next-line security/detect-object-injection
+    const spec = FILTER_SPECS[key];
+
+    if (spec.kind === 'string') {
+      if (typeof value !== 'string') throw invalidArgument(`filters.${key} must be a string`);
+      if (value.length > spec.maxLength) {
+        throw invalidArgument(`filters.${key} must be at most ${spec.maxLength} characters`);
+      }
+      continue;
+    }
+
+    if (spec.kind === 'boolean') {
+      if (typeof value !== 'boolean') throw invalidArgument(`filters.${key} must be a boolean`);
+      continue;
+    }
+
+    if (spec.kind === 'number') {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw invalidArgument(`filters.${key} must be a finite number`);
+      }
+      continue;
+    }
+
+    if (!Array.isArray(value)) throw invalidArgument(`filters.${key} must be an array`);
+    if (value.length > MAX_FILTER_VALUES) {
+      throw invalidArgument(`filters.${key} must have at most ${MAX_FILTER_VALUES} values`);
+    }
+    for (const item of value) {
+      if (spec.kind === 'manaValueArray') {
+        const ok =
+          (typeof item === 'number' && Number.isFinite(item)) ||
+          (typeof item === 'string' && item.length <= MAX_FILTER_VALUE_LENGTH);
+        if (!ok) throw invalidArgument(`filters.${key} values must be numbers or short strings`);
+        continue;
+      }
+      if (typeof item !== 'string') throw invalidArgument(`filters.${key} values must be strings`);
+      if (item.length > MAX_FILTER_VALUE_LENGTH) {
+        throw invalidArgument(
+          `filters.${key} values must be at most ${MAX_FILTER_VALUE_LENGTH} characters`
+        );
+      }
+    }
+  }
+
+  return filters;
 }
 
 /**
@@ -288,7 +441,38 @@ function toPublicIndexCard(entry) {
     // eslint-disable-next-line security/detect-object-injection
     row[field] = entry[field];
   }
+  for (const field of PUBLIC_INDEX_CARD_OPTIONAL_FIELDS) {
+    // eslint-disable-next-line security/detect-object-injection
+    const value = entry[field];
+    // eslint-disable-next-line security/detect-object-injection
+    if (Array.isArray(value) && value.length > 0) row[field] = value;
+  }
   return row;
+}
+
+/**
+ * MTG lands print no `colors` — a Swamp is `colors: []`. Their colour, both
+ * to a player and to this app's own UI, is what they PRODUCE.
+ * `useCardFilter.ts`'s `passesColorFilter` already works this way in the
+ * shipped product: a card whose type line contains 'land' and which has
+ * `produced_mana` passes on ANY produced colour. A server filter reading only
+ * `co` therefore makes every Swamp in every profile invisible under "Black" —
+ * satisfying the AC while regressing behaviour that works today, which is the
+ * failure mode this project has a standing rule about.
+ *
+ * Gated on being a LAND, deliberately. Birds of Paradise produces all five
+ * colours and is a green creature; matching `pm` for non-lands would file it
+ * under every chip and inflate every count. Locked by a negative-control test.
+ */
+function isLand(entry) {
+  return String(entry.t || '').toLowerCase().includes('land');
+}
+
+/** Only real colour letters — Scryfall's produced_mana also carries 'C'. */
+function colorLetters(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((c) => String(c).toUpperCase())
+    .filter((c) => COLOR_LETTERS.includes(c));
 }
 
 /** A colour filter is "active" only when it actually names something. */
@@ -311,9 +495,16 @@ function isColorUnknown(entry) {
  * has already excluded via isColorUnknown.
  */
 function matchesColor(entry, letters) {
-  const colors = Array.isArray(entry.co) ? entry.co : [];
+  // Lands answer with what they produce (see isLand). A land producing only
+  // colourless mana (Wastes) has no valid letters and falls through to the
+  // colourless branch below, which is the right answer for it.
+  if (isLand(entry)) {
+    const produced = colorLetters(entry.pm);
+    if (produced.length > 0) return produced.some((c) => letters.has(c));
+  }
+  const colors = colorLetters(entry.co);
   if (colors.length === 0) return letters.has(COLORLESS_LETTER);
-  return colors.some((c) => letters.has(String(c).toUpperCase()));
+  return colors.some((c) => letters.has(c));
 }
 
 /**
@@ -385,8 +576,7 @@ function filterPublicIndexEntries(entries, filters, options = {}) {
     const initials = new Set(
       f.rarity.map((r) => {
         const key = String(r).toLowerCase();
-        // eslint-disable-next-line security/detect-object-injection
-        return RARITY_INITIAL[key] || key.charAt(0);
+        return RARITY_INITIAL.get(key) || key.charAt(0);
       })
     );
     result = result.filter((e) => initials.has(String(e.r || '').toLowerCase()));
@@ -488,13 +678,19 @@ function sortPublicIndexEntries(entries, sort) {
   const sorted = [...(Array.isArray(entries) ? entries : [])];
   const s = sort || {};
   const dir = s.direction === 'desc' ? -1 : 1;
+  // Locale pinned explicitly. A bare `localeCompare` uses the runtime's
+  // default locale, which is not guaranteed to be the same on a Cloud
+  // Functions instance as on a developer's machine (or across two instances
+  // with different ICU data) — the same query could then return the same page
+  // in a different order depending on which instance answered it, which is
+  // visible to a user scrolling a paginated grid.
 
   switch (s.field) {
     case 'price':
       sorted.sort((a, b) => dir * ((a.p || 0) - (b.p || 0)));
       break;
     case 'edition':
-      sorted.sort((a, b) => dir * String(a.sc || '').localeCompare(String(b.sc || '')));
+      sorted.sort((a, b) => dir * String(a.sc || '').localeCompare(String(b.sc || ''), 'en'));
       break;
     case 'quantity':
       sorted.sort((a, b) => dir * ((a.q || 0) - (b.q || 0)));
@@ -504,7 +700,7 @@ function sortPublicIndexEntries(entries, sort) {
       break;
     case 'name':
     default:
-      sorted.sort((a, b) => dir * String(a.n || '').localeCompare(String(b.n || '')));
+      sorted.sort((a, b) => dir * String(a.n || '').localeCompare(String(b.n || ''), 'en'));
       break;
   }
 
@@ -574,26 +770,43 @@ function expandPublicIndexChunks(docs, totalChunks) {
 }
 
 /**
- * Mitigation A's detector: does any LIVE chunk declare a `tc` (the
- * totalChunks it was written under) that disagrees with what `_meta`
- * currently advertises? A chunk with no `tc` at all predates this tanda and
- * is not evidence of anything, so it is not flagged.
+ * Mitigation A's detector, in two independent halves. Either one firing means
+ * the chunk documents in hand and the `_meta` in hand are not from the same
+ * generation, so no count taken from them can be trusted.
+ *
+ *  1. DISAGREEMENT — a live chunk declares a `tc` (the totalChunks it was
+ *     written under) different from what `_meta` advertises. A chunk carrying
+ *     no `tc` predates this field and is not evidence of anything, so it is
+ *     not flagged.
+ *  2. INCOMPLETENESS — `_meta` advertises N chunks and fewer than N are
+ *     actually in hand. This half is what round 1 lacked, and it is the half
+ *     that matters most: `buildPublicIndex` always emits EVERY chunk in
+ *     0..totalChunks-1 (empty ones included), so a gap is never normal. It is
+ *     also the only signal that catches the real growth window, where our
+ *     chunk snapshot was taken while `_meta` still said 16 and the flip to 32
+ *     landed afterwards — every chunk we hold then agrees with the NEW `tc`,
+ *     and a `tc`-only check happily certifies a snapshot containing half the
+ *     seller's cards.
  */
 function detectGenerationMismatch(docs, totalChunks) {
+  if (!Number.isInteger(totalChunks) || totalChunks < 1) return true;
+  const seen = new Set();
   for (const doc of docs) {
     if (doc.id === META_DOC_ID) continue;
     const chunkId = Number(doc.id);
     if (!Number.isInteger(chunkId) || chunkId < 0 || chunkId >= totalChunks) continue;
+    seen.add(chunkId);
     const tc = (doc.data || {}).tc;
     if (Number.isFinite(tc) && tc !== totalChunks) return true;
   }
-  return false;
+  return seen.size < totalChunks;
 }
 
 /**
  * Reads the whole index for one seller: one `collection().get()` (which
  * costs one Firestore read per chunk document, NOT per card — 33 reads for
- * the 6,647-card production profile, ~257 for a 100k-card account) plus, at
+ * the production profile as measured 2026-08-18, ~257 for a 100k-card
+ * account) plus, at
  * most, one extra `_meta` read when the generation detector fires.
  *
  * @param {object} db injected Firestore
@@ -601,11 +814,15 @@ function detectGenerationMismatch(docs, totalChunks) {
  */
 async function readPublicIndex(db, userId) {
   const indexRef = db.collection(`users/${userId}/public_card_index`);
-  const snapshot = await indexRef.get();
-  const docs = snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 
-  const metaDoc = docs.find((d) => d.id === META_DOC_ID);
-  let meta = metaDoc ? metaDoc.data : null;
+  const readAll = async () => {
+    const snapshot = await indexRef.get();
+    const docs = snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+    const metaDoc = docs.find((d) => d.id === META_DOC_ID);
+    return { docs, meta: metaDoc ? metaDoc.data : null };
+  };
+
+  let { docs, meta } = await readAll();
 
   if (!meta) {
     // No index yet (never built, or built under an older layout). An empty
@@ -618,17 +835,21 @@ async function readPublicIndex(db, userId) {
   let partial = false;
 
   if (detectGenerationMismatch(docs, totalChunks)) {
-    // The flip may simply have landed between our chunk read and now. One
-    // re-read of the single `_meta` document settles it; if it still
-    // disagrees, we are genuinely inside the reduced-visibility window
-    // publicCardIndexExecutor.js documents, and we say so rather than
-    // reporting a total that could be half the truth.
-    const fresh = await indexRef.doc(META_DOC_ID).get();
-    const freshMeta = fresh && fresh.exists ? fresh.data() : null;
-    if (freshMeta) {
-      meta = freshMeta;
-      totalChunks = Number(freshMeta.totalChunks) || 0;
-    }
+    // Re-read the WHOLE index, not just `_meta`. Re-reading `_meta` alone was
+    // the round-2 MEDIUM-1 bug: the new meta gets validated against the OLD
+    // chunk snapshot, so a growth that landed after our first read looks
+    // perfectly consistent (every chunk we hold carries the new `tc`) while we
+    // are in fact holding half the chunks — and we would answer with a FIRM
+    // total over half the seller's cards. That is strictly worse than
+    // `partial: true`, because the client has no way to tell it is being
+    // lied to. Re-reading both together is the only way the completeness half
+    // of the detector can see the chunks that appeared in the meantime.
+    //
+    // Cost: one extra collection read, and only on a detected mismatch — not
+    // on the ordinary path, which stays at exactly one read.
+    ({ docs, meta } = await readAll());
+    if (!meta) return { entries: [], meta: null, partial: false };
+    totalChunks = Number(meta.totalChunks) || 0;
     partial = detectGenerationMismatch(docs, totalChunks);
   }
 
@@ -675,11 +896,13 @@ async function queryPublicCardIndexForUser(params) {
   } = params || {};
 
   // Validation FIRST, before any Firestore call — a rejected userId must
-  // never reach the path interpolation, and a test asserts zero reads.
+  // never reach the path interpolation, and a rejected filter must never get
+  // to spend CPU. Tests assert zero reads happened in both cases.
   assertValidPublicUserId(userId);
+  assertValidFilters(filters);
 
-  if (typeof page !== 'number' || !Number.isInteger(page) || page < 0) {
-    throw invalidArgument('page must be a non-negative integer');
+  if (typeof page !== 'number' || !Number.isInteger(page) || page < 0 || page > MAX_PAGE) {
+    throw invalidArgument(`page must be an integer between 0 and ${MAX_PAGE}`);
   }
   if (!VALID_MODES.includes(mode)) {
     throw invalidArgument(`mode must be one of: ${VALID_MODES.join(', ')}`);
@@ -713,8 +936,16 @@ async function queryPublicCardIndexForUser(params) {
     total: partial ? null : filtered.length,
     page,
     pageSize: resolvedPageSize,
-    hasMore: partial ? sorted.length > start + resolvedPageSize : start + resolvedPageSize < filtered.length,
-    facets: computePublicFacets(entries, filters),
+    // `sorted` and `filtered` are the same length by construction, so the two
+    // arms of the old `partial ? ... : ...` here computed the identical value.
+    // Dead branch removed rather than left to imply a distinction that isn't
+    // there. Under `partial` this is a lower bound, like everything else
+    // derived from an incomplete read.
+    hasMore: start + resolvedPageSize < filtered.length,
+    // Facet counts are counts, and under `partial` they are counts over an
+    // incomplete read — exactly as untrustworthy as `total`, so they go the
+    // same way rather than staying firm next to a null total.
+    facets: partial ? null : computePublicFacets(entries, filters),
     indexState: {
       schemaVersion: meta ? Number(meta.schemaVersion) || 0 : 0,
       totalChunks: meta ? Number(meta.totalChunks) || 0 : 0,
@@ -732,7 +963,12 @@ module.exports = {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   MIN_SEARCH_LEN,
+  MAX_FILTER_VALUES,
+  MAX_SEARCH_LENGTH,
+  PUBLIC_INDEX_CARD_OPTIONAL_FIELDS,
   assertValidPublicUserId,
+  assertValidFilters,
+  isLand,
   toPublicIndexCard,
   filterPublicIndexEntries,
   sortPublicIndexEntries,

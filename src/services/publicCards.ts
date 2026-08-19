@@ -34,6 +34,7 @@ import {
 // triggerIndexReconcileNow below. `import type` is erased at compile time;
 // the value comes from a dynamic import inside queryUserPublicCardIndex.
 import type {
+  PublicCardIndexFacets,
   PublicIndexCard,
   QueryPublicCardIndexRequest,
   QueryPublicCardIndexResponse,
@@ -1056,7 +1057,8 @@ export interface PublicCardIndexPage {
   page: number
   pageSize: number
   hasMore: boolean
-  facets: QueryPublicCardIndexResponse['facets']
+  /** `null` while the index is mid-rebuild — see the type in cloudFunctions.ts. */
+  facets: PublicCardIndexFacets | null
   indexState: QueryPublicCardIndexResponse['indexState']
 }
 
@@ -1088,6 +1090,12 @@ export function publicIndexCardToCard(row: PublicIndexCard): Card {
     public: true,
     colors: row.co,
     type_line: row.t,
+    // Only lands carry this, and it is the ONLY thing that gives a land a
+    // colour — a Swamp's `colors` is []. Without it the grid cannot draw a
+    // land's colour at all, and `useCardFilter`'s land handling
+    // (getCardColorCategory/passesColorFilter, which read produced_mana, not
+    // colors) has nothing to work with.
+    ...(row.pm && row.pm.length > 0 ? { produced_mana: row.pm } : {}),
     rarity: RARITY_BY_INITIAL[row.r],
     // The index stores `ca` (updatedAt) but deliberately does not ship it —
     // it exists to SORT on the server, and the grid never renders it. A

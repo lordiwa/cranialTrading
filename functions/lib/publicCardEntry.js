@@ -5,7 +5,19 @@
  *
  * TASK-247 root cause: the public profile filters and searches over the
  * ~60 cards that happen to already be loaded in memory, instead of a real
- * index — 36 black cards shown of 1,049 real ones. This module is the entry
+ * index — it showed 36 black cards where the profile really had over a
+ * thousand.
+ *
+ * A NOTE ON THE NUMBERS IN THIS FILE. Card counts against the production
+ * profile are a LIVE count: they move every time Rafael publishes or
+ * unpublishes a card, and several figures written here in tanda 1 were
+ * already wrong by tanda 3 (the black slice, the unique-scryfallId count,
+ * and the cache-gap count, which has since closed to zero on its own). They
+ * are kept as DATED measurements — evidence of what was observed when a
+ * decision was made — and are not maintained. The current figures live in
+ * the TASK-247 ticket. Proportions (e.g. "7.1% of entries have no usable
+ * color source") are quoted instead wherever one will do, since a
+ * proportion survives the collection growing. This module is the entry
  * builder for the replacement index (subsequent tandas write the index and
  * wire the query layer to it). Same dependency-free CommonJS technique as
  * functions/lib/cardIndexEntry.js (TASK-245): require()'able and EXECUTABLE
@@ -47,8 +59,11 @@
  * or to a "cards missing color data" query — the exact kind of silent gap
  * TASK-208/TASK-238 already burned this project on once. Decision: a
  * second flag, `cu` (color-unknown), distinct from `x` (no cache doc at
- * all — TASK-247 tanda 1 baseline, 17 of 5,162 scryfallId measured at the
- * time). `x` implies no color data too, but `cu` is the flag that also
+ * all — a small handful of scryfallId at the TASK-247 tanda 1 baseline,
+ * measured 2026-08-18; re-measured 2026-08-19 that gap had closed to zero
+ * on its own, which is exactly why these counts are dated rather than
+ * maintained. The `x` code path stays: the gap closing is not the same as
+ * the gap being impossible). `x` implies no color data too, but `cu` is the flag that also
  * fires when a cache DOES exist yet still has no usable color source —
  * `x` alone cannot distinguish that case from a colorless card either.
  * `x` and `cu` are independent: `x` is set whenever there's no cache doc,
@@ -163,8 +178,8 @@
  * @param {object} publicCardDoc a users/{uid}/public_cards/{id} document
  * @param {object|null|undefined} scryfallCacheDoc the matching
  *   scryfall_cache document, or null/undefined when there is no cache
- *   entry at all for this scryfallId (measured: 17 of 5,162 at TASK-247
- *   tanda 1 baseline)
+ *   entry at all for this scryfallId (a live count — see the header's note
+ *   on dated figures)
  */
 function buildPublicEntry(publicCardDoc, scryfallCacheDoc) {
   const data = publicCardDoc || {};

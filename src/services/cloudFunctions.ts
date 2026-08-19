@@ -451,6 +451,17 @@ export interface PublicIndexCard {
   co: string[] // colors (W/U/B/R/G), [] for colorless
   r: string   // rarity initial: c/u/r/m
   t: string   // type line
+  /**
+   * produced_mana — present ONLY for cards that produce mana, which in
+   * practice means lands. Lands print no `colors`, so this is the only thing
+   * that can colour a Swamp; the server filters on it too (see
+   * functions/lib/publicCardIndexQuery.js's matchesColor). Omitted rather
+   * than sent as `[]` because an empty array still costs 8 bytes on every
+   * one of the ~70% of rows that are not lands — measured +480 B per 60-row
+   * page if always sent, vs ~+234 B (3.1 ms at 600 Kbps) sending it only
+   * where it means something.
+   */
+  pm?: string[]
 }
 
 export interface QueryPublicCardIndexRequest {
@@ -498,18 +509,25 @@ export interface PublicCardIndexState {
   missing: number
 }
 
+export interface PublicCardIndexFacets {
+  color: Record<string, number>
+  status: Record<string, number>
+  rarity: Record<string, number>
+  type: Record<string, number>
+}
+
 export interface QueryPublicCardIndexResponse {
   cards: PublicIndexCard[]
   total: number | null
   page: number
   pageSize: number
   hasMore: boolean
-  facets: {
-    color: Record<string, number>
-    status: Record<string, number>
-    rarity: Record<string, number>
-    type: Record<string, number>
-  }
+  /**
+   * `null` for the same reason `total` is: under `indexState.partial` these
+   * are counts over an incomplete read of the index, so the server refuses to
+   * state them rather than let the UI put a confident number on a chip.
+   */
+  facets: PublicCardIndexFacets | null
   indexState: PublicCardIndexState
 }
 

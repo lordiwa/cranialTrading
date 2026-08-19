@@ -800,3 +800,49 @@ describe('publicCardIndex — assembly, divergence detection, reconciliation (TA
     })
   })
 })
+
+// ── TASK-247 tanda 3: mitigation A, the mid-rebuild detector ──
+//
+// publicCardIndexExecutor.js's header documents the window this closes,
+// LEIDO verbatim: growing totalChunks from 16 to 32 overwrites OLD chunks
+// 0..15 with NEW-scheme content while `_meta` still advertises 16, so a
+// reader honoring `_meta.totalChunks` during that window sees roughly HALF
+// the seller's real cards — indefinitely, if the run crashed, because
+// nothing reconciles automatically. That is TASK-247's own bug with a new
+// cause, and a reader cannot detect it from `_meta` alone.
+//
+// The fix is one field per chunk document: `tc`, the totalChunks the chunk
+// was WRITTEN under. Any chunk whose `tc` disagrees with `_meta.totalChunks`
+// proves the two are from different generations. It costs ~20 bytes per
+// chunk document (32 of them on the production profile) and is detectable
+// with no transaction, no lease, and no coordination.
+describe('buildPublicIndex — each chunk records the totalChunks it was written under (mitigation A)', () => {
+  it('stamps tc on every chunk, including the empty ones', () => {
+    const docs = Array.from({ length: 50 }, (_, i) => ({
+      cardId: `card-${i}`,
+      scryfallId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      cardName: `Card ${i}`,
+    }))
+    const { chunks, meta } = buildPublicIndex(docs, {}, { chunkTargetSize: 10 })
+    expect(Object.keys(chunks)).toHaveLength(meta.totalChunks)
+    for (const chunk of Object.values(chunks) as Array<{ id: number; tc: number }>) {
+      expect(chunk.tc).toBe(meta.totalChunks)
+    }
+  })
+
+  it('changes tc when the bucket space grows, which is exactly what makes the window detectable', () => {
+    const small = buildPublicIndex(
+      [{ cardId: 'c1', scryfallId: 'sf-1', cardName: 'A' }],
+      {},
+      { chunkTargetSize: 1 }
+    )
+    const big = buildPublicIndex(
+      Array.from({ length: 40 }, (_, i) => ({ cardId: `c${i}`, scryfallId: `sf-${i}`, cardName: `A${i}` })),
+      {},
+      { chunkTargetSize: 1 }
+    )
+    expect(small.chunks[0].tc).toBe(small.meta.totalChunks)
+    expect(big.chunks[0].tc).toBe(big.meta.totalChunks)
+    expect(big.chunks[0].tc).not.toBe(small.chunks[0].tc)
+  })
+})

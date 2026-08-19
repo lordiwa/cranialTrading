@@ -505,4 +505,85 @@ describe('publicCardEntry — public-profile index entry building (TASK-247 tand
       expect(pct).toBeLessThan(70)
     })
   })
+
+  // ── TASK-247 tanda 3: the four advanced-filter fields ──
+  //
+  // Rafael's decision for this tanda: power, toughness, full_art and
+  // keywords go INTO the index; oracle_text does NOT. `kw` was already here
+  // since tanda 1, so the gap is `pw`/`to`/`fa` — the three fields
+  // useCardFilter's advPowerMin/advPowerMax, advToughnessMin/advToughnessMax
+  // and advFullArtOnly read. Without them, migrating the public profile onto
+  // this index would satisfy AC2/AC3 and REGRESS those three advanced
+  // filters at the same time (feedback_verificar_contra_el_comportamiento_anterior).
+  //
+  // oracle_text stays out on purpose: its only consumer is passesKeywords,
+  // which already matches against `keywords` and `type_line` too — both of
+  // which are in the index — and it is hundreds of bytes of free text per
+  // card, which is the one thing the 4G-slow byte budget cannot absorb.
+  // Deferred to TASK-248.
+  describe('advanced-filter fields (pw / to / fa)', () => {
+    it('carries power, toughness and full_art from the cache document', () => {
+      const entry = buildPublicEntry(
+        { scryfallId: 'sf-1', cardId: 'c-1', cardName: 'Grizzly Bears' },
+        { colors: ['G'], type_line: 'Creature — Bear', power: '2', toughness: '2', full_art: false }
+      )
+      expect(entry.pw).toBe('2')
+      expect(entry.to).toBe('2')
+      expect(entry.fa).toBe(false)
+    })
+
+    it('marks a full-art printing', () => {
+      const entry = buildPublicEntry(
+        { scryfallId: 'sf-2', cardId: 'c-2', cardName: 'Island' },
+        { colors: [], type_line: 'Basic Land — Island', full_art: true }
+      )
+      expect(entry.fa).toBe(true)
+    })
+
+    it('falls back to card_faces for a dual-faced creature that prints no root power', () => {
+      // Real Scryfall shape for a transforming creature: the root document
+      // has no power/toughness at all, each face has its own.
+      const entry = buildPublicEntry(
+        { scryfallId: 'sf-3', cardId: 'c-3', cardName: 'Delver of Secrets // Insectile Aberration' },
+        {
+          card_faces: [
+            { colors: ['U'], type_line: 'Creature — Human Wizard', power: '1', toughness: '1' },
+            { colors: ['U'], type_line: 'Creature — Human Insect', power: '3', toughness: '2' },
+          ],
+        }
+      )
+      // Joined the same way `t` joins type lines, so the two stay aligned
+      // face-for-face and neither face's stats are silently dropped.
+      expect(entry.pw).toBe('1 // 3')
+      expect(entry.to).toBe('1 // 2')
+    })
+
+    it('leaves pw/to empty for a non-creature rather than inventing a 0', () => {
+      const entry = buildPublicEntry(
+        { scryfallId: 'sf-4', cardId: 'c-4', cardName: 'Lightning Bolt' },
+        { colors: ['R'], type_line: 'Instant' }
+      )
+      expect(entry.pw).toBe('')
+      expect(entry.to).toBe('')
+      expect(entry.fa).toBe(false)
+    })
+
+    it('preserves a non-numeric power such as * without coercing it', () => {
+      const entry = buildPublicEntry(
+        { scryfallId: 'sf-5', cardId: 'c-5', cardName: 'Tarmogoyf' },
+        { colors: ['G'], type_line: 'Creature — Lhurgoyf', power: '*', toughness: '1+*' }
+      )
+      expect(entry.pw).toBe('*')
+      expect(entry.to).toBe('1+*')
+    })
+
+    it('is safe when there is no cache document at all', () => {
+      const entry = buildPublicEntry({ scryfallId: 'sf-6', cardId: 'c-6', cardName: 'Unknown' }, null)
+      expect(entry.pw).toBe('')
+      expect(entry.to).toBe('')
+      expect(entry.fa).toBe(false)
+      expect(entry.x).toBe(1)
+    })
+  })
+
 })

@@ -308,7 +308,27 @@ function buildPublicIndex(publicCardDocs, scryfallCacheByScryfallId, options = {
 
   const chunks = {};
   for (let id = 0; id < totalChunks; id++) {
-    chunks[id] = { id, entries: [] };
+    // `tc` (TASK-247 tanda 3, mitigation A): the totalChunks this chunk was
+    // WRITTEN under. publicCardIndexExecutor.js's header documents that
+    // while the index GROWS (say 16 -> 32), step 1 overwrites old chunks
+    // 0..15 with new-scheme content while `_meta` — live throughout step 1
+    // — still advertises 16, so a reader trusting `_meta` sees roughly HALF
+    // the seller's cards, and a crash mid-step-1 pins that state until the
+    // next reconciliation pass, which nothing schedules automatically. That
+    // is TASK-247's own bug with a new cause, and `_meta` alone cannot
+    // reveal it. A chunk whose `tc` disagrees with `_meta.totalChunks`
+    // proves the two are from different generations — detectable by pure
+    // reads, with no transaction, lease or coordination, for ~20 bytes per
+    // chunk document (32 of them on the production profile). The reader
+    // side is functions/lib/publicCardIndexQuery.js's
+    // detectGenerationMismatch; it answers `partial: true` with no `total`
+    // rather than reporting a number that might be half the truth.
+    //
+    // This is mitigation A (DETECT). Mitigation B (double-buffer each
+    // generation under its own document ids so the window never exists at
+    // all) is a change to the write layer and is deliberately NOT in this
+    // tanda; A stays useful as a safety net even after B ships.
+    chunks[id] = { id, entries: [], tc: totalChunks };
   }
 
   for (const doc of docs) {

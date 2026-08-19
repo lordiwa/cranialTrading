@@ -34,6 +34,7 @@ const { isDualFaced, buildIndexEntry } = require("./lib/cardIndexEntry");
 // exactly one place doing these reads/writes instead of two copies that
 // can drift). This file only wires the self-only onCall wrapper below.
 const { reconcilePublicCardIndexForUser } = require("./lib/publicCardIndexReconciler");
+const { queryPublicCardIndexForUser } = require("./lib/publicCardIndexQuery");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -1964,6 +1965,88 @@ exports.reconcilePublicCardIndex = onCall(
       if (error instanceof HttpsError) throw error;
       logger.error('[reconcilePublicCardIndex] Error:', error);
       throw new HttpsError('internal', 'Failed to reconcile public card index');
+    }
+  }
+);
+
+
+// ============================================================
+// QUERY PUBLIC CARD INDEX — TASK-247 tanda 3/5
+//
+// Thin wiring over functions/lib/publicCardIndexQuery.js, which owns the
+// whole mechanism and carries the full write-up (why this must be a Cloud
+// Function at all, the AC6 privacy argument, the path-injection argument,
+// the OR-inclusive colour semantics, the byte budget, and mitigation A for a
+// rebuild caught in flight). Everything below is argument plumbing and error
+// mapping — deliberately, so the logic stays in a module vitest can actually
+// execute (functions/index.js calls admin.initializeApp() at require() time
+// and has no emulator harness — TASK-236).
+//
+// UNAUTHENTICATED, ON PURPOSE. An anonymous visitor browsing a public seller
+// profile is the primary use case, so there is no request.auth check and no
+// branch anywhere that behaves differently for a signed-in caller. The
+// userId therefore arrives FROM THE CLIENT, which in this project is the
+// shape of a recurring authz bug (seven recorded appearances; TASK-214 and
+// TASK-211 are two of them). The argument for why it is safe here — the
+// collection read is derived exclusively from public_cards, whose own
+// firestore.rules entry is already `allow read: if true`, and this code has
+// no path that can name users/{uid}/cards or the private card_index — lives
+// in the query module's header and is enforced by a test that greps both
+// this block and that module for those paths.
+//
+// SEPARATELY: the index path is built by string interpolation, so a userId
+// containing `/` selects a different COLLECTION, not merely a different
+// user. assertValidPublicUserId (whitelist regex, inside the module) runs
+// before any Firestore call.
+//
+// memory: '2GiB' is not optional. This function reads every chunk of the
+// seller's index and filters/sorts in RAM, which is exactly what
+// queryCardIndex does — and queryCardIndex died of OOM at 512 MiB on
+// almost every search of a ~59k-card account (see its own PARCHE note
+// above). Being born at 512 MiB here would repeat that incident knowingly.
+// ============================================================
+
+exports.queryPublicCardIndex = onCall(
+  { maxInstances: 10, timeoutSeconds: 60, memory: '2GiB' },
+  async (request) => {
+    const {
+      userId,
+      filters = {},
+      sort,
+      page = 0,
+      pageSize,
+      mode = 'cards',
+    } = request.data || {};
+
+    try {
+      const result = await queryPublicCardIndexForUser({
+        db,
+        userId,
+        filters,
+        sort,
+        page,
+        pageSize,
+        mode,
+      });
+
+      logger.info(
+        `[queryPublicCardIndex] seller ${result.indexState.count} indexed -> total=${result.total} ` +
+          `page=${result.page} returned=${result.cards.length} partial=${result.indexState.partial}`
+      );
+
+      return result;
+    } catch (error) {
+      // Same distinction reconcilePublicCardIndex draws (its LOW fix, review
+      // round 2): a raw Firestore SDK error also carries a numeric `.code`,
+      // so checking `error.code` truthiness would let a real failure skip
+      // the logger and vanish. Only our own tagged argument errors are
+      // surfaced to the caller; everything else is logged and generalized.
+      if (error instanceof HttpsError) throw error;
+      if (error && error.invalidArgument) {
+        throw new HttpsError('invalid-argument', error.message);
+      }
+      logger.error('[queryPublicCardIndex] Error:', error);
+      throw new HttpsError('internal', 'Failed to query public card index');
     }
   }
 );

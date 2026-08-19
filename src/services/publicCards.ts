@@ -26,8 +26,21 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
+// TYPE-ONLY, deliberately: a value import here would eagerly run
+// cloudFunctions.ts's module-top-level `getFunctions(getApp())` for every
+// module that imports publicCards.ts, which throws "No Firebase App
+// '[DEFAULT]'" in any test that doesn't also mock firebase/app — the exact
+// breakage already documented (and measured at 9 test files) on
+// triggerIndexReconcileNow below. `import type` is erased at compile time;
+// the value comes from a dynamic import inside queryUserPublicCardIndex.
+import type {
+  PublicIndexCard,
+  QueryPublicCardIndexRequest,
+  QueryPublicCardIndexResponse,
+} from './cloudFunctions'
 import { db } from './firestore'
 import type { Card } from '../types/card'
+import { cardImageProxyUrl } from '../utils/cardImageUrl'
 import { logSanitizedError } from '../utils/logSanitizedError'
 
 /** Firestore caps an 'in' filter at 30 values. */
@@ -981,4 +994,129 @@ export const searchPublicCards = async (
     results.push(data)
   }
   return results.slice(0, 20) // Preserves DashboardView:975 cap
+}
+
+// ============================================================================
+// TASK-247 tanda 3: reading the public card INDEX instead of the raw
+// public_cards page.
+//
+// What this replaces, and why it is a different shape. `getUserPublicCardsPage`
+// + `searchUserPublicCards` above are both honest Firestore queries, and both
+// are structurally incapable of answering the question the profile UI asks:
+//   - the color chips filter over whatever ~60 documents are already in
+//     memory, so a profile with 1,412 black documents reports 36;
+//   - the text search is a PREFIX query (Firestore has no substring
+//     operator), so 'blight' returns 9 of 14 documents and can never reach
+//     `Marauding Blight-Priest` or a split card's back face;
+//   - `public_cards` carries no Scryfall metadata at all — no colors, no
+//     type_line — and `scryfall_cache` requires auth, so an anonymous
+//     visitor cannot enrich client-side either.
+//
+// The index answers all three server-side. Note the two numbers the response
+// keeps separate, which today's page conflates into one: `total` is over the
+// seller's WHOLE public collection, `cards` is just the page. That separation
+// IS the fix.
+//
+// Not migrated here: usePublicProfileCards / UserProfileView still call the
+// two functions above. Rewiring them, and moving the color chips onto the
+// OR-inclusive letter vocabulary this index uses, is tanda 4.
+// ============================================================================
+
+/** Index rows store the rarity initial; the UI shows the full name. */
+const RARITY_BY_INITIAL: Record<string, string> = {
+  c: 'common',
+  u: 'uncommon',
+  r: 'rare',
+  m: 'mythic',
+}
+
+export interface PublicCardIndexPage {
+  cards: Card[]
+  /**
+   * Documents matching the filter across the seller's ENTIRE public
+   * collection — not `cards.length`. `null` means the server caught the
+   * index mid-rebuild and refuses to name a number it cannot stand behind;
+   * render that as "updating", never as 0 and never as `cards.length`.
+   */
+  total: number | null
+  page: number
+  pageSize: number
+  hasMore: boolean
+  facets: QueryPublicCardIndexResponse['facets']
+  indexState: QueryPublicCardIndexResponse['indexState']
+}
+
+/**
+ * Maps one 13-field index row onto the `Card` shape CollectionGrid,
+ * useCardFilter and the exchange cart already expect — the same job
+ * `publicCardToCard` does for a raw public_cards document.
+ *
+ * `image` is DERIVED, not received: the row carries only `s` (scryfallId)
+ * and the URL is rebuilt with cardImageProxyUrl (TASK-241). That is ~90
+ * bytes per row that never crosses the network, 5.4 KB on a 60-row page,
+ * against a project boot budget of 160 KB on slow 4G.
+ */
+export function publicIndexCardToCard(row: PublicIndexCard): Card {
+  return {
+    id: row.i,
+    scryfallId: row.s,
+    name: row.n,
+    edition: row.ed,
+    // Same rule publicCardToCard follows: '' becomes undefined so
+    // cardEnrichment's needsEnrichment still treats it as missing.
+    setCode: row.sc || undefined,
+    quantity: row.q,
+    condition: row.cn as Card['condition'],
+    foil: row.f,
+    price: row.p,
+    image: cardImageProxyUrl(row.s),
+    status: row.st,
+    public: true,
+    colors: row.co,
+    type_line: row.t,
+    rarity: RARITY_BY_INITIAL[row.r],
+    // The index stores `ca` (updatedAt) but deliberately does not ship it —
+    // it exists to SORT on the server, and the grid never renders it. A
+    // fresh Date keeps the required field of Card populated without
+    // pretending to a precision the row doesn't carry.
+    updatedAt: new Date(),
+  }
+}
+
+/**
+ * One page of a seller's public collection, filtered and counted server-side
+ * against the public card index.
+ *
+ * `userId` is the SELLER being viewed, not the caller — see
+ * cloudFunctions.ts's `queryPublicCardIndex` for why that is safe here and
+ * was a security hole in `queryCardIndex` (TASK-214). No auth required: an
+ * anonymous visitor browsing a public profile is the primary use case.
+ */
+export async function queryUserPublicCardIndex(
+  userId: string,
+  options: Omit<QueryPublicCardIndexRequest, 'userId'> = {}
+): Promise<PublicCardIndexPage> {
+  // Dynamic import for the same reason triggerIndexReconcileNow uses one —
+  // see the type-only import at the top of this file.
+  const { queryPublicCardIndex } = await import('./cloudFunctions')
+  const response = await queryPublicCardIndex({
+    userId,
+    filters: options.filters ?? {},
+    ...(options.sort ? { sort: options.sort } : {}),
+    page: options.page ?? 0,
+    // 60 matches usePublicProfileCards's DEFAULT_PAGE_SIZE, so migrating the
+    // profile onto this path does not change how far one scroll goes.
+    pageSize: options.pageSize ?? 60,
+    ...(options.mode ? { mode: options.mode } : {}),
+  })
+
+  return {
+    cards: response.cards.map(publicIndexCardToCard),
+    total: response.total,
+    page: response.page,
+    pageSize: response.pageSize,
+    hasMore: response.hasMore,
+    facets: response.facets,
+    indexState: response.indexState,
+  }
 }

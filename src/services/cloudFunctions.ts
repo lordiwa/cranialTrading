@@ -411,3 +411,131 @@ export async function queryCardIndex(
     throw error
   }
 }
+
+/**
+ * TASK-247 tanda 3: query the PUBLIC card index of the seller whose profile
+ * is being viewed (functions/index.js's `queryPublicCardIndex`, whose module
+ * functions/lib/publicCardIndexQuery.js carries the full write-up).
+ *
+ * Two things about this signature are deliberate and are the opposite of
+ * `queryCardIndex` right above it:
+ *
+ * 1. `userId` is REQUIRED and names someone else. `queryCardIndex` had its
+ *    userId parameter REMOVED by TASK-214 precisely because it let a caller
+ *    read another user's `card_index` — the whole inventory, private cards
+ *    included. This function reads `public_card_index`, which is derived
+ *    exclusively from `public_cards` (`allow read: if true` in
+ *    firestore.rules), so the userId is not a trust boundary here; the
+ *    server still validates it against a whitelist regex because the index
+ *    path is built by string interpolation and a `/` would name a different
+ *    collection entirely.
+ * 2. There is no auth requirement. An anonymous visitor browsing a public
+ *    profile is the primary use case.
+ *
+ * `total` is `number | null`: null means the server caught the index
+ * mid-rebuild and is refusing to name a count it cannot stand behind, rather
+ * than reporting one that could be half the truth. Callers must render that
+ * as "updating", never as 0 and never as `cards.length`.
+ */
+export interface PublicIndexCard {
+  s: string   // scryfallId — the client derives the image URL from this
+  i: string   // the owner's card document id
+  n: string   // display name, `//` intact for split cards
+  q: number   // quantity
+  p: number   // price
+  st: 'sale' | 'trade'
+  f: boolean  // foil
+  cn: string  // condition
+  sc: string  // set code
+  ed: string  // human-readable set name
+  co: string[] // colors (W/U/B/R/G), [] for colorless
+  r: string   // rarity initial: c/u/r/m
+  t: string   // type line
+}
+
+export interface QueryPublicCardIndexRequest {
+  userId: string
+  filters?: {
+    search?: string
+    status?: string[]
+    /** OR-inclusive letters (W/U/B/R/G, plus C for colorless). A B/G card matches both B and G. */
+    color?: string[]
+    rarity?: string[]
+    type?: string[]
+    manaValue?: (number | string)[]
+    edition?: string[]
+    keywords?: string[]
+    formats?: string[]
+    foil?: boolean
+    condition?: string[]
+    minPrice?: number
+    maxPrice?: number
+    powerMin?: number
+    powerMax?: number
+    toughnessMin?: number
+    toughnessMax?: number
+    fullArt?: boolean
+  }
+  sort?: {
+    field: 'name' | 'price' | 'edition' | 'quantity' | 'dateAdded'
+    direction: 'asc' | 'desc'
+  }
+  page?: number
+  pageSize?: number
+  mode?: 'cards' | 'facets'
+}
+
+export interface PublicCardIndexState {
+  schemaVersion: number
+  totalChunks: number
+  /** How many entries the index itself believes it holds. */
+  count: number
+  /** A reconciliation holds a fresh lease right now. */
+  reconciling: boolean
+  /** The index was caught mid-rebuild; `total` is null and counts are not trustworthy. */
+  partial: boolean
+  /** Entries a color filter dropped for having no usable color data (measured: 474 of 6,647). */
+  missing: number
+}
+
+export interface QueryPublicCardIndexResponse {
+  cards: PublicIndexCard[]
+  total: number | null
+  page: number
+  pageSize: number
+  hasMore: boolean
+  facets: {
+    color: Record<string, number>
+    status: Record<string, number>
+    rarity: Record<string, number>
+    type: Record<string, number>
+  }
+  indexState: PublicCardIndexState
+}
+
+export async function queryPublicCardIndex(
+  params: QueryPublicCardIndexRequest
+): Promise<QueryPublicCardIndexResponse> {
+  const callable = httpsCallable<QueryPublicCardIndexRequest, QueryPublicCardIndexResponse>(
+    functions,
+    'queryPublicCardIndex',
+    { timeout: 30000 }
+  )
+
+  try {
+    const result = await callable(params)
+    return result.data
+  } catch (error: unknown) {
+    logSanitizedError('[CloudFunctions] queryPublicCardIndex error', error)
+
+    const firebaseError = error as { code?: string; message?: string }
+    if (firebaseError.code === 'functions/invalid-argument') {
+      throw new Error(firebaseError.message ?? 'Invalid query parameters')
+    }
+    if (firebaseError.code === 'functions/internal') {
+      throw new Error(firebaseError.message ?? 'Internal server error')
+    }
+
+    throw error
+  }
+}

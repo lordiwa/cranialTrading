@@ -218,6 +218,20 @@ function buildPublicEntry(publicCardDoc, scryfallCacheDoc) {
     pm: (cache && cache.produced_mana) || [],
     r: rarity,
     kw: (cache && cache.keywords) || [],
+    // TASK-247 tanda 3: the three fields useCardFilter's advanced filters
+    // read that were NOT in this entry — advPowerMin/Max, advToughnessMin/Max
+    // and advFullArtOnly. Without them, moving the public profile onto this
+    // index would satisfy AC2/AC3 and REGRESS those three filters in the
+    // same change. `keywords` (`kw`, above) was the fourth field of that
+    // group and was already here since tanda 1.
+    //
+    // oracle_text is deliberately NOT added: its only consumer is
+    // passesKeywords, which already matches `keywords` and `type_line` too —
+    // both in this entry — and it is hundreds of bytes of free text per
+    // card against a byte budget sized for slow 4G. Deferred to TASK-248.
+    pw: resolveStat(cache, 'power'),
+    to: resolveStat(cache, 'toughness'),
+    fa: !!(cache && cache.full_art),
     lg,
     // AC9 addendum (review): sort-by-date-added (useCardFilter's
     // getCardTimestamp) needs a timestamp. public_cards documents do NOT
@@ -273,6 +287,41 @@ function resolveColors(cache) {
   }
   if (Array.isArray(cache.color_identity)) return cache.color_identity;
   return null;
+}
+
+/**
+ * AC9-style fallback for a printed stat (`power` / `toughness`): root value
+ * -> the card_faces values joined the way Scryfall itself displays a
+ * dual-faced card ("1 // 3"). A transforming creature carries no root
+ * power/toughness at all — both live on the faces — so without the fallback
+ * every dual-faced creature would look statless to a power/toughness range
+ * filter.
+ *
+ * Joined rather than front-face-only so neither face's stats are silently
+ * dropped; the query layer splits on `//` and matches a range against EITHER
+ * face (functions/lib/publicCardIndexQuery.js's matchesStatRange). Values
+ * stay STRINGS and are never coerced — Scryfall really does print `*` and
+ * `1+*`, and turning those into 0 would put Tarmogoyf in the "power 0"
+ * bucket instead of out of every numeric range, which is what
+ * useCardFilter's own NaN handling already does.
+ *
+ * @param {object|null} cache scryfall_cache document fields
+ * @param {'power'|'toughness'} field
+ * @returns {string}
+ */
+function resolveStat(cache, field) {
+  if (!cache) return '';
+  // eslint-disable-next-line security/detect-object-injection
+  const root = cache[field];
+  if (root !== undefined && root !== null && root !== '') return String(root);
+  if (Array.isArray(cache.card_faces)) {
+    const parts = cache.card_faces
+      // eslint-disable-next-line security/detect-object-injection
+      .map((f) => (f && f[field] !== undefined && f[field] !== null ? String(f[field]) : ''))
+      .filter((v) => v !== '');
+    if (parts.length > 0) return parts.join(' // ');
+  }
+  return '';
 }
 
 /**
@@ -399,6 +448,7 @@ module.exports = {
   buildPublicEntry,
   resolveColors,
   resolveTypeLine,
+  resolveStat,
   resolveTimestamp,
   publicChunkId,
   nextPowerOfTwo,

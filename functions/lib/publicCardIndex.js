@@ -115,6 +115,51 @@
  * the one live in their meta into a perpetual rebuild loop the moment the
  * two constants diverged (e.g. a future tanda changing the default).
  *
+ * SECOND REVIEW ROUND (fresh-context reviewer, 0 HIGH — the HIGH-2 guard
+ * was mutation-confirmed to hold in all 4 directions the reviewer tried):
+ *
+ * MEDIUM-2 (fixed, the important one — the reviewer reproduced it): the
+ * LOW fix above made `diagnosePublicIndex` and `buildPublicIndex` resolve
+ * `chunkTargetSize` through DIFFERENT fallback paths when a caller omits
+ * `options.chunkTargetSize` from both — `diagnosePublicIndex` now falls
+ * back to `currentMeta.chunkTargetSize`, but `buildPublicIndex` has no meta
+ * to fall back to and silently uses the module DEFAULT (400). Measured
+ * repro: a 4-chunk index built at chunkTargetSize 2, one new card to index.
+ * `diagnosePublicIndex(chunks, meta, docs)` (no options) correctly falls
+ * back to `meta.chunkTargetSize = 2` and reports `totalChunksMismatch:
+ * false` (an incremental repair). But `buildPublicIndex(docs, cache)` (no
+ * options, called by 2b to produce the `freshBuild` the plan is built
+ * from) has no meta and silently resolves to the DEFAULT, giving
+ * `freshBuild.meta.totalChunks = 1` — a completely different bucket space
+ * than the one the diagnosis just validated. The incremental branch's
+ * `freshBuild.chunks[chunkId] || { id: chunkId, entries: [] }` fallback
+ * then writes an EMPTY chunk for the one chunk id being repaired (chunk
+ * id 3 doesn't exist in a 1-chunk freshBuild), deleting 2 live cards that
+ * were previously in that chunk while reporting `rebuildRequired: false`.
+ * Fixed: the incremental branch now hard-checks `freshBuild.meta.totalChunks
+ * === diagnosis.metaTotalChunks` and THROWS if they disagree — a caller
+ * mismatch here is a real bug (the two functions were fed different
+ * chunkTargetSize), and a loud error is safer than a plan that looks
+ * successful while quietly dropping cards. The contract, restated for 2b:
+ * always call `buildPublicIndex` for `freshBuild` with the SAME
+ * chunkTargetSize the diagnosis resolved (pass `options.chunkTargetSize`
+ * explicitly to both, or read it back off `currentMeta.chunkTargetSize`
+ * before calling `buildPublicIndex`).
+ *
+ * MEDIUM-1 (fixed): `chunksToDelete` used a plain `id >= totalChunks`
+ * filter, which does not catch a NEGATIVE or FRACTIONAL chunk id (both are
+ * numerically less than any reasonable totalChunks, so they'd slip through
+ * and stay behind forever — the exact non-convergence shape of HIGH-2, with
+ * a different kind of bad id as the input). Fixed: the filter is now
+ * `!Number.isInteger(id) || id < 0 || id >= totalChunks` — anything that
+ * isn't a valid chunk id in the new range gets scheduled for deletion, not
+ * just anything numerically too large. `hasMalformedChunkId` (a
+ * non-numeric `id` field entirely, MED-2) is also now exposed on the
+ * diagnosis return value — the earlier version computed it internally but
+ * never surfaced it, leaving 2b with no signal that some chunk needs
+ * handling outside the normal chunksToWrite/chunksToDelete lists (e.g. by
+ * deleting the whole chunks subcollection instead of relying on exact ids).
+ *
  * CHUNK SIZING (AC10 "decide and document the criterion", measured
  * numbers): target ~400 entries per chunk before power-of-two rounding.
  * This number is not invented here — publicCardEntry.js's own header
@@ -328,6 +373,7 @@ function buildPublicIndex(publicCardDocs, scryfallCacheByScryfallId, options = {
  *   desiredTotalChunks: number,
  *   chunksPresentCount: number,
  *   presentChunkIds: number[],
+ *   hasMalformedChunkId: boolean,
  *   indexEmptied: boolean,
  * }}
  */
@@ -486,6 +532,7 @@ function diagnosePublicIndex(currentChunks, currentMeta, publicCardDocs, options
     desiredTotalChunks,
     chunksPresentCount,
     presentChunkIds,
+    hasMalformedChunkId,
     indexEmptied,
   };
 }
@@ -518,9 +565,13 @@ function planPublicIndexReconciliation(diagnosis, freshBuild) {
     // HIGH-2: chunks currently present outside the new [0, totalChunks)
     // range are NOT touched by chunksToWrite (which only ever spans
     // 0..totalChunks-1) and must be explicitly deleted, or a shrink never
-    // converges — the old plan silently left them behind forever.
+    // converges — the old plan silently left them behind forever. MED-1:
+    // "outside the range" means anything that ISN'T a valid integer id in
+    // [0, totalChunks) — a plain `id >= totalChunks` filter let a negative
+    // or fractional id slip through (both are numerically small) and stay
+    // behind forever, the same non-convergence with a different bad input.
     const chunksToDelete = (diagnosis.presentChunkIds || []).filter(
-      (id) => id >= freshBuild.meta.totalChunks
+      (id) => !Number.isInteger(id) || id < 0 || id >= freshBuild.meta.totalChunks
     );
     return {
       rebuildRequired: true,
@@ -533,6 +584,27 @@ function planPublicIndexReconciliation(diagnosis, freshBuild) {
       chunksToDelete,
       meta: freshBuild.meta,
     };
+  }
+
+  // MEDIUM-2 hard guard: an incremental repair is only safe when `freshBuild`
+  // shares the EXACT bucket space the diagnosis just validated. If it
+  // doesn't (e.g. `freshBuild` was built with no explicit chunkTargetSize
+  // and silently fell back to the module DEFAULT while the diagnosis
+  // resolved a different size from currentMeta.chunkTargetSize — see
+  // header), the chunksToWrite fallback below would write an EMPTY chunk
+  // for whatever id is being repaired, silently dropping every live card
+  // that used to be in it. This is a caller bug, not a recoverable
+  // reconciliation case — refuse loudly instead of emitting a plan that
+  // looks like a successful, small repair.
+  if (freshBuild.meta.totalChunks !== diagnosis.metaTotalChunks) {
+    throw new Error(
+      `planPublicIndexReconciliation: freshBuild.meta.totalChunks (${freshBuild.meta.totalChunks}) does ` +
+        `not match the diagnosis's metaTotalChunks (${diagnosis.metaTotalChunks}) even though the ` +
+        'diagnosis itself reported totalChunksMismatch: false. freshBuild must be built with the SAME ' +
+        'chunkTargetSize the diagnosis resolved (pass options.chunkTargetSize explicitly to both calls, ' +
+        'or read it back off currentMeta.chunkTargetSize before calling buildPublicIndex) — otherwise an ' +
+        '"incremental repair" plan would write an empty chunk and silently drop live cards.'
+    );
   }
 
   // Bucket space agrees — only the specific chunks touched by a missing,

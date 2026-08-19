@@ -626,4 +626,177 @@ describe('publicCardIndex — assembly, divergence detection, reconciliation (TA
       expect(diagnosis.desiredTotalChunks).toBe(built.meta.totalChunks)
     })
   })
+
+  describe('second review round: MEDIUM-2 (freshBuild bucket-space guard), MEDIUM-1 (chunksToDelete filter), and the 4 missing anchors', () => {
+    it('MEDIUM-2: refuses (throws) instead of silently dropping live cards when freshBuild does not share the diagnosis bucket space — the exact no-explicit-options repro measured by the reviewer', () => {
+      const docs = makeCards(6)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      expect(built.meta.totalChunks).toBe(4)
+      const docsPlusOne = [...docs, makeCard(6)]
+
+      // No explicit options on either call: diagnosePublicIndex correctly
+      // falls back to meta.chunkTargetSize (2, the LOW fix), but
+      // buildPublicIndex has no meta to fall back to and silently uses the
+      // module DEFAULT (400) — producing a completely different bucket
+      // space for the same account.
+      const diagnosis = diagnosePublicIndex(built.chunks, built.meta, docsPlusOne)
+      expect(diagnosis.totalChunksMismatch).toBe(false)
+      const freshBuild = buildPublicIndex(docsPlusOne, {})
+      expect(freshBuild.meta.totalChunks).toBe(1)
+
+      expect(() => planPublicIndexReconciliation(diagnosis, freshBuild)).toThrow(
+        /freshBuild\.meta\.totalChunks/
+      )
+    })
+
+    it('MEDIUM-2: does NOT throw, and repairs correctly, when freshBuild is built with the same chunkTargetSize the diagnosis resolved', () => {
+      const docs = makeCards(6)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const docsPlusOne = [...docs, makeCard(6)]
+      const diagnosis = diagnosePublicIndex(built.chunks, built.meta, docsPlusOne)
+      const freshBuild = buildPublicIndex(docsPlusOne, {}, { chunkTargetSize: built.meta.chunkTargetSize })
+      expect(freshBuild.meta.totalChunks).toBe(built.meta.totalChunks)
+
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+      expect(plan.rebuildRequired).toBe(false)
+      const repaired = { ...built.chunks, ...plan.chunksToWrite }
+      const rediagnosed = diagnosePublicIndex(repaired, plan.meta, docsPlusOne, { chunkTargetSize: 2 })
+      expect(rediagnosed.isDivergent).toBe(false)
+    })
+
+    it('MEDIUM-1: chunksToDelete also catches negative and fractional chunk ids, not just ids >= totalChunks', () => {
+      const docs17 = makeCards(17)
+      const grown = buildPublicIndex(docs17, {}, { chunkTargetSize: 1 })
+      const shrunkDocs = docs17.slice(0, 8)
+      // Both -1 and 2.5 are finite numbers, numerically SMALLER than the
+      // new totalChunks (8) — a plain `id >= totalChunks` filter lets both
+      // slip through and stay behind forever.
+      const corrupted = {
+        ...grown.chunks,
+        neg: { id: -1, entries: [] },
+        frac: { id: 2.5, entries: [] },
+      }
+
+      const diagnosis = diagnosePublicIndex(corrupted, grown.meta, shrunkDocs, { chunkTargetSize: 1 })
+      expect(diagnosis.totalChunksMismatch).toBe(true)
+      const freshBuild = buildPublicIndex(shrunkDocs, {}, { chunkTargetSize: 1 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+
+      expect(plan.chunksToDelete).toContain(-1)
+      expect(plan.chunksToDelete).toContain(2.5)
+    })
+
+    it('S3 / MED-2 follow-up: hasMalformedChunkId is exposed on the diagnosis and is the ONLY signal when a malformed chunk sits alongside an otherwise-complete, valid 0..n-1 set', () => {
+      const docs = makeCards(4)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 1 }) // 4 chunks, ids 0-3, all valid
+      const withExtraMalformed = { ...built.chunks, junk: { id: 'not-a-number', entries: [] } }
+
+      const diagnosis = diagnosePublicIndex(withExtraMalformed, built.meta, docs, { chunkTargetSize: 1 })
+      // The valid 0..3 set alone would satisfy both the count check and the
+      // exact-id-set check (MED-1) — hasMalformedChunkId is the only thing
+      // that can catch the extra corrupt chunk.
+      expect(diagnosis.chunksPresentCount).toBe(4)
+      expect(diagnosis.hasMalformedChunkId).toBe(true)
+      expect(diagnosis.totalChunksMismatch).toBe(true)
+      expect(diagnosis.isDivergent).toBe(true)
+    })
+
+    it('S4: a chunkTargetSize of exactly 0 also normalizes to the default (0 is falsy in JS, but also not a NEGATIVE number — both branches of the guard matter)', () => {
+      const docs = makeCards(3)
+      expect(() => buildPublicIndex(docs, {}, { chunkTargetSize: 0 })).not.toThrow()
+      const { meta } = buildPublicIndex(docs, {}, { chunkTargetSize: 0 })
+      expect(meta.chunkTargetSize).toBe(DEFAULT_CHUNK_TARGET_SIZE)
+    })
+
+    it('S1: duplicated-card repair still writes the expectedChunk even when NEITHER stale occurrence sits there', () => {
+      const docs = makeCards(6)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      expect(built.meta.totalChunks).toBe(4)
+      const target = docs[0]
+      const homeChunk = publicChunkId(target.scryfallId, built.meta.totalChunks)
+      const entry = built.chunks[homeChunk].entries.find((e: { i: string }) => e.i === target.cardId)
+      const otherChunkIds = [0, 1, 2, 3].filter((id) => id !== homeChunk)
+      const [chunkA, chunkB] = otherChunkIds
+
+      // Remove the card from its home chunk entirely, and drop two stale
+      // copies into two OTHER chunks — neither occurrence sits at the
+      // expected chunk.
+      const tampered = Object.fromEntries(
+        Object.entries(built.chunks).map(([id, chunk]) => {
+          const numId = Number(id)
+          if (numId === homeChunk) {
+            return [id, { id: numId, entries: chunk.entries.filter((e: { i: string }) => e.i !== target.cardId) }]
+          }
+          if (numId === chunkA || numId === chunkB) {
+            return [id, { id: numId, entries: [...chunk.entries, entry] }]
+          }
+          return [id, chunk]
+        })
+      )
+
+      const diagnosis = diagnosePublicIndex(tampered, built.meta, docs, { chunkTargetSize: 2 })
+      expect(diagnosis.duplicated).toHaveLength(1)
+      expect(diagnosis.duplicated[0].chunks.sort()).toEqual([chunkA, chunkB].sort())
+      // The chunks array does NOT include homeChunk — this is exactly the
+      // case where dropping `affectedChunkIds.add(d.expectedChunk)` from
+      // the plan would silently skip rewriting it.
+      expect(diagnosis.duplicated[0].chunks).not.toContain(homeChunk)
+
+      const freshBuild = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+      expect(Object.keys(plan.chunksToWrite).map(Number)).toContain(homeChunk)
+
+      const repaired = { ...tampered, ...plan.chunksToWrite }
+      expect(repaired[homeChunk].entries.some((e: { i: string }) => e.i === target.cardId)).toBe(true)
+      const occurrences = Object.values(repaired).flatMap((c: any) =>
+        c.entries.filter((e: { i: string }) => e.i === target.cardId)
+      )
+      expect(occurrences).toHaveLength(1)
+    })
+
+    it('S2: an orphaned card with two stale copies reports one orphaned entry per occurrence, and the plan rewrites both chunks', () => {
+      const docs = makeCards(6)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const removedCardId = 'card-1'
+      const remainingDocs = docs.filter((d) => d.cardId !== removedCardId)
+
+      const orphanHomeChunk = Number(
+        Object.entries(built.chunks).find(([, chunk]) =>
+          chunk.entries.some((e: { i: string }) => e.i === removedCardId)
+        )![0]
+      )
+      const orphanEntry = built.chunks[orphanHomeChunk].entries.find(
+        (e: { i: string }) => e.i === removedCardId
+      )
+      const otherChunkId = (orphanHomeChunk + 1) % built.meta.totalChunks
+
+      const withExtraOrphanCopy = Object.fromEntries(
+        Object.entries(built.chunks).map(([id, chunk]) => {
+          const numId = Number(id)
+          if (numId === otherChunkId) return [id, { id: numId, entries: [...chunk.entries, orphanEntry] }]
+          return [id, chunk]
+        })
+      )
+
+      const diagnosis = diagnosePublicIndex(withExtraOrphanCopy, built.meta, remainingDocs, {
+        chunkTargetSize: 2,
+      })
+      expect(diagnosis.orphaned).toHaveLength(2)
+      expect(diagnosis.orphaned.map((o) => o.actualChunk).sort()).toEqual(
+        [orphanHomeChunk, otherChunkId].sort()
+      )
+
+      const freshBuild = buildPublicIndex(remainingDocs, {}, { chunkTargetSize: 2 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+      expect(Object.keys(plan.chunksToWrite).map(Number).sort()).toEqual(
+        [orphanHomeChunk, otherChunkId].sort()
+      )
+
+      const repaired = { ...withExtraOrphanCopy, ...plan.chunksToWrite }
+      const stillPresent = Object.values(repaired).some((c: any) =>
+        c.entries.some((e: { i: string }) => e.i === removedCardId)
+      )
+      expect(stillPresent).toBe(false)
+    })
+  })
 })

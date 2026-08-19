@@ -28,6 +28,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firestore'
 import type { Card } from '../types/card'
+import { logSanitizedError } from '../utils/logSanitizedError'
 
 /** Firestore caps an 'in' filter at 30 values. */
 const FIRESTORE_IN_LIMIT = 30
@@ -127,6 +128,98 @@ export interface PublicPreference {
 }
 
 /**
+ * Whether a card belongs in public_cards — sale/trade status AND explicitly
+ * marked public. TASK-085: whitelist sale/trade explicitly (not a
+ * 'collection' blacklist) — public_cards is now readable by anonymous
+ * users, so a 'wishlist' card marked public must never slip through as
+ * "not collection".
+ */
+function isPublicCard(card: Card): boolean {
+  return (card.status === 'sale' || card.status === 'trade') && card.public === true
+}
+
+/**
+ * Single source of truth for the public_cards document shape (TASK-247
+ * tanda 2c). Previously syncCardToPublic, batchSyncCardsToPublic, and
+ * syncAllUserCards each carried their own object literal — the exact drift
+ * risk the server's PUBLIC_CARD_FIELDS catalog (functions/lib/
+ * publicCardIndexReconciler.js) exists to guard against. Every field that
+ * catalog reads (scryfallId, cardId, cardName, cardNameLower, quantity,
+ * price, status, foil, condition, setCode, edition, updatedAt) is written
+ * here, plus the fields the profile UI itself needs (userId, username,
+ * avatarUrl, image, location) — matches the real 17-field shape measured
+ * against production (see the PublicCard doc comment above). Deliberately
+ * excludes `email` — TASK-169, public_cards is anonymous-readable.
+ *
+ * `location` defaults to '' rather than staying undefined: this project's
+ * Firestore client has no ignoreUndefinedProperties override (see
+ * services/firestore.ts), so `undefined` in a setDoc/batch.set payload
+ * throws. syncAllUserCards already guarded this correctly (`userLocation ??
+ * ''`); syncCardToPublic and batchSyncCardsToPublic used to pass
+ * `userLocation` straight through — unified here to the safe variant. In
+ * practice every caller resolves location from authStore.user.location,
+ * which is always a string (defaulted to '' at signup — see
+ * stores/auth.ts), so this was latent, not a live bug.
+ */
+export function buildPublicCardDoc(
+  card: Card,
+  userId: string,
+  username: string,
+  userLocation?: string,
+  userAvatarUrl?: string | null
+): Omit<PublicCard, 'docId'> {
+  return {
+    cardId: card.id,
+    userId,
+    username,
+    avatarUrl: userAvatarUrl ?? null,
+    cardName: card.name,
+    cardNameLower: card.name.toLowerCase(),
+    scryfallId: card.scryfallId,
+    setCode: card.setCode ?? '',
+    status: card.status as 'trade' | 'sale',
+    price: card.price || 0,
+    edition: card.edition || '',
+    condition: card.condition || 'NM',
+    foil: card.foil || false,
+    quantity: card.quantity || 1,
+    image: card.image || '',
+    location: userLocation ?? '',
+    updatedAt: Timestamp.now(),
+  }
+}
+
+/**
+ * TASK-247 tanda 2c: fire-and-forget trigger for the server-side public
+ * index reconcile (functions/index.js's `reconcilePublicCardIndex`, self-only,
+ * wired in tanda 2b but never invoked from the client until now). Called
+ * once per sync operation by each writer below — never per card — so the
+ * fanout is bounded by how often a user's public set changes, not by its
+ * size. Non-blocking and non-fatal: a reconcile failure must never surface
+ * as a failure of the card save/sync the user actually asked for, matching
+ * the existing non-blocking pattern for these writers' own callers
+ * (stores/collection.ts's fire-and-forget syncCardToPublic/batchSyncCardsToPublic
+ * calls).
+ *
+ * Dynamic `import('./cloudFunctions')` rather than a static one — same
+ * reason stores/collection.ts's applyCardIndexDelta wrapper does it
+ * (TASK-232, see that comment): a static import would make importing
+ * publicCards.ts eagerly run cloudFunctions.ts's module-top-level
+ * `getFunctions(getApp())`, which throws "No Firebase App '[DEFAULT]'" in
+ * any test that imports this module (directly or via stores/collection.ts,
+ * stores/binders.ts, stores/decks.ts, ...) without also mocking
+ * firebase/app — measured: 9 test files broke this way with a static
+ * import before this fix.
+ */
+function scheduleIndexReconcile(): void {
+  import('./cloudFunctions')
+    .then(({ reconcilePublicCardIndex }) => reconcilePublicCardIndex())
+    .catch((error: unknown) => {
+      logSanitizedError('[PublicCards] index reconcile failed (non-fatal)', error, 'warn')
+    })
+}
+
+/**
  * Sync a single card to public_cards collection
  * Only syncs cards with status 'trade' or 'sale' AND public: true
  */
@@ -140,42 +233,19 @@ export async function syncCardToPublic(
   const publicCardId = `${userId}_${card.id}`
   const publicCardRef = doc(db, 'public_cards', publicCardId)
 
-  // TASK-085: whitelist sale/trade explicitly (not a 'collection' blacklist) —
-  // public_cards is now readable by anonymous users, so a 'wishlist' card
-  // marked public must never slip through as "not collection".
-  const isPublicCard = (card.status === 'sale' || card.status === 'trade') && card.public === true
-
-  if (isPublicCard) {
-    const publicCard = {
-      cardId: card.id,
-      userId,
-      username,
-      avatarUrl: userAvatarUrl ?? null,
-      cardName: card.name,
-      cardNameLower: card.name.toLowerCase(),
-      scryfallId: card.scryfallId,
-      setCode: card.setCode ?? '',
-      status: card.status as 'trade' | 'sale',
-      price: card.price || 0,
-      edition: card.edition || '',
-      condition: card.condition || 'NM',
-      foil: card.foil || false,
-      quantity: card.quantity || 1,
-      image: card.image || '',
-      location: userLocation,
-      // TASK-169: el email NO se publica aca. public_cards se lee SIN login
-      // (TASK-085, a proposito, para que un visitante vea quien vende), asi que
-      // copiar el correo del dueño en cada documento permitia bajarse en masa
-      // los emails de toda la plataforma con una peticion anonima. Verificado
-      // en vivo contra dev antes de este arreglo. El contacto vive ahora en
-      // contact_info/{userId}, que exige estar logueado para leerse.
-      updatedAt: Timestamp.now(),
-    }
-    await setDoc(publicCardRef, publicCard)
+  if (isPublicCard(card)) {
+    // TASK-169: el email NO se publica aca. public_cards se lee SIN login
+    // (TASK-085, a proposito, para que un visitante vea quien vende), asi que
+    // copiar el correo del dueño en cada documento permitia bajarse en masa
+    // los emails de toda la plataforma con una peticion anonima. Verificado
+    // en vivo contra dev antes de este arreglo. El contacto vive ahora en
+    // contact_info/{userId}, que exige estar logueado para leerse.
+    await setDoc(publicCardRef, buildPublicCardDoc(card, userId, username, userLocation, userAvatarUrl))
   } else {
     // Remove from public if not public or status changed
     await deleteDoc(publicCardRef).catch(() => { /* doc may not exist */ })
   }
+  scheduleIndexReconcile()
 }
 
 /**
@@ -203,30 +273,10 @@ export async function batchSyncCardsToPublic(
     for (const card of chunk) {
       const publicCardId = `${userId}_${card.id}`
       const publicCardRef = doc(db, 'public_cards', publicCardId)
-      // TASK-085: whitelist sale/trade (see syncCardToPublic comment above).
-      const isPublicCard = (card.status === 'sale' || card.status === 'trade') && card.public === true
 
-      if (isPublicCard) {
-        batch.set(publicCardRef, {
-          cardId: card.id,
-          userId,
-          username,
-          avatarUrl: userAvatarUrl ?? null,
-          cardName: card.name,
-          cardNameLower: card.name.toLowerCase(),
-          scryfallId: card.scryfallId,
-          setCode: card.setCode ?? '',
-          status: card.status as 'trade' | 'sale',
-          price: card.price || 0,
-          edition: card.edition || '',
-          condition: card.condition || 'NM',
-          foil: card.foil || false,
-          quantity: card.quantity || 1,
-          image: card.image || '',
-          location: userLocation,
-          // TASK-169: sin email, ver syncCardToPublic
-          updatedAt: Timestamp.now(),
-        })
+      if (isPublicCard(card)) {
+        // TASK-169: sin email, ver syncCardToPublic
+        batch.set(publicCardRef, buildPublicCardDoc(card, userId, username, userLocation, userAvatarUrl))
       } else {
         batch.delete(publicCardRef)
       }
@@ -236,6 +286,7 @@ export async function batchSyncCardsToPublic(
     completedChunks++
     onProgress?.(completedChunks, totalChunks)
   }
+  scheduleIndexReconcile()
 }
 
 /**
@@ -295,8 +346,7 @@ export async function syncAllUserCards(
   userLocation?: string,
   userAvatarUrl?: string | null
 ): Promise<void> {
-  // TASK-085: whitelist sale/trade (see syncCardToPublic comment above).
-  const publicCards = cards.filter(c => (c.status === 'sale' || c.status === 'trade') && c.public === true)
+  const publicCards = cards.filter(isPublicCard)
 
   // First, remove all existing public cards for this user
   const existingQuery = query(
@@ -324,29 +374,12 @@ export async function syncAllUserCards(
     for (const card of chunk) {
       const publicCardId = `${userId}_${card.id}`
       const publicCardRef = doc(db, 'public_cards', publicCardId)
-      batch.set(publicCardRef, {
-        cardId: card.id,
-        userId,
-        username,
-        avatarUrl: userAvatarUrl ?? null,
-        cardName: card.name,
-        cardNameLower: card.name.toLowerCase(),
-        scryfallId: card.scryfallId,
-        setCode: card.setCode ?? '',
-        status: card.status,
-        price: card.price || 0,
-        edition: card.edition || '',
-        condition: card.condition || 'NM',
-        foil: card.foil || false,
-        quantity: card.quantity || 1,
-        image: card.image || '',
-        location: userLocation ?? '',
-        // TASK-169: sin email, ver syncCardToPublic
-        updatedAt: Timestamp.now(),
-      })
+      // TASK-169: sin email, ver syncCardToPublic
+      batch.set(publicCardRef, buildPublicCardDoc(card, userId, username, userLocation, userAvatarUrl))
     }
     await batch.commit()
   }
+  scheduleIndexReconcile()
 }
 
 /**

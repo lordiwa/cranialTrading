@@ -51,11 +51,37 @@ vi.mock('firebase/firestore', () => ({
   where: (...args: unknown[]) => whereMock(...args),
   writeBatch: () => writeBatchMock(),
 }))
-vi.mock('@/services/firebase', () => ({ db: {} }))
+vi.mock('@/services/firebase', () => ({ db: {}, auth: { currentUser: null } }))
 vi.mock('@/services/firestore', () => ({ db: {} }))
 
+// TASK-247 tanda 2c: the three write functions now trigger the server-side
+// public-index reconcile via a dynamic `import('./cloudFunctions')` (see
+// that function's doc comment for why it's dynamic, not static). Mocking
+// '@/services/cloudFunctions' wholesale here raced against that dynamic
+// import in practice — resolution order between a vi.mock'd alias
+// specifier and the SUT's relative specifier was not reliable, some calls
+// hit the mock and some hit the REAL module (observed: "No Firebase App
+// '[DEFAULT]'" errors from real cloudFunctions.ts, non-deterministically,
+// even though every assertion still happened to pass). Mocking at the same
+// low level cloudFunctions.test.ts itself uses — firebase/functions +
+// firebase/app + firebase/auth — sidesteps the race entirely: the REAL
+// cloudFunctions.ts module always loads (deterministic), and it's firebase/
+// functions' httpsCallable that's mocked underneath it.
+const reconcileCallableMock = vi.fn().mockResolvedValue({ data: { strategy: 'noop' } })
+const httpsCallableMock = vi.fn((..._args: unknown[]) => reconcileCallableMock)
+vi.mock('firebase/functions', () => ({
+  getFunctions: () => ({}),
+  httpsCallable: (...args: unknown[]) => httpsCallableMock(...args),
+}))
+vi.mock('firebase/app', () => ({
+  getApp: () => ({}),
+}))
+vi.mock('firebase/auth', () => ({
+  onIdTokenChanged: () => () => {},
+}))
+
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { batchSyncCardsToPublic, buildPublicCardDoc, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 
 beforeEach(() => {
   setDocMock.mockClear()
@@ -73,6 +99,175 @@ beforeEach(() => {
   batchDeleteMock.mockClear()
   batchCommitMock.mockClear()
   writeBatchMock.mockClear()
+  reconcileCallableMock.mockClear()
+  httpsCallableMock.mockClear()
+})
+
+/**
+ * TASK-247 tanda 2c: single source of truth for the public_cards document
+ * shape. Before this, syncCardToPublic, batchSyncCardsToPublic, and
+ * syncAllUserCards each had their own object literal — the exact drift risk
+ * a `PUBLIC_CARD_FIELDS` catalog on the server side (functions/lib/
+ * publicCardIndexReconciler.js) is guarding against.
+ *
+ * The doc comment on PublicCard (src/services/publicCards.ts) states the
+ * real field set measured against 6,647 production documents: avatarUrl,
+ * cardId, cardName, cardNameLower, condition, edition, foil, image,
+ * location, price, quantity, scryfallId, setCode, status, updatedAt,
+ * userId, username. No `name` field exists — confusing it with cardName
+ * cost a full round in tanda 1.
+ */
+describe('buildPublicCardDoc', () => {
+  it('writes exactly the 17 known public_cards fields — no more, no less, and never `name`', () => {
+    const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true, setCode: 'lea' })
+
+    const payload = buildPublicCardDoc(card, 'user-1', 'alice', 'Montevideo', 'https://avatar')
+
+    expect(Object.keys(payload).sort()).toEqual([
+      'avatarUrl', 'cardId', 'cardName', 'cardNameLower', 'condition', 'edition',
+      'foil', 'image', 'location', 'price', 'quantity', 'scryfallId', 'setCode',
+      'status', 'updatedAt', 'userId', 'username',
+    ])
+    expect(payload).not.toHaveProperty('name')
+    expect(payload).not.toHaveProperty('email')
+  })
+
+  it('carries userId/username/avatarUrl/location straight from the arguments', () => {
+    const card = makeCard({ name: 'Sol Ring', status: 'trade', public: true })
+
+    const payload = buildPublicCardDoc(card, 'user-9', 'bob', 'Buenos Aires', 'https://avatar-9')
+
+    expect(payload.userId).toBe('user-9')
+    expect(payload.username).toBe('bob')
+    expect(payload.avatarUrl).toBe('https://avatar-9')
+    expect(payload.location).toBe('Buenos Aires')
+  })
+
+  it('defaults avatarUrl to null when omitted', () => {
+    const card = makeCard({ status: 'sale', public: true })
+
+    const payload = buildPublicCardDoc(card, 'user-1', 'alice')
+
+    expect(payload.avatarUrl).toBeNull()
+  })
+
+  // Behavior unification: syncCardToPublic/batchSyncCardsToPublic used to
+  // write `location: undefined` when no location was passed (Firestore
+  // rejects undefined field values by default — this project's db has no
+  // ignoreUndefinedProperties override, see src/services/firestore.ts).
+  // syncAllUserCards already defaulted to '' — that's the safe variant this
+  // unification adopts for all three call sites.
+  it('defaults location to an empty string when omitted (never leaves it undefined)', () => {
+    const card = makeCard({ status: 'sale', public: true })
+
+    const payload = buildPublicCardDoc(card, 'user-1', 'alice')
+
+    expect(payload.location).toBe('')
+  })
+
+  it('defaults setCode to an empty string when the card has none', () => {
+    const card = makeCard({ status: 'sale', public: true, setCode: undefined })
+
+    const payload = buildPublicCardDoc(card, 'user-1', 'alice')
+
+    expect(payload.setCode).toBe('')
+  })
+
+  it('produces the identical payload from all three writers for the same card', async () => {
+    const card = makeCard({ id: 'c1', name: 'Time Walk', status: 'sale', public: true, setCode: 'lea' })
+
+    await syncCardToPublic(card, 'user-1', 'alice', 'Montevideo', 'https://avatar')
+    const fromSingle = setDocMock.mock.calls[0]?.[1] as Record<string, unknown>
+
+    await batchSyncCardsToPublic([card], 'user-1', 'alice', 'Montevideo', 'https://avatar')
+    const fromBatch = batchSetMock.mock.calls[0]?.[1] as Record<string, unknown>
+
+    await syncAllUserCards([card], 'user-1', 'alice', 'Montevideo', 'https://avatar')
+    const fromSyncAll = batchSetMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+
+    // updatedAt is stamped independently per call (Timestamp.now() is
+    // mocked to a fixed value here, so this also incidentally locks that
+    // every writer stamps it the same way) — compare the rest field by field.
+    expect(fromBatch).toEqual(fromSingle)
+    expect(fromSyncAll).toEqual(fromSingle)
+
+    // Each writer above also fires its own fire-and-forget reconcile
+    // (dynamic import — see scheduleIndexReconcile's doc comment). Wait for
+    // all 3 to settle here rather than leaving them pending: an unresolved
+    // one would otherwise land mid-flight during the NEXT test and inflate
+    // ITS reconcileCallableMock count (measured — see the "reconcile
+    // trigger" describe block's own comment on this exact failure mode).
+    await vi.waitFor(() => expect(reconcileCallableMock).toHaveBeenCalledTimes(3))
+  })
+})
+
+/**
+ * TASK-247 tanda 2c: nothing drove reconciliation of the public index
+ * before this — the profile served whatever the last manual script run
+ * left behind. Each writer now fires the self-only `reconcilePublicCardIndex`
+ * callable (functions/index.js) once per sync operation, not per card, so
+ * the fanout stays proportional to how often the public set changes.
+ */
+describe('reconcilePublicCardIndex trigger', () => {
+  // scheduleIndexReconcile fires a dynamic import('./cloudFunctions') (see
+  // its doc comment — same TASK-232 reason stores/collection.ts's
+  // applyCardIndexDelta wrapper does it), so the reconcile call itself
+  // lands after the `await syncCardToPublic(...)` in these tests, on
+  // whatever tick the dynamic import actually resolves. A fixed setTimeout
+  // flush was flaky here — the FIRST dynamic import in the whole file does
+  // real module transform work and can take longer than a short fixed
+  // delay, and a leftover pending call then lands during the NEXT test and
+  // inflates ITS count instead. vi.waitFor polls until the expected count
+  // is reached (or its own timeout fails the test for a real reason),
+  // which is exact rather than a specific number of milliseconds — and by
+  // blocking on it, it also guarantees each test's dynamic import has
+  // fully settled before the next test starts, so nothing bleeds across.
+  const waitForReconcileCalls = (n: number) =>
+    vi.waitFor(() => expect(reconcileCallableMock).toHaveBeenCalledTimes(n))
+
+  it('syncCardToPublic triggers a reconcile after a successful publish', async () => {
+    const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true })
+
+    await syncCardToPublic(card, 'user-1', 'alice')
+
+    await waitForReconcileCalls(1)
+  })
+
+  it('syncCardToPublic triggers a reconcile after a delete (card left the public set)', async () => {
+    const card = makeCard({ name: 'Lightning Bolt', status: 'collection', public: true })
+
+    await syncCardToPublic(card, 'user-1', 'alice')
+
+    expect(deleteDocMock).toHaveBeenCalledTimes(1)
+    await waitForReconcileCalls(1)
+  })
+
+  it('batchSyncCardsToPublic triggers exactly one reconcile for the whole batch, not one per card', async () => {
+    const cards = [
+      makeCard({ id: 'c1', name: 'Black Lotus', status: 'sale', public: true }),
+      makeCard({ id: 'c2', name: 'Mox Ruby', status: 'trade', public: true }),
+    ]
+
+    await batchSyncCardsToPublic(cards, 'user-1', 'alice')
+
+    await waitForReconcileCalls(1)
+  })
+
+  it('syncAllUserCards triggers exactly one reconcile for the whole sync', async () => {
+    const cards = [makeCard({ id: 'c1', name: 'Time Walk', status: 'sale', public: true })]
+
+    await syncAllUserCards(cards, 'user-1', 'alice')
+
+    await waitForReconcileCalls(1)
+  })
+
+  it('a reconcile failure does not reject the write (fire-and-forget, non-fatal)', async () => {
+    reconcileCallableMock.mockRejectedValueOnce(new Error('reconcile boom'))
+    const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true })
+
+    await expect(syncCardToPublic(card, 'user-1', 'alice')).resolves.toBeUndefined()
+    await waitForReconcileCalls(1) // let the rejected call settle before the next test
+  })
 })
 
 describe('syncCardToPublic', () => {

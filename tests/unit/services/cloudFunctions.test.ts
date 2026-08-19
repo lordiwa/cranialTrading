@@ -28,7 +28,7 @@ vi.mock('@/services/firebase', () => ({
 }))
 
 // ── Import AFTER mocks ────────────────────────────────────────────────────────
-import { queryCardIndex } from '@/services/cloudFunctions'
+import { queryCardIndex, reconcilePublicCardIndex } from '@/services/cloudFunctions'
 import type { QueryCardIndexRequest } from '@/services/cloudFunctions'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -141,5 +141,45 @@ describe('queryCardIndex', () => {
     mockCallable.mockRejectedValue(unknownError)
 
     await expect(queryCardIndex(makeRequest())).rejects.toThrow('Network timeout')
+  })
+})
+
+/**
+ * TASK-247 tanda 2c: thin wrapper around the self-only reconcilePublicCardIndex
+ * onCall (functions/index.js, wired in tanda 2b). No request payload — the
+ * server derives the target user from request.auth.uid.
+ */
+describe('reconcilePublicCardIndex', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('calls httpsCallable with function name "reconcilePublicCardIndex" and a 300s timeout', () => {
+    mockCallable.mockResolvedValue({ data: { strategy: 'noop' } })
+
+    reconcilePublicCardIndex()
+
+    expect(mockHttpsCallable).toHaveBeenCalledWith(
+      expect.anything(),
+      'reconcilePublicCardIndex',
+      { timeout: 300000 },
+    )
+  })
+
+  it('calls the callable with an empty payload (self-only — no userId param)', async () => {
+    mockCallable.mockResolvedValue({ data: { strategy: 'noop' } })
+
+    await reconcilePublicCardIndex()
+
+    expect(mockCallable).toHaveBeenCalledWith({})
+  })
+
+  it('returns the unwrapped response data', async () => {
+    const responseData = { strategy: 'grow', isDivergent: true, totalChunks: 3, count: 120 }
+    mockCallable.mockResolvedValue({ data: responseData })
+
+    const result = await reconcilePublicCardIndex()
+
+    expect(result).toEqual(responseData)
   })
 })

@@ -199,6 +199,37 @@ export async function buildCardIndex(): Promise<BuildCardIndexResponse> {
 }
 
 /**
+ * TASK-247 tanda 2c: reconcile the caller's own public-profile index
+ * (functions/index.js's `reconcilePublicCardIndex`, wired in tanda 2b but
+ * never invoked from the client until this tanda). Self-only — the server
+ * derives the target user from `request.auth.uid`, there is no userId
+ * parameter to pass. See src/services/publicCards.ts's write functions for
+ * where this is called: once per sync operation (not per card), so the
+ * fanout is bounded by how often a user's public set changes, not by how
+ * many public_cards documents exist.
+ */
+export interface ReconcilePublicCardIndexResponse {
+  strategy?: string
+  isDivergent?: boolean
+  reason?: string
+  totalChunks?: number
+  count?: number
+  refused?: boolean
+  message?: string
+  dryRun?: boolean
+}
+
+export async function reconcilePublicCardIndex(): Promise<ReconcilePublicCardIndexResponse> {
+  const callable = httpsCallable<Record<string, never>, ReconcilePublicCardIndexResponse>(
+    functions,
+    'reconcilePublicCardIndex',
+    { timeout: 300000 }
+  )
+  const result = await callable({})
+  return result.data
+}
+
+/**
  * TASK-232: apply a batch of card_index deltas server-side. Replaces the
  * browser writing card_index chunks directly for status-change/delete
  * mutations — see functions/index.js's applyCardIndexDelta doc comment for

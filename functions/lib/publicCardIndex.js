@@ -33,6 +33,88 @@
  *      case — see `indexEmptied` below for why a dedicated flag still
  *      exists on top of that.
  *
+ * REVIEW ROUND (fresh-context reviewer, reproduced against the 6,647 real
+ * public_cards documents of the production profile — 2 HIGH, both real):
+ *
+ * HIGH-1 (fixed): the detector was BLIND to duplicate entries. `actualById`
+ * used to be a Map keyed by cardId, so a second stale copy of the same card
+ * sitting in a different chunk silently OVERWROTE the first in the map and
+ * vanished from the analysis — measured: 6,648 entries against 6,647 real
+ * cards (one duplicate), and the old code reported `isDivergent: false`
+ * with the plan saying "index already matches public_cards — no writes
+ * needed". A duplicated index, certified healthy, forever. This is the
+ * exact self-duplication failure mode card_index already has its own
+ * memory entry for. Fixed: `actualByCardId` now maps cardId -> an ARRAY of
+ * occurrences, so a duplicate is visible as `occurrences.length > 1` rather
+ * than being overwritten. A new `duplicated` diagnosis category reports
+ * every duplicated cardId with all the chunk ids it was found in;
+ * `planPublicIndexReconciliation` rewrites every one of those chunks (the
+ * fresh build only ever places a card in ONE chunk, so rewriting all of
+ * them converges the count back to 1).
+ *
+ * HIGH-2 (fixed): a full rebuild plan had no way to represent DELETION, so
+ * a seller who shrank their account (fewer cards -> fewer chunks) never
+ * converged. Measured: 32-chunk index, seller drops to 8 cards -> desired
+ * shrinks to 8 chunks -> the old plan wrote chunks 0-7 and left chunks 8-31
+ * sitting at their old paths untouched. Re-diagnosing the "repaired" state
+ * still showed `isDivergent: true` (chunksPresentCount 32 != metaTotalChunks
+ * 8) — every future reconciliation pass would keep calling for a full
+ * rebuild, forever, without ever reaching a healthy state. This direction
+ * matters because it is NOT hypothetical for this project: the ~1,093
+ * orphaned restos measured in production exist precisely because cards that
+ * stopped being for sale were never cleaned out of anything. Fixed: a full
+ * rebuild plan now also carries `chunksToDelete` — every chunk id currently
+ * present that falls OUTSIDE the new index's [0, totalChunks) range. The
+ * 2b caller MUST delete those chunk documents (or, equivalently, delete the
+ * entire chunks subcollection before writing chunksToWrite) — this is now a
+ * contract anchored by the 'shrink: ... converges' test below, not an
+ * assumption left for 2b to guess. Writing chunksToWrite alone, with
+ * chunksToDelete ignored, reproduces the exact non-convergent loop measured
+ * above — also locked by a dedicated regression test.
+ *
+ * MEDIUM fixes (fresh-context reviewer, mutation-tested — all 5 survivors
+ * killed):
+ *
+ * MED-1: the bucket-space check used to compare only chunk COUNT against
+ * meta.totalChunks, not that the chunk ids actually present are exactly
+ * `0..totalChunks-1`. Four chunk documents at ids {0,1,2,7} with
+ * meta.totalChunks=4 used to pass (count matches) while the id set is
+ * wrong. Fixed: `totalChunksMismatch` now also requires every present
+ * chunk id, sorted, to equal its own index (0,1,2,...) — any gap or
+ * out-of-range id forces a mismatch.
+ * MED-2: a chunk document with a non-numeric `id` field used to fall back
+ * to its POSITION in the iteration order (`chunkList.length`) — a
+ * positional fallback inside the module whose entire point is to not be
+ * positional. Fixed: a chunk with a non-finite `id` is now excluded from
+ * `chunkList` entirely (its cards read as `missing`, the safe direction)
+ * and unconditionally forces `totalChunksMismatch: true` via
+ * `hasMalformedChunkId` — a structurally corrupt chunk can never be
+ * silently absorbed into an "everything's fine, incremental repair" plan.
+ * MED-3: the misplaced- and orphaned-repair write paths had no dedicated
+ * test locking that the OLD (wrong) chunk actually loses the stale copy —
+ * see 'misplaced repair actually removes the stale copy from its old
+ * chunk' and 'orphaned repair actually removes the stale entry from its
+ * chunk' below. Orphaned repair matters most in practice: it is the path
+ * that runs against the ~1,093 measured restos.
+ * MED-4: no test covered `isDivergent: true` from `totalChunksMismatch`
+ * ALONE, with zero per-entry diffs (e.g. an account emptied to 0 cards
+ * while stale meta still claims 4 chunks) — see 'flags divergence from
+ * totalChunksMismatch alone...' below.
+ * MED-5: no test asserted `plan.meta` on the incremental branch — a
+ * regression that made 2b persist a wrong meta on an otherwise-correct
+ * incremental repair would have gone undetected. Locked below.
+ *
+ * LOW fixes: `chunkTargetSize` <= 0 (in particular a NEGATIVE value, which
+ * is truthy and used to slip past `|| DEFAULT_CHUNK_TARGET_SIZE`) now
+ * normalizes to the default instead of reaching `nextPowerOfTwo` with a
+ * misleading downstream error. `diagnosePublicIndex` also now falls back to
+ * `currentMeta.chunkTargetSize` when the caller doesn't pass an explicit
+ * `options.chunkTargetSize` — the earlier version silently used the
+ * DEFAULT regardless of what the index was actually built with, which
+ * would have put a seller diagnosed under a different chunkTargetSize than
+ * the one live in their meta into a perpetual rebuild loop the moment the
+ * two constants diverged (e.g. a future tanda changing the default).
+ *
  * CHUNK SIZING (AC10 "decide and document the criterion", measured
  * numbers): target ~400 entries per chunk before power-of-two rounding.
  * This number is not invented here — publicCardEntry.js's own header
@@ -78,28 +160,37 @@
  *
  * RECONCILIATION (AC10, second half): `diagnosePublicIndex` produces a
  * diagnosis, `planPublicIndexReconciliation` turns that diagnosis into a
- * plan of WRITES (never performs them). The dividing line between an
- * incremental patch and a full rebuild is the `totalChunks` CONTRACT
- * publicCardEntry.js already fixed in tanda 1: `totalChunks` may only
- * change via a full atomic rebuild, never be derived per-write. So:
+ * plan of WRITES (and, since the review round, DELETES) — never performs
+ * them. The dividing line between an incremental patch and a full rebuild
+ * is the `totalChunks` CONTRACT publicCardEntry.js already fixed in tanda
+ * 1: `totalChunks` may only change via a full atomic rebuild, never be
+ * derived per-write. So:
  *
  *   - Incremental repair (rebuildRequired: false) is chosen whenever the
  *     current index's own bucket space (its meta's `totalChunks`, and the
- *     chunk documents actually present) still matches what a fresh build
- *     of the CURRENT public_cards would want. In that case only the
- *     specific chunks touched by a missing, orphaned, or misplaced entry
- *     need to be rewritten — every other chunk is already correct and is
- *     left untouched.
+ *     EXACT set of chunk documents actually present) still matches what a
+ *     fresh build of the CURRENT public_cards would want. In that case
+ *     only the specific chunks touched by a missing, orphaned, misplaced,
+ *     or duplicated entry need to be rewritten — every other chunk is
+ *     already correct and is left untouched. `chunksToDelete` is always
+ *     empty on this branch — a bucket-space match means there is nothing
+ *     outside the valid chunk range to remove.
  *   - Full rebuild (rebuildRequired: true) is forced whenever the bucket
  *     space itself is wrong: the persisted `totalChunks` no longer matches
  *     what the current card count wants (the seller grew/shrank across a
- *     power-of-two boundary), or the chunk documents actually present
- *     don't match what the meta claims. Patching individual chunks in that
- *     state is exactly the bug this module exists to prevent: an
- *     incremental writer using the OLD totalChunks and a background
- *     reconciler computing chunk ids under a NEW totalChunks would disagree
- *     about where any given card belongs, which is "the index loses
- *     entries" wearing a reconciliation bug instead of a hash bug.
+ *     power-of-two boundary), the chunk documents actually present don't
+ *     match what the meta claims (missing, extra, or out-of-range chunk
+ *     ids), or a chunk document is structurally corrupt (MED-2). Patching
+ *     individual chunks in that state is exactly the bug this module
+ *     exists to prevent: an incremental writer using the OLD totalChunks
+ *     and a background reconciler computing chunk ids under a NEW
+ *     totalChunks would disagree about where any given card belongs, which
+ *     is "the index loses entries" wearing a reconciliation bug instead of
+ *     a hash bug. On this branch, `chunksToWrite` is every chunk 0..N-1 of
+ *     a fresh build, and `chunksToDelete` is every currently-present chunk
+ *     id that falls outside that range (HIGH-2) — both must be applied for
+ *     the index to actually converge; applying `chunksToWrite` alone
+ *     reproduces the shrink bug this review round found.
  */
 
 const { buildPublicEntry, publicChunkId, nextPowerOfTwo } = require('./publicCardEntry');
@@ -108,6 +199,20 @@ const { buildPublicEntry, publicChunkId, nextPowerOfTwo } = require('./publicCar
 // publicCardEntry.js's own documented cost analysis.
 const DEFAULT_CHUNK_TARGET_SIZE = 400;
 const SCHEMA_VERSION = 1;
+
+/**
+ * LOW fix: normalizes a requested chunkTargetSize, falling back to the
+ * default for anything that isn't a positive finite number — in
+ * particular a NEGATIVE value, which is truthy and used to slip past a
+ * plain `value || DEFAULT_CHUNK_TARGET_SIZE` check and reach
+ * `nextPowerOfTwo` with a confusing downstream error instead of a clear
+ * fallback.
+ *
+ * @param {*} value
+ */
+function normalizeChunkTargetSize(value) {
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_CHUNK_TARGET_SIZE;
+}
 
 /**
  * How many chunks a given card count should request, before power-of-two
@@ -120,7 +225,7 @@ const SCHEMA_VERSION = 1;
  */
 function requestedChunkCount(count, chunkTargetSize) {
   if (!count || count <= 0) return 1;
-  return Math.ceil(count / chunkTargetSize);
+  return Math.ceil(count / normalizeChunkTargetSize(chunkTargetSize));
 }
 
 /**
@@ -153,7 +258,7 @@ function requestedChunkCount(count, chunkTargetSize) {
 function buildPublicIndex(publicCardDocs, scryfallCacheByScryfallId, options = {}) {
   const docs = Array.isArray(publicCardDocs) ? publicCardDocs : [];
   const cacheById = scryfallCacheByScryfallId || {};
-  const chunkTargetSize = options.chunkTargetSize || DEFAULT_CHUNK_TARGET_SIZE;
+  const chunkTargetSize = normalizeChunkTargetSize(options.chunkTargetSize);
   const totalChunks = nextPowerOfTwo(requestedChunkCount(docs.length, chunkTargetSize));
 
   const chunks = {};
@@ -201,10 +306,14 @@ function buildPublicIndex(publicCardDocs, scryfallCacheByScryfallId, options = {
  *   stored, keyed (or indexed) by chunk id. Pass whatever chunk documents
  *   actually exist at the index's current chunk paths — including ones
  *   whose `entries` array is empty.
- * @param {{totalChunks: number}|null|undefined} currentMeta the index's
- *   current meta document, or null/undefined if no meta document exists at
- *   all (treated as "no index" — every real card is `missing`, and
- *   `totalChunksMismatch` is set because there is nothing to match).
+ * @param {{totalChunks: number, chunkTargetSize?: number}|null|undefined}
+ *   currentMeta the index's current meta document, or null/undefined if no
+ *   meta document exists at all (treated as "no index" — every real card
+ *   is `missing`, and `totalChunksMismatch` is set because there is
+ *   nothing to match). When `options.chunkTargetSize` is not given, this
+ *   function falls back to `currentMeta.chunkTargetSize` (the size the
+ *   index was actually built with) before falling back to the module
+ *   default — see LOW fix in the header.
  * @param {Array<object>} publicCardDocs the seller's real public_cards
  *   documents right now (same shape `buildPublicIndex` takes).
  * @param {{chunkTargetSize?: number}} [options]
@@ -213,57 +322,87 @@ function buildPublicIndex(publicCardDocs, scryfallCacheByScryfallId, options = {
  *   missing: Array<{cardId: string, scryfallId: string, expectedChunk: number}>,
  *   orphaned: Array<{cardId: string, scryfallId: string, actualChunk: number}>,
  *   misplaced: Array<{cardId: string, scryfallId: string, actualChunk: number, expectedChunk: number}>,
+ *   duplicated: Array<{cardId: string, scryfallId: string, expectedChunk: number, chunks: number[]}>,
  *   totalChunksMismatch: boolean,
  *   metaTotalChunks: number|null,
  *   desiredTotalChunks: number,
  *   chunksPresentCount: number,
+ *   presentChunkIds: number[],
  *   indexEmptied: boolean,
  * }}
  */
 function diagnosePublicIndex(currentChunks, currentMeta, publicCardDocs, options = {}) {
   const docs = Array.isArray(publicCardDocs) ? publicCardDocs : [];
-  const chunkTargetSize = options.chunkTargetSize || DEFAULT_CHUNK_TARGET_SIZE;
+  const chunkTargetSize = normalizeChunkTargetSize(
+    options.chunkTargetSize ?? (currentMeta && currentMeta.chunkTargetSize)
+  );
   const desiredTotalChunks = nextPowerOfTwo(requestedChunkCount(docs.length, chunkTargetSize));
   const metaTotalChunks =
     currentMeta && Number.isFinite(currentMeta.totalChunks) ? currentMeta.totalChunks : null;
 
   // Normalize currentChunks (object-keyed or array) into a flat list of
-  // { chunkId, entries }.
+  // { chunkId, entries }. MED-2: a chunk whose `id` field is not a finite
+  // number is EXCLUDED here rather than given a positional fallback id —
+  // this module exists to stop chunk identity from ever being inferred
+  // from iteration order, including here in the reader. Its cards read as
+  // `missing` below (the safe direction), and `hasMalformedChunkId` forces
+  // a full rebuild regardless of what the count/id-set checks conclude.
   const chunkList = [];
+  let hasMalformedChunkId = false;
   if (currentChunks) {
     const iterable = Array.isArray(currentChunks) ? currentChunks : Object.values(currentChunks);
     for (const chunk of iterable) {
       if (!chunk) continue;
-      const chunkId = Number.isFinite(chunk.id) ? chunk.id : chunkList.length;
-      chunkList.push({ chunkId, entries: Array.isArray(chunk.entries) ? chunk.entries : [] });
+      if (!Number.isFinite(chunk.id)) {
+        hasMalformedChunkId = true;
+        continue;
+      }
+      chunkList.push({ chunkId: chunk.id, entries: Array.isArray(chunk.entries) ? chunk.entries : [] });
     }
   }
-  const chunksPresentCount = chunkList.length;
+  const presentChunkIds = chunkList.map((c) => c.chunkId).sort((a, b) => a - b);
+  const chunksPresentCount = presentChunkIds.length;
+
+  // MED-1: the bucket space only truly "matches" when the present chunk
+  // ids are EXACTLY {0, 1, ..., metaTotalChunks-1} — matching COUNT alone
+  // (e.g. 4 chunks present at ids {0,1,2,7} against meta.totalChunks=4)
+  // used to pass this check while the id set itself was wrong.
+  const chunkIdsMatchMeta =
+    metaTotalChunks !== null &&
+    chunksPresentCount === metaTotalChunks &&
+    presentChunkIds.every((id, idx) => id === idx);
 
   // The rule used to decide whether entries can still be trusted against
-  // `metaTotalChunks`: only when the bucket space itself (meta + presence
-  // of every chunk 0..totalChunks-1) already matches what a fresh build of
-  // the CURRENT public_cards wants. Any mismatch here means "expected
-  // chunk" cannot be meaningfully computed under the STORED totalChunks
-  // without also being wrong the moment a rebuild lands, so we force a
-  // full rebuild rather than report per-entry misplacement against a
-  // bucket space that's already known to be stale.
+  // `metaTotalChunks`: only when the bucket space itself (meta + the exact
+  // set of chunks 0..totalChunks-1) already matches what a fresh build of
+  // the CURRENT public_cards wants, AND no chunk document is structurally
+  // corrupt. Any mismatch here means "expected chunk" cannot be
+  // meaningfully computed under the STORED totalChunks without also being
+  // wrong the moment a rebuild lands, so we force a full rebuild rather
+  // than report per-entry misplacement against a bucket space that's
+  // already known to be stale.
   const totalChunksMismatch =
     metaTotalChunks === null ||
     metaTotalChunks !== desiredTotalChunks ||
-    chunksPresentCount !== metaTotalChunks;
+    !chunkIdsMatchMeta ||
+    hasMalformedChunkId;
 
   const effectiveTotalChunks = totalChunksMismatch ? desiredTotalChunks : metaTotalChunks;
 
-  // Build the actual index: cardId (`i`) -> { scryfallId, actualChunk }.
-  const actualById = new Map();
+  // Build the actual index: cardId (`i`) -> ARRAY of occurrences. HIGH-1:
+  // this used to be cardId -> single occurrence, which let a second
+  // (stale) copy of a card silently overwrite the first and vanish from
+  // the diagnosis entirely — measured, a real duplicate in production data
+  // was invisible to the old code. Every occurrence is now kept.
+  const actualByCardId = new Map();
   let actualEntryCount = 0;
   for (const { chunkId, entries } of chunkList) {
     for (const entry of entries) {
       actualEntryCount += 1;
       const cardId = entry && entry.i;
       if (!cardId) continue; // malformed entry, not this function's concern
-      actualById.set(cardId, { scryfallId: entry.s || '', actualChunk: chunkId });
+      if (!actualByCardId.has(cardId)) actualByCardId.set(cardId, []);
+      actualByCardId.get(cardId).push({ chunkId, scryfallId: entry.s || '' });
     }
   }
 
@@ -282,26 +421,41 @@ function diagnosePublicIndex(currentChunks, currentMeta, publicCardDocs, options
 
   const missing = [];
   const misplaced = [];
+  const duplicated = [];
   for (const [cardId, expected] of expectedById) {
-    const actual = actualById.get(cardId);
-    if (!actual) {
+    const occurrences = actualByCardId.get(cardId);
+    if (!occurrences || occurrences.length === 0) {
       missing.push({ cardId, scryfallId: expected.scryfallId, expectedChunk: expected.expectedChunk });
-    } else if (actual.actualChunk !== expected.expectedChunk) {
+    } else if (occurrences.length > 1) {
+      // HIGH-1: reported as its own category rather than silently folded
+      // into `misplaced` (which occurrence would even be "the" actual
+      // chunk?) or lost like the pre-fix Map overwrite did.
+      duplicated.push({
+        cardId,
+        scryfallId: expected.scryfallId,
+        expectedChunk: expected.expectedChunk,
+        chunks: occurrences.map((o) => o.chunkId),
+      });
+    } else if (occurrences[0].chunkId !== expected.expectedChunk) {
       misplaced.push({
         cardId,
         scryfallId: expected.scryfallId,
-        actualChunk: actual.actualChunk,
+        actualChunk: occurrences[0].chunkId,
         expectedChunk: expected.expectedChunk,
       });
     }
   }
 
   // Restos (measured in production: ~1,093 of them) — present in the index,
-  // no longer backed by a real public_cards document.
+  // no longer backed by a real public_cards document. A card that is BOTH
+  // orphaned and duplicated (multiple stale copies of a deleted card)
+  // reports one orphaned entry per surviving occurrence — every one of
+  // those chunks still needs to be rewritten to actually converge.
   const orphaned = [];
-  for (const [cardId, actual] of actualById) {
-    if (!expectedById.has(cardId)) {
-      orphaned.push({ cardId, scryfallId: actual.scryfallId, actualChunk: actual.actualChunk });
+  for (const [cardId, occurrences] of actualByCardId) {
+    if (expectedById.has(cardId)) continue;
+    for (const occurrence of occurrences) {
+      orphaned.push({ cardId, scryfallId: occurrence.scryfallId, actualChunk: occurrence.chunkId });
     }
   }
 
@@ -315,25 +469,31 @@ function diagnosePublicIndex(currentChunks, currentMeta, publicCardDocs, options
   const indexEmptied = chunksPresentCount > 0 && actualEntryCount === 0 && docs.length > 0;
 
   const isDivergent =
-    missing.length > 0 || orphaned.length > 0 || misplaced.length > 0 || totalChunksMismatch;
+    missing.length > 0 ||
+    orphaned.length > 0 ||
+    misplaced.length > 0 ||
+    duplicated.length > 0 ||
+    totalChunksMismatch;
 
   return {
     isDivergent,
     missing,
     orphaned,
     misplaced,
+    duplicated,
     totalChunksMismatch,
     metaTotalChunks,
     desiredTotalChunks,
     chunksPresentCount,
+    presentChunkIds,
     indexEmptied,
   };
 }
 
 /**
- * Turns a diagnosis into a plan of WRITES — data describing what should be
- * written where, never an effect. Tanda 2b executes the plan against
- * Firestore; this function only decides its shape.
+ * Turns a diagnosis into a plan of WRITES and DELETES — data describing
+ * what should change where, never an effect. Tanda 2b executes the plan
+ * against Firestore; this function only decides its shape.
  *
  * @param {ReturnType<typeof diagnosePublicIndex>} diagnosis
  * @param {ReturnType<typeof buildPublicIndex>} freshBuild the result of
@@ -345,6 +505,7 @@ function diagnosePublicIndex(currentChunks, currentMeta, publicCardDocs, options
  *   rebuildRequired: boolean,
  *   reason: string,
  *   chunksToWrite: Object<number, {id: number, entries: object[]}>,
+ *   chunksToDelete: number[],
  *   meta: {schemaVersion: number, totalChunks: number, count: number, chunkTargetSize: number},
  * }}
  */
@@ -354,6 +515,13 @@ function planPublicIndexReconciliation(diagnosis, freshBuild) {
   // where a card belongs" bug this module exists to prevent. The only
   // correct plan is every chunk of a fresh build, written atomically.
   if (diagnosis.totalChunksMismatch) {
+    // HIGH-2: chunks currently present outside the new [0, totalChunks)
+    // range are NOT touched by chunksToWrite (which only ever spans
+    // 0..totalChunks-1) and must be explicitly deleted, or a shrink never
+    // converges — the old plan silently left them behind forever.
+    const chunksToDelete = (diagnosis.presentChunkIds || []).filter(
+      (id) => id >= freshBuild.meta.totalChunks
+    );
     return {
       rebuildRequired: true,
       reason:
@@ -362,13 +530,16 @@ function planPublicIndexReconciliation(diagnosis, freshBuild) {
         `documents actually present (${diagnosis.chunksPresentCount}) do not match the meta — an ` +
         'incremental patch cannot change bucket space without remapping the whole index (AC10 contract)',
       chunksToWrite: freshBuild.chunks,
+      chunksToDelete,
       meta: freshBuild.meta,
     };
   }
 
   // Bucket space agrees — only the specific chunks touched by a missing,
-  // orphaned, or misplaced entry need to be rewritten. Every other chunk is
-  // already correct and is left out of the plan entirely.
+  // orphaned, misplaced, or duplicated entry need to be rewritten. Every
+  // other chunk is already correct and is left out of the plan entirely.
+  // Nothing needs deleting on this branch: a bucket-space match means
+  // there is no chunk outside the valid range to begin with.
   const affectedChunkIds = new Set();
   for (const m of diagnosis.missing) affectedChunkIds.add(m.expectedChunk);
   for (const o of diagnosis.orphaned) affectedChunkIds.add(o.actualChunk);
@@ -376,14 +547,21 @@ function planPublicIndexReconciliation(diagnosis, freshBuild) {
     affectedChunkIds.add(mp.expectedChunk);
     affectedChunkIds.add(mp.actualChunk);
   }
+  for (const d of diagnosis.duplicated) {
+    affectedChunkIds.add(d.expectedChunk);
+    for (const chunkId of d.chunks) affectedChunkIds.add(chunkId);
+  }
 
   const chunksToWrite = {};
   for (const chunkId of affectedChunkIds) {
     // The correct content for an affected chunk is exactly what a fresh
     // build says belongs there — this doubles as the fix for `missing`
-    // (the card is now present) and `misplaced` (the card's old chunk no
-    // longer contains it, its new chunk does) and `orphaned` (the stale
-    // entry is absent from the fresh build's version of that chunk).
+    // (the card is now present), `misplaced` (the card's old chunk no
+    // longer contains it, its new chunk does), `orphaned` (the stale entry
+    // is absent from the fresh build's version of that chunk), and
+    // `duplicated` (the fresh build only ever places the card in ONE
+    // chunk, so rewriting every chunk it was found in collapses the count
+    // back to exactly 1).
     chunksToWrite[chunkId] = freshBuild.chunks[chunkId] || { id: chunkId, entries: [] };
   }
 
@@ -394,8 +572,9 @@ function planPublicIndexReconciliation(diagnosis, freshBuild) {
         ? 'index already matches public_cards — no writes needed'
         : `incremental repair of ${affectedChunkIds.size} chunk(s): ` +
           `${diagnosis.missing.length} missing, ${diagnosis.orphaned.length} orphaned, ` +
-          `${diagnosis.misplaced.length} misplaced`,
+          `${diagnosis.misplaced.length} misplaced, ${diagnosis.duplicated.length} duplicated`,
     chunksToWrite,
+    chunksToDelete: [],
     meta: freshBuild.meta,
   };
 }

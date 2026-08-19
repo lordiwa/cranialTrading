@@ -310,6 +310,7 @@ describe('publicCardIndex — assembly, divergence detection, reconciliation (TA
       const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
       expect(plan.rebuildRequired).toBe(false)
       expect(plan.chunksToWrite).toEqual({})
+      expect(plan.chunksToDelete).toEqual([])
       expect(plan.reason).toMatch(/no writes needed/)
     })
 
@@ -338,6 +339,11 @@ describe('publicCardIndex — assembly, divergence detection, reconciliation (TA
       // Untouched chunks are not part of the plan at all — only the one
       // chunk actually affected by the missing card was written.
       expect(Object.keys(plan.chunksToWrite)).toEqual([String(expectedChunk)])
+      expect(plan.chunksToDelete).toEqual([])
+      // MED-5: an incremental repair must still carry the (unchanged) meta
+      // — a regression that dropped or corrupted this would let 2b persist
+      // a wrong meta on an otherwise-correct incremental repair undetected.
+      expect(plan.meta).toEqual(freshBuild.meta)
     })
 
     it('plans a FULL REBUILD (every chunk) when totalChunks itself is wrong — patching individual chunks under a stale bucket space is the bug this module exists to prevent', () => {
@@ -353,6 +359,9 @@ describe('publicCardIndex — assembly, divergence detection, reconciliation (TA
       expect(Object.keys(plan.chunksToWrite)).toHaveLength(32)
       expect(plan.chunksToWrite).toEqual(freshBuild.chunks)
       expect(plan.reason).toMatch(/full rebuild required/)
+      // Growth (16 -> 32): the old range 0-15 is a subset of the new
+      // range 0-31, so there is nothing outside it to delete.
+      expect(plan.chunksToDelete).toEqual([])
     })
 
     it('a full rebuild plan contains every card at its correct new chunk (sanity: the plan actually converges, not just "is large")', () => {
@@ -365,6 +374,256 @@ describe('publicCardIndex — assembly, divergence detection, reconciliation (TA
 
       const rebuiltDiagnosis = diagnosePublicIndex(plan.chunksToWrite, plan.meta, docs17, { chunkTargetSize: 1 })
       expect(rebuiltDiagnosis.isDivergent).toBe(false)
+    })
+  })
+
+  describe('review round: HIGH-1 duplicate blindness, HIGH-2 shrink non-convergence, and MEDIUM mutation survivors', () => {
+    it('HIGH-1: a duplicated entry (same card in two chunks) is NOT invisible — it is reported, not silently overwritten in the actual-index map', () => {
+      const docs = makeCards(6)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const target = docs[0]
+      const homeChunk = publicChunkId(target.scryfallId, built.meta.totalChunks)
+      const otherChunk = (homeChunk + 1) % built.meta.totalChunks
+      expect(otherChunk).not.toBe(homeChunk)
+      const entry = built.chunks[homeChunk].entries.find((e: { i: string }) => e.i === target.cardId)
+
+      // Stale copy left behind in another chunk — the original in its
+      // correct chunk is untouched, so this is a pure duplication, not a
+      // misplacement.
+      const withDuplicate = Object.fromEntries(
+        Object.entries(built.chunks).map(([id, chunk]) => {
+          const numId = Number(id)
+          if (numId === otherChunk) return [id, { id: numId, entries: [...chunk.entries, entry] }]
+          return [id, chunk]
+        })
+      )
+
+      const diagnosis = diagnosePublicIndex(withDuplicate, built.meta, docs, { chunkTargetSize: 2 })
+      expect(diagnosis.isDivergent).toBe(true)
+      expect(diagnosis.duplicated).toHaveLength(1)
+      expect(diagnosis.duplicated[0].cardId).toBe(target.cardId)
+      expect(diagnosis.duplicated[0].chunks.sort()).toEqual([homeChunk, otherChunk].sort())
+      // Must NOT be silently absorbed as "everything's fine" — this was
+      // the exact HIGH-1 failure (isDivergent: false, no writes needed).
+      expect(diagnosis.missing).toEqual([])
+    })
+
+    it('HIGH-1: planPublicIndexReconciliation rewrites every chunk a duplicated card was found in, converging the count back to exactly 1', () => {
+      const docs = makeCards(6)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const target = docs[0]
+      const homeChunk = publicChunkId(target.scryfallId, built.meta.totalChunks)
+      const otherChunk = (homeChunk + 1) % built.meta.totalChunks
+      const entry = built.chunks[homeChunk].entries.find((e: { i: string }) => e.i === target.cardId)
+      const withDuplicate = Object.fromEntries(
+        Object.entries(built.chunks).map(([id, chunk]) => {
+          const numId = Number(id)
+          if (numId === otherChunk) return [id, { id: numId, entries: [...chunk.entries, entry] }]
+          return [id, chunk]
+        })
+      )
+
+      const diagnosis = diagnosePublicIndex(withDuplicate, built.meta, docs, { chunkTargetSize: 2 })
+      const freshBuild = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+
+      expect(plan.rebuildRequired).toBe(false)
+      expect(Object.keys(plan.chunksToWrite).map(Number).sort()).toEqual([homeChunk, otherChunk].sort())
+
+      // Apply the plan and re-diagnose: the count of that card in the
+      // "repaired" store must be exactly 1, not 0 and not 2.
+      const repaired = { ...withDuplicate, ...plan.chunksToWrite }
+      const occurrences = Object.values(repaired).flatMap((c: any) =>
+        c.entries.filter((e: { i: string }) => e.i === target.cardId)
+      )
+      expect(occurrences).toHaveLength(1)
+      const rediagnosed = diagnosePublicIndex(repaired, built.meta, docs, { chunkTargetSize: 2 })
+      expect(rediagnosed.isDivergent).toBe(false)
+    })
+
+    it('HIGH-2: shrink — a full rebuild plan carries chunksToDelete for every chunk id outside the new (smaller) range', () => {
+      // Grow to 17 cards first (chunkTargetSize 1 -> 32 chunks), matching
+      // the growth test above, then shrink back down to 8 cards.
+      const docs17 = makeCards(17)
+      const grown = buildPublicIndex(docs17, {}, { chunkTargetSize: 1 })
+      expect(grown.meta.totalChunks).toBe(32)
+
+      const shrunkDocs = docs17.slice(0, 8) // 8 cards -> nextPowerOfTwo(8) = 8
+      const diagnosis = diagnosePublicIndex(grown.chunks, grown.meta, shrunkDocs, { chunkTargetSize: 1 })
+      expect(diagnosis.totalChunksMismatch).toBe(true)
+      expect(diagnosis.desiredTotalChunks).toBe(8)
+
+      const freshBuild = buildPublicIndex(shrunkDocs, {}, { chunkTargetSize: 1 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+
+      expect(plan.rebuildRequired).toBe(true)
+      expect(Object.keys(plan.chunksToWrite)).toHaveLength(8)
+      // Every chunk id 8..31 (24 of them) is outside the new [0,8) range
+      // and must be deleted, or those documents are left behind forever.
+      expect(plan.chunksToDelete.sort((a: number, b: number) => a - b)).toEqual(
+        Array.from({ length: 24 }, (_, i) => i + 8)
+      )
+    })
+
+    it('HIGH-2: applying chunksToWrite AND chunksToDelete converges the shrunk index to isDivergent: false', () => {
+      const docs17 = makeCards(17)
+      const grown = buildPublicIndex(docs17, {}, { chunkTargetSize: 1 })
+      const shrunkDocs = docs17.slice(0, 8)
+      const diagnosis = diagnosePublicIndex(grown.chunks, grown.meta, shrunkDocs, { chunkTargetSize: 1 })
+      const freshBuild = buildPublicIndex(shrunkDocs, {}, { chunkTargetSize: 1 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+
+      // Simulate correctly applying the plan: chunksToDelete are gone,
+      // chunksToWrite are the only chunks left.
+      const converged = plan.chunksToWrite
+      const rediagnosed = diagnosePublicIndex(converged, plan.meta, shrunkDocs, { chunkTargetSize: 1 })
+      expect(rediagnosed.isDivergent).toBe(false)
+    })
+
+    it('HIGH-2 regression lock: IGNORING chunksToDelete (writing chunksToWrite only, old chunks left in place) reproduces the measured non-convergent loop', () => {
+      const docs17 = makeCards(17)
+      const grown = buildPublicIndex(docs17, {}, { chunkTargetSize: 1 })
+      const shrunkDocs = docs17.slice(0, 8)
+      const diagnosis = diagnosePublicIndex(grown.chunks, grown.meta, shrunkDocs, { chunkTargetSize: 1 })
+      const freshBuild = buildPublicIndex(shrunkDocs, {}, { chunkTargetSize: 1 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+
+      // Buggy caller: writes chunksToWrite but never applies chunksToDelete
+      // — the 31 old chunk documents are still sitting at their paths.
+      const buggyStore = { ...grown.chunks, ...plan.chunksToWrite }
+      const stillDiverged = diagnosePublicIndex(buggyStore, plan.meta, shrunkDocs, { chunkTargetSize: 1 })
+      expect(stillDiverged.isDivergent).toBe(true)
+      expect(stillDiverged.totalChunksMismatch).toBe(true)
+      expect(stillDiverged.chunksPresentCount).toBe(32)
+    })
+
+    it('MED-1: chunk COUNT matching meta is not enough — the actual chunk ids must be exactly 0..totalChunks-1 (a gap/out-of-range id still forces a mismatch)', () => {
+      const docs = makeCards(4)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 1 }) // 4 cards -> 4 chunks
+      expect(built.meta.totalChunks).toBe(4)
+
+      // Same COUNT of chunk documents (4), but ids {0,1,2,7} instead of
+      // {0,1,2,3} — chunk 3 was replaced by a stray chunk at id 7.
+      const { 3: dropped, ...rest } = built.chunks
+      const withStrayId = { ...rest, 7: { id: 7, entries: dropped.entries } }
+
+      const diagnosis = diagnosePublicIndex(withStrayId, built.meta, docs, { chunkTargetSize: 1 })
+      expect(diagnosis.chunksPresentCount).toBe(4)
+      expect(diagnosis.totalChunksMismatch).toBe(true)
+      expect(diagnosis.isDivergent).toBe(true)
+    })
+
+    it('MED-2: a chunk document with a non-numeric id is never absorbed via a positional fallback — it forces totalChunksMismatch and its cards read as missing', () => {
+      const docs = makeCards(4)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 1 })
+      // Corrupt chunk 2's `id` field — a write bug wrote a string, or the
+      // field was dropped entirely.
+      const corrupted = {
+        ...built.chunks,
+        2: { id: 'not-a-number', entries: built.chunks[2].entries },
+      }
+
+      const diagnosis = diagnosePublicIndex(corrupted, built.meta, docs, { chunkTargetSize: 1 })
+      expect(diagnosis.totalChunksMismatch).toBe(true)
+      expect(diagnosis.isDivergent).toBe(true)
+      // The card(s) that were only inside the corrupted chunk must show up
+      // as missing rather than being credited via a positional guess.
+      const cardInChunk2 = docs.find((d) => publicChunkId(d.scryfallId, 4) === 2)
+      if (cardInChunk2) {
+        expect(diagnosis.missing.some((m) => m.cardId === cardInChunk2.cardId)).toBe(true)
+      }
+    })
+
+    it('MED-3: misplaced repair actually removes the stale copy from its old (wrong) chunk', () => {
+      const docs = makeCards(4)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const target = docs[0]
+      const correctChunk = publicChunkId(target.scryfallId, built.meta.totalChunks)
+      const wrongChunk = (correctChunk + 1) % built.meta.totalChunks
+      const entry = built.chunks[correctChunk].entries.find((e: { i: string }) => e.i === target.cardId)
+      const tampered = Object.fromEntries(
+        Object.entries(built.chunks).map(([id, chunk]) => {
+          const numId = Number(id)
+          if (numId === correctChunk) {
+            return [id, { id: numId, entries: chunk.entries.filter((e: { i: string }) => e.i !== target.cardId) }]
+          }
+          if (numId === wrongChunk) return [id, { id: numId, entries: [...chunk.entries, entry] }]
+          return [id, chunk]
+        })
+      )
+
+      const diagnosis = diagnosePublicIndex(tampered, built.meta, docs, { chunkTargetSize: 2 })
+      const freshBuild = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+      const repaired = { ...tampered, ...plan.chunksToWrite }
+
+      // The stale copy must be gone from the wrong chunk, and present
+      // exactly once overall.
+      expect(
+        repaired[wrongChunk].entries.some((e: { i: string }) => e.i === target.cardId)
+      ).toBe(false)
+      const occurrences = Object.values(repaired).flatMap((c: any) =>
+        c.entries.filter((e: { i: string }) => e.i === target.cardId)
+      )
+      expect(occurrences).toHaveLength(1)
+    })
+
+    it('MED-3: orphaned repair actually removes the stale entry from its chunk (the path that runs against the ~1,093 measured restos)', () => {
+      const docs = makeCards(4)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 })
+      const remainingDocs = docs.filter((d) => d.cardId !== 'card-1')
+
+      const diagnosis = diagnosePublicIndex(built.chunks, built.meta, remainingDocs, { chunkTargetSize: 2 })
+      const freshBuild = buildPublicIndex(remainingDocs, {}, { chunkTargetSize: 2 })
+      const plan = planPublicIndexReconciliation(diagnosis, freshBuild)
+      const repaired = { ...built.chunks, ...plan.chunksToWrite }
+
+      const stillPresent = Object.values(repaired).some((c: any) =>
+        c.entries.some((e: { i: string }) => e.i === 'card-1')
+      )
+      expect(stillPresent).toBe(false)
+      const rediagnosed = diagnosePublicIndex(repaired, freshBuild.meta, remainingDocs, { chunkTargetSize: 2 })
+      expect(rediagnosed.isDivergent).toBe(false)
+    })
+
+    it('MED-4: flags divergence from totalChunksMismatch ALONE, with zero per-entry diffs (account emptied to 0 cards while stale meta still claims 4 chunks)', () => {
+      const docs = makeCards(4)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 1 })
+      // Chunks are present and, crucially, ALREADY EMPTY of entries (the
+      // seller genuinely has 0 cards now) — this isolates the mismatch
+      // signal from indexEmptied/missing/orphaned/misplaced/duplicated,
+      // which must all read clean here.
+      const emptiedChunks = Object.fromEntries(
+        Object.entries(built.chunks).map(([id, chunk]) => [id, { id: chunk.id, entries: [] }])
+      )
+
+      const diagnosis = diagnosePublicIndex(emptiedChunks, built.meta, [], { chunkTargetSize: 1 })
+      expect(diagnosis.totalChunksMismatch).toBe(true)
+      expect(diagnosis.missing).toEqual([])
+      expect(diagnosis.orphaned).toEqual([])
+      expect(diagnosis.misplaced).toEqual([])
+      expect(diagnosis.duplicated).toEqual([])
+      expect(diagnosis.indexEmptied).toBe(false) // docs.length is 0 here, not the vaciado case
+      expect(diagnosis.isDivergent).toBe(true)
+    })
+
+    it('LOW: a negative chunkTargetSize normalizes to the default instead of reaching nextPowerOfTwo with a misleading error', () => {
+      const docs = makeCards(3)
+      expect(() => buildPublicIndex(docs, {}, { chunkTargetSize: -5 })).not.toThrow()
+      const { meta } = buildPublicIndex(docs, {}, { chunkTargetSize: -5 })
+      expect(meta.chunkTargetSize).toBe(DEFAULT_CHUNK_TARGET_SIZE)
+    })
+
+    it('LOW: diagnosePublicIndex falls back to currentMeta.chunkTargetSize when the caller does not pass an explicit option, rather than silently using the module default', () => {
+      const docs = makeCards(5)
+      const built = buildPublicIndex(docs, {}, { chunkTargetSize: 2 }) // meta.chunkTargetSize = 2
+      // No `options` passed at all — must read chunkTargetSize back from
+      // currentMeta (2), not silently fall back to DEFAULT_CHUNK_TARGET_SIZE
+      // (400), which would compute a different desiredTotalChunks and
+      // wrongly declare a healthy index divergent.
+      const diagnosis = diagnosePublicIndex(built.chunks, built.meta, docs)
+      expect(diagnosis.isDivergent).toBe(false)
+      expect(diagnosis.desiredTotalChunks).toBe(built.meta.totalChunks)
     })
   })
 })

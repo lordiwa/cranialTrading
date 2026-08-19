@@ -48,6 +48,7 @@ vi.mock('@/services/cloudFunctions', () => ({
 
 // Mock publicCards service (imported by collection store)
 vi.mock('@/services/publicCards', () => ({
+  isPublicCard: vi.fn((card: any) => (card.status === 'sale' || card.status === 'trade') && card.public === true),
   scheduleIndexReconcile: vi.fn(),
   batchSyncCardsToPublic: vi.fn().mockResolvedValue(undefined),
   removeCardFromPublic: vi.fn().mockResolvedValue(undefined),

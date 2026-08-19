@@ -81,7 +81,7 @@ vi.mock('firebase/auth', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { batchSyncCardsToPublic, buildPublicCardDoc, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, RECONCILE_DEBOUNCE_MS, removeCardFromPublic, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { __resetReconcileStateForTests, batchSyncCardsToPublic, buildPublicCardDoc, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, RECONCILE_DEBOUNCE_MS, removeCardFromPublic, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 // Static (not dynamic) import purely to pre-warm the module cache — the SUT's
 // scheduleIndexReconcile/triggerIndexReconcileNow reach cloudFunctions.ts via
 // `import('./cloudFunctions')` (see that function's doc comment for why it's
@@ -115,6 +115,14 @@ beforeEach(() => {
   writeBatchMock.mockClear()
   reconcileCallableMock.mockClear()
   httpsCallableMock.mockClear()
+  // LOW-A (TASK-247 review round 3): the debounce/in-flight state
+  // (_reconcileWindowTimer, _reconcileTrailingPending, _reconcileInFlight,
+  // _reconcileQueuedWhileInFlight) lives in module-level singletons with no
+  // reset previously exported — this file was relying on test EXECUTION
+  // ORDER to never leave state dirty across tests, which is exactly the
+  // kind of implicit coupling that breaks the moment tests get reordered
+  // or run individually. Resetting explicitly here removes that coupling.
+  __resetReconcileStateForTests()
 })
 
 /**
@@ -212,14 +220,14 @@ describe('buildPublicCardDoc', () => {
 
     // Each writer above also fires its own reconcile trigger — see the
     // "reconcilePublicCardIndex trigger" describe block below for the
-    // debounce/in-flight-guard mechanics and their fake-timer tests.
-    // syncCardToPublic + batchSyncCardsToPublic share ONE debounced timer
-    // (the second call resets the first's), so it takes a real advance to
-    // observe; syncAllUserCards fires immediately (see its own doc
-    // comment). Advancing here just drains that shared timer so nothing
-    // leaks into the next test as a real (2s) pending setTimeout.
+    // leading+trailing debounce mechanics and their fake-timer tests. All
+    // 3 calls share ONE coalescing window: the first (syncCardToPublic)
+    // fires immediately (leading edge), the other two land WITHIN that
+    // window and coalesce into a single trailing call once it elapses.
+    // Advancing here drains that trailing call so nothing leaks into the
+    // next test as a real (2s) pending setTimeout.
     await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
-    expect(reconcileCallableMock).toHaveBeenCalledTimes(2) // 1 debounced (coalesced) + 1 immediate (syncAllUserCards)
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(2) // 1 leading (immediate) + 1 trailing (coalesced)
     vi.useRealTimers()
   })
 })
@@ -231,20 +239,42 @@ describe('buildPublicCardDoc', () => {
  * callable (functions/index.js) once per sync operation, not per card, so
  * the fanout stays proportional to how often the public set changes.
  *
- * Review round (HIGH-1/HIGH-2/MED-1): the FIRST version of this trigger had
- * no debounce (a burst of edits fired one full reconcile per edit) and two
- * writers — removeCardFromPublic and stores/collection.ts's
+ * Review round 2 (HIGH-1/HIGH-2/MED-1): the FIRST version of this trigger
+ * had no debounce (a burst of edits fired one full reconcile per edit) and
+ * two writers — removeCardFromPublic and stores/collection.ts's
  * deletePublicCardBatches — never triggered a reconcile at all, so a
  * deleted/sold card stayed listed in the index ("ghost cards", this
  * project's own recurring bug family) until an unrelated edit happened to
- * reconcile as a side effect. These tests use real fake timers
- * (vi.useFakeTimers + vi.advanceTimersByTimeAsync) instead of vi.waitFor —
- * LOW-3 from the same review: vi.waitFor's guarantee is "eventually true",
- * which happened to be enough before there was a real debounce delay to
- * wait out, but is the wrong tool once the thing under test IS a timer.
- * advanceTimersByTimeAsync is deterministic: nothing fires before the
- * debounce window elapses, and everything scheduled within it fires
- * exactly once advanced.
+ * reconcile as a side effect.
+ *
+ * Review round 3 (HIGH-A): the round-2 debounce was TRAILING-ONLY (fire
+ * once RECONCILE_DEBOUNCE_MS after the LAST call in a burst) — copied only
+ * the setTimeout half of the sibling card_index delta debounce
+ * (queueCardIndexDelta/scheduleCardIndexDeltaFlush), not the
+ * flushPendingCardIndexDeltasOnUnload half that survives a tab close. A
+ * trailing-only debounce is WORSE than no debounce at all for this
+ * failure mode: before it existed, a reconcile fired immediately (loss
+ * window = one RTT); after it, the loss window became RTT + 2s, landing
+ * exactly when the user has just finished editing and is most likely to
+ * navigate away or close the tab — with no server-side safety net
+ * (no onDocumentWritten/onSchedule reconcile exists). Fixed with a
+ * LEADING+TRAILING debounce instead: the FIRST call in a burst fires
+ * immediately (restores the original RTT-only loss window — nothing is
+ * lost even if the tab closes a millisecond later), and any calls that
+ * land while that leading call's coalescing window is still open are
+ * coalesced into a single trailing call once the window elapses. A real
+ * keepalive-beacon-on-unload (mirroring sendCardIndexDeltaBeacon) would
+ * close the trailing call's residual loss window too, but is out of this
+ * tanda's scope — the trailing call only ever coalesces work the leading
+ * call didn't already cover.
+ *
+ * These tests use real fake timers (vi.useFakeTimers + advanceTimersByTimeAsync)
+ * instead of vi.waitFor — LOW-3 from review round 2: vi.waitFor's guarantee
+ * is "eventually true", which is the wrong tool once the thing under test
+ * IS a timer. advanceTimersByTimeAsync(0) is used to flush the pending
+ * microtask chain (dynamic import resolution + its .then()) for an
+ * immediate (leading-edge) call, without waiting out any real delay —
+ * proving it fired immediately, not after RECONCILE_DEBOUNCE_MS.
  */
 describe('reconcilePublicCardIndex trigger', () => {
   beforeEach(() => {
@@ -255,37 +285,55 @@ describe('reconcilePublicCardIndex trigger', () => {
     vi.useRealTimers()
   })
 
-  it('does NOT call the reconcile callable before the debounce window elapses', async () => {
+  it('HIGH-A regression lock: the leading edit in a burst reconciles immediately — NOT lost if the coalescing window never elapses (tab closed first)', async () => {
     const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true })
 
     await syncCardToPublic(card, 'user-1', 'alice')
+    // Deliberately do NOT advance by RECONCILE_DEBOUNCE_MS — this simulates
+    // the tab closing/navigating away before the trailing window would
+    // ever elapse. Only flush the leading call's own microtask chain.
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(reconcileCallableMock).not.toHaveBeenCalled()
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
   })
 
-  it('HIGH-1 regression lock: coalesces a burst of edits into exactly ONE reconcile call after the debounce window', async () => {
+  it('HIGH-1 regression lock: coalesces a burst of edits into a leading call plus at most ONE trailing call — never one per edit', async () => {
     for (let i = 0; i < 5; i++) {
       const card = makeCard({ id: `c${i}`, name: 'Lightning Bolt', status: 'sale', public: true })
       // eslint-disable-next-line no-await-in-loop -- simulating 5 rapid-fire edits, must stay sequential
       await syncCardToPublic(card, 'user-1', 'alice')
     }
-
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
-
+    await vi.advanceTimersByTimeAsync(0) // flush the leading call (edit #1)
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS) // window elapses — one trailing call for edits #2-5
+
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(2) // NOT 5
   })
 
-  it('syncCardToPublic triggers a debounced reconcile after a delete (card left the public set)', async () => {
+  it('a single edit does not ALSO fire a trailing call once its window elapses (no phantom second call)', async () => {
+    const card = makeCard({ name: 'Lightning Bolt', status: 'sale', public: true })
+
+    await syncCardToPublic(card, 'user-1', 'alice')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS) // window elapses with nothing queued
+
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(1) // still 1 — no trailing call was queued
+  })
+
+  it('syncCardToPublic triggers an immediate reconcile after a delete (card left the public set)', async () => {
     const card = makeCard({ name: 'Lightning Bolt', status: 'collection', public: true })
 
     await syncCardToPublic(card, 'user-1', 'alice')
 
     expect(deleteDocMock).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(0)
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
   })
 
-  it('batchSyncCardsToPublic triggers exactly one debounced reconcile for the whole batch, not one per card', async () => {
+  it('batchSyncCardsToPublic triggers exactly one immediate reconcile for the whole batch, not one per card', async () => {
     const cards = [
       makeCard({ id: 'c1', name: 'Black Lotus', status: 'sale', public: true }),
       makeCard({ id: 'c2', name: 'Mox Ruby', status: 'trade', public: true }),
@@ -293,28 +341,50 @@ describe('reconcilePublicCardIndex trigger', () => {
 
     await batchSyncCardsToPublic(cards, 'user-1', 'alice')
 
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(0)
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
   })
 
-  it('syncAllUserCards triggers an IMMEDIATE reconcile, bypassing the debounce (deliberate one-shot bulk action)', async () => {
+  // LOW-C (TASK-247 review round 3): batchSyncCardsToPublic didn't catch a
+  // mid-loop batch.commit() failure — the exception propagated straight
+  // out, skipping the scheduleIndexReconcile() call at the end and leaving
+  // whatever chunks DID commit successfully un-reconciled. BATCH_SIZE is
+  // 400, so 401 cards forces a second chunk/commit.
+  it('LOW-C regression lock: still reconciles the successfully-committed chunk(s) even when a later chunk fails', async () => {
+    const cards = Array.from({ length: 401 }, (_, i) =>
+      makeCard({ id: `c${i}`, name: 'Lightning Bolt', status: 'sale', public: true }))
+    batchCommitMock.mockResolvedValueOnce(undefined) // chunk 1: succeeds
+    batchCommitMock.mockRejectedValueOnce(new Error('chunk 2 commit boom')) // chunk 2: fails
+
+    await expect(batchSyncCardsToPublic(cards, 'user-1', 'alice')).rejects.toThrow('chunk 2 commit boom')
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(reconcileCallableMock).toHaveBeenCalledTimes(1) // chunk 1's write still needs to be reflected in the index
+  })
+
+  it('LOW-C: does not reconcile at all when EVERY chunk fails (nothing was actually written)', async () => {
+    const cards = [makeCard({ id: 'c1', name: 'Lightning Bolt', status: 'sale', public: true })]
+    batchCommitMock.mockRejectedValueOnce(new Error('commit boom'))
+
+    await expect(batchSyncCardsToPublic(cards, 'user-1', 'alice')).rejects.toThrow('commit boom')
+
+    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
+    expect(reconcileCallableMock).not.toHaveBeenCalled()
+  })
+
+  it('syncAllUserCards triggers a reconcile through the same shared leading+trailing mechanism as every other writer', async () => {
     const cards = [makeCard({ id: 'c1', name: 'Time Walk', status: 'sale', public: true })]
 
     await syncAllUserCards(cards, 'user-1', 'alice')
-    // advanceTimersByTimeAsync(0) flushes the pending microtask chain
-    // (dynamic import resolution + its .then()) without waiting out any
-    // real delay — proves this fired immediately, not after
-    // RECONCILE_DEBOUNCE_MS.
     await vi.advanceTimersByTimeAsync(0)
 
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
   })
 
-  it('HIGH-2 regression lock: removeCardFromPublic triggers a debounced reconcile — deletes must not be silently unindexed', async () => {
+  it('HIGH-2 regression lock: removeCardFromPublic triggers an immediate reconcile — deletes must not be silently unindexed', async () => {
     await removeCardFromPublic('c1', 'user-1')
 
-    expect(reconcileCallableMock).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(0)
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
   })
 
@@ -324,26 +394,24 @@ describe('reconcilePublicCardIndex trigger', () => {
 
     await syncCardToPublic(card, 'user-1', 'alice')
 
-    // Just proving this doesn't throw/reject out of the test — the actual
-    // resolved value of advanceTimersByTimeAsync isn't part of the contract
-    // being tested here.
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(0)
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
   })
 
-  it('MED-1 regression lock: a schedule that lands while a reconcile is still in flight is queued, not dropped, and fires once the in-flight call settles', async () => {
+  it('MED-1 regression lock: a call that lands while a reconcile is still in flight is queued, not dropped, and fires once the in-flight call settles', async () => {
     let resolveFirst: (value: { data: unknown }) => void = () => {}
     reconcileCallableMock.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve }))
 
     const cardA = makeCard({ id: 'a', name: 'Lightning Bolt', status: 'sale', public: true })
     await syncCardToPublic(cardA, 'user-1', 'alice')
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS) // first call fires and stays in flight (unresolved)
+    await vi.advanceTimersByTimeAsync(0) // leading call fires immediately and stays in flight (unresolved)
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
 
     const cardB = makeCard({ id: 'b', name: 'Mox Ruby', status: 'sale', public: true })
-    await syncCardToPublic(cardB, 'user-1', 'alice')
-    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS) // second debounce elapses WHILE the first is still in flight
-    // Queued, not sent — the in-flight call hasn't settled yet.
+    await syncCardToPublic(cardB, 'user-1', 'alice') // lands inside the coalescing window — queued as trailing
+    await vi.advanceTimersByTimeAsync(RECONCILE_DEBOUNCE_MS) // window elapses WHILE the leading call is still in flight
+    // The trailing call itself is now blocked by the in-flight guard (not
+    // sent — queued a second time, at the triggerIndexReconcileNow level).
     expect(reconcileCallableMock).toHaveBeenCalledTimes(1)
 
     resolveFirst({ data: { strategy: 'noop' } })

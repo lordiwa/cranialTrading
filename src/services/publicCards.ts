@@ -133,8 +133,14 @@ export interface PublicPreference {
  * 'collection' blacklist) — public_cards is now readable by anonymous
  * users, so a 'wishlist' card marked public must never slip through as
  * "not collection".
+ *
+ * Exported (TASK-247 tanda 2c review round 3, MED-A) so stores/collection.ts
+ * can decide WHETHER a mutation could even touch the public set — using
+ * the OLD and NEW card state it already has (updateCard/deleteCard), not
+ * by guessing inside this file's writers, which never see "old" state at
+ * all. See collection.ts's updateCard/deleteCard call sites.
  */
-function isPublicCard(card: Card): boolean {
+export function isPublicCard(card: Card): boolean {
   return (card.status === 'sale' || card.status === 'trade') && card.public === true
 }
 
@@ -190,32 +196,68 @@ export function buildPublicCardDoc(
 }
 
 /**
- * TASK-247 tanda 2c review round (HIGH-1): debounce window for the
+ * TASK-247 tanda 2c review round 2 (HIGH-1): coalescing window for the
  * reconcile trigger. A bare, un-debounced call meant every single quantity
  * +1 click on a 6,758-card public profile fired its own full reconcile
  * invoke (2 GiB, reads the seller's whole public_cards + a scryfall_cache
  * join) — three quick clicks, three full sweeps, and two loops that mutate
  * cards one at a time (stores/buyRequests.ts fulfillRequest,
  * composables/useCollectionTotals.ts's auto-fix) turned that into one full
- * sweep PER CARD. Debouncing coalesces a burst into ONE reconcile after the
- * burst settles — same shape and window as the sibling card_index delta
- * debounce in stores/collection.ts (queueCardIndexDelta +
- * scheduleCardIndexDeltaFlush, TASK-237).
+ * sweep PER CARD.
  *
- * Deliberately kept HERE rather than moved next to that sibling: every path
- * that can change the public set (all 3 writers below, removeCardFromPublic,
- * AND stores/collection.ts's own deletePublicCardBatches for bulk delete,
- * which writes public_cards directly via writeBatch and bypasses every
- * writer in this file) needs to share ONE timer — this module is the only
- * point all of them already converge on. `scheduleIndexReconcile` is
- * exported so deletePublicCardBatches can still participate in the same
- * shared debounce instead of getting its own, uncoordinated one.
+ * Review round 3 (HIGH-A): the first version of this window was
+ * TRAILING-ONLY (fire once RECONCILE_DEBOUNCE_MS after the LAST call in a
+ * burst) — only the setTimeout half of the sibling card_index delta
+ * debounce (queueCardIndexDelta/scheduleCardIndexDeltaFlush, TASK-237),
+ * missing the half that survives a tab close
+ * (flushPendingCardIndexDeltasOnUnload). A trailing-only debounce is WORSE
+ * than no debounce for that failure mode: before it existed, the reconcile
+ * fired immediately (loss window = one RTT); after it, the loss window
+ * became RTT + 2s, landing exactly when the user has just finished editing
+ * and is likeliest to navigate away — and there is no server-side safety
+ * net (no onDocumentWritten/onSchedule reconcile exists; verified by grep).
+ * Fixed to LEADING + TRAILING: the first call in a burst fires immediately
+ * (`scheduleIndexReconcile`'s own call to `triggerIndexReconcileNow`,
+ * below) — restoring the original RTT-only loss window — and any calls
+ * landing while that leading call's coalescing window is still open are
+ * marked `_reconcileTrailingPending` and coalesced into a single trailing
+ * call once the window elapses. A real keepalive beacon on unload
+ * (mirroring sendCardIndexDeltaBeacon) would close the trailing call's own
+ * residual loss window too; that's out of this tanda's scope — the
+ * trailing call only ever coalesces work the leading call didn't already
+ * cover, so nothing from a burst's FIRST edit can be lost this way anymore.
+ *
+ * Deliberately kept HERE rather than moved next to the card_index sibling:
+ * every path that can change the public set (all 3 writers below,
+ * removeCardFromPublic, AND stores/collection.ts's own
+ * deletePublicCardBatches for bulk delete, which writes public_cards
+ * directly via writeBatch and bypasses every writer in this file) needs to
+ * share ONE window — this module is the only point all of them already
+ * converge on. `scheduleIndexReconcile` is exported so
+ * deletePublicCardBatches can still participate in the same shared window
+ * instead of getting its own, uncoordinated one.
  */
 export const RECONCILE_DEBOUNCE_MS = 2000
 
-let _reconcileDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let _reconcileWindowTimer: ReturnType<typeof setTimeout> | null = null
+let _reconcileTrailingPending = false
 let _reconcileInFlight = false
 let _reconcileQueuedWhileInFlight = false
+
+/**
+ * TASK-247 tanda 2c review round 3 (LOW-A): the debounce/in-flight state
+ * above lives in module-level singletons with no reset previously
+ * exported — tests were relying on execution order to never leave state
+ * dirty across tests. Test-only escape hatch, never called from
+ * production code.
+ */
+export function __resetReconcileStateForTests(): void {
+  if (_reconcileWindowTimer) clearTimeout(_reconcileWindowTimer)
+  _reconcileWindowTimer = null
+  _reconcileTrailingPending = false
+  _reconcileInFlight = false
+  _reconcileQueuedWhileInFlight = false
+}
 
 /**
  * TASK-247 tanda 2c review round (MED-1): the server's reconcile holds a
@@ -277,17 +319,29 @@ function triggerIndexReconcileNow(): void {
 }
 
 /**
- * Debounced trigger for the server-side public index reconcile
- * (functions/index.js's `reconcilePublicCardIndex`, self-only, wired in
- * tanda 2b but never invoked from the client until tanda 2c). Called by
- * every writer below on a real change to the public set — coalesced by
- * RECONCILE_DEBOUNCE_MS, see that constant's doc comment.
+ * Leading+trailing coalescing trigger for the server-side public index
+ * reconcile (functions/index.js's `reconcilePublicCardIndex`, self-only,
+ * wired in tanda 2b but never invoked from the client until tanda 2c).
+ * Called by every writer below on a real change to the public set — see
+ * RECONCILE_DEBOUNCE_MS's doc comment for why this fires the FIRST call in
+ * a burst immediately and only coalesces the rest.
  */
 export function scheduleIndexReconcile(): void {
-  if (_reconcileDebounceTimer) clearTimeout(_reconcileDebounceTimer)
-  _reconcileDebounceTimer = setTimeout(() => {
-    _reconcileDebounceTimer = null
-    triggerIndexReconcileNow()
+  if (_reconcileWindowTimer) {
+    // Already inside a coalescing window opened by an earlier call in this
+    // burst — queue a single trailing call instead of firing again now.
+    _reconcileTrailingPending = true
+    return
+  }
+  // Leading edge: fire immediately. This is what makes the reconcile safe
+  // against a tab close/unload — nothing waits on the window below.
+  triggerIndexReconcileNow()
+  _reconcileWindowTimer = setTimeout(() => {
+    _reconcileWindowTimer = null
+    if (_reconcileTrailingPending) {
+      _reconcileTrailingPending = false
+      triggerIndexReconcileNow()
+    }
   }, RECONCILE_DEBOUNCE_MS)
 }
 
@@ -337,28 +391,41 @@ export async function batchSyncCardsToPublic(
   const BATCH_SIZE = 400
   const totalChunks = Math.ceil(cards.length / BATCH_SIZE)
   let completedChunks = 0
+  // TASK-247 tanda 2c review round 3 (LOW-C): a batch.commit() failure
+  // mid-loop used to propagate straight out of this function, skipping
+  // scheduleIndexReconcile() below entirely — any chunk that DID commit
+  // successfully before the failure was left un-reconciled with no trace.
+  // try/finally: whatever succeeded still gets reconciled even when a
+  // later chunk throws; the throw itself still propagates afterward
+  // (unchanged — batchSyncCardsToPublic's own callers already handle
+  // rejection, e.g. stores/collection.ts's fire-and-forget .catch()).
+  let anyChunkSucceeded = false
 
-  for (let i = 0; i < cards.length; i += BATCH_SIZE) {
-    const batch = writeBatch(db)
-    const chunk = cards.slice(i, i + BATCH_SIZE)
+  try {
+    for (let i = 0; i < cards.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db)
+      const chunk = cards.slice(i, i + BATCH_SIZE)
 
-    for (const card of chunk) {
-      const publicCardId = `${userId}_${card.id}`
-      const publicCardRef = doc(db, 'public_cards', publicCardId)
+      for (const card of chunk) {
+        const publicCardId = `${userId}_${card.id}`
+        const publicCardRef = doc(db, 'public_cards', publicCardId)
 
-      if (isPublicCard(card)) {
-        // TASK-169: sin email, ver syncCardToPublic
-        batch.set(publicCardRef, buildPublicCardDoc(card, userId, username, userLocation, userAvatarUrl))
-      } else {
-        batch.delete(publicCardRef)
+        if (isPublicCard(card)) {
+          // TASK-169: sin email, ver syncCardToPublic
+          batch.set(publicCardRef, buildPublicCardDoc(card, userId, username, userLocation, userAvatarUrl))
+        } else {
+          batch.delete(publicCardRef)
+        }
       }
-    }
 
-    await batch.commit()
-    completedChunks++
-    onProgress?.(completedChunks, totalChunks)
+      await batch.commit()
+      anyChunkSucceeded = true
+      completedChunks++
+      onProgress?.(completedChunks, totalChunks)
+    }
+  } finally {
+    if (anyChunkSucceeded) scheduleIndexReconcile()
   }
-  scheduleIndexReconcile()
 }
 
 /**
@@ -459,14 +526,23 @@ export async function syncAllUserCards(
     }
     await batch.commit()
   }
-  // Deliberately NOT debounced: syncAllUserCards is only ever called from
-  // the explicit, user-initiated "sync all" action (stores/collection.ts's
-  // syncAllToPublic, which awaits it and only then shows a success toast) —
-  // a one-shot bulk operation, not a rapid-fire UI interaction, so there is
-  // no burst to coalesce. Firing immediately also means the toast's timing
-  // reflects a reconcile that has actually started, not one still waiting
-  // out RECONCILE_DEBOUNCE_MS after the user was told they're done.
-  triggerIndexReconcileNow()
+  // TASK-247 tanda 2c review round 3 (MED-B): this used to call
+  // triggerIndexReconcileNow() directly, bypassing scheduleIndexReconcile
+  // entirely, on the reasoning that a one-shot bulk action needs no
+  // debounce. That reasoning stopped being safe once scheduleIndexReconcile
+  // gained the leading+trailing design above: calling triggerIndexReconcileNow
+  // directly here never cleared a coalescing window some earlier single-card
+  // edit had already opened, so (a) that window's own trailing call would
+  // still fire ~2s later as a redundant second full sweep, and (b) the
+  // comment's claim that "the toast reflects a reconcile that has actually
+  // started" was false whenever triggerIndexReconcileNow's own in-flight
+  // guard queued this call instead of sending it (e.g. that earlier edit's
+  // leading call was still in flight). Routing through the same shared
+  // scheduleIndexReconcile as every other writer fixes both: it still fires
+  // immediately in the common case (no window open), and when one IS open
+  // it correctly coalesces into that window's single trailing call instead
+  // of firing a redundant, uncoordinated second sweep.
+  scheduleIndexReconcile()
 }
 
 /**

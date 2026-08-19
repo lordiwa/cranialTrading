@@ -19,6 +19,7 @@ import { useToastStore } from './toast'
 import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import {
     batchSyncCardsToPublic,
+    isPublicCard,
     removeCardFromPublic,
     scheduleIndexReconcile,
     syncAllUserCards,
@@ -1760,9 +1761,18 @@ export const useCollectionStore = defineStore('collection', () => {
                 queueCardIndexDelta(cardId, 'update')
                 scheduleCardIndexDeltaFlush()
 
-                // Sync to public collection (non-blocking, log-only on failure)
+                // Sync to public collection (non-blocking, log-only on failure).
+                // TASK-247 tanda 2c review round 3 (MED-A): only call
+                // syncCardToPublic when the public set could actually
+                // change — either the card WAS public before this update
+                // (may need its public_cards doc deleted) or IS public
+                // after it (may need one written/updated). Skipping the
+                // call entirely when neither is true means publicCards.ts's
+                // own reconcile trigger never fires for a private card's
+                // ordinary edit either — see isPublicCard's doc comment for
+                // why this decision belongs here, not inside publicCards.ts.
                 const userInfo = getUserInfo()
-                if (userInfo) {
+                if (userInfo && ((existingCard && isPublicCard(existingCard)) || isPublicCard(updatedCard))) {
                     syncCardToPublic(updatedCard, userInfo.userId, userInfo.username, userInfo.location, userInfo.avatarUrl)
                         .catch((err: unknown) => {
                             logSanitizedError('[PublicSync] Error syncing card update', err)
@@ -2133,11 +2143,18 @@ export const useCollectionStore = defineStore('collection', () => {
             // card_index directly.
             syncIndexOrQueue(deletedCard, 'delete')
 
-            // Remove from public collection (non-blocking, log-only on failure)
-            removeCardFromPublic(cardId, authStore.user.id)
-                .catch((err: unknown) => {
-                    logSanitizedError('[PublicSync] Error removing card', err)
-                })
+            // Remove from public collection (non-blocking, log-only on failure).
+            // TASK-247 tanda 2c review round 3 (MED-A): only call this when
+            // the deleted card actually WAS public — see updateCard's own
+            // isPublicCard guard above for the full rationale. A card that
+            // never had a public_cards doc has nothing to delete and needs
+            // no reconcile.
+            if (isPublicCard(deletedCard)) {
+                removeCardFromPublic(cardId, authStore.user.id)
+                    .catch((err: unknown) => {
+                        logSanitizedError('[PublicSync] Error removing card', err)
+                    })
+            }
 
             // Re-query the server card_index for the definitive membership/order
             // (fills the gap left by the deleted card, corrects total/hasMore).

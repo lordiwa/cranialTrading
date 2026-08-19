@@ -28,6 +28,7 @@ vi.mock('@/services/cloudFunctions', () => ({
 }))
 
 vi.mock('@/services/publicCards', () => ({
+  isPublicCard: vi.fn((card: any) => (card.status === 'sale' || card.status === 'trade') && card.public === true),
   scheduleIndexReconcile: vi.fn(),
   batchSyncCardsToPublic: vi.fn().mockResolvedValue(undefined),
   removeCardFromPublic: vi.fn().mockResolvedValue(undefined),
@@ -95,12 +96,14 @@ vi.mock('@/stores/toast', () => ({
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore, type IndexCard } from '@/stores/collection'
 import { applyCardIndexDelta, queryCardIndex } from '@/services/cloudFunctions'
-import { scheduleIndexReconcile } from '@/services/publicCards'
+import { removeCardFromPublic, scheduleIndexReconcile, syncCardToPublic } from '@/services/publicCards'
 import { makeCard } from '../helpers/fixtures'
 
 const mockQueryCardIndex = vi.mocked(queryCardIndex)
 const mockApplyCardIndexDelta = vi.mocked(applyCardIndexDelta)
 const mockScheduleIndexReconcile = vi.mocked(scheduleIndexReconcile)
+const mockSyncCardToPublic = vi.mocked(syncCardToPublic)
+const mockRemoveCardFromPublic = vi.mocked(removeCardFromPublic)
 
 /** A Firestore-shaped error carrying an exact `.code`, the only signal the cure may react to. */
 const firestoreError = (code: string, message = `simulated ${code}`): Error & { code: string } => {
@@ -288,6 +291,86 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       await store.deleteCard('ghost-1')
 
       expect(store.cards).toHaveLength(0)
+    })
+  })
+
+  /**
+   * TASK-247 tanda 2c review round 3 (MED-A): syncCardToPublic/
+   * removeCardFromPublic used to be called unconditionally by updateCard/
+   * deleteCard for EVERY mutation, even one that never touched the public
+   * set at all (a private card's quantity +1) — each such call still fired
+   * its own reconcile trigger inside publicCards.ts, a full sweep of the
+   * seller's public_cards + scryfall_cache join for a mutation the index
+   * never needed to know about. Fixed here, in collection.ts, because this
+   * is where the OLD and NEW card state are both available — syncCardToPublic/
+   * removeCardFromPublic themselves only ever see one side of that (a
+   * setDoc/deleteDoc, no diff) and would be guessing.
+   */
+  describe('MED-A regression lock: syncCardToPublic/removeCardFromPublic only fire when the public set could actually change', () => {
+    it('updateCard: does NOT call syncCardToPublic when neither the old nor the new state was public', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'collection', public: false })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.updateCard('card-1', { quantity: 5 })
+
+      expect(mockSyncCardToPublic).not.toHaveBeenCalled()
+    })
+
+    it('updateCard: DOES call syncCardToPublic when the card was already public and stays public (positive control)', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'sale', public: true })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.updateCard('card-1', { price: 5 })
+
+      expect(mockSyncCardToPublic).toHaveBeenCalledTimes(1)
+    })
+
+    it('updateCard: DOES call syncCardToPublic when the card BECOMES public (was private, transitions to sale+public)', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'collection', public: false })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.updateCard('card-1', { status: 'sale', public: true })
+
+      expect(mockSyncCardToPublic).toHaveBeenCalledTimes(1)
+    })
+
+    it('updateCard: DOES call syncCardToPublic when the card STOPS being public (was public, transitions to collection) — the public_cards doc must still be deleted', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'sale', public: true })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.updateCard('card-1', { status: 'collection' })
+
+      expect(mockSyncCardToPublic).toHaveBeenCalledTimes(1)
+    })
+
+    it('deleteCard: does NOT call removeCardFromPublic when the deleted card was never public', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'collection', public: false })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.deleteCard('card-1')
+
+      expect(mockRemoveCardFromPublic).not.toHaveBeenCalled()
+    })
+
+    it('deleteCard: DOES call removeCardFromPublic when the deleted card was public (positive control)', async () => {
+      const store = useCollectionStore()
+      const card = makeCard({ id: 'card-1', status: 'sale', public: true })
+      store.cards = [card] as any
+      store.paginatedCards = [card] as any
+
+      await store.deleteCard('card-1')
+
+      expect(mockRemoveCardFromPublic).toHaveBeenCalledTimes(1)
     })
   })
 

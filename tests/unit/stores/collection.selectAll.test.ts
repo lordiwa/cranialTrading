@@ -26,6 +26,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('@/services/publicCards', () => ({
+  isPublicCard: vi.fn((card: any) => (card.status === 'sale' || card.status === 'trade') && card.public === true),
   scheduleIndexReconcile: vi.fn(),
   syncCardToPublic: vi.fn().mockResolvedValue(undefined),
   removeCardFromPublic: vi.fn().mockResolvedValue(undefined),

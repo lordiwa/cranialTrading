@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-19T02:18:12.840Z",
+  "generated_at": "2026-08-19T04:01:14.003Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1356,6 +1356,12 @@
       "title": "El boton de borrar todo no borra carpetas ni mazos, y deja el estado inconsistente",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-247",
+      "title": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales",
+      "status": "todo",
+      "priority": "critical"
     }
   ]
 }

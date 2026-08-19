@@ -1940,6 +1940,13 @@ exports.reconcilePublicCardIndex = onCall(
         // No forceEmptyIndex: the collapse guard is never overridable from
         // this self-only, client-triggered path — only the admin script
         // exposes that, deliberately, behind its own explicit CLI flag.
+        // overrideHint (review round 3): this path genuinely has no
+        // override — pointing the caller at a flag their own path doesn't
+        // have would be worse than saying nothing.
+        overrideHint:
+          'this self-service path has no override. An operator must run ' +
+          'scripts/reconcile-public-card-index.mjs --uid=' + userId + ' --force-empty-index ' +
+          'after confirming the small read is real.',
       });
       if (result.refused) {
         throw new HttpsError('failed-precondition', result.message);

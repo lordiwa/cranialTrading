@@ -343,6 +343,22 @@ const COLLAPSE_RATIO = 0.1;
  * override flag) rather than happening silently as the default path of an
  * otherwise-ordinary reconciliation run.
  *
+ * CORRECTION (review round 3): the FIRST version of this proportional
+ * rewrite made `metaCount < COLLAPSE_MIN_META_COUNT` return `false`
+ * unconditionally — which silently dropped the ORIGINAL exact-zero
+ * protection for small indexes (the pre-this-ticket behavior was
+ * "`docsCount === 0` refuses against ANY `count > 0`", no matter how
+ * small). Measured against production: of the 5 sellers with public
+ * cards, 3 have 18, 15, and 5 entries — under COLLAPSE_MIN_META_COUNT, so
+ * the unconditional `false` left most of this project's real accounts
+ * completely unguarded against the exact failure mode (a query returning
+ * 0 documents for every seller) that created this guard in the first
+ * place. Fixed: below the proportional threshold, the ORIGINAL exact-zero
+ * check still applies — `docsCount === 0` still refuses against any
+ * `metaCount > 0`, regardless of how small `metaCount` is. Only the
+ * proportional (10%) rule is new territory, layered on top starting at
+ * `COLLAPSE_MIN_META_COUNT`, never a replacement for the floor below it.
+ *
  * @param {number} docsCount public_cards documents actually read for this seller
  * @param {{count?: number}|null|undefined} currentMeta the index's current meta document
  * @param {number} [currentEntryCount] the actual number of entries currently
@@ -361,7 +377,11 @@ function requiresCollapseConfirmation(docsCount, currentMeta, currentEntryCount)
     // be large" whenever the caller can show the index still has entries.
     return Number.isFinite(currentEntryCount) && currentEntryCount > 0;
   }
-  if (metaCount < COLLAPSE_MIN_META_COUNT) return false;
+  if (metaCount < COLLAPSE_MIN_META_COUNT) {
+    // Below the proportional threshold: preserve the ORIGINAL exact-zero
+    // guard rather than leaving small indexes unprotected (review round 3).
+    return docsCount === 0 && metaCount > 0;
+  }
   return docsCount < metaCount * COLLAPSE_RATIO;
 }
 

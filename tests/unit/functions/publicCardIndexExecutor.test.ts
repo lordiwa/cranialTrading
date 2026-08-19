@@ -319,12 +319,30 @@ describe('requiresCollapseConfirmation', () => {
   })
 
   // meta.count below COLLAPSE_MIN_META_COUNT (100): a proportional check
-  // doesn't mean much for a small index, so the old exact-zero behavior
-  // still applies to these — a 0-count index has nothing to collapse.
-  it('does NOT require confirmation for a small existing index below the proportional-check threshold', () => {
-    expect(requiresCollapseConfirmation(0, { count: 0 })).toBe(false)
-    expect(requiresCollapseConfirmation(0, { count: 5 })).toBe(false)
-    expect(requiresCollapseConfirmation(0, { count: 99 })).toBe(false)
+  // doesn't mean much for a small index, so the ORIGINAL exact-zero
+  // behavior (from before the proportional rewrite) still applies here —
+  // a 0-count index has nothing to collapse, but any OTHER count still
+  // refuses on a 0-document read.
+  //
+  // CORRECTION (review round 3): the first version of this proportional
+  // rewrite made `metaCount < COLLAPSE_MIN_META_COUNT` return `false`
+  // UNCONDITIONALLY, silently dropping the original exact-zero protection
+  // for small indexes — measured against production, 3 of this project's
+  // 5 real sellers with public cards (18, 15, 5 entries) sit under this
+  // threshold, so that regression would have left most real accounts
+  // completely unguarded against the exact failure mode (a query
+  // returning 0 documents for every seller) that created this guard.
+  // `(0, { count: 5 })` and `(0, { count: 99 })` below are the regression
+  // lock: both must still require confirmation.
+  it('preserves the ORIGINAL exact-zero guard for small indexes below the proportional-check threshold', () => {
+    expect(requiresCollapseConfirmation(0, { count: 0 })).toBe(false) // nothing to collapse
+    expect(requiresCollapseConfirmation(0, { count: 5 })).toBe(true)
+    expect(requiresCollapseConfirmation(0, { count: 99 })).toBe(true)
+  })
+
+  it('does NOT require confirmation for a small existing index when real cards were actually read', () => {
+    expect(requiresCollapseConfirmation(5, { count: 5 })).toBe(false)
+    expect(requiresCollapseConfirmation(1, { count: 5 })).toBe(false)
   })
 
   it('does NOT require confirmation when real cards were actually read (well above the 10% floor)', () => {
@@ -336,6 +354,15 @@ describe('requiresCollapseConfirmation', () => {
     // 10% of 1000 is 100 — docsCount < 100 refuses, docsCount >= 100 does not.
     expect(requiresCollapseConfirmation(99, { count: 1000 })).toBe(true)
     expect(requiresCollapseConfirmation(100, { count: 1000 })).toBe(false)
+  })
+
+  // Review round 3: the OTHER boundary — metaCount itself sitting exactly
+  // at COLLAPSE_MIN_META_COUNT (100) — had no assert; a `<` -> `<=` typo
+  // would have survived. At metaCount=100 the proportional rule is
+  // already active (10% of 100 is 10).
+  it('sits right at the metaCount=100 boundary: the proportional rule is already active there, not the exact-zero floor', () => {
+    expect(requiresCollapseConfirmation(9, { count: 100 })).toBe(true) // 9 < 10% of 100
+    expect(requiresCollapseConfirmation(10, { count: 100 })).toBe(false) // 10 >= 10% of 100
   })
 
   // Review round 2 (MEDIUM-1) fail-closed correction: an unusable stored

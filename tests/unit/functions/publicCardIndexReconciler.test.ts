@@ -22,7 +22,7 @@
  * implements the small slice of the Firestore SDK this module calls.
  */
 import { describe, expect, it } from 'vitest'
-import { reconcilePublicCardIndexForUser } from '../../../functions/lib/publicCardIndexReconciler.js'
+import { reconcilePublicCardIndexForUser, acquireReconcileLease } from '../../../functions/lib/publicCardIndexReconciler.js'
 
 // ---------------------------------------------------------------------
 // Minimal fake Firestore — implements exactly the calls
@@ -267,6 +267,26 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
     expect(result.message).toMatch(/reconciliation attempt started/)
   })
 
+  // Review round 3 (reviewer's mutation): every lease test above seeds
+  // `reconcileLeaseAt` by hand and checks it's HONORED — none of them
+  // check that acquireReconcileLease actually WRITES it. Deleting the
+  // `tx.set(...)` line inside acquireReconcileLease left all lease tests
+  // above green (7/7) because none of them observe the write side. This
+  // test calls acquireReconcileLease directly and inspects the fake
+  // store afterward — it must fail if that write is ever removed.
+  it('MEDIUM-3: acquireReconcileLease actually stamps reconcileLeaseAt on the meta doc, not just honors an existing one', async () => {
+    const { db, store } = makeFakeDb({ public_cards: {} })
+    const metaRef = db.collection('users/seller-1/public_card_index').doc('_meta')
+    const before = Date.now()
+
+    const outcome = await acquireReconcileLease(db, metaRef)
+
+    expect(outcome.acquired).toBe(true)
+    const stamped = store['users/seller-1/public_card_index']['_meta'].reconcileLeaseAt
+    expect(typeof stamped).toBe('number')
+    expect(stamped).toBeGreaterThanOrEqual(before)
+  })
+
   it('MEDIUM-3: a STALE lease (older than the staleness window) does not block a new run', async () => {
     const { db, store } = makeFakeDb({
       public_cards: { c1: publicCardDoc('c1', 's1') },
@@ -288,6 +308,32 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
     })
 
     expect(result.refused).toBeUndefined()
+  })
+
+  // Review round 3 gap: the fail-closed path (non-finite meta.count, but
+  // real entries present) is unit-tested on requiresCollapseConfirmation
+  // directly, but wasn't exercised end-to-end through the reconciler's OWN
+  // wiring of `currentEntryCount` (summed from the real chunk read).
+  // Passing a hardcoded `0` for that argument at the call site would leave
+  // this green for the wrong reason — this test would catch it.
+  it('MEDIUM-1 fail-closed, end-to-end: a corrupted non-finite meta.count with real chunk entries still refuses', async () => {
+    const { db, store } = makeFakeDb({
+      public_cards: {}, // read comes back small/empty either way
+    })
+    store['users/seller-1/public_card_index'] = {
+      0: { id: 0, entries: [{ i: 'card-1', s: 's-1' }] }, // real entries present in the chunk
+      _meta: { schemaVersion: 1, totalChunks: 1, count: 'corrupted' as unknown as number, chunkTargetSize: 400 },
+    }
+    const before = JSON.parse(JSON.stringify(store['users/seller-1/public_card_index']))
+
+    const result = await reconcilePublicCardIndexForUser({
+      db,
+      userId: 'seller-1',
+      documentIdOrderBy: '__name__',
+    })
+
+    expect(result.refused).toBe(true)
+    expect(store['users/seller-1/public_card_index']).toEqual(before) // nothing written
   })
 
   it('dryRun performs no writes even when the index is genuinely divergent', async () => {

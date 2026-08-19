@@ -145,13 +145,21 @@ async function main() {
       dryRun,
       log: console.log,
       logError: console.error,
+      // overrideHint (review round 3): this script's caller DOES have a
+      // real override — say so, unlike the callable's self-service path.
+      overrideHint: `re-run with --uid=${uid} --force-empty-index after confirming the small read is real.`,
     });
     if (result.refused) {
       console.error(`[${uid}] RECHAZADO: ${result.message}`);
     } else if (result.dryRun) {
       console.log(`[${uid}] --dry-run: strategy=${result.strategy} count=${result.count} — no writes performed.`);
     } else {
-      console.log(`[${uid}] strategy=${result.strategy} count=${result.count} totalChunks=${result.totalChunks}`);
+      // Review round 3 (operability): wrote/deleted counts, lost when the
+      // orchestration moved into the shared reconciler module — restored.
+      console.log(
+        `[${uid}] strategy=${result.strategy} count=${result.count} totalChunks=${result.totalChunks} ` +
+          `wrote=${result.wrote ?? 0} deleted=${result.deleted ?? 0}`
+      );
     }
     results.push({ uid, ...result });
   }

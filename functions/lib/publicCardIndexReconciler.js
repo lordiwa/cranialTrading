@@ -140,6 +140,15 @@ async function reconcilePublicCardIndexForUser({
   dryRun = false,
   log = () => {},
   logError = () => {},
+  // Review round 3 (operability): the self-only onCall caller has NO way
+  // to override the collapse guard (forceEmptyIndex is never wired to
+  // request.data — see the AUTHORIZATION note in functions/index.js), so
+  // telling that caller to "re-run with an explicit override" points at a
+  // flag their own path doesn't have. Each caller passes a hint describing
+  // ITS OWN actual recovery path; this default only fires if a future
+  // caller forgets to pass one, and says so explicitly rather than
+  // implying an override exists.
+  overrideHint = 'no override is available on this path — check with an operator',
 }) {
   // HIGH fix (TASK-247 tanda 2b, measured against production): public_cards
   // is a ROOT collection with a `userId` field, NOT a subcollection of
@@ -214,8 +223,7 @@ async function reconcilePublicCardIndexForUser({
       `but the existing index still reports ${currentMeta && currentMeta.count} entries (${currentEntryCount} ` +
       'actual entries found across its chunks). Applying a rebuild as-is would collapse a much larger index ' +
       'toward nothing — this is refused by default rather than applied silently. If the seller genuinely ' +
-      'removed most/all of their public cards, re-run with an explicit override after confirming the small ' +
-      'read is real.';
+      `removed most/all of their public cards: ${overrideHint}`;
     logError(`[reconcilePublicCardIndex] ${message}`);
     return { refused: true, message };
   }
@@ -276,6 +284,12 @@ async function reconcilePublicCardIndexForUser({
   }
 
   const { writeBatches, metaOp, deleteBatches } = planFirestoreBatches(plan);
+  // Review round 3 (operability): both callers used to print how many
+  // chunk docs were written/deleted — lost when the orchestration moved
+  // into this shared module. For a tool that writes and deletes derived
+  // data, that count is the minimum an operator needs to see.
+  let wrote = 0;
+  let deleted = 0;
 
   // Ordering (see functions/lib/publicCardIndexExecutor.js header for the
   // full atomicity write-up, corrected in review round 2 for the grow
@@ -285,6 +299,7 @@ async function reconcilePublicCardIndexForUser({
     for (const op of batch) writer.set(indexRef.doc(String(op.chunkId)), op.data);
     // eslint-disable-next-line no-await-in-loop
     await writer.commit();
+    wrote += batch.length;
   }
 
   // This unconditional overwrite (not a merge) is also what releases the
@@ -306,6 +321,7 @@ async function reconcilePublicCardIndexForUser({
       for (const ref of staleRefs.slice(i, i + 500)) batch.delete(ref);
       // eslint-disable-next-line no-await-in-loop
       await batch.commit();
+      deleted += Math.min(500, staleRefs.length - i);
     }
     log(`[reconcilePublicCardIndex] user ${userId}: wiped ${staleRefs.length} stale/malformed chunk doc(s)`);
   } else {
@@ -314,8 +330,11 @@ async function reconcilePublicCardIndexForUser({
       for (const op of batch) writer.delete(indexRef.doc(String(op.chunkId)));
       // eslint-disable-next-line no-await-in-loop
       await writer.commit();
+      deleted += batch.length;
     }
   }
+
+  log(`[reconcilePublicCardIndex] user ${userId}: wrote ${wrote} chunk doc(s), deleted ${deleted} chunk doc(s)`);
 
   return {
     strategy,
@@ -323,6 +342,8 @@ async function reconcilePublicCardIndexForUser({
     reason: plan.reason,
     totalChunks: freshBuild.meta.totalChunks,
     count: docs.length,
+    wrote,
+    deleted,
   };
 }
 

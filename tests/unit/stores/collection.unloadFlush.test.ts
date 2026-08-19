@@ -39,6 +39,7 @@ vi.mock('@/services/cloudFunctions', () => ({
 }))
 
 vi.mock('@/services/publicCards', () => ({
+  scheduleIndexReconcile: vi.fn(),
   batchSyncCardsToPublic: vi.fn().mockResolvedValue(undefined),
   removeCardFromPublic: vi.fn().mockResolvedValue(undefined),
   syncAllUserCards: vi.fn(),

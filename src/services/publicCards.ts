@@ -190,33 +190,105 @@ export function buildPublicCardDoc(
 }
 
 /**
- * TASK-247 tanda 2c: fire-and-forget trigger for the server-side public
- * index reconcile (functions/index.js's `reconcilePublicCardIndex`, self-only,
- * wired in tanda 2b but never invoked from the client until now). Called
- * once per sync operation by each writer below — never per card — so the
- * fanout is bounded by how often a user's public set changes, not by its
- * size. Non-blocking and non-fatal: a reconcile failure must never surface
- * as a failure of the card save/sync the user actually asked for, matching
- * the existing non-blocking pattern for these writers' own callers
- * (stores/collection.ts's fire-and-forget syncCardToPublic/batchSyncCardsToPublic
- * calls).
+ * TASK-247 tanda 2c review round (HIGH-1): debounce window for the
+ * reconcile trigger. A bare, un-debounced call meant every single quantity
+ * +1 click on a 6,758-card public profile fired its own full reconcile
+ * invoke (2 GiB, reads the seller's whole public_cards + a scryfall_cache
+ * join) — three quick clicks, three full sweeps, and two loops that mutate
+ * cards one at a time (stores/buyRequests.ts fulfillRequest,
+ * composables/useCollectionTotals.ts's auto-fix) turned that into one full
+ * sweep PER CARD. Debouncing coalesces a burst into ONE reconcile after the
+ * burst settles — same shape and window as the sibling card_index delta
+ * debounce in stores/collection.ts (queueCardIndexDelta +
+ * scheduleCardIndexDeltaFlush, TASK-237).
  *
- * Dynamic `import('./cloudFunctions')` rather than a static one — same
- * reason stores/collection.ts's applyCardIndexDelta wrapper does it
- * (TASK-232, see that comment): a static import would make importing
- * publicCards.ts eagerly run cloudFunctions.ts's module-top-level
- * `getFunctions(getApp())`, which throws "No Firebase App '[DEFAULT]'" in
- * any test that imports this module (directly or via stores/collection.ts,
- * stores/binders.ts, stores/decks.ts, ...) without also mocking
- * firebase/app — measured: 9 test files broke this way with a static
- * import before this fix.
+ * Deliberately kept HERE rather than moved next to that sibling: every path
+ * that can change the public set (all 3 writers below, removeCardFromPublic,
+ * AND stores/collection.ts's own deletePublicCardBatches for bulk delete,
+ * which writes public_cards directly via writeBatch and bypasses every
+ * writer in this file) needs to share ONE timer — this module is the only
+ * point all of them already converge on. `scheduleIndexReconcile` is
+ * exported so deletePublicCardBatches can still participate in the same
+ * shared debounce instead of getting its own, uncoordinated one.
  */
-function scheduleIndexReconcile(): void {
+export const RECONCILE_DEBOUNCE_MS = 2000
+
+let _reconcileDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let _reconcileInFlight = false
+let _reconcileQueuedWhileInFlight = false
+
+/**
+ * TASK-247 tanda 2c review round (MED-1): the server's reconcile holds a
+ * lease in Firestore only for the duration of the call
+ * (functions/lib/publicCardIndexReconciler.js's acquireReconcileLease), so
+ * two client-issued calls close enough together can still land on top of
+ * each other even after debouncing coalesces a single burst — the read
+ * phase alone (all of the seller's public_cards + the scryfall_cache join)
+ * is not instant, so a second burst's debounce can elapse WHILE the first
+ * call is still running. Before this fix that second call was simply
+ * refused (failed-precondition) and silently dropped — the index would be
+ * left one edit behind with nothing to notice or retry.
+ *
+ * This in-flight guard makes that impossible from THIS tab: a trigger that
+ * lands while a call is already in flight is not sent — it's queued, and
+ * the queued flag fires exactly one more call the instant the in-flight one
+ * settles (success OR failure), so the index still converges on the latest
+ * state instead of getting stuck on a refused/dropped attempt.
+ *
+ * This does NOT cover a genuine cross-tab/cross-session race (two browser
+ * tabs of the same seller editing at the same instant) — that residual
+ * case still relies on the server lease's own documented self-healing ("the
+ * next attempt IS the cleanup", publicCardIndexReconciler.js), not a client
+ * retry. A cross-tab fix would need server-side coordination beyond a
+ * single tab's in-memory state and is out of this tanda's scope.
+ */
+function triggerIndexReconcileNow(): void {
+  if (_reconcileInFlight) {
+    _reconcileQueuedWhileInFlight = true
+    return
+  }
+  _reconcileInFlight = true
+  // Dynamic `import('./cloudFunctions')` rather than a static one — same
+  // reason stores/collection.ts's applyCardIndexDelta wrapper does it
+  // (TASK-232, see that comment): a static import would make importing
+  // publicCards.ts eagerly run cloudFunctions.ts's module-top-level
+  // `getFunctions(getApp())`, which throws "No Firebase App '[DEFAULT]'" in
+  // any test that imports this module (directly or via stores/collection.ts,
+  // stores/binders.ts, stores/decks.ts, ...) without also mocking
+  // firebase/app — measured: 9 test files broke this way with a static
+  // import before this fix.
   import('./cloudFunctions')
     .then(({ reconcilePublicCardIndex }) => reconcilePublicCardIndex())
     .catch((error: unknown) => {
+      // Non-blocking and non-fatal: a reconcile failure must never surface
+      // as a failure of the card save/sync the user actually asked for,
+      // matching the existing non-blocking pattern for these writers' own
+      // callers (stores/collection.ts's fire-and-forget syncCardToPublic/
+      // batchSyncCardsToPublic calls).
       logSanitizedError('[PublicCards] index reconcile failed (non-fatal)', error, 'warn')
     })
+    .finally(() => {
+      _reconcileInFlight = false
+      if (_reconcileQueuedWhileInFlight) {
+        _reconcileQueuedWhileInFlight = false
+        triggerIndexReconcileNow()
+      }
+    })
+}
+
+/**
+ * Debounced trigger for the server-side public index reconcile
+ * (functions/index.js's `reconcilePublicCardIndex`, self-only, wired in
+ * tanda 2b but never invoked from the client until tanda 2c). Called by
+ * every writer below on a real change to the public set — coalesced by
+ * RECONCILE_DEBOUNCE_MS, see that constant's doc comment.
+ */
+export function scheduleIndexReconcile(): void {
+  if (_reconcileDebounceTimer) clearTimeout(_reconcileDebounceTimer)
+  _reconcileDebounceTimer = setTimeout(() => {
+    _reconcileDebounceTimer = null
+    triggerIndexReconcileNow()
+  }, RECONCILE_DEBOUNCE_MS)
 }
 
 /**
@@ -290,11 +362,19 @@ export async function batchSyncCardsToPublic(
 }
 
 /**
- * Remove a card from public_cards collection
+ * Remove a card from public_cards collection.
+ *
+ * TASK-247 tanda 2c review round (HIGH-2): this used to be the one writer
+ * in this file that never triggered a reconcile at all — a sold/deleted
+ * card's public_cards doc disappeared but its index entry didn't, leaving
+ * a "ghost card" (this project's own recurring bug family, project memory)
+ * listed and filterable on the public profile until an unrelated add/edit
+ * happened to reconcile the index as a side effect.
  */
 export async function removeCardFromPublic(cardId: string, userId: string): Promise<void> {
   const publicCardId = `${userId}_${cardId}`
   await deleteDoc(doc(db, 'public_cards', publicCardId)).catch(() => { /* doc may not exist */ })
+  scheduleIndexReconcile()
 }
 
 /**
@@ -379,7 +459,14 @@ export async function syncAllUserCards(
     }
     await batch.commit()
   }
-  scheduleIndexReconcile()
+  // Deliberately NOT debounced: syncAllUserCards is only ever called from
+  // the explicit, user-initiated "sync all" action (stores/collection.ts's
+  // syncAllToPublic, which awaits it and only then shows a success toast) —
+  // a one-shot bulk operation, not a rapid-fire UI interaction, so there is
+  // no burst to coalesce. Firing immediately also means the toast's timing
+  // reflects a reconcile that has actually started, not one still waiting
+  // out RECONCILE_DEBOUNCE_MS after the user was told they're done.
+  triggerIndexReconcileNow()
 }
 
 /**

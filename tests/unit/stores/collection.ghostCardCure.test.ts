@@ -28,6 +28,7 @@ vi.mock('@/services/cloudFunctions', () => ({
 }))
 
 vi.mock('@/services/publicCards', () => ({
+  scheduleIndexReconcile: vi.fn(),
   batchSyncCardsToPublic: vi.fn().mockResolvedValue(undefined),
   removeCardFromPublic: vi.fn().mockResolvedValue(undefined),
   syncAllUserCards: vi.fn(),
@@ -94,10 +95,12 @@ vi.mock('@/stores/toast', () => ({
 import { setActivePinia, createPinia } from 'pinia'
 import { useCollectionStore, type IndexCard } from '@/stores/collection'
 import { applyCardIndexDelta, queryCardIndex } from '@/services/cloudFunctions'
+import { scheduleIndexReconcile } from '@/services/publicCards'
 import { makeCard } from '../helpers/fixtures'
 
 const mockQueryCardIndex = vi.mocked(queryCardIndex)
 const mockApplyCardIndexDelta = vi.mocked(applyCardIndexDelta)
+const mockScheduleIndexReconcile = vi.mocked(scheduleIndexReconcile)
 
 /** A Firestore-shaped error carrying an exact `.code`, the only signal the cure may react to. */
 const firestoreError = (code: string, message = `simulated ${code}`): Error & { code: string } => {
@@ -455,6 +458,34 @@ describe('collection store: ghost card cure (TASK-223)', () => {
       expect(result.failed).toBe(0)
       expect(store.cards).toHaveLength(0)
       expect(store.paginatedCards).toHaveLength(0)
+    })
+
+    // TASK-247 tanda 2c review round (HIGH-2): deletePublicCardBatches
+    // (collection.ts) writes public_cards directly via writeBatch,
+    // bypassing every writer in services/publicCards.ts — so a bulk delete
+    // never triggered a reconcile at all before this fix, leaving deleted
+    // sale/trade cards listed as "ghost cards" in the public index.
+    it('HIGH-2 regression lock: deleting sale/trade cards triggers exactly one scheduleIndexReconcile call for the whole batch', async () => {
+      const store = useCollectionStore()
+      const saleCard = makeCard({ id: 'sale-1', status: 'sale' })
+      const tradeCard = makeCard({ id: 'trade-1', status: 'trade' })
+      store.cards = [saleCard, tradeCard] as any
+      store.paginatedCards = [saleCard, tradeCard] as any
+
+      await store.batchDeleteCards(['sale-1', 'trade-1'])
+
+      expect(mockScheduleIndexReconcile).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not trigger a reconcile when none of the deleted cards were sale/trade (nothing left public_cards)', async () => {
+      const store = useCollectionStore()
+      const collectionCard = makeCard({ id: 'coll-1', status: 'collection' })
+      store.cards = [collectionCard] as any
+      store.paginatedCards = [collectionCard] as any
+
+      await store.batchDeleteCards(['coll-1'])
+
+      expect(mockScheduleIndexReconcile).not.toHaveBeenCalled()
     })
   })
 

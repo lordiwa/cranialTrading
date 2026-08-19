@@ -154,10 +154,13 @@ describe('reconcilePublicCardIndex', () => {
     vi.clearAllMocks()
   })
 
-  it('calls httpsCallable with function name "reconcilePublicCardIndex" and a 300s timeout', () => {
+  it('calls httpsCallable with function name "reconcilePublicCardIndex" and a 300s timeout', async () => {
     mockCallable.mockResolvedValue({ data: { strategy: 'noop' } })
 
-    reconcilePublicCardIndex()
+    // LOW-2 (TASK-247 review round): await the call — httpsCallable() runs
+    // synchronously before the assertion either way, but an un-awaited
+    // rejection here would be a dangling promise instead of a test failure.
+    await reconcilePublicCardIndex()
 
     expect(mockHttpsCallable).toHaveBeenCalledWith(
       expect.anything(),

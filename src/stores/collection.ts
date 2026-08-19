@@ -20,6 +20,7 @@ import { type Card, type CardCondition, type CardStatus } from '../types/card'
 import {
     batchSyncCardsToPublic,
     removeCardFromPublic,
+    scheduleIndexReconcile,
     syncAllUserCards,
     syncAllUserPreferences,
     syncCardToPublic,
@@ -133,12 +134,23 @@ const applyCardIndexDelta = async (mutations: CardIndexDeltaMutation[]) => {
     return response
 }
 
+/**
+ * TASK-247 tanda 2c review round (HIGH-2): this writes public_cards
+ * directly via writeBatch, bypassing every writer in services/publicCards.ts —
+ * so it never triggered a reconcile at all, even though a bulk delete
+ * changes the public set exactly like the writers do. Ends with a single
+ * scheduleIndexReconcile() call for the WHOLE batch (not per chunk) —
+ * empty-input case (publicCardIds.length === 0) skips the loop entirely
+ * and correctly triggers nothing, matching batchSyncCardsToPublic's own
+ * early-return-means-no-signal behavior.
+ */
 const deletePublicCardBatches = async (
     publicCardIds: string[],
     userId: string,
     batchSize: number,
     progress: { completed: number; total: number; onProgress?: (percent: number) => void },
 ): Promise<void> => {
+    if (publicCardIds.length === 0) return
     for (let i = 0; i < publicCardIds.length; i += batchSize) {
         const chunk = publicCardIds.slice(i, i + batchSize)
         const ok = await commitBatchWithRetry(() => {
@@ -162,6 +174,7 @@ const deletePublicCardBatches = async (
             await backgroundSafeDelay(200)
         }
     }
+    scheduleIndexReconcile()
 }
 
 // ── Index types ─────────────────────────────────────────────────────────────

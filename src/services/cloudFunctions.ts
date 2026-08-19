@@ -207,6 +207,17 @@ export async function buildCardIndex(): Promise<BuildCardIndexResponse> {
  * where this is called: once per sync operation (not per card), so the
  * fanout is bounded by how often a user's public set changes, not by how
  * many public_cards documents exist.
+ *
+ * TASK-247 tanda 2c review round (LOW-1): `refused`/`message` removed —
+ * they're the shape `reconcilePublicCardIndexForUser` returns internally
+ * on a refusal (functions/lib/publicCardIndexReconciler.js), but
+ * functions/index.js's onCall (:1951-1952) always converts a `refused`
+ * result into a thrown `HttpsError('failed-precondition', ...)` before
+ * returning — this callable's success path can never actually carry those
+ * fields. The only consumer (scheduleIndexReconcile's triggerIndexReconcileNow,
+ * publicCards.ts) discards the return value entirely and handles a refusal
+ * via `.catch()` like any other error, so this type only needs to describe
+ * what a successful response can actually contain.
  */
 export interface ReconcilePublicCardIndexResponse {
   strategy?: string
@@ -214,8 +225,6 @@ export interface ReconcilePublicCardIndexResponse {
   reason?: string
   totalChunks?: number
   count?: number
-  refused?: boolean
-  message?: string
   dryRun?: boolean
 }
 

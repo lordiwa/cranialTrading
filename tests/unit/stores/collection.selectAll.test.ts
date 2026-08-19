@@ -26,6 +26,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('@/services/publicCards', () => ({
+  scheduleIndexReconcile: vi.fn(),
   syncCardToPublic: vi.fn().mockResolvedValue(undefined),
   removeCardFromPublic: vi.fn().mockResolvedValue(undefined),
   batchSyncCardsToPublic: vi.fn().mockResolvedValue(undefined),

@@ -125,6 +125,29 @@ describe('chunkOpsIntoBatches', () => {
   it('returns an empty array for an empty op list', () => {
     expect(chunkOpsIntoBatches([])).toEqual([])
   })
+
+  // Review round 2: an empty batch in the returned array would make a
+  // caller do a no-op db.batch().commit() for nothing — every batch
+  // chunkOpsIntoBatches emits, across every split scenario above, must
+  // have at least one op in it.
+  it('never emits an empty batch, across every op-count and byte-size scenario', () => {
+    const scenarios: Array<{ type: 'set' | 'delete'; chunkId: number; data?: object }[]> = [
+      Array.from({ length: 1001 }, (_, i) => ({ type: 'delete' as const, chunkId: i })),
+      Array.from({ length: 80 }, (_, i) => ({
+        type: 'set' as const,
+        chunkId: i,
+        data: { id: i, entries: Array.from({ length: 391 }, () => ({ n: 'x'.repeat(200) })) },
+      })),
+      [],
+      [{ type: 'delete' as const, chunkId: 0 }],
+    ]
+    for (const ops of scenarios) {
+      const batches = chunkOpsIntoBatches(ops)
+      for (const batch of batches) {
+        expect(batch.length).toBeGreaterThan(0)
+      }
+    }
+  })
 })
 
 describe('planFirestoreBatches', () => {
@@ -218,6 +241,17 @@ describe('chooseApplyStrategy', () => {
     expect(chooseApplyStrategy(plan, diagnosis)).toBe('incremental')
   })
 
+  // Review round 2: an incremental plan can touch a chunk via
+  // chunksToDelete alone (nothing to write, something to delete) — the
+  // original "touchesNothing" check only looked at chunksToWrite.length
+  // and chunksToDelete.length together, but this locks the chunksToDelete
+  // half specifically so a future edit can't quietly drop it from the OR.
+  it('picks incremental when only chunksToDelete has entries and chunksToWrite is empty', () => {
+    const plan = { rebuildRequired: false, chunksToWrite: {}, chunksToDelete: [5], meta: {} }
+    const diagnosis = { hasMalformedChunkId: false }
+    expect(chooseApplyStrategy(plan, diagnosis)).toBe('incremental')
+  })
+
   it('picks noop when the plan touches nothing at all', () => {
     const plan = { rebuildRequired: false, chunksToWrite: {}, chunksToDelete: [], meta: {} }
     const diagnosis = { hasMalformedChunkId: false }
@@ -262,26 +296,60 @@ describe('requiresCollapseConfirmation', () => {
   // TASK-247 tanda 2b safety guard, added after the query bug above was
   // measured live: any executor that can REDUCE a derived copy needs a
   // check for "the source read came back suspiciously, catastrophically
-  // empty" for an account that already has a real index — see this
+  // small" for an account that already has a real index — see this
   // function's own header in publicCardIndexExecutor.js for the full
-  // reasoning.
+  // reasoning, including the review-round-2 correction to a PROPORTIONAL
+  // check (COLLAPSE_MIN_META_COUNT / COLLAPSE_RATIO).
   it('requires confirmation when 0 docs were read but the current index already has entries', () => {
     expect(requiresCollapseConfirmation(0, { count: 6647 })).toBe(true)
+  })
+
+  // Review round 2 (MEDIUM-1) regression lock: the FIRST version of this
+  // guard only checked docsCount === 0, so a truncated read that came back
+  // with exactly 1 document (not 0) sailed through unguarded and would
+  // have collapsed 6,647 entries down to 1.
+  it('requires confirmation when the read comes back far smaller than the existing index, even if not exactly 0', () => {
+    expect(requiresCollapseConfirmation(1, { count: 6647 })).toBe(true)
+    expect(requiresCollapseConfirmation(10, { count: 6647 })).toBe(true)
   })
 
   it('does NOT require confirmation when 0 docs were read and there was never an index (new seller)', () => {
     expect(requiresCollapseConfirmation(0, null)).toBe(false)
     expect(requiresCollapseConfirmation(0, undefined)).toBe(false)
+  })
+
+  // meta.count below COLLAPSE_MIN_META_COUNT (100): a proportional check
+  // doesn't mean much for a small index, so the old exact-zero behavior
+  // still applies to these — a 0-count index has nothing to collapse.
+  it('does NOT require confirmation for a small existing index below the proportional-check threshold', () => {
     expect(requiresCollapseConfirmation(0, { count: 0 })).toBe(false)
+    expect(requiresCollapseConfirmation(0, { count: 5 })).toBe(false)
+    expect(requiresCollapseConfirmation(0, { count: 99 })).toBe(false)
   })
 
-  it('does NOT require confirmation when real cards were actually read', () => {
+  it('does NOT require confirmation when real cards were actually read (well above the 10% floor)', () => {
     expect(requiresCollapseConfirmation(6647, { count: 6647 })).toBe(false)
-    expect(requiresCollapseConfirmation(1, { count: 6647 })).toBe(false)
+    expect(requiresCollapseConfirmation(1000, { count: 6647 })).toBe(false)
   })
 
-  it('does NOT require confirmation when the index count itself is not a usable number', () => {
-    expect(requiresCollapseConfirmation(0, { count: NaN })).toBe(false)
+  it('sits right at the 10% boundary as expected: just under refuses, just at or over does not', () => {
+    // 10% of 1000 is 100 — docsCount < 100 refuses, docsCount >= 100 does not.
+    expect(requiresCollapseConfirmation(99, { count: 1000 })).toBe(true)
+    expect(requiresCollapseConfirmation(100, { count: 1000 })).toBe(false)
+  })
+
+  // Review round 2 (MEDIUM-1) fail-closed correction: an unusable stored
+  // count used to fall through to "no confirmation needed" — the opposite
+  // of safe. Now it requires confirmation whenever the caller can show the
+  // index still has real entries via currentEntryCount.
+  it('fails closed on a non-finite meta.count when the index is known to still have entries', () => {
+    expect(requiresCollapseConfirmation(0, { count: '6647' as unknown as number }, 6647)).toBe(true)
+    expect(requiresCollapseConfirmation(0, { count: Infinity }, 6647)).toBe(true)
+    expect(requiresCollapseConfirmation(0, { count: NaN }, 6647)).toBe(true)
+  })
+
+  it('does NOT require confirmation on a non-finite meta.count when no entries are known to exist', () => {
+    expect(requiresCollapseConfirmation(0, { count: NaN }, 0)).toBe(false)
     expect(requiresCollapseConfirmation(0, {})).toBe(false)
   })
 })

@@ -31,23 +31,19 @@
  * chunk writes plus deletes plus a meta update, so a full rebuild CANNOT be
  * made atomic across all of it. What this module guarantees instead is a
  * WRITE ORDER whose every intermediate state is at least as good as the
- * state before the rebuild started — never worse, never a state with FEWER
- * live cards visible than actually exist:
+ * state before the rebuild started — for a SHRINK or same-size rebuild,
+ * never worse, never a state with FEWER live cards visible than actually
+ * exist. A GROW crosses into a bounded, temporary reduced-visibility
+ * window instead — see the CORRECTION note below the three steps; it is
+ * real, it is not "never fewer", and anything reading this file to design
+ * a query layer on top of the index (tanda 3) needs to know that exactly:
  *
  *   1. chunksToWrite FIRST, in size/op-bounded batches. Until every batch in
  *      this phase commits, the index's meta document still advertises the
  *      OLD totalChunks — a reader (tanda 3's query function) keeps reading
  *      the OLD chunk range, which mid-phase may now contain a MIX of
  *      already-rewritten NEW-scheme chunks and not-yet-touched OLD-scheme
- *      chunks. That mix can show a stale/orphaned card an extra moment, or
- *      (for a misplaced card) briefly show the SAME card twice — never
- *      FEWER cards than the healthy old index had. A crash anywhere in this
- *      phase leaves that same safe, merely-stale-not-wrong state; the next
- *      diagnose/reconcile pass (this is a converging fixed point, not a
- *      one-shot operation — see publicCardIndex.js's header) picks up
- *      exactly where it left off, because chunksToWrite content is
- *      recomputed fresh from public_cards each run, not diffed against what
- *      was already written.
+ *      chunks.
  *   2. meta LAST of the "make it correct" work, as a single-document write
  *      (single documents are Firestore-atomic on their own). The instant
  *      this commits, readers start trusting the NEW totalChunks and NEW
@@ -67,7 +63,38 @@
  * DELETE-first: deleting old chunks before the new ones (or before meta)
  * are safely live would create a window where a reader honoring the OLD
  * meta range finds documents genuinely MISSING at their expected path —
- * the one outcome this ordering exists to rule out.
+ * the one outcome this ordering exists to rule out, for shrink AND grow
+ * alike.
+ *
+ * CORRECTION (review round 2, TASK-247 tanda 2b): the claim above used to
+ * read "never worse, never a state with FEWER live cards than actually
+ * exist" unconditionally. That is TRUE for a shrink or same-bucket-count
+ * rebuild (old chunks 0..N-1 all still get overwritten with new content
+ * that is a superset-during-transition of what's real, nothing outside
+ * that range is touched until step 3), but FALSE for a GROW, which is the
+ * common case in practice — adding cards, not removing them. Example
+ * measured against this ticket's own numbers: 6,647 cards at
+ * chunkTargetSize 400 requests 17 chunks, rounds to 32 (nextPowerOfTwo).
+ * Going from an old totalChunks of 16 to a new 32 means step 1 overwrites
+ * OLD chunks 0..15 with NEW-scheme content, where each now holds roughly
+ * HALF the cards it used to (the other half hashed into the new chunks
+ * 16..31, which the OLD meta — still live throughout step 1 — does not
+ * advertise at all). A reader honoring `meta.totalChunks = 16` during that
+ * window sees roughly HALF the seller's real cards, not a superset, not
+ * "never fewer" — genuinely fewer, for the entire duration of step 1. This
+ * window closes the instant step 2 (the meta write) commits, and a crash
+ * mid-step-1 leaves that reduced-visibility state pinned until the NEXT
+ * reconciliation pass repairs it — and there is currently no pass that
+ * runs automatically (see MEDIUM-3/lease note below on concurrent runs,
+ * and this module's export list — nothing here schedules a retry). The
+ * write order chosen is still the right one: changing chunk-bucket space
+ * cannot be made atomic by any ordering when a hash-based lookup is
+ * involved (a reader has to compute which chunk to open BEFORE it can
+ * check whether that chunk's content is "new" or "old" — there is no order
+ * that hides a grow's transition from every possible reader). What this
+ * order buys is that the window is bounded to step 1's own duration and
+ * self-heals on the very next successful reconciliation, not that it
+ * doesn't exist.
  *
  * hasMalformedChunkId (see publicCardIndex.js's MED-2/diagnosePublicIndex):
  * a chunk document whose `id` field is not a finite number cannot be named
@@ -97,14 +124,18 @@ const BATCH_MAX_BYTES = 9 * 1024 * 1024;
 
 /**
  * Estimates the Firestore payload size of a single write/delete operation.
- * Not exact (Firestore's own wire encoding has overhead a JSON byte count
- * doesn't capture — see BATCH_MAX_BYTES headroom above), but conservative
- * enough to keep every produced batch well clear of the real 10 MiB
- * ceiling: `JSON.stringify` is always <= the encoded Firestore payload
- * would be for the same compact numeric/string-only entry shape
- * (publicCardEntry.js's `n`/`nl`/`s`/etc keys), and a delete carries no
- * payload of its own worth estimating beyond a small constant for the
- * document path.
+ * Not exact, and NOT conservative in the sense of "always an overestimate"
+ * — the opposite (review round 2 correction): `JSON.stringify` UNDERESTIMATES
+ * the real encoded Firestore payload for this compact entry shape.
+ * Firestore's wire format spends a fixed ~8 bytes per number field plus the
+ * field name length + 1, on top of what a plain JSON byte count charges —
+ * for publicCardEntry.js's ~441 B entries (several numeric fields: `q`,
+ * `p`, `f`, `cm`, `ca`, plus short key names) that overhead realistically
+ * lands around 5-8% of the JSON estimate. BATCH_MAX_BYTES already carries
+ * ~10% headroom under Firestore's real 10 MiB ceiling specifically to
+ * absorb this — the code doesn't need to change, only this comment, which
+ * used to describe the underestimate as if it were a safety margin instead
+ * of the thing the margin above exists to cover.
  *
  * @param {{type: 'set'|'delete', data?: object}} op
  * @returns {number} estimated bytes
@@ -254,39 +285,91 @@ function buildPublicCardsQuerySpec(userId) {
   };
 }
 
+// review round 2 (MEDIUM-1): the reviewer's proposed threshold, kept as
+// named constants rather than inlined so the "why 100, why 10%" is one
+// place to read and one place to change. Below COLLAPSE_MIN_META_COUNT the
+// index is small enough that a proportional check doesn't mean much (a
+// 3-card index dropping to 1 is not the same risk shape as a 6,647-card
+// index dropping to 1) — the exact-zero behavior from before this fix
+// still applies to those, unchanged.
+const COLLAPSE_MIN_META_COUNT = 100;
+const COLLAPSE_RATIO = 0.1;
+
 /**
  * requiresCollapseConfirmation — the safety guard the query bug above
  * demonstrates this project needs, not just this one bug fixed. ANY
  * executor that can REDUCE a derived copy needs a check for "the source
- * read came back suspiciously, catastrophically empty" — a read of 0
- * source documents for a seller whose index ALREADY has entries is not
- * evidence the seller emptied their account, it is at least as likely
- * evidence the read itself is broken (wrong collection, wrong filter, a
- * transient permission/connectivity failure that returns empty instead of
- * throwing). Applying a full-rebuild plan built from a false "0 real
- * cards" would silently collapse a healthy N-entry index to nothing — the
- * exact "índice vaciado" failure family (TASK-208/TASK-238) this whole
- * ticket exists to close, reintroduced by the piece meant to repair it.
+ * read came back suspiciously, catastrophically small" — a read that comes
+ * back far smaller than what the index already believes exists is not
+ * strong evidence the seller emptied most of their account, it is at least
+ * as likely evidence the read itself is broken (wrong collection, wrong
+ * filter, a truncated page, a transient permission/connectivity failure
+ * that returns partial results instead of throwing). Applying a
+ * full-rebuild plan built from a falsely small read would silently
+ * collapse a healthy N-entry index toward nothing — the exact "índice
+ * vaciado" failure family (TASK-208/TASK-238) this whole ticket exists to
+ * close, reintroduced by the piece meant to repair it.
+ *
+ * CORRECTION (review round 2, MEDIUM-1): the first version of this guard
+ * only checked `docsCount === 0`, so `requiresCollapseConfirmation(1, {
+ * count: 6647 })` returned `false` — a truncated read that comes back with
+ * exactly 1 document (instead of 0) sailed straight through and would
+ * collapse 6,647 entries down to 1 with no guard at all. The asymmetry the
+ * reviewer argued for is why this is now a PROPORTIONAL check rather than
+ * an exact-zero one: if this guard is ever wrong in the "refuses when it
+ * didn't need to" direction, the cost is a stale-but-still-visible index
+ * an operator unblocks with an explicit flag; if it's wrong in the
+ * "doesn't refuse when it should have" direction, the cost is the silent
+ * índice-vaciado failure this ticket exists to close. Those two failure
+ * costs are not symmetric, so the guard is deliberately biased toward
+ * refusing.
+ *
+ * FAIL-CLOSED on an unusable `currentMeta.count` (CORRECTION, same round):
+ * the first version used `Number.isFinite(currentMeta.count)` to decide
+ * whether to even consider confirmation — a non-finite count (a stored
+ * string, `Infinity`, `NaN`, from a corrupted meta write) made the check
+ * fall straight through to "no confirmation needed", the opposite of safe.
+ * Fixed: an unusable count REQUIRES confirmation whenever the caller can
+ * show the index still has real entries (`currentEntryCount`, the actual
+ * summed `entries.length` across the chunk documents the caller just
+ * read — always available to the reconciler, since it already reads every
+ * chunk to diagnose). Only when the count is unusable AND no entries are
+ * known to exist does this fall through to "nothing to protect".
  *
  * This does not (and cannot, from pure data alone) distinguish a real
- * "the seller removed every public card" from a broken read — both look
- * identical from here. It exists to force that distinction to be made
- * EXPLICITLY (a human confirming, or an operator passing an explicit
+ * "the seller removed most/all of their public cards" from a broken read —
+ * both look identical from here. It exists to force that distinction to be
+ * made EXPLICITLY (a human confirming, or an operator passing an explicit
  * override flag) rather than happening silently as the default path of an
  * otherwise-ordinary reconciliation run.
  *
  * @param {number} docsCount public_cards documents actually read for this seller
  * @param {{count?: number}|null|undefined} currentMeta the index's current meta document
+ * @param {number} [currentEntryCount] the actual number of entries currently
+ *   found across the index's chunk documents (summed by the caller from the
+ *   same read used to build the diagnosis) — only consulted when
+ *   `currentMeta.count` itself is not a usable finite number.
  * @returns {boolean} true when applying a rebuild plan as-is would collapse
- *   a non-empty index to empty and must be blocked pending explicit confirmation
+ *   the index by more than COLLAPSE_RATIO and must be blocked pending
+ *   explicit confirmation
  */
-function requiresCollapseConfirmation(docsCount, currentMeta) {
-  return docsCount === 0 && !!currentMeta && Number.isFinite(currentMeta.count) && currentMeta.count > 0;
+function requiresCollapseConfirmation(docsCount, currentMeta, currentEntryCount) {
+  if (!currentMeta) return false; // no existing index at all — nothing to collapse
+  const metaCount = currentMeta.count;
+  if (!Number.isFinite(metaCount)) {
+    // Fail-closed: an unusable stored count is treated as "unknown, could
+    // be large" whenever the caller can show the index still has entries.
+    return Number.isFinite(currentEntryCount) && currentEntryCount > 0;
+  }
+  if (metaCount < COLLAPSE_MIN_META_COUNT) return false;
+  return docsCount < metaCount * COLLAPSE_RATIO;
 }
 
 module.exports = {
   BATCH_MAX_OPS,
   BATCH_MAX_BYTES,
+  COLLAPSE_MIN_META_COUNT,
+  COLLAPSE_RATIO,
   estimateOpBytes,
   chunkOpsIntoBatches,
   planFirestoreBatches,

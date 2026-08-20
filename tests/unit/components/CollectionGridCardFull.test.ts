@@ -1,18 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { makeCard } from '../helpers/fixtures'
-
-// Use vi.hoisted for refs that vi.mock factories can reference at hoist time.
-// We cannot use Vue's ref() inside vi.hoisted (import not resolved yet),
-// so we create plain reactive-like objects and replace them with real refs below.
-const swipeMocks = vi.hoisted(() => {
-  return {
-    isSwiping: { value: false },
-    swipeOffset: { value: 0 },
-    useSwipeFn: vi.fn(),
-  }
-})
 
 // Mock Firebase dependencies
 vi.mock('@/services/firebase', () => ({
@@ -43,11 +34,6 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(),
   onAuthStateChanged: vi.fn(),
-}))
-
-// Mock useSwipe — returns the reactive refs we control from tests
-vi.mock('../../../src/composables/useSwipe', () => ({
-  useSwipe: swipeMocks.useSwipeFn,
 }))
 
 // Mock composables that need store/Firebase access
@@ -87,21 +73,8 @@ vi.mock('../../../src/composables/useContextMenu', () => ({
 import CollectionGridCardFull from '../../../src/components/collection/CollectionGridCardFull.vue'
 
 describe('CollectionGridCardFull', () => {
-  // Real Vue refs used to control swipe state from test assertions
-  let isSwipingRef: ReturnType<typeof ref<boolean>>
-  let swipeOffsetRef: ReturnType<typeof ref<number>>
-
   beforeEach(() => {
     setActivePinia(createPinia())
-
-    // Create real Vue refs and wire the mock to return them
-    isSwipingRef = ref(false)
-    swipeOffsetRef = ref(0)
-    swipeMocks.useSwipeFn.mockImplementation(() => ({
-      isSwiping: isSwipingRef,
-      swipeOffset: swipeOffsetRef,
-    }))
-    swipeMocks.useSwipeFn.mockClear()
   })
 
   it('renders card name', () => {
@@ -116,62 +89,25 @@ describe('CollectionGridCardFull', () => {
     expect(wrapper.text()).toContain('Magic 2021')
   })
 
-  it('calls useSwipe with threshold: 80', () => {
-    const card = makeCard()
-    mount(CollectionGridCardFull, { props: { card } })
-    expect(swipeMocks.useSwipeFn).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ threshold: 80 })
-    )
-  })
-
   it('does not have inline ontouchstart/ontouchmove/ontouchend attributes', () => {
     const card = makeCard()
     const wrapper = mount(CollectionGridCardFull, { props: { card } })
-    // useSwipe attaches via addEventListener in onMounted — no template @touch* bindings
     const html = wrapper.html()
     expect(html).not.toContain('ontouchstart')
     expect(html).not.toContain('ontouchmove')
     expect(html).not.toContain('ontouchend')
   })
 
-  it('applies swipeStyle transform when isSwiping with positive offset', async () => {
-    const card = makeCard()
-    const wrapper = mount(CollectionGridCardFull, { props: { card } })
-
-    isSwipingRef.value = true
-    swipeOffsetRef.value = 50
-    await wrapper.vm.$nextTick()
-
-    const imageContainer = wrapper.find('.aspect-\\[3\\/4\\]')
-    const style = imageContainer.attributes('style') ?? ''
-    expect(style).toContain('translateX(50px)')
-  })
-
-  it('clamps swipeOffset to +120px maximum', async () => {
-    const card = makeCard()
-    const wrapper = mount(CollectionGridCardFull, { props: { card } })
-
-    isSwipingRef.value = true
-    swipeOffsetRef.value = 200
-    await wrapper.vm.$nextTick()
-
-    const imageContainer = wrapper.find('.aspect-\\[3\\/4\\]')
-    const style = imageContainer.attributes('style') ?? ''
-    expect(style).toContain('translateX(120px)')
-  })
-
-  it('clamps swipeOffset to -120px minimum', async () => {
-    const card = makeCard()
-    const wrapper = mount(CollectionGridCardFull, { props: { card } })
-
-    isSwipingRef.value = true
-    swipeOffsetRef.value = -200
-    await wrapper.vm.$nextTick()
-
-    const imageContainer = wrapper.find('.aspect-\\[3\\/4\\]')
-    const style = imageContainer.attributes('style') ?? ''
-    expect(style).toContain('translateX(-120px)')
+  // TASK-251: swipe (useSwipe) was removed project-wide as unused UI. This
+  // reads the component's own source so the regression fires the moment
+  // useSwipe is reintroduced as a dependency — a runtime/DOM assertion can't
+  // see an import that is never invoked.
+  it('does not import useSwipe (TASK-251 regression lock)', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src/components/collection/CollectionGridCardFull.vue'),
+      'utf-8'
+    )
+    expect(source).not.toMatch(/useSwipe/)
   })
 
   it('shows delete overlay when isBeingDeleted=true', () => {

@@ -4,7 +4,6 @@ import { useCardAllocation } from '../../composables/useCardAllocation'
 import { useCardPrices } from '../../composables/useCardPrices'
 import { useContextMenu } from '../../composables/useContextMenu'
 import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePriceHistory'
-import { useSwipe } from '../../composables/useSwipe'
 import { useCollectionStore } from '../../stores/collection'
 import { useMarketStore } from '../../stores/market'
 import { useToastStore } from '../../stores/toast'
@@ -53,15 +52,12 @@ const marketStore = useMarketStore()
 const toastStore = useToastStore()
 const togglingPublic = ref(false)
 
-// Ref for swipe (useSwipe attaches listeners via addEventListener in onMounted)
+// Ref used to observe the card scrolling into viewport (lazy CK price fetch)
 const cardRef = ref<HTMLElement | null>(null)
 
 interface ParsedCardImage {
   card_faces?: { image_uris?: { normal?: string; small?: string } }[]
 }
-
-// Status cycle order
-const STATUS_ORDER: CardStatus[] = ['collection', 'trade', 'sale', 'wishlist']
 
 const setStatus = async (status: CardStatus) => {
   if (props.readonly || props.isBeingDeleted || status === props.card.status) return
@@ -77,47 +73,6 @@ const setStatus = async (status: CardStatus) => {
     toastStore.show(t('cards.grid.statusError'), 'error')
   }
 }
-
-const cycleStatus = async () => {
-  if (props.readonly || props.isBeingDeleted) return
-  const currentIndex = STATUS_ORDER.indexOf(props.card.status)
-  const nextIndex = (currentIndex + 1) % STATUS_ORDER.length
-  // eslint-disable-next-line security/detect-object-injection
-  const nextStatus = STATUS_ORDER[nextIndex] ?? 'collection'
-  try {
-    await collectionStore.updateCard(props.card.id, { status: nextStatus })
-    toastStore.show(t('cards.grid.statusChanged', { status: nextStatus ?? '' }), 'success')
-  } catch {
-    toastStore.show(t('cards.grid.statusError'), 'error')
-  }
-}
-
-// Wire useSwipe composable (ARCH-06) — no inline touch handlers needed
-const { isSwiping, swipeOffset } = useSwipe(cardRef, {
-  threshold: 80,
-  onSwipeLeft: () => {
-    if (props.readonly || props.isBeingDeleted) return
-    emit('delete', props.card)
-  },
-  onSwipeRight: () => { void cycleStatus() },
-})
-
-// Clamped offset for visual indicator (±120px)
-const clampedOffset = computed(() => Math.max(-120, Math.min(120, swipeOffset.value)))
-
-const swipeStyle = computed(() => {
-  if (!isSwiping.value || clampedOffset.value === 0) return {}
-  return {
-    transform: `translateX(${clampedOffset.value}px)`,
-    transition: 'none',
-  }
-})
-
-const swipeIndicator = computed(() => {
-  if (clampedOffset.value < -40) return 'delete'
-  if (clampedOffset.value > 40) return 'status'
-  return null
-})
 
 const togglePublic = async () => {
   if (togglingPublic.value || props.readonly || props.isBeingDeleted) return
@@ -141,7 +96,7 @@ const handleCardActivate = () => {
     emit('toggleSelect', props.card.id)
     return
   }
-  if (props.isBeingDeleted || isSwiping.value) return
+  if (props.isBeingDeleted) return
   emit('cardClick', props.card)
 }
 
@@ -394,28 +349,10 @@ const handleContextMenuSelect = async (itemId: string) => {
       :class="isBeingDeleted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
       @contextmenu.prevent="handleContextMenu"
   >
-    <!-- Swipe background indicators (mobile only) -->
-    <div v-if="isSwiping && !readonly" class="absolute inset-0 md:hidden flex">
-      <!-- Left side (delete) -->
-      <div
-          class="flex-1 flex items-center justify-start pl-4 rounded-none transition-colors"
-          :class="swipeIndicator === 'delete' ? 'bg-rust/30' : 'bg-transparent'"
-      >
-        <SvgIcon v-if="clampedOffset < -20" name="trash" size="medium" class="text-rust" />
-      </div>
-      <!-- Right side (status change) -->
-      <div
-          class="flex-1 flex items-center justify-end pr-4 rounded-none transition-colors"
-          :class="swipeIndicator === 'status' ? 'bg-neon/20' : 'bg-transparent'"
-      >
-        <SvgIcon v-if="clampedOffset > 20" name="flip" size="medium" class="text-neon" />
-      </div>
-    </div>
-
     <!-- Row 1: Card Image -->
     <!-- Status-toggle bar removed: ~5 <svg><use> icons per card across ~10 virtualized
          cards corrupted low-end Mali GPUs (cranialBugColl / Tecno Spark 30C, Mali-G52).
-         Status changes + public toggle remain available via the context menu and swipe-right. -->
+         Status changes + public toggle remain available via the context menu. -->
     <!-- TASK-175: bg-primary (not bg-secondary) — same color as the loading
          overlay below (`v-if="!imageLoaded"` / the !hasImage branch), so
          there is no visual difference between "container background showing
@@ -430,11 +367,7 @@ const handleContextMenuSelect = async (itemId: string) => {
           !selectionMode && isBeingDeleted ? 'border-rust animate-pulse' : '',
           !selectionMode && !isBeingDeleted ? (isCardAllocated ? 'border-neon-30' : 'border-silver-30 group-hover:border-neon') : '',
           selectionMode && !isSelected ? 'border-silver-30' : '',
-          // v2 redesign — mobile swipe-affordance hint (DESIGN-DIRECTION.md §8.7): permanent
-          // inset border (rust=delete left, neon=status-change right), independent of live swipe state.
-          !readonly && !isBeingDeleted ? 'md:!shadow-none shadow-[inset_3px_0_0_#8B2E1F,inset_-3px_0_0_#5AC168]' : '',
         ]"
-        :style="swipeStyle"
         :tabindex="isBeingDeleted ? -1 : 0"
         role="button"
         :aria-label="t('cards.grid.cardActivateAria', { name: card.name, status: card.status, qty: card.quantity })"

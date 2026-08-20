@@ -275,7 +275,7 @@ src/
 
 Tab navigation between the three views uses `<RouterLink>` — never internal state toggles. Legacy `/collection?deck=X` / `?binder=X` / `?from=decks` query params are still redirected in `CollectionView.initView()` for backward compatibility.
 
-`CollectionGridCard.vue` is a routing shell that delegates to `CollectionGridCardCompact.vue` (grid thumbnail) or `CollectionGridCardFull.vue` (list row with swipe). Swipe interactions use the `useSwipe` composable — no inline `@touchstart` / `@touchmove` / `@touchend` handlers.
+`CollectionGridCard.vue` is a routing shell that delegates to `CollectionGridCardCompact.vue` (grid thumbnail) or `CollectionGridCardFull.vue` (list row). Swipe-to-delete/status-change was removed project-wide (TASK-251, unused and inconsistent on mobile) — status changes go through the context menu (`setStatus`) and deletion through the grid's ELIMINAR button; there is no `useSwipe` composable anymore.
 
 ## Core Data Types
 
@@ -348,7 +348,7 @@ Auto-dismiss after 4 seconds.
 - `DeckView.vue` ↔ `DeckEditorGrid.vue` ↔ `stores/decks.ts` (deck editor + allocations)
 - `BinderView.vue` ↔ `DeckEditorGrid.vue` (binder-mode) ↔ `stores/binders.ts` (binder editor)
 - `DeckView.vue` ↔ `BinderView.vue` ↔ `composables/useCollectionImport.ts` (shared import flow)
-- `CollectionGridCard.vue` ↔ `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (shell + variants — swipe lives in Full via `useSwipe`)
+- `CollectionGridCard.vue` ↔ `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (shell + variants)
 - `CollectionView.vue` ↔ `composables/useCollectionFilterUrl.ts` ↔ `composables/useCollectionPagination.ts` (URL-synced filters + server pagination)
 - `AddCardModal.vue` ↔ `EditCardModal.vue`
 - `SearchView.vue` ↔ Scryfall service + `FilterPanel.vue` + AddCardModal (search results page)
@@ -429,7 +429,7 @@ Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json
   - SavedMatchesView (blocked-users inline — consolidation tech debt noted in Phase 02-C SUMMARY)
   - en.json ↔ es.json ↔ pt.json (always all 3)
   - AddCardModal ↔ EditCardModal (shared behavior)
-  - `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (same Card prop shape, different presentation — swipe only in Full)
+  - `CollectionGridCardCompact.vue` ↔ `CollectionGridCardFull.vue` (same Card prop shape, different presentation)
 
 ### Rule 7: Build + Tests = Definition of "Done"
 

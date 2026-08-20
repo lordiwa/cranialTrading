@@ -295,8 +295,9 @@ export class CollectionPage {
    * The "ELIMINAR"/"DELETE" button rendered directly on a grid card
    * (CollectionGridCardFull.vue "Row 8") — NOT inside the detail modal.
    * CardDetailModal.vue's v2 redesign has no delete affordance of its own;
-   * the grid button, swipe-left, and the card's context menu are the only
-   * paths to collectionStore.deleteCard(). Confirm/cancel go through the
+   * the grid button and the card's context menu are the only paths to
+   * collectionStore.deleteCard() (TASK-251 removed the swipe-left gesture,
+   * which used to be a third). Confirm/cancel go through the
    * separate z-[60] ConfirmModal (commonPage.confirmAction/cancelAction),
    * not the z-50 detail modal.
    */

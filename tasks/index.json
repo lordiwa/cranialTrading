@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T19:04:57.057Z",
+  "generated_at": "2026-08-20T19:33:47.389Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1396,7 +1396,7 @@
     {
       "key": "TASK-253",
       "title": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)",
-      "status": "in_review",
+      "status": "done",
       "priority": "medium"
     }
   ]

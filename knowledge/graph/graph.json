@@ -132,6 +132,12 @@
       "type": "task",
       "ref": "tasks/TASK-251.json",
       "label": "La carta se arrastra en el perfil publico ajeno aunque el swipe no haga nada: promesa falsa en movil"
+    },
+    {
+      "id": "task-253",
+      "type": "task",
+      "ref": "tasks/TASK-253.json",
+      "label": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)"
     }
   ],
   "edges": []

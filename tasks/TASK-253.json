@@ -11,7 +11,7 @@
     "AC6 - Eliminacion atomica: grep de e2e/ y de los page objects buscando el handle y el gesto, y todo lo que aparezca se limpia en el MISMO commit. Si no aparece nada, declararlo explicitamente en el hand-off.",
     "AC7 - Gate del proyecto verde antes del hand-off: npm run test:unit completo y npx vite build."
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "medium",
   "labels": [
     "ui",
@@ -20,17 +20,30 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "d93aa09",
+    "34d70af"
+  ],
   "linked_prs": [],
   "comments": [
     {
       "author": "reviewer",
       "at": "2026-08-20T19:04:57.057Z",
       "body": "REVISION FULL de d93aa09. APROBADO. 0 HIGH, 0 MEDIUM, 1 LOW.\n\nProfundidad FULL elegida por el orquestador: por conteo de lineas (67) daria light, pero BottomSheet.vue fue tocado por tickets de tier tdd y su ticket hermano TASK-251, la misma clase de cambio, se reviso FULL. Ante la duda, FULL.\n\nTODO LO CRITICO VERIFICADO POR EJECUCION, NO POR LECTURA.\n\nAC5, el candado MUERDE. El reviewer reprodujo la mutacion el mismo, sin creerle al developer: git checkout d93aa09^ -- src/components/ui/BottomSheet.vue reintroduce los tres handlers y sus bindings, y vitest da 1 failed / 9 passed, siendo el que falla exactamente el candado. Restaurado el commit, 10/10 verdes y el working tree limpio. Ademas el candado afirma expect(handle).not.toBeNull() ANTES de disparar el gesto, asi que no puede pasar vacuamente si el data-testid desaparece. No es un sensor vacuo.\n\nAC2, vias de cierre intactas, medido por tests que despachan eventos DOM reales: overlay click cierra, closeOnClickOutside=false no cierra, Escape cierra, boton X cierra. El diff no toca closeSheet, handleOverlayClick ni handleEscape. Los unicos consumidores, BinderView.vue y DeckView.vue, usan solo props y @close.\n\nAC3 y AC6, eliminacion atomica medida por grep: cero hits de SWIPE_CLOSE_THRESHOLD_PX, touchStartY, touchCurrentY, onHandleTouch* y cursor-grab en src/, tests/ y e2e/. El unico hit de swipe en e2e/ es un comentario en e2e/pages/collection.page.ts:299 sobre el swipe-left de TASK-251, no relacionado. La barrita decorativa sigue en su lugar.\n\nAC7, gate corrido por el reviewer: npm run test:unit 163 archivos y 2207 tests verdes, npx vite build exitoso.\n\nLOW-1, no bloquea: el AC1 pide verificacion por comportamiento y la que hay es con TouchEvent sintetico en jsdom, no en navegador ni dispositivo real. El reviewer lo considera suficiente porque la mutacion demuestra que esa misma secuencia sintetica SI disparaba los handlers viejos, o sea que el sensor es valido. Queda pendiente el toque en dev con dispositivo tactil para cumplir el estandar de verificacion en navegador del proyecto.\n\nConfianza del reviewer 9/10. Lo unico no medido es el comportamiento tactil en navegador real."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-20T19:33:34.163Z",
+      "body": "LOW-1 DE LA REVISION CERRADO POR MEDICION EN NAVEGADOR, sobre el bundle YA DESPLEGADO en dev (v1.59.2), no en jsdom.\n\nMetodo: se abrio el BottomSheet real de /decks (la hoja de Discovery) disparando su trigger, y se despacharon TouchEvent sinteticos sobre el handle real: touchstart en y=400, dos touchmove hasta y=650, touchend, o sea un arrastre hacia abajo de 250 px, muy por encima de cualquier umbral razonable.\n\nRESULTADOS, con dos controles porque un verde sin control no vale nada:\n- Eventos tactiles que llegaron al handle: 4. Control de que el gesto SI llega al elemento; sin esto, un \"no se cerro\" solo probaria que los eventos se perdieron.\n- Tras el swipe: la hoja NO entra en transicion de salida.\n- Control positivo, el boton X: la hoja SI entra en transicion de salida. Sin este brazo, el \"no se cerro\" del swipe no distinguiria entre el gesto removido y una medicion incapaz de detectar cualquier cierre.\n- Ademas, medido en el DOM desplegado: la clase cursor-grab NO esta presente en el handle, y la barrita decorativa si.\n\nFALSA ALARMA QUE VALE LA PENA DEJAR ESCRITA: el primer intento de control dio ROJO, la X parecia no cerrar. El error era del metodo, no del codigo. Se estaba usando \"el elemento sigue en el DOM\" como criterio de cierre, y en una pestana manejada por CDP sin foco la transicion de salida de Vue queda colgada, con las clases bottom-sheet-leave-from y bottom-sheet-leave-active puestas, y el elemento nunca se desmonta. Es el mismo patron ya registrado en la memoria del proyecto sobre rAF muriendo en pestana de fondo. El criterio correcto es mirar las clases de transicion, no la presencia del nodo. Cualquier verificacion futura de cierre o desmontaje por navegador automatizado en este proyecto tiene que usar el mismo criterio."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-20T19:33:47.389Z",
+      "body": "CERRADO. Los 7 AC cumplidos y verificados.\n\nEntregado en d93aa09: se van los tres handlers tactiles, los refs touchStartY y touchCurrentY, la constante SWIPE_CLOSE_THRESHOLD_PX, los tres bindings @touch*.passive y la clase cursor-grab. La barrita decorativa se mantiene, por decision de alcance del orquestador declarada en el ticket. Con esto el proyecto no tiene ni un solo gesto de swipe: TASK-251 saco el de las cartas, este saca el ultimo.\n\nProfundidad de revision: FULL. Entradas de la rubrica: 67 lineas cambiadas, que por conteo solo darian light, pero BottomSheet.vue fue tocado por tickets de tier tdd y el ticket hermano TASK-251 se reviso FULL. Ante la duda, FULL. Veredicto: 0 HIGH, 0 MEDIUM, 1 LOW, y el LOW quedo cerrado despues por medicion en navegador.\n\nEl candado del AC5 se probo POR MUTACION DOS VECES Y POR SEPARADO: primero el developer, y despues el reviewer reproduciendola el mismo sin creerle, con git checkout del commit anterior. Rojo con los handlers vivos, verde sin ellos. Ademas el candado afirma que el handle existe antes de disparar el gesto, asi que no puede pasar vacuamente si el data-testid desaparece.\n\nGate corrido tres veces por tres actores distintos: developer, reviewer y orquestador. 163 archivos y 2207 tests verdes, vite build OK, y la suite E2E completa 125 passed / 11 skipped / 0 failed en 12,7 min antes del push a develop.\n\nDesplegado en la version 1.59.2. Dev verificado por comportamiento sobre el bundle desplegado, con control de que los eventos llegan y control positivo de que la X si cierra."
     }
   ],
   "created_at": "2026-08-20T18:51:51.162Z",
-  "updated_at": "2026-08-20T19:04:57.057Z",
+  "updated_at": "2026-08-20T19:33:47.389Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

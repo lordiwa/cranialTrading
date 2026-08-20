@@ -1590,6 +1590,13 @@
     "messages": {
       "loadError": "Error loading profile",
       "loadCardsError": "Error loading profile cards"
+    },
+    "index": {
+      "updating": "This seller catalogue is being rebuilt right now, so the count below may be incomplete.",
+      "unknownTotal": "updating",
+      "colorUnknownExcluded": "{count} cards are hidden by this colour filter because we have no colour data for them. They are still listed with no filter, and still findable by name.",
+      "error": "We could not load this collection. This is a problem on our side, not an empty profile.",
+      "retry": "TRY AGAIN"
     }
   },
   "discovery": {

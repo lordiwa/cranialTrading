@@ -5,8 +5,6 @@ import { useHead, useSeoMeta } from '@unhead/vue';
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firestore';
 import { resolveUsernameToUid } from '../services/userLookup';
-import { getCardsByIds } from '../services/scryfallCache';
-import { buildEnrichmentPatch, needsEnrichment } from '../utils/cardEnrichment';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -14,8 +12,8 @@ import { useExchangeCartStore } from '../stores/exchangeCart';
 import { useBuyRequestsStore } from '../stores/buyRequests';
 import { useI18n } from '../composables/useI18n';
 import { buildLoginUrl, buildRegisterUrl } from '../composables/useReturnUrl';
-import { colorOrder, manaOrder, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter';
-import { usePublicProfileCards } from '../composables/usePublicProfileCards';
+import { colorOrder, getCardColorCategory, getCardManaCategory, getCardNameCategory, getCardTypeCategory, manaOrder, translateCategory as translateCategoryLabel, typeOrder } from '../composables/useCardFilter';
+import { PUBLIC_COLOR_LETTERS, PUBLIC_MANA_VALUES, PUBLIC_RARITIES, PUBLIC_TYPES, usePublicProfileIndex } from '../composables/usePublicProfileIndex';
 import { shareCart } from '../utils/exchangeCartShare';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
@@ -60,32 +58,39 @@ const canShowInterest = computed(() => {
   return !!(authStore.user && !isOwnProfile.value);
 });
 
-// TASK-136 (round 2, M1/M4): server-side-paginated /public_cards state, with
-// a cross-profile generation guard (composables/usePublicProfileCards.ts) so
-// a loadMore()/status-count response in flight for a previous profile can
-// never append cards or overwrite the header stats after the visitor has
-// already navigated to a different profile. saleCount/tradeCount come from a
-// decoupled Firestore aggregate count query — exact totals, not just
-// whatever page(s) have been scrolled into view (design→app v2 F8,
+// TASK-247 tanda 4: the whole filter/search/pagination state now comes from
+// the PUBLIC CARD INDEX through a Cloud Function, not from whatever documents
+// are in memory. Every chip, the text search and the result count are resolved
+// over the seller's WHOLE public collection — the fix this ticket exists for.
+// The cross-profile generation guard TASK-136 introduced lives on inside the
+// composable. saleCount/tradeCount still come from a decoupled Firestore
+// aggregate count query, so the header chips stay unconditional totals rather
+// than following whatever filter is active (design→app v2 F8,
 // cranial-design/prototype/22-user-profile-*.html for the chip UI).
 const {
   cards,
+  total: filteredTotal,
   loadingMore: loadingMorePublicCards,
   searching,
+  error: cardsError,
+  partial: indexPartial,
+  missing: colorUnknownExcluded,
   saleCount,
   tradeCount,
+  activeFilterCount,
+  filterQuery,
+  selectedColors,
+  selectedRarities,
+  selectedTypes,
+  selectedManaValues,
+  sort,
+  advancedFilters,
   loadFirstPage: loadFirstPublicCardsPage,
-  loadMore: loadMorePublicCardsRaw,
-  setSearchTerm: setPublicCardsSearchTerm,
-} = usePublicProfileCards({
+  loadMore: loadMorePublicCards,
+  resetFilters,
+} = usePublicProfileIndex(userId, {
   onError: () => toastStore.show(t('profile.messages.loadCardsError'), 'error'),
-  onPageLoaded: () => void enrichPublicCardsInMemory(),
 });
-
-const loadMorePublicCards = () => {
-  if (!userId.value) return;
-  void loadMorePublicCardsRaw(userId.value);
-};
 
 // Cart mode: show cart buttons for anonymous users (not logged in, not own profile)
 const showCartMode = computed(() => !authStore.user);
@@ -169,16 +174,11 @@ const loadProfile = async () => {
     }
 
     if (userId.value) {
-      await loadFirstPublicCardsPage(userId.value);
-      // TASK-138 AC1: a search term left over from a previously viewed
-      // profile (filterQuery persists across route changes — same
-      // component instance) must be re-applied to the NEW profile's
-      // userId, since setSearchTerm is scoped per-call, not reactive to
-      // userId on its own. loadFirstPublicCardsPage above already reset
-      // to page 1; this re-triggers the debounced server search on top.
-      if (filterQuery.value.trim()) {
-        setPublicCardsSearchTerm(userId.value, filterQuery.value);
-      }
+      // TASK-138 AC1 no longer needs a separate re-apply step: the composable
+      // reads userId (a ref) and the current filter state on every query, so a
+      // search term left over from a previously viewed profile is carried into
+      // the new profile's first query by construction.
+      await loadFirstPublicCardsPage();
     }
   } catch (err) {
     console.error('Error loading profile:', err);
@@ -196,39 +196,18 @@ const loadProfile = async () => {
   }
 };
 
-// SCRUM-67: in-memory, read-only enrichment of the public cards so advanced
-// filters have the metadata they depend on. Batches the Scryfall fetch via the
-// same cache-backed service the collection store uses. Does NOT persist.
-const enrichPublicCardsInMemory = async () => {
-  const toEnrich = cards.value.filter(needsEnrichment);
-  if (toEnrich.length === 0) return;
-
-  const identifiers = toEnrich.map(c => ({ id: c.scryfallId }));
-  let scryfallCards;
-  try {
-    scryfallCards = await getCardsByIds(identifiers);
-  } catch (err) {
-    console.warn('[SCRUM-67] Public-card enrichment fetch failed:', err);
-    return;
-  }
-  if (scryfallCards.length === 0) return;
-
-  const scryfallMap = new Map(scryfallCards.map(sc => [sc.id, sc]));
-
-  // Build a fresh array so useCardFilter (which watches `cards`) recomputes.
-  let patched = false;
-  const next = cards.value.map(card => {
-    if (!needsEnrichment(card)) return card;
-    const sc = scryfallMap.get(card.scryfallId);
-    if (!sc) return card;
-    const patch = buildEnrichmentPatch(card, sc as unknown as Record<string, unknown>);
-    if (Object.keys(patch).length === 0) return card;
-    patched = true;
-    return { ...card, ...patch };
-  });
-
-  if (patched) cards.value = next;
+/** Re-runs the index query after a failure, without reloading the profile. */
+const retryLoad = () => {
+  void loadFirstPublicCardsPage();
 };
+
+// enrichPublicCardsInMemory used to live here (SCRUM-67). It fetched Scryfall
+// card-by-card for whatever page was loaded so the advanced filters had colour
+// and type data to work with. It is DELETED, not moved: the index carries `co`,
+// `pm`, `t`, `cm`, `r`, `kw`, `lg`, `pw`, `to` and `fa` already, resolved
+// server-side from scryfall_cache, so an ANONYMOUS visitor — who cannot read
+// scryfall_cache at all under firestore.rules — now gets the same answers a
+// signed-in one does. Nothing else called it.
 
 const handleContact = (id: string, username: string) => {
   selectedUserId.value = id;
@@ -240,138 +219,151 @@ const handleCloseChat = () => {
   showChat.value = false;
 };
 
-// ========== FILTER COMPOSABLE ==========
-const {
-  filterQuery,
-  sortBy,
-  groupBy,
-  selectedColors,
-  exactColorMode,
-  selectedManaValues,
-  selectedTypes,
-  selectedRarities,
-  filteredCards,
-  groupedCards,
-  translateCategory,
-  // Advanced filters
-  advPriceMin,
-  advPriceMax,
-  advFoilFilter,
-  advSelectedSets,
-  advSelectedKeywords,
-  advSelectedFormats,
-  advSelectedCreatureTypes,
-  advFullArtOnly,
-  advPowerMin,
-  advPowerMax,
-  advToughnessMin,
-  advToughnessMax,
-  advancedFilterCount,
-  collectionSets,
-  collectionCreatureTypes,
-  resetAdvancedFilters,
-} = useCardFilter(cards);
+// ========== FILTERS ==========
+//
+// Every filter below is a SERVER query, not an in-memory pass over `cards`.
+// The composable owns the state and re-queries whenever it changes.
+//
+// COLOUR VOCABULARY (Rafael, 2026-08-19 — settled): OR-inclusive letters. A
+// B/G card answers to Black AND to Green, there is no 'Multicolor' chip, and
+// a land counts by what it PRODUCES (a Swamp is black). `useCardFilter`'s
+// category vocabulary is deliberately NOT used for filtering here; it is still
+// the vocabulary of the owner's own collection views, which this ticket does
+// not touch.
+const sortBy = ref<'recent' | 'name' | 'price'>('name');
+const groupBy = ref<'none' | 'type' | 'mana' | 'color' | 'name'>('none');
 
-// TASK-138 AC1: wire the filter bar's text search to the server-side prefix
-// query (usePublicProfileCards.setSearchTerm) instead of only filtering
-// whatever page(s) had already loaded — a term ≥2 chars replaces `cards`
-// with the matching results from the WHOLE profile (debounced, gen-token
-// guarded inside the composable). useCardFilter's own local text filter
-// (filteredCards) still runs on top of the result but is a no-op there,
-// since every server-matched card's name already contains the term. Below
-// 2 chars, the composable falls back to normal pagination on its own.
-// Advanced/chip filters and groupBy stay local to whatever `cards` currently
-// holds (search results OR paginated cards) — they never reach past what's
-// loaded, a documented limit of this approach. LOW (review addendum): the
-// server search is a cardNameLower PREFIX match only — a card that used to
-// surface via useCardFilter's local substring-on-name-or-edition check
-// (mid-word match, or a match on `edition`) will not be found once search
-// mode kicks in; only whole-profile prefix-on-name reach is in scope here.
-watch(filterQuery, (term) => {
-  if (!userId.value) return;
-  setPublicCardsSearchTerm(userId.value, term);
+const SORT_FIELDS = {
+  recent: { field: 'dateAdded', direction: 'desc' },
+  name: { field: 'name', direction: 'asc' },
+  price: { field: 'price', direction: 'desc' },
+} as const;
+
+watch(sortBy, (value) => {
+  // eslint-disable-next-line security/detect-object-injection
+  sort.value = { ...SORT_FIELDS[value] };
 });
 
-// Bridge: individual refs <-> AdvancedFilters for the modal
-const colorToModal: Record<string, string> = { White: 'w', Blue: 'u', Black: 'b', Red: 'r', Green: 'g', Colorless: 'c' };
-const colorFromModal: Record<string, string> = { w: 'White', u: 'Blue', b: 'Black', r: 'Red', g: 'Green', c: 'Colorless' };
-const typeToModal: Record<string, string> = { Creatures: 'creature', Instants: 'instant', Sorceries: 'sorcery', Enchantments: 'enchantment', Artifacts: 'artifact', Planeswalkers: 'planeswalker', Lands: 'land' };
-const typeFromModal: Record<string, string> = { creature: 'Creatures', instant: 'Instants', sorcery: 'Sorceries', enchantment: 'Enchantments', artifact: 'Artifacts', planeswalker: 'Planeswalkers', land: 'Lands' };
-const rarityToModal: Record<string, string> = { Common: 'common', Uncommon: 'uncommon', Rare: 'rare', Mythic: 'mythic' };
-const rarityFromModal: Record<string, string> = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', mythic: 'Mythic' };
+/**
+ * GROUPING is presentation over the cards currently loaded, not a filter —
+ * the group headers count what is on screen, which is what they always did.
+ * It keeps `useCardFilter`'s category helpers precisely because grouping is
+ * where a 'Multicolor' or 'Lands' heading is still a useful label; the
+ * FILTER above does not use them.
+ */
+const groupedCards = computed(() => {
+  if (groupBy.value === 'none') return [{ type: 'all', cards: cards.value }];
 
+  const categoryOf = (card: Card): string => {
+    switch (groupBy.value) {
+      case 'mana': return getCardManaCategory(card);
+      case 'color': return getCardColorCategory(card);
+      case 'type': return getCardTypeCategory(card);
+      case 'name': return getCardNameCategory(card);
+      default: return 'all';
+    }
+  };
+  const order = groupBy.value === 'mana' ? manaOrder : groupBy.value === 'color' ? colorOrder : groupBy.value === 'type' ? typeOrder : [];
+
+  const groups = new Map<string, Card[]>();
+  for (const card of cards.value) {
+    const category = categoryOf(card);
+    const bucket = groups.get(category);
+    if (bucket) bucket.push(card);
+    else groups.set(category, [card]);
+  }
+
+  const keys = [...groups.keys()].sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return keys.map(type => ({ type, cards: groups.get(type)! }));
+});
+
+const translateCategory = (category: string): string => translateCategoryLabel(category, t);
+
+// Bridge: composable state <-> the AdvancedFilterModal's own shape. The modal
+// already speaks colour LETTERS ('w'/'u'/'b'/…) and lowercase type and rarity
+// names, which is the same vocabulary the index uses — only the case differs.
+const narrowedList = (selected: Set<string>, all: readonly string[]): string[] =>
+  selected.size >= all.length ? [] : all.filter(v => selected.has(v));
+
+/**
+ * Sets the visitor can pick from. Derived from the cards currently loaded —
+ * the index exposes no set FACET, so this list grows as pages load instead of
+ * covering the whole collection from the first render. Known limitation,
+ * written down rather than hidden: the set filter itself is applied
+ * server-side over everything, it is only the OPTIONS that are partial.
+ */
+const collectionSets = computed(() => {
+  const seen = new Map<string, string>();
+  for (const card of cards.value) {
+    if (card.setCode && !seen.has(card.setCode)) seen.set(card.setCode, card.edition || card.setCode);
+  }
+  return [...seen].map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
+});
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
 const localAdvancedFilters = computed<AdvancedFilters>(() => ({
-  colors: selectedColors.value.size < colorOrder.length
-    // eslint-disable-next-line security/detect-object-injection
-    ? [...selectedColors.value].map(c => colorToModal[c]).filter(Boolean) as string[]
-    : [],
-  types: selectedTypes.value.size < typeOrder.length
-    // eslint-disable-next-line security/detect-object-injection
-    ? [...selectedTypes.value].map(t => typeToModal[t]).filter(Boolean) as string[]
-    : [],
-  manaValue: selectedManaValues.value.size < manaOrder.length
+  colors: narrowedList(selectedColors.value, PUBLIC_COLOR_LETTERS).map(c => c.toLowerCase()),
+  types: narrowedList(selectedTypes.value, PUBLIC_TYPES),
+  manaValue: selectedManaValues.value.size < PUBLIC_MANA_VALUES.length
     ? { values: [...selectedManaValues.value].map(v => v === '10+' ? 10 : Number.parseInt(v, 10)).filter(v => !Number.isNaN(v)) }
     : { min: undefined, max: undefined, values: undefined },
-  rarity: selectedRarities.value.size < rarityOrder.length
-    // eslint-disable-next-line security/detect-object-injection
-    ? [...selectedRarities.value].map(r => rarityToModal[r]).filter(Boolean) as string[]
-    : [],
-  sets: advSelectedSets.value,
-  power: { min: advPowerMin.value, max: advPowerMax.value },
-  toughness: { min: advToughnessMin.value, max: advToughnessMax.value },
-  formatLegal: advSelectedFormats.value,
-  priceUSD: { min: advPriceMin.value, max: advPriceMax.value },
-  keywords: advSelectedKeywords.value,
-  creatureTypes: advSelectedCreatureTypes.value,
-  isFoil: advFoilFilter.value === 'foil',
-  isFullArt: advFullArtOnly.value,
+  rarity: narrowedList(selectedRarities.value, PUBLIC_RARITIES),
+  sets: advancedFilters.value.edition ?? [],
+  power: { min: advancedFilters.value.powerMin, max: advancedFilters.value.powerMax },
+  toughness: { min: advancedFilters.value.toughnessMin, max: advancedFilters.value.toughnessMax },
+  formatLegal: advancedFilters.value.formats ?? [],
+  priceUSD: { min: advancedFilters.value.minPrice, max: advancedFilters.value.maxPrice },
+  keywords: advancedFilters.value.keywords ?? [],
+  // The index carries no oracle text, so creature SUBTYPES cannot be filtered
+  // on a public profile. Offering an empty list is the honest answer; the
+  // alternative — filtering the loaded page only — is the bug this ticket
+  // closes, in miniature.
+  creatureTypes: [],
+  isFoil: advancedFilters.value.foil === true,
+  isFullArt: advancedFilters.value.fullArt === true,
 }));
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
-const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
-  advSelectedSets.value = [...updated.sets];
-  advSelectedKeywords.value = [...updated.keywords];
-  advSelectedFormats.value = [...updated.formatLegal];
-  advSelectedCreatureTypes.value = [...(updated.creatureTypes ?? [])];
-  advPriceMin.value = updated.priceUSD.min;
-  advPriceMax.value = updated.priceUSD.max;
-  advPowerMin.value = updated.power.min;
-  advPowerMax.value = updated.power.max;
-  advToughnessMin.value = updated.toughness.min;
-  advToughnessMax.value = updated.toughness.max;
-  advFoilFilter.value = updated.isFoil ? 'foil' : 'any';
-  advFullArtOnly.value = updated.isFullArt;
-  if (updated.manaValue.values?.length) {
-    const mapped = updated.manaValue.values.map(v => v === 10 ? '10+' : String(v));
-    selectedManaValues.value = new Set(mapped);
-  } else {
-    selectedManaValues.value = new Set(manaOrder);
-  }
-  const mappedColors = updated.colors.map(c => colorFromModal[c]).filter((v): v is string => !!v);
-  selectedColors.value = new Set(mappedColors.length > 0 ? mappedColors : colorOrder);
-  const mappedTypes = updated.types.map(t => typeFromModal[t]).filter((v): v is string => !!v);
-  selectedTypes.value = new Set(mappedTypes.length > 0 ? mappedTypes : typeOrder);
-  const mappedRarities = updated.rarity.map(r => rarityFromModal[r]).filter((v): v is string => !!v);
-  selectedRarities.value = new Set(mappedRarities.length > 0 ? mappedRarities : rarityOrder);
-};
-/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, security/detect-object-injection */
+const restoreOrAll = (picked: string[], all: readonly string[]): Set<string> =>
+  new Set(picked.length > 0 ? picked : all);
 
-const activeChipFilterCount = computed(() => {
-  let count = 0;
-  if (selectedColors.value.size < colorOrder.length) count++;
-  if (selectedManaValues.value.size < manaOrder.length) count++;
-  if (selectedTypes.value.size < typeOrder.length) count++;
-  if (selectedRarities.value.size < rarityOrder.length) count++;
-  count += advancedFilterCount.value;
-  return count;
-});
+const handleLocalFiltersUpdate = (updated: AdvancedFilters) => {
+  selectedColors.value = restoreOrAll(updated.colors.map(c => c.toUpperCase()), PUBLIC_COLOR_LETTERS);
+  selectedTypes.value = restoreOrAll(updated.types, PUBLIC_TYPES);
+  selectedRarities.value = restoreOrAll(updated.rarity, PUBLIC_RARITIES);
+  selectedManaValues.value = updated.manaValue.values?.length
+    ? new Set(updated.manaValue.values.map(v => v >= 10 ? '10+' : String(v)))
+    : new Set(PUBLIC_MANA_VALUES);
+
+  // One assignment, so the composable's deep watcher fires ONE query for the
+  // whole modal rather than one per field.
+  advancedFilters.value = {
+    ...(updated.sets.length > 0 ? { edition: [...updated.sets] } : {}),
+    ...(updated.keywords.length > 0 ? { keywords: [...updated.keywords] } : {}),
+    ...(updated.formatLegal.length > 0 ? { formats: [...updated.formatLegal] } : {}),
+    ...(updated.priceUSD.min !== undefined ? { minPrice: updated.priceUSD.min } : {}),
+    ...(updated.priceUSD.max !== undefined ? { maxPrice: updated.priceUSD.max } : {}),
+    ...(updated.power.min !== undefined ? { powerMin: updated.power.min } : {}),
+    ...(updated.power.max !== undefined ? { powerMax: updated.power.max } : {}),
+    ...(updated.toughness.min !== undefined ? { toughnessMin: updated.toughness.min } : {}),
+    ...(updated.toughness.max !== undefined ? { toughnessMax: updated.toughness.max } : {}),
+    ...(updated.isFoil ? { foil: true } : {}),
+    ...(updated.isFullArt ? { fullArt: true } : {}),
+  };
+};
+
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
 
 const resetAllChipFilters = () => {
-  selectedColors.value = new Set(colorOrder);
-  selectedManaValues.value = new Set(manaOrder);
-  selectedTypes.value = new Set(typeOrder);
-  selectedRarities.value = new Set(rarityOrder);
-  resetAdvancedFilters();
+  resetFilters();
 };
 
 const getGroupCardCount = (groupCards: Card[]): number => {
@@ -639,7 +631,15 @@ onMounted(() => {
            the term) and collapses the document height so the browser clamps the
            window scroll to the top. Zero-hit searches fall through to the inner
            "no results after filtering" state below, which keeps the bar mounted. -->
-      <div v-if="cards.length === 0 && !searching && !filterQuery.trim()" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
+      <!-- Query failure. Kept ABOVE the empty state on purpose: an error that
+           falls through to "this user has no public cards" is an outage the
+           visitor reads as an empty shop, and nobody reports it. -->
+      <div v-if="cardsError" data-testid="profile-cards-error" class="bg-surface-1 border border-rust rounded-lg p-8 text-center">
+        <p class="text-body text-rust mb-4">{{ t('profile.index.error') }}</p>
+        <BaseButton size="small" @click="retryLoad">{{ t('profile.index.retry') }}</BaseButton>
+      </div>
+
+      <div v-else-if="cards.length === 0 && !searching && activeFilterCount === 0 && !filterQuery.trim()" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
         <p class="text-body text-silver-70">
           {{ t('profile.noPublicCards') }}
         </p>
@@ -650,7 +650,15 @@ onMounted(() => {
         <div class="flex items-end justify-between gap-4 flex-wrap mb-4">
           <h2 class="font-display text-h2 font-bold text-silver">
             {{ t('profile.publicCollection') }}
-            <span class="font-display font-tnum text-h3 font-normal text-silver-50 ml-2">{{ filteredCards.length }}</span>
+            <!-- The count is the number of matching documents in the WHOLE
+                 public collection, which is the entire point of TASK-247 —
+                 never cards.length, which is one page. `null` means the index
+                 is mid-rebuild and the server refused to name a number; we
+                 say "updating" rather than invent one. -->
+            <span
+                data-testid="profile-result-total"
+                class="font-display font-tnum text-h3 font-normal text-silver-50 ml-2"
+            >{{ filteredTotal === null ? t('profile.index.unknownTotal') : filteredTotal }}</span>
           </h2>
           <span class="text-tiny text-silver-30">{{ t('profile.publicPricesUsd') }}</span>
         </div>
@@ -662,26 +670,36 @@ onMounted(() => {
             v-model:group-by="groupBy"
             :v2="true"
             :show-advanced-filters="true"
-            :active-filter-count="activeChipFilterCount"
+            :active-filter-count="activeFilterCount"
             :show-suggestions="false"
             @open-filters="showFilters = true"
         />
+
+        <!-- The index is mid-rebuild: counts are withheld, not guessed. -->
+        <p v-if="indexPartial" data-testid="profile-index-partial" class="mt-3 text-small text-silver-70 bg-surface-1 border border-line rounded-lg px-4 py-3">
+          {{ t('profile.index.updating') }}
+        </p>
+
+        <!-- Cards a colour filter dropped for having no colour data. Without
+             this line they simply vanish when a chip is pressed, which is
+             indistinguishable from the seller not owning them. -->
+        <p v-if="colorUnknownExcluded" data-testid="profile-color-unknown" class="mt-3 text-small text-silver-50">
+          {{ t('profile.index.colorUnknownExcluded', { count: colorUnknownExcluded }) }}
+        </p>
 
         <AdvancedFilterModal
             :show="showFilters"
             :filters="localAdvancedFilters"
             mode="local"
             :local-sets="collectionSets"
-            :local-creature-types="collectionCreatureTypes"
-            :exact-color-mode="exactColorMode"
+            :local-creature-types="[]"
             @close="showFilters = false"
             @update:filters="handleLocalFiltersUpdate"
-            @update:exact-color-mode="exactColorMode = $event"
             @reset="resetAllChipFilters"
         />
 
         <!-- No results after filtering -->
-        <div v-if="filteredCards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
+        <div v-if="cards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
           <p class="text-body text-silver-70">
             {{ t('profile.noPublicCards') }}
           </p>

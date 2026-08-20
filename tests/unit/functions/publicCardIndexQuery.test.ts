@@ -62,6 +62,7 @@ import {
   computePublicFacets,
   queryPublicCardIndexForUser,
   PUBLIC_INDEX_CARD_FIELDS,
+  MAX_SEARCH_LENGTH,
 } from '../../../functions/lib/publicCardIndexQuery.js'
 import { buildPublicIndex } from '../../../functions/lib/publicCardIndex.js'
 
@@ -202,10 +203,16 @@ function buildSyntheticProfile(): SyntheticEntry[] {
     const name = BLIGHT_NAMES[k % BLIGHT_NAMES.length] as string
     // Two documents per unique name SHARING one scryfallId — the real shape
     // of a collection (same card, two conditions or a foil and a non-foil),
-    // and the reason AC2's three numbers differ: 1,412 documents, 1,049
-    // unique scryfallId, 2,658 copies. `q: 2` likewise makes sum(quantity)
-    // differ from the document count, so an implementation that counted
-    // either of the other two numbers cannot pass by coincidence.
+    // and the reason a document count, a unique-scryfallId count and a copies
+    // count are three different numbers. This fixture's OWN separation is
+    // asserted, not narrated, by the 'MEDIUM-4' block at the bottom of this
+    // file; the production ratios it mirrors are dated in the ticket. An
+    // earlier version of this comment quoted 1,412 / 1,049 / 2,658 as if they
+    // were this fixture's numbers. They were not — they were a dated
+    // production measurement, and the fixture's own counts differ. `q: 2`
+    // likewise makes sum(quantity) differ from the document count, so an
+    // implementation that counted either of the other two numbers cannot pass
+    // by coincidence.
     entries.push(
       makeEntry(n++, ['B'], {
         n: name,
@@ -1301,5 +1308,82 @@ describe('MEDIUM-4 RED — the fixture must have the SHAPE of a real collection'
     const ratio = PROFILE.length / new Set(PROFILE.map((e) => e.s)).size
     expect(ratio).toBeGreaterThan(1.2)
     expect(ratio).toBeLessThan(1.45)
+  })
+})
+
+// ── TANDA 4 carry-over: the filter validator had no tests of its own ────────
+
+describe('TANDA-4 — filter-key validation, the miniature of this ticket bug', () => {
+  // The rejection of unknown keys WORKS today but nothing asserted it. A
+  // refactor that went back to ignoring them silently — a client believing a
+  // filter is applied while the server returns an unfiltered grid — is this
+  // ticket in miniature, and it would have passed every other test here.
+  it('rejects an unknown filter key instead of silently ignoring it', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db,
+        userId: 'seller1',
+        filters: { colour: ['B'] } as never,
+        page: 0,
+        pageSize: 60,
+      })
+    ).rejects.toThrow(/unknown filter/)
+    expect(db.reads).toEqual([])
+  })
+
+  it('rejects a prototype-polluting key rather than treating it as a filter', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db,
+        userId: 'seller1',
+        filters: JSON.parse('{"__proto__": {"polluted": true}}') as never,
+        page: 0,
+        pageSize: 60,
+      })
+    ).rejects.toThrow(/unknown filter/)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+
+  it('treats a null filters payload as no filters, not as a crash', async () => {
+    // assertValidFilters returns {} for null — but the caller used to DISCARD
+    // that return value, so a null reached the filter path and threw a
+    // TypeError (a 500) AFTER paying for the whole index read.
+    const db = makeIndexedDb()
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: null as never,
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.total).toBe(PROFILE.length)
+    expect(res.indexState.missing).toBe(0)
+  })
+
+  it('accepts a search term of exactly the maximum length and rejects one character more', async () => {
+    const db = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db,
+        userId: 'seller1',
+        filters: { search: 'a'.repeat(MAX_SEARCH_LENGTH) },
+        page: 0,
+        pageSize: 60,
+      })
+    ).resolves.toBeTruthy()
+
+    const db2 = makeIndexedDb()
+    await expect(
+      queryPublicCardIndexForUser({
+        db: db2,
+        userId: 'seller1',
+        filters: { search: 'a'.repeat(MAX_SEARCH_LENGTH + 1) },
+        page: 0,
+        pageSize: 60,
+      })
+    ).rejects.toThrow(/at most 100 characters/)
+    expect(db2.reads).toEqual([])
   })
 })

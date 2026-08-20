@@ -16,12 +16,8 @@ import {
   type DocumentData,
   getCountFromServer,
   getDocs,
-  limit,
-  orderBy,
   query,
-  type QueryDocumentSnapshot,
   setDoc,
-  startAfter,
   Timestamp,
   where,
   writeBatch,
@@ -798,98 +794,17 @@ export async function getUserPublicCards(userId: string): Promise<PublicCard[]> 
   return snapshot.docs.map(d => ({ ...d.data(), docId: d.id } as PublicCard))
 }
 
-export interface PublicCardsPage {
-  cards: PublicCard[]
-  /** Last doc of this page — pass back in as `cursor` to fetch the next page. Null once exhausted. */
-  cursor: QueryDocumentSnapshot | null
-  hasMore: boolean
-}
-
 /**
- * Server-side-paginated query for a single user's public cards (TASK-136).
- *
- * Used by the public profile view instead of reading the owner's private
- * users/{uid}/cards subcollection — that subcollection is readable by
- * anyone (see firestore.rules comment) and the view used to download it in
- * full (thousands of docs, including private ones) and filter client-side.
- * /public_cards is safe-by-construction: writers here only ever publish
- * sale/trade cards with public===true (see syncCardToPublic above).
- *
- * Orders by `cardName` to reuse the existing `userId ASC, cardName ASC`
- * composite index (firestore.indexes.json) — no new index deploy needed.
- * Fetches `pageSize + 1` docs to detect `hasMore` without a separate count
- * query; the extra doc is trimmed before returning.
+ * TASK-247 tanda 4 removed `PublicCardsPage`, `getUserPublicCardsPage` and
+ * `searchUserPublicCards` from this file. They were the public profile's
+ * pagination and text search, and both were structurally incapable of
+ * answering what the profile asks: the page query left every filter to run
+ * over the ~60 documents in memory, and the search was a Firestore PREFIX
+ * query (no substring operator exists) that could never reach a name matching
+ * mid-word. `queryUserPublicCardIndex` below replaces both, server-side and
+ * over the whole collection. Nothing else called them, so they were deleted
+ * rather than left as a second, wrong way to do the same thing.
  */
-export async function getUserPublicCardsPage(
-  userId: string,
-  pageSize: number,
-  cursor: QueryDocumentSnapshot | null = null
-): Promise<PublicCardsPage> {
-  const constraints = [
-    where('userId', '==', userId),
-    orderBy('cardName'),
-    ...(cursor ? [startAfter(cursor)] : []),
-    limit(pageSize + 1),
-  ]
-  const snapshot = await getDocs(query(collection(db, 'public_cards'), ...constraints))
-
-  const hasMore = snapshot.docs.length > pageSize
-  const pageDocs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
-
-  return {
-    cards: pageDocs.map(d => ({ ...d.data(), docId: d.id }) as PublicCard),
-    cursor: pageDocs.length > 0 ? (pageDocs[pageDocs.length - 1] ?? null) : null,
-    hasMore,
-  }
-}
-
-/**
- * Server-side prefix search over a single user's public cards (TASK-138 AC1).
- *
- * Text search on the public profile used to filter only whatever page(s)
- * getUserPublicCardsPage had already loaded (~60 of potentially 5000+ cards)
- * — finding a specific card in a large profile was effectively impossible
- * from the UI. This queries `cardNameLower` directly against Firestore,
- * scoped to `userId`, so it reaches cards regardless of pagination state.
- *
- * Requires the composite index `public_cards: userId ASC, cardNameLower ASC`
- * (firestore.indexes.json) — deploy is manual, done by the team lead.
- *
- * Deliberately NOT cursor-paginated like getUserPublicCardsPage: this is a
- * single capped page (default 50). A "find this card" search returning 50
- * name-prefix matches within one user's profile covers the realistic case;
- * paginating search results themselves would double the gen-token/debounce
- * surface in usePublicProfileCards for a scenario (>50 same-prefix cards for
- * one seller) rare enough not to justify it here.
- */
-export async function searchUserPublicCards(
-  userId: string,
-  term: string,
-  pageSize = 50
-): Promise<PublicCardsPage> {
-  const termLower = term.trim().toLowerCase()
-  if (termLower.length < 2) {
-    return { cards: [], cursor: null, hasMore: false }
-  }
-
-  const constraints = [
-    where('userId', '==', userId),
-    where('cardNameLower', '>=', termLower),
-    where('cardNameLower', '<=', termLower + ''),
-    orderBy('cardNameLower'),
-    limit(pageSize + 1),
-  ]
-  const snapshot = await getDocs(query(collection(db, 'public_cards'), ...constraints))
-
-  const hasMore = snapshot.docs.length > pageSize
-  const pageDocs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
-
-  return {
-    cards: pageDocs.map(d => ({ ...d.data(), docId: d.id }) as PublicCard),
-    cursor: pageDocs.length > 0 ? (pageDocs[pageDocs.length - 1] ?? null) : null,
-    hasMore,
-  }
-}
 
 export interface PublicCardStatusCounts {
   sale: number
@@ -1019,7 +934,11 @@ export const searchPublicCards = async (
 // + `searchUserPublicCards` above are both honest Firestore queries, and both
 // are structurally incapable of answering the question the profile UI asks:
 //   - the color chips filter over whatever ~60 documents are already in
-//     memory, so a profile with 1,412 black documents reports 36;
+//     memory, so a profile with over a thousand black documents reports the
+//     couple of dozen that happen to be on the loaded page (MEASURED against
+//     production 2026-08-19: 1,488 black documents including lands, against
+//     36 shown — a dated measurement of a live, growing account, not a
+//     maintained figure);
 //   - the text search is a PREFIX query (Firestore has no substring
 //     operator), so 'blight' returns 9 of 14 documents and can never reach
 //     `Marauding Blight-Priest` or a split card's back face;

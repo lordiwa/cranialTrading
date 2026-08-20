@@ -899,7 +899,12 @@ async function queryPublicCardIndexForUser(params) {
   // never reach the path interpolation, and a rejected filter must never get
   // to spend CPU. Tests assert zero reads happened in both cases.
   assertValidPublicUserId(userId);
-  assertValidFilters(filters);
+  // The RETURN VALUE is what the rest of this function must use: for a null
+  // (or undefined) payload assertValidFilters normalizes to {}, and throwing
+  // that away let a null reach hasColorFilter and crash with a TypeError —
+  // a 500, raised only AFTER the whole index had already been read and paid
+  // for. Every downstream use below reads `safeFilters`, not `filters`.
+  const safeFilters = assertValidFilters(filters);
 
   if (typeof page !== 'number' || !Number.isInteger(page) || page < 0 || page > MAX_PAGE) {
     throw invalidArgument(`page must be an integer between 0 and ${MAX_PAGE}`);
@@ -921,7 +926,7 @@ async function queryPublicCardIndexForUser(params) {
 
   const { entries, meta, partial } = await readPublicIndex(db, userId);
 
-  const filtered = filterPublicIndexEntries(entries, filters);
+  const filtered = filterPublicIndexEntries(entries, safeFilters);
   const sorted = sortPublicIndexEntries(filtered, sort);
 
   const start = page * resolvedPageSize;
@@ -945,14 +950,19 @@ async function queryPublicCardIndexForUser(params) {
     // Facet counts are counts, and under `partial` they are counts over an
     // incomplete read — exactly as untrustworthy as `total`, so they go the
     // same way rather than staying firm next to a null total.
-    facets: partial ? null : computePublicFacets(entries, filters),
+    facets: partial ? null : computePublicFacets(entries, safeFilters),
     indexState: {
       schemaVersion: meta ? Number(meta.schemaVersion) || 0 : 0,
       totalChunks: meta ? Number(meta.totalChunks) || 0 : 0,
       count: meta ? Number(meta.count) || 0 : 0,
       reconciling: isReconciling(meta, now),
       partial,
-      missing: countColorUnknownExcluded(entries, filters),
+      // Same rule as `total` and `facets`: under `partial` this is a count
+      // over an incomplete read, so it is withheld rather than left standing
+      // firm next to a null total — a firm-looking "474 cards hidden" beside
+      // "we cannot tell you how many there are" is the inconsistency this
+      // mitigation exists to avoid.
+      missing: partial ? null : countColorUnknownExcluded(entries, safeFilters),
     },
   };
 }

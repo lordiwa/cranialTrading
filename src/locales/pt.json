@@ -1590,6 +1590,13 @@
     "messages": {
       "loadError": "Erro ao carregar perfil",
       "loadCardsError": "Erro ao carregar cartas do perfil"
+    },
+    "index": {
+      "updating": "O catálogo deste vendedor está sendo reconstruído agora, então a contagem abaixo pode estar incompleta.",
+      "unknownTotal": "atualizando",
+      "colorUnknownExcluded": "{count} cartas ficam fora deste filtro de cor porque não temos o dado de cor delas. Elas continuam aparecendo sem filtro e continuam sendo encontradas pelo nome.",
+      "error": "Não conseguimos carregar esta coleção. O problema é nosso, não um perfil vazio.",
+      "retry": "TENTAR DE NOVO"
     }
   },
   "discovery": {

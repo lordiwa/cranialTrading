@@ -81,7 +81,7 @@ vi.mock('firebase/auth', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { __resetReconcileStateForTests, batchSyncCardsToPublic, buildPublicCardDoc, chunkList, getUserPublicCardsCount, getUserPublicCardsPage, getUserPublicCardStatusCounts, mapWithConcurrency, RECONCILE_DEBOUNCE_MS, removeCardFromPublic, searchUserPublicCards, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
+import { __resetReconcileStateForTests, batchSyncCardsToPublic, buildPublicCardDoc, chunkList, getUserPublicCardsCount, getUserPublicCardStatusCounts, mapWithConcurrency, RECONCILE_DEBOUNCE_MS, removeCardFromPublic, syncAllUserCards, syncCardToPublic } from '@/services/publicCards'
 // Static (not dynamic) import purely to pre-warm the module cache — the SUT's
 // scheduleIndexReconcile/triggerIndexReconcileNow reach cloudFunctions.ts via
 // `import('./cloudFunctions')` (see that function's doc comment for why it's
@@ -613,93 +613,11 @@ describe('syncAllUserCards', () => {
   })
 })
 
-/**
- * TASK-136: perfil público paginado vía /public_cards.
- *
- * Regression lock — the public profile MUST fetch cards through this
- * server-side-paginated query against the denormalized /public_cards
- * collection, and MUST NEVER fall back to a full getDocs() scan of the
- * private users/{uid}/cards subcollection (the pre-fix bug: 5654 docs
- * downloaded per profile visit, including private ones, filtered
- * client-side).
- */
-describe('getUserPublicCardsPage', () => {
-  const makeDoc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data })
-
-  it('queries the public_cards collection filtered by userId — never users/{uid}/cards', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-
-    await getUserPublicCardsPage('user-1', 60, null)
-
-    expect(collectionMock).toHaveBeenCalledWith({}, 'public_cards')
-    expect(collectionMock).not.toHaveBeenCalledWith(expect.anything(), 'users')
-    expect(whereMock).toHaveBeenCalledWith('userId', '==', 'user-1')
-  })
-
-  it('orders by cardName (matches the deployed composite index) and requests pageSize+1 docs to detect hasMore without a count query', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-
-    await getUserPublicCardsPage('user-1', 60, null)
-
-    expect(orderByMock).toHaveBeenCalledWith('cardName')
-    expect(limitMock).toHaveBeenCalledWith(61)
-  })
-
-  it('does not call startAfter on the first page (cursor null)', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-
-    await getUserPublicCardsPage('user-1', 60, null)
-
-    expect(startAfterMock).not.toHaveBeenCalled()
-  })
-
-  it('passes startAfter(cursor) when paging past the first page', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-    const cursor = makeDoc('prev-last-doc', { cardName: 'Zzz' })
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await getUserPublicCardsPage('user-1', 60, cursor as any)
-
-    expect(startAfterMock).toHaveBeenCalledWith(cursor)
-  })
-
-  it('trims to pageSize and reports hasMore=true when more docs than pageSize come back', async () => {
-    const docs = [
-      makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' }),
-      makeDoc('c1', { cardId: 'c1', userId: 'user-1', cardName: 'Card 1', status: 'trade' }),
-      makeDoc('c2', { cardId: 'c2', userId: 'user-1', cardName: 'Card 2', status: 'sale' }),
-    ]
-    getDocsMock.mockResolvedValueOnce({ docs })
-
-    const page = await getUserPublicCardsPage('user-1', 2, null)
-
-    expect(page.cards).toHaveLength(2)
-    expect(page.cards.map(c => c.docId)).toEqual(['c0', 'c1'])
-    expect(page.hasMore).toBe(true)
-    expect(page.cursor).toBe(docs[1])
-  })
-
-  it('reports hasMore=false and keeps all docs when fewer than pageSize+1 come back', async () => {
-    const docs = [makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' })]
-    getDocsMock.mockResolvedValueOnce({ docs })
-
-    const page = await getUserPublicCardsPage('user-1', 2, null)
-
-    expect(page.cards).toHaveLength(1)
-    expect(page.hasMore).toBe(false)
-    expect(page.cursor).toBe(docs[0])
-  })
-
-  it('returns an empty page with a null cursor and hasMore=false when the user has no public cards', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-
-    const page = await getUserPublicCardsPage('user-1', 60, null)
-
-    expect(page.cards).toEqual([])
-    expect(page.cursor).toBeNull()
-    expect(page.hasMore).toBe(false)
-  })
-})
+// TASK-247 tanda 4 deleted getUserPublicCardsPage and searchUserPublicCards
+// along with their tests. Both were the public profile's own data path and
+// both were structurally unable to answer what the profile asks (page-local
+// filtering; a Firestore PREFIX search with no substring operator behind it).
+// queryUserPublicCardIndex replaces them, covered in publicCardIndexClient.test.ts.
 
 /**
  * TASK-136 M4 (round 2): exact sale/trade totals for the profile header chips,
@@ -775,95 +693,6 @@ describe('getUserPublicCardsCount', () => {
     expect(count).toBe(42)
   })
 })
-
-/**
- * TASK-138 AC1: server-side prefix search over a single user's public cards,
- * so text search on a public profile can find cards NOT yet loaded into the
- * grid (the pre-fix bug: text search only filtered whatever ~60-card page(s)
- * had already been scrolled into view).
- *
- * Filters on the SAME composite index as getUserPublicCardsPage's userId
- * equality, but ranges on cardNameLower instead of ordering by cardName —
- * requires the NEW composite index `public_cards: userId ASC, cardNameLower
- * ASC` added to firestore.indexes.json in this same commit (deploy is manual,
- * done by the team lead after this commit lands).
- *
- * Deliberately capped at a single page (no cursor/hasMore pagination of
- * search results themselves, unlike getUserPublicCardsPage) — see
- * usePublicProfileCards.ts for why.
- */
-describe('searchUserPublicCards', () => {
-  const makeDoc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data })
-
-  it('queries public_cards filtered by userId with a cardNameLower prefix range, ordered by cardNameLower', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-
-    await searchUserPublicCards('user-1', 'Light', 50)
-
-    expect(collectionMock).toHaveBeenCalledWith({}, 'public_cards')
-    expect(whereMock).toHaveBeenCalledWith('userId', '==', 'user-1')
-    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '>=', 'light')
-    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '<=', 'light')
-    expect(orderByMock).toHaveBeenCalledWith('cardNameLower')
-  })
-
-  it('normalizes the search term to lowercase before querying (regression: uppercase input must still match lowercased cardNameLower)', async () => {
-    getDocsMock.mockResolvedValueOnce({ docs: [] })
-
-    await searchUserPublicCards('user-1', 'LIGHTNING', 50)
-
-    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '>=', 'lightning')
-    expect(whereMock).toHaveBeenCalledWith('cardNameLower', '<=', 'lightning')
-  })
-
-  it('requests pageSize+1 docs and trims to pageSize with hasMore=true when the cap is exceeded', async () => {
-    const docs = [
-      makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' }),
-      makeDoc('c1', { cardId: 'c1', userId: 'user-1', cardName: 'Card 1', status: 'trade' }),
-      makeDoc('c2', { cardId: 'c2', userId: 'user-1', cardName: 'Card 2', status: 'sale' }),
-    ]
-    getDocsMock.mockResolvedValueOnce({ docs })
-
-    const page = await searchUserPublicCards('user-1', 'car', 2)
-
-    expect(limitMock).toHaveBeenCalledWith(3)
-    expect(page.cards).toHaveLength(2)
-    expect(page.hasMore).toBe(true)
-  })
-
-  it('reports hasMore=false when results are fewer than pageSize', async () => {
-    const docs = [makeDoc('c0', { cardId: 'c0', userId: 'user-1', cardName: 'Card 0', status: 'sale' })]
-    getDocsMock.mockResolvedValueOnce({ docs })
-
-    const page = await searchUserPublicCards('user-1', 'car', 50)
-
-    expect(page.cards).toHaveLength(1)
-    expect(page.hasMore).toBe(false)
-  })
-
-  it('returns an empty page without querying when the term is shorter than 2 characters', async () => {
-    const page = await searchUserPublicCards('user-1', 'a', 50)
-
-    expect(page.cards).toEqual([])
-    expect(page.hasMore).toBe(false)
-    expect(getDocsMock).not.toHaveBeenCalled()
-  })
-
-  it('returns an empty page without querying for a blank/whitespace-only term', async () => {
-    const page = await searchUserPublicCards('user-1', '   ', 50)
-
-    expect(page.cards).toEqual([])
-    expect(getDocsMock).not.toHaveBeenCalled()
-  })
-})
-
-// ─── perf: bounded-concurrency chunk fanout (bug report 2026-08-07) ──────────
-//
-// findCardsMatchingPreferences and findPreferencesMatchingCards each split the
-// card-name list into 30-name Firestore 'in' chunks and awaited them ONE AT A
-// TIME. On a 59k collection that is thousands of serial round-trips on the
-// post-login landing. These two helpers make the fanout concurrent while keeping
-// a cap, so Firestore is not hit with unbounded parallelism.
 
 describe('chunkList', () => {
   it('splits into chunks of the given size', () => {

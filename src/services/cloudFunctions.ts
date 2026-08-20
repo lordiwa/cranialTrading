@@ -505,8 +505,14 @@ export interface PublicCardIndexState {
   reconciling: boolean
   /** The index was caught mid-rebuild; `total` is null and counts are not trustworthy. */
   partial: boolean
-  /** Entries a color filter dropped for having no usable color data (measured: 474 of 6,647). */
-  missing: number
+  /**
+   * Entries a color filter dropped for having no usable color data (measured
+   * 2026-08-18: 474 of 6,647, 7.1%). `null` under `partial`, for the same
+   * reason `total` and `facets` are: a firm "474 hidden" next to "we cannot
+   * tell you how many there are" would be the inconsistency the mid-rebuild
+   * detector exists to avoid.
+   */
+  missing: number | null
 }
 
 export interface PublicCardIndexFacets {

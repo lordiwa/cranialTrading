@@ -1,0 +1,36 @@
+{
+  "key": "TASK-253",
+  "title": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)",
+  "description": "ORDEN DE RAFAEL el 2026-08-20, respondiendo a la pregunta que quedo abierta al cerrar TASK-251: \"se va, si no swipe nada\". TASK-251 elimino el swipe de CollectionGridCardFull y borro el composable useSwipe, pero dejo vivo el ultimo gesto de swipe del proyecto: el swipe-down para cerrar BottomSheet. Este ticket lo termina.\n\nSUPERFICIE, LEIDA POR EL ORQUESTADOR CON LINEAS EXACTAS, no supuesta:\n- src/components/ui/BottomSheet.vue (172 lineas en total). Los tres handlers viven en el bloque script: onHandleTouchStart (linea 56), onHandleTouchMove (linea 62) y onHandleTouchEnd (linea 67), este ultimo es el que compara contra SWIPE_CLOSE_THRESHOLD_PX y llama a closeSheet(). En el template, el div data-testid=\"bottom-sheet-handle\" (linea 104) cablea los tres con @touchstart.passive, @touchmove.passive y @touchend.passive, y lleva las clases cursor-grab y touch-none.\n- Los refs touchStartY y touchCurrentY, y la constante SWIPE_CLOSE_THRESHOLD_PX, quedan sin uso una vez removidos los handlers: van tambien.\n- tests/unit/components/BottomSheet.test.ts es el UNICO archivo de test que toca este componente. Hay que quitar de ahi lo que pruebe el gesto, no dejar tests muertos.\n- Consumidores: solo src/views/BinderView.vue y src/views/DeckView.vue. NINGUNO de los dos pasa nada relacionado con el gesto, asi que no deberian necesitar cambios; verificarlo igual antes de dar por cerrado.\n\nQUE SE MANTIENE, para que no se vaya de scope: el boton X de cerrar (data-testid=\"bottom-sheet-close\"), el cierre por tecla Escape, y el cierre por click en el overlay si hoy existe. Este ticket quita UN gesto, no cambia ninguna otra via de cierre.\n\nDECISION DE ALCANCE TOMADA POR EL ORQUESTADOR, sujeta a que Rafael la corrija: la barrita gris decorativa (el span w-10 h-1 dentro del handle) SE QUEDA, porque es el indicador visual estandar de una hoja inferior y no promete por si sola un gesto. Lo que SI se va es cursor-grab, que si promete explicitamente que eso se arrastra. Si Rafael quiere la barrita fuera tambien, es una linea mas.\n\nCONTEXTO QUE IMPORTA: el motivo de TASK-251 fue que el swipe estaba sin usar y se comportaba inconsistente en movil. Mismo motivo aca. Ver tambien la regla del proyecto de eliminacion atomica de funcionalidad: hay que grepear E2E y page objects en el MISMO commit, no despues.",
+  "acceptance_criteria": [
+    "AC1 - Un gesto tactil de arrastre hacia abajo sobre el handle de BottomSheet YA NO cierra la hoja. Verificado por comportamiento, no por lectura de codigo.",
+    "AC2 - Las otras vias de cierre siguen funcionando, sin excepcion: el boton X, la tecla Escape, y el click en el overlay si hoy cierra. Si alguna deja de andar es una regresion, no un efecto colateral aceptable.",
+    "AC3 - No queda codigo muerto: se van los tres handlers, los refs touchStartY y touchCurrentY, la constante SWIPE_CLOSE_THRESHOLD_PX y los tres binding @touch* del template, mas la clase cursor-grab. Verificar con grep que no queda ninguna referencia colgada.",
+    "AC4 - tests/unit/components/BottomSheet.test.ts queda consistente: sin tests muertos que prueben un gesto que ya no existe, y con el resto de la cobertura del componente intacta.",
+    "AC5 - Candado de regresion que MUERDE: un test que dispare el gesto sintetico de swipe-down y afirme que la hoja NO se cierra. Probarlo por mutacion, o sea confirmar que se pone rojo si se reintroducen los handlers. Un candado que pasa con y sin la implementacion no cuenta.",
+    "AC6 - Eliminacion atomica: grep de e2e/ y de los page objects buscando el handle y el gesto, y todo lo que aparezca se limpia en el MISMO commit. Si no aparece nada, declararlo explicitamente en el hand-off.",
+    "AC7 - Gate del proyecto verde antes del hand-off: npm run test:unit completo y npx vite build."
+  ],
+  "status": "in_review",
+  "priority": "medium",
+  "labels": [
+    "ui",
+    "cleanup",
+    "mobile"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-20T19:04:57.057Z",
+      "body": "REVISION FULL de d93aa09. APROBADO. 0 HIGH, 0 MEDIUM, 1 LOW.\n\nProfundidad FULL elegida por el orquestador: por conteo de lineas (67) daria light, pero BottomSheet.vue fue tocado por tickets de tier tdd y su ticket hermano TASK-251, la misma clase de cambio, se reviso FULL. Ante la duda, FULL.\n\nTODO LO CRITICO VERIFICADO POR EJECUCION, NO POR LECTURA.\n\nAC5, el candado MUERDE. El reviewer reprodujo la mutacion el mismo, sin creerle al developer: git checkout d93aa09^ -- src/components/ui/BottomSheet.vue reintroduce los tres handlers y sus bindings, y vitest da 1 failed / 9 passed, siendo el que falla exactamente el candado. Restaurado el commit, 10/10 verdes y el working tree limpio. Ademas el candado afirma expect(handle).not.toBeNull() ANTES de disparar el gesto, asi que no puede pasar vacuamente si el data-testid desaparece. No es un sensor vacuo.\n\nAC2, vias de cierre intactas, medido por tests que despachan eventos DOM reales: overlay click cierra, closeOnClickOutside=false no cierra, Escape cierra, boton X cierra. El diff no toca closeSheet, handleOverlayClick ni handleEscape. Los unicos consumidores, BinderView.vue y DeckView.vue, usan solo props y @close.\n\nAC3 y AC6, eliminacion atomica medida por grep: cero hits de SWIPE_CLOSE_THRESHOLD_PX, touchStartY, touchCurrentY, onHandleTouch* y cursor-grab en src/, tests/ y e2e/. El unico hit de swipe en e2e/ es un comentario en e2e/pages/collection.page.ts:299 sobre el swipe-left de TASK-251, no relacionado. La barrita decorativa sigue en su lugar.\n\nAC7, gate corrido por el reviewer: npm run test:unit 163 archivos y 2207 tests verdes, npx vite build exitoso.\n\nLOW-1, no bloquea: el AC1 pide verificacion por comportamiento y la que hay es con TouchEvent sintetico en jsdom, no en navegador ni dispositivo real. El reviewer lo considera suficiente porque la mutacion demuestra que esa misma secuencia sintetica SI disparaba los handlers viejos, o sea que el sensor es valido. Queda pendiente el toque en dev con dispositivo tactil para cumplir el estandar de verificacion en navegador del proyecto.\n\nConfianza del reviewer 9/10. Lo unico no medido es el comportamiento tactil en navegador real."
+    }
+  ],
+  "created_at": "2026-08-20T18:51:51.162Z",
+  "updated_at": "2026-08-20T19:04:57.057Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

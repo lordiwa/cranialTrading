@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T17:48:15.487Z",
+  "generated_at": "2026-08-20T19:04:57.057Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1366,7 +1366,7 @@
     {
       "key": "TASK-248",
       "title": "Busqueda por HABILIDAD y texto de carta en el perfil publico (escindido del AC4 de TASK-247)",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -1392,6 +1392,12 @@
       "title": "En movil, buscar desde /inicio redirige al login estando logueado; en escritorio funciona",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-253",
+      "title": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)",
+      "status": "in_review",
+      "priority": "medium"
     }
   ]
 }

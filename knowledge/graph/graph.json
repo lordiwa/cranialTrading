@@ -122,6 +122,12 @@
       "label": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales"
     },
     {
+      "id": "task-248",
+      "type": "task",
+      "ref": "tasks/TASK-248.json",
+      "label": "Busqueda por HABILIDAD y texto de carta en el perfil publico (escindido del AC4 de TASK-247)"
+    },
+    {
       "id": "task-251",
       "type": "task",
       "ref": "tasks/TASK-251.json",

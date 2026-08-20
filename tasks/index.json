@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T19:33:47.389Z",
+  "generated_at": "2026-08-20T21:05:39.594Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1398,6 +1398,12 @@
       "title": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)",
       "status": "done",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-254",
+      "title": "La suite E2E local no compila nada: Playwright reusa un vite preview viejo y testea el dist que haya en disco, que suele ser el bundle de PRODUCCION",
+      "status": "todo",
+      "priority": "critical"
     }
   ]
 }

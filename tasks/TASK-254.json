@@ -1,0 +1,32 @@
+{
+  "key": "TASK-254",
+  "title": "La suite E2E local no compila nada: Playwright reusa un vite preview viejo y testea el dist que haya en disco, que suele ser el bundle de PRODUCCION",
+  "description": "CAUSA RAIZ MEDIDA POR EL ORQUESTADOR el 2026-08-20. No es una hipotesis: cada pieza de abajo se midio.\n\nQUE PASA:\n1. playwright.config.ts NO define reuseExistingServer, asi que toma el default local de Playwright, que es !process.env.CI, o sea TRUE fuera de CI.\n2. Habia un proceso `node vite.js preview --port 4173` corriendo desde el 2026-08-17 a las 13:27, o sea TRES DIAS. Medido con netstat mas Win32_Process: PID 19008, linea de comando y fecha de arranque confirmadas. El orquestador lo mato el 2026-08-20 con autorizacion explicita de Rafael, asi que el sintoma inmediato esta cortado, pero LA CAUSA SIGUE VIVA: manana aparece otro preview huerfano y vuelve a pasar.\n3. Con ese servidor ocupando el puerto, el comando webServer de Playwright (`npx vite build --mode development && npx vite preview --port 4173`) NUNCA SE EJECUTA. No se compila. Playwright reusa el servidor existente.\n4. `vite preview` sirve dist/ DESDE DISCO. O sea que la suite testea el ultimo bundle que alguien haya dejado en dist/, sea cual sea.\n5. `npx vite build` SIN --mode compila a PRODUCCION. Esta escrito en el propio CLAUDE.md, y el proyecto se lo pide explicitamente a developer y reviewer en cada ticket como parte del gate. O sea que la practica normal del equipo deja un bundle de produccion en dist/ varias veces por dia.\n\nRESULTADO: la suite E2E local corre contra PRODUCCION, con todos sus specs mutadores.\n\nLO IMPORTANTE PARA NO PERDER TIEMPO DEBUGGEANDO EN EL LUGAR EQUIVOCADO: la configuracion PARECE CORRECTA y de hecho LO ES. Se verifico por medicion que `npx vite build --mode development` produce el API key de dev (AIzaSyBJvs...) y ningun rastro del de prod. El problema no es el modo de compilacion; es que ese comando NUNCA CORRE. Esto NO es la regresion de v1.55.2 volviendo, es un segundo camino distinto al mismo desastre.\n\nDANO MEDIDO EN PRODUCCION (leido por REST contra la coleccion users, que es `allow read: if true`):\n- 138 usuarios totales en prod. 119 son cuentas de prueba de la E2E: el 86,2% del padron.\n- Se crean desde el 2026-03-05 y hay de TODOS los meses: marzo 21, abril 32, mayo 4, junio 13, julio 33, agosto 16.\n- Dos de ellas las creo el orquestador hoy mismo: test_1787248832197 a las 18:00:37Z y test_1787252709890 a las 19:05:14Z, timestamps que caen exactamente dentro de las dos ventanas en que corrio la suite completa antes de pushear v1.59.1 y v1.59.2.\n- Una tercera, test_1787199700669 a las 04:21Z, es de una corrida ajena del mismo dia.\n- El documento de usuario de la cuenta de prueba rafamoose_mtg (uid 385E6XCLhGhqOqzEalrQBRX6Bym2) quedo modificado a las 19:16:16Z.\n\nESTO REENCUADRA UNA NOTA VIEJA DEL PROYECTO: se creia que de los 135 usuarios de prod solo 5 tenian cartas publicas y que los otros 125 eran probablemente cuentas vacias, sin verificar. Ya esta verificado: son cuentas de prueba de la E2E. No son usuarios reales.\n\nNO MEDIDO, y hace falta credencial de admin o de la propia cuenta: el mazo huerfano que deja deck-editor.spec.ts \"add card from collection to mainboard\", y la deriva de campos que dejan collection-crud \"edit card\" y el cambio masivo de estado, todo sobre rafamoose_mtg en produccion. users/{uid}/decks y /cards son owner-only en firestore.rules, y la sesion de navegador disponible es la personal de Rafael, no la de prueba.\n\nFUERA DE ALCANCE DE ESTE TICKET, va aparte: borrar las 119 cuentas acumuladas. Es borrado de datos en produccion y necesita decision y ejecucion humana.",
+  "acceptance_criteria": [
+    "AC1 - playwright.config.ts declara reuseExistingServer de forma EXPLICITA y en local queda en false, para que la suite compile siempre su propio bundle en vez de heredar lo que haya en disco. Declarar por escrito que pasa en CI, donde el comportamiento actual puede ser el correcto y no hay que romperlo.",
+    "AC2 - Guarda de arranque que ABORTA la corrida, no que avisa: antes del primer spec se verifica que el bundle que se va a testear lleva el VITE_FIREBASE_PROJECT_ID esperado, y si no coincide la suite falla de entrada con un mensaje que nombre el proyecto encontrado y el esperado. Fallar cerrado: si no se puede determinar el proyecto, tambien aborta, nunca sigue asumiendo que esta bien.",
+    "AC3 - El candado se planta EN ROJO primero y la corrida roja se captura verbatim: con un dist compilado a produccion, la suite tiene que abortar. Reproducir el defecto real, no una simulacion: compilar con npx vite build sin --mode, intentar correr la suite, y mostrar que ahora aborta donde antes corria feliz contra prod.",
+    "AC4 - Control negativo obligatorio: con un dist compilado correctamente a development, la suite arranca normal y NO aborta. Sin este brazo, un AC2 que aborta siempre pasaria por bueno.",
+    "AC5 - El caso especifico del preview huerfano queda cubierto: con un vite preview ajeno ya escuchando en 4173, la suite NO debe heredarlo silenciosamente. Verificar el comportamiento concreto que se elija, sea abortar con un mensaje claro o levantar su propio servidor en otro puerto, y dejarlo escrito.",
+    "AC6 - NO se rompe la corrida contra el entorno desplegado. playwright.config.ts ya soporta E2E_BASE_URL, que saltea el webServer entero y es lo que usa el cron nocturno. Verificar que ese camino sigue funcionando y que la guarda del AC2 no lo rompe ni lo bloquea, porque ahi no hay dist local que inspeccionar.",
+    "AC7 - Gate del proyecto verde: npm run test:unit y npx vite build.",
+    "AC8 - Verificado por comportamiento en una corrida real de la suite, no solo con tests unitarios de la config. La medicion que abrio este ticket fue de comportamiento y el arreglo se verifica igual."
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "e2e",
+    "ci",
+    "produccion",
+    "seguridad-de-datos"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-20T21:05:39.594Z",
+  "updated_at": "2026-08-20T21:05:39.594Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

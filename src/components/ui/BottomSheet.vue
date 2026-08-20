@@ -33,10 +33,6 @@ useFocusTrap(sheetRef, showRef);
 
 const titleId = `bottom-sheet-title-${Math.random().toString(36).slice(2, 9)}`;
 
-const SWIPE_CLOSE_THRESHOLD_PX = 80;
-const touchStartY = ref<number | null>(null);
-const touchCurrentY = ref<number | null>(null);
-
 const closeSheet = () => {
   emit('close');
 };
@@ -49,28 +45,6 @@ const handleOverlayClick = () => {
 
 const handleEscape = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    closeSheet();
-  }
-};
-
-const onHandleTouchStart = (e: TouchEvent) => {
-  const t0 = e.touches[0];
-  touchStartY.value = t0 ? t0.clientY : null;
-  touchCurrentY.value = touchStartY.value;
-};
-
-const onHandleTouchMove = (e: TouchEvent) => {
-  const t0 = e.touches[0];
-  if (t0) touchCurrentY.value = t0.clientY;
-};
-
-const onHandleTouchEnd = (e: TouchEvent) => {
-  const start = touchStartY.value;
-  const end = e.changedTouches[0]?.clientY ?? touchCurrentY.value;
-  touchStartY.value = null;
-  touchCurrentY.value = null;
-  if (start === null || end === null || end === undefined) return;
-  if (end - start >= SWIPE_CLOSE_THRESHOLD_PX) {
     closeSheet();
   }
 };
@@ -99,13 +73,10 @@ const onHandleTouchEnd = (e: TouchEvent) => {
             style="padding-bottom: env(safe-area-inset-bottom);"
             @keydown="handleEscape"
         >
-          <!-- Drag handle (swipe-down area) -->
+          <!-- Drag handle (decorative bottom-sheet indicator) -->
           <div
               data-testid="bottom-sheet-handle"
-              class="flex flex-col items-center pt-2 pb-1 cursor-grab touch-none select-none"
-              @touchstart.passive="onHandleTouchStart"
-              @touchmove.passive="onHandleTouchMove"
-              @touchend.passive="onHandleTouchEnd"
+              class="flex flex-col items-center pt-2 pb-1 select-none"
           >
             <span class="block w-10 h-1 rounded-full bg-silver-30" aria-hidden="true"></span>
           </div>

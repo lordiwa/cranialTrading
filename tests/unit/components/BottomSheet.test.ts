@@ -107,7 +107,11 @@ describe('BottomSheet', () => {
     wrapper.unmount()
   })
 
-  it('emits close after a swipe-down gesture above the threshold', async () => {
+  // TASK-253: BottomSheet's swipe-down-to-close gesture was removed (Rafael, 2026-08-20 —
+  // "se va, si no swipe nada", completing TASK-251). This is the regression lock: it fires
+  // the same synthetic touch sequence the old passing test used and asserts NO close is
+  // emitted. Mutation-tested: reintroducing the touch handlers reddens this test (see hand-off).
+  it('does NOT emit close after a swipe-down gesture on the handle (gesture removed, TASK-253)', async () => {
     const wrapper = mount(BottomSheet, {
       props: { show: true, ariaLabel: 'sheet' },
       slots: { default: SLOT_BUTTON },
@@ -129,34 +133,6 @@ describe('BottomSheet', () => {
     handle?.dispatchEvent(new TouchEvent('touchend', {
       bubbles: true,
       changedTouches: [{ clientY: 200 } as Touch],
-    }))
-    await nextTick()
-
-    expect(wrapper.emitted('close')).toBeTruthy()
-    wrapper.unmount()
-  })
-
-  it('does NOT emit close for swipe-down below the threshold', async () => {
-    const wrapper = mount(BottomSheet, {
-      props: { show: true, ariaLabel: 'sheet' },
-      slots: { default: SLOT_BUTTON },
-      attachTo: document.body,
-    })
-    await nextTick()
-
-    const handle = document.querySelector<HTMLElement>('[data-testid="bottom-sheet-handle"]')
-
-    handle?.dispatchEvent(new TouchEvent('touchstart', {
-      bubbles: true,
-      touches: [{ clientY: 100 } as Touch],
-    }))
-    handle?.dispatchEvent(new TouchEvent('touchmove', {
-      bubbles: true,
-      touches: [{ clientY: 130 } as Touch],
-    }))
-    handle?.dispatchEvent(new TouchEvent('touchend', {
-      bubbles: true,
-      changedTouches: [{ clientY: 130 } as Touch],
     }))
     await nextTick()
 

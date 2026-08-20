@@ -138,6 +138,12 @@
       "type": "task",
       "ref": "tasks/TASK-253.json",
       "label": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)"
+    },
+    {
+      "id": "task-255",
+      "type": "task",
+      "ref": "tasks/TASK-255.json",
+      "label": "Un cambio de estado que se cuelga deja la carta INVISIBLE: el delta de borrado del indice sale igual y el documento queda vivo"
     }
   ],
   "edges": []

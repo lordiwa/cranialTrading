@@ -68,13 +68,15 @@ vi.mock('@/composables/useI18n', () => ({
 const mockGetDocs = vi.fn()
 const mockDeleteDoc = vi.fn().mockResolvedValue(undefined)
 const mockSetDoc = vi.fn().mockResolvedValue(undefined)
-const mockAddDoc = vi.fn().mockResolvedValue({ id: 'new-card' })
 
 vi.mock('firebase/firestore', () => ({
-  addDoc: (...args: unknown[]) => mockAddDoc(...args),
   collection: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
   deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
-  doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
+  // TASK-255 round 1 (HIGH-1 fix): addCard pre-generates the new doc's id
+  // via `doc(colRef)` (ONE arg) instead of relying on addDoc's return value.
+  doc: vi.fn((...args: unknown[]) => (
+    args.length === 1 ? { id: 'new-card', path: 'users/test-user-id/cards/new-card' } : { path: args.slice(1).join('/') }
+  )),
   getCountFromServer: vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
@@ -162,7 +164,6 @@ describe('collection store: mutating BEFORE the card_index has loaded (TASK-185)
     mockGetDocs.mockResolvedValue(snapshotOf([]))
     mockDeleteDoc.mockResolvedValue(undefined)
     mockSetDoc.mockResolvedValue(undefined)
-    mockAddDoc.mockResolvedValue({ id: 'new-card' })
     mockBuildCardIndex.mockResolvedValue({ totalCards: 0, chunks: 0 })
     mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
     mockLoadCollectionChunk.mockReset()

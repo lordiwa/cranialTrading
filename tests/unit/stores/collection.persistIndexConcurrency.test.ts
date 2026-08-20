@@ -149,12 +149,21 @@ describe('collection store: bounded-concurrency card_index chunk writes (TASK-15
       const loaded = await store.loadCollection()
       void loaded
 
-      // Track concurrency: every setDoc call blocks until manually resolved,
-      // and we record the in-flight count at the moment each call starts.
+      // Track concurrency: every CHUNK setDoc call blocks until manually
+      // resolved, and we record the in-flight count at the moment each call
+      // starts.
+      //
+      // TASK-255 round 1 (HIGH-1 fix): addCard's own card-document write
+      // now ALSO goes through setDoc — gating it unconditionally would hang
+      // addCard itself forever. Dispatch on payload shape: only a chunk
+      // write (payload.cards is an array) is tracked/blocked here; the
+      // card-doc write (no `cards` array) resolves immediately and is not
+      // counted toward in-flight concurrency.
       let inFlight = 0
       let peakInFlight = 0
       const resolvers: Array<() => void> = []
-      mockSetDoc.mockImplementation(() => {
+      mockSetDoc.mockImplementation((_ref: unknown, data: { cards?: unknown }) => {
+        if (!Array.isArray(data.cards)) return Promise.resolve() // the new card's own document write
         inFlight++
         peakInFlight = Math.max(peakInFlight, inFlight)
         return new Promise<void>((resolve) => {
@@ -195,7 +204,10 @@ describe('collection store: bounded-concurrency card_index chunk writes (TASK-15
         await vi.advanceTimersByTimeAsync(0)
       }
 
-      expect(mockSetDoc).toHaveBeenCalledTimes(7)
+      // 7 chunk writes + addCard's own card-document write (TASK-255 round 1
+      // HIGH-1 fix — that write is real, but resolves immediately above and
+      // is not part of what this test is measuring).
+      expect(mockSetDoc).toHaveBeenCalledTimes(8)
       // PARALLELISM: more than one write was in flight at once (sequential
       // code would never exceed 1).
       expect(peakInFlight).toBeGreaterThan(1)

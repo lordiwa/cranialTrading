@@ -71,13 +71,20 @@ vi.mock('@/composables/useI18n', () => ({
 const mockUpdateDoc = vi.fn().mockResolvedValue(undefined)
 const mockSetDoc = vi.fn()
 const mockCommit = vi.fn().mockResolvedValue(undefined)
-const mockAddDoc = vi.fn().mockResolvedValue({ id: 'card-1' })
+
+// TASK-255 round 1 (HIGH-1 fix): addCard pre-generates the new doc's id via
+// `doc(colRef)` (ONE arg) — queueNewCardIds replaces the old
+// `mockAddDoc.mockResolvedValueOnce({id:...})` chaining.
+let mockNewCardIdQueue: string[] = []
+const queueNewCardIds = (...ids: string[]) => { mockNewCardIdQueue = [...ids] }
+const nextNewCardId = () => (mockNewCardIdQueue.length > 0 ? mockNewCardIdQueue.shift()! : 'card-1')
 
 vi.mock('firebase/firestore', () => ({
-  addDoc: (...args: unknown[]) => mockAddDoc(...args),
   collection: vi.fn(),
   deleteDoc: vi.fn(),
-  doc: vi.fn((...args: unknown[]) => ({ path: args.join('/') })),
+  doc: vi.fn((...args: unknown[]) => (
+    args.length === 1 ? { id: nextNewCardId(), path: 'ignored' } : { path: args.join('/') }
+  )),
   getCountFromServer: vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
   getDocs: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
@@ -122,7 +129,7 @@ describe('collection store: serialize card_index persist (TASK-123 regression)',
     vi.clearAllMocks()
     mockUpdateDoc.mockResolvedValue(undefined)
     mockCommit.mockResolvedValue(undefined)
-    mockAddDoc.mockResolvedValue({ id: 'card-1' })
+    mockNewCardIdQueue = []
     mockQueryCardIndex.mockResolvedValue({ cards: [], total: 0, page: 0, pageSize: 50, hasMore: false })
   })
 
@@ -132,26 +139,36 @@ describe('collection store: serialize card_index persist (TASK-123 regression)',
       // Seed cardIndexRaw with a single card via addCard, then flush its own
       // seeding persist so it doesn't interfere with the scenario below.
       mockSetDoc.mockResolvedValue(undefined)
-      mockAddDoc.mockResolvedValueOnce({ id: 'card-1' })
+      queueNewCardIds('card-1')
       const { id: _id, updatedAt: _u, ...cardData } = makeCard({ id: 'ignored', status: 'collection' })
       const store = useCollectionStore()
       await store.addCard(cardData as any)
       await vi.advanceTimersByTimeAsync(2100)
       mockSetDoc.mockClear()
 
-      // Every setDoc call now blocks until the test explicitly resolves it —
-      // simulating in-flight Firestore writes whose network responses can
-      // arrive in any order. `serverChunk` mirrors whatever chunk write was
-      // last RESOLVED (i.e. last to "land" on the server), which is exactly
-      // the property that must always match the newest local snapshot.
+      // Every CHUNK setDoc call now blocks until the test explicitly resolves
+      // it — simulating in-flight Firestore writes whose network responses
+      // can arrive in any order. `serverChunk` mirrors whatever chunk write
+      // was last RESOLVED (i.e. last to "land" on the server), which is
+      // exactly the property that must always match the newest local
+      // snapshot.
+      //
+      // TASK-255 round 1 (HIGH-1 fix): addCard's OWN card-document write now
+      // ALSO goes through setDoc — gating every call unconditionally would
+      // hang card-2/card-3's own doc creation forever (their payload has no
+      // `cards` array). Dispatch on payload shape: only a chunk write
+      // (payload.cards is an array) gets queued into `pending`; a card-doc
+      // write resolves immediately, untouched.
       let serverChunk: Array<{ i: string; st: string }> | null = null
       const pending: Array<{ resolved: boolean; resolve: () => void }> = []
-      mockSetDoc.mockImplementation((_ref: unknown, data: { cards: Array<{ i: string; st: string }> }) => {
+      mockSetDoc.mockImplementation((_ref: unknown, data: { cards?: Array<{ i: string; st: string }> }) => {
+        if (!Array.isArray(data.cards)) return Promise.resolve() // the new card's own document write
+        const cards = data.cards
         return new Promise<void>((resolve) => {
           pending.push({
             resolved: false,
             resolve: () => {
-              serverChunk = data.cards
+              serverChunk = cards
               resolve()
             },
           })
@@ -161,7 +178,7 @@ describe('collection store: serialize card_index persist (TASK-123 regression)',
       // Mutation 1: add card-2. Its debounced persist fires and starts
       // writing (blocks on the mocked setDoc) — the snapshot at this point
       // is [card-1, card-2].
-      mockAddDoc.mockResolvedValueOnce({ id: 'card-2' })
+      queueNewCardIds('card-2')
       const { id: _id2, updatedAt: _u2, ...cardData2 } = makeCard({ id: 'ignored-2' })
       await store.addCard(cardData2 as any)
       await vi.advanceTimersByTimeAsync(2000)
@@ -171,7 +188,7 @@ describe('collection store: serialize card_index persist (TASK-123 regression)',
       // ~30-sequential-setDoc multi-second window from the real 59k-card
       // case. Its own debounced persist then fires too, with the NEWER
       // snapshot [card-1, card-2, card-3].
-      mockAddDoc.mockResolvedValueOnce({ id: 'card-3' })
+      queueNewCardIds('card-3')
       const { id: _id3, updatedAt: _u3, ...cardData3 } = makeCard({ id: 'ignored-3' })
       await store.addCard(cardData3 as any)
       await vi.advanceTimersByTimeAsync(2100)

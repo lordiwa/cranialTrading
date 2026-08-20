@@ -377,6 +377,12 @@ describe('collection store: loadFromIndex must not trust a corrupt card_index (T
       mockGetDocs.mockResolvedValue(
         snapshotOf([chunkDoc('chunk_0', []), chunkDoc('chunk_1', []), chunkDoc('chunk_2', [])])
       )
+      // TASK-255 round 1 (HIGH-1 fix): addCard's OWN card-document write now
+      // also goes through setDoc (previously addDoc, a separate mock) — let
+      // that one succeed so addCard reaches persistIndexToFirestore's chunk
+      // write loop at all; only the CHUNK writes (everything after) must
+      // fail, to simulate the real-world interruption this test is about.
+      mockSetDoc.mockResolvedValueOnce(undefined)
       mockSetDoc.mockRejectedValue(new Error('network died mid-write'))
 
       await store.addCard(newCardPayload() as never)

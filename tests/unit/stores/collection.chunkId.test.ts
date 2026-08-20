@@ -51,16 +51,22 @@ vi.mock('@/composables/useI18n', () => ({
   t: (key: string) => key,
 }))
 
-const mockAddDoc = vi.fn().mockResolvedValue({ id: 'new-card' })
+// TASK-255 round 1 (HIGH-1 fix): addCard now pre-generates the new doc's id
+// via `doc(colRef)` (ONE arg, no path segments) and writes with `setDoc`
+// instead of `addDoc` — see collection.lateWriteContinuation.test.ts for
+// why. Mirror that shape here: a one-arg `doc()` call is the id-pregeneration
+// call and gets a fixed id; any other call (updateCard/deleteCard's
+// `doc(db, 'users', uid, 'cards', id)`) keeps the old path-only shape.
 const mockSetDoc = vi.fn().mockResolvedValue(undefined)
 const mockCommit = vi.fn().mockResolvedValue(undefined)
 const mockGetCountFromServer = vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) })
 
 vi.mock('firebase/firestore', () => ({
-  addDoc: (...args: unknown[]) => mockAddDoc(...args),
   collection: vi.fn(),
   deleteDoc: vi.fn(),
-  doc: vi.fn((...args: unknown[]) => ({ path: args.join('/') })),
+  doc: vi.fn((...args: unknown[]) => (
+    args.length === 1 ? { id: 'new-card', path: 'users/test-user-id/cards/new-card' } : { path: args.join('/') }
+  )),
   getCountFromServer: (...args: unknown[]) => mockGetCountFromServer(...args),
   getDocs: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
@@ -92,7 +98,6 @@ describe('collection store addCard(): sticky chunkId (TASK-230)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    mockAddDoc.mockResolvedValue({ id: 'new-card' })
     mockSetDoc.mockResolvedValue(undefined)
     mockCommit.mockResolvedValue(undefined)
     mockGetCountFromServer.mockResolvedValue({ data: () => ({ count: 0 }) })
@@ -105,8 +110,8 @@ describe('collection store addCard(): sticky chunkId (TASK-230)', () => {
     const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...cardData } = makeCard({ id: 'ignored' })
     await store.addCard(cardData as any)
 
-    expect(mockAddDoc).toHaveBeenCalledTimes(1)
-    const [, payload] = mockAddDoc.mock.calls[0]
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    const [, payload] = mockSetDoc.mock.calls[0]
     expect(payload.chunkId).toBe(0)
   })
 
@@ -118,7 +123,7 @@ describe('collection store addCard(): sticky chunkId (TASK-230)', () => {
     const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...cardData } = makeCard({ id: 'ignored' })
     await store.addCard(cardData as any)
 
-    const [, payload] = mockAddDoc.mock.calls[0]
+    const [, payload] = mockSetDoc.mock.calls[0]
     expect(payload.chunkId).toBe(1)
   })
 
@@ -132,7 +137,7 @@ describe('collection store addCard(): sticky chunkId (TASK-230)', () => {
     const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...cardData } = makeCard({ id: 'ignored' })
     await store.addCard(cardData as any)
 
-    const [, payload] = mockAddDoc.mock.calls[0]
+    const [, payload] = mockSetDoc.mock.calls[0]
     // cards.value.length (0) would wrongly give chunkId 0; the true count (4000) gives chunk 2.
     expect(payload.chunkId).toBe(2)
   })
@@ -145,8 +150,8 @@ describe('collection store addCard(): sticky chunkId (TASK-230)', () => {
     const result = await store.addCard(cardData as any)
 
     expect(result).toBe('new-card')
-    expect(mockAddDoc).toHaveBeenCalledTimes(1)
-    const [, payload] = mockAddDoc.mock.calls[0]
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    const [, payload] = mockSetDoc.mock.calls[0]
     expect(payload).not.toHaveProperty('chunkId')
   })
 

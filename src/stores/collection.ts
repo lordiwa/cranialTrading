@@ -2,7 +2,6 @@ import { computed, onScopeDispose, ref, shallowRef } from 'vue'
 import { backgroundSafeDelay } from '../utils/backgroundSafeDelay'
 import { defineStore } from 'pinia'
 import {
-    addDoc,
     collection,
     deleteDoc,
     doc,
@@ -31,7 +30,7 @@ import { buildEnrichmentPatch } from '../utils/cardEnrichment'
 import { cardImageProxyUrl } from '../utils/cardImageUrl'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import { getCardsNeedingPublicSync, isPossiblyPublicCard } from '../utils/publicSyncFilter'
-import { withTimeout } from '../utils/withTimeout'
+import { TimeoutError, withTimeout } from '../utils/withTimeout'
 import type { CardIndexDeltaMutation, QueryCardIndexRequest } from '../services/cloudFunctions'
 
 /**
@@ -1671,14 +1670,58 @@ export const useCollectionStore = defineStore('collection', () => {
             } catch (countError) {
                 logSanitizedError('[TASK-230] Could not read server card count, omitting chunkId', countError)
             }
-            // TASK-255 AC1: same reasoning as deleteDoc's wrap below — the
-            // raw Firestore write has no built-in timeout.
-            const docRef = await withTimeout(addDoc(colRef, {
+            // TASK-255 AC1 + HIGH-1 fix (reviewer, ec5f49b round 1): addDoc
+            // doesn't reveal the new document's id until the write actually
+            // resolves. Wrapping addDoc in a timeout without changing that
+            // reintroduced this exact ticket's bug on the CREATE side: a
+            // write that lands LATE (withTimeout never cancels it — the SDK
+            // gives no way to) after the client already gave up is
+            // completely unrecoverable — no id was ever known, so there is
+            // no way to backfill its card_index entry. `doc(colRef)`
+            // generates the id locally, with no network round trip, so the
+            // id is known BEFORE the write even starts — a late-landing
+            // write can still be indexed (see the TimeoutError branch
+            // below).
+            const newRef = doc(colRef)
+            const writeData = {
                 ...cleanData,
                 ...(chunkId !== undefined ? { chunkId } : {}),
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
-            }), CARD_WRITE_TIMEOUT_MS, 'addDoc')
+            }
+            const writePromise = setDoc(newRef, writeData)
+            try {
+                await withTimeout(writePromise, CARD_WRITE_TIMEOUT_MS, 'addDoc')
+            } catch (writeError) {
+                if (writeError instanceof TimeoutError) {
+                    // TASK-255 HIGH-1: attach a background continuation to
+                    // the ORIGINAL write promise (not the timeout race,
+                    // which has already settled and is what the outer catch
+                    // below reacts to) — TASK-229 measured pending writes
+                    // under saturation converging as late as ~4 minutes
+                    // after the client's own await gave up, with the tab
+                    // still open. If this write actually lands, insert its
+                    // card_index entry then, same allowInsert:true
+                    // mechanism as the synchronous AC3 backstop below. If it
+                    // never lands, or lands as a genuine failure, there is
+                    // no document and nothing to index — the `.catch` below
+                    // is intentionally empty. This is detached from
+                    // addCard's own return: addCard has already reported
+                    // failure to its caller by the time this can fire.
+                    writePromise
+                        .then(() => {
+                            void applyCardIndexDelta([{ cardId: newRef.id, action: 'update', allowInsert: true }])
+                                .catch((err: unknown) => {
+                                    logSanitizedError(`[IndexSync] addDoc for card ${newRef.id} landed AFTER its timeout — late backstop insert into card_index failed`, err, 'error')
+                                })
+                        })
+                        .catch(() => {
+                            // The write itself failed for real, just late — no document, nothing to index.
+                        })
+                }
+                throw writeError
+            }
+            const docRef = newRef
 
             const newCard: Card = {
                 id: docRef.id,
@@ -1702,26 +1745,37 @@ export const useCollectionStore = defineStore('collection', () => {
             // brand-new card into card_index, and measurement against the
             // production incident found it losing that race: two cards
             // created in the same session never showed up in either
-            // rewritten chunk. Back it up with a single, synchronously
-            // awaited, SERVER-authoritative insert — the same
-            // allowInsert:true mechanism deleteCard's gap #1 compensation
-            // already relies on (TASK-232), which re-reads the doc's real
-            // chunkId from Firestore instead of trusting client-side
-            // in-memory state or debounce timing. Best-effort: a failure
-            // here does not fail the card creation itself (the document,
-            // the source of truth, already exists) — mirrors every other
-            // applyCardIndexDelta call site in this file. Only reachable
-            // when chunkId was actually written above (getCountFromServer
-            // succeeded) — the server cannot allowInsert a doc it can't
-            // place in a chunk (functions/index.js applyCardIndexDelta);
-            // the getCountFromServer failure branch already logs its own
-            // reason and stays a pre-existing, out-of-scope gap (TASK-230).
+            // rewritten chunk. Back it up with a single SERVER-authoritative
+            // insert — the same allowInsert:true mechanism deleteCard's gap
+            // #1 compensation already relies on (TASK-232), which re-reads
+            // the doc's real chunkId from Firestore instead of trusting
+            // client-side in-memory state or debounce timing. Best-effort:
+            // a failure here does not fail the card creation itself (the
+            // document, the source of truth, already exists) — mirrors
+            // every other applyCardIndexDelta call site in this file. Only
+            // reachable when chunkId was actually written above
+            // (getCountFromServer succeeded) — the server cannot
+            // allowInsert a doc it can't place in a chunk
+            // (functions/index.js applyCardIndexDelta); the
+            // getCountFromServer failure branch already logs its own reason
+            // and stays a pre-existing, out-of-scope gap (TASK-230).
+            //
+            // LOW (reviewer, ec5f49b round 1): NOT awaited. applyCardIndexDelta
+            // is an httpsCallable with its OWN 60s client timeout
+            // (cloudFunctions.ts) — awaiting it here meant a healthy-but-
+            // slow save could sit in "GUARDANDO" for up to ~80s total
+            // (CARD_WRITE_TIMEOUT_MS + this call's own ceiling), MORE than
+            // before this ticket, when addCard awaited nothing extra at
+            // all. This backstop's only job is reliability, not the UI's
+            // read of success — fire-and-forget matches the existing local
+            // persistIndexToFirestore path right above it, and it is called
+            // (this line always runs) whether or not its own promise has
+            // settled by the time addCard returns.
             if (chunkId !== undefined) {
-                try {
-                    await applyCardIndexDelta([{ cardId: docRef.id, action: 'update', allowInsert: true }])
-                } catch (indexError: unknown) {
-                    logSanitizedError(`[IndexSync] applyCardIndexDelta allowInsert failed for new card ${docRef.id} — falling back to the debounced client persist above`, indexError, 'warn')
-                }
+                void applyCardIndexDelta([{ cardId: docRef.id, action: 'update', allowInsert: true }])
+                    .catch((indexError: unknown) => {
+                        logSanitizedError(`[IndexSync] applyCardIndexDelta allowInsert failed for new card ${docRef.id} — falling back to the debounced client persist above`, indexError, 'warn')
+                    })
             }
 
             // Sync to public collection (non-blocking, log-only on failure)
@@ -2182,6 +2236,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 logSanitizedError(`[IndexSync] applyCardIndexDelta failed for delete of card ${cardId} — outcome unknown, may be applied or stale; not retried`, deltaError, 'error')
             }
 
+            const deletePromise = deleteDoc(cardRef)
             try {
                 // TASK-255 AC1/AC2: withTimeout is the whole fix here. A
                 // deleteDoc that HANGS (the measured production mechanism —
@@ -2194,7 +2249,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 // compensation branch already proven for a genuine failure
                 // (TASK-232 gap #1) — no new compensation logic needed, the
                 // hang just needed a way to actually arrive here.
-                await withTimeout(deleteDoc(cardRef), CARD_WRITE_TIMEOUT_MS, 'deleteDoc')
+                await withTimeout(deletePromise, CARD_WRITE_TIMEOUT_MS, 'deleteDoc')
             } catch (error) {
                 if (isNotFoundError(error)) {
                     // TASK-223: the doc is already gone — deleteCard's entire
@@ -2214,6 +2269,38 @@ export const useCollectionStore = defineStore('collection', () => {
                         await applyCardIndexDelta([{ cardId, action: 'update', allowInsert: true }])
                     } catch (restoreError: unknown) {
                         logSanitizedError('[IndexSync] Failed to restore card_index entry after a failed delete — card may be invisible until the next rebuild', restoreError)
+                    }
+
+                    // TASK-255 MEDIUM-1 fix (reviewer, ec5f49b round 1): the
+                    // compensation above assumes this deleteDoc failure is
+                    // final. On a TimeoutError specifically it is NOT — the
+                    // underlying delete is still in flight (withTimeout
+                    // never cancels it) and can still commit minutes later
+                    // (TASK-229). If it does, the compensation just
+                    // reinserted an index entry for a card whose document is
+                    // actually gone — a phantom entry (index says present,
+                    // no document backs it; visible and self-heals on the
+                    // user's next natural retry, unlike the invisible-card
+                    // case this ticket is centrally about, but still a real
+                    // divergence this fix should not leave open). Attach a
+                    // background continuation to the ORIGINAL deleteDoc
+                    // promise (not the timeout race, already settled) that
+                    // removes the entry again if the delete lands late. A
+                    // genuine (non-timeout) failure does NOT get this
+                    // continuation — it is already final, and attaching one
+                    // there would just duplicate the compensation above for
+                    // no reason.
+                    if (error instanceof TimeoutError) {
+                        deletePromise
+                            .then(() => {
+                                void applyCardIndexDelta([{ cardId, action: 'delete' }])
+                                    .catch((err: unknown) => {
+                                        logSanitizedError(`[IndexSync] deleteDoc for card ${cardId} landed AFTER its timeout — could not remove the compensated card_index entry, may be a phantom until the next rebuild`, err, 'error')
+                                    })
+                            })
+                            .catch(() => {
+                                // The delete itself failed for real, just late — the compensation above already covers this.
+                            })
                     }
                     throw error
                 }

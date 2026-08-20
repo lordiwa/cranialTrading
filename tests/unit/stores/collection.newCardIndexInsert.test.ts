@@ -7,14 +7,28 @@
  * same account within the same production incident.
  *
  * Decision (see collection.ts addCard, "TASK-255 AC3" comment): addCard now
- * ALSO issues a single, synchronously-awaited, server-authoritative
- * applyCardIndexDelta({ action: 'update', allowInsert: true }) call right
- * after addDoc succeeds — the same mechanism deleteCard's gap #1
- * compensation already uses, reading the doc's real chunkId fresh from the
- * server rather than trusting client-side in-memory state or timing. The
- * existing client-side persistIndexToFirestore path is left untouched
- * (paginatedCards/local UI state still need it) — this is a reliability
- * backstop, not a replacement.
+ * ALSO issues a server-authoritative applyCardIndexDelta({ action: 'update',
+ * allowInsert: true }) call right after setDoc succeeds — the same
+ * mechanism deleteCard's gap #1 compensation already uses, reading the
+ * doc's real chunkId fresh from the server rather than trusting client-side
+ * in-memory state or timing. The existing client-side persistIndexToFirestore
+ * path is left untouched (paginatedCards/local UI state still need it) —
+ * this is a reliability backstop, not a replacement.
+ *
+ * Round 1 review (ec5f49b) LOW fix: this backstop call is fire-and-forget
+ * (not awaited) — awaiting it added up to ~80s of "GUARDANDO" for a
+ * healthy-but-slow save (CARD_WRITE_TIMEOUT_MS + the callable's own 60s
+ * ceiling), more than addCard waited before this ticket existed. It is
+ * still guaranteed to be CALLED (the line always runs) before addCard
+ * returns — its own settlement just isn't awaited, hence `vi.waitFor`
+ * below instead of asserting immediately after `addCard` resolves.
+ *
+ * Round 1 review (ec5f49b) HIGH-1 fix: addCard now pre-generates the new
+ * doc's id via `doc(colRef)` and writes with `setDoc`, instead of `addDoc`
+ * (which only reveals the id once the write itself resolves) — see
+ * collection.addCardLateWrite.test.ts for the scenario this unlocks (a
+ * write that lands AFTER its own timeout can still be indexed, because the
+ * id was already known).
  */
 
 vi.mock('@/services/firebase', () => ({
@@ -51,16 +65,21 @@ vi.mock('@/composables/useI18n', () => ({
   t: (key: string) => key,
 }))
 
-const mockAddDoc = vi.fn().mockResolvedValue({ id: 'new-card' })
 const mockSetDoc = vi.fn().mockResolvedValue(undefined)
 const mockCommit = vi.fn().mockResolvedValue(undefined)
 const mockGetCountFromServer = vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) })
+// `doc(colRef)` (one arg, no path segments) is how addCard now pre-generates
+// the new card's id — mirror the real SDK by returning a fixed id for that
+// shape, distinct from the multi-arg `doc(db, 'users', uid, 'cards', id)`
+// shape other call sites (updateCard/deleteCard) use.
+const mockDoc = vi.fn((...args: unknown[]) => (
+  args.length === 1 ? { id: 'new-card', path: 'users/test-user-id/cards/new-card' } : { path: args.join('/') }
+))
 
 vi.mock('firebase/firestore', () => ({
-  addDoc: (...args: unknown[]) => mockAddDoc(...args),
   collection: vi.fn(),
   deleteDoc: vi.fn(),
-  doc: vi.fn((...args: unknown[]) => ({ path: args.join('/') })),
+  doc: (...args: unknown[]) => mockDoc(...args),
   getCountFromServer: (...args: unknown[]) => mockGetCountFromServer(...args),
   getDocs: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
@@ -92,21 +111,24 @@ describe('collection store addCard(): TASK-255 AC3 — a new card must reach car
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    mockAddDoc.mockResolvedValue({ id: 'new-card' })
     mockSetDoc.mockResolvedValue(undefined)
     mockCommit.mockResolvedValue(undefined)
     mockGetCountFromServer.mockResolvedValue({ data: () => ({ count: 0 }) })
     mockApplyCardIndexDelta.mockResolvedValue({ applied: 1, skipped: 0, skippedIds: [], fallbackUsed: 0 })
   })
 
-  it('issues an awaited allowInsert applyCardIndexDelta for the new doc id right after addDoc succeeds', async () => {
+  it('issues an allowInsert applyCardIndexDelta for the new doc id right after setDoc succeeds', async () => {
     const store = useCollectionStore()
     const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...cardData } = makeCard({ id: 'ignored' })
 
     const newId = await store.addCard(cardData as any)
 
     expect(newId).toBe('new-card')
-    expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'new-card', action: 'update', allowInsert: true }])
+    // Fire-and-forget (round 1 LOW fix) — the call is issued before addCard
+    // returns, but its own settlement isn't awaited by addCard.
+    await vi.waitFor(() => {
+      expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'new-card', action: 'update', allowInsert: true }])
+    })
   })
 
   it('does not fail the add when the backstop insert call itself fails — best-effort, like deleteCard delta calls', async () => {

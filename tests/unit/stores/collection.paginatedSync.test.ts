@@ -51,13 +51,24 @@ vi.mock('@/composables/useI18n', () => ({
 const mockUpdateDoc = vi.fn().mockResolvedValue(undefined)
 const mockSetDoc = vi.fn().mockResolvedValue(undefined)
 const mockCommit = vi.fn().mockResolvedValue(undefined)
-const mockAddDoc = vi.fn().mockResolvedValue({ id: 'card-1' })
+
+// TASK-255 round 1 (HIGH-1 fix): addCard pre-generates the new doc's id via
+// `doc(colRef)` (ONE arg, no path segments) and writes with setDoc, instead
+// of relying on addDoc's return value. Several tests below need a DISTINCT
+// id per addCard call (they used to chain
+// `mockAddDoc.mockResolvedValueOnce({id:...})`) — queueNewCardIds replaces
+// that: push the ids a test expects, in call order; once the queue drains,
+// every further one-arg doc() call falls back to 'card-1'.
+let mockNewCardIdQueue: string[] = []
+const queueNewCardIds = (...ids: string[]) => { mockNewCardIdQueue = [...ids] }
+const nextNewCardId = () => (mockNewCardIdQueue.length > 0 ? mockNewCardIdQueue.shift()! : 'card-1')
 
 vi.mock('firebase/firestore', () => ({
-  addDoc: (...args: unknown[]) => mockAddDoc(...args),
   collection: vi.fn(),
   deleteDoc: vi.fn(),
-  doc: vi.fn((...args: unknown[]) => ({ path: args.join('/') })),
+  doc: vi.fn((...args: unknown[]) => (
+    args.length === 1 ? { id: nextNewCardId(), path: 'ignored' } : { path: args.join('/') }
+  )),
   getCountFromServer: vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
   getDocs: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
@@ -104,7 +115,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
     mockUpdateDoc.mockResolvedValue(undefined)
     mockSetDoc.mockResolvedValue(undefined)
     mockCommit.mockResolvedValue(undefined)
-    mockAddDoc.mockResolvedValue({ id: 'card-1' })
+    mockNewCardIdQueue = []
     // Sane default so the TASK-116 deferred refreshCurrentPage() (which now
     // fires after any addCard/deleteCard's debounced persist flushes) doesn't
     // hit an unmocked resolved value in tests that don't care about its result.
@@ -191,16 +202,19 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       // the cards already live in a previously-built card_index. addCard's
       // syncIndexLocal('add') is the only way to populate it from the public API.
       // Each call must resolve a DISTINCT id — addCard uses docRef.id (from
-      // addDoc), not the input card's stripped id, to build the stored card.
-      mockAddDoc
-        .mockResolvedValueOnce({ id: 'card-1' })
-        .mockResolvedValueOnce({ id: 'card-2' })
-        .mockResolvedValueOnce({ id: 'card-3' })
+      // the pre-generated doc() ref), not the input card's stripped id, to
+      // build the stored card.
+      queueNewCardIds('card-1', 'card-2', 'card-3')
       for (const id of ['card-1', 'card-2', 'card-3']) {
         const { id: _id, updatedAt: _updatedAt, ...cardData } = makeCard({ id, status: 'collection' })
         // eslint-disable-next-line no-await-in-loop
         await store.addCard(cardData as any)
       }
+      // TASK-255 round 1 (LOW fix): addCard's own AC3 backstop insert
+      // (applyCardIndexDelta allowInsert:true) is fire-and-forget — wait for
+      // all 3 seeding calls to actually land before clearing, or a late one
+      // pollutes the count this test asserts on below.
+      await vi.waitFor(() => expect(mockApplyCardIndexDelta).toHaveBeenCalledTimes(3))
       mockSetDoc.mockClear()
       mockApplyCardIndexDelta.mockClear()
 
@@ -287,7 +301,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
 
       const newId = await store.addCard(cardData as any)
 
-      expect(newId).toBe('card-1') // mockAddDoc resolves { id: 'card-1' }
+      expect(newId).toBe('card-1') // doc() falls back to 'card-1' when no id was queued
       expect(store.paginatedCards).toHaveLength(1)
       expect(store.paginatedCards[0].id).toBe('card-1')
       // No immediate re-query needed — the optimistic patch already reflects it.
@@ -539,9 +553,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       vi.useFakeTimers()
       try {
         // --- Seed cardIndexRaw with two cards via addCard, then flush their own persist ---
-        mockAddDoc
-          .mockResolvedValueOnce({ id: 'card-A' })
-          .mockResolvedValueOnce({ id: 'card-B' })
+        queueNewCardIds('card-A', 'card-B')
         const { id: _idA, updatedAt: _uA, ...cardAData } = makeCard({ id: 'ignored-a', name: 'Card A' })
         const { id: _idB, updatedAt: _uB, ...cardBData } = makeCard({ id: 'ignored-b', name: 'Card B' })
         const store = useCollectionStore()
@@ -551,21 +563,33 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         mockSetDoc.mockClear()
         mockQueryCardIndex.mockClear()
 
-        // --- Simulate the "server" as whatever the LAST-RESOLVED setDoc call wrote ---
+        // --- Simulate the "server" as whatever the LAST-RESOLVED CHUNK setDoc call wrote ---
         let serverChunk: Array<{ i: string }> = [indexRecordFor('card-A'), indexRecordFor('card-B')]
         let resolveFirstSetDoc!: () => void
         let resolveSecondSetDoc!: () => void
         const firstSetDocGate = new Promise<void>((res) => { resolveFirstSetDoc = res })
         const secondSetDocGate = new Promise<void>((res) => { resolveSecondSetDoc = res })
-        mockSetDoc
-          .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+        // TASK-255 round 1 (HIGH-1 fix): addCard's OWN card-document write now
+        // ALSO goes through setDoc (previously addDoc, a separate mock) — a
+        // plain mockImplementationOnce() chain would wrongly consume its slots
+        // on card-C/card-D's own doc writes instead of the intended CHUNK
+        // writes. Dispatch on payload shape instead: only a chunk write's
+        // payload carries a `cards` array; a card-doc write's payload does not
+        // and resolves immediately, undisturbed, not counted against the gates.
+        let chunkWriteCount = 0
+        mockSetDoc.mockImplementation(async (_ref: unknown, data: { cards?: Array<{ i: string }> }) => {
+          if (!Array.isArray(data.cards)) return // the new card's own document write
+          chunkWriteCount++
+          if (chunkWriteCount === 1) {
             await firstSetDocGate
             serverChunk = data.cards // persist-1's write commits (STALE — missing card-D)
-          })
-          .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+          } else if (chunkWriteCount === 2) {
             await secondSetDocGate
             serverChunk = data.cards // persist-2's write commits (correct — has card-D)
-          })
+          } else {
+            serverChunk = data.cards
+          }
+        })
         mockQueryCardIndex.mockImplementation(async () => ({
           cards: serverChunk,
           total: serverChunk.length,
@@ -575,7 +599,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         }))
 
         // persist-1: add card-C schedules its debounced persist
-        mockAddDoc.mockResolvedValueOnce({ id: 'card-C' })
+        queueNewCardIds('card-C')
         const { id: _idC, updatedAt: _uC, ...cardCData } = makeCard({ id: 'ignored-c', name: 'Card C' })
         await store.addCard(cardCData as any)
         await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, snapshot missing card-D, blocks on setDoc
@@ -584,7 +608,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         // this is the ~30-sequential-setDoc multi-second window from the real 59k-card
         // case: a mutation lands and re-schedules the debounce WHILE persist-1 hasn't
         // finished writing yet.
-        mockAddDoc.mockResolvedValueOnce({ id: 'card-D' })
+        queueNewCardIds('card-D')
         const { id: _idD, updatedAt: _uD, ...cardDData } = makeCard({ id: 'ignored-d', name: 'Card D' })
         await store.addCard(cardDData as any)
 
@@ -617,9 +641,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
       vi.useFakeTimers()
       try {
         // --- Seed cardIndexRaw with two cards via addCard, then flush their own persist ---
-        mockAddDoc
-          .mockResolvedValueOnce({ id: 'card-A' })
-          .mockResolvedValueOnce({ id: 'card-B' })
+        queueNewCardIds('card-A', 'card-B')
         const { id: _idA, updatedAt: _uA, ...cardAData } = makeCard({ id: 'ignored-a', name: 'Card A' })
         const { id: _idB, updatedAt: _uB, ...cardBData } = makeCard({ id: 'ignored-b', name: 'Card B' })
         const store = useCollectionStore()
@@ -629,17 +651,24 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         mockSetDoc.mockClear()
         mockQueryCardIndex.mockClear()
 
+        // TASK-255 round 1 (HIGH-1 fix): see the sibling test above for why
+        // this dispatches on payload shape instead of a plain
+        // mockImplementationOnce() chain — addCard's own card-doc setDoc
+        // calls (card-C, card-D) would otherwise consume the chunk-write gates.
         let serverChunk: Array<{ i: string }> = [indexRecordFor('card-A'), indexRecordFor('card-B')]
         let resolveFirstSetDoc!: () => void
         const firstSetDocGate = new Promise<void>((res) => { resolveFirstSetDoc = res })
-        mockSetDoc
-          .mockImplementationOnce(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+        let chunkWriteCount = 0
+        mockSetDoc.mockImplementation(async (_ref: unknown, data: { cards?: Array<{ i: string }> }) => {
+          if (!Array.isArray(data.cards)) return // the new card's own document write
+          chunkWriteCount++
+          if (chunkWriteCount === 1) {
             await firstSetDocGate
             serverChunk = data.cards // persist-1's write commits (STALE — missing card-D)
-          })
-          .mockImplementation(async (_ref: unknown, data: { cards: Array<{ i: string }> }) => {
+          } else {
             serverChunk = data.cards // persist-2+ resolve immediately with correct data
-          })
+          }
+        })
         mockQueryCardIndex.mockImplementation(async () => ({
           cards: serverChunk,
           total: serverChunk.length,
@@ -648,7 +677,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
           hasMore: false,
         }))
 
-        mockAddDoc.mockResolvedValueOnce({ id: 'card-C' })
+        queueNewCardIds('card-C')
         const { id: _idC, updatedAt: _uC, ...cardCData } = makeCard({ id: 'ignored-c', name: 'Card C' })
         await store.addCard(cardCData as any)
         await vi.advanceTimersByTimeAsync(2000) // timer-1 fires — persist-1 starts, blocks on setDoc
@@ -656,7 +685,7 @@ describe('collection store: paginatedCards sync on toggle (TASK-113 regression)'
         // Second mutation lands DURING persist-1's writes — this SCHEDULES timer-2
         // but does NOT fire it (matches PEDIDO #3's exact gap: the mutation falls
         // in the last <2s of persist-1's writes, so timer-2 is still pending).
-        mockAddDoc.mockResolvedValueOnce({ id: 'card-D' })
+        queueNewCardIds('card-D')
         const { id: _idD, updatedAt: _uD, ...cardDData } = makeCard({ id: 'ignored-d', name: 'Card D' })
         await store.addCard(cardDData as any)
 

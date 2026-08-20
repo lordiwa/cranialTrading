@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T15:34:38.099Z",
+  "generated_at": "2026-08-20T17:48:15.487Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1366,7 +1366,7 @@
     {
       "key": "TASK-248",
       "title": "Busqueda por HABILIDAD y texto de carta en el perfil publico (escindido del AC4 de TASK-247)",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {
@@ -1380,6 +1380,18 @@
       "title": "El backfill del indice publico deja entradas sin set code y sin color, y una segunda pasada no las completa",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-251",
+      "title": "La carta se arrastra en el perfil publico ajeno aunque el swipe no haga nada: promesa falsa en movil",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-252",
+      "title": "En movil, buscar desde /inicio redirige al login estando logueado; en escritorio funciona",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

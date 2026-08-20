@@ -120,6 +120,12 @@
       "type": "task",
       "ref": "tasks/TASK-247.json",
       "label": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales"
+    },
+    {
+      "id": "task-251",
+      "type": "task",
+      "ref": "tasks/TASK-251.json",
+      "label": "La carta se arrastra en el perfil publico ajeno aunque el swipe no haga nada: promesa falsa en movil"
     }
   ],
   "edges": []

@@ -1,0 +1,32 @@
+{
+  "key": "TASK-252",
+  "title": "En movil, buscar desde /inicio redirige al login estando logueado; en escritorio funciona",
+  "description": "REPORTADO POR RAFAEL el 2026-08-20: \"en mobile al ir al inicio y luego buscar no sirve te redirige al login, en web si sirve\".\n\nTRAZADO POR EL ORQUESTADOR SIN ESCRIBIR CODIGO. Fuente de todo lo que sigue: LEIDO en el codigo con lineas exactas. NO reproducido en un dispositivo por el orquestador; la reproduccion en movil es de Rafael.\n\nMECANISMO DE LA REDIRECCION, CONFIRMADO Y SIN AMBIGUEDAD:\n- /search es requiresAuth: true (src/router/index.ts:97).\n- /inicio NO es requiresAuth (src/router/index.ts:33-40), y eso es DELIBERADO: TASK-182 lo saco a proposito porque bloquear ahi era el componente mas grande de los 7,5 s hasta un hero usable a 600 Kbps. No es un bug, es una decision de rendimiento medida.\n- TODAS las vias del buscador van a /search, en escritorio y en movil por igual: src/components/ui/GlobalSearch.vue:139, :149 y :196, y src/composables/useGlobalSearch.ts:130 y :171. El comentario de src/components/layout/AppHeader.vue:155 lo dice explicitamente: la pastilla de escritorio y el boton-icono de movil \"son la misma superficie en dos breakpoints\". O SEA: LA RUTA ES LA MISMA EN LOS DOS. La diferencia entre movil y escritorio NO esta en que naveguen a lugares distintos.\n- El unico punto del que puede salir la redireccion es src/router/authGuard.ts, rama requiresAuth: espera waitForSessionKnown(authStore) y despues `if (!authStore.hasSession) next({ path: '/login', query: { returnUrl: to.fullPath } })`.\n\nComo /inicio no espera a que se resuelva la autenticacion, el usuario puede llegar a buscar MUY temprano, antes de que la sesion este restaurada. Esa es la ventana donde vive este defecto, y explica por que aparece justo en la secuencia \"ir al inicio y luego buscar\" y no entrando directo a /search.\n\nDOS CAUSAS CANDIDATAS, las dos con mecanismo trazado. NINGUNA MEDIDA TODAVIA — no elegir una sin discriminar primero:\n\nH1 — FALLA LA CARGA DEL SDK DE FIREBASE. src/stores/auth.ts:221-231: si la inicializacion de Firebase Auth falla, el catch pone hasSession=false y sessionKnown=true precisamente para que el guard no se cuelgue, y muestra un toast con auth.messages.connectionError. El guard entonces ve \"no hay sesion\" y manda a /login, aunque el usuario SI este logueado. En 4G lenta —que es el mercado objetivo de este proyecto— una carga fallida del SDK es mucho mas probable que en escritorio con buena conexion. Esta hipotesis explica sola la asimetria movil/escritorio.\n\nH2 — CARRERA EN LA RESTAURACION DE LA SESION. src/stores/auth.ts:190-202 pone sessionKnown=true tanto en la rama con usuario como en la rama sin usuario. Si onAuthStateChanged dispara primero con null y despues con el usuario real (restauracion lenta desde IndexedDB, o IndexedDB degradado por modo privado, ITP de Safari, o particionado de almacenamiento), el guard decide en el primer disparo, con hasSession=false, y redirige. En escritorio la restauracion es rapida y la ventana no se abre.\n\nDISCRIMINADOR BARATO, HACERLO ANTES QUE CUALQUIER OTRA COSA: si al ser redirigido aparece un TOAST DE ERROR DE CONEXION, es H1. Si NO aparece ningun toast, H1 queda descartada y la sospecha se concentra en H2. Es una pregunta de una linea a Rafael, o una reproduccion en el navegador con emulacion movil y red limitada.\n\nADVERTENCIA SOBRE EL ARREGLO: Rafael lo describio como \"un arreglo corto\". Puede serlo, pero el camino obvio —hacer que /inicio espere la autenticacion— REVIERTE la optimizacion medida de TASK-182 y devuelve el peor tramo del arranque a 600 Kbps. NO tomar ese camino sin medir lo que cuesta. El arreglo correcto probablemente vive en distinguir \"no hay sesion\" de \"todavia no se pudo saber si hay sesion\", que hoy se colapsan en el mismo hasSession=false, y en no tratar un fallo de carga del SDK como prueba de que el usuario es un invitado.",
+  "acceptance_criteria": [
+    "AC1 - DISCRIMINAR ENTRE H1 Y H2 ANTES DE TOCAR CODIGO, y dejar escrito cual es con su evidencia. El discriminador mas barato es si aparece el toast de error de conexion al ser redirigido. Reproducir con emulacion movil y red limitada, o pedirle el dato a Rafael. Un arreglo elegido sin este paso es un arreglo a ciegas.",
+    "AC2 - Reproducir el defecto de forma controlada: usuario LOGUEADO, entrar a /inicio, buscar, y observar la redireccion a /login con returnUrl. Declarar en que condiciones se reproduce y en cuales no, porque en escritorio no ocurre y esa asimetria es el dato central.",
+    "AC3 - Distinguir 'no hay sesion' de 'todavia no se pudo determinar si hay sesion'. Hoy los dos casos terminan en hasSession=false y el guard los trata igual. Un fallo de carga del SDK NO es prueba de que el usuario sea un invitado, y no debe expulsarlo de una ruta protegida.",
+    "AC4 - NO revertir la optimizacion de TASK-182. /inicio debe seguir sin bloquear en la resolucion de autenticacion; era el componente mas grande de los 7,5 s hasta un hero usable a 600 Kbps. Si el arreglo propuesto la toca, MEDIR el costo en bytes y en tiempo con limitacion de 4G lenta, nunca contra localhost, y declararlo antes de seguir.",
+    "AC5 - Un usuario logueado que es redirigido por un fallo transitorio debe poder volver a lo que estaba haciendo. Verificar que el returnUrl que el guard ya adjunta se respeta de verdad al reintentar, y no se pierde.",
+    "AC6 - Candado de regresion plantado EN ROJO primero, con la corrida roja capturada verbatim: el guard, con la sesion todavia sin determinar o con una carga de SDK fallida, NO debe redirigir a /login a un usuario que si tiene sesion. Es una funcion pura y testeable: createAuthGuard ya se maneja con un store falso, sin Firebase ni Pinia. Si no se puede plantar en rojo primero, decirlo explicitamente en vez de escribir una assertion vacua.",
+    "AC7 - Verificado en un dispositivo movil real o con emulacion movil mas limitacion de red, NO solo con tests unitarios. El defecto es de temporizado y de red: un verde en unit no prueba que se arreglo."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "movil",
+    "auth",
+    "busqueda",
+    "router"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-20T17:27:27.006Z",
+  "updated_at": "2026-08-20T17:27:27.006Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]"
+}

@@ -215,6 +215,20 @@ function defaultSleep(ms) {
 }
 
 /**
+ * A `not_found` entry as Scryfall echoes it back: normally the identifier
+ * object that was sent (`{ id: '...' }`), tolerated as a bare string too.
+ * Anything else yields null and is ignored rather than guessed at.
+ *
+ * @param {unknown} entry
+ * @returns {string|null}
+ */
+function notFoundEntryToId(entry) {
+  if (typeof entry === 'string') return entry || null;
+  if (entry && typeof entry === 'object' && typeof entry.id === 'string') return entry.id || null;
+  return null;
+}
+
+/**
  * One POST /cards/collection with a bounded retry on 429 / transport error.
  * Never throws: a caller gets `{ ok: false, reason }` so the batch's ids can
  * be counted as failed without taking the reconcile down.
@@ -252,7 +266,23 @@ async function fetchCollectionBatch(identifiers, { fetchImpl, sleepImpl, retries
 
       // eslint-disable-next-line no-await-in-loop
       const data = await response.json();
-      return { ok: true, cards: (data && data.data) || [] };
+      // MEDIUM-1 (review round 4): a 200 whose body is not the documented
+      // shape is a FAILED batch, never an answer. This used to read
+      // `cards: (data && data.data) || []`, which turned any unreadable 200
+      // — a proxy, a captive portal, an API shape change, an error wrapped
+      // in a 200 — into "Scryfall knows none of these", tombstoning up to 75
+      // legitimate ids for 30 days while reporting `failed: 0`.
+      if (!data || !Array.isArray(data.data)) {
+        return { ok: false, reason: 'unexpected 200 body: no `data` array' };
+      }
+      // `not_found` is Scryfall's own answer about which identifiers did not
+      // resolve, and it is the AUTHORITY whenever it is present — the set
+      // difference survives only as the fallback for a body that omits it.
+      return {
+        ok: true,
+        cards: data.data,
+        notFound: Array.isArray(data.not_found) ? data.not_found : null,
+      };
     } catch (err) {
       left--;
       if (left === 0) return { ok: false, reason: err instanceof Error ? err.message : String(err) };
@@ -344,12 +374,16 @@ async function backfillScryfallCacheForIds({
     }
     const batch = ids.slice(i, i + SCRYFALL_BATCH_SIZE);
 
-    const elapsed = Date.now() - lastRequestAt;
+    // LOW-3 (review round 4): the throttle reads the SAME injected clock the
+    // time budget above reads. It used to call `Date.now()` directly, so a
+    // test injecting a fake clock steered the budget but not the pacing —
+    // half an injection, and a trap for whoever writes the next test.
+    const elapsed = nowImpl() - lastRequestAt;
     if (lastRequestAt !== 0 && elapsed < SCRYFALL_MIN_INTERVAL_MS) {
       // eslint-disable-next-line no-await-in-loop
       await sleepImpl(SCRYFALL_MIN_INTERVAL_MS - elapsed);
     }
-    lastRequestAt = Date.now();
+    lastRequestAt = nowImpl();
     stats.requests++;
 
     // eslint-disable-next-line no-await-in-loop
@@ -368,6 +402,9 @@ async function backfillScryfallCacheForIds({
     }
 
     const returned = new Set();
+    // Guards against a `not_found` entry that was never in this batch being
+    // tombstoned on this run's behalf.
+    const batchIds = new Set(batch);
     const writer = db.batch();
     for (const card of result.cards) {
       if (!card || !card.id) continue;
@@ -377,6 +414,18 @@ async function backfillScryfallCacheForIds({
         ? { ...fields, _cachedAt: serverTimestamp, _metadataUpdatedAt: serverTimestamp }
         : fields;
       writer.set(db.collection('scryfall_cache').doc(card.id), stamped, { merge: true });
+      // LOW-2, DECLARED rather than fixed (review round 4). The in-memory
+      // map is updated HERE, before the commit below persists the same
+      // data. If that commit fails, this run keeps metadata Firestore does
+      // not have, and the index it writes carries `sc` for cards whose
+      // cache document was never written. Left as is on purpose: the
+      // direction is benign — the index comes out MORE complete, never
+      // less, the values are real Scryfall data rather than invented, and
+      // the next reconcile simply re-requests those ids, since the cache
+      // document is still missing its `set`. The alternative (buffer, then
+      // merge after the commit) would trade a benign inconsistency for a
+      // second copy of the batch in memory, and it is the reason the merge
+      // exists at all — see the function doc above.
       // eslint-disable-next-line security/detect-object-injection
       cacheByScryfallId[card.id] = { ...(cacheByScryfallId[card.id] || {}), ...fields };
     }
@@ -393,13 +442,29 @@ async function backfillScryfallCacheForIds({
       continue;
     }
 
-    // Ids Scryfall's own collection endpoint did not return are a genuine
-    // miss (a deleted or never-existing printing), not a transient failure —
-    // counted, logged, and RECORDED (LOW, review round 3) so the next
-    // reconcile of this seller does not spend a request on them again until
-    // the record goes stale. Recorded in their own collection, never as an
-    // empty scryfall_cache document — see SCRYFALL_NOT_FOUND_COLLECTION.
-    const missingIds = batch.filter((id) => !returned.has(id));
+    // Ids Scryfall's own collection endpoint says do not resolve are a
+    // genuine miss (a deleted or never-existing printing), not a transient
+    // failure — counted, logged, and RECORDED (LOW, review round 3) so the
+    // next reconcile of this seller does not spend a request on them again
+    // until the record goes stale. Recorded in their own collection, never
+    // as an empty scryfall_cache document — see
+    // SCRYFALL_NOT_FOUND_COLLECTION.
+    //
+    // MEDIUM-1 (review round 4): WHO DECIDES an id does not exist. When the
+    // response carries a `not_found` array, that array is the authority and
+    // the set difference is not consulted at all — an id absent from BOTH
+    // arrays is an anomaly, and writing a 30-day tombstone for it is the
+    // silent damage this finding is about. The set difference remains only
+    // as the fallback for a well-formed body that omits `not_found`.
+    const missingIds = result.notFound
+      ? Array.from(
+          new Set(
+            result.notFound
+              .map(notFoundEntryToId)
+              .filter((id) => id && batchIds.has(id) && !returned.has(id))
+          )
+        )
+      : batch.filter((id) => !returned.has(id));
     if (missingIds.length > 0) {
       stats.notFound += missingIds.length;
       try {
@@ -437,6 +502,7 @@ module.exports = {
   SCRYFALL_MIN_INTERVAL_MS,
   SCRYFALL_CACHE_FIELDS,
   SCRYFALL_NOT_FOUND_COLLECTION,
+  notFoundEntryToId,
   pickScryfallCacheFields,
   selectIdsNeedingCacheBackfill,
   fetchKnownMissingIds,

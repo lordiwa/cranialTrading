@@ -280,6 +280,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Scryfall ids the collection endpoint says do not resolve (TASK-247).
+    // The catch-all below already denies this collection; the rule is spelled
+    // out anyway because the rules of this project are deployed BY HAND, and
+    // an unnamed collection is one nobody finds when they come looking. No
+    // client ever reads or writes it — only the reconcile, through the admin
+    // SDK, which bypasses rules entirely.
+    match /scryfall_not_found/{cardId} {
+      allow read, write: if false;
+    }
+
     // Denegar todo lo demás por defecto
     match /{document=**} {
       allow read, write: if false;

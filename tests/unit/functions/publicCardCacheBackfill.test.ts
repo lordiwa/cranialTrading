@@ -493,3 +493,188 @@ describe('backfillScryfallCacheForIds — ids Scryfall does not know are remembe
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * MEDIUM-1 (review round 4) — a 200 with an unexpected body used to mark the
+ * WHOLE batch as non-existent for 30 days, and report `failed: 0`.
+ *
+ * MEASURED by the reviewer against the real module: `fetchImpl` returning
+ * `{ok: true, status: 200, json: () => ({object: 'error'})}` over five VALID
+ * ids produced `{notFound: 5, failed: 0}`, and all five were written into
+ * `scryfall_not_found`. Nothing in the result said anything had gone wrong.
+ *
+ * The cause was inferring "not found" BY ABSENCE: `cards: (data && data.data)
+ * || []` discarded the `not_found` array the endpoint itself returns, so any
+ * 200 without `data` — a proxy, a captive portal, an API shape change, an
+ * error wrapped in a 200 — read as "Scryfall knows none of these". Up to 75
+ * legitimate cards per batch would then keep `sc: ''` for 30 days, with no
+ * Card Kingdom price and no repair path short of deleting documents by hand.
+ *
+ * Two rules, neither of which assumes anything about the API: a body without
+ * a `data` ARRAY is a FAILED batch, and when `not_found` is present it is the
+ * AUTHORITY on which ids do not exist — never the set difference.
+ */
+describe('backfillScryfallCacheForIds — a 200 is not automatically an answer', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e']
+  const bodyFetch = (body: unknown) =>
+    vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => body,
+    })
+
+  it('treats a 200 whose body has no `data` array as a FAILED batch, not as five non-existent cards', async () => {
+    const db = makeFakeDb()
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ids,
+      cacheByScryfallId: {},
+      fetchImpl: bodyFetch({ object: 'error' }),
+      sleepImpl: async () => {},
+    })
+    expect(result.failed).toBe(5)
+    expect(result.notFound).toBe(0)
+    // And nothing was tombstoned: a 30-day "this card does not exist" record
+    // is exactly what must NOT come out of an unreadable response.
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]).toBeUndefined()
+  })
+
+  it('treats a 200 with no body at all as a failed batch', async () => {
+    const db = makeFakeDb()
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ids,
+      cacheByScryfallId: {},
+      fetchImpl: bodyFetch(null),
+      sleepImpl: async () => {},
+    })
+    expect(result.failed).toBe(5)
+    expect(result.notFound).toBe(0)
+  })
+
+  it('treats a `data` that is not an array as a failed batch', async () => {
+    const db = makeFakeDb()
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ids,
+      cacheByScryfallId: {},
+      fetchImpl: bodyFetch({ data: { 0: scryfallCard('a') } }),
+      sleepImpl: async () => {},
+    })
+    expect(result.failed).toBe(5)
+    expect(result.notFound).toBe(0)
+  })
+
+  // THE NORMAL RESPONSE of POST /cards/collection: some identifiers resolve,
+  // the rest come back in `not_found`. This is the path that runs most.
+  //
+  // `d` is deliberately in NEITHER array — the shape that separates the two
+  // rules. Under the authority rule only `b` is a miss; under the old set
+  // difference `d` would be tombstoned for 30 days on the strength of an
+  // anomaly nobody asserted.
+  it('uses `not_found` as the authority on the mixed response, the endpoint’s normal shape', async () => {
+    const db = makeFakeDb()
+    const cacheByScryfallId: Record<string, Record<string, unknown>> = {}
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ['a', 'b', 'c', 'd'],
+      cacheByScryfallId,
+      fetchImpl: bodyFetch({
+        data: [scryfallCard('a'), scryfallCard('c')],
+        // Scryfall echoes the identifier objects that failed to resolve.
+        not_found: [{ id: 'b' }],
+      }),
+      sleepImpl: async () => {},
+    })
+    expect(result.written).toBe(2)
+    expect(result.notFound).toBe(1)
+    expect(result.failed).toBe(0)
+    expect(cacheByScryfallId.a?.set).toBe('m20')
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]?.b).toBeDefined()
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]?.a).toBeUndefined()
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]?.c).toBeUndefined()
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]?.d).toBeUndefined()
+  })
+
+  it('records nothing when `not_found` is present and empty, even if a card is missing from `data`', async () => {
+    // Scryfall said "none of these are missing". Believe IT, not the set
+    // difference — an id absent from both arrays is an anomaly, and inventing
+    // a 30-day tombstone for it is the exact damage MEDIUM-1 describes.
+    const db = makeFakeDb()
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ['a', 'b'],
+      cacheByScryfallId: {},
+      fetchImpl: bodyFetch({ data: [scryfallCard('a')], not_found: [] }),
+      sleepImpl: async () => {},
+    })
+    expect(result.written).toBe(1)
+    expect(result.notFound).toBe(0)
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]).toBeUndefined()
+  })
+
+  it('accepts a bare string identifier in `not_found` as well as an object', async () => {
+    const db = makeFakeDb()
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ['a', 'b'],
+      cacheByScryfallId: {},
+      fetchImpl: bodyFetch({ data: [scryfallCard('a')], not_found: ['b'] }),
+      sleepImpl: async () => {},
+    })
+    expect(result.notFound).toBe(1)
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]?.b).toBeDefined()
+  })
+
+  it('ignores a `not_found` id that was never in this batch', async () => {
+    const db = makeFakeDb()
+    const result = await backfillScryfallCacheForIds({
+      db,
+      scryfallIds: ['a'],
+      cacheByScryfallId: {},
+      fetchImpl: bodyFetch({ data: [], not_found: [{ id: 'a' }, { id: 'somebody-elses-id' }] }),
+      sleepImpl: async () => {},
+    })
+    expect(result.notFound).toBe(1)
+    expect(db.store[SCRYFALL_NOT_FOUND_COLLECTION]?.['somebody-elses-id']).toBeUndefined()
+  })
+})
+
+/**
+ * LOW-3 (review round 4) — two clocks in the same loop. The Scryfall throttle
+ * read `Date.now()` while the time budget read the injected `nowImpl()`, so a
+ * test injecting a fake clock controlled the budget but NOT the rate limiter,
+ * which kept measuring wall time. Nothing breaks today; it is a half-done
+ * injection that would mislead the next test written against it.
+ */
+describe('backfillScryfallCacheForIds — one injected clock, not two', () => {
+  it('paces requests off the injected clock, so a fake clock controls the throttle too', async () => {
+    // A clock that advances 200ms per reading — comfortably past
+    // SCRYFALL_MIN_INTERVAL_MS, so a module reading THIS clock never needs to
+    // sleep between batches. A module reading the wall clock sees ~0ms
+    // elapsed and sleeps.
+    let t = 1_000_000
+    const nowImpl = () => {
+      t += 200
+      return t
+    }
+    const sleepImpl = vi.fn().mockResolvedValue(undefined)
+    const idsTwoBatches = Array.from({ length: SCRYFALL_BATCH_SIZE + 1 }, (_, i) => `id-${i}`)
+    const result = await backfillScryfallCacheForIds({
+      db: makeFakeDb(),
+      scryfallIds: idsTwoBatches,
+      cacheByScryfallId: {},
+      fetchImpl: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ data: [], not_found: [] }),
+      }),
+      sleepImpl,
+      nowImpl,
+    })
+    expect(result.requests).toBe(2)
+    expect(sleepImpl).not.toHaveBeenCalled()
+  })
+})

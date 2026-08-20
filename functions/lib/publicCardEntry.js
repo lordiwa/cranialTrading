@@ -227,8 +227,9 @@ function buildPublicEntry(publicCardDoc, scryfallCacheDoc) {
     // required) leaves the set filter empty.
     //
     // `cache.set` is the machine SET CODE ('m20'), the same kind of value as
-    // `setCode`; `cache.set_name` ('Core Set 2020') is `ed` below and is NOT
-    // interchangeable with it (the recurring Card.edition bug of this
+    // `setCode`; `cache.set_name` ('Core Set 2020') is the human name that
+    // belongs with `ed` below, and is NOT interchangeable with it (the
+    // recurring Card.edition bug of this
     // project). Uppercased to match how setCode is written everywhere else
     // (importHelpers' `card.setCode?.toUpperCase()`) and how the query
     // layer's `edition` filter compares it.
@@ -252,6 +253,15 @@ function buildPublicEntry(publicCardDoc, scryfallCacheDoc) {
     // edition (see useCardFilter.ts's filteredCards), so search parity
     // with today's behavior needs this alongside `sc`/setCode, which is
     // the machine set CODE and not interchangeable with it.
+    //
+    // LOW-4 (review round 4): unlike `sc` above, this has NO fallback to
+    // `cache.set_name` — the document's own `edition` is the only source.
+    // Deliberate, and MEASURED before deciding: of the 8,388 public_cards
+    // documents in production on 2026-08-19, ZERO lack `edition`, and zero
+    // lack `edition` and `setCode` at once. A cache fallback here would
+    // repair nothing that is broken today, so the line is left alone; what
+    // was actually wrong was the comment above, which said the cache name
+    // WAS this field.
     ed: data.edition || '',
     t: resolveTypeLine(cache),
     cm: (cache && cache.cmc) ?? 0,

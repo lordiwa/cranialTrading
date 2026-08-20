@@ -325,9 +325,53 @@ async function reconcilePublicCardIndexForUser({
   // and a `noop` run both return before this point, so neither talks to
   // Scryfall at all. For the dry run that is the pre-existing rule (--dry-run
   // must not write, and that includes scryfall_cache and someone else's rate
-  // limit). For a `noop` run it is new and deliberate: a noop rewrites no
-  // chunk, so a cache repair made there could not reach any entry anyway (see
-  // the KNOWN LIMIT below) — it would have been pure quota.
+  // limit). For a `noop` run it is new and deliberate.
+  //
+  // WHAT A NOOP STOPPED DOING, IN FULL (LOW-1, review round 4 — the earlier
+  // version of this note only counted the loss from the index's side, which
+  // understated it). Two things went away, not one:
+  //   1. For THIS index: nothing. A noop rewrites no chunk, so a cache
+  //      repair made there could not have reached any entry anyway (see the
+  //      KNOWN LIMIT below).
+  //   2. For the REST OF THE PRODUCT: a real loss. `scryfall_cache` is a
+  //      SHARED collection — card_index, loadCardPage and hydrateCard all
+  //      read it — so a backfill during a noop used to leave something
+  //      behind for those readers even when this index needed nothing. That
+  //      no longer happens: a seller whose index is permanently healthy now
+  //      never contributes a cache repair.
+  // The gap is closed by any run that DOES write (the pre-deploy full
+  // rebuild, and every reconcile after a real change), and by
+  // scripts/backfill-scryfall-cache.mjs, which exists precisely to repair
+  // the shared cache independently of any index.
+  //
+  // NOT moved back above the `noop` return, and the reason is the lease, not
+  // preference: this lease is released ONLY by the unconditional
+  // `metaRef.set(metaOp.data)` at the end of a writing run (that document has
+  // no `reconcileLeaseAt`). The `noop` path returns without writing _meta, so
+  // a noop that took the lease would hold it for the full
+  // RECONCILE_LEASE_STALE_MS — ten minutes — with two effects, not one:
+  //   a. every later reconcile of that seller is refused for those ten
+  //      minutes, on an index that was healthy;
+  //   b. publicCardIndexQuery.js's `isReconciling(meta, now)` reads that
+  //      SAME `reconcileLeaseAt` and reports `indexState.reconciling` to the
+  //      public profile — so the flag would say "this index is being
+  //      rebuilt" to VISITORS of a seller whose index needs nothing. Today
+  //      that flag reaches usePublicProfileIndex's returned ref and no view
+  //      renders it (checked), so this half is latent rather than visible —
+  //      but it is one template line away from being a user-facing lie.
+  // Restoring the capability therefore needs an explicit release on the noop
+  // path, which is lease logic this round did not open.
+  //
+  // AND WHY THIS IS NOT A REGRESSION, which is the part that makes the
+  // trade acceptable rather than merely convenient: none of this backfill is
+  // deployed. MEASURED 2026-08-19: zero accounts have a built public index in
+  // either project, so the capability being given up here does not exist in
+  // production for anyone to lose. The first deployed version is simply
+  // slightly smaller than an uncommitted intermediate state. That is what
+  // separates this from round 1 of this same tanda, which deleted
+  // `enrichPublicCardsInMemory` — a path that WAS live in production and
+  // whose removal really did take something away. Same shape, different
+  // impact; do not read this note as a precedent for the other case.
   //
   // Deliberately NOT allowed to throw: this runs after the seller's entire
   // collection has already been read and after the lease was taken, and a

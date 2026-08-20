@@ -14,6 +14,7 @@ import { useI18n } from '../composables/useI18n';
 import { buildLoginUrl, buildRegisterUrl } from '../composables/useReturnUrl';
 import { colorOrder, getCardColorCategory, getCardManaCategory, getCardNameCategory, getCardTypeCategory, manaOrder, translateCategory as translateCategoryLabel, typeOrder } from '../composables/useCardFilter';
 import { PUBLIC_COLOR_LETTERS, PUBLIC_MANA_VALUES, PUBLIC_RARITIES, PUBLIC_TYPES, usePublicProfileIndex } from '../composables/usePublicProfileIndex';
+import { resolveProfileEmptyState } from '../composables/useProfileEmptyState';
 import { shareCart } from '../utils/exchangeCartShare';
 import AppContainer from '../components/layout/AppContainer.vue';
 import BaseLoader from '../components/ui/BaseLoader.vue';
@@ -76,7 +77,7 @@ const {
   partial: indexPartial,
   indexBuilt,
   loading: loadingPublicCards,
-  missing: colorUnknownExcluded,
+  missing: dataUnknownExcluded,
   saleCount,
   tradeCount,
   activeFilterCount,
@@ -382,6 +383,27 @@ const resetAllChipFilters = () => {
   resetFilters();
 };
 
+// TASK-248 AC1: which empty/error/results state to render — see
+// useProfileEmptyState.ts's header for why this is a pure function instead
+// of inline template conditionals.
+const profileEmptyState = computed(() => resolveProfileEmptyState({
+  cardsError: cardsError.value,
+  indexBuilt: indexBuilt.value,
+  loadingPublicCards: loadingPublicCards.value,
+  cardsLength: cards.value.length,
+  searching: searching.value,
+  activeFilterCount: activeFilterCount.value,
+  filterQuery: filterQuery.value,
+}));
+
+// The "your filters matched nothing" empty state's own clear action — resets
+// BOTH the chip filters (resetAllChipFilters/resetFilters) and the free-text
+// search box, since either alone can be the reason cards.length is 0 here.
+const clearAllProfileFilters = () => {
+  resetFilters();
+  filterQuery.value = '';
+};
+
 const getGroupCardCount = (groupCards: Card[]): number => {
   return groupCards.reduce((sum, card) => sum + (card.quantity || 1), 0);
 };
@@ -662,7 +684,7 @@ onMounted(() => {
            no public cards" while the header above still says "1703 for sale"
            is a contradiction the visitor can see. -->
       <div
-          v-else-if="!indexBuilt && !loadingPublicCards && cards.length === 0"
+          v-else-if="profileEmptyState === 'building'"
           data-testid="profile-index-building"
           class="bg-surface-1 border border-line rounded-lg p-8 text-center"
       >
@@ -671,7 +693,12 @@ onMounted(() => {
         </p>
       </div>
 
-      <div v-else-if="cards.length === 0 && !searching && activeFilterCount === 0 && !filterQuery.trim()" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
+      <!-- TASK-248 AC1: truly zero public cards, no filter or search active.
+           Kept separate from the "filter matched nothing" state below (which
+           needs the search bar to stay mounted) via resolveProfileEmptyState
+           — see that module's header for why the two were indistinguishable
+           before this ticket. -->
+      <div v-else-if="profileEmptyState === 'empty'" data-testid="profile-no-public-cards" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
         <p class="text-body text-silver-70">
           {{ t('profile.noPublicCards') }}
         </p>
@@ -712,11 +739,12 @@ onMounted(() => {
           {{ t('profile.index.updating') }}
         </p>
 
-        <!-- Cards a colour filter dropped for having no colour data. Without
-             this line they simply vanish when a chip is pressed, which is
+        <!-- Cards a colour or keyword filter dropped for having no colour or
+             keyword data (TASK-247 AC9 / TASK-248 AC5). Without this line
+             they simply vanish when a chip is pressed, which is
              indistinguishable from the seller not owning them. -->
-        <p v-if="colorUnknownExcluded" data-testid="profile-color-unknown" class="mt-3 text-small text-silver-50">
-          {{ t('profile.index.colorUnknownExcluded', { count: colorUnknownExcluded }) }}
+        <p v-if="dataUnknownExcluded" data-testid="profile-data-unknown" class="mt-3 text-small text-silver-50">
+          {{ t('profile.index.dataUnknownExcluded', { count: dataUnknownExcluded }) }}
         </p>
 
         <AdvancedFilterModal
@@ -730,11 +758,22 @@ onMounted(() => {
             @reset="resetAllChipFilters"
         />
 
-        <!-- No results after filtering -->
-        <div v-if="cards.length === 0" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
-          <p class="text-body text-silver-70">
-            {{ t('profile.noPublicCards') }}
+        <!-- TASK-248 AC1: no results after filtering — reached only when
+             `profileEmptyState` is 'filtered-empty' or 'results'; if we are
+             here with zero cards, a filter or search IS active (the 'empty'
+             branch above already claimed the truly-empty case), so this is
+             ALWAYS "your filters matched nothing", never "this seller
+             publishes nothing". Distinct message and testid from
+             profile-no-public-cards on purpose — reusing the same key here
+             is the exact regression this ticket fixed (see
+             tests/unit/views/userProfileEmptyStateKeys.test.ts). -->
+        <div v-if="cards.length === 0" data-testid="profile-filtered-empty" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
+          <p class="text-body text-silver-70 mb-4">
+            {{ t('collection.empty.noFilterResults') }}
           </p>
+          <BaseButton size="small" data-testid="profile-clear-filters" @click="clearAllProfileFilters">
+            {{ t('collection.empty.clearFilters') }}
+          </BaseButton>
         </div>
 
         <!-- LOW-5 (ronda 2): every chip press is a server round-trip and the

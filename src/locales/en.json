@@ -1595,7 +1595,7 @@
       "updating": "This seller's catalogue is being rebuilt right now, so the count shown may be incomplete.",
       "building": "This seller's catalogue is still being built, so their cards are not listed yet. It will be ready shortly.",
       "unknownTotal": "updating",
-      "colorUnknownExcluded": "{count} cards are hidden by this colour filter because we have no colour data for them. They are still listed with no filter, and still findable by name.",
+      "dataUnknownExcluded": "{count} cards are hidden by these filters because we don't have all their data (colour or ability). They are still listed with no filter, and still findable by name.",
       "error": "We could not load this collection. This is a problem on our side, not an empty profile.",
       "retry": "TRY AGAIN"
     }

@@ -672,6 +672,85 @@ function countColorUnknownExcluded(entries, filters) {
   return filterPublicIndexEntries(entries, filters, { skip: 'color' }).filter(isColorUnknown).length;
 }
 
+/** A keyword filter is "active" only when it actually names something. */
+function hasKeywordFilter(filters) {
+  return Array.isArray(filters.keywords) && filters.keywords.length > 0;
+}
+
+/**
+ * TASK-248 AC4/AC5 measurement, against the same 6,647-entry production
+ * profile publicCardEntry.js's header dates its own numbers against
+ * (2026-08-19).
+ *
+ * AC4 (card_faces / split cards, e.g. 'Blightreaper Thallid // Blightsower
+ * Thallid'): MEASURED there is no fallback chain to write. Scryfall's own
+ * `card_faces[].` objects carry NO `keywords` property at all — checked
+ * against all 192 production entries whose scryfallId has `card_faces`, 0
+ * had a face-level `keywords` array. The top-level `keywords` field (this
+ * entry's `kw`) is Scryfall's own aggregate for the WHOLE card, both faces
+ * included, computed by Scryfall itself — there is nowhere else for a named
+ * keyword ability to hide. This is why `kw` needed no `resolveColors`/
+ * `resolveTypeLine`-style fallback in publicCardEntry.js's buildPublicEntry
+ * to begin with. Confirmed directly against Blightreaper Thallid //
+ * Blightsower Thallid's own cached document: root `keywords: ['Transform']`,
+ * root `oracle_text` absent, BOTH faces carry real oracle_text and NEITHER
+ * carries a `keywords` key.
+ *
+ * AC5 (the 3,136-of-6,647 entries with `kw: []`): MEASURED against every one
+ * of them — all 3,136 have a real scryfall_cache document (0 had the `x`
+ * flag at measurement time). Of those, 30 have no oracle_text/keywords
+ * anywhere (root or faces — genuinely blank rules text, e.g. a French
+ * vanilla land) and 66 have oracle_text only inside `card_faces[]` (root
+ * oracle_text absent, e.g. an MDFC where the printed text lives entirely on
+ * the two faces). NEITHER group is a data gap for keyword search: oracle_text
+ * is not part of this index at all (buildPublicEntry's own note: hundreds of
+ * bytes/card against a 4G-slow byte budget, deferred to TASK-248 and still
+ * out of scope here — see FUERA DE ALCANCE in the ticket). `kw: []` on an
+ * entry that HAS a cache document is Scryfall correctly reporting "no named
+ * keyword ability", the same legitimate-empty-value shape as `colors: []`
+ * meaning incolora in publicCardEntry.js's AC9 — not a hole to patch.
+ *
+ * DECISION (reusing `x`/`cu`, not inventing a third flag, as the ticket
+ * asked): the ONLY real data gap a keyword filter can hide is the same one
+ * AC9 already flags — no scryfall_cache document at all (`x`). An x-flagged
+ * entry has no keywords AND no type_line (publicCardEntry's `kw`/`t` both
+ * come from `cache`, which is null), so it was already being silently
+ * dropped by an active keyword filter with nothing to explain it — the exact
+ * "hueco ignorado" AC5 forbids, the same shape AC9 fixed for colour. `cu` is
+ * deliberately NOT part of this check: it means colour resolution failed,
+ * which says nothing about whether the entry's keywords are known — an
+ * entry can be `cu`-flagged with a perfectly good cache document and real
+ * keywords.
+ */
+function isKeywordDataUnknown(entry) {
+  return entry.x === 1;
+}
+
+/**
+ * How many entries were excluded from a keyword-filtered result specifically
+ * because their keyword data is unknown (`x` — see isKeywordDataUnknown),
+ * mirroring countColorUnknownExcluded. Zero when no keyword filter is
+ * active.
+ *
+ * KNOWN LIMITATION, documented rather than solved (out of TASK-248's
+ * concrete scope, which is a single active keyword filter — Rafael's
+ * repro): when a colour filter AND a keyword filter are BOTH active at
+ * once, an x-flagged entry is already dropped by whichever filter's
+ * `skip`-free pass runs first, so it is invisible to the OTHER filter's own
+ * `{ skip: '...' }` recount — the two counts can each undercount in that
+ * combination rather than double-count. `missing` stays a non-negative,
+ * finite number in every case; it is a lower bound on "cards hidden by
+ * unknown data" when multiple unknown-data-sensitive filters are combined,
+ * not a guaranteed exact count. Fixing this precisely needs `skip` to accept
+ * more than one dimension at once, which is a real change to
+ * filterPublicIndexEntries's contract — left for the ticket that actually
+ * needs the combination to be exact, rather than added here unasked.
+ */
+function countKeywordUnknownExcluded(entries, filters) {
+  if (!hasKeywordFilter(filters)) return 0;
+  return filterPublicIndexEntries(entries, filters, { skip: 'keywords' }).filter(isKeywordDataUnknown).length;
+}
+
 /**
  * Sorts a copy — never the caller's array. Default (no/unknown direction) is
  * ascending; the default FIELD is `name`, matching `getUserPublicCardsPage`'s
@@ -980,7 +1059,12 @@ async function queryPublicCardIndexForUser(params) {
       // firm next to a null total — a firm-looking "474 cards hidden" beside
       // "we cannot tell you how many there are" is the inconsistency this
       // mitigation exists to avoid.
-      missing: partial ? null : countColorUnknownExcluded(entries, safeFilters),
+      // TASK-248 AC5: combined with the keyword-filter equivalent — see
+      // countKeywordUnknownExcluded's own header for the documented
+      // undercount limitation when both filters are active at once.
+      missing: partial
+        ? null
+        : countColorUnknownExcluded(entries, safeFilters) + countKeywordUnknownExcluded(entries, safeFilters),
     },
   };
 }
@@ -1001,6 +1085,8 @@ module.exports = {
   filterPublicIndexEntries,
   sortPublicIndexEntries,
   computePublicFacets,
+  countKeywordUnknownExcluded,
+  isKeywordDataUnknown,
   expandPublicIndexChunks,
   detectGenerationMismatch,
   countColorUnknownExcluded,

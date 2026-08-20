@@ -14,7 +14,7 @@
     "AC9 (NUEVO, 2026-08-19, por medicion del orquestador) - El enriquecimiento no puede leer la raiz del documento de scryfall_cache sin fallback, porque hay huecos MEDIDOS sobre las 5.145 cartas publicas cacheadas: 380 (7,4%) no tienen colors NI color_identity; 115 son cartas de doble cara que guardan los colores dentro de card_faces[].colors y no en la raiz (verificado: en el ejemplo inspeccionado face[0].colors existe y color_identity de la raiz tambien); 1 no tiene type_line. Requisito: cadena de fallback explicita colors -> color_identity -> union de card_faces[].colors, y lo mismo para type_line. Ademas hay 17 scryfallId de public_cards que NO estan en scryfall_cache (cobertura global medida 5.145/5.162 = 99,67%), entre ellos Leyline Binding, Scalding Tarn, Cranial Plating, Summoner's Pact y Kogla the Titan Ape: decidir y dejar escrito si el backfill las trae de Scryfall o si quedan sin filtrar, y que ve el usuario en ese caso. Un arreglo que deje el 7,4% mal filtrado es la misma forma del bug que este ticket cierra.",
     "AC10 (NUEVO, 2026-08-19) - La estructura nueva NO puede heredar el chunking POR POSICION del card_index, que es el origen de la familia de bugs TASK-208/TASK-238 (chunks que pierden entradas, indice vaciado que no se repara solo y pasa los tres chequeos de salud). El chunk de una carta se deriva de su identidad (p.ej. hash del scryfallId), nunca de su posicion en un array. Y la reconciliacion se disena en este ticket, no se difiere: tiene que existir una forma de detectar que el indice publico diverge de public_cards y de repararlo, porque este ticket agrega una TERCERA copia derivada a un proyecto que todavia no reconcilia las dos que tiene (TASK-228)."
   ],
-  "status": "in_review",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "regresion",
@@ -26,7 +26,32 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "7afed2a",
+    "f701656",
+    "b7ba8a5",
+    "37b3faf",
+    "fe2d43d",
+    "887770c",
+    "a51d6b6",
+    "a6b7bd8",
+    "593b1b6",
+    "2d25fe4",
+    "e4c7ba6",
+    "4bbfc9d",
+    "f227e6f",
+    "0038950",
+    "c2c84a5",
+    "2c3a5f8",
+    "346dc07",
+    "453670c",
+    "6250f1a",
+    "52ff1c0",
+    "bf88257",
+    "5ffac27",
+    "e49d5db",
+    "c9f9732"
+  ],
   "linked_prs": [],
   "comments": [
     {
@@ -113,10 +138,20 @@
       "author": "orchestrator",
       "at": "2026-08-20T04:50:36.536Z",
       "body": "VERIFICACION EN DEV — HECHA, MEDIDA Y CON LOS OJOS. 2026-08-19/20. Es la primera vez en todo el ticket que algo de esto se ve funcionando en un navegador.\n\nDESPLIEGUE A DEV, en el orden obligatorio:\n1. queryPublicCardIndex desplegada (v2, callable, us-central1, memoria 2048, nodejs22). Verificada con functions:list: la memoria NO dice ---, o sea no cayo en la saturacion de cola que este proyecto ya sufrio.\n2. reconcilePublicCardIndex desplegada, mismos parametros, tambien sana. Las dos con --only functions:nombre, de a una, esperando entre medio.\n3. firestore.rules desplegadas a mano a dev (el CI no las toca). Compilaron sin errores. Incluye el bloque nuevo de scryfall_not_found.\n\nENSUCIADO DELIBERADO DE LA CACHE DE DEV, el paso que Rafael aprobo y sin el cual todo esto seria teatro. Medido antes: en dev los 3.097 scryfallIds unicos sin setCode estaban TODOS en scryfall_cache con set, asi que los ids que obligan a llamar a Scryfall eran CERO — el modulo nuevo de 283 lineas no habria ejecutado ni una vez y habria llegado a produccion sin haber hecho jamas una llamada real. Se le borro el campo set a 6 docs de cache REALMENTE usados por el vendedor publico de dev (si no, el reconcile nunca los pide y el ejercicio no prueba nada): Obscura Charm (snc), Awe for the Guilds (dgm), Questing Druid // Seek the Beast (woe, carta partida, ejercita card_faces), Thunderous Debut (woe), Ossification (pcbb), Fiendish Panda (fdn). El script guarda los valores originales en un JSON, que es lo que convierte la verificacion en un control de verdad.\n\nEL BACKFILL HABLO CON LA SCRYFALL REAL POR PRIMERA VEZ EN SU VIDA, y salio bien:\n[publicCardCacheBackfill] requested=6 written=6 notFound=0 failed=0 requests=1 skippedKnownMissing=0 abandoned=0\nEso cierra el riesgo que las cuatro rondas de revision declararon y no podian cerrar. Antes: \"logica correcta contra dobles\". Ahora: una peticion real, seis escrituras, cero fallos.\n\nEL CONTROL QUE IMPORTA, no que escribiera UN set sino EL MISMO: 6 de 6 SET_CORRECTO (snc, dgm, woe, woe, pcbb, fdn), y CERO campos ricos perdidos (produced_mana y keywords preservados en los 6). Esa es exactamente la mutacion merge->reemplazo que el reviewer mato en los tests con 8 mutaciones, ahora verificada contra Firestore real y Scryfall real. El MEDIUM-4 de la ronda 2 queda cerrado no solo por sensor sino por medicion.\n\nINDICE CONSTRUIDO: --dry-run --all primero (1 vendedor, 3.211 cartas, rebuild-by-id, 16 chunks, cero escrituras, y confirmado que --dry-run NO toca la red). Despues la corrida real: wrote 16 chunk doc(s), deleted 0. Cobertura re-medida: SIN_INDICE 0, idxCount 3.211 = pubCount 3.211, chunks 16 de 16, schemaVersion 1, desfasados 0.\n\nVERIFICACION EN EL NAVEGADOR, local contra dev ANTES de pushear el hosting — a proposito, para no desplegar y despues descubrir. Perfil /@rafael_m.\n\nControl independiente construido primero, leyendo el indice y aplicando la misma regla que el servidor (OR-inclusiva por letra sobre co, mas pm SOLO para tierras), re-medido en el momento y no contra ningun numero escrito: 3.211 entradas, 47 tierras (las 47 producen algun color), 423 sin color usable, y por color W 797, U 719, B 686, R 903, G 550.\n\nLO QUE MOSTRO LA PANTALLA:\n- Sin filtro: \"Coleccion publica 3211\". Coincide con el indice.\n- Chip NEGRO: 686. CONTRA 686 MEDIDOS. Coincidencia exacta.\n- Chip VERDE: 550. CONTRA 550 MEDIDOS. Coincidencia exacta.\n\nDos numeros independientes, dos coincidencias exactas. ESTO ES EL TICKET ENTERO: el filtro ya no se resuelve sobre las ~60 cartas cargadas, alcanza la coleccion completa.\n\nY DOS DECISIONES DE RAFAEL, VISIBLES EN PANTALLA, no deducidas del codigo:\n- OR-INCLUSIVA: Maelstrom Archangel, una carta de CINCO colores, aparece bajo Negro. Es la decision de \"sin bucket Multicolor\" funcionando.\n- TIERRAS POR LO QUE PRODUCEN: Copperline Gorge, una TIERRA, aparece bajo Verde porque produce mana verde. Es la decision que se tomo midiendo contra produccion, ahora visible.\nAdemas los precios de CardKingdom se renderizan (CK: $29.99, $1.79, $0.69, $2.49...), que es el flujo de negocio numero 1 y era lo que el HIGH-1 de la ronda 1 ponia en riesgo.\n\nTROPIEZO PROPIO, registrado porque es el tipo de cosa que envenena una medicion: en un intento intermedio me equivoque de chip y termine leyendo 370 y 272 con un filtro de TIPO encendido que yo mismo habia prendido sin darme cuenta. NO interprete esos numeros: recargue la pagina a estado limpio y rehice la prueba mirando antes de tocar. Un numero de una UI cuyo estado no controlas no es una medicion.\n\nQUE SIGUE SIN VERIFICARSE, declarado: el rate limit real de Scryfall (la corrida fue de 1 peticion y 6 ids, no ejercita ni el 429 ni el presupuesto de tiempo ni el tope de 1.500); que el indice se MANTENGA al dia solo (el trigger de la tanda 2c sigue sin correr en produccion); y los 333 ids reales del backfill de produccion, de los cuales 322 son la forma \"existe en cache pero sin set\" que en dev no se pudo reproducir a esa escala."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-20T15:33:44.959Z",
+      "body": "DESPLIEGUE A PRODUCCION COMPLETO — 2026-08-20, autorizado por Rafael.\n\nLos cuatro pasos, en el orden no negociable (backfill ANTES del hosting, para no abrir una ventana con los perfiles publicos vacios):\n\n1. Cloud Functions a mano, de a una. queryPublicCardIndex y reconcilePublicCardIndex creadas en cranial-trading. Verificadas por functions:list — v2, callable, us-central1, 2048 MB, nodejs22. Ninguna con la memoria en \"---\" (la cola de deploy de este proyecto se saturo antes).\n2. firestore:rules desplegadas a mano (el CI solo despliega hosting). Compilacion OK, reglas liberadas.\n3. Backfill de produccion. Dry-run: 5 vendedores, 8.388 cartas. Corrida real con --yes-production: 5 vendedores, 5 reparados, 0 rechazados, 43 chunks escritos. Scryfall real: requested=1563 written=1563 notFound=0 failed=0, 24 requests. Cobertura verificada con un --all --dry-run posterior: los 5 dan strategy=noop isDivergent=false missing=0, o sea idxCount == pubCount en los 5.\n4. Merge develop -> main por fast-forward (24 commits, v1.59.0). CI verde entero: type-check, unit-tests, build (modo produccion), e2e (smoke), deploy-prod OK en 43 s.\n\nVERIFICADO EN PRODUCCION CON LOS OJOS (https://cranial-trading.web.app/@rafael_m):\n- \"Coleccion publica 6647\" — el TOTAL REAL del vendedor, no las ~60 de la pagina cargada. Ese era el bug.\n- Chip Black en modo CUALQ: 1465 de 6647. El filtro corre sobre el indice entero, no sobre la pagina.\n- El estado \"181 cartas quedan fuera de este filtro de color porque no tenemos su dato de color. Siguen apareciendo sin filtro, y se siguen encontrando por nombre.\" se muestra en pantalla — es uno de los tres estados visibles que pedia la tanda 4, funcionando en produccion.\n- Indice del vendedor grande medido de forma independiente contra Firestore: _meta con totalChunks=32 count=6647, 6647 entradas presentes en los chunks, 0 sin campo de color.\n\nLIMITE DECLARADO DE ESTA VERIFICACION: no se confirmo coincidencia exacta chip-por-chip. Mi replica de la regla de los chips (co UNION pm) predijo 1671 y la pantalla dio 1465; la replica es mia, no la del codigo, asi que la discrepancia mide mi replica, no el producto. Lo que SI queda verificado es lo que este ticket prometia: el filtro opera sobre las 6.647 cartas reales y no sobre la pagina cargada. La verificacion chip-por-chip contra un sensor correcto ya se hizo en dev (Negro 686/686, Verde 550/550).\n\nRESIDUO MEDIDO, NO BLOQUEANTE: 128 de las 6.647 entradas del indice quedaron sin set code, porque el backfill de Scryfall topea en 1500 ids por corrida y una segunda pasada NO los completa — el reconciliador da noop, ya que mide divergencia de conteo/chunks y no completitud de campos ricos. Las 181 cartas sin dato de color que la UI declara son de la misma familia. Queda para ticket aparte; no deja produccion peor que antes.\n\nReview depth: full (diff de 24 commits, >150 lineas, toca logica tdd-tier y superficie de privacidad). Rubrica: cambio grande + superficie mandatory-FULL. Veredicto PASS registrado por el reviewer en contexto fresco (tanda 4 ronda 4, commit b7ba8a5)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-20T15:33:53.860Z",
+      "body": "Cerrado. Las cuatro tandas revisadas con PASS en contexto fresco, desplegado y verificado en dev, y ahora desplegado y verificado en PRODUCCION (functions, reglas, backfill de 8.388 cartas y hosting). El perfil publico de prod muestra el total real de 6.647 y filtra sobre el indice entero. Review depth full. Detalle completo en el comentario anterior, incluidos el limite declarado de la verificacion visual y el residuo de 128 entradas sin set code."
     }
   ],
   "created_at": "2026-08-19T04:01:14.003Z",
-  "updated_at": "2026-08-20T04:50:36.536Z",
+  "updated_at": "2026-08-20T15:33:53.860Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

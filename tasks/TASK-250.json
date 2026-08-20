@@ -1,0 +1,30 @@
+{
+  "key": "TASK-250",
+  "title": "El backfill del indice publico deja entradas sin set code y sin color, y una segunda pasada no las completa",
+  "description": "MEDIDO en el deploy a produccion de TASK-247 (2026-08-20), no supuesto.\n\nAl correr scripts/reconcile-public-card-index.mjs --all sobre produccion, el vendedor grande (uid Rt5DOfZXBtPZkEpK4N5pW6a5FXs1, 6.647 cartas publicas) topeo el limite de 1500 ids por corrida al pedirle datos a Scryfall. El log lo dice de frente: \"1500 scryfallId(s) have no set code in scryfall_cache — fetching from Scryfall (cap 1500 per run, 744 left for the next run)\".\n\nEL PROBLEMA NO ES EL TOPE, ES QUE NO HAY SEGUNDA PASADA QUE LO CIERRE. Se corrio el reconciliador de nuevo sobre ese mismo uid y devolvio strategy=noop isDivergent=false missing=0, reason=\"index already matches public_cards\". El reconciliador mide divergencia de CONTEO y de chunks, no completitud de los campos ricos de cada entrada, asi que una vez que el indice tiene la cantidad correcta de cartas se declara sano aunque a las entradas les falten campos. El tope por corrida se vuelve permanente por construccion.\n\nESTADO REAL MEDIDO DESPUES DEL BACKFILL, leyendo users/<uid>/public_card_index directamente con el admin SDK:\n- 33 documentos: _meta (totalChunks=32, count=6647) + 32 chunks.\n- 6.647 entradas presentes. Ninguna se perdio.\n- 0 entradas sin el campo de color (co).\n- 128 entradas sin set code (sc).\n\nY la UI de produccion declara un numero relacionado pero distinto: \"181 cartas quedan fuera de este filtro de color porque no tenemos su dato de color\". Los dos numeros (128 sin sc medido por mi, 181 sin dato de color segun la app) son de la misma familia — join incompleto contra scryfall_cache — pero NO coinciden, y no se investigo por que. Esa discrepancia es parte de lo que hay que entender aca, no un detalle de redondeo.\n\nNO ES BLOQUEANTE Y NO DEJA PRODUCCION PEOR QUE ANTES: las cartas afectadas siguen apareciendo sin filtro y se siguen encontrando por nombre, y la UI lo declara en pantalla en vez de mentir. Es degradado y visible, no roto y silencioso.\n\nMITIGANTE EXISTENTE, CON UNA ADVERTENCIA: scripts/backfill-scryfall-cache.mjs llena scryfall_cache directamente. PERO su linea 275 tiene la FORMA VIEJA del bug que arreglo la ronda 4 de TASK-247 (data.data ?? [] ignorando not_found), marcada por el reviewer como LOW-3: no escribe lapidas, pero puede saltearse hasta 75 ids en silencio. Arreglar eso primero, o al menos no confiar en su salida sin medirla.\n\nNota de escala para dimensionar: en dev el backfill pidio 6 ids; en prod pidio 1563 y dejo 744 pendientes. La estimacion previa al deploy era de 333. Cualquier cuenta grande futura va a topear el limite igual.",
+  "acceptance_criteria": [
+    "MEDIR primero, antes de tocar codigo: leer users/<uid>/public_card_index de las 5 cuentas de produccion y reportar, por cuenta, cuantas entradas no tienen set code y cuantas no tienen dato de color. Cerrar el ticket sin codigo es resultado valido si los numeros resultan ser cero o irrelevantes.",
+    "Explicar la discrepancia entre las 128 entradas sin sc que midio el orquestador y las 181 cartas que la UI de produccion declara sin dato de color. Son dos definiciones distintas de 'dato faltante' o hay un tercer campo en juego; hay que nombrar cual, con la fuente pegada.",
+    "Decidir y justificar por escrito donde va el arreglo: (a) que el reconciliador mida completitud de campos y no solo divergencia de conteo, (b) que el backfill de Scryfall se reintente hasta agotar los pendientes en vez de topear y olvidar, o (c) las dos. Declarar el costo de la opcion elegida en lecturas y en peticiones a Scryfall.",
+    "Arreglar scripts/backfill-scryfall-cache.mjs:275, que tiene la forma vieja del bug data.data ?? [] ignorando not_found (LOW-3 de TASK-247). Es el instrumento que se usa como mitigante, asi que no puede tragarse ids en silencio.",
+    "Dejar las 5 cuentas de produccion con el indice completo, y verificarlo con una medicion independiente del script que hizo el arreglo — no con la salida del propio script.",
+    "Candado de regresion que falle si una entrada del indice se escribe sin set code habiendo dato disponible en scryfall_cache. Verificarlo por mutacion: romper el join a proposito y ver el candado en rojo."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "card-index",
+    "public-profile",
+    "scryfall"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-20T15:34:38.099Z",
+  "updated_at": "2026-08-20T15:34:38.099Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]"
+}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T04:50:36.536Z",
+  "generated_at": "2026-08-20T15:34:38.099Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1360,7 +1360,7 @@
     {
       "key": "TASK-247",
       "title": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales",
-      "status": "in_review",
+      "status": "done",
       "priority": "critical"
     },
     {
@@ -1372,6 +1372,12 @@
     {
       "key": "TASK-249",
       "title": "El vendedor que despublica TODO su inventario queda con el indice publico intacto: el collapse guard lo refusa en silencio",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-250",
+      "title": "El backfill del indice publico deja entradas sin set code y sin color, y una segunda pasada no las completa",
       "status": "todo",
       "priority": "medium"
     }

@@ -21,7 +21,7 @@
  * end-to-end smoke layer on top of them, using a fake that only
  * implements the small slice of the Firestore SDK this module calls.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { reconcilePublicCardIndexForUser, acquireReconcileLease } from '../../../functions/lib/publicCardIndexReconciler.js'
 
 // ---------------------------------------------------------------------
@@ -109,10 +109,13 @@ function makeFakeDb(initialStore: Record<string, Record<string, any>>) {
       return results
     },
     batch() {
-      const ops: Array<{ type: 'set' | 'delete'; ref: any; data?: any }> = []
+      const ops: Array<{ type: 'set' | 'delete'; ref: any; data?: any; merge?: boolean }> = []
       return {
-        set(ref: any, data: any) {
-          ops.push({ type: 'set', ref, data })
+        // The backfill writes cache docs with { merge: true }; the reconciler
+        // writes chunk docs without it. A fake that ignored the flag would
+        // make a merging write look like a replacing one.
+        set(ref: any, data: any, opts?: { merge?: boolean }) {
+          ops.push({ type: 'set', ref, data, merge: !!(opts && opts.merge) })
         },
         delete(ref: any) {
           ops.push({ type: 'delete', ref })
@@ -120,7 +123,11 @@ function makeFakeDb(initialStore: Record<string, Record<string, any>>) {
         async commit() {
           for (const op of ops) {
             store[op.ref._path] = store[op.ref._path] || {}
-            if (op.type === 'set') store[op.ref._path][op.ref.id] = op.data
+            if (op.type === 'set') {
+              store[op.ref._path][op.ref.id] = op.merge
+                ? { ...(store[op.ref._path][op.ref.id] || {}), ...op.data }
+                : op.data
+            }
             else delete store[op.ref._path][op.ref.id]
           }
         },
@@ -165,6 +172,24 @@ function publicCardDoc(cardId: string, scryfallId: string, extra: Record<string,
   }
 }
 
+/**
+ * MEDIUM-1 (review round 3): five tests in this file used to run with no
+ * `scryfallFetch` injected at all, so the reconcile's cache backfill reached
+ * the REAL api.scryfall.com — measured by the reviewer as five live HTTP 400
+ * responses (the fixtures' short ids are not valid Scryfall ids). They were
+ * green by luck, tied the suite to a third party, and under a real 429 would
+ * have entered the retry path with the REAL sleep. Every call below now
+ * injects both, whether or not it expects the backfill to run.
+ */
+function offlineScryfall() {
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    json: async () => ({ data: [] }),
+  })
+}
+
 describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
   it('reads public_cards from the ROOT collection filtered by userId, not a subcollection', async () => {
     const { db } = makeFakeDb({
@@ -177,6 +202,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       db,
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
     expect(result.count).toBe(1) // only c1, not someone-else's c2
   })
@@ -197,6 +224,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       db,
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
 
     expect(result.strategy).toBe('wipe-subcollection')
@@ -223,6 +252,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       db,
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
 
     expect(result.refused).toBe(true)
@@ -243,6 +274,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
       forceEmptyIndex: true,
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
 
     expect(result.refused).toBeUndefined()
@@ -261,6 +294,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       db,
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
 
     expect(result.refused).toBe(true)
@@ -305,6 +340,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       db,
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
 
     expect(result.refused).toBeUndefined()
@@ -330,6 +367,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       db,
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
 
     expect(result.refused).toBe(true)
@@ -346,6 +385,8 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
       userId: 'seller-1',
       documentIdOrderBy: '__name__',
       dryRun: true,
+      scryfallFetch: offlineScryfall(),
+      sleepImpl: async () => {},
     })
     expect(result.dryRun).toBe(true)
     expect(store['users/seller-1/public_card_index']).toBeUndefined()
@@ -462,6 +503,116 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
         scryfallFetch: fetchImpl,
         sleepImpl: async () => {},
       })
+      expect(fetchImpl).not.toHaveBeenCalled()
+    })
+  })
+
+
+  /**
+   * MEDIUM-4 (review round 3) — every HIGH-1 test above starts from an EMPTY
+   * `scryfall_cache`, which is the MINORITY shape. The majority shape is a
+   * cache document that already exists and is rich, only without `set`
+   * (written by the import path, whose buildCacheFieldsFromScryfall never
+   * stored it). With an empty base a merging write and a replacing write are
+   * indistinguishable, so nothing here could tell them apart.
+   *
+   * The field that makes the difference visible is `produced_mana`: the land
+   * rule categorizes a land by the mana it PRODUCES, not by `colors`, and the
+   * field travels into the entry as `pm`. A replacing write would blank it
+   * for every card whose Scryfall response does not repeat it, dropping those
+   * lands into the generic bucket and lowering the profile's per-color counts
+   * silently — this ticket's own symptom, with a new cause.
+   */
+  describe('MEDIUM-4 — a cache document that exists but is INCOMPLETE is merged, not replaced', () => {
+    it('adds the missing set while keeping produced_mana, so the land rule still fires', async () => {
+      const { db, store } = makeFakeDb({
+        public_cards: { c1: publicCardDoc('c1', 's1', { setCode: undefined }) },
+        // The dominant production shape: rich, but no `set`.
+        scryfall_cache: { s1: { type_line: 'Land', produced_mana: ['B'], keywords: ['Cycling'] } },
+      })
+      // Scryfall's answer deliberately does not repeat produced_mana.
+      const fetchImpl = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ data: [{ id: 's1', name: 'Card c1', set: 'znr', set_name: 'Zendikar Rising' }] }),
+      })
+
+      await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: fetchImpl,
+        sleepImpl: async () => {},
+      })
+
+      const entries = Object.entries(store['users/seller-1/public_card_index'] || {})
+        .filter(([id]) => id !== '_meta')
+        .flatMap(([, doc]: [string, any]) => doc.entries || [])
+      expect(entries).toHaveLength(1)
+      // sc is the CODE, uppercased; ed is the human name — never crossed.
+      expect(entries[0].sc).toBe('ZNR')
+      expect(entries[0].ed).toBe('Some Set')
+      // The land rule's field survived the backfill.
+      expect(entries[0].pm).toEqual(['B'])
+      expect(entries[0].t).toBe('Land')
+      // And the cache document itself kept what it already had.
+      expect(store.scryfall_cache.s1.produced_mana).toEqual(['B'])
+      expect(store.scryfall_cache.s1.set).toBe('znr')
+    })
+  })
+
+  /**
+   * MEDIUM-3 (review round 3) — the backfill used to run in phase 2b, BEFORE
+   * the collapse guard and BEFORE the lease. Two consequences: a run that was
+   * about to be refused still spent Scryfall quota, and the lease — the one
+   * mechanism that stops two writers working the same seller at once — did
+   * not cover the external call at all. It now runs after both.
+   *
+   * The lease and the collapse guard themselves are untouched; only the
+   * backfill moved relative to them.
+   */
+  describe('MEDIUM-3 — no Scryfall quota is spent on a run that will not write', () => {
+    it('does not call Scryfall when the collapse guard refuses the run', async () => {
+      const { db, store } = makeFakeDb({
+        public_cards: { c1: publicCardDoc('c1', 's1', { setCode: undefined }) },
+      })
+      store['users/seller-1/public_card_index'] = {
+        0: { id: 0, entries: Array.from({ length: 500 }, (_, i) => ({ i: `card-${i}`, s: `s-${i}` })) },
+        _meta: { schemaVersion: 1, totalChunks: 1, count: 6647, chunkTargetSize: 400 },
+      }
+      const fetchImpl = offlineScryfall()
+
+      const result = await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: fetchImpl,
+        sleepImpl: async () => {},
+      })
+
+      expect(result.refused).toBe(true)
+      expect(fetchImpl).not.toHaveBeenCalled()
+    })
+
+    it('does not call Scryfall when another run already holds the lease', async () => {
+      const { db, store } = makeFakeDb({
+        public_cards: { c1: publicCardDoc('c1', 's1', { setCode: undefined }) },
+      })
+      store['users/seller-1/public_card_index'] = {
+        _meta: { schemaVersion: 1, totalChunks: 1, count: 0, chunkTargetSize: 400, reconcileLeaseAt: Date.now() },
+      }
+      const fetchImpl = offlineScryfall()
+
+      const result = await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: fetchImpl,
+        sleepImpl: async () => {},
+      })
+
+      expect(result.refused).toBe(true)
       expect(fetchImpl).not.toHaveBeenCalled()
     })
   })

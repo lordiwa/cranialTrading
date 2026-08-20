@@ -233,13 +233,20 @@ function buildPublicEntry(publicCardDoc, scryfallCacheDoc) {
     // (importHelpers' `card.setCode?.toUpperCase()`) and how the query
     // layer's `edition` filter compares it.
     //
+    // LOW (review round 3): the uppercasing used to apply only to the CACHE
+    // branch, so an index could carry both 'znr' (from the document's own
+    // stored setCode) and 'ZNR' (from the cache) for the same set. Filtering
+    // uppercases before comparing and never noticed; sorting by edition does
+    // a plain string compare, which files every lowercase code after every
+    // uppercase one. Normalized once, for both sources.
+    //
     // This is the FLOOR, not the ceiling: measured on the same data, 2,054
     // of the 2,387 distinct scryfallIds without a setCode have `set` in
     // scryfall_cache. The remaining 333 (322 cached without `set`, 11 with
     // no cache document at all) are closed upstream by the reconciler, which
     // re-fetches them from Scryfall and populates scryfall_cache before this
     // builder runs — see functions/lib/publicCardCacheBackfill.js.
-    sc: data.setCode || (cache && cache.set ? String(cache.set).toUpperCase() : '') || '',
+    sc: String(data.setCode || (cache && cache.set) || '').toUpperCase(),
     // AC9 addendum (review): the human-readable set name — UserProfileView
     // relies on useCardFilter's local substring search matching name OR
     // edition (see useCardFilter.ts's filteredCards), so search parity

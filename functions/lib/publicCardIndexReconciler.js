@@ -204,54 +204,6 @@ async function reconcilePublicCardIndexForUser({
   const cacheByScryfallId = {};
   for (const [scryfallId, cacheDoc] of scryfallCacheMap) cacheByScryfallId[scryfallId] = cacheDoc;
 
-  // Phase 2b: close the cache's own gaps from Scryfall before building any
-  // entry from it (TASK-247 tanda 4 ronda 2, HIGH-1 — Rafael's DECISION 9).
-  // MEASURED on production 2026-08-19: 35.8% of public_cards documents have
-  // no `setCode`, and for 333 of those distinct scryfallIds `scryfall_cache`
-  // has no `set` to fall back on either — so publicCardEntry writes `sc: ''`,
-  // getCardPrices cannot resolve an mtgjson uuid, and the Card Kingdom price
-  // (this product's primary price source) silently stops applying. Fetching
-  // here, in the writer, is what makes the repair reach the seller's WHOLE
-  // collection instead of one loaded page.
-  //
-  // Deliberately skipped on a dry run: --dry-run must not write anything, and
-  // that includes scryfall_cache and a third party's rate limit. Deliberately
-  // NOT allowed to throw: this runs after the seller's entire collection has
-  // already been read, and a Scryfall outage must degrade to "these cards
-  // keep sc: ''" and not to "no index was written at all".
-  //
-  // KNOWN LIMIT, stated rather than implied: diagnosePublicIndex compares
-  // index membership by card id, not entry CONTENT, so a card already in a
-  // healthy index keeps the `sc` it was written with until something else
-  // makes that chunk get rewritten. The pre-deploy full rebuild is what
-  // applies this across an existing index.
-  if (!dryRun) {
-    const needBackfill = selectIdsNeedingCacheBackfill(uniqueScryfallIds, cacheByScryfallId);
-    if (needBackfill.length > 0) {
-      log(
-        `[reconcilePublicCardIndex] user ${userId}: ${needBackfill.length} scryfallId(s) have no set code in ` +
-          `scryfall_cache — fetching from Scryfall (cap ${MAX_BACKFILL_IDS} per run)`
-      );
-      try {
-        await backfillScryfallCacheForIds({
-          db,
-          scryfallIds: needBackfill,
-          cacheByScryfallId,
-          ...(scryfallFetch ? { fetchImpl: scryfallFetch } : {}),
-          ...(sleepImpl ? { sleepImpl } : {}),
-          ...(cacheStampAt ? { serverTimestamp: cacheStampAt } : {}),
-          log,
-          logError,
-        });
-      } catch (err) {
-        logError(
-          `[reconcilePublicCardIndex] user ${userId}: cache backfill failed entirely ` +
-            `(${err instanceof Error ? err.message : String(err)}) — continuing with the index build`
-        );
-      }
-    }
-  }
-
   // Phase 3: read the existing index (chunks + meta) as it currently
   // stands in Firestore.
   const [chunkSnapshot, metaSnapshot] = await Promise.all([indexRef.get(), metaRef.get()]);
@@ -351,7 +303,83 @@ async function reconcilePublicCardIndexForUser({
     return { refused: true, message };
   }
 
-  const { writeBatches, metaOp, deleteBatches } = planFirestoreBatches(plan);
+  // Phase 2b: close the cache's own gaps from Scryfall before writing any
+  // entry built from it (TASK-247 tanda 4 ronda 2, HIGH-1 — Rafael's
+  // DECISION 9). MEASURED on production 2026-08-19: 35.8% of public_cards
+  // documents have no `setCode`, and for 333 of those distinct scryfallIds
+  // `scryfall_cache` has no `set` to fall back on either — so publicCardEntry
+  // writes `sc: ''`, getCardPrices cannot resolve an mtgjson uuid, and the
+  // Card Kingdom price (this product's primary price source) silently stops
+  // applying. Fetching here, in the writer, is what makes the repair reach the
+  // seller's WHOLE collection instead of one loaded page.
+  //
+  // WHERE IT SITS, and why it moved (MEDIUM-3, review round 3): this used to
+  // run right after the cache read, BEFORE the collapse guard and BEFORE the
+  // lease. That spent a third party's quota on runs that were about to be
+  // refused, and left the one call that leaves this process entirely as the
+  // only step the lease did not cover. It now runs with the lease held and
+  // only on a run that is actually going to write. Neither the guard nor the
+  // lease was touched — only this block moved relative to them.
+  //
+  // Consequences of the move, stated rather than discovered later: a dry run
+  // and a `noop` run both return before this point, so neither talks to
+  // Scryfall at all. For the dry run that is the pre-existing rule (--dry-run
+  // must not write, and that includes scryfall_cache and someone else's rate
+  // limit). For a `noop` run it is new and deliberate: a noop rewrites no
+  // chunk, so a cache repair made there could not reach any entry anyway (see
+  // the KNOWN LIMIT below) — it would have been pure quota.
+  //
+  // Deliberately NOT allowed to throw: this runs after the seller's entire
+  // collection has already been read and after the lease was taken, and a
+  // Scryfall outage must degrade to "these cards keep sc: ''", never to "no
+  // index was written at all".
+  //
+  // KNOWN LIMIT, stated rather than implied: diagnosePublicIndex compares
+  // index membership by card id, not entry CONTENT, so a card already in a
+  // healthy index keeps the `sc` it was written with until something else
+  // makes that chunk get rewritten. The pre-deploy full rebuild is what
+  // applies this across an existing index.
+  let indexBuild = freshBuild;
+  let indexPlan = plan;
+  const needBackfill = selectIdsNeedingCacheBackfill(uniqueScryfallIds, cacheByScryfallId);
+  if (needBackfill.ids.length > 0) {
+    log(
+      `[reconcilePublicCardIndex] user ${userId}: ${needBackfill.ids.length} scryfallId(s) have no set code in ` +
+        `scryfall_cache — fetching from Scryfall (cap ${MAX_BACKFILL_IDS} per run` +
+        `${needBackfill.remaining > 0 ? `, ${needBackfill.remaining} left for the next run` : ''})`
+    );
+    let backfillStats = null;
+    try {
+      backfillStats = await backfillScryfallCacheForIds({
+        db,
+        scryfallIds: needBackfill.ids,
+        cacheByScryfallId,
+        ...(scryfallFetch ? { fetchImpl: scryfallFetch } : {}),
+        ...(sleepImpl ? { sleepImpl } : {}),
+        ...(cacheStampAt ? { serverTimestamp: cacheStampAt } : {}),
+        log,
+        logError,
+      });
+    } catch (err) {
+      logError(
+        `[reconcilePublicCardIndex] user ${userId}: cache backfill failed entirely ` +
+          `(${err instanceof Error ? err.message : String(err)}) — continuing with the index build`
+      );
+    }
+
+    // The build above was computed from the PRE-backfill cache, so it has to
+    // be redone for the freshly fetched metadata to reach this run's own
+    // entries — which is the entire reason the backfill lives in the writer.
+    // Only entry CONTENT can differ: `buildPublicIndex` sizes its chunk space
+    // from `docs.length` and `chunkTargetSize`, neither of which the backfill
+    // touches, so the strategy decided above still holds.
+    if (backfillStats && backfillStats.written > 0) {
+      indexBuild = buildPublicIndex(docs, cacheByScryfallId, { chunkTargetSize });
+      indexPlan = planPublicIndexReconciliation(diagnosis, indexBuild);
+    }
+  }
+
+  const { writeBatches, metaOp, deleteBatches } = planFirestoreBatches(indexPlan);
   // Review round 3 (operability): both callers used to print how many
   // chunk docs were written/deleted — lost when the orchestration moved
   // into this shared module. For a tool that writes and deletes derived
@@ -381,7 +409,7 @@ async function reconcilePublicCardIndexForUser({
     // every doc actually in the subcollection and delete whichever ones
     // are NOT a valid chunk id in the new [0, totalChunks) range (and
     // isn't `_meta`).
-    const validChunkDocIds = new Set(Array.from({ length: freshBuild.meta.totalChunks }, (_, i) => String(i)));
+    const validChunkDocIds = new Set(Array.from({ length: indexBuild.meta.totalChunks }, (_, i) => String(i)));
     const allRefs = await indexRef.listDocuments();
     const staleRefs = allRefs.filter((ref) => ref.id !== '_meta' && !validChunkDocIds.has(ref.id));
     for (let i = 0; i < staleRefs.length; i += 500) {
@@ -407,8 +435,8 @@ async function reconcilePublicCardIndexForUser({
   return {
     strategy,
     isDivergent: diagnosis.isDivergent,
-    reason: plan.reason,
-    totalChunks: freshBuild.meta.totalChunks,
+    reason: indexPlan.reason,
+    totalChunks: indexBuild.meta.totalChunks,
     count: docs.length,
     wrote,
     deleted,

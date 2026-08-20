@@ -130,7 +130,7 @@ describe('publicCardEntry — public-profile index entry building (TASK-247 tand
       expect(entry.st).toBe('sale')
       expect(entry.f).toBe(false)
       expect(entry.cn).toBe('NM')
-      expect(entry.sc).toBe('znr')
+      expect(entry.sc).toBe('ZNR')
       expect(entry.ed).toBe('Zendikar Rising')
     })
 
@@ -613,7 +613,21 @@ describe('publicCardEntry — public-profile index entry building (TASK-247 tand
 
     it("prefers the document's own setCode over the cache", () => {
       const entry = buildPublicEntry(basePublicCard, { set: 'm20' })
-      expect(entry.sc).toBe('znr')
+      expect(entry.sc).toBe('ZNR')
+    })
+
+    // LOW (review round 3): the cache fallback was uppercased but the
+    // document's own `setCode` was passed through as stored, so an index
+    // could hold both 'znr' and 'ZNR' for the same set. Filtering already
+    // uppercases before comparing and did not care, but sorting by edition
+    // does a plain string compare, which puts every lowercase code after
+    // every uppercase one. One casing, whichever source the code came from.
+    it('normalizes the casing of sc whichever source it came from', () => {
+      const fromDoc = buildPublicEntry({ ...basePublicCard, setCode: 'znr' }, null)
+      const { setCode, ...withoutSetCode } = basePublicCard
+      const fromCache = buildPublicEntry(withoutSetCode, { set: 'znr' })
+      expect(fromDoc.sc).toBe('ZNR')
+      expect(fromCache.sc).toBe('ZNR')
     })
 
     it('never lets set_name leak into sc — sc is the CODE, ed is the name', () => {

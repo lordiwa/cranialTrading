@@ -96,7 +96,16 @@ function fakeIndex(page: { filters?: { color?: string[] }; page?: number; pageSi
   const matching = letters.size === 0
     ? ALL_CARDS
     : ALL_CARDS.filter(card => {
-      const produced = card.produced_mana ?? []
+      // Mirrors the SERVER's rule (functions/lib/publicCardIndexQuery.js's
+      // matchesColor): produced_mana counts only for LANDS. LOW-2 of the
+      // ronda-2 review: this stub used to apply produced_mana to any card,
+      // which would have put Birds of Paradise — the exact negative control
+      // the ticket names — under all five chips. No coverage hole came of it
+      // (this fixture has no such card, and the real lock lives in
+      // tests/unit/functions/publicCardIndexQuery.test.ts), but a stub that
+      // contradicts the server is a trap for whoever reads it next.
+      const isLand = /land/i.test(card.type_line ?? '')
+      const produced = isLand ? (card.produced_mana ?? []) : []
       const source = produced.length > 0 ? produced : (card.colors ?? [])
       if (source.length === 0) return letters.has('C')
       return source.some(c => letters.has(c))
@@ -110,7 +119,7 @@ function fakeIndex(page: { filters?: { color?: string[] }; page?: number; pageSi
     pageSize: size,
     hasMore: start + size < matching.length,
     facets: { color: {}, status: {}, rarity: {}, type: {} },
-    indexState: { schemaVersion: 1, totalChunks: 1, count: TOTAL_DOCS, reconciling: false, partial: false, missing: 0 },
+    indexState: { built: true, schemaVersion: 1, totalChunks: 1, count: TOTAL_DOCS, reconciling: false, partial: false, missing: 0 },
   }
 }
 
@@ -139,7 +148,14 @@ describe('AC7 — a colour filter on a public profile reaches the whole collecti
     expect(profile.total.value).toBeGreaterThan(BLACK_ON_FIRST_PAGE)
   })
 
-  it('counts a B/G gold card under Black (OR-inclusive, Rafael 2026-08-19)', async () => {
+  // The next two tests assert that the composable RELAYS the server's answer
+  // for a gold card and for a land — they do NOT prove the server's colour
+  // rule, which is the fake index's rule here. That rule's real lock, with its
+  // negative control (a non-land producing all five colours must NOT answer to
+  // all five chips), is in tests/unit/functions/publicCardIndexQuery.test.ts.
+  // Labelled explicitly after the ronda-2 review, which found these two easy
+  // to mistake for product coverage.
+  it('relays the server verdict for a B/G gold card — it stays in the Black page (OR-inclusive, Rafael 2026-08-19)', async () => {
     const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
     await profile.loadFirstPage()
 
@@ -149,7 +165,7 @@ describe('AC7 — a colour filter on a public profile reaches the whole collecti
     expect(profile.cards.value.map(c => c.id)).toContain('card-005')
   })
 
-  it('counts a Swamp under Black — a land is the colour it PRODUCES', async () => {
+  it('relays the server verdict for a Swamp — a land is the colour it PRODUCES', async () => {
     const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
     await profile.loadFirstPage()
 

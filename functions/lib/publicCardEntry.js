@@ -216,7 +216,30 @@ function buildPublicEntry(publicCardDoc, scryfallCacheDoc) {
     st: data.status || 'collection',
     f: !!data.foil,
     cn: data.condition || 'NM',
-    sc: data.setCode || '',
+    // TASK-247 tanda 4 ronda 2, HIGH-1. MEASURED against production
+    // 2026-08-19: 3,005 of 8,388 public_cards documents (35.8%) carry no
+    // `setCode`, one seller's entire 1,703-card profile among them. Until
+    // tanda 4 the browser patched it in (enrichPublicCardsInMemory); tanda 4
+    // deleted that path, so this is now the ONLY source, and without it
+    // getCardPrices cannot resolve an mtgjson uuid — the Card Kingdom price,
+    // this product's primary price source, silently stops replacing the TCG
+    // one — while UserProfileView's `collectionSets` (truthy setCode
+    // required) leaves the set filter empty.
+    //
+    // `cache.set` is the machine SET CODE ('m20'), the same kind of value as
+    // `setCode`; `cache.set_name` ('Core Set 2020') is `ed` below and is NOT
+    // interchangeable with it (the recurring Card.edition bug of this
+    // project). Uppercased to match how setCode is written everywhere else
+    // (importHelpers' `card.setCode?.toUpperCase()`) and how the query
+    // layer's `edition` filter compares it.
+    //
+    // This is the FLOOR, not the ceiling: measured on the same data, 2,054
+    // of the 2,387 distinct scryfallIds without a setCode have `set` in
+    // scryfall_cache. The remaining 333 (322 cached without `set`, 11 with
+    // no cache document at all) are closed upstream by the reconciler, which
+    // re-fetches them from Scryfall and populates scryfall_cache before this
+    // builder runs — see functions/lib/publicCardCacheBackfill.js.
+    sc: data.setCode || (cache && cache.set ? String(cache.set).toUpperCase() : '') || '',
     // AC9 addendum (review): the human-readable set name — UserProfileView
     // relies on useCardFilter's local substring search matching name OR
     // edition (see useCardFilter.ts's filteredCards), so search parity

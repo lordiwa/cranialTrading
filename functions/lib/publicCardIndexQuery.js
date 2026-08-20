@@ -213,6 +213,8 @@
  * it is the only thing standing between a client string and an arbitrary
  * Firestore collection path.
  */
+const { PUBLIC_TYPE_CATEGORIES, publicTypeCategory } = require('./publicCardType');
+
 const PUBLIC_USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** The document id `_meta` occupies inside the chunk collection. */
@@ -282,17 +284,15 @@ const RARITY_INITIAL = new Map([
 const VALID_SORT_FIELDS = ['name', 'price', 'edition', 'quantity', 'dateAdded'];
 const VALID_MODES = ['cards', 'facets'];
 
-/** Top-level MTG card types, for the `type` facet counts. */
-const TYPE_FACETS = [
-  'creature',
-  'instant',
-  'sorcery',
-  'artifact',
-  'enchantment',
-  'planeswalker',
-  'land',
-  'battle',
-];
+/**
+ * The `type` facet keys. MEDIUM-2 (tanda 4 ronda 2): these are now the
+ * EXCLUSIVE categories of functions/lib/publicCardType.js, the same ones the
+ * filter uses, so a facet count and a filtered count can never disagree.
+ * 'battle' is gone as a key on purpose — it was never selectable (the chip
+ * list has seven entries) and under exclusive categorization a Battle is
+ * 'other', exactly as the owner's own view classifies it.
+ */
+const TYPE_FACETS = PUBLIC_TYPE_CATEGORIES;
 
 /**
  * An argument error the callable wrapper can map onto
@@ -583,11 +583,15 @@ function filterPublicIndexEntries(entries, filters, options = {}) {
   }
 
   if (skip !== 'type' && Array.isArray(f.type) && f.type.length > 0) {
-    const terms = f.type.map((t) => String(t).toLowerCase());
-    result = result.filter((e) => {
-      const line = String(e.t || '').toLowerCase();
-      return terms.some((t) => line.includes(t));
-    });
+    // MEDIUM-2 (tanda 4 ronda 2), Rafael's DECISION 10: EXCLUSIVE categories,
+    // at parity with useCardFilter.getCardTypeCategory — the rule the owner's
+    // own collection views already use. The previous substring match put an
+    // Artifact Creature under BOTH chips, which made the public profile's
+    // per-type counts exceed the owner's over the same cards. The two
+    // implementations are bound by tests/unit/functions/publicCardTypeParity
+    // .test.ts (all 127 combinations of the seven type words).
+    const wanted = new Set(f.type.map((t) => String(t).toLowerCase()));
+    result = result.filter((e) => wanted.has(publicTypeCategory(e.t)));
   }
 
   if (skip !== 'manaValue' && Array.isArray(f.manaValue) && f.manaValue.length > 0) {
@@ -740,7 +744,12 @@ function computePublicFacets(entries, filters) {
   const forType = filterPublicIndexEntries(entries, filters, { skip: 'type' });
   for (const name of TYPE_FACETS) {
     // eslint-disable-next-line security/detect-object-injection
-    type[name] = forType.filter((e) => String(e.t || '').toLowerCase().includes(name)).length;
+    type[name] = 0;
+  }
+  for (const e of forType) {
+    const category = publicTypeCategory(e.t);
+    // eslint-disable-next-line security/detect-object-injection
+    type[category] = (type[category] || 0) + 1;
   }
 
   return { color, status, rarity, type };
@@ -952,6 +961,15 @@ async function queryPublicCardIndexForUser(params) {
     // same way rather than staying firm next to a null total.
     facets: partial ? null : computePublicFacets(entries, safeFilters),
     indexState: {
+      // MEDIUM-1 (tanda 4 ronda 2): "this seller's index has never been
+      // built" is a DIFFERENT thing from "this seller publishes nothing", and
+      // until now the two were indistinguishable — every count came back 0
+      // either way, while the profile header went on showing the seller's
+      // real "1703 for sale" over a body saying they have no public cards.
+      // MEASURED 2026-08-19: zero accounts have a built index in either
+      // project, so on deploy day this is the state of EVERY profile until
+      // the backfill runs. `_meta` is the signal; it was being thrown away.
+      built: !!meta,
       schemaVersion: meta ? Number(meta.schemaVersion) || 0 : 0,
       totalChunks: meta ? Number(meta.totalChunks) || 0 : 0,
       count: meta ? Number(meta.count) || 0 : 0,

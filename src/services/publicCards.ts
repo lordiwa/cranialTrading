@@ -100,7 +100,7 @@ export interface PublicCard {
   cardName: string
   cardNameLower: string // lowercased cardName — matches the prefix query in publicCardSearch.ts
   scryfallId: string
-  setCode: string // TASK-138 AC3: Scryfall set code, NOT card.edition (human-readable set_name — see cardEnrichment.ts canonical rule). '' when the source card had no setCode yet; docs written before this field existed are patched in-memory by UserProfileView's enrichPublicCardsInMemory (needsEnrichment/buildEnrichmentPatch already backfill setCode for display — no separate backfill script needed).
+  setCode: string // TASK-138 AC3: Scryfall set code, NOT card.edition (human-readable set_name — see cardEnrichment.ts canonical rule). '' when the source card had no setCode yet, which is 35.8% of production's public_cards (measured 2026-08-19). The in-browser patching this comment used to promise is GONE (TASK-247 tanda 4 deleted enrichPublicCardsInMemory), and it never reached past the loaded page anyway. The set code now comes from the WRITER: publicCardEntry.js falls back to the scryfall_cache `set`, and the reconcile fetches from Scryfall whatever the cache is still missing (functions/lib/publicCardCacheBackfill.js).
   status: 'trade' | 'sale'
   price: number
   edition: string
@@ -813,9 +813,9 @@ export interface PublicCardStatusCounts {
 
 /**
  * Exact sale/trade totals for a user's public profile header (TASK-136 M4,
- * round 2). Decoupled from getUserPublicCardsPage's pagination so the header
- * chips always show the profile's true totals, not just however many cards
- * have been scrolled into view so far.
+ * round 2). Decoupled from the index query's pagination so the header chips
+ * always show the profile's true totals, not just however many cards have
+ * been scrolled into view so far.
  *
  * Deliberately two equality-only queries (userId== + status==) rather than
  * one query with an orderBy — equality-only compound filters use Firestore's
@@ -930,9 +930,10 @@ export const searchPublicCards = async (
 // TASK-247 tanda 3: reading the public card INDEX instead of the raw
 // public_cards page.
 //
-// What this replaces, and why it is a different shape. `getUserPublicCardsPage`
-// + `searchUserPublicCards` above are both honest Firestore queries, and both
-// are structurally incapable of answering the question the profile UI asks:
+// What this replaced, and why it is a different shape. `getUserPublicCardsPage`
+// and `searchUserPublicCards` (deleted in tanda 4) were both honest Firestore
+// queries, and both were structurally incapable of answering the question the
+// profile UI asks:
 //   - the color chips filter over whatever ~60 documents are already in
 //     memory, so a profile with over a thousand black documents reports the
 //     couple of dozen that happen to be on the loaded page (MEASURED against
@@ -943,17 +944,22 @@ export const searchPublicCards = async (
 //     operator), so 'blight' returns 9 of 14 documents and can never reach
 //     `Marauding Blight-Priest` or a split card's back face;
 //   - `public_cards` carries no Scryfall metadata at all — no colors, no
-//     type_line — and `scryfall_cache` requires auth, so an anonymous
-//     visitor cannot enrich client-side either.
+//     type_line — so the view had to enrich card-by-card in the browser,
+//     which only ever reached the loaded page. (Correction, tanda 4 ronda 2:
+//     this comment used to add "and `scryfall_cache` requires auth, so an
+//     anonymous visitor cannot enrich client-side either". That was wrong —
+//     scryfallCache.ts catches the permission-denied and falls through to the
+//     public Scryfall API, so anonymous visitors were enriched too. The
+//     defect was the REACH, not who could do it.)
 //
 // The index answers all three server-side. Note the two numbers the response
 // keeps separate, which today's page conflates into one: `total` is over the
 // seller's WHOLE public collection, `cards` is just the page. That separation
 // IS the fix.
 //
-// Not migrated here: usePublicProfileCards / UserProfileView still call the
-// two functions above. Rewiring them, and moving the color chips onto the
-// OR-inclusive letter vocabulary this index uses, is tanda 4.
+// Tanda 4 did the rewiring this note used to defer: UserProfileView reads the
+// index through usePublicProfileIndex, and usePublicProfileCards /
+// getUserPublicCardsPage / searchUserPublicCards are gone.
 // ============================================================================
 
 /** Index rows store the rarity initial; the UI shows the full name. */
@@ -1045,8 +1051,9 @@ export async function queryUserPublicCardIndex(
     filters: options.filters ?? {},
     ...(options.sort ? { sort: options.sort } : {}),
     page: options.page ?? 0,
-    // 60 matches usePublicProfileCards's DEFAULT_PAGE_SIZE, so migrating the
-    // profile onto this path does not change how far one scroll goes.
+    // 60 is the page size the profile has always scrolled by (the deleted
+    // usePublicProfileCards used the same DEFAULT_PAGE_SIZE), so migrating the
+    // profile onto this path did not change how far one scroll goes.
     pageSize: options.pageSize ?? 60,
     ...(options.mode ? { mode: options.mode } : {}),
   })

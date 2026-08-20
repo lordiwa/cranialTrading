@@ -350,4 +350,120 @@ describe('reconcilePublicCardIndexForUser (fake Firestore, end-to-end)', () => {
     expect(result.dryRun).toBe(true)
     expect(store['users/seller-1/public_card_index']).toBeUndefined()
   })
+
+  // ── TASK-247 tanda 4 ronda 2, HIGH-1 ────────────────────────────────────
+  //
+  // A public card whose document has no `setCode` and whose scryfall_cache
+  // document has no `set` either used to come out of the index with `sc: ''`,
+  // which costs it its Card Kingdom price (getCardPrices cannot resolve an
+  // mtgjson uuid without a set code) and drops it out of the profile's set
+  // filter. MEASURED on production 2026-08-19: 333 of the 2,387 distinct
+  // scryfallIds without a setCode are in exactly that state. Rafael's
+  // decision (DECISION 9): the reconcile fetches them from Scryfall and
+  // populates scryfall_cache, so the index it is building right now already
+  // has them.
+  describe('HIGH-1 — the reconcile fills scryfall_cache gaps from Scryfall', () => {
+    const seed = () =>
+      makeFakeDb({
+        public_cards: {
+          c1: publicCardDoc('c1', 's1', { setCode: undefined }),
+        },
+        scryfall_cache: {},
+      })
+
+    const scryfallResponse = (cards: any[]) => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({ data: cards }),
+    })
+
+    it('writes the fetched metadata into scryfall_cache', async () => {
+      const { db, store } = seed()
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValue(scryfallResponse([{ id: 's1', name: 'Card c1', set: 'm20', set_name: 'Core Set 2020', type_line: 'Instant' }]))
+      await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: fetchImpl,
+        sleepImpl: async () => {},
+      })
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      expect(store.scryfall_cache.s1.set).toBe('m20')
+    })
+
+    it('the index built in the SAME run already carries the set code', async () => {
+      // The point of doing this in the writer: a backfill whose result only
+      // showed up on the NEXT reconcile would leave the profile without a CK
+      // price until someone ran it twice.
+      const { db, store } = seed()
+      await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: vi
+          .fn()
+          .mockResolvedValue(scryfallResponse([{ id: 's1', name: 'Card c1', set: 'm20', set_name: 'Core Set 2020' }])),
+        sleepImpl: async () => {},
+      })
+      const chunks = Object.entries(store['users/seller-1/public_card_index'] || {})
+        .filter(([id]) => id !== '_meta')
+        .flatMap(([, doc]: [string, any]) => doc.entries || [])
+      expect(chunks).toHaveLength(1)
+      expect(chunks[0].sc).toBe('M20')
+    })
+
+    it('never spends a Scryfall request on an id the cache already has a set for', async () => {
+      const { db } = makeFakeDb({
+        public_cards: { c1: publicCardDoc('c1', 's1', { setCode: undefined }) },
+        scryfall_cache: { s1: { set: 'war', type_line: 'Instant' } },
+      })
+      const fetchImpl = vi.fn()
+      await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: fetchImpl,
+        sleepImpl: async () => {},
+      })
+      expect(fetchImpl).not.toHaveBeenCalled()
+    })
+
+    it('a Scryfall outage does NOT abort the reconcile — the index is still written', async () => {
+      const { db, store } = seed()
+      const result = await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        scryfallFetch: vi.fn().mockRejectedValue(new Error('ECONNRESET')),
+        sleepImpl: async () => {},
+      })
+      expect(result.refused).toBeFalsy()
+      expect(result.count).toBe(1)
+      const chunks = Object.entries(store['users/seller-1/public_card_index'] || {})
+        .filter(([id]) => id !== '_meta')
+        .flatMap(([, doc]: [string, any]) => doc.entries || [])
+      expect(chunks).toHaveLength(1)
+      // The unresolvable card keeps an empty set code and stays in the index
+      // rather than breaking it.
+      expect(chunks[0].sc).toBe('')
+    })
+
+    it('does not touch Scryfall at all on a dry run', async () => {
+      const { db } = seed()
+      const fetchImpl = vi.fn()
+      await reconcilePublicCardIndexForUser({
+        db,
+        userId: 'seller-1',
+        documentIdOrderBy: '__name__',
+        dryRun: true,
+        scryfallFetch: fetchImpl,
+        sleepImpl: async () => {},
+      })
+      expect(fetchImpl).not.toHaveBeenCalled()
+    })
+  })
+
 })

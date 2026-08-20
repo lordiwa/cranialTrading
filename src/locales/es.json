@@ -1592,7 +1592,8 @@
       "loadCardsError": "Error al cargar cartas del perfil"
     },
     "index": {
-      "updating": "El catálogo de este vendedor se está reconstruyendo ahora mismo, así que el conteo de abajo puede estar incompleto.",
+      "updating": "El catálogo de este vendedor se está reconstruyendo ahora mismo, así que el conteo que se muestra puede estar incompleto.",
+      "building": "El catálogo de este vendedor todavía se está armando, así que sus cartas aún no aparecen. Va a estar listo en un rato.",
       "unknownTotal": "actualizando",
       "colorUnknownExcluded": "{count} cartas quedan fuera de este filtro de color porque no tenemos su dato de color. Siguen apareciendo sin filtro, y se siguen encontrando por nombre.",
       "error": "No pudimos cargar esta colección. Es un problema nuestro, no un perfil vacío.",

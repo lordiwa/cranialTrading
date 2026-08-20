@@ -798,6 +798,68 @@ describe('mitigation A — a half-finished rebuild is detected, never silently h
     expect(res.cards.length).toBeGreaterThan(0)
   })
 
+  it('withholds `missing` under partial, exactly as it withholds the total', async () => {
+    // MEDIUM-3 (tanda 4 ronda 2): the `missing: partial ? null : ...` line had
+    // no test at all — the only asserts on `missing` anywhere were firm
+    // numbers on the healthy path. A firm "474 cards hidden" standing next to
+    // "we cannot tell you how many there are" is the exact inconsistency the
+    // mid-rebuild mitigation exists to avoid, and the client type is
+    // `number | null` because of this branch.
+    const db = makeIndexedDb(PROFILE, { tcOverride: { 0: 999, 3: 999 } })
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: { color: ['B'] },
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.indexState.partial).toBe(true)
+    expect(res.total).toBeNull()
+    expect(res.indexState.missing).toBeNull()
+  })
+
+  it('states a firm `missing` on the healthy path, so null really does mean "unknown"', async () => {
+    // The negative control for the test above: without it, a `missing` that
+    // was always null would pass it.
+    const db = makeIndexedDb()
+    const res = await queryPublicCardIndexForUser({
+      db,
+      userId: 'seller1',
+      filters: { color: ['B'] },
+      page: 0,
+      pageSize: 60,
+    })
+    expect(res.indexState.partial).toBe(false)
+    expect(typeof res.indexState.missing).toBe('number')
+  })
+
+  it('says whether the index has been BUILT at all — an unbuilt index is not an empty shop', async () => {
+    // MEDIUM-1 (tanda 4 ronda 2). MEASURED 2026-08-19: ZERO accounts have a
+    // built public index in either project (prod 5 sellers / 8,388 public
+    // cards / 0 indexes; dev 1 seller / 3,211 / 0). So this is the state of
+    // EVERY account on deploy day, not an edge case — and today it is
+    // indistinguishable from "this seller publishes nothing", while the
+    // header goes on showing a real "1703 for sale" above it.
+    const missingIndex = makeFakeDb({}, null)
+    const unbuilt = await queryPublicCardIndexForUser({
+      db: missingIndex,
+      userId: 'seller1',
+      filters: {},
+      page: 0,
+      pageSize: 60,
+    })
+    expect(unbuilt.indexState.built).toBe(false)
+
+    const built = await queryPublicCardIndexForUser({
+      db: makeIndexedDb(),
+      userId: 'seller1',
+      filters: {},
+      page: 0,
+      pageSize: 60,
+    })
+    expect(built.indexState.built).toBe(true)
+  })
+
   it('re-reads the WHOLE index exactly once before giving up', async () => {
     // Not just _meta: validating a fresh meta against a stale chunk snapshot
     // is round-2 MEDIUM-1. Both reads are full collection reads.
@@ -902,13 +964,56 @@ describe('the rest of the filter set', () => {
     expect(filterPublicIndexEntries(entries, { rarity: ['m'] })).toHaveLength(1)
   })
 
-  it('filters by type as a substring of the type line', () => {
+  /**
+   * MEDIUM-2 (tanda 4 ronda 2). Round 1 made this filter a plain
+   * `type_line.includes(t)`, which is NOT what the shipped product does: the
+   * owner's own collection views categorize through
+   * useCardFilter.getCardTypeCategory, where a card falls in EXACTLY ONE
+   * category by a fixed precedence. Under substring matching an Artifact
+   * Creature answers to 'artifact' AND to 'creature', so the public
+   * profile's per-type counts EXCEED the owner's own counts over the very
+   * same cards — a discrepancy the user can see and nobody can explain.
+   * Rafael's DECISION 10: back to exclusive categories, at parity with the
+   * owner's view. (The colour filter's OR-inclusive semantics is not a
+   * contradiction: there too the rule was "match the shipped product".)
+   */
+  it("filters by type as an EXCLUSIVE category, exactly as the owner's own view does", () => {
     const entries = [
       makeEntry(1, ['R'], { t: 'Legendary Creature — Goblin Shaman' }),
       makeEntry(2, ['R'], { t: 'Instant' }),
     ]
     expect(filterPublicIndexEntries(entries, { type: ['creature'] })).toHaveLength(1)
-    expect(filterPublicIndexEntries(entries, { type: ['goblin'] })).toHaveLength(1)
+    // 'goblin' is a creature SUBTYPE, not a category — under the old
+    // substring rule this returned 1.
+    expect(filterPublicIndexEntries(entries, { type: ['goblin'] })).toHaveLength(0)
+  })
+
+  it('puts an Artifact Creature under creatures ONLY, never under both chips', () => {
+    const entries = [makeEntry(3, [], { t: 'Artifact Creature — Golem' })]
+    expect(filterPublicIndexEntries(entries, { type: ['creature'] })).toHaveLength(1)
+    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(0)
+  })
+
+  it('puts an Enchantment Artifact under enchantments, following the same precedence as the owner view', () => {
+    const entries = [makeEntry(4, [], { t: 'Enchantment Artifact' })]
+    expect(filterPublicIndexEntries(entries, { type: ['enchantment'] })).toHaveLength(1)
+    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(0)
+  })
+
+  it('an artifact land is a creature-less artifact, not a land', () => {
+    const entries = [makeEntry(5, [], { t: 'Artifact Land' })]
+    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(1)
+    expect(filterPublicIndexEntries(entries, { type: ['land'] })).toHaveLength(0)
+  })
+
+  it('counts a type facet the same exclusive way it filters', () => {
+    const entries = [
+      makeEntry(6, [], { t: 'Artifact Creature — Golem' }),
+      makeEntry(7, [], { t: 'Artifact' }),
+    ]
+    const facets = computePublicFacets(entries, {})
+    expect(facets.type.creature).toBe(1)
+    expect(facets.type.artifact).toBe(1)
   })
 
   it('filters by mana value, with a 10+ bucket', () => {

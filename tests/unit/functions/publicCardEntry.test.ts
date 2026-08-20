@@ -586,4 +586,48 @@ describe('publicCardEntry — public-profile index entry building (TASK-247 tand
     })
   })
 
+
+  /**
+   * TASK-247 tanda 4 ronda 2, HIGH-1. MEASURED against production
+   * 2026-08-19: 3,005 of 8,388 `public_cards` documents carry no `setCode`
+   * at all (one seller's entire 1,703-card profile among them). Until tanda
+   * 4 that field was patched in the BROWSER by enrichPublicCardsInMemory;
+   * tanda 4 deleted that path, so whatever `sc` this builder writes is now
+   * the ONLY source. Without it `getCardPrices` cannot resolve an mtgjson
+   * uuid (src/services/mtgjson.ts) and the Card Kingdom price — the primary
+   * price source of this product — never replaces the TCG one, and
+   * UserProfileView's `collectionSets` (which requires a truthy setCode)
+   * leaves the set filter empty.
+   *
+   * `set` on the scryfall_cache document is the machine SET CODE ('m20'),
+   * the same thing `setCode` is. It is NOT `set_name` ('Core Set 2020'),
+   * which is `edition`/`ed` — crossing those two is a recurring bug in this
+   * project, so both directions are locked below.
+   */
+  describe('HIGH-1 (tanda 4 ronda 2) — sc falls back to the cache set code', () => {
+    it("uses the cache document's `set` when the public_cards doc has no setCode", () => {
+      const { setCode, ...withoutSetCode } = basePublicCard
+      const entry = buildPublicEntry(withoutSetCode, { set: 'm20', set_name: 'Core Set 2020' })
+      expect(entry.sc).toBe('M20')
+    })
+
+    it("prefers the document's own setCode over the cache", () => {
+      const entry = buildPublicEntry(basePublicCard, { set: 'm20' })
+      expect(entry.sc).toBe('znr')
+    })
+
+    it('never lets set_name leak into sc — sc is the CODE, ed is the name', () => {
+      const { setCode, ...withoutSetCode } = basePublicCard
+      const entry = buildPublicEntry(withoutSetCode, { set_name: 'Core Set 2020' })
+      expect(entry.sc).toBe('')
+      expect(entry.ed).toBe('Zendikar Rising')
+    })
+
+    it('is an empty string, not thrown, when neither source has it', () => {
+      const { setCode, ...withoutSetCode } = basePublicCard
+      expect(buildPublicEntry(withoutSetCode, null).sc).toBe('')
+      expect(buildPublicEntry(withoutSetCode, {}).sc).toBe('')
+    })
+  })
+
 })

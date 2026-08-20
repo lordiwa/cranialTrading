@@ -74,6 +74,8 @@ const {
   searching,
   error: cardsError,
   partial: indexPartial,
+  indexBuilt,
+  loading: loadingPublicCards,
   missing: colorUnknownExcluded,
   saleCount,
   tradeCount,
@@ -205,9 +207,20 @@ const retryLoad = () => {
 // card-by-card for whatever page was loaded so the advanced filters had colour
 // and type data to work with. It is DELETED, not moved: the index carries `co`,
 // `pm`, `t`, `cm`, `r`, `kw`, `lg`, `pw`, `to` and `fa` already, resolved
-// server-side from scryfall_cache, so an ANONYMOUS visitor — who cannot read
-// scryfall_cache at all under firestore.rules — now gets the same answers a
-// signed-in one does. Nothing else called it.
+// server-side, over the seller's WHOLE collection instead of one page.
+//
+// CORRECTION (tanda 4 ronda 2). The first version of this note claimed an
+// anonymous visitor "cannot read scryfall_cache at all" and therefore gained
+// something here. That was FALSE and the reviewer verified it: the L2 read in
+// src/services/scryfallCache.ts is wrapped in a try/catch that routes a
+// permission-denied straight to the public Scryfall API, so anonymous
+// visitors WERE being enriched. What this deletion gains is REACH (the whole
+// collection, not the loaded page) and cost — not a capability anonymous
+// visitors lacked. What it costs is the `setCode` that enrichment used to
+// patch in; that is now supplied by the writer instead (see
+// functions/lib/publicCardEntry.js and publicCardCacheBackfill.js).
+//
+// Nothing else called it.
 
 const handleContact = (id: string, username: string) => {
   selectedUserId.value = id;
@@ -230,7 +243,10 @@ const handleCloseChat = () => {
 // category vocabulary is deliberately NOT used for filtering here; it is still
 // the vocabulary of the owner's own collection views, which this ticket does
 // not touch.
-const sortBy = ref<'recent' | 'name' | 'price'>('name');
+// LOW-6 (ronda 2): back to 'recent', which is what this profile shipped with
+// and what useCardFilter's own default is. Tanda 4 changed it to alphabetical
+// with nothing deciding that.
+const sortBy = ref<'recent' | 'name' | 'price'>('recent');
 const groupBy = ref<'none' | 'type' | 'mana' | 'color' | 'name'>('none');
 
 const SORT_FIELDS = {
@@ -639,6 +655,22 @@ onMounted(() => {
         <BaseButton size="small" @click="retryLoad">{{ t('profile.index.retry') }}</BaseButton>
       </div>
 
+      <!-- The seller's index has never been built. Distinct from an empty
+           profile on purpose: measured 2026-08-19, ZERO accounts had a built
+           index in either project, so this is the state of every profile
+           until the backfill runs — and falling through to "this seller has
+           no public cards" while the header above still says "1703 for sale"
+           is a contradiction the visitor can see. -->
+      <div
+          v-else-if="!indexBuilt && !loadingPublicCards && cards.length === 0"
+          data-testid="profile-index-building"
+          class="bg-surface-1 border border-line rounded-lg p-8 text-center"
+      >
+        <p class="text-body text-silver-70">
+          {{ t('profile.index.building') }}
+        </p>
+      </div>
+
       <div v-else-if="cards.length === 0 && !searching && activeFilterCount === 0 && !filterQuery.trim()" class="bg-surface-1 border border-line rounded-lg p-8 text-center">
         <p class="text-body text-silver-70">
           {{ t('profile.noPublicCards') }}
@@ -705,7 +737,19 @@ onMounted(() => {
           </p>
         </div>
 
-        <div v-else class="space-y-8">
+        <!-- LOW-5 (ronda 2): every chip press is a server round-trip and the
+             grid gave no sign of it — the old cards simply sat there until the
+             new answer replaced them, which reads as "the chip did nothing".
+             Template-only: the grid dims and stops taking clicks while the
+             query is in flight, and `aria-busy` says the same thing to a
+             screen reader. `loading` covers chips/filters/sort, `searching`
+             covers the debounced search box. -->
+        <div
+            v-else
+            class="space-y-8 transition-opacity duration-150"
+            :class="{ 'opacity-50 pointer-events-none': loadingPublicCards || searching }"
+            :aria-busy="loadingPublicCards || searching"
+        >
           <!-- Grouped view -->
           <div v-for="group in groupedCards" :key="group.type" class="mb-6">
             <!-- Category Header (hidden when no grouping) -->

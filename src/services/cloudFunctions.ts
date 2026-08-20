@@ -497,6 +497,15 @@ export interface QueryPublicCardIndexRequest {
 }
 
 export interface PublicCardIndexState {
+  /**
+   * Whether this seller's index has ever been built (`_meta` exists). An
+   * unbuilt index is NOT an empty shop, and until TASK-247 tanda 4 ronda 2
+   * the two were indistinguishable — every count came back 0 either way,
+   * while the profile header kept showing the seller's real "1703 for sale".
+   * MEASURED 2026-08-19: zero accounts have a built index in either project,
+   * so this is every profile's state until the backfill runs.
+   */
+  built: boolean
   schemaVersion: number
   totalChunks: number
   /** How many entries the index itself believes it holds. */

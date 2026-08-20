@@ -55,6 +55,7 @@ function makePage(overrides: Partial<PublicCardIndexPage> = {}): PublicCardIndex
     hasMore: false,
     facets: { color: {}, status: {}, rarity: {}, type: {} },
     indexState: {
+      built: true,
       schemaVersion: 1,
       totalChunks: 1,
       count: 1,
@@ -260,5 +261,89 @@ describe('usePublicProfileIndex — states the UI has to be able to show', () =>
     await profile.loadFirstPage()
 
     expect(profile.error.value).toBe(false)
+  })
+})
+
+// ── TANDA 4 RONDA 2 ─────────────────────────────────────────────────────────
+
+describe('an index that was never built is not an empty shop (MEDIUM-1)', () => {
+  it('exposes indexBuilt so the view can say "catalogue being built" instead of "no cards"', async () => {
+    // MEASURED 2026-08-19: zero accounts have a built public index in either
+    // project. This is the state of EVERY profile on deploy day, until the
+    // backfill runs — not an edge case.
+    mockQuery.mockResolvedValue(
+      makePage({ cards: [], total: 0, indexState: { built: false, schemaVersion: 0, totalChunks: 0, count: 0, reconciling: false, partial: false, missing: 0 } })
+    )
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    await profile.loadFirstPage()
+    expect(profile.indexBuilt.value).toBe(false)
+  })
+
+  it('reports a built index as built, so the flag is not simply always false', async () => {
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    await profile.loadFirstPage()
+    expect(profile.indexBuilt.value).toBe(true)
+  })
+
+  it('does not claim the index is unbuilt before the first answer arrives', async () => {
+    // Starting at `false` would flash "catalogue being built" on every load.
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    expect(profile.indexBuilt.value).toBe(true)
+  })
+})
+
+describe('the header counts belong to the profile on screen (LOW-4)', () => {
+  it("clears the previous seller's counts when the status query for the new one fails", async () => {
+    const userId = ref<string | null>('seller-1')
+    mockCounts.mockResolvedValueOnce({ sale: 1703, trade: 12 })
+    const profile = usePublicProfileIndex(userId)
+    await profile.loadFirstPage()
+    await flush()
+    expect(profile.saleCount.value).toBe(1703)
+
+    // Navigating to another seller whose count query fails must not leave the
+    // first seller's 1,703 sitting under the second seller's name.
+    mockCounts.mockRejectedValueOnce(new Error('permission-denied'))
+    userId.value = 'seller-2'
+    await profile.loadFirstPage()
+    await flush()
+    expect(profile.saleCount.value).toBe(0)
+    expect(profile.tradeCount.value).toBe(0)
+  })
+})
+
+describe('the default sort is the one the profile shipped with (LOW-6)', () => {
+  it('asks for most-recent-first, not alphabetical', async () => {
+    // useCardFilter's own default is 'recent'; tanda 4 silently changed the
+    // public profile to 'name'. Nothing decided that.
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    await profile.loadFirstPage()
+    expect(mockQuery.mock.calls[0]?.[1]?.sort).toEqual({ field: 'dateAdded', direction: 'desc' })
+  })
+})
+
+describe('the filter badge counts DIMENSIONS, not keys (LOW-8)', () => {
+  it('counts a price range once, the way the owner view advancedFilterCount does', async () => {
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    await profile.loadFirstPage()
+    profile.advancedFilters.value = { minPrice: 1, maxPrice: 10 }
+    await flush()
+    expect(profile.activeFilterCount.value).toBe(1)
+  })
+
+  it('counts power and toughness ranges once each too', async () => {
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    await profile.loadFirstPage()
+    profile.advancedFilters.value = { powerMin: 1, powerMax: 4, toughnessMin: 2 }
+    await flush()
+    expect(profile.activeFilterCount.value).toBe(2)
+  })
+
+  it('still counts unrelated filters separately', async () => {
+    const profile = usePublicProfileIndex(ref<string | null>('seller-1'))
+    await profile.loadFirstPage()
+    profile.advancedFilters.value = { minPrice: 1, foil: true }
+    await flush()
+    expect(profile.activeFilterCount.value).toBe(2)
   })
 })

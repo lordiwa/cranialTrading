@@ -43,7 +43,10 @@ describe('AC6 — the public profile never reads the visited user private data',
     // what TASK-136 removed and what AC6 forbids.
     expect(src).not.toMatch(/['"`]cards['"`]\s*\)/)
     expect(src).not.toMatch(/users\/\$\{[^}]*\}\/cards/)
-    expect(src).not.toMatch(/card_index/)
+    // LOW-3 (ronda 2): a bare /card_index/ also forbids `public_card_index`,
+    // which is the collection this feature is SUPPOSED to read. Only the
+    // PRIVATE index is off limits here.
+    expect(src).not.toMatch(/(?<!public_)card_index/)
   })
 
   it.each(SOURCES)('%s does not import the collection store or the card services', (_name, src) => {

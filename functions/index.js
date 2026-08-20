@@ -1938,6 +1938,10 @@ exports.reconcilePublicCardIndex = onCall(
         documentIdOrderBy: admin.firestore.FieldPath.documentId(),
         log: (msg) => logger.info(msg),
         logError: (msg) => logger.error(msg),
+        // TASK-247 tanda 4 ronda 2 (HIGH-1): the reconcile fetches from
+        // Scryfall whatever scryfall_cache still has no set code for, and
+        // stamps those documents like every other cache writer does.
+        cacheStampAt: admin.firestore.Timestamp.now(),
         // No forceEmptyIndex: the collapse guard is never overridable from
         // this self-only, client-triggered path — only the admin script
         // exposes that, deliberately, behind its own explicit CLI flag.

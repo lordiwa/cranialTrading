@@ -17,15 +17,17 @@
  * class from the same firebase-admin package underneath, just imported
  * through different entry points for CJS vs ESM callers).
  *
- * NOT covered by vitest, documented explicitly rather than faked with a
- * vacuous assertion: this module does real Firestore reads/writes and
- * needs a live `db`. functions/lib/publicCardIndex.js and
- * functions/lib/publicCardIndexExecutor.js — everything this module
- * DECIDES rather than DOES — already have their own test files covering
- * chunk assembly, divergence diagnosis, plan construction, batch slicing,
- * strategy selection, the query spec, and the collapse guard. This module
- * is the untested wiring those tests exist to make thin enough not to need
- * its own coverage.
+ * COVERAGE (this note used to say the module was untested; that stopped
+ * being true in review round 2 and is corrected here). Because `db` is a
+ * plain injected argument, tests/unit/functions/publicCardIndexReconciler
+ * .test.ts drives the whole orchestration through a hand-rolled fake
+ * Firestore — the collection choice, the collapse guard, the lease, the
+ * malformed-chunk-path wipe, and the Scryfall cache backfill — without
+ * firebase-admin and without an emulator (TASK-236). What it still does not
+ * cover is real Firestore/network behaviour. Everything this module DECIDES
+ * rather than DOES lives in functions/lib/publicCardIndex.js,
+ * publicCardIndexExecutor.js and publicCardCacheBackfill.js, each with its
+ * own tests.
  */
 
 const {
@@ -34,6 +36,11 @@ const {
   planPublicIndexReconciliation,
   DEFAULT_CHUNK_TARGET_SIZE,
 } = require('./publicCardIndex');
+const {
+  MAX_BACKFILL_IDS,
+  backfillScryfallCacheForIds,
+  selectIdsNeedingCacheBackfill,
+} = require('./publicCardCacheBackfill');
 const {
   planFirestoreBatches,
   chooseApplyStrategy,
@@ -125,6 +132,12 @@ async function acquireReconcileLease(db, metaRef) {
  * @param {boolean} [args.dryRun] diagnose and plan only, never write
  * @param {(msg: string) => void} [args.log]
  * @param {(msg: string) => void} [args.logError]
+ * @param {Function} [args.scryfallFetch] injected `fetch` for the cache
+ *   backfill (tests only; production uses the global one)
+ * @param {Function} [args.sleepImpl] injected sleep for the cache backfill
+ * @param {*} [args.cacheStampAt] the caller's own admin Timestamp, written as
+ *   `_cachedAt`/`_metadataUpdatedAt` on any cache document the backfill
+ *   creates — passed in so this module stays free of firebase-admin
  * @returns {Promise<{
  *   refused?: boolean, message?: string,
  *   dryRun?: boolean,
@@ -140,6 +153,13 @@ async function reconcilePublicCardIndexForUser({
   dryRun = false,
   log = () => {},
   logError = () => {},
+  // TASK-247 tanda 4 ronda 2 (HIGH-1): injectable so vitest can execute the
+  // Scryfall backfill's batching, pacing and partial-failure isolation
+  // without a network. Production leaves both unset and gets global `fetch`
+  // and a real timer.
+  scryfallFetch = undefined,
+  sleepImpl = undefined,
+  cacheStampAt = null,
   // Review round 3 (operability): the self-only onCall caller has NO way
   // to override the collapse guard (forceEmptyIndex is never wired to
   // request.data — see the AUTHORIZATION note in functions/index.js), so
@@ -183,6 +203,54 @@ async function reconcilePublicCardIndexForUser({
   const scryfallCacheMap = await fetchScryfallCacheMap(db, uniqueScryfallIds);
   const cacheByScryfallId = {};
   for (const [scryfallId, cacheDoc] of scryfallCacheMap) cacheByScryfallId[scryfallId] = cacheDoc;
+
+  // Phase 2b: close the cache's own gaps from Scryfall before building any
+  // entry from it (TASK-247 tanda 4 ronda 2, HIGH-1 — Rafael's DECISION 9).
+  // MEASURED on production 2026-08-19: 35.8% of public_cards documents have
+  // no `setCode`, and for 333 of those distinct scryfallIds `scryfall_cache`
+  // has no `set` to fall back on either — so publicCardEntry writes `sc: ''`,
+  // getCardPrices cannot resolve an mtgjson uuid, and the Card Kingdom price
+  // (this product's primary price source) silently stops applying. Fetching
+  // here, in the writer, is what makes the repair reach the seller's WHOLE
+  // collection instead of one loaded page.
+  //
+  // Deliberately skipped on a dry run: --dry-run must not write anything, and
+  // that includes scryfall_cache and a third party's rate limit. Deliberately
+  // NOT allowed to throw: this runs after the seller's entire collection has
+  // already been read, and a Scryfall outage must degrade to "these cards
+  // keep sc: ''" and not to "no index was written at all".
+  //
+  // KNOWN LIMIT, stated rather than implied: diagnosePublicIndex compares
+  // index membership by card id, not entry CONTENT, so a card already in a
+  // healthy index keeps the `sc` it was written with until something else
+  // makes that chunk get rewritten. The pre-deploy full rebuild is what
+  // applies this across an existing index.
+  if (!dryRun) {
+    const needBackfill = selectIdsNeedingCacheBackfill(uniqueScryfallIds, cacheByScryfallId);
+    if (needBackfill.length > 0) {
+      log(
+        `[reconcilePublicCardIndex] user ${userId}: ${needBackfill.length} scryfallId(s) have no set code in ` +
+          `scryfall_cache — fetching from Scryfall (cap ${MAX_BACKFILL_IDS} per run)`
+      );
+      try {
+        await backfillScryfallCacheForIds({
+          db,
+          scryfallIds: needBackfill,
+          cacheByScryfallId,
+          ...(scryfallFetch ? { fetchImpl: scryfallFetch } : {}),
+          ...(sleepImpl ? { sleepImpl } : {}),
+          ...(cacheStampAt ? { serverTimestamp: cacheStampAt } : {}),
+          log,
+          logError,
+        });
+      } catch (err) {
+        logError(
+          `[reconcilePublicCardIndex] user ${userId}: cache backfill failed entirely ` +
+            `(${err instanceof Error ? err.message : String(err)}) — continuing with the index build`
+        );
+      }
+    }
+  }
 
   // Phase 3: read the existing index (chunks + meta) as it currently
   // stands in Firestore.

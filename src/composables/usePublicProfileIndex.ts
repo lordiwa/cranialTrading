@@ -63,7 +63,23 @@ const MIN_SEARCH_LEN = 2
 /** The chip vocabulary. Letters, OR-inclusive; `C` is genuinely colourless. */
 export const PUBLIC_COLOR_LETTERS = ['W', 'U', 'B', 'R', 'G', 'C'] as const
 export const PUBLIC_RARITIES = ['common', 'uncommon', 'rare', 'mythic'] as const
-/** Substring-matched against the index's type line (`t`). */
+/**
+ * Resolved server-side into EXCLUSIVE categories, at parity with
+ * `useCardFilter.getCardTypeCategory` — a card falls in exactly one
+ * (Rafael's DECISION 10; tanda 4's substring rule put an Artifact Creature
+ * under two chips and made the public counts exceed the owner's). The
+ * precedence lives in functions/lib/publicCardType.js and is bound to the
+ * browser's copy by tests/unit/functions/publicCardTypeParity.test.ts.
+ *
+ * KNOWN GAP, stated rather than hidden: the owner's own chip list
+ * (`typeOrder`) has an eighth entry, 'Other', for cards in none of these
+ * seven (a Battle, a Conspiracy). This list has no 'Other' chip, because the
+ * chips come from the SHARED AdvancedFilterModal, whose type options are also
+ * used by the Scryfall-backed search view, where 'other' is not a valid type.
+ * Consequence: with the type filter narrowed at all, an 'other' card is not
+ * listed. Unchanged from tanda 4's substring rule (which never matched them
+ * either); with no type narrowing — the default — they are listed normally.
+ */
 export const PUBLIC_TYPES = ['creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'planeswalker', 'land'] as const
 export const PUBLIC_MANA_VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'] as const
 
@@ -89,6 +105,12 @@ export interface UsePublicProfileIndex {
   error: Ref<boolean>
   /** The index is mid-rebuild: no firm counts are available. */
   partial: Ref<boolean>
+  /**
+   * The seller's index exists at all. `false` means "catalogue still being
+   * built", which is a different message from "this seller publishes
+   * nothing" — and, on deploy day, the state of every profile.
+   */
+  indexBuilt: Ref<boolean>
   /** A reconciliation is running right now. */
   reconciling: Ref<boolean>
   /** Cards an active colour filter dropped for having no colour data. */
@@ -137,6 +159,9 @@ export function usePublicProfileIndex(
   const searching = ref(false)
   const error = ref(false)
   const partial = ref(false)
+  // Starts optimistic on purpose: `false` would flash "catalogue being built"
+  // on every load, before the first answer has said anything.
+  const indexBuilt = ref(true)
   const reconciling = ref(false)
   const missing = ref<number | null>(0)
   const facets = ref<PublicCardIndexFacets | null>(null)
@@ -149,7 +174,10 @@ export function usePublicProfileIndex(
   const selectedRarities = ref<Set<string>>(new Set(PUBLIC_RARITIES))
   const selectedTypes = ref<Set<string>>(new Set(PUBLIC_TYPES))
   const selectedManaValues = ref<Set<string>>(new Set(PUBLIC_MANA_VALUES))
-  const sort = ref<PublicProfileSort>({ field: 'name', direction: 'asc' })
+  // The profile shipped sorted most-recent-first (useCardFilter's own default
+  // is 'recent'); tanda 4 changed it to alphabetical with nothing deciding
+  // that. LOW-6, restored.
+  const sort = ref<PublicProfileSort>({ field: 'dateAdded', direction: 'desc' })
   const advancedFilters = ref<PublicProfileFilters>({})
 
   let generation = 0
@@ -189,25 +217,55 @@ export function usePublicProfileIndex(
     return filters
   }
 
-  const countActiveFilters = (filters: PublicProfileFilters): number =>
-    Object.entries(filters).filter(([key, value]) => {
-      if (key === 'search') return false // the search bar shows itself
+  /**
+   * A RANGE is one filter dimension even though it travels as two keys. The
+   * badge on the filter button is the same badge `useCardFilter`'s
+   * advancedFilterCount drives on the owner's own views, where a price range
+   * has always counted 1 — counting it 2 here made the same UI report a
+   * different number for the same choice (LOW-8).
+   */
+  const RANGE_PAIRS: [keyof PublicProfileFilters, keyof PublicProfileFilters][] = [
+    ['minPrice', 'maxPrice'],
+    ['powerMin', 'powerMax'],
+    ['toughnessMin', 'toughnessMax'],
+  ]
+
+  const countActiveFilters = (filters: PublicProfileFilters): number => {
+    const isSet = (key: keyof PublicProfileFilters): boolean => {
+      const value = filters[key]
       if (value === undefined || value === null) return false
       if (Array.isArray(value)) return value.length > 0
       return true
-    }).length
+    }
+
+    const paired = new Set<string>(RANGE_PAIRS.flat() as string[])
+    let count = Object.keys(filters).filter(
+      key => key !== 'search' && !paired.has(key) && isSet(key as keyof PublicProfileFilters)
+    ).length
+    for (const [min, max] of RANGE_PAIRS) {
+      if (isSet(min) || isSet(max)) count++
+    }
+    return count
+  }
 
   const applyState = (result: PublicCardIndexPage): void => {
     total.value = result.total
     hasMore.value = result.hasMore
     facets.value = result.facets
     partial.value = result.indexState.partial
+    indexBuilt.value = result.indexState.built
     reconciling.value = result.indexState.reconciling
     missing.value = result.indexState.missing
     error.value = false
   }
 
   const loadStatusCounts = async (uid: string, myGeneration: number): Promise<void> => {
+    // LOW-4: clear first. Without this, a failed count query for the NEW
+    // seller leaves the PREVIOUS seller's totals sitting in the header under
+    // someone else's name — showing one user's numbers as another's is not a
+    // cosmetic defect.
+    saleCount.value = 0
+    tradeCount.value = 0
     try {
       const counts = await getUserPublicCardStatusCounts(uid)
       if (myGeneration !== generation) return
@@ -336,6 +394,7 @@ export function usePublicProfileIndex(
     searching,
     error,
     partial,
+    indexBuilt,
     reconciling,
     missing,
     facets,

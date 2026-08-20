@@ -64,7 +64,7 @@
  * real and not a broken/truncated query.
  */
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
-import { getFirestore, FieldPath } from 'firebase-admin/firestore';
+import { getFirestore, FieldPath, Timestamp } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -145,6 +145,10 @@ async function main() {
       dryRun,
       log: console.log,
       logError: console.error,
+      // TASK-247 tanda 4 ronda 2: the reconcile now fetches from Scryfall
+      // whatever scryfall_cache is missing a set code for, and stamps those
+      // cache documents the same way every other cache writer does.
+      cacheStampAt: Timestamp.now(),
       // overrideHint (review round 3): this script's caller DOES have a
       // real override — say so, unlike the callable's self-service path.
       overrideHint: `re-run with --uid=${uid} --force-empty-index after confirming the small read is real.`,

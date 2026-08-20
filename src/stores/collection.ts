@@ -31,7 +31,37 @@ import { buildEnrichmentPatch } from '../utils/cardEnrichment'
 import { cardImageProxyUrl } from '../utils/cardImageUrl'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import { getCardsNeedingPublicSync, isPossiblyPublicCard } from '../utils/publicSyncFilter'
+import { withTimeout } from '../utils/withTimeout'
 import type { CardIndexDeltaMutation, QueryCardIndexRequest } from '../services/cloudFunctions'
+
+/**
+ * TASK-255 AC1. addDoc/updateDoc/deleteDoc (raw Firestore SDK writes, as
+ * opposed to the httpsCallable Cloud Functions elsewhere in this file, which
+ * already carry their own 30-60s client timeouts — see cloudFunctions.ts)
+ * have NO built-in timeout in the web SDK. Under a bad connection the await
+ * can sit pending forever — this is the exact, measured mechanism of the
+ * production incident: a deleteDoc that never settled left the save button
+ * stuck on "GUARDANDO" forever and skipped the existing failure-compensation
+ * logic entirely, since neither the catch nor the finally block ever ran.
+ *
+ * 20000ms (20s), chosen relative to two already-established numbers in this
+ * codebase rather than invented from scratch:
+ *   - It sits below the 30-60s timeouts already given to this store's own
+ *     httpsCallable writes (applyCardIndexDelta, bulkImportCards) — a
+ *     single small document write should not need as much slack as a
+ *     Cloud Function invocation that reads/writes multiple chunks.
+ *   - TASK-229 measured that a SATURATED write STREAM (a ~24MB card_index
+ *     rewrite, not a single doc) can leave promises pending for minutes
+ *     before converging — this timeout deliberately does NOT try to cover
+ *     that scenario (a single-document write is a tiny fraction of that
+ *     payload) and is scoped to "this exact card's write", not the shared
+ *     stream.
+ * This number has NOT been measured against live throttled 4G — that
+ * verification is AC10, owned by the orchestrator in-browser. If AC10 finds
+ * 20s too short for a legitimate slow save, raise this constant; the
+ * compensation path below stays correct for any value.
+ */
+const CARD_WRITE_TIMEOUT_MS = 20000
 
 /**
  * Commit a Firestore batch with retry logic (skips retries for permission errors)
@@ -1641,12 +1671,14 @@ export const useCollectionStore = defineStore('collection', () => {
             } catch (countError) {
                 logSanitizedError('[TASK-230] Could not read server card count, omitting chunkId', countError)
             }
-            const docRef = await addDoc(colRef, {
+            // TASK-255 AC1: same reasoning as deleteDoc's wrap below — the
+            // raw Firestore write has no built-in timeout.
+            const docRef = await withTimeout(addDoc(colRef, {
                 ...cleanData,
                 ...(chunkId !== undefined ? { chunkId } : {}),
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
-            })
+            }), CARD_WRITE_TIMEOUT_MS, 'addDoc')
 
             const newCard: Card = {
                 id: docRef.id,
@@ -1662,6 +1694,34 @@ export const useCollectionStore = defineStore('collection', () => {
             // the 2000 real cards stored there (TASK-185).
             if (syncIndexOrQueue(newCard, 'add')) {
                 persistIndexToFirestore()
+            }
+
+            // TASK-255 AC3 decision: this client-side syncIndexOrQueue +
+            // persistIndexToFirestore path above is a debounced, IN-MEMORY,
+            // full-chunk rewrite — it is the ONLY path that used to put a
+            // brand-new card into card_index, and measurement against the
+            // production incident found it losing that race: two cards
+            // created in the same session never showed up in either
+            // rewritten chunk. Back it up with a single, synchronously
+            // awaited, SERVER-authoritative insert — the same
+            // allowInsert:true mechanism deleteCard's gap #1 compensation
+            // already relies on (TASK-232), which re-reads the doc's real
+            // chunkId from Firestore instead of trusting client-side
+            // in-memory state or debounce timing. Best-effort: a failure
+            // here does not fail the card creation itself (the document,
+            // the source of truth, already exists) — mirrors every other
+            // applyCardIndexDelta call site in this file. Only reachable
+            // when chunkId was actually written above (getCountFromServer
+            // succeeded) — the server cannot allowInsert a doc it can't
+            // place in a chunk (functions/index.js applyCardIndexDelta);
+            // the getCountFromServer failure branch already logs its own
+            // reason and stays a pre-existing, out-of-scope gap (TASK-230).
+            if (chunkId !== undefined) {
+                try {
+                    await applyCardIndexDelta([{ cardId: docRef.id, action: 'update', allowInsert: true }])
+                } catch (indexError: unknown) {
+                    logSanitizedError(`[IndexSync] applyCardIndexDelta allowInsert failed for new card ${docRef.id} — falling back to the debounced client persist above`, indexError, 'warn')
+                }
             }
 
             // Sync to public collection (non-blocking, log-only on failure)
@@ -1744,10 +1804,16 @@ export const useCollectionStore = defineStore('collection', () => {
             }
 
             const cardRef = doc(db, 'users', authStore.user.id, 'cards', cardId)
-            await updateDoc(cardRef, {
+            // TASK-255 AC1: same reasoning as deleteCard's wrap — the raw
+            // Firestore write has no built-in timeout, and this is the same
+            // "guardado" flow (CardDetailModal.handleSave) that hung in the
+            // production incident. A timeout here lets this update fall
+            // through to the existing rollback+toast branch below instead
+            // of leaving the save button stuck forever.
+            await withTimeout(updateDoc(cardRef, {
                 ...cleanUpdates,
                 updatedAt: Timestamp.now(),
-            })
+            }), CARD_WRITE_TIMEOUT_MS, 'updateDoc')
 
             // Sync index — LOCAL in-memory only (syncIndexLocal). The
             // Firestore card_index chunk write moves server-side (TASK-232):
@@ -2117,7 +2183,18 @@ export const useCollectionStore = defineStore('collection', () => {
             }
 
             try {
-                await deleteDoc(cardRef)
+                // TASK-255 AC1/AC2: withTimeout is the whole fix here. A
+                // deleteDoc that HANGS (the measured production mechanism —
+                // not a rejection) never used to reach this catch, so the
+                // gap #1 compensation below never ran and the card_index
+                // delete above was left standing with no matching doc
+                // deletion — an invisible card. Wrapping the raw Firestore
+                // write in a timeout converts a hang into a rejection after
+                // CARD_WRITE_TIMEOUT_MS, which funnels into the SAME
+                // compensation branch already proven for a genuine failure
+                // (TASK-232 gap #1) — no new compensation logic needed, the
+                // hang just needed a way to actually arrive here.
+                await withTimeout(deleteDoc(cardRef), CARD_WRITE_TIMEOUT_MS, 'deleteDoc')
             } catch (error) {
                 if (isNotFoundError(error)) {
                     // TASK-223: the doc is already gone — deleteCard's entire

@@ -114,6 +114,12 @@
       "type": "task",
       "ref": "tasks/TASK-245.json",
       "label": "El cambio masivo de estado BORRA los metadatos de todas las cartas que toca en el card_index"
+    },
+    {
+      "id": "task-247",
+      "type": "task",
+      "ref": "tasks/TASK-247.json",
+      "label": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales"
     }
   ],
   "edges": []

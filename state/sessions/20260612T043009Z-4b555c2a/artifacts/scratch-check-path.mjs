@@ -1,0 +1,10 @@
+import { applicationDefault, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+initializeApp({ credential: applicationDefault(), projectId: 'cranial-trading' });
+const db=getFirestore(); const UID='Rt5DOfZXBtPZkEpK4N5pW6a5FXs1';
+const sub=await db.collection(`users/${UID}/public_cards`).count().get();
+const top=await db.collection('public_cards').where('userId','==',UID).count().get();
+console.log('users/%s/public_cards  -> %d documentos', UID.slice(0,8), sub.data().count);
+console.log('public_cards (raiz) donde userId=%s -> %d documentos', UID.slice(0,8), top.data().count);
+const subs=await db.doc(`users/${UID}`).listCollections();
+console.log('subcolecciones reales de users/%s: %s', UID.slice(0,8), subs.map(c=>c.id).join(', '));

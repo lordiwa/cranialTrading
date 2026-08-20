@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-19T05:41:53.292Z",
+  "generated_at": "2026-08-20T04:50:36.536Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1362,6 +1362,18 @@
       "title": "REGRESION: el perfil publico filtra y busca solo sobre las ~60 cartas cargadas — 36 negras mostradas de 1.049 reales",
       "status": "in_review",
       "priority": "critical"
+    },
+    {
+      "key": "TASK-248",
+      "title": "Busqueda por HABILIDAD y texto de carta en el perfil publico (escindido del AC4 de TASK-247)",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-249",
+      "title": "El vendedor que despublica TODO su inventario queda con el indice publico intacto: el collapse guard lo refusa en silencio",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

@@ -1,0 +1,37 @@
+{
+  "key": "TASK-248",
+  "title": "Busqueda por HABILIDAD y texto de carta en el perfil publico (escindido del AC4 de TASK-247)",
+  "description": "ESCINDIDO DE TASK-247 POR DECISION EXPLICITA DE RAFAEL el 2026-08-19. El AC4 de TASK-247 exigia decidir si la busqueda por habilidad entraba en ese ticket o salia aparte, y si salia aparte, abrirlo con la evidencia. Esto es ese ticket. Rafael tambien fijo la PRIORIDAD RELATIVA: es lo siguiente a hacer DESPUES del filtro de color, pero TASK-247 se despliega primero. No empezar este ticket hasta que TASK-247 este en produccion y verificado.\n\nEVIDENCIA HEREDADA DE TASK-247 (medida contra PRODUCCION, proyecto cranial-trading, cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1, perfil https://cranialtrading.com/@rafael_m):\n- Rafael reporto que ANTES catalogaba sus cartas por HABILIDAD usando los datos de Scryfall. Hoy no existe busqueda por habilidad ni por texto de carta en NINGUNA parte del perfil publico.\n- Los documentos de public_cards no guardan ningun dato de Scryfall: 0 de 6.647 tienen colors o type_line, y tampoco oracle_text. El dato de la habilidad NO esta en la copia publica.\n- El dato SI existe en nuestro propio scryfall_cache: 5.108 de 5.108 scryfallId unicos de public_cards estan cacheados (0 sin cachear) al momento de la medicion de TASK-247.\n\nDECISION DE ARQUITECTURA YA TOMADA POR RAFAEL (2026-08-19, heredada, NO relitigar): la consulta se resuelve SERVER-SIDE contra NUESTRO scryfall_cache. NO se denormaliza Scryfall dentro de public_cards y NO hay backfill masivo de documentos. TASK-247 ya dejo la infraestructura: functions/lib/publicCardEntry.js construye la entrada del indice publico uniendo el documento de public_cards contra su documento de scryfall_cache, functions/lib/publicCardIndex.js ensambla los chunks, y la tanda 3 de TASK-247 agrega la Cloud Function de consulta publica. Este ticket EXTIENDE esa capa, no construye una nueva.\n\nRESTRICCIONES DURAS HEREDADAS:\n- No se puede reintroducir la fuga de privacidad que cerro TASK-136: nunca descargar users/{uid}/cards del usuario visitado ni filtrar cartas privadas en el cliente.\n- firestore.rules no tiene match para users/{uid}/public_card_index, asi que cae en el deny catch-all: el navegador NO puede leer los chunks y la consulta DEBE ir por Cloud Function.\n- El mercado objetivo esta en 4G lenta y el peso importa mas que la velocidad: hay que medir BYTES, no solo milisegundos. El 80% del mercado tiene 25k+ cartas y el 30% tiene 100k+.\n\nEL PROBLEMA TECNICO CENTRAL, DICHO DE FRENTE: oracle_text es texto libre de cientos de bytes por carta. Meterlo entero en el indice publico multiplica el peso de los chunks, que es exactamente lo que el presupuesto de 4G lenta no tolera. La solucion NO es obvia y es lo primero que hay que decidir por medicion, no por opinion.",
+  "acceptance_criteria": [
+    "AC1 - DECIDIR POR MEDICION donde vive el dato de la habilidad para que la busqueda alcance la coleccion publica completa, y dejar la decision escrita con su costo EN BYTES. Al menos tres opciones a evaluar contra el tamano real: (a) meter oracle_text completo en la entrada del indice publico, (b) un indice invertido de terminos derivado de oracle_text, (c) resolver la busqueda dentro de la Cloud Function leyendo scryfall_cache al vuelo sin tocar el indice. Medir el peso resultante de los chunks para una cuenta de 6.647 cartas publicas Y extrapolar a una de 100.000, que es el 30% del mercado.",
+    "AC2 - La busqueda por habilidad devuelve resultados sobre la coleccion publica COMPLETA, no sobre la pagina cargada. Igual que el AC2 de TASK-247, la verificacion tiene que declarar EN QUE UNIDAD cuenta: documentos de public_cards, scryfallId unicos, o copias sumando quantity. Sin unidad declarada la verificacion no vale.",
+    "AC3 - Definir por escrito que significa exactamente 'buscar por habilidad' antes de implementar nada: es substring crudo sobre oracle_text, es por palabra clave de MTG reconocida (flying, deathtouch, trample, lifelink), o son las dos cosas con interfaces distintas. Rafael reporto que CATALOGABA por habilidad, lo que sugiere agrupar y no solo buscar. Preguntarle antes de asumir.",
+    "AC4 - Cartas de doble cara y cartas partidas: la habilidad puede vivir dentro de card_faces[].oracle_text y no en la raiz del documento. Cadena de fallback explicita, igual que la que TASK-247 ya establecio para colors y type_line en functions/lib/publicCardEntry.js. Caso de prueba concreto heredado de TASK-247: 'Blightreaper Thallid // Blightsower Thallid'.",
+    "AC5 - Huecos de datos declarados y manejados, no ignorados. TASK-247 midio que 474 de 6.647 cartas publicas (7,1%) no tienen ninguna fuente de color usable y que 17 scryfallId de public_cards no estan en scryfall_cache. Medir el hueco EQUIVALENTE para oracle_text y decidir explicitamente que ve el usuario para esas cartas, reusando la semantica de las banderas x y cu que ya definio functions/lib/publicCardEntry.js en vez de inventar una nueva.",
+    "AC6 - NO se reintroduce la fuga de privacidad de TASK-136: verificar POR MEDICION, leyendo las peticiones de red al mirar un perfil ajeno, que en ningun momento se descarga users/{uid}/cards del visitado ni llegan cartas privadas al navegador.",
+    "AC7 - Candado de regresion que se pone ROJO con el defecto presente: buscar por una habilidad sobre una coleccion publica mas grande que una pagina y verificar que el resultado cubre toda la coleccion. Si no se puede plantar en rojo primero, decirlo explicitamente en vez de escribir una assertion vacua.",
+    "AC8 - Presupuesto de peso verificado POR MEDICION con throttling de 4G lenta, nunca contra localhost. Declarar los bytes que agrega esta funcionalidad al perfil publico y confirmar que no rompe el presupuesto de arranque ya establecido para el proyecto.",
+    "AC9 - Verificado en PRODUCCION sobre el perfil real de Rafael, con al menos un caso de habilidad que el mismo elija y con control negativo: una habilidad que no tiene, que debe devolver cero."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "perfil-publico",
+    "busqueda",
+    "escindido-de-TASK-247",
+    "bloqueado-por-deploy-247"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-247"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-19T17:40:02.950Z",
+  "updated_at": "2026-08-19T17:40:02.950Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

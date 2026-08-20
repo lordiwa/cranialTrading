@@ -1,0 +1,22 @@
+import { createRequire } from 'module';
+import { applicationDefault, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+const require = createRequire('C:/Users/srpar/WebstormProjects/cranialTrading/x.js');
+const idx = require('C:/Users/srpar/WebstormProjects/cranialTrading/functions/lib/publicCardIndex.js');
+initializeApp({ credential: applicationDefault(), projectId: 'cranial-trading' });
+const db = getFirestore();
+const UID='Rt5DOfZXBtPZkEpK4N5pW6a5FXs1';
+const docs=(await db.collection('public_cards').where('userId','==',UID).get()).docs.map(d=>d.data());
+const ids=[...new Set(docs.map(c=>c.scryfallId).filter(Boolean))];
+const cache=new Map();
+for(let i=0;i<ids.length;i+=300){const g=await db.getAll(...ids.slice(i,i+300).map(id=>db.collection('scryfall_cache').doc(id)));for(const x of g) if(x.exists) cache.set(x.id,x.data().card||x.data());}
+const {buildPublicIndex:build, diagnosePublicIndex:diag, planPublicIndexReconciliation:plan}=idx;
+const res=build(docs,cache), meta=res.meta;
+const vaciado={}; for(const [k,c] of Object.entries(res.chunks)) vaciado[k]={...c,entries:[]};
+const menos={...res.chunks}; delete menos[Object.keys(menos).pop()];
+const show=(lbl,dg,fresh)=>{const r=plan(dg,fresh);console.log('%-15s rebuild=%-5s chunks=%-3d | %s',lbl,r.rebuildRequired,Object.keys(r.chunksToWrite||{}).length,(r.reason||'').slice(0,70));};
+show('sano', diag(res.chunks,meta,docs,cache), res);
+show('vaciado', diag(vaciado,meta,docs,cache), res);
+show('chunk perdido', diag(menos,meta,docs,cache), res);
+const dm=docs.slice(0,-50); show('50 restos', diag(res.chunks,meta,dm,cache), build(dm,cache));
+const gr=docs.concat(docs).concat(docs); show('cuenta x3', diag(res.chunks,meta,gr,cache), build(gr,cache));

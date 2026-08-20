@@ -1,0 +1,35 @@
+{
+  "key": "TASK-249",
+  "title": "El vendedor que despublica TODO su inventario queda con el indice publico intacto: el collapse guard lo refusa en silencio",
+  "description": "ESCINDIDO DE TASK-247 (MED-2 de la primera revision en contexto fresco de la tanda 2c). DECISION DE RAFAEL, 2026-08-19: se arregla permitiendo el vaciado cuando la accion vino del usuario. El cliente manda una senal de intencionalidad y el guard la respeta; el guard sigue protegiendo contra vaciados accidentales (crash, bug, lectura a medias), que es para lo que fue hecho. Las alternativas descartadas por Rafael fueron (a) solo mostrarle el error al usuario y que un operador corra el script a mano, y (b) dejarlo como esta con un ticket abierto.\n\nEL DEFECTO, MEDIDO POR LECTURA DEL CODIGO. requiresCollapseConfirmation (functions/lib/publicCardIndexExecutor.js:372-386) refusa la reconciliacion cuando docsCount < metaCount * COLLAPSE_RATIO y metaCount >= COLLAPSE_MIN_META_COUNT. El guard es CORRECTO y no se elimina: existe para que una lectura incompleta o un bug no vacien un indice entero por accidente, que es una perdida de datos dificil de revertir.\n\nEl problema es que la tanda 2c hizo que ese guard pase a ser ALCANZABLE POR EL USUARIO, y no hay ningun camino para el caso legitimo. Escenario concreto: un vendedor con 6.758 cartas indexadas marca TODAS como privadas (cierra su tienda, se toma vacaciones, decide dejar de vender). La reconciliacion lee 0 documentos publicos contra 6.758 en el meta, el guard refusa, el cliente hace catch y logSanitizedError con nivel warn (src/services/publicCards.ts, el .catch de scheduleIndexReconcile), y el usuario NO VE NADA. El indice conserva las 6.758 entradas y su perfil publico las sigue mostrando y filtrando.\n\nPOR QUE IMPORTA: no es una fuga de datos privados en el sentido de TASK-136 — son cartas que el usuario habia publicado el mismo. Pero es un dato publico que el dueno pidio retirar y no se retiro, y el usuario no tiene forma de enterarse ni de arreglarlo. El overrideHint del propio codigo dice correctamente que hace falta un operador corriendo scripts/reconcile-public-card-index.mjs --force-empty-index, o sea que hoy la unica salida es intervencion manual para algo que el usuario pidio explicitamente.\n\nCONTEXTO QUE HAY QUE RESPETAR: TASK-247 dejo el camino de escritura con debounce de flanco de subida mas un guard de in-flight en src/services/publicCards.ts. La senal de intencionalidad tiene que sobrevivir a ese coalescing: si el usuario despublica todo y en la misma rafaga hace otra cosa, la senal no se puede perder al coalescer. Ese es el punto de diseno mas delicado del ticket y hay que resolverlo explicitamente, no de casualidad.",
+  "acceptance_criteria": [
+    "AC1 - El cliente puede senalar que un vaciado del indice publico es INTENCIONAL (vino de una accion del usuario) y el collapse guard respeta esa senal. Definir por escrito la forma exacta de la senal y por que no puede ser falsificada por un cliente cualquiera para vaciar el indice de otro usuario: la funcion reconcilePublicCardIndex es self-only y deriva el userId de request.auth.uid, asi que el peor caso es un usuario vaciando su propio indice, que es precisamente lo que se quiere permitir. Dejarlo escrito igual en vez de darlo por obvio.",
+    "AC2 - El guard SIGUE refusando cuando el vaciado NO es intencional. Candado de regresion explicito: una reconciliacion sin la senal, con la misma proporcion de colapso, tiene que seguir siendo refusada. Si este test no existe, el ticket reintroduce el riesgo de perdida de datos que el guard existe para evitar.",
+    "AC3 - La senal SOBREVIVE al coalescing del camino de escritura. TASK-247 dejo un debounce de flanco de subida mas un guard de in-flight en src/services/publicCards.ts: si el usuario despublica todo y en la misma rafaga dispara otros triggers, la senal no se puede perder al coalescer varias llamadas en una. Verificarlo con un test que dispare la rafaga mixta, no razonando sobre el codigo.",
+    "AC4 - El usuario VE lo que paso cuando el guard refusa sin senal. Hoy el unico rastro es un logSanitizedError de nivel warn en la consola del navegador, invisible. Decidir y dejar escrito que ve el usuario: un toast, un estado en la UI del perfil, o lo que corresponda. Un refuse silencioso sigue siendo un defecto aunque el vaciado intencional ya funcione.",
+    "AC5 - Candado de regresion que se pone ROJO con el defecto presente: reconciliar un indice con 6.758 entradas en meta contra 0 documentos publicos, con la senal de intencionalidad puesta, y verificar que el indice queda efectivamente vacio. Si no se puede plantar en rojo primero, decirlo explicitamente en vez de escribir una assertion vacua.",
+    "AC6 - Verificado POR MEDICION en dev sobre una cuenta con inventario real: despublicar todo desde la UI y confirmar que el perfil publico deja de mostrar cartas. Declarar la unidad de conteo, igual que exige el AC2 de TASK-247 (documentos de public_cards, no cartas unicas ni copias sumando quantity).",
+    "AC7 - El camino del operador (scripts/reconcile-public-card-index.mjs --force-empty-index) sigue existiendo y funcionando despues del cambio. Es la red para el caso en que la senal del cliente no llegue, y no se elimina al agregar el camino del usuario."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "perfil-publico",
+    "indice-publico",
+    "escindido-de-TASK-247",
+    "collapse-guard"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-247"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-19T18:42:32.035Z",
+  "updated_at": "2026-08-19T18:42:32.035Z",
+  "jira_key": null,
+  "verification_tier": "tdd",
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

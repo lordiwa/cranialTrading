@@ -1,0 +1,58 @@
+{
+ "projectId": "cranial-trading-dev",
+ "at": "2026-08-20T04:42:42.248Z",
+ "docs": [
+  {
+   "scryfallId": "4a02b758-65b6-4c25-83b9-de63a1a92b51",
+   "name": "Obscura Charm",
+   "set_original": "snc",
+   "set_name_original": "Streets of New Capenna",
+   "produced_mana_original": null,
+   "keywords_original": []
+  },
+  {
+   "scryfallId": "ec644ac3-07a2-43de-8173-9cc18e2ea2d9",
+   "name": "Awe for the Guilds",
+   "set_original": "dgm",
+   "set_name_original": "Dragon's Maze",
+   "produced_mana_original": null,
+   "keywords_original": []
+  },
+  {
+   "scryfallId": "c6406eba-da58-4264-a213-20e22c1c3bec",
+   "name": "Questing Druid // Seek the Beast",
+   "set_original": "woe",
+   "set_name_original": "Wilds of Eldraine",
+   "produced_mana_original": null,
+   "keywords_original": []
+  },
+  {
+   "scryfallId": "d98f51ec-8eae-434a-ab62-85bdb6586fa2",
+   "name": "Thunderous Debut",
+   "set_original": "woe",
+   "set_name_original": "Wilds of Eldraine",
+   "produced_mana_original": null,
+   "keywords_original": [
+    "Bargain"
+   ]
+  },
+  {
+   "scryfallId": "edefaf86-5749-47b6-a28a-70c1a7f0b8f6",
+   "name": "Ossification",
+   "set_original": "pcbb",
+   "set_name_original": "Cowboy Bebop",
+   "produced_mana_original": null,
+   "keywords_original": [
+    "Enchant"
+   ]
+  },
+  {
+   "scryfallId": "4e434d74-cad0-45f5-bc8d-f34aa5e1d879",
+   "name": "Fiendish Panda",
+   "set_original": "fdn",
+   "set_name_original": "Foundations",
+   "produced_mana_original": null,
+   "keywords_original": []
+  }
+ ]
+}

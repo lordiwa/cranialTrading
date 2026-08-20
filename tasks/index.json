@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T21:05:39.594Z",
+  "generated_at": "2026-08-20T23:14:32.272Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1403,6 +1403,12 @@
       "key": "TASK-254",
       "title": "La suite E2E local no compila nada: Playwright reusa un vite preview viejo y testea el dist que haya en disco, que suele ser el bundle de PRODUCCION",
       "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-255",
+      "title": "Un cambio de estado que se cuelga deja la carta INVISIBLE: el delta de borrado del indice sale igual y el documento queda vivo",
+      "status": "in_review",
       "priority": "critical"
     }
   ]

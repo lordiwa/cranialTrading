@@ -1,0 +1,68 @@
+{
+  "projectId": "cranial-trading-dev",
+  "at": "2026-08-21T05:48:15.720Z",
+  "counts": {
+    "users": 6,
+    "usernames": 6,
+    "orphans": 0
+  },
+  "users": [
+    {
+      "uid": "DkdTugHe5dZaW1p9tRkxuuKJCoC3",
+      "username": "e2euser1787291169394"
+    },
+    {
+      "uid": "iEA2CA3QVqaaFWxKKQYUkRZugGF3",
+      "username": "e2euser1787291217421"
+    },
+    {
+      "uid": "jV6gJqf3csPA4vRfO2k9Vb5ejYo2",
+      "username": "RafaMoose"
+    },
+    {
+      "uid": "nhlGNZttZ5fe40e2KDOcgUCw9l53",
+      "username": "e2euser1787291267656"
+    },
+    {
+      "uid": "pVoPuRZpMPXboK4UVd7Hvx3bRYj1",
+      "username": "e2euser1787291059756"
+    },
+    {
+      "uid": "yoU2gaJARfe72oW7GK2GkQxSgCe2",
+      "username": "rafael_m"
+    }
+  ],
+  "index": [
+    {
+      "norm": "e2euser1787291059756",
+      "uid": "pVoPuRZpMPXboK4UVd7Hvx3bRYj1",
+      "docUsername": "e2euser1787291059756"
+    },
+    {
+      "norm": "e2euser1787291169394",
+      "uid": "DkdTugHe5dZaW1p9tRkxuuKJCoC3",
+      "docUsername": "e2euser1787291169394"
+    },
+    {
+      "norm": "e2euser1787291217421",
+      "uid": "iEA2CA3QVqaaFWxKKQYUkRZugGF3",
+      "docUsername": "e2euser1787291217421"
+    },
+    {
+      "norm": "e2euser1787291267656",
+      "uid": "nhlGNZttZ5fe40e2KDOcgUCw9l53",
+      "docUsername": "e2euser1787291267656"
+    },
+    {
+      "norm": "rafael_m",
+      "uid": "yoU2gaJARfe72oW7GK2GkQxSgCe2",
+      "docUsername": "rafael_m"
+    },
+    {
+      "norm": "RafaMoose",
+      "uid": "jV6gJqf3csPA4vRfO2k9Vb5ejYo2",
+      "docUsername": "RafaMoose"
+    }
+  ],
+  "orphans": []
+}

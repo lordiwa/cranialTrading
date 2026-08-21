@@ -1,0 +1,32 @@
+{
+  "projectId": "cranial-trading-dev",
+  "at": "2026-08-21T05:48:38.678Z",
+  "counts": {
+    "users": 2,
+    "usernames": 2,
+    "orphans": 0
+  },
+  "users": [
+    {
+      "uid": "jV6gJqf3csPA4vRfO2k9Vb5ejYo2",
+      "username": "RafaMoose"
+    },
+    {
+      "uid": "yoU2gaJARfe72oW7GK2GkQxSgCe2",
+      "username": "rafael_m"
+    }
+  ],
+  "index": [
+    {
+      "norm": "rafael_m",
+      "uid": "yoU2gaJARfe72oW7GK2GkQxSgCe2",
+      "docUsername": "rafael_m"
+    },
+    {
+      "norm": "RafaMoose",
+      "uid": "jV6gJqf3csPA4vRfO2k9Vb5ejYo2",
+      "docUsername": "RafaMoose"
+    }
+  ],
+  "orphans": []
+}

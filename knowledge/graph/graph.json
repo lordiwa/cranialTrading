@@ -162,6 +162,12 @@
       "type": "task",
       "ref": "tasks/TASK-257.json",
       "label": "resolveUsernameToUid confia en el indice de /usernames sin verificar el doc resuelto, y cada corrida de register deja un indice huerfano"
+    },
+    {
+      "id": "task-258",
+      "type": "task",
+      "ref": "tasks/TASK-258.json",
+      "label": "El test E2E del perfil propio esquiva el goto directo por un fixture de dev sin normalizar, ya reparado: sacar el rodeo y probar lo que hace el usuario al refrescar"
     }
   ],
   "edges": []

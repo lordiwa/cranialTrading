@@ -2,9 +2,9 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "paused",
-  "updated_at": "2026-08-21T16:00:21.465Z",
+  "updated_at": "2026-08-21T16:33:52.020Z",
   "active_task": null,
-  "workflow_step": "impl",
+  "workflow_step": "review",
   "next_action": "(1) PREGUNTARLE A RAFAEL POR EL PUSH de develop: 441d03a + f6b15b2 sin pushear es lo que mantiene vivos los dos sintomas. Gate 1 con auto_push_after_close en FALSE, o sea que nunca se pushea sin que lo diga el. (2) Abrir los 3 follow-ups del cierre de TASK-257, con su OK: (a) MEDIUM-1, candado de regresion del guard provisioningUids en la capa store, que el reviewer demostro que SI es testeable aunque el timing del SDK no lo sea, mas la opcion de cablear scratch-ac4-usernames-audit.mjs como paso del nightly; (b) LOW-1 y LOW-2, los dos residuales que el developer no habia declarado, ventana de snapshot viejo del getDoc y multi-tab; (c) el hallazgo de normalizacion de /usernames/RafaMoose. (3) Seguir el loop ya acordado con lo que queda del goal: keys:TASK-258,TASK-259, loop_auth SIN CAMBIOS (auto_close true, auto_consolidate true, uat_delegated FALSE, auto_push FALSE). DISCIPLINA: puerto 4173 libre antes de E2E; pre-commit >2 min, timeout 540000 ms; commit con pathspec limitado.",
   "handoff_summary": "TASK-257 CERRADO EN VERDE el 2026-08-21. Reviewer FULL en contexto fresco: APROBADO, cero HIGH. Los 6 ACs cumplidos. El AC4, que era la mitad sin unit test, se cerro POR MEDICION: 4 corridas de e2e:auth con el fix, 4 usuarios y 4 indices en relacion 1:1, cero huerfanos; y aparecio solo un CONTROL NEGATIVO no fabricado, el Nightly E2E corriendo contra el sitio desplegado (codigo viejo, sin el guard) que reprodujo el bug con la firma exacta de AC1. Sin guard 1/1 huerfano, con guard 4/4 limpio. El reviewer verifico por mutacion que el candado de AC3 no es vacuo, re-corrio el gate entero y re-verifico merge-base. Dev quedo en users=2/usernames=2/huerfanos=0. PENDIENTE OPERATIVO GRANDE: 441d03a (y f6b15b2 de TASK-256) siguen SIN PUSHEAR, asi que el nightly regenera el huerfano cada noche Y el fix de lectura no esta desplegado, o sea que los huerfanos de prod siguen sirviendo perfiles equivocados. El push es decision de Rafael (auto_push_after_close esta en FALSE). Del cierre se desprenden 3 follow-ups con causa medida, todavia SIN ABRIR, esperando su OK.",
   "open_questions": [
@@ -202,7 +202,7 @@
   },
   "loop_state": {
     "current_ticket": "TASK-258",
-    "phase": "impl",
+    "phase": "review",
     "iteration": 1,
     "completed_this_run": 0
   }

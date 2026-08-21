@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T16:02:42.976Z",
+  "generated_at": "2026-08-21T16:39:40.042Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1425,8 +1425,8 @@
     },
     {
       "key": "TASK-258",
-      "title": "Un usuario que refresca o marca su propio perfil publico recibe 404: loadProfile corre en onMounted antes de que se restaure la sesion",
-      "status": "in_progress",
+      "title": "El test E2E del perfil propio esquiva el goto directo por un fixture de dev sin normalizar, ya reparado: sacar el rodeo y probar lo que hace el usuario al refrescar",
+      "status": "done",
       "priority": "high"
     },
     {

@@ -16,6 +16,10 @@ const remoteBaseURL = process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: './e2e/specs',
+  // TASK-254 AC2/AC6. Runs once, after webServer is up (or skipped for
+  // E2E_BASE_URL), before the first spec — verifies dist/ was built for the
+  // Firebase project this run expects, and aborts the whole run if not.
+  globalSetup: './e2e/verify-dist-env.global-setup.ts',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -74,7 +78,22 @@ export default defineConfig({
           ? 'npx vite preview --port 4173'
           : `npx vite build --mode ${process.env.VITE_MODE || 'development'} && npx vite preview --port 4173`,
         port: 4173,
-        reuseExistingServer: !process.env.CI,
+        // TASK-254 AC1. Explicit, never Playwright's own default. Previously
+        // this was `!process.env.CI`: in CI that already evaluated to
+        // false (CI always starts on a clean runner with nothing on 4173 —
+        // that half was correct and is unchanged here). Locally it evaluated
+        // to TRUE, Playwright's own out-of-CI default, which is the root
+        // cause of this ticket: a leftover `vite preview` process (measured
+        // 2026-08-20: PID 19008, alive for 3 days) let Playwright skip
+        // `command` entirely and reuse it, serving whatever dist/ happened
+        // to hold on disk — production, in the incident this ticket fixes.
+        // Local runs must always rebuild, so this is unconditionally false;
+        // if the port is already occupied (an orphan preview, AC5),
+        // Playwright's own webServer setup refuses to start rather than
+        // silently reusing it — see TASK-254 hand-off for the verified
+        // error text and for what someone deliberately running a preview
+        // to debug should do instead (kill it, or pass E2E_BASE_URL).
+        reuseExistingServer: false,
         timeout: 120_000,
       },
 });

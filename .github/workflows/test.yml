@@ -44,12 +44,27 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Build (dev mode for develop branch, prod mode for main)
+      # TASK-254: this condition and the E2E job's VITE_MODE condition below
+      # must stay the SAME predicate (github.ref == main), not two conditions
+      # that happen to agree on develop and main. They used to be complements
+      # of DIFFERENT predicates (this one keyed on == develop, the E2E job's
+      # on == main) — on a pull_request event github.ref is
+      # refs/pull/<n>/merge, neither branch, so both fell through to their
+      # "else": this job built PRODUCTION and the E2E job expected
+      # development, which the TASK-254 guard correctly read as a mismatch
+      # and aborted. Before the guard existed, that same fallthrough meant
+      # every PR silently built prod and ran the FULL (mutating) E2E suite
+      # against it — this ticket's incident, on a second path nobody had
+      # looked at. Keying both on "is this main" — never inverted — fixes
+      # that: PRs (and any other non-main ref) now build development, same
+      # as develop; only main builds production, because the E2E job tests
+      # the exact same dist artifact that deploy-prod then publishes.
+      - name: Build (prod mode for main, dev mode for every other ref incl. PRs)
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            npx vite build --mode development
-          else
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             npx vite build
+          else
+            npx vite build --mode development
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -123,12 +138,21 @@ jobs:
       # writing real documents to production on every push to main until this
       # ticket. Any test newly tagged @smoke MUST be read-only (no create/edit/
       # delete against Firestore); verify that before adding the tag.
+      # TASK-254: VITE_MODE tells the local playwright.config.ts webServer
+      # what to build in local/dev runs, and it is what the TASK-254 dist-vs-
+      # project guard (e2e/verify-dist-env.global-setup.ts) reads to know
+      # which Firebase project this run is SUPPOSED to be testing. It must be
+      # set explicitly here, matching the same branch check the `build` job
+      # already uses to decide --mode: on main the `build` job compiles
+      # WITHOUT --mode (production, deliberately — see the comment above),
+      # so the guard's expectation must say "production" too, or it aborts a
+      # correct, intentional prod-bundle run and deploy-prod never fires.
       - name: Run E2E tests (full suite on develop, smoke only on main)
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            npx playwright test --grep @smoke
+            VITE_MODE=production npx playwright test --grep @smoke
           else
-            npx playwright test
+            VITE_MODE=development npx playwright test
           fi
       - uses: actions/upload-artifact@v4
         if: always()

@@ -9,7 +9,8 @@ test.describe('Match Calculation', () => {
     // v2 redesign (TASK-094 F2): Recalcular + Sincronizar fused into one "Actualizar"/
     // "Update" button. No conditional skip — this flow must stay covered.
     //
-    // CI round 2 lesson: on the CI fixture account (~59k cards) the sync+recalculate
+    // CI round 2 lesson: on the CI fixture account (~59k cards, pre-2026-08-21
+    // dev wipe; the current sole account has 1,878) the sync+recalculate
     // pipeline can take MINUTES. Waiting for it to *settle* (an enabled/idle button after
     // completion) is not viable at that scale, and bumping the timeout further just delays
     // the same failure. This test validates the INTENTION — the unified refresh flow

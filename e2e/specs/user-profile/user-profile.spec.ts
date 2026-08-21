@@ -1,40 +1,36 @@
 import { test, expect } from '../../fixtures/test';
 
-// TASK-256. Which account each test targets, and why:
+// TASK-267: dev was wiped entirely on 2026-08-21 (all prior accounts gone,
+// including 'rafael_m'/'rafamoose'). It now holds exactly ONE account,
+// created and measured fresh for this purpose:
 //
-// - 'rafael_m' (uid yoU2gaJARfe72oW7GK2GkQxSgCe2): the ONLY dev account with a
-//   real, populated public profile (3,211 cards), measured 2026-08-20. Used by
-//   every test that looks at somebody ELSE's public profile.
-// - 'rafamoose' (uid jV6gJqf3csPA4vRfO2k9Vb5ejYo2, TEST_USER_A_EMAIL): the
-//   account the whole suite authenticates as (e2e/auth.setup.ts). Used ONLY by
-//   the "own profile" tests.
-// - The old target, 'rafael', is gone as a real account. Its
-//   /usernames/rafael index pointer was measured live to still exist and now
-//   points at an ORPHANED doc whose `username` field is something else
-//   entirely (a leftover from a register.spec.ts run). resolveUsernameToUid()
-//   trusts the index pointer without checking the resolved doc's username
-//   field matches, so the profile silently rendered THAT doc — which is why
-//   the old "username visible" assertion passed against a "deleted" account:
-//   it was never checking that the visible username was the right one.
-//   Real production bug, not a test bug — reported, not fixed here (out of
-//   this ticket's scope; see hand-off AC7).
+// - 'qa_mtg' (email qa@cranialtrading.com, uid
+//   90PkdmyFKrVm1RLDXjInJdlYXy73, TEST_USER_A_*): the account the whole
+//   suite authenticates as (e2e/auth.setup.ts) AND the only account with a
+//   populated public profile — 1,878 cards, all status='sale', all public,
+//   measured via Admin SDK and the browser 2026-08-21. Because there is only
+//   one account, it now serves BOTH roles this file used to split across two
+//   usernames: "somebody ELSE's public profile" tests and "own profile"
+//   tests both target it.
 //
-// TASK-258: this file used to detour the "own profile" test through the
-// UserPopover click instead of a raw `page.goto` to the profile URL, with a
-// long comment claiming a real onMounted/auth-restore race caused any direct
-// navigation to 404. That claim was measured FALSE (TASK-258 orchestrator
-// comment, 2026-08-21): an anonymous visitor who never had a session 404'd on
-// the exact same URL, which a session-restore race cannot explain. The real
-// cause was a dev-only fixture bug — `/usernames/RafaMoose` and
-// `users.username` were both stored unnormalized ("RafaMoose" instead of
-// "rafamoose"), so `resolveUsernameToUid`'s normalized lookup and its legacy
-// fallback both missed it. Production had zero such cases. The fixture is
-// repaired (dev now has `/usernames/rafamoose` and a normalized
-// `users.username`), so the detour is gone — see the "own profile loads via
-// direct URL" test below, which is the scenario the detour used to hide:
-// bookmarking or refreshing on your own profile.
-const PUBLIC_PROFILE_USERNAME = 'rafael_m';
-const OWN_PROFILE_USERNAME = 'rafamoose';
+// Historical context, kept because it explains why some tests below are
+// written the way they are (anchoring on real text, not "something
+// rendered"), NOT because it still describes live data:
+// - TASK-256 found that resolveUsernameToUid() trusts the /usernames/{norm}
+//   index pointer without checking the resolved doc's `username` field
+//   still matches — an orphaned index entry could make a profile silently
+//   render the WRONG account under the requested URL. That underlying
+//   production bug was reported, not fixed, and is unrelated to the
+//   account wipe. A live example of the same shape now exists as
+//   /usernames/qa (TASK-268, kept deliberately as evidence — do not delete
+//   it, and do not use 'qa' as a "username that doesn't exist" fixture).
+// - TASK-258 found that a prior "own profile 404s on direct navigation"
+//   symptom was a dev-fixture bug (unnormalized username casing), not a
+//   real onMounted/auth-restore race — hence this file navigates straight
+//   to the own-profile URL below instead of detouring through the
+//   UserPopover.
+const PUBLIC_PROFILE_USERNAME = 'qa_mtg';
+const OWN_PROFILE_USERNAME = 'qa_mtg';
 
 test.describe('User Profile', () => {
   test('view public user profile: username, location, avatar visible', async ({ userProfilePage }) => {

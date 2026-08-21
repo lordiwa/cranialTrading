@@ -579,7 +579,8 @@ test.describe('Collection CRUD', () => {
   });
 
   // TASK-146 → TASK-168: this assertion has now been through THREE anchors.
-  // getCardCount() failed first: on a 59k-card window-virtualized grid the
+  // getCardCount() failed first: on a large (originally 59k-card, pre-2026-08-21
+  // wipe) window-virtualized grid the
   // virtualizer refills the visible window right behind a removed row, so a
   // count poll can pass by catching a transient mid-remount state. Identity at
   // grid index 0 replaced it and failed too — twice in consecutive CI runs —

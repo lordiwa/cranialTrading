@@ -25,7 +25,9 @@ export class MatchesPage {
     // Covers both the idle label (ACTUALIZAR/UPDATE) and the in-progress label
     // (ACTUALIZANDO…/UPDATING…) — "actualizando" is NOT a substring match of
     // "actualizar" (nor is "updating" of "update"), so both forms must be listed
-    // explicitly. On accounts with a large collection (e.g. CI's 59k-card fixture),
+    // explicitly. On accounts with a large collection (CI's old 59k-card fixture
+    // before the 2026-08-21 dev wipe — the current sole account has 1,878 cards,
+    // but the defensive matching stays valid for whatever account runs this),
     // /saved-matches can mount mid-refresh, so the button may already show the
     // in-progress label on first paint. "sincronizando"/"syncing" are included
     // defensively even though SavedMatchesView currently only ever renders the
@@ -67,7 +69,8 @@ export class MatchesPage {
 
   // True when the refresh flow (sync + recalculate) is already in progress — either the
   // button shows its in-progress label, or the calculate-phase progress bar is visible.
-  // Large accounts (CI's 59k-card fixture) can be mid-refresh before the test even starts.
+  // Large accounts (CI's old 59k-card fixture, pre-2026-08-21 wipe) can be
+  // mid-refresh before the test even starts.
   async isRefreshBusy(): Promise<boolean> {
     const label = (await this.refreshButton.textContent().catch(() => '')) ?? '';
     const busyLabel = /actualizando|updating|sincronizando|syncing/i.test(label);

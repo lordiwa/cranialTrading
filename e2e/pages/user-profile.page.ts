@@ -12,10 +12,10 @@ export class UserProfilePage {
   readonly notFoundMessage: Locator;
   // TASK-256: resolveUsernameToUid trusts the /usernames/{norm} index pointer
   // without checking the resolved doc's `username` field still matches —
-  // measured live on dev: /usernames/rafael points at an orphaned doc whose
-  // username field is now something else entirely, and the profile renders
-  // it anyway. `username` alone (any <h1> visible) does not catch that; a
-  // test needs the actual text.
+  // a live example of the same shape is /usernames/qa (TASK-268, see
+  // e2e/specs/user-profile/user-profile.spec.ts's file-header comment).
+  // `username` alone (any <h1> visible) does not catch that; a test needs
+  // the actual text.
   readonly resultTotal: Locator;
   readonly filteredEmptyState: Locator;
   // TASK-256 AC1/own-profile: the header.profile.viewPublicProfile i18n string

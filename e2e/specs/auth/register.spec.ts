@@ -140,13 +140,14 @@ test.describe('Registration', () => {
     await registerPage.fillForm({
       email: `unique_${Date.now()}@e2etest.com`,
       password: 'Test123456!',
-      // TASK-256: 'rafael' is gone as a real account — its /usernames/rafael
-      // index entry is now an orphaned pointer to a doc with a DIFFERENT
-      // username field (measured live 2026-08-20, see
-      // e2e/specs/user-profile/user-profile.spec.ts's file-header comment).
-      // 'rafael_m' is confirmed live in dev: 3,211 public cards, its own
-      // /usernames/rafael_m index doc resolves correctly.
-      username: 'rafael_m', // Known existing username
+      // TASK-267: dev was wiped entirely on 2026-08-21; the old 'rafael_m'
+      // fixture is gone along with every other prior account. 'qa_mtg' is
+      // the sole account left, confirmed live: its own /usernames/qa_mtg
+      // index doc resolves correctly (see
+      // e2e/specs/user-profile/user-profile.spec.ts's file-header comment
+      // for the full account picture, including the TASK-268 /usernames/qa
+      // orphan — do not confuse that orphan key with this real username).
+      username: 'qa_mtg', // Known existing username
       location: 'Test City',
     });
     await registerPage.submit();

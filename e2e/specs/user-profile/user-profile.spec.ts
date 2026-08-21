@@ -49,7 +49,14 @@ test.describe('User Profile', () => {
     await expect(userProfilePage.searchInput).toBeVisible({ timeout: 10_000 });
     await expect(userProfilePage.resultTotal).toBeVisible();
     const initialTotal = await userProfilePage.resultTotal.textContent();
-    expect(Number(initialTotal)).toBeGreaterThan(0);
+    // TASK-267: `toBeGreaterThan(0)` passes just as well with 1 card as with
+    // a working collection, and also passes if public_card_index is broken
+    // and returns some small residual result — it can't tell "the public
+    // collection actually loaded" from "something came back". qa_mtg had
+    // 1,878 public cards measured 2026-08-21; the floor below is set well
+    // under that on purpose, loose enough to tolerate the account growing or
+    // being pruned, but high enough that a broken/empty index cannot pass it.
+    expect(Number(initialTotal)).toBeGreaterThan(1000);
 
     // A search term no card can match proves the filter actually filters
     // (server-side, over the whole collection — TASK-247) rather than being a

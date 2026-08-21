@@ -5,11 +5,32 @@ test.describe('Match Management', () => {
     await matchesPage.goto();
   });
 
+  // TASK-259 (AC4): kept @smoke — everything it asserts is read-only. The old
+  // version only checked the 4 tab buttons exist, a shell check that would
+  // stay green even if match calculation/rendering were broken underneath
+  // them. Strengthened with a real check that the matches list itself
+  // finished rendering — not just the tab chrome.
+  //
+  // Deliberately does NOT assert the specific empty-state text
+  // (`matches.empty.new.title`), even though the DEV suite account is
+  // measured at 0 matches: @smoke also runs on push-to-main against
+  // PRODUCTION, reusing the SAME `TEST_USER_A_EMAIL`/`PASSWORD` secret pair
+  // (test.yml) — but dev and prod are different Firebase projects, so that
+  // credential pair resolves to two independent accounts whose match count
+  // was never measured to agree. SavedMatchesView.vue renders exactly one of
+  // "new" tab's empty state OR at least one match card once loading finishes
+  // (currentMatches.length === 0 && !loading, else the matches list) — this
+  // OR holds true and is real+read-only whether the authenticated account
+  // has 0 matches or many, in dev or in prod.
   test('matches page loads with tab navigation @smoke', async ({ matchesPage }) => {
     await expect(matchesPage.tabs.new).toBeVisible();
     await expect(matchesPage.tabs.sent).toBeVisible();
     await expect(matchesPage.tabs.saved).toBeVisible();
     await expect(matchesPage.tabs.deleted).toBeVisible();
+
+    await expect(
+      matchesPage.noMatchesMessage.or(matchesPage.matchCards.first()),
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test('open match detail modal → shows card comparison + user info', async ({ matchesPage }) => {

@@ -13,14 +13,26 @@ test.describe('Search', () => {
     expect(count).toBeGreaterThan(0);
   });
 
+  // TASK-259: `expect(typeof visible).toBe('boolean')` was tautological —
+  // isVisible() always returns a boolean, so this passed whether or not the
+  // dropdown ever appeared. Asserting it appears WITH content is a real
+  // check, but per CLAUDE.md's known-flakes list, the sibling
+  // `selecting autocomplete suggestion...` test is @nightly-skip'd because it
+  // additionally requires a live Scryfall suggestion to carry a *price*. This
+  // test does not add that dependency — it only requires the query ('Lightn')
+  // to return SOME suggestion, a materially weaker (and observed far more
+  // reliable) condition than "has a price". It depends on the same live
+  // autocomplete endpoint the sibling already depends on, so it does not
+  // introduce a new flake surface, and by dropping the price requirement it
+  // is strictly less exposed to that endpoint's flakiness than the sibling.
   test('autocomplete suggestions appear while typing', async ({ searchPage }) => {
     await searchPage.typeForAutocomplete('Lightn');
-    await searchPage.page.waitForTimeout(1500);
 
     const dropdown = searchPage.autocompleteDropdown;
-    const visible = await dropdown.isVisible().catch(() => false);
-    // Autocomplete may or may not appear depending on API latency
-    expect(typeof visible).toBe('boolean');
+    await expect(dropdown).toBeVisible({ timeout: 5_000 });
+
+    const suggestionCount = await dropdown.locator('button, div, li').count();
+    expect(suggestionCount).toBeGreaterThan(0);
   });
 
   // Tagged @nightly-skip: known flake, depends on a live Scryfall suggestion

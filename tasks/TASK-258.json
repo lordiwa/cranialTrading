@@ -1,0 +1,29 @@
+{
+  "key": "TASK-258",
+  "title": "Un usuario que refresca o marca su propio perfil publico recibe 404: loadProfile corre en onMounted antes de que se restaure la sesion",
+  "description": "MEDIDO EN VIVO por el developer durante TASK-256 y confirmado como bug real de cara al usuario, no como problema de la suite.\n\nEL COMPORTAMIENTO: navegar directo a la URL del propio perfil publico, por ejemplo con page.goto('/@RafaMoose') o simplemente refrescando la pagina, da SIEMPRE 404, incluso con el username escrito con las mayusculas exactas. El motivo esta leido en el codigo: UserProfileView.loadProfile() corre en onMounted, antes de que authStore.user termine de repoblarse desde localStorage, y no hay ningun watcher que reintente cuando la sesion queda restaurada. La navegacion client-side, o sea llegar al perfil haciendo click desde dentro de la aplicacion, funciona bien porque para entonces la sesion ya esta.\n\nTRADUCCION A EXPERIENCIA REAL: un usuario que se guarda su propio perfil en marcadores, que comparte el link y despues lo abre, o que simplemente aprieta F5 estando en su perfil, ve una pagina de usuario no encontrado. No es un caso de laboratorio: refrescar es lo mas comun que hay.\n\nCOMO SE RELACIONA CON TASK-256: la prueba E2E del perfil propio ESQUIVA este bug a proposito, navegando por el popover en vez de con goto directo, y el rodeo esta documentado a gritos en el encabezado del archivo. El reviewer lo juzgo defendible porque el titulo de esa prueba promete otra cosa, pero dejo dicho que sin ticket el hallazgo se pierde. Este es el ticket.\n\nOJO CON EL PATRON GENERAL DEL PROYECTO: la regla dice NUNCA declarar onMounted como async con await, porque rompe la carga de perfil para usuarios anonimos en produccion. El arreglo de este ticket tiene que respetar esa regla, o sea reintentar cuando la sesion queda lista, no convertir onMounted en async.",
+  "acceptance_criteria": [
+    "AC1 - Reproducir el 404 y capturarlo verbatim ANTES de tocar nada: entrar por URL directa al propio perfil publico estando logueado, con el username en mayusculas exactas, y registrar el resultado.",
+    "AC2 - El perfil propio carga bien por URL directa y tras un refresh, sin convertir onMounted en async con await. La regla del proyecto sobre onMounted async se respeta y se declara explicitamente como respetada.",
+    "AC3 - Test de regresion que FALLE con el codigo actual: navegar por URL directa al propio perfil y afirmar que carga. Capturar la corrida roja verbatim antes del arreglo.",
+    "AC4 - Verificar que no se rompe el caso que la regla protege: el perfil publico sigue cargando para un visitante ANONIMO, sin sesion. Es el caso que la regla de onMounted existe para no romper.",
+    "AC5 - Verificar que el arreglo no introduce una segunda carga ni un parpadeo: contar las llamadas a loadProfile en una navegacion normal y en una por URL directa.",
+    "AC6 - Gate verde: npm run test:unit, npx vite build, npm run lint, y e2e:profile en verde."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "produccion",
+    "auth"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T04:39:10.830Z",
+  "updated_at": "2026-08-21T04:39:10.830Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

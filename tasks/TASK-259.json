@@ -1,0 +1,37 @@
+{
+  "key": "TASK-259",
+  "title": "Barrido sistematico de verdes vacios en el resto de la suite E2E: 45 usos de if isVisible sin clasificar, 2 aserciones tautologicas confirmadas y el @smoke de matches sin datos que afirmar",
+  "description": "Sale del AC7 de TASK-256, que quedo PARCIAL por declaracion propia del developer y que el reviewer acepto como reporte pero no como barrido. Sin este ticket el inventario vive solo en un mensaje de commit y se evapora, que es exactamente el modo de fallo de los verdes vacios.\n\nLO QUE YA ESTA CONFIRMADO, leido en el codigo, no sospechado:\n1. e2e/specs/search/search.spec.ts linea 23, prueba \"autocomplete suggestions appear while typing\": termina en expect(typeof visible).toBe('boolean'), que es cierto SIEMPRE, con la sugerencia visible o invisible. Es la misma forma tautologica exacta que TASK-256 elimino del perfil publico.\n2. e2e/specs/auth/register.spec.ts, prueba \"duplicate email blocks registration\", alrededor de la linea 46: expect(url).toContain('/register') es SIEMPRE cierto, porque RegisterView.handleRegister() nunca navega fuera de /register, ni en exito ni en error. Esta en el mismo archivo que TASK-256 si toco, pero la prueba de email duplicado no estaba en su alcance nombrado. La prueba hermana, la de username duplicado, ya quedo arreglada en TASK-256 y sirve de modelo directo: afirmar el toast de error visible mas la pantalla de verificacion ausente.\n3. e2e/specs/matches/match-management.spec.ts, prueba \"matches page loads with tab navigation @smoke\": afirma solo que las cuatro solapas esten visibles, o sea cascaron puro, y esta etiquetada @smoke, o sea que corre contra PRODUCCION en cada push a main. TASK-256 decidio NO tocarla, con una razon medida y buena: la cuenta con la que se autentica la suite tiene 0 matches, y los matches son dato DERIVADO, no fixture, asi que exigir al menos uno seria flaky o falso en vez de real. Sigue sin resolver que hace esa etiqueta ahi.\n\nLO QUE QUEDO SIN AUDITAR: alrededor de 45 usos de if (await ...isVisible()) repartidos en 18 archivos, contados con un grep crudo y NUNCA clasificados. Algunos son legitimos, por ejemplo esperar un elemento realmente opcional; otros son cuerpos de prueba enteros vueltos opcionales, que es la primera de las tres formas vacuas. Nadie sabe todavia cual es cual, y esa es la tarea.\n\nADVERTENCIA DE METODO, aprendida en TASK-256: el developer intento automatizar el barrido con un script que contaba expect( por bloque test() y dio falsos positivos masivos por un error de emparejado de llaves; lo descarto bien en vez de reportar basura. Si se automatiza, el script necesita su propio control negativo, o sea demostrar que marca en rojo un caso vacuo conocido y NO marca uno sano conocido, antes de creerle un solo resultado.\n\nCONTEXTO DEL PROYECTO: ya existe una nota que documenta 14 mecanismos distintos por los cuales una prueba pasa sin probar nada. Este ticket es el barrido concreto sobre la suite real.",
+  "acceptance_criteria": [
+    "AC1 - Clasificar los ~45 usos de if (await ...isVisible()) uno por uno, con archivo y linea, en tres categorias: legitimo, sospechoso, y vacuo confirmado. Un conteo global no alcanza; el entregable es la lista.",
+    "AC2 - Si se automatiza la deteccion, el script tiene su propio control negativo: demostrar que marca en rojo un caso vacuo conocido y que NO marca un caso sano conocido, ANTES de creerle ningun resultado. Sin ese control, la salida no se reporta.",
+    "AC3 - Arreglar los dos tautologicos ya confirmados: search.spec.ts linea 23 y la prueba de email duplicado de register.spec.ts. Cada uno con evidencia de rojo POR MUTACION capturada verbatim, siguiendo el modelo de la prueba hermana de username duplicado que ya quedo arreglada en TASK-256.",
+    "AC4 - Resolver la etiqueta @smoke de matches: o la prueba afirma algo real y de SOLO LECTURA, o se le saca la etiqueta. Tener en cuenta lo ya medido: la cuenta de la suite tiene 0 matches y los matches son dato derivado, no fixture, asi que forzar al menos uno seria falso. Declarar la decision y su motivo.",
+    "AC5 - Revisar el conjunto @smoke completo con el mismo criterio, prueba por prueba: que promete el titulo contra que afirma el codigo. El @smoke es el unico gate que corre contra la base real de produccion. Reportar cada discrepancia aunque no se arregle aca.",
+    "AC6 - Verificar que ninguna prueba etiquetada @smoke escribe en la base, leyendo el codigo, no confiando en su titulo ni en comentarios. Nada controla ese requisito automaticamente y ya se violo antes.",
+    "AC7 - Todo hallazgo que no se arregle en este ticket queda en un ticket propio, no en un mensaje de commit.",
+    "AC8 - Gate verde: npm run test:unit, npx vite build, npm run lint, y las areas E2E tocadas en verde."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "e2e",
+    "calidad-de-tests",
+    "verdes-vacios"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-21T04:49:39.960Z",
+      "body": "DOS HALLAZGOS LOW DE LA REVISION DE TASK-256 QUE CORRESPONDEN A ESTE TICKET, no a uno propio: son la misma clase de trabajo, o sea especificidad de aserciones.\n\nLOW-1: en register.spec.ts, la prueba de username duplicado que TASK-256 dejo arreglada afirma expect(errorToast).toBeVisible(), y eso pasa con CUALQUIER toast de error: uno de red, uno de rate-limit de Firebase, el que sea. No distingue el rechazo por duplicado, que es lo que la prueba dice medir. Afirmar el TEXTO del mensaje la volveria especifica. Aplica igual a la prueba de email duplicado que este ticket ya tiene que arreglar en su AC3, asi que conviene resolver las dos con el mismo criterio.\n\nLOW-2: en user-profile.spec.ts, Number(resultTotal.textContent) da NaN cuando filteredTotal es null, que es lo que pasa mientras el card_index esta a medio reconstruir y la interfaz muestra el total como desconocido. El efecto es un rojo por flake de infraestructura y no por defecto de la funcionalidad, o sea ruido que despues hace desconfiar de la suite. El riesgo es bajo mientras el indice de rafael_m siga asentado, pero es exactamente la clase de aserción fragil que este ticket revisa.\n\nLOW-3 de esa misma revision NO necesita accion y no se traslada: fue un flake de auth.setup (login waitForURL timeout) en la tercera corrida seguida, probable rate-limit de Firebase por las corridas encadenadas. Queda anotado como flake conocido, no como defecto."
+    }
+  ],
+  "created_at": "2026-08-21T04:39:42.336Z",
+  "updated_at": "2026-08-21T04:49:39.960Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

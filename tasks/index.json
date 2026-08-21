@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T03:14:04.843Z",
+  "generated_at": "2026-08-21T04:50:22.663Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1414,8 +1414,26 @@
     {
       "key": "TASK-256",
       "title": "Las 5 pruebas E2E del perfil publico pasan contra una cuenta BORRADA: 3 no tienen asercion real y una de ellas es @smoke, o sea el unico chequeo de perfiles en PRODUCCION",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-257",
+      "title": "resolveUsernameToUid confia en el indice de /usernames sin verificar el doc resuelto, y cada corrida de register deja un indice huerfano",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-258",
+      "title": "Un usuario que refresca o marca su propio perfil publico recibe 404: loadProfile corre en onMounted antes de que se restaure la sesion",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-259",
+      "title": "Barrido sistematico de verdes vacios en el resto de la suite E2E: 45 usos de if isVisible sin clasificar, 2 aserciones tautologicas confirmadas y el @smoke de matches sin datos que afirmar",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

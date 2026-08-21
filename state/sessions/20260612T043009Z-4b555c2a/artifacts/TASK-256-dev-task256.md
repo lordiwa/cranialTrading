@@ -354,3 +354,39 @@ re-derived by a live mutation in this session):
 
 No evidence is missing for the 6 mandatory AC2 mutations — all 6 have
 verbatim red output above, captured live, not reconstructed.
+
+---
+
+## NOTA DEL ORQUESTADOR (2026-08-21, posterior a la escritura de este archivo)
+
+La cuenta que la mutacion 6 creo en dev **YA FUE BORRADA**. Cualquier parrafo de mas
+arriba que diga que quedo sin limpiar describe el estado al momento de correr la
+mutacion, no el estado final.
+
+Al medirlo resulto bastante mas grande que una cuenta suelta. Medido con
+firebase-admin y ADC contra `cranial-trading-dev`:
+
+- Firebase **Auth**: 226 cuentas. El vaciado del 2026-08-20 borro Firestore pero
+  **no** Auth. NO se toco en esta limpieza.
+- `/users`: 11 documentos, de los cuales 9 eran basura de corridas E2E del 20 y 21
+  de agosto.
+- `/usernames`: 18 documentos, de los cuales **7 eran huerfanos** (el indice apunta
+  a un uid cuyo documento declara otro username).
+
+Los huerfanos son **sistematicos**, no accidentes: cinco tenian la forma
+`/usernames/e2euser<ts>` apuntando a un uid cuyo documento dice `test_<ts>`. O sea
+que cada corrida de `register.spec.ts` deja uno. Entre ellos estaban
+`/usernames/rafael` — el que hizo pasar en verde la prueba @smoke contra una cuenta
+borrada, o sea el defecto que origino TASK-256 — y `/usernames/zzmut1787284751233`,
+el que dejo la mutacion 6 de este mismo archivo.
+
+Rafael autorizo explicitamente la limpieza completa. Estado final, **re-medido
+despues de borrar**: `/users` = 2 (RafaMoose, rafael_m), `/usernames` = 2, **0
+huerfanos**, `/public_cards` intacto en 3211, Auth intacto. `npm run e2e:profile`
+corrido despues de la limpieza: **6/6 verde**.
+
+No se tocaron `/contact_info` (6 documentos) ni `/public_preferences` (2), que
+probablemente conservan restos de las cuentas borradas. Queda anotado, sin accionar.
+
+La **causa** no se arreglo aca: la proxima corrida de register vuelve a generar un
+huerfano. Eso es **TASK-257**.

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-257",
+  "title": "resolveUsernameToUid confia en el indice de /usernames sin verificar el doc resuelto, y cada corrida de register deja un indice huerfano",
+  "description": "MEDIDO POR EL ORQUESTADOR el 2026-08-21 en dev, con firebase-admin y ADC. Salio como hallazgo lateral de TASK-256 y esta reproducido en vivo, siete veces.\n\nEL SINTOMA QUE LO HIZO VISIBLE: la prueba E2E del perfil publico pasaba en verde contra la cuenta `rafael`, que ya no existia. El motivo medido es que `/usernames/rafael` seguia existiendo como INDICE HUERFANO, apuntando al uid izrKVMHbfDSmFUUSGyjjuBtmPPk1, cuyo documento en /users declaraba OTRO username: `unique_1787274290836`. `resolveUsernameToUid()` confia en el puntero del indice y no verifica que el documento resuelto tenga efectivamente ese username, asi que la aplicacion resolvia el perfil, mostraba un usuario distinto al pedido, y nadie lo notaba.\n\nNO ES UN HUERFANO SUELTO, ES SISTEMATICO. En el momento de la medicion /usernames tenia 18 documentos y 7 eran huerfanos. Cinco de ellos tenian exactamente la misma forma: `/usernames/e2euser<timestamp>` apuntando a un uid cuyo documento dice `test_<timestamp>`. O sea que el flujo de registro escribe el indice con un username y el documento de usuario con otro, y cada corrida de register.spec.ts deja uno atras. El septimo, `/usernames/zzmut1787284751233`, lo dejo la propia corrida de mutacion de TASK-256 unas horas antes.\n\nESTADO ACTUAL: los 7 huerfanos fueron borrados el 2026-08-21 con autorizacion explicita de Rafael, junto con 9 cuentas basura de /users. Dev quedo en /users = 2 y /usernames = 2, con 0 huerfanos, verificado por re-medicion. O sea que la BASURA se limpio pero LA CAUSA NO SE TOCO: la proxima corrida de register vuelve a generar uno.\n\nPOR QUE IMPORTA MAS ALLA DE LOS TESTS: es un bug de datos de produccion, no de la suite. Un indice huerfano hace que una URL de perfil publico resuelva a la persona equivocada. Y la parte de deteccion ya esta cubierta: la asercion nueva de TASK-256 afirma el texto del h1 contra el username pedido, asi que un huerfano ahora pone el test en rojo. Lo que falta es que la aplicacion no lo produzca y no lo siga.\n\nDOS MITADES INDEPENDIENTES, y conviene no confundirlas: (1) la LECTURA, que resuelve sin verificar; (2) la ESCRITURA, que crea el indice y el documento con usernames distintos. Arreglar solo la lectura deja de servir datos incorrectos pero sigue ensuciando la base; arreglar solo la escritura deja los huerfanos ya existentes de produccion sirviendo perfiles equivocados.",
+  "acceptance_criteria": [
+    "AC1 - Trazar y declarar por escrito la causa de la ESCRITURA divergente: por que el flujo de registro deja /usernames/<a> apuntando a un uid cuyo documento dice username <b>. Nombrar el archivo y la linea. No proponer arreglo antes de tener la traza.",
+    "AC2 - La LECTURA deja de confiar ciegamente en el indice: resolveUsernameToUid verifica que el documento resuelto declare el username pedido, y si no coincide se comporta como usuario-no-encontrado en vez de servir el perfil equivocado. Con test que lo demuestre.",
+    "AC3 - Test de regresion que FALLE con el codigo actual: sembrar un indice huerfano a proposito (indice con un username, documento con otro) y afirmar que la resolucion NO devuelve ese perfil. Capturar la corrida roja verbatim antes del arreglo.",
+    "AC4 - La ESCRITURA deja de generar huerfanos: despues del arreglo, una corrida completa de e2e:auth deja /usernames sin ningun documento cuyo uid apunte a un doc con otro username. Verificado por medicion antes y despues, no por lectura de codigo.",
+    "AC5 - Medir PRODUCCION: cuantos indices huerfanos hay hoy en /usernames de prod. Solo reportar el numero y la lista; NO borrar nada de produccion en este ticket.",
+    "AC6 - Gate verde: npm run test:unit, npx vite build, npm run lint."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "data-integrity",
+    "produccion"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T04:38:52.417Z",
+  "updated_at": "2026-08-21T04:38:52.417Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

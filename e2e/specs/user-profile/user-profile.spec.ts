@@ -5,9 +5,9 @@ import { test, expect } from '../../fixtures/test';
 // - 'rafael_m' (uid yoU2gaJARfe72oW7GK2GkQxSgCe2): the ONLY dev account with a
 //   real, populated public profile (3,211 cards), measured 2026-08-20. Used by
 //   every test that looks at somebody ELSE's public profile.
-// - 'RafaMoose' (uid jV6gJqf3csPA4vRfO2k9Vb5ejYo2, TEST_USER_A_EMAIL): the
+// - 'rafamoose' (uid jV6gJqf3csPA4vRfO2k9Vb5ejYo2, TEST_USER_A_EMAIL): the
 //   account the whole suite authenticates as (e2e/auth.setup.ts). Used ONLY by
-//   the "own profile" test, and MUST be the exact stored casing — see below.
+//   the "own profile" tests.
 // - The old target, 'rafael', is gone as a real account. Its
 //   /usernames/rafael index pointer was measured live to still exist and now
 //   points at an ORPHANED doc whose `username` field is something else
@@ -19,29 +19,22 @@ import { test, expect } from '../../fixtures/test';
 //   Real production bug, not a test bug — reported, not fixed here (out of
 //   this ticket's scope; see hand-off AC7).
 //
-// 'RafaMoose' has EXACT case that matters: UserProfileView.vue's own-profile
-// branch is `authStore.user?.username === username.value`, comparing the
-// route param to the raw (non-normalized) stored `username` field — it does
-// NOT go through resolveUsernameToUid's normalization. Any other casing
-// ('rafamoose') falls through to resolveUsernameToUid, which has no
-// /usernames/rafamoose index doc, so it 404s.
-//
-// Exact case is necessary but NOT sufficient. Measured live: a raw
-// `page.goto('/@RafaMoose')` — a full browser navigation — 404s too, because
-// it races the app's own async auth-restore. `loadProfile()` runs in
-// `onMounted`, and on a fresh page load `authStore.user` is still null at
-// that point (Firebase hasn't finished restoring the session from
-// localStorage yet), so the own-profile branch above is skipped in favour of
-// resolveUsernameToUid — which then 404s for the reason above. There is no
-// watcher that retries once auth becomes ready. Real race in production
-// code, not a test artifact — reported, not fixed here (see hand-off AC7).
-// The realistic fix is realistic navigation: real users reach their own
-// profile through the in-app "View my public profile" link (a client-side
-// `<router-link>` click, UserPopover.vue), which only ever renders once
-// `authStore.user` is already populated — so it never hits this race. The
-// "own profile" test below reproduces that path instead of a raw goto.
+// TASK-258: this file used to detour the "own profile" test through the
+// UserPopover click instead of a raw `page.goto` to the profile URL, with a
+// long comment claiming a real onMounted/auth-restore race caused any direct
+// navigation to 404. That claim was measured FALSE (TASK-258 orchestrator
+// comment, 2026-08-21): an anonymous visitor who never had a session 404'd on
+// the exact same URL, which a session-restore race cannot explain. The real
+// cause was a dev-only fixture bug — `/usernames/RafaMoose` and
+// `users.username` were both stored unnormalized ("RafaMoose" instead of
+// "rafamoose"), so `resolveUsernameToUid`'s normalized lookup and its legacy
+// fallback both missed it. Production had zero such cases. The fixture is
+// repaired (dev now has `/usernames/rafamoose` and a normalized
+// `users.username`), so the detour is gone — see the "own profile loads via
+// direct URL" test below, which is the scenario the detour used to hide:
+// bookmarking or refreshing on your own profile.
 const PUBLIC_PROFILE_USERNAME = 'rafael_m';
-const OWN_PROFILE_USERNAME = 'RafaMoose'; // exact case — see comment above
+const OWN_PROFILE_USERNAME = 'rafamoose';
 
 test.describe('User Profile', () => {
   test('view public user profile: username, location, avatar visible', async ({ userProfilePage }) => {
@@ -108,6 +101,18 @@ test.describe('User Profile', () => {
     await userProfilePage.goto('zzznonexistentuserzzz');
 
     await expect(userProfilePage.notFoundMessage).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('own profile loads via direct URL navigation (bookmark / refresh)', async ({ userProfilePage, page }) => {
+    // TASK-258 AC1. The exact scenario the old popover detour hid: a full
+    // browser navigation straight to the own-profile URL, the same thing a
+    // bookmark, a shared link, or F5 on the profile page does. This must
+    // actually load the right profile, not just respond with SOME page —
+    // asserting the h1 text against the requested username, not a bare
+    // toBeVisible, is what would have caught the old bug (it 404'd instead).
+    await page.goto(`/@${OWN_PROFILE_USERNAME}`);
+    await expect(userProfilePage.username).toHaveText(`@${OWN_PROFILE_USERNAME}`, { timeout: 10_000 });
+    await expect(userProfilePage.notFoundMessage).toBeHidden();
   });
 
   test('logged-in user viewing own profile sees different UI', async ({ userProfilePage, page }) => {

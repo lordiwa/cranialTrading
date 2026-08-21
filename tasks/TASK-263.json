@@ -1,0 +1,38 @@
+{
+  "key": "TASK-263",
+  "title": "Parte B de TASK-259: auditoria del conjunto @smoke completo, el unico gate que corre contra PRODUCCION",
+  "description": "Sale de partir TASK-259, que no entraba en una ventana de contexto (8 ACs, ~45 usos de isVisible en 18 archivos, mas la auditoria del @smoke). Rafael eligio partirlo el 2026-08-21 y empezar por la parte A; esta es la parte B, que es la que MAS RIESGO CUBRE.\\n\\nPOR QUE IMPORTA MAS QUE LAS OTRAS DOS PARTES: el conjunto @smoke es el unico gate que corre contra la base real de PRODUCCION. CLAUDE.md documenta que en main la CI corre solo --grep @smoke, contra el artefacto configurado para produccion. Un @smoke que no afirma nada deja pasar a produccion un bundle roto con la CI en verde, y un @smoke que escribe muta la base de produccion en cada push a main. Las dos cosas ya pasaron en este proyecto: TASK-151 (2026-08-08) encontro que binders.spec.ts crear binder y deck-crud.spec.ts crear mazo estaban etiquetados @smoke y escribian documentos reales en produccion en cada push a main.\\n\\nCONJUNTO @smoke DECLARADO en CLAUDE.md (verificado 2026-08-08, ocho pruebas): collection/collection-crud.spec.ts la coleccion carga con la grilla visible, user-profile/user-profile.spec.ts ver perfil publico, auth/login.spec.ts login exitoso redirige a /inicio, matches/match-management.spec.ts la pagina de matches carga con navegacion de solapas, smoke/navigation.spec.ts el link de Collection navega a /collection y el cambio de solapa renderiza el contenido correcto, search/search.spec.ts buscar por nombre devuelve grilla de resultados, messages/messages.spec.ts la pagina de mensajes carga la lista de conversaciones.\\n\\nOJO, ESE LISTADO ES DE HACE DOS SEMANAS Y NO SE PUEDE DAR POR BUENO: la primera tarea es re-derivarlo del codigo con un grep de @smoke sobre e2e/specs, no leerlo de CLAUDE.md. Ademas TASK-257 reforzo el @smoke de collection-crud y quedo anotado en el estado de sesion que ese refuerzo pondria en rojo el job e2e contra produccion, o sea que el conjunto ya se movio.\\n\\nLa etiqueta @smoke de matches NO se resuelve aca: es el AC4 de la parte A.\\n\\nADVERTENCIA DE METODO, aprendida en TASK-256: si se automatiza cualquier deteccion, el script necesita su propio control negativo antes de creerle un solo resultado.",
+  "acceptance_criteria": [
+    "AC1 - Re-derivar el conjunto @smoke actual DEL CODIGO con un grep sobre e2e/specs, no del listado de CLAUDE.md. Entregar la lista con archivo, linea y titulo. Reportar explicitamente cualquier diferencia contra las ocho pruebas que CLAUDE.md declara verificadas el 2026-08-08.",
+    "AC2 - Revisar cada prueba @smoke con el mismo criterio: que promete el titulo contra que afirma el codigo. Una por una, con archivo y linea. Reportar cada discrepancia aunque no se arregle aca.",
+    "AC3 - Verificar que ninguna prueba @smoke escribe en la base, LEYENDO EL CODIGO y siguiendo cada helper y cada page object que invoque. No confiar en el titulo ni en los comentarios. Nada controla ese requisito automaticamente y ya se violo antes (TASK-151). Declarar por cada prueba si escribe, no escribe, o no se pudo determinar.",
+    "AC4 - Si aparece un @smoke que escribe, tratarlo como el hallazgo mas grave del ticket: reportarlo de inmediato al humano antes de seguir, con el rastro de llamadas que lo demuestra.",
+    "AC5 - Actualizar en CLAUDE.md el listado del conjunto @smoke con lo medido, incluyendo la fecha de verificacion, para que el listado no siga envejeciendo en silencio.",
+    "AC6 - Todo hallazgo que no se arregle aca queda en un ticket propio, no en un mensaje de commit.",
+    "AC7 - Gate verde: npm run test:unit, npx vite build, npm run lint, y las areas E2E tocadas en verde."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "e2e",
+    "calidad-de-tests",
+    "verdes-vacios",
+    "smoke",
+    "produccion"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "developer",
+      "at": "2026-08-21T18:30:00.000Z",
+      "body": "AC1 no arranca de cero — el listado de CLAUDE.md ya se midio MAL en DOS puntos distintos durante el trabajo de la parte A (TASK-259), asi que el AC1 de re-derivar del codigo en vez de leer el documento es necesario, no solo prudente:\\n\\n1. matches/match-management.spec.ts \"matches page loads with tab navigation\" perdio la etiqueta @smoke en el commit de la parte A (5bf7a9f, 2026-08-21) por HIGH-1: montar esa vista corre cleanExpiredMatches(), que borra documentos via writeBatch — no era de solo lectura. Tracked en TASK-265.\\n\\n2. user-profile/user-profile.spec.ts \"view public user profile\" YA HABIA PERDIDO la etiqueta @smoke, como efecto colateral no advertido de f6b15b2 (TASK-256, 2026-08-18) — el fix toco el test pero la etiqueta desaparecio sin que nadie lo notara, y CLAUDE.md siguio afirmando 8 pruebas (incluida esa) durante 3 dias hasta que se midio con grep el 2026-08-21.\\n\\nVerificado con `grep -rn \"test(.*@smoke\" e2e/specs/ | wc -l` -> 6, no 8. El conjunto real actual: collection-crud (collection page loads...), login (successful login redirects...), navigation.spec.ts (nav: Collection link... y tab switching...), search (search by card name...), messages (messages page loads...). NO estan: matches (removido a proposito) ni user-profile (perdido sin querer).\\n\\nCLAUDE.md ya se corrigio a 6 tests y ambas ausencias quedaron documentadas ahi (linea ~197), pero el AC1 de esta parte B tiene que re-verificar por su cuenta, no asumir que mi correccion de hoy sigue siendo exacta."
+    }
+  ],
+  "created_at": "2026-08-21T17:19:48.854Z",
+  "updated_at": "2026-08-21T17:19:48.854Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

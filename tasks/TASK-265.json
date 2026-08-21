@@ -1,0 +1,31 @@
+{
+  "key": "TASK-265",
+  "title": "Cargar /saved-matches BORRA documentos: cleanExpiredMatches corre en el mount de la vista, con catch silencioso",
+  "description": "HALLAZGO DEL REVIEW DE TASK-259 (HIGH-1), trazado linea por linea en el codigo actual y RE-VERIFICADO de forma independiente por el orquestador antes de abrir este ticket. No es sospecha: es la cadena leida entera.\\n\\nLA CADENA MEDIDA:\\n1. Entrar a /saved-matches monta SavedMatchesView.\\n2. SavedMatchesView.vue:773, initView(), llama matchesStore.loadAllMatches().\\n3. src/stores/matches.ts:292 _loadAllMatches() hace, como PRIMER paso, await cleanExpiredMatches() (linea 298, con el comentario Limpiar expirados antes de cargar).\\n4. cleanExpiredMatches() (matches.ts:386-418) hace getDocs sobre users/<uid>/matches_nuevos y users/<uid>/matches_guardados, filtra por isMatchExpired (15 dias) y BORRA por writeBatch en chunks de 500, con batch.commit().\\n5. El catch final es SILENCIOSO (catch { // silent fail }), asi que un borrado fallido o parcial no deja rastro en ningun lado.\\n\\nPOR QUE ES UN PROBLEMA Y NO UNA FUNCIONALIDAD: una operacion de LECTURA de la interfaz (abrir una pantalla) ejecuta una operacion DESTRUCTIVA como efecto secundario, sin que nadie la pida y sin confirmacion. Consecuencias concretas: (a) cualquier prueba automatizada que visite /saved-matches borra datos, que es exactamente como esto se descubrio; (b) el borrado depende de quien haya abierto la pantalla y cuando, o sea que el dato se pierde por una razon que no tiene nada que ver con el dato; (c) el catch silencioso significa que si el borrado se rompe, o borra de mas, nadie se entera.\\n\\nCOMO SE DESCUBRIO: la prueba matches page loads with tab navigation estaba etiquetada @smoke, y @smoke es el UNICO gate que corre contra la base real de PRODUCCION en cada push a main. O sea que cada push a main podia ejecutar borrados en batch contra produccion. El efecto es PREEXISTENTE, no lo introdujo el commit 777784c de TASK-259: la version vieja del test disparaba el mismo mount. Por decision de Rafael (2026-08-21) la mitigacion inmediata fue SACARLE la etiqueta @smoke a esa prueba, lo cual corta la exposicion a produccion pero NO toca esta causa. Este ticket es la causa.\\n\\nSEGUNDA VEZ QUE ESTE PROYECTO SE ENCUENTRA UN @smoke QUE ESCRIBE: la primera fue TASK-151 (2026-08-08), con binders.spec.ts y deck-crud.spec.ts escribiendo documentos reales en produccion en cada push a main. Aquella vez la causa era una etiqueta mal puesta; esta vez la etiqueta era el sintoma y la causa esta en el codigo de produccion.\\n\\nADVERTENCIA DE ALCANCE: cambiar esto toca el store de matches, que es el pipeline de calculo de matches. No es un cambio cosmetico y necesita su propia red de tests. Ver tambien SCRUM-71.2, cuyo comentario en cleanExpiredMatches explica por que matches_eliminados se excluye a proposito de la limpieza: esa decision tiene que sobrevivir a este arreglo.",
+  "acceptance_criteria": [
+    "AC1 - Decidir y declarar donde tiene que vivir la expiracion de matches, con el motivo. Las opciones a evaluar como minimo: una Cloud Function programada, el momento del recalculo de matches, una accion explicita del usuario, o filtrar los expirados en la LECTURA sin borrarlos. Lo que NO puede seguir pasando es que montar una vista borre documentos.",
+    "AC2 - Que cargar /saved-matches deje de ejecutar cualquier borrado. Probarlo POR MEDICION, no por lectura: contar los documentos de users/<uid>/matches_nuevos y matches_guardados antes y despues de montar la vista con al menos un documento expirado presente, y mostrar que el conteo no cambia.",
+    "AC3 - Control negativo obligatorio del AC2: demostrar que el instrumento de medicion SI detecta un borrado cuando lo hay, corriendolo contra el codigo actual (donde el borrado ocurre) y mostrando que ahi el conteo baja. Un sensor que nunca vio el bug no prueba que el bug se fue.",
+    "AC4 - Sacar el catch silencioso: un fallo al expirar matches tiene que quedar registrado, no desaparecer. Declarar que se hace con el error.",
+    "AC5 - Preservar la decision de SCRUM-71.2: matches_eliminados NO expira, porque son registros de descarte y bloqueo y si se limpiaran, la persona descartada reaparece en el siguiente recalculo. Que el arreglo no la rompa, y que haya una prueba que lo fije.",
+    "AC6 - Verificar si algun otro camino de la aplicacion llama loadAllMatches en un mount y por lo tanto arrastra el mismo efecto. El review de TASK-259 midio que HomeView y AppHeader ya NO lo hacen (diferido al click de la campana, TASK-148), pero eso hay que re-verificarlo contra el codigo del dia, no darlo por cierto.",
+    "AC7 - Gate verde: npm run test:unit, npx vite build, npm run lint, y npm run e2e:matches en verde."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "matches",
+    "borrado-de-datos",
+    "produccion",
+    "efecto-secundario-en-mount"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T18:18:39.319Z",
+  "updated_at": "2026-08-21T18:18:39.319Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

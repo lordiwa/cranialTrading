@@ -1,0 +1,30 @@
+{
+  "key": "TASK-266",
+  "title": "Registro con email duplicado le muestra al usuario el error crudo de Firebase sin traducir",
+  "description": "HALLAZGO DEL REVIEW DE TASK-259 (MEDIUM-3b). Sale de arreglar la prueba E2E de email duplicado: para hacerla especifica hubo que afirmar el texto del mensaje de error, y al medir cual era el texto real aparecio que la aplicacion le muestra al usuario la cadena cruda del SDK de Firebase.\\n\\nLO MEDIDO: el catch de register() en src/stores/auth.ts NO tiene rama para el codigo auth/email-already-in-use, asi que cae al caso general y muestra error.message tal cual viene de Firebase. El texto que ve la persona en dev, verificado en vivo durante TASK-259, es literalmente: Firebase: Error (auth/email-already-in-use). Sin traducir, con la palabra Firebase adentro, y en el mismo idioma sin importar el locale de la aplicacion.\\n\\nEL PRECEDENTE YA EXISTE EN EL MISMO ARCHIVO: changeRegistrationEmail (auth.ts:511) SI mapea ese mismo error a un mensaje localizado. O sea que no hace falta inventar nada: hay que darle a register() la misma paridad que su hermana ya tiene.\\n\\nPOR QUE IMPORTA MAS DE LO QUE PARECE: es el primer contacto de alguien que se esta registrando, y el caso es de los mas comunes que hay (ya tengo cuenta con este mail). Ver un error tecnico con la palabra Firebase adentro en ese momento es de lo que peor comunica en todo el producto. Ademas filtra al usuario final un detalle de implementacion sobre que proveedor de autenticacion se usa.\\n\\nATADURA A DESATAR, IMPORTANTE PARA QUIEN TOME ESTE TICKET: la prueba E2E duplicate email blocks registration de e2e/specs/auth/register.spec.ts afirma hoy el TEXTO de ese mensaje. Si se arregla este ticket sin tocar la prueba, la prueba se pone ROJA por una mejora legitima. El review de TASK-259 ya dejo la mitigacion propuesta: ampliar la regex de la prueba a /email-already-in-use|ya esta en uso|already in use|ja esta em uso/i, que cubre tanto el codigo crudo de hoy como los textos localizados que traeria este arreglo, sin perder especificidad (un rate-limit o un error de red siguen sin matchear). Se decidio dejar esa ampliacion junto con este ticket y no en TASK-259, para que la prueba y el arreglo se muevan juntos.",
+  "acceptance_criteria": [
+    "AC1 - register() en src/stores/auth.ts mapea auth/email-already-in-use a un mensaje localizado, con la misma forma que ya usa changeRegistrationEmail (auth.ts:511). Nada de la cadena cruda del SDK llega a la interfaz.",
+    "AC2 - La clave del mensaje existe en los TRES locales: src/locales/en.json, es.json y pt.json. Verificar que existan ANTES de usarlas (Anti-Loop Rule 3 del proyecto); si hay que crearlas, se crean las tres en el mismo paso.",
+    "AC3 - Revisar el resto del catch de register() con el mismo criterio y reportar que otros codigos de error de Firebase se estan filtrando crudos. Arreglar los que sean del mismo caso de uso; los que no, reportarlos.",
+    "AC4 - Actualizar en el mismo commit la prueba E2E duplicate email blocks registration de e2e/specs/auth/register.spec.ts, que hoy afirma el texto crudo y se pondria roja con este arreglo. La regex propuesta por el review de TASK-259 es /email-already-in-use|ya esta en uso|already in use|ja esta em uso/i, que cubre el antes y el despues sin perder especificidad. Esto es cambio atomico: el arreglo y su prueba se mueven juntos.",
+    "AC5 - Evidencia de que el mensaje nuevo se ve de verdad: medirlo en la interfaz, no solo por unit test del mapeo.",
+    "AC6 - Gate verde: npm run test:unit, npx vite build, npm run lint, y npm run e2e:auth en verde."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "auth",
+    "i18n",
+    "ux",
+    "mensajes-de-error"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T18:19:07.501Z",
+  "updated_at": "2026-08-21T18:19:07.501Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

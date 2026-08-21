@@ -1,0 +1,30 @@
+{
+  "key": "TASK-264",
+  "title": "Parte C de TASK-259: clasificar los ~45 usos de if isVisible en 18 archivos, con control negativo obligatorio",
+  "description": "Sale de partir TASK-259, que no entraba en una ventana de contexto. Rafael eligio partirlo el 2026-08-21 y empezar por la parte A; esta es la parte C, la de mayor volumen y la mas mecanica.\\n\\nEL PROBLEMA: hay alrededor de 45 usos de if (await ...isVisible()) repartidos en 18 archivos de e2e/specs, contados con un grep crudo en TASK-256 y NUNCA clasificados. Algunos son legitimos, por ejemplo esperar un elemento realmente opcional; otros son cuerpos de prueba enteros vueltos opcionales, que es la primera de las tres formas vacuas: si el elemento no aparece, el cuerpo entero se saltea y la prueba pasa sin haber afirmado nada. El numero 45 y el numero 18 son de un grep crudo, o sea LEIDOS, no verificados: la primera tarea es re-contarlos.\\n\\nADVERTENCIA DE METODO, medida en TASK-256, no teorica: el developer intento automatizar el barrido con un script que contaba expect( por bloque test() y dio falsos positivos masivos por un error de emparejado de llaves. Lo descarto bien en vez de reportar basura. Por eso el control negativo del AC2 es obligatorio y no opcional.\\n\\nHALLAZGO HEREDADO de la revision de TASK-256 que corresponde a este ticket (era su LOW-2): en e2e/specs/user-profile/user-profile.spec.ts, Number(resultTotal.textContent) da NaN cuando filteredTotal es null, que es lo que pasa mientras el card_index esta a medio reconstruir y la interfaz muestra el total como desconocido. El efecto es un rojo por flake de infraestructura y no por defecto de la funcionalidad, o sea ruido que despues hace desconfiar de la suite entera. Es exactamente la clase de asercion fragil que este ticket revisa.\\n\\nCONTEXTO DEL PROYECTO: ya existe una nota que documenta 14 mecanismos distintos por los cuales una prueba pasa sin probar nada. Este ticket es el barrido concreto sobre la superficie mas grande de la suite real.",
+  "acceptance_criteria": [
+    "AC1 - Re-contar los usos de if (await ...isVisible()) del codigo actual, con archivo y linea. El ~45 en 18 archivos es un grep crudo heredado, no un dato verificado; reportar el numero real y cualquier diferencia.",
+    "AC2 - Clasificar cada uso uno por uno, con archivo y linea, en tres categorias: legitimo, sospechoso, y vacuo confirmado. Un conteo global NO alcanza; el entregable es la lista completa, use por uso.",
+    "AC3 - Si se automatiza la deteccion, el script tiene su propio control negativo ANTES de creerle ningun resultado: demostrar con salida capturada verbatim que marca en rojo un caso vacuo conocido y que NO marca un caso sano conocido. Sin ese control, la salida del script no se reporta y la clasificacion se hace a mano.",
+    "AC4 - Decidir y declarar, por cada vacuo confirmado, si se arregla aca o queda en ticket propio. Los que se arreglen aca van con evidencia de rojo POR MUTACION capturada verbatim.",
+    "AC5 - Arreglar el NaN heredado de la revision de TASK-256 en user-profile.spec.ts: Number(resultTotal.textContent) da NaN cuando filteredTotal es null, con el card_index a medio reconstruir. Que la prueba distinga total desconocido de total incorrecto en vez de ponerse roja por flake de infraestructura.",
+    "AC6 - Todo hallazgo que no se arregle aca queda en un ticket propio, no en un mensaje de commit.",
+    "AC7 - Gate verde: npm run test:unit, npx vite build, npm run lint, y las areas E2E tocadas en verde."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "e2e",
+    "calidad-de-tests",
+    "verdes-vacios"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T17:20:10.393Z",
+  "updated_at": "2026-08-21T17:20:10.393Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

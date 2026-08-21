@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T16:39:40.042Z",
+  "generated_at": "2026-08-21T18:53:54.670Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1431,8 +1431,8 @@
     },
     {
       "key": "TASK-259",
-      "title": "Barrido sistematico de verdes vacios en el resto de la suite E2E: 45 usos de if isVisible sin clasificar, 2 aserciones tautologicas confirmadas y el @smoke de matches sin datos que afirmar",
-      "status": "todo",
+      "title": "Parte A de TASK-259: arreglar los 2 tautologicos confirmados (search y email duplicado) y resolver la etiqueta @smoke de matches",
+      "status": "done",
       "priority": "medium"
     },
     {
@@ -1452,6 +1452,36 @@
       "title": "Dos residuales del guard provisioningUids que el developer no habia declarado: ventana de snapshot viejo y multi-tab",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-263",
+      "title": "Parte B de TASK-259: auditoria del conjunto @smoke completo, el unico gate que corre contra PRODUCCION",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-264",
+      "title": "Parte C de TASK-259: clasificar los ~45 usos de if isVisible en 18 archivos, con control negativo obligatorio",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-265",
+      "title": "Cargar /saved-matches BORRA documentos: cleanExpiredMatches corre en el mount de la vista, con catch silencioso",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-266",
+      "title": "Registro con email duplicado le muestra al usuario el error crudo de Firebase sin traducir",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-267",
+      "title": "Vaciado completo de dev Y produccion: Firestore + Auth, con export previo, re-siembra y verificacion",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

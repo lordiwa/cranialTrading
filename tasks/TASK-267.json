@@ -1,0 +1,35 @@
+{
+  "key": "TASK-267",
+  "title": "Vaciado completo de dev Y produccion: Firestore + Auth, con export previo, re-siembra y verificacion",
+  "description": "DECISION DE RAFAEL, 2026-08-21: reiniciar las bases para empezar frescos con lo construido. Alcance elegido explicitamente: LOS DOS entornos (cranial-trading-dev y cranial-trading), y Firestore MAS Firebase Auth, o sea limpieza real y no la parcial del 2026-08-20. Momento elegido: DESPUES de cerrar TASK-259 y pushear develop, para que el trabajo este a salvo en git y los dos sintomas medidos ya esten apagados.\\n\\nESTE TICKET ES IRREVERSIBLE Y TOCA DATOS DE PERSONAS REALES. No se ejecuta ningun paso destructivo sin una confirmacion final explicita de Rafael en el momento, sobre el punto concreto de las cuentas de Auth de produccion. La eleccion ya tomada autoriza el PLAN, no dispara la ejecucion.\\n\\nLO QUE HACE ESTE VACIADO DISTINTO DEL ANTERIOR: el del 2026-08-20 borro Firestore pero NO Auth, y por eso dev quedo con 226 cuentas historicas de E2E y produccion con 196. Esta vez Auth entra en el alcance. Consecuencia directa y aceptada: se borran cuentas de gente que se registro en produccion despues del 2026-08-20, actividad real y reciente, medida.\\n\\nEL RIESGO QUE NO CUBRE NINGUN BACKUP: PITR y los backups programados, activos desde el 2026-08-19, respaldan FIRESTORE. NO respaldan Firebase Auth: eso ya estaba anotado como pregunta abierta desde ese mismo dia y sigue sin ticket propio. La UNICA red para Auth es un firebase auth:export previo, y por eso es el primer paso y no un paso opcional.\\n\\nEL OTRO RIESGO: el ensayo de restauracion de backups NUNCA se hizo. Esta abierto desde el 2026-08-19. Vaciar sin haber ensayado nunca un restore significa que, si algo hay que recuperar, seria la primera vez que se prueba el mecanismo, y seria en el peor momento posible. El ensayo se propuso hacer con el backup de PROD por costo (0,587 GiB x USD 0,286/GiB = ~USD 0,17, contra USD 1,68 del de dev).\\n\\nLO QUE SE ROMPE AL VACIAR Y HAY QUE RE-SEMBRAR: (a) la cuenta que usan los E2E (TEST_USER_A_EMAIL / TEST_USER_A_PASSWORD) deja de existir en Auth y TODA la suite queda inutilizable hasta recrearla, en los DOS entornos; (b) el @smoke de collection-crud, reforzado por TASK-257, exige que la cuenta tenga al menos una carta visible, asi que sin siembra queda rojo y bloquea deploy; (c) la coleccion public_cards no existia en prod y ya bloqueaba la promocion a main, o sea que la siembra de prod es ademas lo que destraba ese camino.",
+  "acceptance_criteria": [
+    "AC1 - ANTES de borrar nada: firebase auth:export de los DOS entornos, guardado fuera del repositorio, con el conteo de cuentas exportadas verificado contra el conteo en vivo. Es la unica red que existe para Auth, porque PITR y los backups NO lo cubren. Si el export no se puede verificar, NO se sigue.",
+    "AC2 - ANTES de borrar nada: ensayar de verdad la restauracion de un backup de Firestore, que sigue pendiente desde el 2026-08-19. Hacerlo con el backup de PRODUCCION por costo (~USD 0,17 contra ~USD 1,68 del de dev). Restaurar crea una base nueva, nunca sobrescribe. Un backup sin ensayar es una suposicion, y este es el momento en que deja de poder serlo.",
+    "AC3 - Confirmacion final explicita de Rafael, en el momento, sobre el punto concreto de borrar las cuentas de Auth de PRODUCCION (196 medidas, con registros reales posteriores al 2026-08-20). La decision de alcance ya tomada autoriza el plan; este AC es el gatillo y es intransferible.",
+    "AC4 - Vaciar en el orden: dev primero, verificar que quedo como se esperaba, y RECIEN ahi produccion. Dev es el ensayo de produccion; hacerlo al reves desperdicia la unica oportunidad de descubrir un problema en el entorno donde no importa.",
+    "AC5 - Re-sembrar en AMBOS entornos la cuenta de los E2E (TEST_USER_A_EMAIL / TEST_USER_A_PASSWORD) con al menos una carta publica visible. Sin esto la suite entera queda inutilizable y el @smoke de collection-crud reforzado por TASK-257 queda rojo, bloqueando el deploy. En produccion esto ademas destraba la promocion a main, que estaba frenada justamente por no existir public_cards.",
+    "AC6 - Verificar POR MEDICION el estado final de los dos entornos: conteo de documentos por coleccion y conteo de cuentas en Auth, antes y despues, mostrados uno al lado del otro. Nada de dar por hecho que el borrado hizo lo que decia.",
+    "AC7 - Correr npm run e2e:smoke contra dev despues de la re-siembra y dejarlo en verde. Es la prueba de que el entorno reconstruido sirve, no solo de que se vacio.",
+    "AC8 - Dejar registrado que colecciones existian antes en cada entorno, para que la ausencia de una despues sea distinguible de que nunca existio. Es exactamente la ambiguedad que hoy complica leer el estado de produccion."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "infraestructura",
+    "borrado-de-datos",
+    "produccion",
+    "irreversible",
+    "backups"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-259"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T18:38:48.218Z",
+  "updated_at": "2026-08-21T18:38:48.218Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

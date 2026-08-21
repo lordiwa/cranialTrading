@@ -168,6 +168,12 @@
       "type": "task",
       "ref": "tasks/TASK-258.json",
       "label": "El test E2E del perfil propio esquiva el goto directo por un fixture de dev sin normalizar, ya reparado: sacar el rodeo y probar lo que hace el usuario al refrescar"
+    },
+    {
+      "id": "task-259",
+      "type": "task",
+      "ref": "tasks/TASK-259.json",
+      "label": "Parte A de TASK-259: arreglar los 2 tautologicos confirmados (search y email duplicado) y resolver la etiqueta @smoke de matches"
     }
   ],
   "edges": []

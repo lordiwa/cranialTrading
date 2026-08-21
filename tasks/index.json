@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T04:50:22.663Z",
+  "generated_at": "2026-08-21T05:03:03.030Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1420,7 +1420,7 @@
     {
       "key": "TASK-257",
       "title": "resolveUsernameToUid confia en el indice de /usernames sin verificar el doc resuelto, y cada corrida de register deja un indice huerfano",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "high"
     },
     {

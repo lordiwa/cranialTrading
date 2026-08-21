@@ -10,7 +10,7 @@
     "AC5 - Medir PRODUCCION: cuantos indices huerfanos hay hoy en /usernames de prod. Solo reportar el numero y la lista; NO borrar nada de produccion en este ticket.",
     "AC6 - Gate verde: npm run test:unit, npx vite build, npm run lint."
   ],
-  "status": "todo",
+  "status": "in_progress",
   "priority": "high",
   "labels": [
     "bug",
@@ -23,7 +23,7 @@
   "linked_prs": [],
   "comments": [],
   "created_at": "2026-08-21T04:38:52.417Z",
-  "updated_at": "2026-08-21T04:38:52.417Z",
+  "updated_at": "2026-08-21T05:03:03.030Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

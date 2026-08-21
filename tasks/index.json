@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T19:08:41.028Z",
+  "generated_at": "2026-08-21T20:33:20.738Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1480,6 +1480,18 @@
     {
       "key": "TASK-267",
       "title": "Vaciado completo de dev Y produccion: Firestore + Auth, con export previo, re-siembra y verificacion",
+      "status": "in_progress",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-268",
+      "title": "releaseUsername genera indices huerfanos de /usernames POR DISENO declarado: el catch silencioso los llama aceptables",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-269",
+      "title": "Nadie prueba que el boton de contacto APAREZCA: las 2 unicas aserciones son toBeHidden, cero toBeVisible",
       "status": "todo",
       "priority": "high"
     }

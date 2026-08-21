@@ -1,0 +1,31 @@
+{
+  "key": "TASK-268",
+  "title": "releaseUsername genera indices huerfanos de /usernames POR DISENO declarado: el catch silencioso los llama aceptables",
+  "description": "MEDIDO EN VIVO EL 2026-08-21, en una cuenta creada esa misma tarde contra el sitio de dev recien desplegado con el fix de TASK-257. No es sospecha ni lectura: el huerfano se observo nacer.\\n\\nLO OBSERVADO: la cuenta de QA (qa@cranialtrading.com, uid 90PkdmyFKrVm1RLDXjInJdlYXy73) quedo con DOS documentos en /usernames apuntando al MISMO uid, creados con 877 ms de diferencia:\\n  /usernames/qa      -> uid 90PkdmyFK..., createdAt 12:06:39.759\\n  /usernames/qa_mtg  -> uid 90PkdmyFK..., createdAt 12:06:40.636\\nY el documento /users/<uid> dice username qa_mtg. O sea que /usernames/qa es un HUERFANO: resolver /@qa sirve el perfil de qa_mtg. Es la firma exacta del bug que TASK-257 cerro, en un camino que TASK-257 NO cubria.\\n\\nLA CAUSA, leida en el codigo: src/stores/auth.ts, releaseUsername (alrededor de la linea 777). Cambiar de username reserva el nuevo con reserveUsername y libera el viejo con releaseUsername, que es best-effort y termina en un catch VACIO cuyo comentario dice textualmente: best-effort: a dangling reservation is acceptable, swallow. O sea que el huerfano no es un accidente del que nadie se entero: esta declarado como aceptable en el propio codigo.\\n\\nPOR QUE ESA PREMISA YA NO SE SOSTIENE: TASK-257 midio que un indice huerfano NO es inocuo. En PRODUCCION se midio /usernames/rafael apuntando al uid 385E6XCLhGhqOqzEalrQBRX6Bym2 cuyo documento dice rafael_mtg, o sea que entrar a /@rafael en produccion servia el perfil de OTRA PERSONA. Un puntero colgado no es basura inerte: es una identidad que resuelve mal. Lo que el comentario llama aceptable es justamente el defecto que se acaba de arreglar por otro lado.\\n\\nOJO CON EL ALCANCE, no confundir con TASK-257: aquel arreglo cerro la carrera del REGISTRO y quedo probado por medicion (4 corridas de e2e:auth, 4 usuarios y 4 indices en relacion 1:1, cero huerfanos). Este ticket es sobre el camino de CAMBIO de username, que es otra puerta al mismo estado. El arreglo de TASK-257 sigue siendo valido; no hay que revertir nada.\\n\\nDATO DE CONTEXTO: al momento de este ticket, dev quedo con /usernames en 2 documentos para UNA sola cuenta real, o sea una tasa de huerfanos del 50 por ciento en una base recien vaciada. Es el mejor escenario posible para medir, porque no hay ruido historico.",
+  "acceptance_criteria": [
+    "AC1 - Reproducir el huerfano por medicion antes de arreglar nada: crear una cuenta, cambiarle el username, y mostrar los dos documentos de /usernames apuntando al mismo uid. Sin reproduccion no se toca el codigo (leccion de TASK-258, cuya premisa era falsa por estar solo leida).",
+    "AC2 - Decidir y declarar que hace el sistema cuando el borrado del indice viejo falla. Las opciones a evaluar como minimo: hacerlo atomico junto con la reserva del nuevo, reintentar, dejar registro del fallo para reconciliar despues, o una reconciliacion periodica. Lo que NO puede seguir pasando es que el fallo se trague en silencio y quede declarado como aceptable.",
+    "AC3 - Sacar el catch vacio de releaseUsername: un fallo al liberar un username tiene que quedar registrado en algun lado. Hoy no hay ninguna forma de saber cuantos huerfanos se generaron ni cuando.",
+    "AC4 - Verificar si resolveUsernameToUid protege la LECTURA contra un huerfano que igual llegue a existir. TASK-257 trabajo sobre ese camino; comprobar si su guard cubre este caso o solo el del registro. Declarar el resultado, sea cual sea.",
+    "AC5 - Limpiar el huerfano /usernames/qa que existe hoy en dev, DESPUES de haberlo usado para reproducir. No borrarlo antes: es la evidencia.",
+    "AC6 - Revisar si el mismo patron de best-effort con catch silencioso aparece en otros indices del proyecto. El grep tiene que buscar la FORMA (catch vacio junto a deleteDoc), no la palabra usernames.",
+    "AC7 - Gate verde: npm run test:unit, npx vite build, npm run lint, y npm run e2e:auth y e2e:profile en verde."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "auth",
+    "usernames",
+    "indices-huerfanos",
+    "catch-silencioso"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T20:09:28.522Z",
+  "updated_at": "2026-08-21T20:09:28.522Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

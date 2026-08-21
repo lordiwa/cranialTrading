@@ -1,0 +1,37 @@
+{
+  "key": "TASK-269",
+  "title": "Nadie prueba que el boton de contacto APAREZCA: las 2 unicas aserciones son toBeHidden, cero toBeVisible",
+  "description": "MEDIDO el 2026-08-21, con grep sobre todo e2e/, mientras se repuntaban los specs a la cuenta de QA nueva. No es sospecha: es el conteo.\\n\\nLO MEDIDO: en toda la suite E2E hay exactamente DOS aserciones sobre el boton de contacto, y las dos afirman que esta OCULTO.\\n  e2e/specs/user-profile/user-profile.spec.ts:98  -> await expect(contactBtn).toBeHidden()      [visitante SIN sesion]\\n  e2e/specs/user-profile/user-profile.spec.ts:137 -> await expect(userProfilePage.contactButton).toBeHidden()  [usuario en su PROPIO perfil]\\nConteo: toBeHidden 1 en specs (mas uno inline), toBeVisible CERO.\\n\\nLA CONSECUENCIA: si el boton de contacto desapareciera por completo del producto, o si su locator dejara de matchear por un cambio de texto o de rol, LAS DOS PRUEBAS SEGUIRIAN EN VERDE. Un elemento que no existe esta, trivialmente, oculto. O sea que la suite no puede distinguir el boton funciona y se oculta cuando corresponde de el boton no existe en ningun lado.\\n\\nPOR QUE IMPORTA MAS QUE UN TEST CUALQUIERA: el boton de contacto es el mecanismo por el que dos personas se conectan para intercambiar. En una plataforma de trading es el paso final de todo el embudo: buscar, encontrar, y CONTACTAR. Es la unica accion que convierte una visita en una transaccion, y es justo la que nadie verifica que exista.\\n\\nEL CASO QUE FALTA, nombrado con precision: un usuario CON SESION mirando el perfil de OTRA persona debe VER el boton de contacto. Ese escenario no esta cubierto en user-profile.spec.ts ni en contacts.spec.ts. En contacts.spec.ts hay pruebas relacionadas pero estan gateadas con if (count > 0) sobre contactos ya guardados, no sobre perfiles publicos, asi que se saltean enteras si la cuenta no tiene contactos: es ademas otro ejemplar de la primera forma vacua.\\n\\nBLOQUEO ESTRUCTURAL A RESOLVER PRIMERO: escribir ese caso positivo EXIGE DOS CUENTAS, porque por definicion se trata de mirar el perfil de otro. Hoy dev tiene UNA SOLA cuenta (qa@cranialtrading.com, username qa_mtg), creada tras el vaciado del 2026-08-21. Antes del vaciado habia dos usernames distintos en los specs (rafael_m para el perfil publico y rafamoose para el perfil propio) y aun asi el caso positivo NUNCA se escribio, o sea que el hueco no lo causo el vaciado ni la unificacion de cuentas: ya existia. Lo que el vaciado hizo fue volverlo visible.\\n\\nLo mismo aplica a matches y a mensajes, que tambien necesitan dos partes por definicion. Conviene decidir el asunto de la segunda cuenta una sola vez, para los tres casos.",
+  "acceptance_criteria": [
+    "AC1 - Decidir, con Rafael, si se crea una SEGUNDA cuenta de QA. Es un pre-requisito estructural: sin dos cuentas el caso positivo no se puede escribir. Evaluar de paso si conviene que sea de QA y no la cuenta personal de Rafael, para que sus datos no queden atados a la suite. La decision cubre tambien matches y mensajes, que necesitan dos partes por la misma razon.",
+    "AC2 - Escribir el caso positivo que falta: un usuario CON SESION mirando el perfil de OTRA persona VE el boton de contacto. Con evidencia de rojo POR MUTACION capturada verbatim, o sea romper a proposito el boton y mostrar que la prueba nueva se pone roja.",
+    "AC3 - Verificar que las dos aserciones toBeHidden existentes sigan siendo correctas con dos cuentas, y que ninguna quede probando algo distinto de lo que su titulo promete.",
+    "AC4 - Revisar contacts.spec.ts con el mismo criterio: sus pruebas gateadas con if (count > 0) sobre contactos guardados se saltean enteras si la cuenta no tiene contactos. Clasificar cada una y arreglar o ticketear.",
+    "AC5 - Aplicar el mismo grep a los demas controles de accion del producto (iniciar conversacion, marcar interes, guardar match): contar cuantos tienen una asercion de VISIBLE y cuantos solo de OCULTO. El patron encontrado aca puede no ser unico, y el entregable es la lista.",
+    "AC6 - Gate verde: npm run test:unit, npx vite build, npm run lint, y e2e:profile y e2e:messages en verde."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "e2e",
+    "calidad-de-tests",
+    "verdes-vacios",
+    "cobertura-faltante",
+    "contacto"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-21T20:33:20.738Z",
+      "body": "HALLAZGO MEDIUM del review de las specs repuntadas (TASK-267, commits 59abd90 + acc713f). Precisa y AMPLIA el alcance de este ticket con un mecanismo que no estaba nombrado: no es solo que falte el caso positivo del boton de contacto, es que dos tests que dicen probar el perfil PUBLICO ahora se renderizan por la rama del perfil PROPIO.\\n\\nEL MECANISMO, trazado en codigo: con PUBLIC_PROFILE_USERNAME === OWN_PROFILE_USERNAME (user-profile.spec.ts:33-34) y la suite autenticada como esa misma cuenta, los tests view public user profile y browse public cards entran por isOwnProfile === true (src/views/UserProfileView.vue:54).\\n\\nCONSECUENCIAS MEDIDAS:\\n1. La asercion de avatar (user-profile.spec.ts:42) ahora ejercita authStore.getAvatarUrl, que es la rama del perfil PROPIO (UserProfileView.vue:110), y NO getAvatarUrlForUser, que es la funcion que ve un visitante. O sea que el avatar tal como lo ve otra persona no lo prueba nadie: el unico render genuino de visitante que queda es el test logged-out, y ese no afirma el avatar.\\n2. view public user profile quedo casi DUPLICADO de own profile loads via direct URL: mismo goto, mismo h1.\\n3. El boton de contacto solo tiene aserciones NEGATIVAS (toBeHidden en las lineas 105 y 148). Si el boton se borrara de la aplicacion, la suite entera sigue en verde. El caso positivo (canShowInterest === true, o sea logueado mirando a un extrano) es INALCANZABLE con una sola cuenta.\\n4. El comentario de cabecera dice que qa_mtg cumple AMBOS roles, y eso SOBRESTIMA: cumple el rol de perfil ajeno solo para el visitante anonimo.\\n\\nMATIZ HONESTO DEL REVIEWER, que conviene no perder: esto NO es un falso verde hoy. Los tests todavia pueden fallar. Es un agujero de COBERTURA creado por la realidad de tener una sola cuenta, y el problema adicional es que el comentario no lo reconoce.\\n\\nRECOMENDACION DEL REVIEWER, ademas de la segunda cuenta que ya pide el AC1: mover la asercion de avatar al test logged-out (que si es render de visitante genuino) y agregar una frase en la cabecera del archivo reconociendo por que rama entran esos tests. Lo primero recupera cobertura real sin depender de la decision de la segunda cuenta.\\n\\nOTRO HALLAZGO LOW del mismo review, que corresponde a este ticket: el titulo view public user profile: username, location, avatar visible promete afirmar la UBICACION y nada la afirma (lineas 37-43). Es preexistente e identico antes del diff, o sea que no lo introdujo TASK-267."
+    }
+  ],
+  "created_at": "2026-08-21T20:27:56.210Z",
+  "updated_at": "2026-08-21T20:33:20.738Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

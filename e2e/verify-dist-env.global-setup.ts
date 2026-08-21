@@ -90,14 +90,30 @@ export default async function globalSetup(): Promise<void> {
 
   const verdict = evaluateDistBundle(bundleText, expectedMode, candidates)
 
-  if (!verdict.ok && verdict.reason === 'mismatch') {
-    throw new Error(
-      `[TASK-254 guard] dist/ was built for Firebase project mode "${verdict.foundMode}" but this E2E run expects "${verdict.expectedMode}". Aborting — this is the exact incident that put 119 E2E test accounts into production (TASK-254). Delete dist/ and let webServer rebuild it, or rerun with VITE_MODE=${verdict.expectedMode}.`,
-    )
-  }
-  if (!verdict.ok && verdict.reason === 'undetermined') {
-    throw new Error(
-      `[TASK-254 guard] Could not determine which Firebase project dist/ was built for (matched ${verdict.matchCount} of 2 known API keys). Failing closed — aborting rather than assuming it is safe. Expected mode: "${expectedMode}".`,
-    )
+  // Exhaustive over DistVerdict's failure reasons, not an if-chain that
+  // silently no-ops on a reason nobody added a branch for yet — see
+  // reviewer HIGH-1: a guard that fails open on an unhandled case is worse
+  // than no guard, because it also gives false confidence.
+  if (!verdict.ok) {
+    if (verdict.reason === 'mismatch') {
+      throw new Error(
+        `[TASK-254 guard] dist/ was built for Firebase project mode "${verdict.foundMode}" but this E2E run expects "${verdict.expectedMode}". Aborting — this is the exact incident that put 119 E2E test accounts into production (TASK-254). Delete dist/ and let webServer rebuild it, or rerun with VITE_MODE=${verdict.expectedMode}.`,
+      )
+    }
+    if (verdict.reason === 'undetermined') {
+      throw new Error(
+        `[TASK-254 guard] Could not determine which Firebase project dist/ was built for (matched ${verdict.matchCount} of 2 known API keys). Failing closed — aborting rather than assuming it is safe. Expected mode: "${expectedMode}".`,
+      )
+    }
+    if (verdict.reason === 'invalid-key') {
+      // Belt-and-suspenders: the validateCandidateKeys() call above already
+      // aborts before this point is ever reached in this file. This branch
+      // only fires if a future refactor removes that early check.
+      throw new Error(
+        `[TASK-254 guard] dist/ check aborted: apiKey invalid for mode(s): ${verdict.invalidModes.join(', ')}. Failing closed. Expected mode: "${expectedMode}".`,
+      )
+    }
+    const unhandledReason: never = verdict
+    throw new Error(`[TASK-254 guard] Unknown verdict shape, aborting rather than assuming it is safe: ${JSON.stringify(unhandledReason)}`)
   }
 }

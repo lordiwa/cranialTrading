@@ -26,9 +26,15 @@
   ],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-21T03:14:04.843Z",
+      "body": "EL ALCANCE DE ESTE TICKET ES MAS GRANDE DE LO QUE DECIA SU TITULO. MEDIDO POR EL ORQUESTADOR el 2026-08-21, con la prueba mas dura que se puede hacer.\n\nProduccion quedo con la base de Firestore COMPLETAMENTE VACIA el 2026-08-20: cero colecciones raiz, cero usuarios, cero cartas, verificado por medicion. Con esa base vacia se corrio el conjunto @smoke completo contra el bundle de PRODUCCION (VITE_MODE=production npx playwright test --grep @smoke).\n\nRESULTADO: 9 de 9 EN VERDE, 1,4 minutos. Incluido el setup que se autentica.\n\nO sea que EL GATE DE PRODUCCION NO PUEDE DETECTAR LA PERDIDA TOTAL DE DATOS, que es la falla mas catastrofica que existe. Pasa igual.\n\nPOR QUE PASAN, leido en el codigo. Los titulos prometen datos y las aserciones miran cascaron:\n- \"collection page loads with card grid visible\" afirma la URL y que collectionPage.statusFilters este visible. NO afirma que se renderice ninguna carta. El titulo dice grilla de cartas visible y el codigo mira los chips de filtro.\n- \"matches page loads with tab navigation\" afirma que las cuatro solapas esten visibles. Cascaron puro.\n- \"view public user profile\" ya estaba documentado arriba: paso contra una cuenta BORRADA.\n- El resto son navegacion y carga de pagina de la misma clase.\n\nCONSECUENCIA PRACTICA: el conjunto @smoke es el UNICO gate que corre contra la base real, en cada push a main, y lo unico que demuestra es que el cascaron de la aplicacion dibuja. No prueba que el backend responda, ni que haya datos, ni que la aplicacion sea usable. Si manana produccion se vacia sola, o una regla de Firestore bloquea todas las lecturas, o el indice se corrompe entero, este gate sigue verde y deploy-prod sigue publicando.\n\nESTO AMPLIA EL AC7 DEL TICKET, que pedia barrer el resto de la suite buscando la misma clase de defecto: ya no es una sospecha, esta medido, y alcanza al conjunto @smoke entero y no solo a las cinco pruebas del perfil publico. Al menos dos de las ocho tienen un titulo que promete mas de lo que el codigo afirma, y eso es lo que las volvio invisibles: quien lee la lista de nombres cree que hay cobertura de datos.\n\nDATO PARA QUIEN LO TOME: la oportunidad de medir esto es IRREPETIBLE en condiciones normales. Una base de produccion vacia es exactamente el control negativo perfecto para un gate de humo, y existio por el vaciado deliberado del 2026-08-20. Si se quiere volver a verificar despues de arreglar, hay que reproducir esa condicion en dev, que hoy tiene solo dos cuentas y es mucho mas manejable que antes."
+    }
+  ],
   "created_at": "2026-08-21T01:18:00.884Z",
-  "updated_at": "2026-08-21T01:18:00.884Z",
+  "updated_at": "2026-08-21T03:14:04.843Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
-import { evaluateDistBundle, resolveExpectedMode, type ProjectCandidate } from './helpers/verify-dist-env'
+import { evaluateDistBundle, resolveExpectedMode, validateCandidateKeys, type ProjectCandidate } from './helpers/verify-dist-env'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -61,6 +61,20 @@ export default async function globalSetup(): Promise<void> {
     { mode: 'development', apiKey: devEnv.VITE_FIREBASE_API_KEY },
     { mode: 'production', apiKey: prodEnv.VITE_FIREBASE_API_KEY },
   ]
+
+  // Reviewer HIGH-1. Validate the keys themselves BEFORE touching dist/ at
+  // all — evaluateDistBundle() is fail-OPEN if handed a falsy apiKey
+  // (empty string matches everything via String.includes(''); undefined
+  // matches the literal text "undefined", measured present in a real
+  // production bundle), so an unvalidated candidate must never reach it.
+  // A missing/blanked VITE_FIREBASE_API_KEY in either .env file is exactly
+  // the "cannot determine" case AC2 requires failing closed on.
+  const keyValidation = validateCandidateKeys(candidates)
+  if (!keyValidation.ok) {
+    throw new Error(
+      `[TASK-254 guard] VITE_FIREBASE_API_KEY is missing or implausibly short for mode(s): ${keyValidation.invalidModes.join(', ')}. Cannot trust a dist/ project match without a real key to look for. Failing closed instead of assuming it is safe. Check .env.development and .env.production. Expected mode: "${expectedMode}".`,
+    )
+  }
 
   const assetsDir = path.join(ROOT, 'dist', 'assets')
   if (!existsSync(assetsDir)) {

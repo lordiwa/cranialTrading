@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T20:33:20.738Z",
+  "generated_at": "2026-08-21T23:38:49.171Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1492,6 +1492,18 @@
     {
       "key": "TASK-269",
       "title": "Nadie prueba que el boton de contacto APAREZCA: las 2 unicas aserciones son toBeHidden, cero toBeVisible",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-270",
+      "title": "El modal de bienvenida puede dejar sus botones FUERA DE ALCANCE: no tiene max-height ni scroll, y es lo primero que ve todo usuario nuevo",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-271",
+      "title": "La suite E2E ensucia dev en cada corrida y ademas FABRICA los huerfanos de /usernames que TASK-268 investiga",
       "status": "todo",
       "priority": "high"
     }

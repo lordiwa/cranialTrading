@@ -23,9 +23,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-21T21:42:14.062Z",
+      "body": "SEGUNDA OBSERVACION INDEPENDIENTE, 2026-08-21 20:58. EL BUG ES REPRODUCIBLE AL 100 POR CIENTO: dos de dos cuentas creadas hoy generaron un indice huerfano, con la misma firma y con tiempos casi identicos.\\n\\nCuenta 1 (qa@cranialtrading.com, uid 90PkdmyFKrVm1RLDXjInJdlYXy73):\\n  /usernames/qa      creado 12:06:39.759\\n  /usernames/qa_mtg  creado 12:06:40.636   -> diferencia 877 ms\\n\\nCuenta 2 (qa2@cranialtrading.com, uid Y3LH090ljOWcc6gk5NL5EcsGBUi1):\\n  /usernames/qa2      creado 20:58:39.661\\n  /usernames/qa2_mtg  creado 20:58:40.547   -> diferencia 886 ms\\n\\nEn ambos casos el documento /users/<uid> dice el username LARGO (qa_mtg, qa2_mtg) y el corto queda colgado apuntando al mismo uid. La regularidad de la diferencia (877 y 886 ms) sugiere que NO es una carrera aleatoria sino un paso fijo del flujo: se reserva un username derivado y despues el elegido, sin liberar el primero. Eso REFINA la hipotesis original de este ticket, que apuntaba al camino de CAMBIO de username: puede estar ocurriendo dentro del propio registro u onboarding, no en un cambio posterior hecho a mano. El AC1 tiene que reproducirlo mirando AMBOS caminos y declarar cual es.\\n\\nHALLAZGO ADICIONAL DEL MISMO BARRIDO, otra variante del mismo problema: /usernames/e2euser1787344154777 EXISTE apuntando al uid 8sPvgX2OsfgA23ErE3U1ym2AuR32, pero NO hay documento en /users para ese uid. O sea un indice que apunta a un usuario inexistente, no a uno con otro nombre. Esas tres cuentas e2euser vienen de las corridas de la suite E2E de hoy (register.spec.ts crea cuentas reales y no las limpia, lo que ya esta documentado en CLAUDE.md). Coincide con lo que el proyecto ya sabia: los indices huerfanos de /usernames que deja register son SISTEMATICOS. Vale sumarlo al AC6 de este ticket, porque muestra que hay al menos DOS formas de huerfano: el que apunta a un doc con otro username, y el que apunta a un doc que no existe.\\n\\nDATO OPERATIVO: el huerfano /usernames/qa sigue vivo A PROPOSITO como evidencia (AC5). Ahora hay un segundo ejemplar, /usernames/qa2, que sirve igual. Al limpiar, limpiar los dos."
+    }
+  ],
   "created_at": "2026-08-21T20:09:28.522Z",
-  "updated_at": "2026-08-21T20:09:28.522Z",
+  "updated_at": "2026-08-21T21:42:14.062Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

@@ -1,0 +1,32 @@
+{
+  "key": "TASK-270",
+  "title": "El modal de bienvenida puede dejar sus botones FUERA DE ALCANCE: no tiene max-height ni scroll, y es lo primero que ve todo usuario nuevo",
+  "description": "REPORTADO POR RAFAEL el 2026-08-21 al crear la cuenta qa2@cranialtrading.com, con estas palabras: el boton de aceptar del primer tour al crear cuenta no es clickeable, sale muy abajo. La CAUSA fue localizada en el codigo por el orquestador; el sintoma lo vio Rafael en su navegador.\\n\\nCAUSA, leida en src/components/ui/WelcomeModal.vue: el contenedor exterior (linea 50) es fixed inset-0 z-[9999] flex items-center justify-center p-4, y el modal interior (linea 61) es relative ... px-8 py-10 md:px-9 max-w-lg w-full mx-4 text-center. NINGUNO DE LOS DOS tiene max-height ni overflow-y-auto: verificado con grep sobre el archivo entero, las unicas clases de layout que aparecen son las de la linea 50.\\n\\nCon items-center y sin scroll, cuando el contenido es mas alto que la ventana el modal se desborda hacia ARRIBA y hacia ABAJO por igual, y no hay ninguna forma de desplazarse hasta lo que quedo afuera. Los botones estan AL FINAL (lineas 109-119: el boton de empezar el tour y debajo el de saltarlo), o sea que son lo primero que se pierde.\\n\\nPOR QUE EL CONTENIDO CRECE TANTO: el modal apila logo (w-14 h-14 mas margen), kicker, titulo, subtitulo, TRES TARJETAS que en pantallas chicas van en grid-cols-1, o sea una debajo de la otra, cada una con px-3.5 py-5 y un icono de w-11 h-11, despues los tres indicadores de paso, y recien ahi los botones. En una ventana de poca altura eso no entra.\\n\\nEL ESCAPE QUE EXISTE NO ALCANZA: el overlay tiene @click=handleSkip (linea 53), asi que hacer clic en el fondo cierra el tour. Pero si el modal ocupa toda la pantalla, no queda fondo visible donde hacer clic. O sea que el usuario puede quedar sin ninguna salida visible.\\n\\nPOR QUE ES MAS GRAVE QUE UN BUG DE ESTILO CUALQUIERA: esto es LO PRIMERO que ve una persona despues de registrarse. Alguien que no puede cerrar la pantalla de bienvenida no llega ni a ver el producto. Y el mercado objetivo de este proyecto es MOVIL con 4G lenta, o sea pantallas chicas, que es justo donde el contenido no entra. Un usuario nuevo trabado en el primer paso es una perdida silenciosa que ninguna metrica de la aplicacion registra.\\n\\nARREGLO CONOCIDO Y CHICO: darle al modal un max-height (del orden de 90vh) mas overflow-y-auto, o poner el scroll en el contenedor exterior cambiando items-center por items-start con overflow-y-auto. Es cambio de una o dos clases; lo dificil no es arreglarlo sino PROBARLO de forma que no vuelva.",
+  "acceptance_criteria": [
+    "AC1 - Reproducir el sintoma ANTES de tocar nada, con medicion: abrir el modal de bienvenida en una ventana de poca altura (probar al menos 640x480 y una vertical tipo movil, 390x670) y mostrar que el boton de empezar el tour queda fuera del area visible y no se puede alcanzar por scroll. Capturar la evidencia.",
+    "AC2 - Arreglar el desbordamiento: el modal tiene que poder desplazarse cuando su contenido supera la altura de la ventana, y sus botones tienen que ser siempre alcanzables. Declarar cual de las dos soluciones se eligio y por que.",
+    "AC3 - Evidencia de rojo POR MUTACION: una prueba que falle si alguien quita el max-height o el overflow, capturada verbatim. Sin esa prueba el arreglo es una linea de CSS que cualquier refactor futuro borra sin que nadie se entere; es exactamente el modo de fallo que este proyecto viene persiguiendo.",
+    "AC4 - Cubrirlo en E2E con al menos un viewport chico: que exista una prueba que abra el modal en una ventana de poca altura y afirme que el boton es visible y CLICKEABLE, no solo que exista en el DOM. Un elemento fuera de la pantalla igual esta en el DOM.",
+    "AC5 - Revisar el resto de los modales del proyecto con el mismo criterio, buscando la FORMA del defecto (un contenedor fixed con items-center y sin overflow) y no el nombre del archivo. AddCardModal, EditCardModal, CardStatusModal y el de detalle de carta son candidatos: ese ultimo ya se observo necesitando scroll interno. Reportar cada uno, arreglar los que compartan la causa o abrir ticket.",
+    "AC6 - Verificar que el modal siga siendo cerrable en el caso extremo: si por lo que sea el contenido no entra, el usuario tiene que conservar una salida visible. Hoy la unica es hacer clic en el fondo, que desaparece justamente cuando el modal ocupa toda la pantalla.",
+    "AC7 - Gate verde: npm run test:unit, npx vite build, npm run lint, y las areas E2E tocadas en verde."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "ui",
+    "onboarding",
+    "movil",
+    "accesibilidad",
+    "reportado-por-usuario"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T21:44:06.765Z",
+  "updated_at": "2026-08-21T21:44:06.765Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

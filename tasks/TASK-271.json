@@ -1,0 +1,34 @@
+{
+  "key": "TASK-271",
+  "title": "La suite E2E ensucia dev en cada corrida y ademas FABRICA los huerfanos de /usernames que TASK-268 investiga",
+  "description": "MEDIDO el 2026-08-21, sobre una base recien vaciada, que es la mejor condicion posible para verlo porque no hay ruido historico.\\n\\nLO QUE DEJA CADA CORRIDA, medido despues de una suite completa (124 pasaron, 0 fallaron) contra dev vaciado esa misma tarde:\\n- TRES cuentas nuevas en Auth mas sus documentos: e2euser1787343768133, e2euser1787344154777, e2euser1787345049960. Las crea register.spec.ts en successful registration.\\n- DOS mazos en la cuenta de QA, donde antes habia cero. Los crea deck-editor.spec.ts en add card from collection to mainboard.\\n\\nEL HALLAZGO QUE CAMBIA LA PRIORIDAD: la basura no es solo ruido, esta FABRICANDO EL MISMO DEFECTO QUE SE ESTA INVESTIGANDO. Medido: /usernames/e2euser1787344154777 EXISTE apuntando al uid 8sPvgX2OsfgA23ErE3U1ym2AuR32, pero NO hay documento en /users para ese uid. O sea un indice huerfano, de la familia exacta de TASK-268, generado por la propia suite. Cada corrida de register agrega uno. Mientras eso siga pasando, la evidencia de TASK-268 se contamina en cada corrida, y justo ahora dev esta limpio de ruido historico por primera vez.\\n\\nHay ademas DOS FORMAS distintas de huerfano, y conviene no confundirlas: el indice que apunta a un documento con OTRO username (el caso qa y qa2 de TASK-268) y el indice que apunta a un uid SIN documento (este caso). Un teardown que borre la cuenta y el documento pero se olvide del indice FABRICA la segunda forma, asi que este ticket puede empeorar el problema si se hace mal.\\n\\nLO QUE YA EXISTE Y NO HAY QUE REHACER: e2e/helpers/admin.ts (TASK-240) ya trae el arranque del Admin SDK, getTestAdmin(), el patron de SALTEAR el test cuando no hay credenciales en vez de crear algo que despues no se puede borrar, y scopes como lista blanca para que un teardown no pueda escribir fuera de lo suyo. Esa es la parte cara y ya esta hecha y revisada. Hoy solo sabe de CARTAS: snapshot, docFields, deleteCards, restoreQuantities. No sabe borrar cuentas ni mazos.\\n\\nPOR QUE ESTO NO SE HIZO ANTES: CLAUDE.md documenta que register.spec.ts era la unica excepcion verdadera, porque crea una cuenta real sin ningun camino de borrado expuesto en la interfaz, y por eso se la excluyo del nightly con la etiqueta @nightly-skip en vez de limpiarla. Esa razon YA NO APLICA: con el Admin SDK el borrado no necesita pasar por la interfaz. La exclusion del nightly puede seguir por otros motivos (es un flake conocido por rate-limit de Firebase), pero ya no por imposibilidad de limpieza.\\n\\nADVERTENCIA DE METODO, aprendida en TASK-240 y no teorica: aquel ticket tuvo un teardown que borraba lo que estuviera en el indice 0 de la grilla y termino de-indexando una carta AJENA, una fixture de otro ticket. Por eso el borrado tiene que ser POR IDENTIFICADOR conocido, nunca por posicion ni por heuristica, y el sensor tiene que PONERSE ROJO si la cuenta no vuelve a su estado inicial, en vez de tragarse el fallo para no molestar.",
+  "acceptance_criteria": [
+    "AC1 - Medir el estado ANTES y DESPUES de una corrida completa, mostrando los dos conteos lado a lado: cuentas en Auth, documentos en /users, documentos en /usernames, y mazos de la cuenta de QA. Es la linea de base contra la cual se demuestra que el arreglo funciona.",
+    "AC2 - Agregar a e2e/helpers/admin.ts un borrado de cuenta que elimine LAS TRES COSAS: la cuenta de Auth, su documento en /users, y su entrada en /usernames. Omitir la tercera fabrica un huerfano de la segunda forma descrita arriba, o sea que el arreglo crearia el defecto que viene a limpiar.",
+    "AC3 - Control negativo obligatorio: demostrar con salida capturada verbatim que el sensor SE PONE ROJO cuando la limpieza no ocurre. Un teardown que nunca se vio fallar no prueba nada. Correr la prueba con el borrado deshabilitado a proposito y mostrar el rojo.",
+    "AC4 - register.spec.ts borra la cuenta que crea, al final del mismo test. Si no hay credenciales de administrador, el test SE SALTEA en vez de crear una cuenta que no va a poder borrar: es el patron que TASK-240 ya dejo establecido y funcionando.",
+    "AC5 - deck-editor.spec.ts borra el mazo que crea. Evaluar primero hacerlo por la interfaz, porque deck-crud.spec.ts ya ejercita ese mismo flujo de borrado y usarlo prueba el camino real del producto; recurrir al Admin SDK solo si por la interfaz resulta inestable, y declarar cual se eligio y por que.",
+    "AC6 - El borrado es SIEMPRE por identificador conocido, capturado en el momento de crear. Nunca por posicion en una grilla, por el mas reciente, ni por ninguna heuristica: es exactamente lo que en TASK-240 termino borrando una fixture ajena.",
+    "AC7 - Barrer el resto de la suite buscando la MISMA FORMA, o sea tests que crean documentos y no los borran. El barrido se hace sobre el codigo y se confirma MIDIENDO conteos antes y despues, no leyendo titulos ni comentarios. Reportar cada caso encontrado y arreglar o abrir ticket.",
+    "AC8 - Revisar si la etiqueta @nightly-skip de register.spec.ts sigue estando justificada. Su motivo original era que no se podia limpiar, y este ticket lo elimina; puede que siga justificada por el flake de rate-limit de Firebase, que es otra razon distinta. Declarar la decision y su motivo real.",
+    "AC9 - Limpiar la basura que YA quedo en dev: las 3 cuentas e2euser con sus documentos e indices, incluido el huerfano /usernames/e2euser1787344154777, y los 2 mazos de la cuenta de QA. NO tocar /usernames/qa ni /usernames/qa2, que estan vivos A PROPOSITO como evidencia de TASK-268.",
+    "AC10 - Gate verde: npm run test:unit, npx vite build, npm run lint, y la suite E2E completa en verde, mas la medicion del AC1 repetida al final mostrando que la cuenta vuelve a su estado inicial."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "e2e",
+    "calidad-de-tests",
+    "limpieza",
+    "indices-huerfanos"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T23:38:49.171Z",
+  "updated_at": "2026-08-21T23:38:49.171Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

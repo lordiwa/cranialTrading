@@ -5,24 +5,25 @@ test.describe('Match Management', () => {
     await matchesPage.goto();
   });
 
-  // TASK-259 (AC4): kept @smoke — everything it asserts is read-only. The old
-  // version only checked the 4 tab buttons exist, a shell check that would
-  // stay green even if match calculation/rendering were broken underneath
-  // them. Strengthened with a real check that the matches list itself
-  // finished rendering — not just the tab chrome.
-  //
-  // Deliberately does NOT assert the specific empty-state text
-  // (`matches.empty.new.title`), even though the DEV suite account is
-  // measured at 0 matches: @smoke also runs on push-to-main against
-  // PRODUCTION, reusing the SAME `TEST_USER_A_EMAIL`/`PASSWORD` secret pair
-  // (test.yml) — but dev and prod are different Firebase projects, so that
-  // credential pair resolves to two independent accounts whose match count
-  // was never measured to agree. SavedMatchesView.vue renders exactly one of
-  // "new" tab's empty state OR at least one match card once loading finishes
-  // (currentMatches.length === 0 && !loading, else the matches list) — this
-  // OR holds true and is real+read-only whether the authenticated account
-  // has 0 matches or many, in dev or in prod.
-  test('matches page loads with tab navigation @smoke', async ({ matchesPage }) => {
+  // TASK-259 review (HIGH-1), TASK-265: @smoke REMOVED — this test is NOT
+  // read-only, and an earlier version of this comment wrongly claimed it
+  // was. Traced and independently re-verified: matchesPage.goto() mounts
+  // SavedMatchesView, whose initView() (line ~759) calls
+  // matchesStore.loadAllMatches() → _loadAllMatches() (stores/matches.ts
+  // line ~292), whose FIRST step is `await cleanExpiredMatches()` (line
+  // ~298). cleanExpiredMatches() (line ~386) reads matches_nuevos/
+  // matches_guardados, filters anything past its 15-day expiration, and
+  // **deletes it via writeBatch** — silently (empty catch). So simply
+  // loading /saved-matches can delete real documents, and @smoke runs on
+  // every push to `main` against PRODUCTION. This was already true of the
+  // OLD version of this test (the effect is pre-existing, TASK-259 didn't
+  // introduce it) — what TASK-259 introduced was a comment asserting the
+  // test was read-only, which was false. TASK-265 tracks fixing the cause
+  // (cleanExpiredMatches running as a mount-time side effect instead of a
+  // deliberate, gated action). The `.or()` assertion below is unrelated to
+  // this and stays — it's a genuine strengthening over the old 4-tabs-only
+  // shell check, confirmed independently, not a mutator.
+  test('matches page loads with tab navigation', async ({ matchesPage }) => {
     await expect(matchesPage.tabs.new).toBeVisible();
     await expect(matchesPage.tabs.sent).toBeVisible();
     await expect(matchesPage.tabs.saved).toBeVisible();

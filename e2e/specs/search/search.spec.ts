@@ -15,24 +15,30 @@ test.describe('Search', () => {
 
   // TASK-259: `expect(typeof visible).toBe('boolean')` was tautological —
   // isVisible() always returns a boolean, so this passed whether or not the
-  // dropdown ever appeared. Asserting it appears WITH content is a real
-  // check, but per CLAUDE.md's known-flakes list, the sibling
-  // `selecting autocomplete suggestion...` test is @nightly-skip'd because it
-  // additionally requires a live Scryfall suggestion to carry a *price*. This
-  // test does not add that dependency — it only requires the query ('Lightn')
-  // to return SOME suggestion, a materially weaker (and observed far more
-  // reliable) condition than "has a price". It depends on the same live
-  // autocomplete endpoint the sibling already depends on, so it does not
-  // introduce a new flake surface, and by dropping the price requirement it
-  // is strictly less exposed to that endpoint's flakiness than the sibling.
+  // dropdown ever appeared. Asserting it appears is a real check, but per
+  // CLAUDE.md's known-flakes list, the sibling `selecting autocomplete
+  // suggestion...` test is @nightly-skip'd because it additionally requires a
+  // live Scryfall suggestion to carry a *price*. This test does not add that
+  // dependency — it only requires the query ('Lightn') to return SOME
+  // suggestion, a materially weaker (and observed far more reliable)
+  // condition than "has a price". It depends on the same live autocomplete
+  // endpoint the sibling already depends on, so it does not introduce a new
+  // flake surface, and by dropping the price requirement it is strictly less
+  // exposed to that endpoint's flakiness than the sibling.
+  //
+  // TASK-259 review (LOW-1): a second `suggestionCount > 0` assertion was
+  // dropped — it was true by construction, not a real check. FilterPanel.vue's
+  // dropdown container is `v-if="showSuggestions && suggestions.length > 0"`
+  // (line ~396) and `showSuggestions` (line ~177) is only ever set true when
+  // `suggestions.length > 0`. So `dropdown` visible already implies at least
+  // one suggestion exists — a second count check adds no detection power, and
+  // its `'button, div, li'` selector would have counted any nested div, not
+  // just suggestion items. The `toBeVisible()` above is the whole real check.
   test('autocomplete suggestions appear while typing', async ({ searchPage }) => {
     await searchPage.typeForAutocomplete('Lightn');
 
     const dropdown = searchPage.autocompleteDropdown;
     await expect(dropdown).toBeVisible({ timeout: 5_000 });
-
-    const suggestionCount = await dropdown.locator('button, div, li').count();
-    expect(suggestionCount).toBeGreaterThan(0);
   });
 
   // Tagged @nightly-skip: known flake, depends on a live Scryfall suggestion

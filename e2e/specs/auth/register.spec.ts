@@ -31,13 +31,46 @@ test.describe('Registration', () => {
   // checked directly instead: the first required input (email) must report
   // itself invalid, and the verification screen (only reachable through a
   // real handleRegister() success) must never appear.
-  test('register button disabled when required fields empty', async ({ registerPage }) => {
+  //
+  // TASK-259 review (MEDIUM-2): `validity.valid` alone is a property of the
+  // input, independent of whether the SUBMIT was actually blocked — a
+  // `novalidate` on the form (or any other bypass of the native barrier)
+  // would leave the input reporting invalid while handleRegister() runs
+  // anyway. Added a toast-absence check as a second signal.
+  //
+  // HONEST CAVEAT, measured by mutation (see commit message): for THIS test
+  // specifically, `novalidate` ALONE does not turn the toast-absence check
+  // red — handleRegister()'s own `if (!email.value || ...) return;` guard
+  // (all 4 fields ARE empty here) is a second, independent, JS-level barrier
+  // that stops it before it ever reaches authStore.register(), regardless of
+  // whether the native `required` barrier was bypassed. The toast check only
+  // reds when BOTH the native barrier AND that JS guard are bypassed
+  // together (verified: mutated both, got red; reverted, got green) — it is
+  // real defense-in-depth against that compound regression, not a
+  // stand-alone detector for `novalidate` on its own. The sibling
+  // `invalid email format...` test below does NOT have this caveat: its
+  // fields are non-empty, so the JS guard does not apply there and the
+  // toast check is independently load-bearing.
+  //
+  // Timing note shared with the sibling test: the toast, when one appears,
+  // is visible from ~400ms and auto-dismisses at ~4s (matches CLAUDE.md's
+  // documented 4s toast lifetime). `expect(locator).toBeHidden()` AUTO-
+  // RETRIES for its own default ~5s window — so checked after any wait ≥0,
+  // it would still pass once the toast's own auto-dismiss made it hidden,
+  // REGARDLESS of whether it ever appeared, defeating the check entirely.
+  // Takes a single point-in-time `isVisible()` snapshot instead, at a delay
+  // long enough for the toast to have appeared (~400ms observed) but short
+  // enough that it hasn't auto-dismissed yet (~4s observed) if it did.
+  test('register button disabled when required fields empty', async ({ registerPage, commonPage }) => {
     await registerPage.submit();
 
     const emailIsInvalid = await registerPage.emailInput.evaluate(
       (el: HTMLInputElement) => !el.validity.valid,
     );
     expect(emailIsInvalid).toBe(true);
+    await registerPage.page.waitForTimeout(1_500);
+    const toastAppeared = await commonPage.errorToast.isVisible();
+    expect(toastAppeared).toBe(false);
     await expect(registerPage.verificationScreen).toBeHidden();
   });
 
@@ -47,7 +80,16 @@ test.describe('Registration', () => {
   // checks truthiness); the email <input type="email"> relies entirely on
   // the browser's native format validation to stop the submit event before
   // handleRegister ever runs. Assert that directly.
-  test('invalid email format shows validation error', async ({ registerPage }) => {
+  //
+  // TASK-259 review (MEDIUM-2): same gap as the sibling test above, but here
+  // it matters more, and does NOT carry that test's caveat — the fields are
+  // non-empty, so handleRegister()'s own `if (!email.value || ...) return;`
+  // guard does NOT stop it. Verified by mutation (see commit message): with
+  // just the native format barrier (`type="email"` via `novalidate`)
+  // bypassed, handleRegister() calls authStore.register('not-an-email', ...),
+  // Firebase rejects it with `auth/invalid-email`, and an error toast DOES
+  // appear — this check alone (no compound mutation needed) catches it.
+  test('invalid email format shows validation error', async ({ registerPage, commonPage }) => {
     await registerPage.fillForm({
       email: 'not-an-email',
       password: 'Test123456!',
@@ -60,6 +102,12 @@ test.describe('Registration', () => {
       (el: HTMLInputElement) => !el.validity.valid,
     );
     expect(emailIsInvalid).toBe(true);
+    // Same measured timing and single-snapshot reasoning as the sibling test
+    // above (toBeHidden() would auto-retry past the toast's own auto-dismiss
+    // and pass regardless of whether it ever appeared).
+    await registerPage.page.waitForTimeout(1_500);
+    const toastAppeared = await commonPage.errorToast.isVisible();
+    expect(toastAppeared).toBe(false);
     await expect(registerPage.verificationScreen).toBeHidden();
   });
 

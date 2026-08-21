@@ -58,21 +58,30 @@ test.describe('Registration', () => {
     expect(url).toContain('/register');
   });
 
-  test('duplicate username blocks registration', async ({ registerPage, commonPage, page }) => {
+  test('duplicate username blocks registration', async ({ registerPage, commonPage }) => {
     await registerPage.fillForm({
       email: `unique_${Date.now()}@e2etest.com`,
       password: 'Test123456!',
-      username: 'rafael', // Known existing username
+      // TASK-256: 'rafael' is gone as a real account — its /usernames/rafael
+      // index entry is now an orphaned pointer to a doc with a DIFFERENT
+      // username field (measured live 2026-08-20, see
+      // e2e/specs/user-profile/user-profile.spec.ts's file-header comment).
+      // 'rafael_m' is confirmed live in dev: 3,211 public cards, its own
+      // /usernames/rafael_m index doc resolves correctly.
+      username: 'rafael_m', // Known existing username
       location: 'Test City',
     });
     await registerPage.submit();
 
-    // Should show error or remain on register page
-    await page.waitForTimeout(3000);
-    const url = page.url();
-    const hasError = url.includes('/register') ||
-      await commonPage.errorToast.isVisible().catch(() => false);
-    expect(hasError).toBeTruthy();
+    // TASK-256: the old `hasError = url.includes('/register') || errorToast`
+    // was tautological regardless of the account used — RegisterView.vue's
+    // handleRegister() never navigates on success either (registered.value
+    // just flips a v-if; router.push only happens later, after email
+    // verification), so `url.includes('/register')` is true whether
+    // registration succeeded or failed. Only the toast and the pending-
+    // verification screen actually distinguish the two outcomes.
+    await expect(commonPage.errorToast).toBeVisible({ timeout: 10_000 });
+    await expect(registerPage.verificationScreen).toBeHidden();
   });
 
   test('back to login link works from register page', async ({ registerPage, page }) => {

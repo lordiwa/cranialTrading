@@ -23,6 +23,16 @@ test.describe('Collection CRUD', () => {
   test('collection page loads with card grid visible @smoke', async ({ collectionPage, page }) => {
     await expect(page).toHaveURL(/\/collection/);
     await expect(collectionPage.statusFilters).toBeVisible();
+    // TASK-256: the old version stopped at "the filter chips exist" — true on
+    // an EMPTY account too, so it could never catch data loss. Per the
+    // ticket thread: the @smoke suite (this assertion included) passed 9/9
+    // against a fully-wiped production Firestore on 2026-08-20.
+    // waitForGridReady/getCardCount are the same virtualized-grid-aware
+    // helpers the rest of this file already uses for real card counts; on
+    // zero cards they now TIME OUT (a real red) instead of the old
+    // assertion's silent pass. Read-only — no mutation.
+    const cardCount = await collectionPage.getCardCount();
+    expect(cardCount).toBeGreaterThan(0);
   });
 
   // TASK-240 — this test's cleanup is an ADMIN TEARDOWN, not a UI delete, and

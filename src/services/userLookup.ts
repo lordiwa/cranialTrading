@@ -21,7 +21,17 @@ export async function resolveUsernameToUid(
     if (uid) {
       const userSnap = await getDoc(doc(db, 'users', uid));
       if (userSnap.exists()) {
-        return { id: uid, data: userSnap.data() as Record<string, unknown> };
+        const data = userSnap.data() as Record<string, unknown>;
+        // TASK-257: the index pointer alone is not proof of ownership — an
+        // orphaned /usernames/{norm} doc (write-side race in stores/auth.ts,
+        // see TASK-257 AC1) can point at a uid whose /users doc has since
+        // moved on to a DIFFERENT username. Serving that doc here would
+        // resolve the profile to the wrong person (measured live, TASK-256).
+        // `username` is always the normalized value (utils/username.ts), so
+        // a straight equality against `norm` is the right check.
+        if (data.username === norm) {
+          return { id: uid, data };
+        }
       }
     }
   }

@@ -131,6 +131,23 @@ const loadFirebaseDeps = (): Promise<FirebaseDeps> => {
     return firebaseDepsPromise;
 };
 
+/**
+ * TASK-257: uids currently being provisioned by an explicit creation flow
+ * (register(), loginWithGoogle()'s new-user branch). Both flows reserve a
+ * username and write /users/{uid} themselves, but Firebase Auth fires
+ * onAuthStateChanged as soon as the user is signed in — BEFORE either flow's
+ * own write lands — which triggers loadUserData()'s unawaited self-heal path
+ * (see the callback below, line ~196) concurrently. Two independent
+ * reserveUsername + setDoc(users/{uid}) writes then race: whichever lands
+ * last wins /users/{uid}.username, while the LOSER's /usernames/{norm} index
+ * doc is left pointing at a uid whose doc now says something else — an
+ * orphaned index (measured live, TASK-256/257: 5 of 7 orphans in dev had
+ * exactly this shape). loadUserData checks this set and skips its self-heal
+ * write entirely while the uid is marked as provisioning; the explicit flow
+ * calls loadUserData itself once its own write has landed.
+ */
+const provisioningUids = new Set<string>();
+
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const loading = ref(true);
@@ -333,7 +350,13 @@ export const useAuthStore = defineStore('auth', () => {
                 }
             } else {
                 const firebaseUser = auth.currentUser;
-                if (firebaseUser) {
+                // TASK-257: an explicit creation flow (register()/loginWithGoogle())
+                // is already provisioning /users/{userId} for this uid — its own
+                // reserveUsername + setDoc will land shortly, and it calls
+                // loadUserData() itself afterwards. Self-healing here too would
+                // race it with a SECOND, independently-generated username and
+                // orphan whichever /usernames/{norm} index doc loses.
+                if (firebaseUser && !provisioningUids.has(userId)) {
                     // D-06b: self-heal must also reserve a unique, normalized username
                     // (was a raw 'Usuario' write that collided for displayName-less users).
                     /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback */
@@ -397,24 +420,36 @@ export const useAuthStore = defineStore('auth', () => {
             const userId = userCredential.user.uid;
             const norm = normalizeUsername(username);
 
-            // D-06 step 3: atomically reserve the username.
-            const reserved = await reserveUsername(userId, norm);
-            if (!reserved) {
-                // D-06 step 4: rollback — delete the just-created auth user
-                // (allowed: it is the freshly-authenticated current user).
-                await authFns.deleteUser(userCredential.user);
-                toastStore.show(t('auth.messages.usernameTaken'), 'error');
-                return false;
-            }
+            // TASK-257: mark this uid as provisioning BEFORE the next await,
+            // synchronously — createUserWithEmailAndPassword's resolution
+            // also fires onAuthStateChanged, whose listener (above) calls
+            // loadUserData(userId) unawaited. Setting this flag now closes
+            // the race window as tightly as this layer can: loadUserData's
+            // self-heal branch checks it and skips, instead of reserving and
+            // writing a SECOND, differently-generated username concurrently.
+            provisioningUids.add(userId);
+            try {
+                // D-06 step 3: atomically reserve the username.
+                const reserved = await reserveUsername(userId, norm);
+                if (!reserved) {
+                    // D-06 step 4: rollback — delete the just-created auth user
+                    // (allowed: it is the freshly-authenticated current user).
+                    await authFns.deleteUser(userCredential.user);
+                    toastStore.show(t('auth.messages.usernameTaken'), 'error');
+                    return false;
+                }
 
-            // D-06 step 5: persist the user doc with the NORMALIZED username (D-05).
-            // TASK-188: sin `email` — /users es de lectura publica y las reglas no
-            // filtran por campo. El email vive en Firebase Auth y en contact_info.
-            await firestoreFns.setDoc(firestoreFns.doc(db, 'users', userId), {
-                username: norm,
-                location,
-                createdAt: new Date(),
-            });
+                // D-06 step 5: persist the user doc with the NORMALIZED username (D-05).
+                // TASK-188: sin `email` — /users es de lectura publica y las reglas no
+                // filtran por campo. El email vive en Firebase Auth y en contact_info.
+                await firestoreFns.setDoc(firestoreFns.doc(db, 'users', userId), {
+                    username: norm,
+                    location,
+                    createdAt: new Date(),
+                });
+            } finally {
+                provisioningUids.delete(userId);
+            }
 
             await authFns.sendEmailVerification(userCredential.user);
             await loadUserData(userId);
@@ -546,26 +581,36 @@ export const useAuthStore = defineStore('auth', () => {
             // Google", not on every app boot.
             const userCredential = await authFns.signInWithPopup(auth, provider, authFns.browserPopupRedirectResolver);
             const firebaseUser = userCredential.user;
+            // TASK-257: same guard as register() — signInWithPopup's resolution
+            // also fires onAuthStateChanged, whose listener calls
+            // loadUserData(uid) unawaited, which can self-heal (reserve+write a
+            // DIFFERENT generated username) concurrently with this flow's own
+            // provisioning below and orphan the loser's /usernames/{norm} index.
+            provisioningUids.add(firebaseUser.uid);
 
-            // Check if user document exists
-            const userDoc = await firestoreFns.getDoc(firestoreFns.doc(db, 'users', firebaseUser.uid));
+            try {
+                // Check if user document exists
+                const userDoc = await firestoreFns.getDoc(firestoreFns.doc(db, 'users', firebaseUser.uid));
 
-            if (!userDoc.exists()) {
-                // D-07: derive a base, then reserve a unique username (shared helper).
-                /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback */
-                const rawBase = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
-                    || firebaseUser.email?.split('@')[0]
-                    || 'user';
-                /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
-                const finalUsername = await reserveUniqueUsername(firebaseUser.uid, rawBase);
+                if (!userDoc.exists()) {
+                    // D-07: derive a base, then reserve a unique username (shared helper).
+                    /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback */
+                    const rawBase = firebaseUser.displayName?.toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '')
+                        || firebaseUser.email?.split('@')[0]
+                        || 'user';
+                    /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
+                    const finalUsername = await reserveUniqueUsername(firebaseUser.uid, rawBase);
 
-                // TASK-188: sin `email` — /users es de lectura publica.
-                await firestoreFns.setDoc(firestoreFns.doc(db, 'users', firebaseUser.uid), {
-                    username: finalUsername,
-                    location: '',
-                    createdAt: new Date(),
-                    avatarUrl: firebaseUser.photoURL ?? null,
-                });
+                    // TASK-188: sin `email` — /users es de lectura publica.
+                    await firestoreFns.setDoc(firestoreFns.doc(db, 'users', firebaseUser.uid), {
+                        username: finalUsername,
+                        location: '',
+                        createdAt: new Date(),
+                        avatarUrl: firebaseUser.photoURL ?? null,
+                    });
+                }
+            } finally {
+                provisioningUids.delete(firebaseUser.uid);
             }
 
             await loadUserData(firebaseUser.uid);

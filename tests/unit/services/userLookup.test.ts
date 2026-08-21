@@ -65,6 +65,18 @@ describe('resolveUsernameToUid', () => {
     expect(result).toEqual({ id: 'U3b', data: { username: 'rafael_m' } });
   });
 
+  it('TASK-257 regression: index points to a doc whose username field is DIFFERENT (orphan) → does not serve that profile, falls through to legacy', async () => {
+    // Reproduces the measured shape: /usernames/e2euser123 → uid U9, but
+    // /users/U9.username is 'test_123' (register()'s explicit setDoc lost a
+    // race against the onAuthStateChanged self-heal write, TASK-257 AC1).
+    getDocMock
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ uid: 'U9' }) }) // index: e2euser123 -> U9
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ username: 'test_123' }) }); // users/U9 says test_123
+    getDocsMock.mockResolvedValueOnce({ empty: true, docs: [] }); // legacy query for 'e2euser123' finds nobody either
+    const result = await resolveUsernameToUid('e2euser123');
+    expect(result).toBeNull();
+  });
+
   it('returns null for whitespace-only / empty username', async () => {
     const result = await resolveUsernameToUid('   ');
     expect(result).toBeNull();

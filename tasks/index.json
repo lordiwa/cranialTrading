@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-20T23:50:19.523Z",
+  "generated_at": "2026-08-21T02:41:39.914Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1402,7 +1402,7 @@
     {
       "key": "TASK-254",
       "title": "La suite E2E local no compila nada: Playwright reusa un vite preview viejo y testea el dist que haya en disco, que suele ser el bundle de PRODUCCION",
-      "status": "todo",
+      "status": "done",
       "priority": "critical"
     },
     {
@@ -1410,6 +1410,12 @@
       "title": "Un cambio de estado que se cuelga deja la carta INVISIBLE: el delta de borrado del indice sale igual y el documento queda vivo",
       "status": "done",
       "priority": "critical"
+    },
+    {
+      "key": "TASK-256",
+      "title": "Las 5 pruebas E2E del perfil publico pasan contra una cuenta BORRADA: 3 no tienen asercion real y una de ellas es @smoke, o sea el unico chequeo de perfiles en PRODUCCION",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

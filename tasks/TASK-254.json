@@ -12,7 +12,7 @@
     "AC7 - Gate del proyecto verde: npm run test:unit y npx vite build.",
     "AC8 - Verificado por comportamiento en una corrida real de la suite, no solo con tests unitarios de la config. La medicion que abrio este ticket fue de comportamiento y el arreglo se verifica igual."
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "e2e",
@@ -22,11 +22,26 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "802df00",
+    "eb5fe94",
+    "5346e28"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-21T02:41:14.462Z",
+      "body": "REVISION FULL, RONDA 3 (5346e28). VEREDICTO: LIMPIO. Cero HIGH, cero MEDIUM nuevos. Listo para cerrar.\n\nHistorial de las tres rondas: la ronda 1 (802df00) fue BLOQUEADA por un HIGH, la guarda era FAIL-OPEN si una API key del .env estaba vacia o ausente, porque includes('') es siempre cierto e includes(undefined) matchea el texto literal \"undefined\", MEDIDO presente en 3 de 62 chunks de un build real. La ronda 2 (eb5fe94) cerro ese HIGH y quedo APROBADA con un MEDIUM de diseno. La ronda 3 aplica ese MEDIUM.\n\nLAS DOS CAPAS SIGUEN SIENDO DOS, verificado POR EJECUCION y no por lectura. El reviewer repitio su repro end-to-end contra el commit nuevo, con dist de produccion, VITE_MODE=production y la key de prod blanqueada de forma transitoria: aborto con el mensaje DEL GLOBALSETUP y no con el de la primitiva, lo que prueba por comportamiento que la capa de arriba corre primero, antes de tocar disco, y que aporta lo suyo, el mensaje rico que nombra los modos y los archivos sin leer un solo chunk. La capa de adentro tambien esta viva, ejercitada por tres tests unitarios incluido el de invalid-key-gana-al-match, que prueba que la primitiva rechaza aunque el bundle SI matchee al candidate sano. Lo unico muerto por construccion es la rama invalid-key del globalSetup, etiquetada como cinturon y tiradores, que es exactamente lo que es.\n\nLA RAMA never NO ES UNA HENDIJA: la linea siguiente es un throw incondicional, asi que un reason no manejado en el futuro aborta con el JSON del verdict en vez de pasar en silencio. Fail-closed en runtime pase lo que pase.\n\nRESIDUO REGISTRADO, no bloqueante: NINGUN tsconfig incluye e2e/, MEDIDO, asi que el vue-tsc del CI no chequea estos archivos y la exhaustividad del never no tiene gate de compilacion. Si alguien agrega un cuarto reason y olvida la rama, ningun gate se pone rojo al compilar; lo atrapa el throw en runtime en la primera corrida, que es fail-closed. Cerrarlo seria agregar e2e/*.ts a un tsconfig chequeado.\n\nSOBRE EL ROJO DE ESTA RONDA, que el developer no capturo por separado: el reviewer lo considera ACEPTABLE EN ESTE CASO y coincide con el orquestador, por dos condiciones que no generaliza. Primera, los inputs de los tests son identicos byte a byte entre las dos versiones. Segunda, el estado rojo, o sea el commit anterior, fue EJECUTADO y verificado por un tercero afirmando en verde el comportamiento peligroso. El contraste quedo capturado en git y es evidencia equivalente a una ventana roja, con la ventaja de ser permanente. Para tier tdd en general la regla de rojo capturado sigue en pie.\n\nLOW de la ronda 2 cerrado: cero API keys reales en tests/, reemplazadas por dos fake de 39 caracteres. Los unicos hits de keys reales estan en e2e/.auth/, que son artefactos de runtime gitignoreados y ajenos a este commit.\n\nGate corrido por el reviewer: 2238 tests verdes, vite build OK, lint 0 errores y 126 warnings preexistentes. Protocolo E2E cumplido en cada corrida: puerto 4173 verificado libre antes, solo specs de solo lectura, ningun preview vivo al final.\n\nConfianza del reviewer 9/10. Lo no cubierto es el camino de CI en main real, verificado solo por lectura de predicados en las tres rondas: se comprueba en la proxima promocion a main."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-21T02:41:39.914Z",
+      "body": "CERRADO. Tres rondas, dos HIGH devueltos por el orquestador antes de la revision y uno mas encontrado por el reviewer.\n\nQUE CIERRA: la suite E2E local no compilaba nada. Playwright no declaraba reuseExistingServer, asi que heredaba cualquier vite preview escuchando en 4173 y testeaba el dist que hubiera en disco. Como el gate del proyecto pide npx vite build pelado, que compila a PRODUCCION, la suite terminaba corriendo contra la base real. Medido: 119 de 138 usuarios de produccion eran cuentas creadas por la E2E, el 86,2% del padron, desde el 2026-03-05.\n\nLO QUE APARECIO DE PASO Y NO ESTABA EN EL TICKET: el job build y el job e2e decidian por PREDICADOS DISTINTOS, uno preguntaba si la rama era develop y el otro si era main. En un evento pull_request github.ref no es ninguna de las dos, asi que los dos caian a su else: se compilaba PRODUCCION y se le corria la suite COMPLETA encima, con todos los specs que escriben. Segundo camino al mismo incidente, por CI en vez de por el preview local, que nadie habia mirado. O sea que las 119 cuentas tenian al menos DOS fuentes. Los dos jobs pasan a mirar el mismo predicado.\n\nDOS HIGH QUE EL ORQUESTADOR DEVOLVIO ANTES DE COMMITEAR, los dos habrian roto el despliegue a produccion y ninguno se ve en local: el primero, que la guarda esperaba siempre development y por lo tanto abortaba en main, con lo cual deploy-prod no corria nunca; el segundo, el de los predicados distintos, que ademas habria hecho fallar todo pull request.\n\nUN HIGH DEL REVIEWER: la guarda era FAIL-OPEN si una API key del .env estaba vacia o ausente, porque includes('') es siempre cierto e includes(undefined) matchea el texto literal 'undefined', medido presente en 3 de 62 chunks de un build real. Una guarda que falla hacia el lado permisivo bajo mala configuracion es peor que no tenerla, porque ademas da confianza.\n\nUN MEDIUM DE DISENO, aplicado antes de cerrar aunque el riesgo presente fuera cero: la primitiva quedaba fail-open a proposito y dos tests PROHIBIAN arreglarla. Su seguridad dependia de que todo llamador futuro se acordara de validar primero, y en este proyecto una convencion usada como control ya se pago siete veces con el mismo agujero de authz. Ahora la primitiva se defiende sola y esos dos tests fijan el comportamiento seguro.\n\nProfundidad de revision: FULL en las tres rondas. Entradas de la rubrica: toca el pipeline de CI/CD, o sea puerta de release y de despliegue a produccion, mas la infraestructura de test. Cualquiera de las dos ya fuerza FULL.\n\nVERIFICACION QUE SOSTIENE EL CIERRE: el reviewer reprodujo su propio escenario letal contra cada commit, no se conformo con los tests unitarios; confirmo el orden globalSetup despues del webServer y antes de los specs LEYENDO EL CODIGO FUENTE DE PLAYWRIGHT, con archivos y lineas, que era la pieza sobre la que se apoya todo; y enumero los cuatro caminos del pipeline uno por uno. Gate final 2238 tests verdes, build OK, lint 0 errores.\n\nRESIDUO DECLARADO: ningun tsconfig incluye e2e/, asi que la exhaustividad del never no tiene gate de compilacion; el runtime la cubre fail-closed. Y el camino de CI en main real quedo verificado solo por lectura de predicados: se comprueba en la proxima promocion a main."
+    }
+  ],
   "created_at": "2026-08-20T21:05:39.594Z",
-  "updated_at": "2026-08-20T21:05:39.594Z",
+  "updated_at": "2026-08-21T02:41:39.914Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

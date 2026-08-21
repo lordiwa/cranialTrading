@@ -140,6 +140,12 @@
       "label": "Quitar el swipe-down de BottomSheet.vue (completa TASK-251: swipe en ningun lado)"
     },
     {
+      "id": "task-254",
+      "type": "task",
+      "ref": "tasks/TASK-254.json",
+      "label": "La suite E2E local no compila nada: Playwright reusa un vite preview viejo y testea el dist que haya en disco, que suele ser el bundle de PRODUCCION"
+    },
+    {
       "id": "task-255",
       "type": "task",
       "ref": "tasks/TASK-255.json",

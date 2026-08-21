@@ -1,0 +1,34 @@
+{
+  "key": "TASK-256",
+  "title": "Las 5 pruebas E2E del perfil publico pasan contra una cuenta BORRADA: 3 no tienen asercion real y una de ellas es @smoke, o sea el unico chequeo de perfiles en PRODUCCION",
+  "description": "MEDIDO POR EL ORQUESTADOR el 2026-08-20, con la prueba mas dura posible: se borro la cuenta `rafael` de dev durante la limpieza de la base, y despues se corrio `npm run e2e:profile`. LAS 6 PRUEBAS PASARON EN VERDE, 46,6 s, contra un usuario que ya no existe.\n\nEsto confirma con evidencia dura una sospecha que ya estaba anotada como pregunta abierta de la sesion, y la agrava.\n\nQUE AFIRMA REALMENTE CADA UNA, leido en e2e/specs/user-profile/user-profile.spec.ts:\n1. \"view public user profile: username, location, avatar visible @smoke\" — hace goto('rafael') y afirma que userProfilePage.username es visible. PASO CONTRA LA CUENTA BORRADA, o sea que ese locator matchea algo que tambien esta presente en la pagina de usuario-no-encontrado. No prueba que el perfil haya cargado.\n2. \"browse public cards on profile with text search filter\" — NO TIENE NINGUNA ASERCION. Todo el cuerpo esta dentro de un `if (await searchInput.isVisible())`, asi que si el input no aparece la prueba no hace nada y pasa igual.\n3. \"logged-out visitor does NOT see interest/contact buttons\" — termina en `expect(typeof visible).toBe('boolean')`, que es cierto SIEMPRE, con el boton visible o invisible. El comentario del propio test admite que no distingue.\n4. \"non-existent username shows user-not-found state\" — ESTA SI ES REAL: afirma que notFoundMessage es visible. Es la unica de las cinco que puede fallar por el motivo correcto.\n5. \"logged-in user viewing own profile sees different UI\" — EL CUERPO ES UN COMENTARIO. Navega y no afirma nada.\n\nLO QUE LO VUELVE URGENTE Y NO COSMETICO: la numero 1 esta etiquetada @smoke. Por la politica de tres niveles del proyecto, el CI de `main` corre SOLO `--grep @smoke`, y esas corren contra PRODUCCION. O sea que el unico chequeo de perfiles publicos que se ejecuta contra la base real no prueba nada. Y desde el 2026-08-20 produccion esta VACIA, con lo cual ese verde es todavia menos informativo.\n\nSEGUNDO DEFECTO, EN OTRO ARCHIVO: e2e/specs/auth/register.spec.ts linea 65 usa `username: 'rafael'` con el comentario \"Known existing username\" para probar que el registro RECHAZA nombres duplicados. Esa cuenta ya no existe en dev, asi que la precondicion de la prueba es falsa y la prueba dejo de ejercitar el rechazo por duplicado. NO VERIFICADO por corrida: register.spec.ts es flaky conocido por el rate-limit de Firebase y no se corrio para no ensuciar la medicion.\n\nCONTEXTO DE DATOS, para que quien lo tome no se confunda: dev quedo con DOS cuentas. `RafaMoose` (uid jV6gJqf3csPA4vRfO2k9Vb5ejYo2, rafael@remoose.com) es la que usa la propia suite para autenticarse. `rafael_m` (uid yoU2gaJARfe72oW7GK2GkQxSgCe2) es la que tiene 3211 cartas publicas, o sea la unica con un perfil publico poblado de verdad. La cuenta `rafael` que los tests nombran ya no existe.",
+  "acceptance_criteria": [
+    "AC1 - Las pruebas apuntan a cuentas que existen. Repuntar los tests a la cuenta correcta segun lo que cada uno necesita: las que miran un perfil publico ajeno necesitan una cuenta CON cartas publicas, y la que mira el propio perfil necesita la cuenta con la que la suite se autentica. Declarar por escrito cual eligio cada test y por que.",
+    "AC2 - LA PRUEBA CENTRAL: cada uno de los 5 tests tiene que PODER FALLAR por el motivo correcto. Demostrarlo POR MUTACION, uno por uno, con la corrida roja capturada verbatim: apuntar el test a un username inexistente tiene que ponerlo ROJO. Hoy eso da verde, y ese es exactamente el defecto. Un test que siga pasando bajo esa mutacion NO esta arreglado.",
+    "AC3 - Se eliminan las tres formas vacuas concretas, no se maquillan: el cuerpo envuelto en un `if` que lo vuelve opcional, el `expect(typeof x).toBe('boolean')`, y el test cuyo cuerpo es solo un comentario. Cada uno queda con una asercion que describa el comportamiento que el titulo promete.",
+    "AC4 - El test del visitante deslogueado prueba lo que dice: que un visitante SIN sesion no ve los botones de contacto e interes. Verificar ademas que el mecanismo de deslogueo funciona de verdad, porque hoy limpia cookies pero la sesion de Firebase vive en localStorage, asi que puede no estar deslogueando nada. Si esa es la causa de que la asercion se haya debilitado, decirlo y arreglar la causa, no la asercion.",
+    "AC5 - La etiqueta @smoke se revisa a conciencia. La numero 1 corre contra PRODUCCION en cada push a main. O queda como un chequeo que realmente prueba algo, o se le saca la etiqueta. Verificar ademas que sigue siendo de SOLO LECTURA, que es requisito de @smoke y no lo controla nada automaticamente.",
+    "AC6 - register.spec.ts linea 65 deja de depender de un username borrado. Usar una cuenta que exista, y dejar el test ejercitando de verdad el rechazo por duplicado: demostrar por mutacion que con un username inexistente el test se pone ROJO.",
+    "AC7 - Barrido del resto de la suite buscando la MISMA clase de defecto: cuerpos dentro de un if opcional, aserciones tautologicas, y tests sin ninguna asercion. Reportar lo que se encuentre aunque no se arregle en este ticket. Se sabe que hay mas: existe una nota del proyecto sobre 14 mecanismos distintos de verde vacio.",
+    "AC8 - Gate verde: npm run test:unit, npx vite build y npm run lint. Y npm run e2e:profile en verde CON las mutaciones revertidas.",
+    "AC9 - Antes de correr cualquier E2E, verificar que nadie escuche en el puerto 4173. Si hay un preview huerfano, Playwright NO compila y la corrida no prueba lo que se cree. Ver TASK-254."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "e2e",
+    "verdes-vacios",
+    "produccion"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-254"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T01:18:00.884Z",
+  "updated_at": "2026-08-21T01:18:00.884Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

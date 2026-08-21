@@ -150,6 +150,12 @@
       "type": "task",
       "ref": "tasks/TASK-255.json",
       "label": "Un cambio de estado que se cuelga deja la carta INVISIBLE: el delta de borrado del indice sale igual y el documento queda vivo"
+    },
+    {
+      "id": "task-256",
+      "type": "task",
+      "ref": "tasks/TASK-256.json",
+      "label": "Las 5 pruebas E2E del perfil publico pasan contra una cuenta BORRADA: 3 no tienen asercion real y una de ellas es @smoke, o sea el unico chequeo de perfiles en PRODUCCION"
     }
   ],
   "edges": []

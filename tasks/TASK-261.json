@@ -1,0 +1,30 @@
+{
+  "key": "TASK-261",
+  "title": "Cablear el auditor de indices huerfanos de /usernames como paso del nightly",
+  "description": "Se desprende del cierre de TASK-257 (complemento del MEDIUM-1 del reviewer). Rafael lo eligio como ticket propio, separado de TASK-260.\n\nQUE EXISTE HOY: durante TASK-257 se escribio `scratch-ac4-usernames-audit.mjs` (esta en `state/sessions/20260612T043009Z-4b555c2a/artifacts/`). Es de solo lectura: escanea /users y /usernames enteros con firebase-admin y marca como huerfano todo `/usernames/<norm>` cuyo uid apunte a un /users/<uid> inexistente, o cuyo campo `username` no sea `<norm>`. Funciono: detecto los huerfanos de dev, y detecto tambien uno que aparecio solo horas despues (el que dejo el propio nightly corriendo contra el codigo viejo).\n\nEL PROBLEMA: es un script manual, en un directorio de artifacts de sesion, que hay que acordarse de correr. La medicion del AC4 de TASK-257 fue n=4 justamente porque es a mano. Cableado al nightly, la misma verificacion se vuelve vigilancia continua con n creciente y costo cero de atencion humana.\n\nPOR QUE EL NIGHTLY Y NO EL CI DE PUSH: el nightly ya corre contra el entorno dev DESPLEGADO (`https://cranial-trading-dev.web.app`, ver `.github/workflows/nightly-e2e.yml`), ya tiene credenciales de admin cableadas desde `FIREBASE_SERVICE_ACCOUNT_DEV` (es lo que usa el admin teardown de TASK-240), y ya es un detector y no un gate de deploy. Encaja exactamente ahi.\n\nOJO CON UNA COSA MEDIDA: mientras un fix no este PUSHEADO, el nightly corre codigo viejo, porque pega contra el sitio desplegado. Eso fue literalmente lo que paso el 2026-08-21 y genero un huerfano nuevo. O sea que este auditor va a reportar huerfanos legitimos cuando develop este por detras del working tree: eso es senal correcta, no falso positivo, pero conviene que el reporte lo diga para que nadie lo lea al reves.\n\nDECISION A TOMAR DENTRO DEL TICKET: si un huerfano detectado debe poner el nightly en ROJO o solo reportar. Hay antecedente en las dos direcciones dentro del proyecto: el admin teardown de TASK-240 ROJEA a proposito (una falla ahi es una fuga real, y quedarse en verde le costo a este proyecto dos fallas silenciosas), pero el nightly tambien tiene el patron de issue unico con label `nightly-e2e` en vez de spam.",
+  "acceptance_criteria": [
+    "AC1 - El auditor deja de vivir en state/artifacts y pasa a ser codigo del repo, versionado y con su ubicacion decidida (p.ej. scripts/ o e2e/helpers/), sin cambiarle la definicion de huerfano que ya se verifico que discrimina.",
+    "AC2 - Corre como paso del workflow nightly, usando las credenciales de admin que ese workflow ya tiene cableadas desde FIREBASE_SERVICE_ACCOUNT_DEV. Si las credenciales faltan, el paso se SALTEA de forma visible en vez de fallar por una razon que no es la que interesa.",
+    "AC3 - El resultado es visible sin abrir logs: conteo de huerfanos y la lista, en el Job Summary, junto al resumen de E2E que ya produce e2e/nightly-summary.mjs.",
+    "AC4 - Decidir y DEJAR ESCRITO en el ticket si un huerfano rojea el nightly o solo reporta, con el motivo. No dejarlo implicito en el codigo.",
+    "AC5 - Verificado por MEDICION, no por lectura del YAML: sembrar un huerfano a proposito en dev, correr el paso, y mostrar que lo reporta; quitarlo, re-correr, y mostrar que reporta cero. Sin el control negativo, un paso que siempre dice cero es indistinguible de uno que funciona.",
+    "AC6 - No toca el gate de push a develop ni el deploy: es detector, igual que el resto del nightly."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "ci",
+    "data-integrity",
+    "e2e",
+    "follow-up-257"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T14:39:13.653Z",
+  "updated_at": "2026-08-21T14:39:13.653Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

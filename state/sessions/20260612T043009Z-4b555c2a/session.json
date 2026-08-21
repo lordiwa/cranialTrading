@@ -2,7 +2,7 @@
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
   "lifecycle_state": "paused",
-  "updated_at": "2026-08-21T14:27:57.652Z",
+  "updated_at": "2026-08-21T14:39:58.593Z",
   "active_task": null,
   "workflow_step": "idle",
   "next_action": "(1) PREGUNTARLE A RAFAEL POR EL PUSH de develop: 441d03a + f6b15b2 sin pushear es lo que mantiene vivos los dos sintomas. Gate 1 con auto_push_after_close en FALSE, o sea que nunca se pushea sin que lo diga el. (2) Abrir los 3 follow-ups del cierre de TASK-257, con su OK: (a) MEDIUM-1, candado de regresion del guard provisioningUids en la capa store, que el reviewer demostro que SI es testeable aunque el timing del SDK no lo sea, mas la opcion de cablear scratch-ac4-usernames-audit.mjs como paso del nightly; (b) LOW-1 y LOW-2, los dos residuales que el developer no habia declarado, ventana de snapshot viejo del getDoc y multi-tab; (c) el hallazgo de normalizacion de /usernames/RafaMoose. (3) Seguir el loop ya acordado con lo que queda del goal: keys:TASK-258,TASK-259, loop_auth SIN CAMBIOS (auto_close true, auto_consolidate true, uat_delegated FALSE, auto_push FALSE). DISCIPLINA: puerto 4173 libre antes de E2E; pre-commit >2 min, timeout 540000 ms; commit con pathspec limitado.",
@@ -98,6 +98,14 @@
     {
       "at": "2026-08-21T05:29:34.785Z",
       "what": "Rafael pidio PAUSA con /clear antes de arrancar el loop. GOAL DEL LOOP YA ACORDADO, no hace falta volver a preguntarlo: keys:TASK-257,TASK-258,TASK-259. GATES: dejar loop_auth como esta (auto_close_on_green_review true, auto_consolidate true, uat_delegated_to_orchestrator FALSE, auto_push_after_close FALSE, auto_version_bump FALSE). O sea el loop cierra con review verde y no frena cada 5, pero NUNCA pushea y frena en cualquier ticket uat-only."
+    },
+    {
+      "at": "2026-08-21T14:39:58.594Z",
+      "what": "2026-08-21 Rafael decidio PUSHEAR AL FINAL DE LA TANDA, junto con TASK-258 y TASK-259, y no ahora. Motivo: la suite E2E completa (~13 min) corre una vez por tanda justo antes del push, que es lo que dice el propio CLAUDE.md, asi que una sola corrida cubre los 3 tickets en vez de tres. COSTO ACEPTADO A SABIENDAS: una noche mas de nightly regenerando el huerfano /usernames/rafael en dev, y el fix de LECTURA sin desplegar, o sea que /@rafael en produccion sigue sirviendo el perfil de otra persona hasta el push."
+    },
+    {
+      "at": "2026-08-21T14:39:58.594Z",
+      "what": "2026-08-21 Rafael eligio abrir 3 de los 4 follow-ups del cierre de TASK-257: TASK-260 (candado de regresion del guard provisioningUids, que el reviewer demostro que SI es testeable en la capa store), TASK-261 (cablear el auditor de huerfanos al nightly), TASK-262 (los dos residuales no declarados: ventana de snapshot viejo del getDoc, y multi-tab). NO se abrio el cuarto, el de normalizacion de /usernames (RafaMoose guardado sin normalizar mientras normalizeUsername hace toLowerCase): queda como pregunta abierta, sin ticket."
     }
   ],
   "subagent_results": [

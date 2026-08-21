@@ -1,0 +1,29 @@
+{
+  "key": "TASK-260",
+  "title": "El guard provisioningUids no tiene candado de regresion, y su semantica SI es testeable en la capa store",
+  "description": "Se desprende del cierre de TASK-257 (MEDIUM-1 del reviewer, review FULL de 441d03a). Causa nombrada, no supuesta.\n\nQUE PASA HOY: `src/stores/auth.ts` tiene un guard `provisioningUids` (un Set a nivel de modulo) que evita que la rama de self-heal de `loadUserData` corra mientras el flujo explicito de register()/loginWithGoogle() reserva el username y escribe /users/{uid}. Ese guard es lo unico que impide que se generen indices huerfanos en /usernames. NADA automatizado se pone rojo si alguien quita o reordena el check `!provisioningUids.has(userId)` en un refactor futuro. El unico detector que existe hoy es un script manual que vive en `state/sessions/.../artifacts/scratch-ac4-usernames-audit.mjs`, que hay que acordarse de correr a mano.\n\nPOR QUE ESTO CONTRADICE LO QUE SE ASUMIO EN TASK-257: el developer declaro esa mitad como dificil de testear de forma deterministica sin mockear el SDK, y el ticket se cerro con medicion en vez de test, que es lo que el AC4 pedia. El reviewer, en contexto fresco, refino esa afirmacion: lo genuinamente intesteable es el TIMING con que el SDK de Firebase dispara onAuthStateChanged. La SEMANTICA del guard NO lo es.\n\nCOMO SE TESTEA (camino concreto que dejo el reviewer, no una idea vaga): con la misma maquinaria de mocks que ya usan los 8 archivos `tests/unit/stores/auth.*.test.ts`. Mockear las deps, retener el `reserveUsername` de register() en una promesa controlada, invocar `loadUserData(uid)` en el medio de esa ventana, y afirmar que `reserveUniqueUsername` y el `setDoc` del self-heal NO corren. Y la mitad simetrica, que es la que evita un candado vacuo: despues de que el finally limpia el flag, esas mismas llamadas SI deben correr.\n\nVALOR: TASK-257 arreglo un bug de datos de produccion (un indice huerfano hace que una URL de perfil publico resuelva a la persona equivocada; medido vivo en prod, /usernames/rafael -> doc rafael_mtg). Sin candado, ese arreglo puede desaparecer en un refactor sin que nadie se entere hasta que vuelvan a aparecer huerfanos.",
+  "acceptance_criteria": [
+    "AC1 - Test unitario en la capa store que falle si se saca el check de provisioningUids de la rama de self-heal de loadUserData: con el flujo explicito en vuelo (reserveUsername retenido en una promesa controlada), invocar loadUserData(uid) y afirmar que reserveUniqueUsername y el setDoc del self-heal NO se llaman.",
+    "AC2 - Mitad simetrica, para que el candado no sea vacuo: despues de que el finally limpia el flag, esas mismas llamadas SI corren. Un candado que solo prueba la mitad 'no corre' pasaria igual si el self-heal estuviera roto del todo.",
+    "AC3 - Cubrir los DOS flujos, no uno: register() y loginWithGoogle(). Son hermanos exactos (Regla 1/6 del proyecto) y el guard esta aplicado a los dos.",
+    "AC4 - Evidencia de rojo por MUTACION, capturada verbatim: quitar el check del guard en el codigo, correr los tests nuevos, mostrar que se ponen rojos por el motivo correcto, restaurar y mostrar el verde. Sin esto no hay prueba de que el candado discrimine.",
+    "AC5 - Gate verde: npm run test:unit, npx vite build, npm run lint."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "test-coverage",
+    "auth",
+    "data-integrity",
+    "follow-up-257"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T14:38:45.876Z",
+  "updated_at": "2026-08-21T14:38:45.876Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,0 +1,28 @@
+{
+  "key": "TASK-262",
+  "title": "Dos residuales del guard provisioningUids que el developer no habia declarado: ventana de snapshot viejo y multi-tab",
+  "description": "Se desprende del cierre de TASK-257 (LOW-1 y LOW-2 del reviewer, review FULL de 441d03a). Los encontro el reviewer en contexto fresco; el developer habia declarado UN residual, el del orden de eventos del SDK, y estos son DOS escenarios distintos que conviene tener nombrados en vez de tapados bajo esa etiqueta general.\n\nCONTEXTO: el guard `provisioningUids` (Set a nivel de modulo en `src/stores/auth.ts`) hace que la rama de self-heal de `loadUserData` se saltee mientras el flujo explicito de register()/loginWithGoogle() esta reservando el username y escribiendo /users/{uid}. Si el self-heal corre igual, genera una SEGUNDA reserva con un username derivado de displayName/email.split('@')[0], y el indice del que pierde queda huerfano.\n\nRESIDUAL 1 - VENTANA DE SNAPSHOT VIEJO. El check del flag esta DESPUES del `await getDoc` dentro de loadUserData. Eso es deliberado y esta bien: cierra la ventana de adelante. Pero si la respuesta de ese getDoc llega con un not-exists VIEJO despues de que el setDoc explicito ya aterrizo y el finally ya limpio el flag, el self-heal corre igual y vuelve a generar el huerfano. Hardening barato que propuso el reviewer: capturar el flag TAMBIEN antes de emitir el getDoc, y saltear si estuvo puesto en cualquiera de los dos momentos.\n\nRESIDUAL 2 - MULTI-TAB. `provisioningUids` es un Set por contexto JS. Firebase Auth propaga el estado de autenticacion a otras pestañas abiertas del mismo origen. El listener de la pestaña B corre loadUserData SIN el flag puesto (el flag vive en la pestaña A) y puede self-healear durante el registro que esta ocurriendo en A. Un Set en memoria no puede ver otra pestaña; cerrar esto de verdad requiere otra cosa (coordinacion entre pestañas, o mover la deteccion a una capa que las dos vean).\n\nPOR QUE SON LOW Y NO ALTO: el fix de LECTURA de TASK-257 (resolveUsernameToUid verifica que el doc resuelto declare el username pedido) ya evita la consecuencia grave, que era servir el perfil de otra persona. Lo que queda es higiene de base: se ensucia /usernames con punteros muertos. Frecuencia esperada baja en los dos casos.\n\nANTES DE ARREGLAR, MEDIR: ninguno de los dos fue observado en vivo. Fueron derivados por lectura del codigo por el reviewer, y el proyecto tiene la regla de no abrir arreglo sin causa medida. Este ticket existe para NOMBRARLOS y decidir con datos, no para parchear a ciegas.",
+  "acceptance_criteria": [
+    "AC1 - Determinar si el residual 1 (snapshot viejo del getDoc) es alcanzable de verdad en este codigo, o si algo mas rio arriba ya lo impide. Trazar y declararlo por escrito, nombrando archivo y linea, antes de proponer arreglo.",
+    "AC2 - Lo mismo para el residual 2 (multi-tab): determinar si es alcanzable, idealmente reproduciendolo con dos pestañas contra dev y midiendo /usernames antes y despues. Si no se puede reproducir, decirlo y decir por que, en vez de asumir que existe.",
+    "AC3 - Para cada residual que resulte ALCANZABLE: arreglarlo con candado de regresion, y evidencia de rojo por mutacion capturada verbatim. Para cada uno que resulte NO alcanzable: cerrarlo por escrito con la traza que lo descarta, sin tocar codigo.",
+    "AC4 - No romper el guard que ya funciona: la medicion de TASK-257 (4 corridas de e2e:auth, cero huerfanos) tiene que seguir dando cero despues del cambio. Re-medirla, no suponerla.",
+    "AC5 - Gate verde: npm run test:unit, npx vite build, npm run lint."
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "auth",
+    "data-integrity",
+    "follow-up-257"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-21T14:39:39.240Z",
+  "updated_at": "2026-08-21T14:39:39.240Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

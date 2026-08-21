@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T14:27:17.095Z",
+  "generated_at": "2026-08-21T14:39:39.240Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1434,6 +1434,24 @@
       "title": "Barrido sistematico de verdes vacios en el resto de la suite E2E: 45 usos de if isVisible sin clasificar, 2 aserciones tautologicas confirmadas y el @smoke de matches sin datos que afirmar",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-260",
+      "title": "El guard provisioningUids no tiene candado de regresion, y su semantica SI es testeable en la capa store",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-261",
+      "title": "Cablear el auditor de indices huerfanos de /usernames como paso del nightly",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-262",
+      "title": "Dos residuales del guard provisioningUids que el developer no habia declarado: ventana de snapshot viejo y multi-tab",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

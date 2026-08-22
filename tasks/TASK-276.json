@@ -1,0 +1,26 @@
+{
+  "key": "TASK-276",
+  "title": "El diagnostico de cardinalidad del card_index no lo lee nadie: sin ruta de lectura, el sensor no contesta nada",
+  "description": "MEDIDO POR EL REVIEWER DE TASK-275 el 2026-08-22, con grep sobre el arbol: la cadena cardIndexHealth tiene UN SOLO hit en todo el repositorio, el setDoc que lo escribe. No hay script admin, no hay UI, no hay consulta de ningun tipo que lea ese documento.\n\nCONSECUENCIA CONCRETA: TASK-275 dejo un sensor que detecta la divergencia y persiste un diagnostico por cuenta, pero ese dato es hoy inconsultable. La opcion A se eligio justamente para poder decir en una semana en QUE CUENTAS pasa y con que frecuencia, y sin ruta de lectura esa pregunta sigue sin poder contestarse aunque el sensor funcione perfecto.\n\nESTE ES UN ERROR DE ALCANCE DEL ORQUESTADOR, NO DEL DEVELOPER: el encargo de TASK-275 especifico la escritura y omitio la lectura. Queda escrito asi para que nadie lo lea como una falla de implementacion.\n\nDEPENDENCIA REAL, NO FORMAL: mientras la regla de firestore.rules de TASK-275 no este desplegada, no hay ningun documento que leer, porque el setDoc rebota con permission-denied y el catch se lo traga en silencio.\n\nForma sugerida, no impuesta: un script en artifacts/ o scripts/ con firebase-admin que recorra las cuentas y liste las que tengan documento de diagnostico, en la linea de los scratch-* que este proyecto ya usa para medir (artifacts/scratch-index-divergence.mjs, artifacts/scratch-public-index-coverage.mjs).",
+  "acceptance_criteria": [
+    "AC1 - Existe una ruta de lectura que, corrida contra un entorno, devuelve la lista de cuentas con diagnostico de cardinalidad presente, con sus conteos y su timestamp. No alcanza con poder leer una cuenta puntual que ya se conoce: la pregunta es en QUE cuentas pasa, o sea que hay que poder recorrer.",
+    "AC2 - Demostrado con salida capturada contra cranial-trading-dev. Una ruta de lectura que nunca se corrio contra datos reales es una suposicion, y este proyecto ya tiene historia medida de sensores que pasaban sin probar nada.",
+    "AC3 - El caso de CERO cuentas divergentes se distingue explicitamente del caso de fallo de la consulta. Un resultado vacio nunca puede leerse como sano por defecto: es el modo de falla que este proyecto viene persiguiendo todo el mes.",
+    "AC4 - Declarar que hace el script cuando una cuenta NO tiene documento de diagnostico. Hay dos causas distintas que no se pueden confundir: nunca hubo divergencia, o la regla no estaba desplegada y la escritura rebotaba."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "card-index",
+    "observabilidad"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-22T04:04:35.951Z",
+  "updated_at": "2026-08-22T04:04:35.951Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

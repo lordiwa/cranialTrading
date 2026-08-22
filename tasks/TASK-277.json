@@ -1,0 +1,28 @@
+{
+  "key": "TASK-277",
+  "title": "Un documento de diagnostico que se sobreescribe dice la ultima vez que paso, no con que frecuencia pasa",
+  "description": "LO MARCO EL PROPIO DEVELOPER EN SU HAND-OFF DE TASK-275, en contra de su propio trabajo, el 2026-08-22.\n\nEl sensor de cardinalidad escribe users/<uid>/diagnostics/cardIndexHealth con docCount, indexCount, difference y detectedAt. Es exactamente lo que pedia el alcance. El problema es el alcance: un documento por cuenta que se pisa a si mismo en cada deteccion solo puede contestar CUANDO FUE LA ULTIMA VEZ. La pregunta que motivo elegir la opcion A sobre la B fue con QUE FRECUENCIA REAL pasa, para recien despues decidir si vale la pena atacar la carrera de escritura, que es la causa trazada y toca el subsistema mas danado del proyecto.\n\nO sea que, tal como quedo, el sensor no puede sostener la decision para la que se construyo.\n\nESTE ES UN ERROR DE ALCANCE DEL ORQUESTADOR, NO DEL DEVELOPER. El developer implemento lo pedido y ademas senalo la brecha sin que nadie se la preguntara, en vez de dejarla pasar.\n\nCONTEXTO DE COSTO, PARA NO SOBREDIMENSIONAR ESTO: un contador acumulado es barato (un increment en el mismo documento que ya se escribe). Un documento por deteccion es mas informativo pero abre una coleccion que crece sin techo en el peor caso. La eleccion entre las dos formas es parte del ticket, no esta decidida.\n\nADVERTENCIA MEDIDA QUE HAY QUE RESPETAR AL INTERPRETAR CUALQUIER CONTEO (LOW-3 del reviewer de TASK-275): no todo diagnostico registrado va a ser este bug. Hay al menos dos falsos positivos transitorios conocidos, un documento que nace entre la lectura del indice y la lectura agregada, y un rebuild legitimo en vuelo. Un contador que los mezcle va a sobreestimar la frecuencia, que es justo el numero que este ticket existe para dar bien.",
+  "acceptance_criteria": [
+    "AC1 - Elegir entre contador acumulado y documento por deteccion, y dejar el motivo escrito en el ticket. La eleccion NO esta tomada de antemano; el criterio que decide es si la coleccion puede crecer sin techo en el peor caso.",
+    "AC2 - El dato registrado permite contestar, para una cuenta dada, cuantas veces se detecto divergencia y en que ventana de tiempo. Si no puede contestar eso, no cumple el proposito y da igual la forma que tenga.",
+    "AC3 - Los falsos positivos transitorios conocidos quedan distinguibles del caso real, o, si no se pueden distinguir, queda escrito en el propio dato que el conteo es un techo y no una medicion limpia. Un numero que se va a citar despues no puede esconder su propio margen.",
+    "AC4 - Control negativo con salida capturada: demostrar que el contador AVANZA ante divergencias sembradas repetidas y que NO avanza en el caso sano. Misma exigencia que goberno TASK-275 por el AC5."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "card-index",
+    "observabilidad"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-276"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-22T04:04:57.892Z",
+  "updated_at": "2026-08-22T04:04:57.892Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

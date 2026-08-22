@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-22T03:25:30.054Z",
+  "generated_at": "2026-08-22T04:04:57.892Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1528,7 +1528,19 @@
     {
       "key": "TASK-275",
       "title": "El card_index queda con huecos que el uso NO cierra, y el conjunto faltante cambia entre sesiones",
-      "status": "in_progress",
+      "status": "done",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-276",
+      "title": "El diagnostico de cardinalidad del card_index no lo lee nadie: sin ruta de lectura, el sensor no contesta nada",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-277",
+      "title": "Un documento de diagnostico que se sobreescribe dice la ultima vez que paso, no con que frecuencia pasa",
+      "status": "todo",
       "priority": "medium"
     }
   ]

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-274",
+  "title": "El teardown de add-card no cubre el camino de merge del modal: si la carta ya existe, suma quantity y nadie lo revierte",
+  "description": "HALLAZGO DEL REVIEWER DE TASK-271 (MEDIUM-3), leido en el codigo, con el estado de la cuenta medido.\n\nAddCardModal tiene DOS desenlaces medidos el 2026-08-17 (SCRUM-35 bug numero 1): crear un documento nuevo, O FUSIONAR contra una fila existente del mismo print (mismo scryfallId, edicion, condicion, foil y estado) sumandole 1 a quantity sin crear ningun documento.\n\ncollection-crud.spec.ts \"add card\" maneja los dos: ademas de buscar documentos nuevos, detecta el bump de quantity y lo revierte con restoreQuantities. preferences-crud.spec.ts \"add wishlist card\", agregado en el commit 921f717, copio SOLO LA MITAD: busca documentos nuevos y nada mas.\n\nConsecuencia si una corrida cae en el camino de merge: no aparece ningun documento nuevo, el poll agota sus 15 s y el test se pone ROJO con un mensaje enganoso (\"no se encontro la carta\"), mientras el +1 de quantity queda sin revertir sobre una fila que el test no creo.\n\nATENUANTES, y son reales: el rojo es ruidoso (no es un verde vacio), el dano es un +1 acotado y no crecimiento sin limite, y despues del AC9 de TASK-271 no queda ninguna fila donde fusionar, porque cada corrida borra la suya. O sea que el estado estable es autoconsistente. El caso vuelve a ser posible solo si una corrida se pone roja despues de crear y deja su fila colgada.\n\nCONTRA-EVIDENCIA DE PROBABILIDAD, medida: las dos corridas del 2026-08-21 (20:49 y 23:49) NO fusionaron entre si — dejaron DOS documentos Lightning Bolt separados, no uno con quantity 2. La explicacion mas probable es que el primer resultado de Scryfall vario de edicion entre corridas, lo que hace que las dos filas no sean el mismo print. O sea que el camino de merge existe pero no es el habitual aca.",
+  "acceptance_criteria": [
+    "AC1 - Reproducir el camino de merge A PROPOSITO antes de arreglar nada: sembrar una fila del mismo print que el test va a agregar, correr, y mostrar con salida verbatim que hoy el test se pone rojo con el mensaje enganoso y que la quantity queda sumada sin revertir. Sin esa reproduccion el arreglo seria a ciegas.",
+    "AC2 - El teardown detecta el bump de quantity ademas del documento nuevo, y lo revierte con restoreQuantities, respetando sus dos alcances (docScope e indexScope) como ya hace collection-crud.spec.ts. NO ampliar esos alcances a toda la cuenta: en TASK-240 se midio que un alcance global le revirtio la quantity a una carta ajena que habia tocado otro escritor.",
+    "AC3 - Revertir la quantity tiene que tocar EL DOCUMENTO Y SU ENTRADA EN card_index. Revertir solo el documento deja doc y entrada en desacuerdo permanente, que es la clase de dano de TASK-238 y no la repara nada.",
+    "AC4 - Control negativo: demostrar con salida verbatim que el sensor SE PONE ROJO si la reversion no ocurre.",
+    "AC5 - Barrer si algun otro test que use AddCardModal tiene la misma mitad faltante, y decir explicitamente cuales revisaste y cuales no."
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "e2e",
+    "test-quality"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-271"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-22T01:39:23.766Z",
+  "updated_at": "2026-08-22T01:39:23.766Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-22T00:26:02.834Z",
+  "generated_at": "2026-08-22T02:41:41.285Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1504,7 +1504,7 @@
     {
       "key": "TASK-271",
       "title": "La suite E2E ensucia dev en cada corrida y ademas FABRICA los huerfanos de /usernames que TASK-268 investiga",
-      "status": "in_review",
+      "status": "done",
       "priority": "high"
     },
     {
@@ -1518,6 +1518,18 @@
       "title": "getTestAdmin() se apaga si desaparece la cuenta TEST_USER_A_EMAIL, y con eso saltea tests que no la usan",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-274",
+      "title": "El teardown de add-card no cubre el camino de merge del modal: si la carta ya existe, suma quantity y nadie lo revierte",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-275",
+      "title": "Una importacion de 1878 cartas perdio 6 en card_index, y son exactamente las 6 primeras en orden de id",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

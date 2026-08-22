@@ -1,0 +1,29 @@
+{
+  "key": "TASK-275",
+  "title": "Una importacion de 1878 cartas perdio 6 en card_index, y son exactamente las 6 primeras en orden de id",
+  "description": "MEDIDO el 2026-08-22 contra cranial-trading-dev, sobre la cuenta de QA (uid 90PkdmyFKrVm1RLDXjInJdlYXy73) que se sembro el 2026-08-21 y por lo tanto NO arrastra historia: es una reproduccion limpia, no un residuo viejo.\n\nNUMEROS: 1880 documentos en users/<uid>/cards, 1872 entradas unicas en card_index (un solo chunk, chunk_0, con campo count coherente en 1872), CERO entradas duplicadas y CERO fantasmas (ninguna entrada apunta a un documento inexistente). Faltan 8 documentos en el indice.\n\nLos 8 se parten en dos grupos con causas distintas:\n\nGRUPO A, 2 documentos, ya explicado por TASK-234: las dos cartas Lightning Bolt de wishlist, creadas por la interfaz a las 20:49:31Z y 23:49:33Z por preferences-crud.spec.ts. Una carta recien agregada frecuentemente no llega al indice. SIN VERIFICAR y hay que verificarlo antes de sacar conclusiones: puede que el indice EXCLUYA wishlist por diseno, en cuyo caso estas dos no faltan, simplemente no corresponden. Los numeros no permiten distinguir los dos casos: 1878 de venta menos 6 da 1872 igual.\n\nGRUPO B, 6 documentos, ESTO ES LO NUEVO: seis cartas con status sale, TODAS con createdAt identico 2026-08-21T20:07:38.389Z, o sea de la importacion masiva con la que se sembro la cuenta. Sus ids son 08nexzl4dCaooAUdvp99 (Primal Growth), 0EY51RPdPXPrBGvj5czQ (Sosuke, Son of Seshiro), 0W8JuAkCRtkXHQBd8e2J (Signal the Clans), 0nzhvjT6qhn6H3aoyLvw (Renegade Doppelganger), 1KHng2c7z1Nm0fltCUrA (Honden of Nights Reach) y 1Ne1Hq2tgoVcKhPRMnWC (Finest Hour).\n\nLO QUE HACE QUE ESTO SEA UNA FORMA Y NO RUIDO: esos 6 son EXACTAMENTE los 6 primeros documentos en orden de id ascendente, que es el orden en que Firestore devuelve una coleccion sin ordenar. Que los 6 perdidos de 1878 sean justo la cabeza del orden no es plausible por azar. Encaja con lo que el proyecto ya tiene documentado sobre que el indice se arma POR POSICION y que pierde tramos.\n\nPOR QUE IMPORTA MAS DE LO QUE SUGIERE EL NUMERO: la busqueda por nombre se construye A PARTIR del indice, asi que esas 6 cartas estan invisibles para quien busque, aunque el documento exista y la carta este a la venta. Seis de 1878 es 0,3 por ciento en esta cuenta; lo que no se sabe es si el tramo perdido es de tamano fijo o proporcional, y esa es justamente la pregunta que decide si en una cuenta de 100 mil cartas se pierden 6 o se pierden 300. El 80 por ciento del mercado objetivo tiene 25 mil cartas o mas.\n\nNO SE TOCO NADA. La divergencia se deja VIVA a proposito como reproduccion, igual que se hizo con los huerfanos /usernames/qa y /usernames/qa2 para TASK-268. Repararla antes de entender la causa borraria la evidencia.\n\nInstrumento: artifacts/scratch-index-divergence.mjs",
+  "acceptance_criteria": [
+    "AC1 - Determinar si el tramo perdido es de TAMANO FIJO o PROPORCIONAL al total. Es la pregunta que decide la gravedad real. Medirlo importando lotes de tamanos distintos (por ejemplo 100, 1000 y 5000 cartas) en una cuenta desechable y contando documentos contra entradas en cada caso. Sin esto, la gravedad es una suposicion.",
+    "AC2 - Confirmar o descartar que los perdidos sean SIEMPRE la cabeza del orden. En esta medicion fueron los 6 primeros por id; si en otra importacion son los 6 ultimos, o 6 del medio, la causa es otra y la hipotesis de la cabeza hay que tirarla. Reportar el resultado aunque contradiga la hipotesis.",
+    "AC3 - Responder la ambiguedad del grupo A: el card_index INCLUYE o EXCLUYE las cartas con status wishlist? Leer el codigo que construye el indice y confirmarlo midiendo. Segun la respuesta, las 2 Lightning Bolt son un sintoma o no son nada, y hoy los numeros no distinguen los dos casos.",
+    "AC4 - Localizar en el codigo el punto exacto donde se pierden las entradas, con archivo y linea, y explicar el mecanismo. No alcanza con reparar el sintoma: TASK-208 ya documenta que un indice vaciado pasa los tres chequeos de salud y no se repara solo, asi que una reparacion sin causa se vuelve a romper en la proxima importacion.",
+    "AC5 - Control negativo: demostrar con salida capturada que el sensor que se agregue SE PONE ROJO ante una divergencia sembrada a proposito. Un chequeo de coherencia que nunca se vio fallar no sirve, y este proyecto ya tiene tres chequeos de salud que no detectan un indice vaciado.",
+    "AC6 - NO reparar la divergencia de la cuenta de QA hasta que la causa este entendida. Es la unica reproduccion limpia que existe, sobre una cuenta sembrada el 2026-08-21 y sin historia previa."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "card-index",
+    "importacion",
+    "busqueda"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-22T01:42:22.586Z",
+  "updated_at": "2026-08-22T01:42:22.586Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -54,34 +54,61 @@ test.describe('Registration', () => {
     });
     await registerPage.submit();
 
+    let registrationSucceeded = false;
     try {
       await expect(registerPage.verificationScreen).toBeVisible({ timeout: 15_000 });
+      registrationSucceeded = true;
     } finally {
       // Runs whether the assertion above passed or failed: a red assertion
       // does not mean registration didn't happen — the account may still
       // exist and still need deleting.
       const uid = await admin!.getUidByEmail(email);
+
+      // Review MEDIUM-1: a null `uid` here does NOT mean cleanup already
+      // happened — it can equally mean getUidByEmail lagged or is broken.
+      // The old code let a null uid make the ENTIRE post-cleanup check block
+      // a no-op (it lived inside `if (uid)`), so a broken lookup passed the
+      // test GREEN with all three pieces still live — the lookup that
+      // decides whether to clean up was also the only thing deciding whether
+      // cleanup was verified, so its own failure silenced the sensor
+      // instead of tripping it. If the verification screen was seen, the
+      // account demonstrably exists, so `uid` being null at this point is
+      // itself a defect that must redden here, not be swallowed.
+      if (registrationSucceeded) {
+        expect
+          .soft(uid, 'TASK-271: registration succeeded but getUidByEmail(email) returned null — cannot verify or perform cleanup')
+          .not.toBeNull();
+      }
+
       if (uid) {
         await admin!.deleteAccount({ uid, usernameNorm });
+      }
 
-        // AC3's sensor: a teardown call that returns without throwing is not
-        // proof it deleted anything — TASK-240's whole premise is that a
-        // "green" teardown can still leak. Re-check all THREE pieces by the
-        // same identity used to delete them. `expect.soft` on purpose: a
-        // hard `expect` stops at the first failure (measured — an earlier
-        // draft's Auth-only hard assertion masked whether /usernames or
-        // /users were ever checked at all when Auth failed first). Soft
-        // assertions all run regardless of one another, so a partial leak
-        // (e.g. Auth+users deleted but /usernames orphaned — precisely the
-        // TASK-268 damage class) reds out exactly the assertion that
-        // detected it and none of the others. Verified live per-field (see
-        // this ticket's commit message for the three captured red runs, one
-        // per disabled step, plus the final green) by disabling each of
-        // deleteAccount's three steps one at a time.
+      // AC3's sensor: a teardown call that returns without throwing is not
+      // proof it deleted anything — TASK-240's whole premise is that a
+      // "green" teardown can still leak. Re-check all THREE pieces by the
+      // identity captured at creation time (AC6), with `expect.soft` so all
+      // three are always evaluated regardless of one another — a hard
+      // `expect` stops at the first failure, which would mask whether
+      // /usernames or /users were ever checked at all once Auth failed
+      // first (measured on an earlier draft of this test). A partial leak
+      // (e.g. Auth+users deleted but /usernames orphaned — precisely the
+      // TASK-268 damage class) reds out exactly the assertion that detected
+      // it and none of the others. Verified live (see this ticket's commit
+      // message for the captured red run, with all three deletion steps in
+      // `deleteAccount` disabled at once and all three messages present in
+      // the same failure, plus the final green).
+      //
+      // /usernames is keyed by `usernameNorm`, which this test always knows
+      // — unlike the Auth/`/users` checks below, it never needed `uid`, so
+      // (review MEDIUM-1) it must not live inside `if (uid)` where a lookup
+      // failure would silence it too.
+      const usernameDocAfter = await admin!.db.doc(`usernames/${usernameNorm}`).get();
+      expect.soft(usernameDocAfter.exists, 'TASK-271: /usernames entry was not deleted').toBe(false);
+
+      if (uid) {
         const uidAfter = await admin!.getUidByEmail(email);
         expect.soft(uidAfter, 'TASK-271: Auth account was not deleted').toBeNull();
-        const usernameDocAfter = await admin!.db.doc(`usernames/${usernameNorm}`).get();
-        expect.soft(usernameDocAfter.exists, 'TASK-271: /usernames entry was not deleted').toBe(false);
         const userDocAfter = await admin!.db.doc(`users/${uid}`).get();
         expect.soft(userDocAfter.exists, 'TASK-271: /users doc was not deleted').toBe(false);
       }

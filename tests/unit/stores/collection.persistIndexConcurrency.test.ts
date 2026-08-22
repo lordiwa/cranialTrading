@@ -207,7 +207,19 @@ describe('collection store: bounded-concurrency card_index chunk writes (TASK-15
       // 7 chunk writes + addCard's own card-document write (TASK-255 round 1
       // HIGH-1 fix — that write is real, but resolves immediately above and
       // is not part of what this test is measuring).
-      expect(mockSetDoc).toHaveBeenCalledTimes(8)
+      //
+      // TASK-275 added a THIRD kind of setDoc on this path: the card_index
+      // cardinality diagnostic, which this file's mocked getCountFromServer
+      // (count 0, against a 7-chunk index) makes look divergent. So a raw
+      // setDoc call count no longer isolates what this test measures —
+      // count the chunk writes by payload shape, the same dispatch the mock
+      // implementation above already uses.
+      const chunkWrites = mockSetDoc.mock.calls.filter(
+        ([, data]) => Array.isArray((data as { cards?: unknown } | undefined)?.cards)
+      )
+      expect(chunkWrites).toHaveLength(7)
+      // ...and addCard's own card-document write still happened alongside them.
+      expect(mockSetDoc.mock.calls.length).toBeGreaterThanOrEqual(8)
       // PARALLELISM: more than one write was in flight at once (sequential
       // code would never exceed 1).
       expect(peakInFlight).toBeGreaterThan(1)

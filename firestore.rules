@@ -157,6 +157,21 @@ service cloud.firestore {
         allow write: if request.auth.uid == userId;
       }
 
+      // TASK-275: diagnóstico de salud del card_index. El cliente escribe
+      // users/{uid}/diagnostics/cardIndexHealth SOLO cuando detecta que la
+      // cantidad de entradas del índice cargado no coincide con el conteo real
+      // de documentos de /cards (una carta sin entrada es invisible para la
+      // búsqueda, que se construye A PARTIR del índice). Sin divergencia no se
+      // escribe nada.
+      //
+      // Owner-only, igual que /cards y /card_index: el documento revela el
+      // tamaño de la colección del usuario, que es privado por las mismas
+      // razones de TASK-087/TASK-214/TASK-215.
+      match /diagnostics/{diagnosticId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if request.auth.uid == userId;
+      }
+
       // SCRUM-70: solicitudes de compra (carrito enviado por un visitante)
       // Crear: cualquiera (visitantes anónimos sin auth) puede enviar un carrito,
       //        pero debe llegar con status 'pending' (guardia mínima de forma).

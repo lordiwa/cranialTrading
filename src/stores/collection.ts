@@ -27,6 +27,7 @@ import {
 import { t } from '../composables/useI18n'
 import { getCardsByIds } from '../services/scryfallCache'
 import { buildEnrichmentPatch } from '../utils/cardEnrichment'
+import { evaluateIndexCardinality } from '../utils/cardIndexCardinality'
 import { cardImageProxyUrl } from '../utils/cardImageUrl'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import { getCardsNeedingPublicSync, isPossiblyPublicCard } from '../utils/publicSyncFilter'
@@ -623,6 +624,69 @@ export const useCollectionStore = defineStore('collection', () => {
      */
     let _lastWrittenTotalChunks: number | null = null
 
+    /**
+     * TASK-275: sensor de CARDINALIDAD del card_index. DETECCIÓN PURA — no
+     * repara, y eso es deliberado.
+     *
+     * Qué agujero tapa: `indexLooksComplete` más abajo mira cuatro condiciones
+     * (versión, duplicados, contigüidad desde 0, último chunk exactamente
+     * lleno) y NINGUNA compara contra la fuente de verdad. Medido contra la
+     * cuenta de QA de dev el 2026-08-22: 1880 documentos en
+     * users/<uid>/cards contra 1879 entradas en un solo chunk contiguo y sin
+     * duplicados — las cuatro condiciones dicen "sano" mientras falta una
+     * carta, y la carta que falta es invisible para la búsqueda, que se
+     * construye A PARTIR del índice. La suite E2E completa cargó esa colección
+     * decenas de veces y el hueco no se cerró nunca, justamente porque cada
+     * carga vio un índice "completo" según esos criterios.
+     *
+     * Por qué NO dispara buildCardIndex: reconstruir la cuenta entera desde
+     * users/<uid>/cards no es gratis en una cuenta de 100 mil cartas, y el
+     * único caso conocido hoy es una cuenta de prueba durante una suite E2E,
+     * que no se parece al uso de nadie. Primero se mide la frecuencia real;
+     * decidir si vale una reparación automática es otro ticket (la carrera
+     * cliente-contra-servidor del persistido, trazada en TASK-275). Si alguien
+     * agrega acá una reparación, está cambiando el alcance, no completándolo.
+     *
+     * Por qué persiste en vez de un console.warn: este proyecto no tiene
+     * NINGUNA superficie de telemetría en src/ (medido por grep el
+     * 2026-08-22), así que un warn sólo lo ve quien tenga devtools abierto y
+     * no contesta la pregunta de frecuencia que motiva todo esto.
+     *
+     * Coste: UNA lectura agregada (getCountFromServer, el mismo mecanismo que
+     * addCard ya usa) por carga de índice — no por carta, y no en un watcher.
+     * En el caso SANO no escribe absolutamente nada.
+     */
+    const checkIndexCardinality = async (userId: string, indexCount: number): Promise<void> => {
+        try {
+            const colRef = collection(db, 'users', userId, 'cards')
+            const countSnap = await getCountFromServer(colRef)
+            const report = evaluateIndexCardinality(countSnap.data().count, indexCount)
+
+            if (!report.diverged) return
+
+            console.warn(
+                `[TASK-275] card_index DIVERGE en cardinalidad: ${report.docCount} documentos contra ` +
+                `${report.indexCount} entradas (diferencia ${report.difference}). Los cuatro chequeos de ` +
+                `indexLooksComplete NO ven esto. Detección pura: no se dispara ninguna reparación.`
+            )
+
+            // Sólo acá se escribe. Un documento por cuenta, sobreescrito: es un
+            // estado actual, no una bitácora que crezca sin límite.
+            await setDoc(doc(db, 'users', userId, 'diagnostics', 'cardIndexHealth'), {
+                docCount: report.docCount,
+                indexCount: report.indexCount,
+                difference: report.difference,
+                detectedAt: Timestamp.now(),
+            })
+        } catch (error) {
+            // El sensor NO puede volverse una dependencia dura de la carga: si
+            // la lectura agregada o la escritura del diagnóstico fallan
+            // (offline, 4G degradada, reglas sin desplegar), la colección ya
+            // cargada sigue siendo perfectamente válida.
+            logSanitizedError('[TASK-275] No se pudo medir la cardinalidad del card_index', error, 'warn')
+        }
+    }
+
     /** Load from card_index chunks. Returns true if index was found and loaded. */
     const loadFromIndex = async (userId: string): Promise<boolean> => {
         try {
@@ -770,6 +834,14 @@ export const useCollectionStore = defineStore('collection', () => {
                     })
                 }).catch(() => {})
             }
+
+            // TASK-275: sensor ADITIVO de cardinalidad. Sale al lado de la
+            // decisión de arriba, no dentro de ella: no cambia el
+            // comportamiento de indexLooksComplete ni de su rebuild. Sin await
+            // a propósito — es una lectura agregada de red y el mercado
+            // objetivo está en 4G lenta; la colección ya está en `cards.value`
+            // y no debe esperar a un diagnóstico. Se traga sus propios errores.
+            void checkIndexCardinality(userId, allIndex.length)
 
             return true
         } catch (error) {

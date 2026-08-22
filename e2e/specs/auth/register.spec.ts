@@ -1,25 +1,79 @@
 import { test, expect } from '../../fixtures/test';
+import { adminUnavailableReason, getTestAdmin } from '../../helpers/admin';
 
 test.describe('Registration', () => {
   test.beforeEach(async ({ registerPage }) => {
     await registerPage.goto();
   });
 
-  // Tagged @nightly-skip: creates a real Firebase Auth account + Firestore user
-  // doc with no cleanup path (account deletion isn't exposed via UI). Excluded
-  // from the nightly cron (grep-invert) so the CI account doesn't accumulate
-  // orphaned accounts every night. Still runs on every push-to-develop full suite.
-  test('successful registration shows email verification screen @nightly-skip', async ({ registerPage }) => {
+  // TASK-271: this used to be @nightly-skip with no cleanup path at all —
+  // "account deletion isn't exposed via UI" — so it created a real Firebase
+  // Auth account + `/users` doc + `/usernames` reservation on every run and
+  // left all three forever. TASK-240 already established the pattern this
+  // now follows: an out-of-band admin teardown deletes by the identifier the
+  // test captured at creation time, and if admin credentials are unavailable
+  // the test SKIPS instead of creating an account it cannot clean up (AC4) —
+  // never runs and leaves the mess anyway.
+  //
+  // AC8 decision: @nightly-skip is REMOVED. Its original reason (no cleanup
+  // path) is gone now that this test deletes what it creates. The test does
+  // carry a real, separate flake risk — Firebase rate-limits
+  // `sendEmailVerification` under repeated automated registration, which is
+  // why `search.spec.ts`'s autocomplete test and this file's own historical
+  // notes both call out flakiness unrelated to cleanup — but that is a
+  // known-flake concern (CLAUDE.md's "Known flaky specs" list), not a
+  // teardown concern, and @nightly-skip was never the mechanism for flake
+  // exclusion; it excluded tests nightly could not afford to run at all
+  // because they leaked. This one no longer leaks, so it runs nightly like
+  // any other test — flaky retries (`retries: 2` under CI) are what absorb
+  // the rate-limit risk, same as every other flaky-but-not-leaking spec.
+  test('successful registration shows email verification screen', async ({ registerPage }) => {
+    const admin = await getTestAdmin();
+    test.skip(admin === null, `TASK-271: no admin teardown available — ${adminUnavailableReason()}`);
+
     const unique = Date.now();
+    const email = `test_${unique}@e2etest.com`;
+    // AC6: the identifier this run's teardown deletes by. Captured HERE, from
+    // the exact values this test is about to submit — never rederived later
+    // by lookup, grid position, "most recent", or any other heuristic. This
+    // is the same failure mode TASK-240 measured: heuristic teardown deleted
+    // an unrelated fixture instead of what the test created.
+    const usernameNorm = `e2euser${unique}`.toLowerCase();
+
     await registerPage.fillForm({
-      email: `test_${unique}@e2etest.com`,
+      email,
       password: 'Test123456!',
-      username: `e2euser${unique}`,
+      username: usernameNorm,
       location: 'Test City, USA',
     });
     await registerPage.submit();
 
-    await expect(registerPage.verificationScreen).toBeVisible({ timeout: 15_000 });
+    try {
+      await expect(registerPage.verificationScreen).toBeVisible({ timeout: 15_000 });
+    } finally {
+      // Runs whether the assertion above passed or failed: a red assertion
+      // does not mean registration didn't happen — the account may still
+      // exist and still need deleting.
+      const uid = await admin!.getUidByEmail(email);
+      if (uid) {
+        await admin!.deleteAccount({ uid, usernameNorm });
+
+        // AC3's sensor: a teardown call that returns without throwing is not
+        // proof it deleted anything — TASK-240's whole premise is that a
+        // "green" teardown can still leak. Re-check the account by the same
+        // identity used to delete it, and REDDEN if any of the three pieces
+        // is still there. Verified live (see this ticket's commit message
+        // for the captured red/green runs) by disabling the `deleteAccount`
+        // call above on purpose: this assertion is what turned red, not the
+        // registration flow itself.
+        const uidAfter = await admin!.getUidByEmail(email);
+        expect(uidAfter, 'TASK-271: Auth account was not deleted').toBeNull();
+        const usernameDocAfter = await admin!.db.doc(`usernames/${usernameNorm}`).get();
+        expect(usernameDocAfter.exists, 'TASK-271: /usernames entry was not deleted').toBe(false);
+        const userDocAfter = await admin!.db.doc(`users/${uid}`).get();
+        expect(userDocAfter.exists, 'TASK-271: /users doc was not deleted').toBe(false);
+      }
+    }
   });
 
   // TASK-259: `expect(page).toHaveURL(/\/register/)` was tautological —

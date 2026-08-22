@@ -141,6 +141,48 @@ export type TestAdmin = {
     expected: Record<string, number>,
     scope: { docScope: Iterable<string>; indexScope: Iterable<string> },
   ): Promise<string[]>;
+  /**
+   * TASK-271. Deletes a whole account the way register.spec.ts's own test
+   * created one: the Firebase Auth user, its `/users/{uid}` doc, AND its
+   * `/usernames/{usernameNorm}` reservation. All three, always — omitting the
+   * third is the exact defect this ticket exists to stop. TASK-268 measured
+   * that deleting the account and the user doc while leaving the usernames
+   * entry behind is precisely how an orphan gets manufactured; the account
+   * that is normally live in dev today (`test_*@e2etest.com`) is coherent
+   * with its `/usernames` entry only because nothing has deleted it yet.
+   *
+   * `uid` and `usernameNorm` must be identifiers the CALLER captured at
+   * account-creation time (AC6) — never rederived by lookup, grid position,
+   * "most recent", or any other heuristic. TASK-240 already measured what
+   * heuristic teardown does: it deleted an unrelated fixture instead of what
+   * the test created.
+   *
+   * Ordered to fail SAFE: the `/usernames` entry is removed FIRST, before the
+   * Auth user is touched. If any step after it throws, the run stops with the
+   * Auth user (and `/users` doc) still intact and the username reservation
+   * already released — an inconsistency, but not the dangling-index-pointing-
+   * at-nothing shape that is the actual orphan. Reversing this order (Auth
+   * first) would let an interruption after the Auth delete leave exactly that
+   * orphan behind — the fresh-every-run kind, not TASK-268's INTENTIONAL
+   * `/usernames/qa` and `/usernames/qa2` fixtures, which this function must
+   * never be pointed at.
+   *
+   * Each step is idempotent (existence-checked before deleting, and the Auth
+   * delete swallows `auth/user-not-found`), so calling this twice on the same
+   * account — or on one that partially failed a prior teardown — does not
+   * throw.
+   */
+  deleteAccount(params: {
+    uid: string;
+    usernameNorm: string;
+  }): Promise<{ usernameDocDeleted: boolean; userDocDeleted: boolean; authDeleted: boolean }>;
+  /**
+   * TASK-271. Resolves the uid of the account that just registered with
+   * `email` — an identity lookup by the exact address the test itself chose
+   * at creation time (AC6), not a heuristic. Returns null if Auth has no user
+   * with that email (e.g. registration failed before this ran).
+   */
+  getUidByEmail(email: string): Promise<string | null>;
 };
 
 let cached: TestAdmin | null | undefined;
@@ -191,8 +233,11 @@ async function build(): Promise<TestAdmin | null> {
 
   let uid: string;
   let db: Firestore;
+  // Hoisted out of the try block: deleteAccount (TASK-271) needs the same app
+  // handle for getAuth(app).deleteUser(), not just the uid/db it derives here.
+  let app: ReturnType<typeof initializeApp>;
   try {
-    const app = getApps().find((a) => a.name === 'e2e-teardown')
+    app = getApps().find((a) => a.name === 'e2e-teardown')
       ?? initializeApp({ credential: applicationDefault(), projectId }, 'e2e-teardown');
     uid = (await getAuth(app).getUserByEmail(email)).uid;
     db = getFirestore(app);
@@ -551,5 +596,62 @@ async function build(): Promise<TestAdmin | null> {
     return { docsDeleted, indexEntriesRemoved, passes };
   };
 
-  return { uid, db, snapshot, docFields: readDocFields, deleteCards, restoreQuantities };
+  /**
+   * See the TestAdmin.deleteAccount doc comment for the ordering rationale
+   * (usernames entry first, Auth user last — fail-safe against orphaning).
+   */
+  const deleteAccount = async ({
+    uid: targetUid,
+    usernameNorm,
+  }: {
+    uid: string;
+    usernameNorm: string;
+  }): Promise<{ usernameDocDeleted: boolean; userDocDeleted: boolean; authDeleted: boolean }> => {
+    const usernameRef = db.doc(`usernames/${usernameNorm}`);
+    let usernameDocDeleted = false;
+    if ((await usernameRef.get()).exists) {
+      await usernameRef.delete();
+      usernameDocDeleted = true;
+    }
+
+    const userRef = db.doc(`users/${targetUid}`);
+    let userDocDeleted = false;
+    if ((await userRef.get()).exists) {
+      await userRef.delete();
+      userDocDeleted = true;
+    }
+
+    let authDeleted = false;
+    try {
+      await getAuth(app).deleteUser(targetUid);
+      authDeleted = true;
+    } catch (err) {
+      // Already gone (re-run of a partially-completed teardown) — not an
+      // error for an idempotent operation. Anything else is real and must
+      // surface, not be swallowed into a false "deleted".
+      if ((err as { code?: string }).code !== 'auth/user-not-found') throw err;
+    }
+
+    return { usernameDocDeleted, userDocDeleted, authDeleted };
+  };
+
+  const getUidByEmail = async (email: string): Promise<string | null> => {
+    try {
+      return (await getAuth(app).getUserByEmail(email)).uid;
+    } catch (err) {
+      if ((err as { code?: string }).code === 'auth/user-not-found') return null;
+      throw err;
+    }
+  };
+
+  return {
+    uid,
+    db,
+    snapshot,
+    docFields: readDocFields,
+    deleteCards,
+    restoreQuantities,
+    deleteAccount,
+    getUidByEmail,
+  };
 }

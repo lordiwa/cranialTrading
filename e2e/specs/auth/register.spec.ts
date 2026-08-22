@@ -6,28 +6,34 @@ test.describe('Registration', () => {
     await registerPage.goto();
   });
 
-  // TASK-271: this used to be @nightly-skip with no cleanup path at all —
-  // "account deletion isn't exposed via UI" — so it created a real Firebase
-  // Auth account + `/users` doc + `/usernames` reservation on every run and
-  // left all three forever. TASK-240 already established the pattern this
-  // now follows: an out-of-band admin teardown deletes by the identifier the
-  // test captured at creation time, and if admin credentials are unavailable
-  // the test SKIPS instead of creating an account it cannot clean up (AC4) —
-  // never runs and leaves the mess anyway.
+  // TASK-271: this used to have no cleanup path at all — "account deletion
+  // isn't exposed via UI" — so it created a real Firebase Auth account +
+  // `/users` doc + `/usernames` reservation on every run and left all three
+  // forever. TASK-240 already established the pattern this now follows: an
+  // out-of-band admin teardown deletes by the identifier the test captured at
+  // creation time, and if admin credentials are unavailable the test SKIPS
+  // instead of creating an account it cannot clean up (AC4) — never runs and
+  // leaves the mess anyway.
   //
-  // AC8 decision: @nightly-skip is REMOVED. Its original reason (no cleanup
-  // path) is gone now that this test deletes what it creates. The test does
-  // carry a real, separate flake risk — Firebase rate-limits
-  // `sendEmailVerification` under repeated automated registration, which is
-  // why `search.spec.ts`'s autocomplete test and this file's own historical
-  // notes both call out flakiness unrelated to cleanup — but that is a
-  // known-flake concern (CLAUDE.md's "Known flaky specs" list), not a
-  // teardown concern, and @nightly-skip was never the mechanism for flake
-  // exclusion; it excluded tests nightly could not afford to run at all
-  // because they leaked. This one no longer leaks, so it runs nightly like
-  // any other test — flaky retries (`retries: 2` under CI) are what absorb
-  // the rate-limit risk, same as every other flaky-but-not-leaking spec.
-  test('successful registration shows email verification screen', async ({ registerPage }) => {
+  // AC8 decision, CORRECTED (an earlier draft of this comment got this
+  // wrong): `@nightly-skip` STAYS. CLAUDE.md documents TWO independent
+  // reasons this test carried the tag, not one:
+  //   (a) no cleanup path (the "Mutators" section, e2e-3-level-policy) — DEAD
+  //       as of this ticket, this test deletes what it creates now.
+  //   (b) a real, separate flake — Firebase rate-limits
+  //       `sendEmailVerification` under repeated automated registration (the
+  //       "Known flaky specs" line). CLAUDE.md's "Known flakes" bullet in the
+  //       nightly section says this explicitly: register.spec.ts and
+  //       search.spec.ts's autocomplete test are tagged `@nightly-skip`
+  //       "in addition to Playwright's existing retries: 2 under CI, so
+  //       neither ever reds out a nightly run on its own" — i.e. the project
+  //       already measured that CI's retries do NOT absorb this flake on
+  //       their own, which is exactly why the tag exists on top of them.
+  // Only (a) is this ticket's business. (b) is untouched and still live, so
+  // removing the tag on (a)'s strength alone would silently undo a decision
+  // CLAUDE.md already documents — don't re-derive "the tag can go" from this
+  // ticket without re-reading both of those CLAUDE.md sections first.
+  test('successful registration shows email verification screen @nightly-skip', async ({ registerPage }) => {
     const admin = await getTestAdmin();
     test.skip(admin === null, `TASK-271: no admin teardown available — ${adminUnavailableReason()}`);
 
@@ -60,18 +66,24 @@ test.describe('Registration', () => {
 
         // AC3's sensor: a teardown call that returns without throwing is not
         // proof it deleted anything — TASK-240's whole premise is that a
-        // "green" teardown can still leak. Re-check the account by the same
-        // identity used to delete it, and REDDEN if any of the three pieces
-        // is still there. Verified live (see this ticket's commit message
-        // for the captured red/green runs) by disabling the `deleteAccount`
-        // call above on purpose: this assertion is what turned red, not the
-        // registration flow itself.
+        // "green" teardown can still leak. Re-check all THREE pieces by the
+        // same identity used to delete them. `expect.soft` on purpose: a
+        // hard `expect` stops at the first failure (measured — an earlier
+        // draft's Auth-only hard assertion masked whether /usernames or
+        // /users were ever checked at all when Auth failed first). Soft
+        // assertions all run regardless of one another, so a partial leak
+        // (e.g. Auth+users deleted but /usernames orphaned — precisely the
+        // TASK-268 damage class) reds out exactly the assertion that
+        // detected it and none of the others. Verified live per-field (see
+        // this ticket's commit message for the three captured red runs, one
+        // per disabled step, plus the final green) by disabling each of
+        // deleteAccount's three steps one at a time.
         const uidAfter = await admin!.getUidByEmail(email);
-        expect(uidAfter, 'TASK-271: Auth account was not deleted').toBeNull();
+        expect.soft(uidAfter, 'TASK-271: Auth account was not deleted').toBeNull();
         const usernameDocAfter = await admin!.db.doc(`usernames/${usernameNorm}`).get();
-        expect(usernameDocAfter.exists, 'TASK-271: /usernames entry was not deleted').toBe(false);
+        expect.soft(usernameDocAfter.exists, 'TASK-271: /usernames entry was not deleted').toBe(false);
         const userDocAfter = await admin!.db.doc(`users/${uid}`).get();
-        expect(userDocAfter.exists, 'TASK-271: /users doc was not deleted').toBe(false);
+        expect.soft(userDocAfter.exists, 'TASK-271: /users doc was not deleted').toBe(false);
       }
     }
   });

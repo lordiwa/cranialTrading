@@ -26,9 +26,11 @@ test.describe('Registration', () => {
   //       nightly section says this explicitly: register.spec.ts and
   //       search.spec.ts's autocomplete test are tagged `@nightly-skip`
   //       "in addition to Playwright's existing retries: 2 under CI, so
-  //       neither ever reds out a nightly run on its own" — i.e. the project
-  //       already measured that CI's retries do NOT absorb this flake on
-  //       their own, which is exactly why the tag exists on top of them.
+  //       neither ever reds out a nightly run on its own" — i.e. CLAUDE.md
+  //       documents the DECISION to exclude this test from nightly on top
+  //       of the retries, not a measurement that the retries fail on their
+  //       own. Read as a measurement, this line would itself be exactly the
+  //       "read cited as measured" failure mode this ticket exists to fix.
   // Only (a) is this ticket's business. (b) is untouched and still live, so
   // removing the tag on (a)'s strength alone would silently undo a decision
   // CLAUDE.md already documents — don't re-derive "the tag can go" from this

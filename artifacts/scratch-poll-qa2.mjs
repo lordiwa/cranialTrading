@@ -1,0 +1,10 @@
+import { applicationDefault, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+const app = initializeApp({ credential: applicationDefault(), projectId: 'cranial-trading-dev' }, 'p');
+const db = getFirestore(app);
+const uid = 'Y3LH090ljOWcc6gk5NL5EcsGBUi1';
+const pc = (await db.collection('public_cards').count().get()).data().count;
+const idx = (await db.collection('users').doc(uid).collection('public_card_index').count().get()).data().count;
+const pub = (await db.collection('users').doc(uid).collection('cards').where('public','==',true).count().get()).data().count;
+console.log(JSON.stringify({ public_cards: pc, qa2_index_chunks: idx, qa2_cards_public_true: pub }));
+process.exit(0);

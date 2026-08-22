@@ -1,0 +1,28 @@
+{
+  "key": "TASK-273",
+  "title": "getTestAdmin() se apaga si desaparece la cuenta TEST_USER_A_EMAIL, y con eso saltea tests que no la usan",
+  "description": "HALLAZGO DEL REVIEWER DE TASK-271 (MEDIUM-2), leido en el codigo.\n\ne2e/helpers/admin.ts, funcion build(): getTestAdmin() exige que la variable TEST_USER_A_EMAIL este seteada Y que getUserByEmail(esa cuenta) resuelva; si no, devuelve null y todo consumidor SE SALTEA. Eso es correcto para el consumidor original (collection-crud.spec.ts, que opera sobre esa cuenta), pero desde TASK-271 el helper tiene consumidores que NO tocan esa cuenta para nada: register.spec.ts solo necesita borrar la cuenta efimera que el mismo acaba de crear.\n\nConsecuencia concreta: si la cuenta de QA desaparece —y desaparecer esta PLANEADO, es el vaciado de TASK-267— register.spec.ts se saltea PARA SIEMPRE aun con credenciales de administrador perfectamente validas, y vuelve a no limpiar lo que crea. El skip es visible en el reporte, asi que no es un verde vacio; pero es perdida de cobertura por un motivo que no tiene nada que ver con la capacidad real de borrar.\n\nLa resolucion de identidad de la cuenta de QA es un requisito de las operaciones que trabajan SOBRE esa cuenta (snapshot, docFields, deleteCards, restoreQuantities), no de las que no la tocan (deleteAccount, getUidByEmail).",
+  "acceptance_criteria": [
+    "AC1 - deleteAccount() y getUidByEmail() quedan disponibles sin depender de que TEST_USER_A_EMAIL resuelva. Las operaciones que si operan sobre la cuenta de QA (snapshot, docFields, deleteCards, restoreQuantities) siguen exigiendola.",
+    "AC2 - Los tres rieles de seguridad existentes se mantienen INTACTOS sobre el camino nuevo: VITE_MODE=production, E2E_BASE_URL que no sea dev, y projectId distinto de cranial-trading-dev siguen devolviendo null. El reviewer de TASK-271 verifico que hoy no existe ningun camino a un borrado de Auth de produccion, y ese hecho tiene que seguir siendo cierto despues del cambio. Demostrarlo con un test, no con lectura.",
+    "AC3 - Control negativo: demostrar con salida verbatim que register.spec.ts SIGUE corriendo (y limpiando) cuando TEST_USER_A_EMAIL apunta a una cuenta inexistente, y que collection-crud.spec.ts en cambio SE SALTEA en ese mismo escenario. Los dos comportamientos en la misma corrida.",
+    "AC4 - El motivo del skip queda distinguible en el reporte: 'no hay credenciales' y 'no existe la cuenta de QA' no pueden verse igual, porque llevan a acciones distintas."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "e2e",
+    "test-infra"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-271"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-22T00:25:41.662Z",
+  "updated_at": "2026-08-22T00:25:41.662Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T23:38:49.171Z",
+  "generated_at": "2026-08-22T00:26:02.834Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1504,8 +1504,20 @@
     {
       "key": "TASK-271",
       "title": "La suite E2E ensucia dev en cada corrida y ademas FABRICA los huerfanos de /usernames que TASK-268 investiga",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
+    },
+    {
+      "key": "TASK-272",
+      "title": "Los dos teardowns de binders.spec.ts no pueden fallar: el borrado vive detras de un catch silencioso",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-273",
+      "title": "getTestAdmin() se apaga si desaparece la cuenta TEST_USER_A_EMAIL, y con eso saltea tests que no la usan",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

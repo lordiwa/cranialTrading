@@ -14,7 +14,7 @@
     "AC9 - Limpiar la basura que YA quedo en dev: las 3 cuentas e2euser con sus documentos e indices, incluido el huerfano /usernames/e2euser1787344154777, y los 2 mazos de la cuenta de QA. NO tocar /usernames/qa ni /usernames/qa2, que estan vivos A PROPOSITO como evidencia de TASK-268.",
     "AC10 - Gate verde: npm run test:unit, npx vite build, npm run lint, y la suite E2E completa en verde, mas la medicion del AC1 repetida al final mostrando que la cuenta vuelve a su estado inicial."
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "e2e",
@@ -26,9 +26,20 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-22T00:02:28.776Z",
+      "body": "AC1 - LINEA DE BASE MEDIDA por Admin SDK contra cranial-trading-dev el 2026-08-21, antes de tocar nada.\n\nAuth: 6 cuentas | /users: 6 docs | /usernames: 8 docs | /public_cards: 7536\nCuenta de QA (uid 90PkdmyFKrVm1RLDXjInJdlYXy73): 1880 cartas, 3 mazos, 1 carpeta.\nCuenta qa2 (uid Y3LH090ljOWcc6gk5NL5EcsGBUi1): 5658 cartas, 17 chunks de public_card_index.\n\nDOS CIFRAS DEL TICKET QUEDAN CORREGIDAS POR MEDICION:\n1) El AC9 dice \"las 3 cuentas e2euser\". Son CUATRO: test_1787343768133, test_1787344154777, test_1787345049960 y test_1787355871117@e2etest.com. La cuarta se creo el 2026-08-21 a las 23:44:31 GMT, despues de que se escribiera el ticket.\n2) El AC9 dice \"los 2 mazos de la cuenta de QA\". Son TRES, mas 1 carpeta.\n\nTERCERA CORRECCION, esta importa para el AC2: el AC9 llama huerfano a /usernames/e2euser1787344154777. MEDIDO que HOY NO LO ES: su uid apunta a un doc de /users que existe y cuyo campo username coincide con la entrada. Los cuatro e2euser estan coherentes. Los UNICOS huerfanos medidos en dev son /usernames/qa y /usernames/qa2 (apuntan a uids cuyos docs declaran qa_mtg y qa2_mtg), y estan vivos A PROPOSITO como evidencia de TASK-268.\nLa lectura correcta es que esas cuatro entradas se VUELVEN huerfanas si el borrado del AC2 omite la tercera cosa. O sea que el escenario que el AC2 previene no es hipotetico: es el estado exacto en el que quedaria dev si se limpiara mal.\n\nComando: artifacts/scratch-e2e-baseline.mjs y artifacts/scratch-orphan-check.mjs"
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-22T00:03:51.256Z",
+      "body": "AC7 - BARRIDO (researcher, read-only sobre el codigo) MAS MEDICION DEL ORQUESTADOR contra cranial-trading-dev. El barrido dio LEIDO; la medicion de abajo convierte dos hallazgos en MEDIDO y cierra cuatro dudas del barrido.\n\nFUGAS CONFIRMADAS POR MEDICION (crean documentos y no los borran, una por corrida):\n1. e2e/specs/preferences/preferences-crud.spec.ts:15-34 \"add wishlist card via add card modal\" - HALLAZGO NUEVO, no estaba en el ticket. MEDIDO: la cuenta de QA tiene DOS cartas Lightning Bolt en wishlist, ids 6eeOJUGGc30w4q3IbJ3y (createdAt 2026-08-21T20:49:31Z) y ybwMo29QyYUJ0OMw0M5w (createdAt 2026-08-21T23:49:33Z). Dos corridas, dos documentos. Su test hermano preferences-crud.spec.ts:36-58 \"delete a wishlist card\" borra por POSICION (cards.first()), no por identificador, y ademas es condicional; la acumulacion medida demuestra que de hecho no limpia. Doble defecto: fuga mas el patron por posicion que en TASK-240 termino borrando una fixture ajena.\n2. e2e/specs/decks/deck-editor.spec.ts:4-22 \"add card from collection to mainboard\" - ya sabido, ahora MEDIDO: los 3 mazos de la cuenta se llaman \"Editor Test 1787344435282\" (20:33:55Z), \"Editor Test 1787345274285\" (20:47:54Z) y \"Editor Test 1787356078184\" (23:47:58Z). Uno por corrida.\n3. e2e/specs/auth/register.spec.ts - ya sabido, cubierto por el AC4.\n\nTEARDOWNS DEFECTUOSOS (LEIDO, sin fuga medida):\n- e2e/specs/binders/binders.spec.ts:12-33 y :60-76 - el borrado esta detras de deleteBtn.isVisible({timeout:3000}).catch(() => false) sin fallback ni assert: si el boton no aparece en 3 s, la carpeta queda y el test sigue verde. MEDIDO que HOY no hay acumulacion (una sola carpeta, llamada \"test\", que no sigue el patron de nombre de los tests), asi que el guard viene funcionando; sigue siendo un teardown que no puede fallar.\n\nDUDAS DEL BARRIDO CERRADAS POR MEDICION:\n- deck-import.spec.ts NO deja mazos: los unicos 3 mazos son los de deck-editor. No crea documentos aunque el import falle.\n- matches, mensajes y contactos: la cuenta de QA NO TIENE las subcolecciones savedMatches, matches_nuevos, matches_guardados, blockedUsers, savedContacts ni conversaciones. Sus subcolecciones son exactamente binders(1), card_index(1), cards(1880), decks(3), public_card_index(9). O sea que match-management.spec.ts, messages.spec.ts y contacts.spec.ts toman hoy la rama de count===0 y no escriben nada. No son fuga. Pero eso mismo significa que no ejercitan nada: es material de TASK-263/TASK-264, no de este ticket, y se deja anotado ahi en vez de arreglarse aca.\n\nBORRADO PERMANENTE DE DATO REAL (categoria aparte, ni fuga ni deriva): collection-crud.spec.ts:374-388 \"delete card\" y :521-542 \"bulk delete\" eliminan cartas preexistentes de la cuenta y no las restauran. No acumulan, pero cada corrida consume una carta real. No se toca en este ticket; se nombra para que la ausencia futura de cartas sea explicable.\n\nDISPOSICION PROPUESTA: arreglar dentro de TASK-271 las fugas 1 y 2 (mismo patron que el AC5 ya pide) mas el borrado por posicion de preferences-crud. Abrir ticket aparte para los guards silenciosos de binders y para la vacuidad medida de matches/mensajes/contactos."
+    }
+  ],
   "created_at": "2026-08-21T23:38:49.171Z",
-  "updated_at": "2026-08-21T23:38:49.171Z",
+  "updated_at": "2026-08-22T00:19:30.744Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

@@ -1,0 +1,28 @@
+{
+  "key": "TASK-272",
+  "title": "Los dos teardowns de binders.spec.ts no pueden fallar: el borrado vive detras de un catch silencioso",
+  "description": "HALLAZGO DEL BARRIDO DEL AC7 DE TASK-271 (leido en el codigo, sin fuga medida).\n\ne2e/specs/binders/binders.spec.ts:12-33 (\"create new binder -> appears in list\") y :60-76 (\"delete binder with confirmation\") esconden su propio borrado detras de deleteBtn.isVisible({ timeout: 3000 }).catch(() => false), sin fallback y sin ninguna asercion sobre el resultado. Si el boton tarda mas de 3 s o no aparece, la expresion se evalua a false, el borrado NO ocurre, y el test sigue en VERDE. Un teardown que no puede fallar no prueba nada: es la misma forma que en TASK-240 dejo la cuenta creciendo una carta por corrida mientras la suite reportaba verde.\n\nMEDIDO el 2026-08-21 contra cranial-trading-dev: HOY NO HAY FUGA. La cuenta de QA tiene UNA sola carpeta, llamada \"test\", que no sigue el patron de nombre que generan estos tests. O sea que el guard viene funcionando en la practica. Este ticket NO es por una fuga observada; es porque el mecanismo que evitaria verla no existe. La diferencia importa: si mañana el boton se pone lento, nadie se entera.\n\nAdemas el segundo test, cuyo proposito ES borrar una carpeta, tiene su asercion principal detras del mismo guard: si el boton no aparece, el test que verifica el borrado pasa sin haber verificado ningun borrado.",
+  "acceptance_criteria": [
+    "AC1 - Control negativo obligatorio: demostrar con salida capturada verbatim que cada test SE PONE ROJO cuando el borrado no ocurre. Forzarlo (por ejemplo apuntando el selector a algo inexistente) y mostrar el rojo. Sin esa salida el arreglo no esta probado, que es el defecto exacto que este ticket cierra.",
+    "AC2 - El borrado deja de estar condicionado a isVisible con catch: si la carpeta se creo, el borrado DEBE ocurrir o el test debe fallar. Un boton que no aparece es un fallo del producto, no una razon para saltear la limpieza en silencio.",
+    "AC3 - El borrado es por identificador conocido, capturado al crear, nunca por posicion en la lista ni por 'la mas reciente'. Es el patron que en TASK-240 termino borrando una fixture ajena.",
+    "AC4 - El test cuyo proposito es verificar el borrado tiene que afirmar que la carpeta YA NO ESTA, y esa asercion no puede vivir detras de ningun guard que la pueda saltear.",
+    "AC5 - Medir conteo de /users/<uid>/binders antes y despues de correr binders.spec.ts, mostrando los dos numeros lado a lado, y demostrar que la cuenta vuelve a su estado inicial. Linea de base del 2026-08-21: 1 carpeta, llamada 'test', que NO hay que borrar."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "e2e",
+    "test-quality",
+    "verde-vacio"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-22T00:25:22.633Z",
+  "updated_at": "2026-08-22T00:25:22.633Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

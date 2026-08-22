@@ -39,42 +39,48 @@ test.describe('Preferences (Wishlist) CRUD', () => {
     await preferencesPage.addModal.searchInput.press('Enter');
     await page.waitForTimeout(3000);
 
-    // Click first result card
+    // Review MEDIUM-2: this used to wrap the whole body in
+    // `if (resultCount > 0)`, so a 0-result search made the test pass GREEN
+    // without creating or deleting anything — exercising nothing while
+    // looking like a pass. The sibling "delete a wishlist card" test got a
+    // loud `test.skip` for the identical condition in the same commit;
+    // leaving this one silent was an inconsistency worse than the gap
+    // itself, since it invites copying the wrong half next time.
     const resultCount = await preferencesPage.addModal.resultCards.count();
-    if (resultCount > 0) {
-      await preferencesPage.addModal.resultCards.first().click({ force: true });
-      await page.waitForTimeout(500);
-      // Set status to wishlist via the status chip group (v2 redesign — see AddCardModal.vue)
-      await preferencesPage.addModal.statusChipWishlist.waitFor({ state: 'visible', timeout: 5000 });
-      await preferencesPage.addModal.statusChipWishlist.click();
-      await expect(preferencesPage.addModal.statusChipWishlist).toHaveAttribute('aria-pressed', 'true');
-      await preferencesPage.addModal.saveButton.click();
-      await commonPage.waitForToast('success');
+    test.skip(resultCount === 0, `TASK-271: search for "${SEARCH_TERMS.common}" returned no results, nothing to add`);
 
-      let created: string[] = [];
-      const deadline = Date.now() + 15_000;
-      for (;;) {
-        const now = await admin.docFields();
-        created = Object.keys(now.quantities).filter(
-          (id) => !beforeIds.has(id) && (now.names[id] ?? '').toLowerCase() === addedName,
-        );
-        if (created.length > 0 || Date.now() > deadline) break;
-        await page.waitForTimeout(2000);
-      }
-      // Reddens rather than leaking silently: if the toast fired but no
-      // matching new doc ever showed up, this run's card is still out there
-      // somewhere the teardown didn't find it, and staying green would hide
-      // that (TASK-240's whole premise: a toast is not proof of a write).
-      expect(created.length, 'TASK-271: could not find the card this run created to clean it up').toBeGreaterThan(0);
-      await admin.deleteCards(created);
+    await preferencesPage.addModal.resultCards.first().click({ force: true });
+    await page.waitForTimeout(500);
+    // Set status to wishlist via the status chip group (v2 redesign — see AddCardModal.vue)
+    await preferencesPage.addModal.statusChipWishlist.waitFor({ state: 'visible', timeout: 5000 });
+    await preferencesPage.addModal.statusChipWishlist.click();
+    await expect(preferencesPage.addModal.statusChipWishlist).toHaveAttribute('aria-pressed', 'true');
+    await preferencesPage.addModal.saveButton.click();
+    await commonPage.waitForToast('success');
 
-      // The sensor: deleteCards() returning without throwing is not proof it
-      // deleted anything — same TASK-240 premise as everywhere else in this
-      // suite. Re-check by the same ids this run captured.
-      const after = await admin.docFields();
-      const stillThere = created.filter((id) => id in after.quantities);
-      expect(stillThere, 'TASK-271: card(s) this run created were not actually deleted').toEqual([]);
+    let created: string[] = [];
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      const now = await admin.docFields();
+      created = Object.keys(now.quantities).filter(
+        (id) => !beforeIds.has(id) && (now.names[id] ?? '').toLowerCase() === addedName,
+      );
+      if (created.length > 0 || Date.now() > deadline) break;
+      await page.waitForTimeout(2000);
     }
+    // Reddens rather than leaking silently: if the toast fired but no
+    // matching new doc ever showed up, this run's card is still out there
+    // somewhere the teardown didn't find it, and staying green would hide
+    // that (TASK-240's whole premise: a toast is not proof of a write).
+    expect(created.length, 'TASK-271: could not find the card this run created to clean it up').toBeGreaterThan(0);
+    await admin.deleteCards(created);
+
+    // The sensor: deleteCards() returning without throwing is not proof it
+    // deleted anything — same TASK-240 premise as everywhere else in this
+    // suite. Re-check by the same ids this run captured.
+    const after = await admin.docFields();
+    const stillThere = created.filter((id) => id in after.quantities);
+    expect(stillThere, 'TASK-271: card(s) this run created were not actually deleted').toEqual([]);
   });
 
   // TASK-271: this test used to click `cards.first()` in the grid — POSITIONAL
@@ -105,6 +111,30 @@ test.describe('Preferences (Wishlist) CRUD', () => {
     const deleteTestCardName = 'Counterspell';
     const before = await admin.docFields();
     const beforeIds = new Set(Object.keys(before.quantities));
+
+    // Review MEDIUM-1: targeting later by name only works while exactly one
+    // card has this name. A stray Counterspell already sitting in the
+    // wishlist (e.g. a prior run of THIS test going red after creating its
+    // card but before this ticket moved the "found it" assert inside
+    // try/finally, below) would make that ambiguous — `.first()` could grab
+    // the bystander instead of the one this run creates, delete IT through
+    // the real UI path, and leave the actual card this run made to be
+    // cleaned up only by the admin fallback: the test would report green
+    // having silently deleted someone else's card without ever really
+    // exercising the delete flow it claims to test. Redden here, before
+    // creating anything, rather than let that ambiguity happen.
+    //
+    // Checked on-screen, not via `admin.docFields()`: that projection has no
+    // `status` field, so it can't distinguish a wishlist Counterspell from
+    // an unrelated one sitting in this account's sale inventory (this
+    // account's two "Counterspell" sale rows are exactly that — real,
+    // unrelated, and not a leak). `preferencesPage.goto()` already applied
+    // the WANTED filter, so the on-screen grid is wishlist-only by construction.
+    const preExistingOnScreen = page.getByText(deleteTestCardName, { exact: true });
+    await expect(
+      preExistingOnScreen,
+      `TASK-271: a stray "${deleteTestCardName}" already exists in the wishlist view — targeting by name would be ambiguous`,
+    ).toHaveCount(0);
 
     await preferencesPage.openAddCardModal();
     await preferencesPage.addModal.searchInput.waitFor({ state: 'visible', timeout: 5000 });
@@ -150,9 +180,16 @@ test.describe('Preferences (Wishlist) CRUD', () => {
       if (created.length > 0 || Date.now() > findDeadline) break;
       await page.waitForTimeout(2000);
     }
-    expect(created.length, 'TASK-271: could not find the card this run created, cannot test deleting it').toBeGreaterThan(0);
 
     try {
+      // Review MEDIUM-1 (b): this used to sit BEFORE try/finally. Moved in
+      // so every exit from here on — this assert included — goes through
+      // the same finally, rather than a failed poll skipping cleanup
+      // entirely (though with `created` empty in that case there is nothing
+      // for deleteCards to target either way; the point is consistency of
+      // control flow, not a new cleanup path).
+      expect(created.length, 'TASK-271: could not find the card this run created, cannot test deleting it').toBeGreaterThan(0);
+
       // Locate THIS run's card by name (identity), not by grid position.
       // MEASURED (this ticket): with a single WANTED card the grid renders
       // `CollectionGridCardFull.vue` — its DELETE button is inline on the
@@ -163,8 +200,15 @@ test.describe('Preferences (Wishlist) CRUD', () => {
       // not a descendant of it. Starting from the paragraph that names the
       // card and walking up to that shared wrapper scopes the DELETE click
       // to THIS card's own button, never a bystander's.
-      const cardName = page.getByText(deleteTestCardName, { exact: true }).first();
-      await cardName.waitFor({ state: 'visible', timeout: 10_000 });
+      //
+      // Review MEDIUM-1 (a): one-line uniqueness guard right before the
+      // click — on top of the pre-existing-bystander check above, which
+      // only covers what existed before this run started. This confirms
+      // exactly one match is on screen at the moment of targeting; more
+      // than one means `.first()` below cannot be trusted to be OUR card.
+      const matchingCards = page.getByText(deleteTestCardName, { exact: true });
+      await expect(matchingCards, `TASK-271: expected exactly one "${deleteTestCardName}" card on screen before deleting`).toHaveCount(1, { timeout: 10_000 });
+      const cardName = matchingCards.first();
       const cardWrapper = cardName.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " group ") and contains(concat(" ", normalize-space(@class), " "), " relative ")][1]');
       const deleteBtn = cardWrapper.getByRole('button', { name: /delete|eliminar/i });
       await deleteBtn.waitFor({ state: 'visible', timeout: 5_000 });

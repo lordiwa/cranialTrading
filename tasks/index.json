@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-22T04:04:57.892Z",
+  "generated_at": "2026-08-22T15:02:04.929Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1540,6 +1540,12 @@
     {
       "key": "TASK-277",
       "title": "Un documento de diagnostico que se sobreescribe dice la ultima vez que paso, no con que frecuencia pasa",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-278",
+      "title": "Un @smoke que gatea el deploy a produccion depende de que Scryfall este vivo y responda a tiempo",
       "status": "todo",
       "priority": "medium"
     }

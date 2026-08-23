@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-22T15:02:04.929Z",
+  "generated_at": "2026-08-23T04:06:26.537Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1548,6 +1548,12 @@
       "title": "Un @smoke que gatea el deploy a produccion depende de que Scryfall este vivo y responda a tiempo",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-279",
+      "title": "Importar por texto plano PIERDE la ultima palabra del nombre: \"4 Lightning Bolt\" entra como \"Lightning\"",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

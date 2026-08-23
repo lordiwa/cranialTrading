@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-23T04:06:26.537Z",
+      "body": "EVIDENCIA VIVA DEL DEFECTO QUE ESTE TICKET DESCRIBE, observada el 2026-08-22 sin buscarla.\n\nSembrando volumen en la cuenta E2E de dev (TASK-267), el card_index privado QUEDO CORRUPTO en medio del proceso. Lo reporto el developer que estaba sembrando: una pestana del navegador que quedo colgada disparo un rebuild del indice DEL LADO DEL CLIENTE que llego a completarse PARCIALMENTE, con UNA sola carta, y PISO el chunk real que ya tenia el resto.\n\nEs exactamente el escenario que este ticket describe: buildCardIndex no tiene lock ni transaccion, asi que dos rebuilds del mismo usuario que se solapan no se coordinan y el ultimo en escribir gana, sin importar cuanto sepa. Aca el que gano sabia menos: un rebuild con 1 carta sobrescribio el estado bueno.\n\nCONDICION QUE LO DISPARO, y vale porque no es un caso de laboratorio: no hizo falta abrir dos sesiones a proposito. Alcanzo con una pestana colgada por la grilla del editor de mazos con 2.200 cartas (instancia viva del problema conocido de reactividad con colecciones grandes) mientras otro camino seguia trabajando sobre la misma cuenta. O sea que la carrera se alcanza por accidente, con una sola persona usando la aplicacion, si una pestana queda a medio morir.\n\nCOMO SE REPARO, y esto tambien es dato util para el ticket: NO se pudo arreglar desde la interfaz. Se llamo buildCardIndex directo por Cloud Function, autenticado como el usuario real con el SDK cliente, o sea el mismo backend que usa la app pero sin navegador. Despues de eso el indice quedo sano y se verifico POR MEDICION: 2202 cards, 2202 entradas reales sumando los chunks del card_index, _meta.count 2202 y 2202 en public_cards. Los cuatro numeros coinciden.\n\nSe registra aca en vez de abrir un ticket nuevo: la causa ya esta descrita en este ticket y lo que faltaba era una reproduccion real. Ahora la hay."
+    }
+  ],
   "created_at": "2026-08-12T02:43:35.460Z",
-  "updated_at": "2026-08-12T02:43:35.460Z",
+  "updated_at": "2026-08-23T04:06:26.537Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

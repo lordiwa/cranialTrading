@@ -1,0 +1,28 @@
+{
+  "key": "TASK-279",
+  "title": "Importar por texto plano PIERDE la ultima palabra del nombre: \"4 Lightning Bolt\" entra como \"Lightning\"",
+  "description": "MEDIDO EL 2026-08-22 EJECUTANDO LA REGEX, no leyendola: 7 de 10 lineas de prueba salen con el nombre truncado.\n\nLA REGLA EXACTA DEL DEFECTO: toda linea SIN codigo de set entre parentesis pierde su ULTIMA palabra. Solo se salvan los nombres de UNA sola palabra y las lineas que si traen (SET).\n\nMedido, entrada -> nombre extraido:\n  \"4 Lightning Bolt\"           -> \"Lightning\"        TRUNCADO\n  \"2 Kor Outfitter\"            -> \"Kor\"              TRUNCADO\n  \"1 Sol Ring\"                 -> \"Sol\"              TRUNCADO\n  \"1 Jace, the Mind Sculptor\"  -> \"Jace, the Mind\"   TRUNCADO\n  \"1 Snapcaster Mage\"          -> \"Snapcaster\"       TRUNCADO\n  \"4 Path to Exile\"            -> \"Path to\"          TRUNCADO\n  \"1 Craterhoof Behemoth\"      -> \"Craterhoof\"       TRUNCADO\n  \"3 Opt\"                      -> \"Opt\"              correcto (una sola palabra)\n  \"4 Lightning Bolt (2X2)\"     -> \"Lightning Bolt\"   correcto (trae set)\n  \"2 Kor Outfitter (ZEN)\"      -> \"Kor Outfitter\"    correcto (trae set)\n\nDONDE: src/utils/importHelpers.ts, parseTextImportLine, la regex\n  /^(\\d+)x?\\s+(.+?)(?:\\s+\\((\\w+)\\))?(?:\\s+[\\w-]+)?(?:\\s+\\*f\\*?)?$/i\n\nCAUSA, trazada: el nombre se captura con (.+?) que es PEREZOSO, y mas adelante hay un grupo opcional (?:\\s+[\\w-]+)? pensado para un sufijo suelto. Cuando la linea NO trae \"(SET)\", el motor satisface el patron con el nombre mas corto posible y deja que ese grupo opcional se coma la ultima palabra. Cuando SI trae \"(SET)\", el ancla de los parentesis obliga a retroceder y el nombre se captura entero, que es por que el defecto es invisible en cualquier lista exportada con codigos de set.\n\nPOR QUE IMPORTA Y NO ES UN CASO DE BORDE: \"4 Lightning Bolt\" es EL formato estandar de listas de Magic. Un usuario que pega una lista sin codigos de set no recibe un error: recibe cartas equivocadas o inexistentes, en silencio, porque el nombre truncado se manda igual a Scryfall. \"Lightning\" y \"Sol\" son busquedas que devuelven OTRAS cartas reales. El mercado objetivo de este proyecto tiene colecciones de 25.000 cartas o mas, o sea que importar listas es un flujo central, no accesorio.\n\nCOMO APARECIO: mientras se sembraba volumen en la cuenta E2E de dev para TASK-267. El developer lo encontro, lo esquivo cambiando al import por CSV, y NO lo arreglo ni abrio ticket por no haberlo medido a fondo, cosa correcta. El orquestador lo midio despues ejecutando la regex contra 10 casos.\n\nHALLAZGO RELACIONADO, MEDIDO POR OBSERVACION Y NO POR INSTRUMENTO, se deja anotado aca en vez de abrir un segundo ticket sin causa medida: ese mismo flujo de import por texto consulta Scryfall UNA CARTA POR VEZ, secuencial con await dentro de un bucle. Con 2199 lineas termino en una pared de \"Failed to fetch\". Si se toca esta funcion, vale medir tambien eso, porque para una coleccion de 25.000 cartas el import por texto es inusable por ese motivo aunque se arregle el truncamiento.\n\nNO SE ARREGLA EN TASK-267: ese ticket es el vaciado y la re-siembra, y su alcance ya esta cerrado. Esto es un defecto de producto preexistente que el seeding destapo.",
+  "acceptance_criteria": [
+    "AC1 - Un test unitario sobre parseTextImportLine que ENCIERRE el defecto medido: las 7 lineas truncadas de la descripcion tienen que devolver el nombre COMPLETO, y las 3 que hoy salen bien tienen que seguir saliendo bien. El test debe escribirse PRIMERO y verse fallar (evidencia del rojo en el hand-off), porque el arreglo es una regex y una regex se arregla rompiendo otra cosa con facilidad.",
+    "AC2 - Cubrir en el mismo test los casos que la regex dice soportar y que NO deben romperse: cantidad con y sin la x ('4 Bolt' y '4x Bolt'), el marcador de foil (*f* y *F*), el codigo de set entre parentesis, y nombres con coma como 'Jace, the Mind Sculptor'. Sin esto el arreglo del truncamiento puede romper el foil o el set en silencio.",
+    "AC3 - Decidir y DEJAR ESCRITO que hace el parser con el sufijo suelto que hoy captura el grupo (?:\\s+[\\w-]+)?. Hay que saber para que existe antes de sacarlo: si es un numero de coleccionista o un identificador de Moxfield, sacarlo a secas cambia el comportamiento de esas listas. La decision va comentada en el codigo, no solo en el ticket.",
+    "AC4 - Verificar POR MEDICION contra el flujo real, no solo contra la funcion pura: importar por la UI una lista de al menos 10 cartas SIN codigos de set en dev, y comprobar con firebase-admin que las cartas que entraron son las pedidas y no otras. El defecto es peligroso justamente porque el nombre truncado igual encuentra cartas reales en Scryfall, asi que un import que 'funciona' no prueba nada: hay que comparar los nombres uno por uno.",
+    "AC5 - Confirmar si el mismo parser se usa en mas de un lugar (import de mazos, de carpetas, de coleccion) y que el arreglo los cubra a todos. El comentario del archivo dice que es compartido entre deck y binder; verificarlo con grep antes de dar el ticket por cerrado."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "import",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-23T04:06:04.107Z",
+  "updated_at": "2026-08-23T04:06:04.107Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -74,6 +74,26 @@ if (!BASE_URL) {
   process.exit(1)
 }
 
+// The script writes through whatever app is served at --base-url — --project
+// only controls the *verification* read. A mismatch between the two means the
+// seed lands on one project while verify() checks another, which reports
+// success while proving nothing. Require the hostname to name the project.
+if (projectId !== DEFAULT_PROJECT_ID) {
+  let hostname = ''
+  try {
+    hostname = new URL(BASE_URL).hostname
+  } catch {
+    hostname = ''
+  }
+  if (!hostname.includes(projectId)) {
+    console.error(
+      `Refusing to run: --base-url (${BASE_URL}) does not appear to point at Firebase project "${projectId}".\n` +
+      `Pass a --base-url whose hostname contains "${projectId}", or fix --project to match where --base-url actually serves from.`
+    )
+    process.exit(1)
+  }
+}
+
 const CARD_NAME = args.get('card') ?? 'Lightning Bolt'
 
 const email = process.env.TEST_USER_A_EMAIL
@@ -135,7 +155,14 @@ async function seed() {
   await saleButton.waitFor({ state: 'visible', timeout: 10_000 })
   await saleButton.click()
 
-  const publicToggle = modal.locator('[role="switch"]').first()
+  // Filter by the toggle's own label text, not position — the modal has TWO
+  // role="switch" buttons (foil first, publish second in DOM order). A
+  // positional .first() silently grabs foil instead, which is exactly the
+  // bug this filter replaces (measured: a prior run flipped foil to true
+  // instead of touching publish at all).
+  const publicToggle = modal
+    .locator('[role="switch"]')
+    .filter({ hasText: /publish|publicar/i })
   const ariaChecked = await publicToggle.getAttribute('aria-checked').catch(() => null)
   if (ariaChecked === 'false') await publicToggle.click()
 
@@ -146,12 +173,32 @@ async function seed() {
   const saveButton = modal.getByRole('button', { name: /^add$|agregar/i })
   await saveButton.click()
 
-  await page.locator('text=/success|éxito|agregad|added/i').first().waitFor({ timeout: 15_000 }).catch(() => {})
+  // Wait for an explicit outcome instead of best-effort + unconditional
+  // "Seeded" — a silent save failure (Firestore rules, network — this
+  // project's central measured failure mode) must not be reported as
+  // success. Locale is forced to 'en' above, so match the English toast text.
+  const successToast = page.locator('text=/added$/i').first()
+  const errorToast = page.locator('text=/error adding card/i').first()
+  const [sawSuccess, sawError] = await Promise.all([
+    successToast.waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false),
+    errorToast.waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false),
+  ])
+
   // Let the fire-and-forget syncCardToPublic + scheduleIndexReconcile settle
-  // (both are non-blocking background calls kicked off by addCard).
-  await page.waitForTimeout(4_000)
+  // (both are non-blocking background calls kicked off by addCard) before
+  // closing the browser — only meaningful when the save actually succeeded.
+  if (sawSuccess) await page.waitForTimeout(4_000)
 
   await browser.close()
+
+  if (!sawSuccess || sawError) {
+    console.error(
+      `Seed FAILED: the app never confirmed the save (success toast seen=${sawSuccess}, error toast seen=${sawError}).\n` +
+      `Refusing to report success.`
+    )
+    process.exit(1)
+  }
+
   console.log(`Seeded "${CARD_NAME}" (status=sale, public=true) for ${email} on ${BASE_URL}`)
 }
 
@@ -174,11 +221,35 @@ async function verify() {
   console.log('users/<uid>/card_index chunks:', cardIndexSnap.size)
   console.log('users/<uid>/public_card_index docs:', publicCardIndexSnap.size)
   console.log('public_cards (root, userId==uid):', publicCardsSnap.size)
+
+  // Raw counts don't tell you whether THIS is what the smoke test needs —
+  // with pre-existing cards in the account (production, post-reseed), a
+  // nonzero count proves nothing about this run. Assert the actual claim:
+  // at least one card is status=sale AND public=true.
+  const visibleCard = cardsSnap.docs.find((doc) => {
+    const data = doc.data()
+    return data.status === 'sale' && data.public === true
+  })
+  if (!visibleCard) {
+    throw new Error(
+      `verification FAILED: no card in users/${uid}/cards has status=sale AND public=true — ` +
+      `the smoke test has nothing to find, even though ${cardsSnap.size} card doc(s) exist.`
+    )
+  }
+  console.log(`OK: "${visibleCard.data().name}" (${visibleCard.id}) is status=sale, public=true.`)
 }
 
 await seed()
 try {
   await verify()
 } catch (err) {
-  console.warn('Seed succeeded but verification could not run (likely missing ADC):', err.message)
+  // Missing ADC is a soft skip (the seed itself doesn't need it); an actual
+  // failed assertion is not — it must fail the script, not just print.
+  const isCredentialError = /credential|could not load the default/i.test(err.message)
+  if (isCredentialError) {
+    console.warn('Seed succeeded but verification could not run (likely missing ADC):', err.message)
+  } else {
+    console.error('Verification FAILED:', err.message)
+    process.exit(1)
+  }
 }

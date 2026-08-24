@@ -9,7 +9,7 @@
     "AC4: las escrituras de src/stores/decks.ts y src/stores/binders.ts que handleSave invoca (reduceAllocationsForCard, allocateCardToDeck, deallocateCard, allocateCardToBinder, deallocateCard de binders) quedan envueltas en withTimeout, y getCountFromServer en collection.ts:1741 tambien. Verificable por grep: cero awaits sin techo en esa cadena.",
     "AC5: npm run test:unit verde y npx vite build verde. Ningun test existente roto."
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "bug",
@@ -18,11 +18,25 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "a9a53f8",
+    "c08131b"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-24T17:07:22.778Z",
+      "body": "PASS (ronda 2, sobre c08131b encima de a9a53f8). review_depth full.\n\nRonda 1 sobre a9a53f8: BLOQUEO por 2 HIGH.\n- HIGH-1: deleteCard resolvia la carta solo desde memoria y devolvia false sin tocar Firestore, asi que el caso cross-status del incidente (sale 5 -> collection 2) borraba nada y creaba el doc nuevo: los dos docs quedaban vivos. El fix decidia bien las ops pero no las ejecutaba.\n- HIGH-2: regresion introducida — el await al servidor quedo antes de pintar statusDistribution/condition/foil, que antes era sincrono, y el modal no se desmonta nunca; abrir A, cerrar y abrir B mostraba los datos de A con SAVE habilitado hasta 20s en 4G lenta.\n\nRonda 2: los dos CERRADOS y verificados.\n- HIGH-1: fallbackCard como cuarta fuente de resolucion (collection.ts:2347) y despues el flujo real completo. Test que monta el componente real con memoria vacia y afirma deleteDoc EJECUTADO sobre el doc server-only, no la mera emision de la op — la distincion exacta que bloqueo la ronda 1.\n- HIGH-2: snapshot de memoria sincrono antes del primer await (identico al base b04616e), servidor solo como refinamiento, token monotonico sin carrera verificado para dos aperturas rapidas y para close en vuelo. Ventana CERO.\n\nMEDIDO por el reviewer: npm run test:unit 2277/2277 verde (176 archivos, 71s), npx vite build verde (12.4s), npm run type-check verde. Tests nuevos verificados como no-vacuos en las dos rondas: cada uno apunta a un delta conductual concreto y daria rojo con el commit anterior. Alcance limpio, sin refactors colados; decks.ts y binders.ts ausentes del diff de la ronda 2.\n\nResiduos registrados, ninguno bloqueante: (1) handleSave sigue sin techo estructural propio, y el `await import('../services/cloudFunctions')` de collection.ts:153 es el unico await estrictamente sin techo que queda en la cadena — pre-existente desde TASK-232, corrige la enumeracion de la ronda 1 que lo daba por acotado; (2) los updateDoc hermanos fuera de la cadena de handleSave siguen sin techo; (3) el setTimeout(300ms) del test conviene reemplazarlo por vi.waitFor condicional; (4) el refinamiento del servidor pisa clicks del usuario hechos durante el primer RTT.\n\nConfianza 8/10, pesimista: todo LEIDO en codigo o MEDIDO por ejecucion local. No medido: el import dinamico colgado en navegador real."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-24T17:07:36.083Z",
+      "body": "Cerrado con review PASS en la ronda 2. review_depth full; inputs del rubro: 1066 lineas cambiadas en la ronda 1 (muy por encima del umbral de 150) y logica core de tier tdd en collection.ts, decks.ts, binders.ts y CardDetailModal.vue.\n\nDos commits: a9a53f8 (verificacion contra Firestore antes de crear + withTimeout en decks/binders/getCountFromServer) y c08131b (los dos HIGH de la ronda 1: fallback de deleteCard para filas server-only, e init del modal sincrono-primero con token de apertura).\n\nEl incidente que lo origino esta MEDIDO en produccion, no supuesto: cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1, dos docs de Grand Abolisher con el mismo scryfallId, uno qty 5 en sale y otro qty 2 en collection, ambos con createdAt == updatedAt, o sea los dos creates. El card_index de esa cuenta esta sano (5766 docs / 5766 entradas, divergencia 0), asi que la hipotesis inicial de indice corrupto quedo DESCARTADA POR MEDICION.\n\nPENDIENTE Y NO HECHO EN ESTE TICKET: los dos docs duplicados de Grand Abolisher siguen vivos en produccion. El fix impide que se vuelva a fabricar, no limpia el que ya existe.\n\nTampoco se ha verificado en dev ni desplegado: falta bump de version, suite E2E completa y push a develop.\n\nCuatro residuos anotados por el reviewer para tickets aparte: techo estructural en handleSave (incluye el await import sin techo de collection.ts:153, pre-existente desde TASK-232), updateDoc hermanos fuera de la cadena, vi.waitFor en vez del sleep de 300ms en el test, y el refinamiento del servidor pisando clicks del primer RTT."
+    }
+  ],
   "created_at": "2026-08-24T16:11:15.174Z",
-  "updated_at": "2026-08-24T16:11:17.535Z",
+  "updated_at": "2026-08-24T17:07:36.083Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

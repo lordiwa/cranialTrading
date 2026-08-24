@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-23T04:06:26.537Z",
+  "generated_at": "2026-08-24T17:07:36.083Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1554,6 +1554,12 @@
       "title": "Importar por texto plano PIERDE la ultima palabra del nombre: \"4 Lightning Bolt\" entra como \"Lightning\"",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-280",
+      "title": "Editar cantidad en CardDetailModal duplica la carta y deja el boton en GUARDANDO",
+      "status": "done",
+      "priority": "critical"
     }
   ]
 }

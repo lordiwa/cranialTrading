@@ -2,6 +2,12 @@
   "schema_version": 1,
   "nodes": [
     {
+      "id": "decision-20260822-task-275-deteccion-sin-reparacion",
+      "type": "decision",
+      "ref": "state/sessions/20260612T043009Z-4b555c2a/session.json",
+      "label": "Opcion A en card_index: deteccion pura sin disparar buildCardIndex, y persistencia del diagnostico por cuenta"
+    },
+    {
       "id": "task-145",
       "type": "task",
       "ref": "tasks/TASK-145.json",
@@ -188,10 +194,10 @@
       "label": "El card_index queda con huecos que el uso NO cierra, y el conjunto faltante cambia entre sesiones"
     },
     {
-      "id": "decision-20260822-task-275-deteccion-sin-reparacion",
-      "type": "decision",
-      "ref": "state/sessions/20260612T043009Z-4b555c2a/session.json",
-      "label": "Opcion A en card_index: deteccion pura sin disparar buildCardIndex, y persistencia del diagnostico por cuenta"
+      "id": "task-280",
+      "type": "task",
+      "ref": "tasks/TASK-280.json",
+      "label": "Editar cantidad en CardDetailModal duplica la carta y deja el boton en GUARDANDO"
     }
   ],
   "edges": [

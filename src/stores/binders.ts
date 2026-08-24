@@ -319,20 +319,31 @@ export const useBindersStore = defineStore('binders', () => {
     // ALLOCATION OPERATIONS
     // ========================================================================
 
+    // TASK-281 HIGH-1: returns { allocated, failed } instead of a bare
+    // number. A bare 0 was ambiguous between two very different causes —
+    // (a) a real write failure, and (b) the BY-DESIGN availability cap
+    // below (toAllocate <= 0, e.g. the binder "+" button has no upper
+    // bound in the UI so it's easy to ask for more than's left after deck
+    // allocations). CardDetailModal.handleSave needs to tell them apart:
+    // the cap is not a failure and must not produce an error toast that
+    // then can never be dismissed by retrying (the target/original slots
+    // would stay stuck at the same over-cap values forever). failed=true
+    // only for auth/binder/card-not-found and the actual Firestore write
+    // failing; failed=false (with allocated===0) for the cap.
     const allocateCardToBinder = async (
         binderId: string,
         cardId: string,
         quantity: number
-    ): Promise<number> => {
-        if (!authStore.user?.id) return 0
+    ): Promise<{ allocated: number; failed: boolean }> => {
+        if (!authStore.user?.id) return { allocated: 0, failed: true }
 
         try {
             const binder = binders.value.find(b => b.id === binderId)
-            if (!binder) return 0
+            if (!binder) return { allocated: 0, failed: true }
 
             const collectionStore = useCollectionStore()
             const card = collectionStore.getCardById(cardId)
-            if (!card) return 0
+            if (!card) return { allocated: 0, failed: true }
 
             // Calculate available quantity (across decks AND binders)
             const decksStore = useDecksStore()
@@ -340,9 +351,9 @@ export const useBindersStore = defineStore('binders', () => {
             const binderAllocated = getTotalAllocatedForCard(cardId)
             const available = Math.max(0, card.quantity - deckAllocated - binderAllocated)
 
-            // Cap at available
+            // Cap at available — NOT a failure, see the function comment above.
             const toAllocate = Math.min(quantity, available)
-            if (toAllocate <= 0) return 0
+            if (toAllocate <= 0) return { allocated: 0, failed: false }
 
             if (!binder.allocations) binder.allocations = []
 
@@ -384,11 +395,11 @@ export const useBindersStore = defineStore('binders', () => {
                 binders.value = [...binders.value]
             }
 
-            return toAllocate
+            return { allocated: toAllocate, failed: false }
         } catch (error) {
             logSanitizedError('Error allocating card to binder', error)
             toastStore.show(t('binders.errors.create'), 'error')
-            return 0
+            return { allocated: 0, failed: true }
         }
     }
 

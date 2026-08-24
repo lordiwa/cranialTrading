@@ -101,7 +101,10 @@ describe('binders store — AC4: writes wrapped in withTimeout must not hang han
     const result = await resultPromise
 
     expect(settled).toBe(true)
-    expect(result).toBe(0)
+    // TASK-281 HIGH-1: allocateCardToBinder now distinguishes a real write
+    // failure (this case — the withTimeout wrapped write timed out) from
+    // the availability cap, both of which used to collapse into a bare 0.
+    expect(result).toEqual({ allocated: 0, failed: true })
   })
 
   it('deallocateCard: a hung updateDoc still resolves to false instead of hanging', async () => {

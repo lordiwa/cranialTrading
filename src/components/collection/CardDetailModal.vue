@@ -681,8 +681,9 @@ const handleSave = async () => {
     // TASK-281: none of the writes below reject on failure — deleteCard/
     // updateCard/deallocateCard resolve to false, addCard to null,
     // allocateCardToDeck to { allocated: 0, wishlisted: 0 },
-    // allocateCardToBinder to 0, and reduceAllocationsForCard (AC4) now to
-    // false — so the catch block below can never see a failed write.
+    // allocateCardToBinder to { allocated: 0, failed: true/false }, and
+    // reduceAllocationsForCard (AC4) now to false — so the catch block
+    // below can never see a failed write.
     // anySucceeded/anyFailed accumulate across every step so we can tell,
     // at the end, whether to show success, a partial-failure message, or
     // the generic error — see the anyFailed check after STEP 3.5 below.
@@ -759,11 +760,17 @@ const handleSave = async () => {
         if (ok) anySucceeded = true
         else anyFailed = true
       } else {
-        // allocate ops are only ever emitted with quantity > 0 (computeBinderSlotOps
-        // guards target > 0), so 0 back means the write failed, not "nothing to do".
-        const allocated = await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
-        if (allocated > 0) anySucceeded = true
-        else anyFailed = true
+        // TASK-281 HIGH-1: allocateCardToBinder can return allocated:0 for
+        // two different reasons — a real write failure (failed:true), or
+        // the availability cap being hit by design (failed:false; the
+        // binder "+" button has no upper bound in the UI, so this is
+        // reachable). Only the former is a save failure — treating the
+        // cap as a failure would show an error the user can never clear
+        // by retrying (the target/original slots stay at the same
+        // over-cap values forever).
+        const result = await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
+        if (result.allocated > 0) anySucceeded = true
+        else if (result.failed) anyFailed = true
       }
     }
 

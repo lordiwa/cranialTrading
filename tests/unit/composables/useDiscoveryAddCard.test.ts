@@ -35,7 +35,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
       ...(overrides.decksStore as object ?? {}),
     },
     bindersStore: {
-      allocateCardToBinder: vi.fn().mockResolvedValue(1),
+      allocateCardToBinder: vi.fn().mockResolvedValue({ allocated: 1, failed: false }),
       binders: ref<Array<{ id: string; forSale?: boolean }>>([
         { id: 'binder-1', forSale: false },
       ]),
@@ -158,7 +158,7 @@ describe('useDiscoveryAddCard', () => {
     it('adds with status=sale when binder.forSale=true', async () => {
       const deps = makeDeps({
         bindersStore: {
-          allocateCardToBinder: vi.fn().mockResolvedValue(1),
+          allocateCardToBinder: vi.fn().mockResolvedValue({ allocated: 1, failed: false }),
           binders: ref([{ id: 'binder-1', forSale: true }]),
         },
       })
@@ -184,7 +184,7 @@ describe('useDiscoveryAddCard', () => {
 
     it('returns ok:false when allocation returns 0 (no available copies)', async () => {
       const deps = makeDeps()
-      deps.bindersStore.allocateCardToBinder = vi.fn().mockResolvedValue(0)
+      deps.bindersStore.allocateCardToBinder = vi.fn().mockResolvedValue({ allocated: 0, failed: false })
       const { addToBinder } = useDiscoveryAddCard('binders', deps)
 
       const result = await addToBinder(makePrint())

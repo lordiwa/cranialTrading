@@ -302,7 +302,7 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     wrapper.unmount()
   })
 
-  it('AC2 surface allocateCardToBinder: 0 shows the error toast, not success', async () => {
+  it('AC2 surface allocateCardToBinder: a real write failure ({allocated:0, failed:true}) shows the error toast, not success', async () => {
     const card = makeCard({ id: 'card-1', status: 'collection', quantity: 4 })
     const collectionStore = useCollectionStore()
     collectionStore.cards = [card] as any
@@ -311,7 +311,7 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
 
     const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
     await flushPromises()
-    bindersStore.allocateCardToBinder = vi.fn().mockResolvedValue(0)
+    bindersStore.allocateCardToBinder = vi.fn().mockResolvedValue({ allocated: 0, failed: true })
 
     const buttons = panelButtons('cards.detailModal.assignToBinders')
     buttons[1]!.click() // plus: 0 -> 1
@@ -321,6 +321,37 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
     expect(wrapper.emitted('close')).toBeFalsy()
+
+    wrapper.unmount()
+  })
+
+  it('HIGH-1 regression: allocateCardToBinder hitting the availability cap ({allocated:0, failed:false}) is NOT a save failure — no error toast, modal still closes', async () => {
+    // Reviewer finding on the first cut of this ticket: a bare 0 from
+    // allocateCardToBinder is ambiguous between a real write failure and
+    // the BY-DESIGN availability cap (binders.ts: `if (toAllocate <= 0)
+    // return ...`). The binder "+" button has no upper bound in the UI, so
+    // a user can genuinely ask for more than is available — that must not
+    // produce an error toast the user can never clear by retrying (the
+    // target/original slots would stay stuck at the same over-cap values
+    // forever, since nothing about them changes on retry).
+    const card = makeCard({ id: 'card-1', status: 'collection', quantity: 4 })
+    const collectionStore = useCollectionStore()
+    collectionStore.cards = [card] as any
+    const bindersStore = useBindersStore()
+    seedBinder(bindersStore, [])
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
+    await flushPromises()
+    bindersStore.allocateCardToBinder = vi.fn().mockResolvedValue({ allocated: 0, failed: false })
+
+    const buttons = panelButtons('cards.detailModal.assignToBinders')
+    buttons[1]!.click() // plus: 0 -> 1
+    await save()
+
+    const toastStore = useToastStore()
+    expect(toastStore.toasts.some(t => t.type === 'error')).toBe(false)
+    expect(toastStore.toasts.some(t => t.type === 'success')).toBe(true)
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -404,6 +435,35 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const errorToast = toastStore.toasts.find(t => t.type === 'error')
     expect(errorToast).toBeTruthy()
     expect(errorToast!.message).toBe('cards.detailModal.saveError')
+
+    wrapper.unmount()
+  })
+
+  it('MEDIUM-2 (AC4): reduceAllocationsForCard returning false (STEP 1) shows the error toast, not success, and the modal does not close', async () => {
+    // AC4 implemented reduceAllocationsForCard: Promise<boolean> but nothing
+    // exercised handleSave's STEP 1 branch actually consuming that boolean —
+    // reviewer finding. STEP 1 only runs when owned qty drops below what's
+    // already allocated to a deck, so seed a deck allocation for this card
+    // first, then reduce collection below it.
+    const card = makeCard({ id: 'card-1', status: 'collection', quantity: 4 })
+    const collectionStore = useCollectionStore()
+    collectionStore.cards = [card] as any
+    const decksStore = useDecksStore()
+    seedDeck(decksStore, [{ cardId: 'card-1', quantity: 3, isInSideboard: false }])
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
+    await flushPromises()
+    decksStore.reduceAllocationsForCard = vi.fn().mockResolvedValue(false)
+
+    // collection 4 -> 2: newOwnedQty(2) < totalAllocated(3) triggers STEP 1.
+    await clickQty('qty-row-collection', 0, 2)
+    await save()
+
+    expect(decksStore.reduceAllocationsForCard).toHaveBeenCalled()
+    const toastStore = useToastStore()
+    expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
+    expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
+    expect(wrapper.emitted('close')).toBeFalsy()
 
     wrapper.unmount()
   })

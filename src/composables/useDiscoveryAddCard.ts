@@ -19,7 +19,11 @@ interface DiscoveryAddDeps {
     ) => Promise<{ allocated: number; wishlisted: number }>
   }
   bindersStore: {
-    allocateCardToBinder: (binderId: string, cardId: string, quantity: number) => Promise<number>
+    // TASK-281 HIGH-1: allocated:0 is ambiguous on its own (write failure vs.
+    // the by-design availability cap) — see the store's own comment on
+    // allocateCardToBinder. This composable doesn't need to tell them apart
+    // (unchanged from before this ticket): both still mean "nothing to add".
+    allocateCardToBinder: (binderId: string, cardId: string, quantity: number) => Promise<{ allocated: number; failed: boolean }>
     binders: Ref<{ id: string; forSale?: boolean }[]>
   }
   toastStore: { show: (msg: string, kind?: 'success' | 'error' | 'info') => void }
@@ -167,7 +171,7 @@ export function useDiscoveryAddCard(scope: DiscoveryScope, deps: DiscoveryAddDep
       const status: CardStatus = binder?.forSale ? 'sale' : 'collection'
       const cardId = await ensureCollectionCard(print, status)
       if (!cardId) return { ok: false }
-      const allocated = await deps.bindersStore.allocateCardToBinder(deps.selectedBinderId.value, cardId, 1)
+      const { allocated } = await deps.bindersStore.allocateCardToBinder(deps.selectedBinderId.value, cardId, 1)
       if (allocated === 0) {
         deps.toastStore.show(deps.t('discovery.messages.addError'), 'error')
         return { ok: false }

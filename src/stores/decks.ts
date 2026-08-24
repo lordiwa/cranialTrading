@@ -1103,11 +1103,18 @@ export const useDecksStore = defineStore('decks', () => {
         return toConvert
     }
 
-    const reduceAllocationsForCard = async (card: Card, newQuantity: number): Promise<void> => {
-        if (!authStore.user?.id) return
+    // TASK-281 AC4: returns Promise<boolean> (was Promise<void>) so
+    // CardDetailModal.handleSave can tell whether this step actually wrote
+    // anything. Only one caller exists (handleSave's STEP 1), so widening
+    // the return type is low-risk. false = a write it needed to make did
+    // not happen (auth missing, wishlist-card creation failed, or one or
+    // more deck updateDoc calls failed/timed out); true covers both a
+    // clean write and the legitimate no-op (nothing to reduce).
+    const reduceAllocationsForCard = async (card: Card, newQuantity: number): Promise<boolean> => {
+        if (!authStore.user?.id) return false
 
         const totalAllocated = getTotalAllocatedForCard(card.id)
-        if (newQuantity >= totalAllocated) return
+        if (newQuantity >= totalAllocated) return true
 
         const collectionStore = useCollectionStore()
         let excessToRemove = totalAllocated - newQuantity
@@ -1118,7 +1125,7 @@ export const useDecksStore = defineStore('decks', () => {
             price: card.price ?? 0, image: card.image ?? '',
             cmc: card.cmc, type_line: card.type_line, colors: card.colors,
         })
-        if (!wishCardId) return
+        if (!wishCardId) return false
 
         const updatePromises: Promise<void>[] = []
         const touchedDeckIds: string[] = []
@@ -1161,6 +1168,8 @@ export const useDecksStore = defineStore('decks', () => {
             }
             decks.value = [...decks.value]
         }
+
+        return failures.length === 0
     }
 
     /**

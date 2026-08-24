@@ -804,6 +804,7 @@
       "editionPrintLabel": "Edition / Print",
       "updated": "Card updated",
       "saveError": "Error saving changes",
+      "savePartialError": "Save incomplete — some changes were saved, others were not. Please check and try again.",
       "priceHistory": {
         "toggle": "Price history",
         "noData": "Not enough data yet"

@@ -505,12 +505,19 @@ const adjustBinder = (binderId: string, delta: number) => {
 // SCRUM-35 fix: aplica ops calculadas por computeStatusOperations (util pura).
 // Cada op opera sobre la fila exacta (scryfallId, edition, condition, foil, status).
 // Devuelve mapping status → cardId para que el sync de allocations sepa cuál usar.
+// TASK-281 AC1: deleteCard/updateCard resuelven Promise<boolean> y addCard
+// Promise<string | null> — ninguno rechaza en un fallo, así que el único
+// modo de que handleSave se entere es mirar el valor de retorno. anySucceeded
+// / anyFailed dejan que handleSave arme el mensaje correcto (éxito / parcial
+// / error total) sin que esta función decida el toast por sí sola.
 const applyStatusOperations = async (
   ops: ReturnType<typeof computeStatusOperations>,
   cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
   existingCards: Card[],
-): Promise<Record<CardStatus, string | null>> => {
+): Promise<{ idsByStatus: Record<CardStatus, string | null>; anySucceeded: boolean; anyFailed: boolean }> => {
   const idsByStatus: Record<CardStatus, string | null> = { collection: null, sale: null, trade: null, wishlist: null }
+  let anySucceeded = false
+  let anyFailed = false
   // SCRUM-35 D: snapshot canonical id por status — ignora edition (identidad relajada)
   // para que survive cards con edition stale legacy. Prefiere la fila con edition
   // canónica si existe; si todas son stale, agarra la primera (que será actualizada
@@ -540,28 +547,47 @@ const applyStatusOperations = async (
       // MERGED with a server read), so pass that row as a fallback the
       // store can delete by even though memory never held it.
       const fallbackCard = existingCards.find(c => c.id === op.cardId)
-      await collectionStore.deleteCard(op.cardId, fallbackCard)
-      // eslint-disable-next-line security/detect-object-injection
-      idsByStatus[op.status] = null
+      const deleted = await collectionStore.deleteCard(op.cardId, fallbackCard)
+      if (deleted) {
+        anySucceeded = true
+        // eslint-disable-next-line security/detect-object-injection
+        idsByStatus[op.status] = null
+      } else {
+        // TASK-281 AC1: deleteCard resolved false — no Firestore write
+        // happened, so the row this status pointed at is still there.
+        // Leave idsByStatus[op.status] as the canonical id resolved above
+        // instead of nulling it out for a delete that never occurred.
+        anyFailed = true
+      }
     } else if (op.type === 'update' && op.cardId) {
-      await collectionStore.updateCard(op.cardId, {
+      const updated = await collectionStore.updateCard(op.cardId, {
         quantity: op.quantity, condition: cardData.condition, foil: cardData.foil,
         scryfallId: cardData.scryfallId, edition: cardData.edition, setCode: cardData.setCode,
         image: cardData.image, price: cardData.price, public: cardData.isPublic,
       })
-      // eslint-disable-next-line security/detect-object-injection
-      idsByStatus[op.status] = op.cardId
+      if (updated) {
+        anySucceeded = true
+        // eslint-disable-next-line security/detect-object-injection
+        idsByStatus[op.status] = op.cardId
+      } else {
+        anyFailed = true
+      }
     } else if (op.type === 'create') {
       const newId = await collectionStore.addCard({
         scryfallId: cardData.scryfallId, name: cardData.name, edition: cardData.edition,
         setCode: cardData.setCode, quantity: op.quantity, condition: cardData.condition,
         foil: cardData.foil, price: cardData.price, image: cardData.image, status: op.status, public: cardData.isPublic,
       })
-      // eslint-disable-next-line security/detect-object-injection
-      if (newId) idsByStatus[op.status] = newId
+      if (newId) {
+        anySucceeded = true
+        // eslint-disable-next-line security/detect-object-injection
+        idsByStatus[op.status] = newId
+      } else {
+        anyFailed = true
+      }
     }
   }
-  return idsByStatus
+  return { idsByStatus, anySucceeded, anyFailed }
 }
 
 // SCRUM-35 D2: snapshot allocations grouped by (deckId × board) across ALL related
@@ -652,15 +678,31 @@ const handleSave = async () => {
     // SCRUM-40 (QA gap): snapshot per-binder totals BEFORE mutation, same shape as deck slots.
     const originalBinderSlots = buildOriginalBinderSlotsForRelated(savedRelatedCards)
 
+    // TASK-281: none of the writes below reject on failure — deleteCard/
+    // updateCard/deallocateCard resolve to false, addCard to null,
+    // allocateCardToDeck to { allocated: 0, wishlisted: 0 },
+    // allocateCardToBinder to 0, and reduceAllocationsForCard (AC4) now to
+    // false — so the catch block below can never see a failed write.
+    // anySucceeded/anyFailed accumulate across every step so we can tell,
+    // at the end, whether to show success, a partial-failure message, or
+    // the generic error — see the anyFailed check after STEP 3.5 below.
+    let anySucceeded = false
+    let anyFailed = false
+
     // STEP 1: reduce deck allocations if owned drops below allocated (owned path only).
     if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
-      await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
+      const step1Ok = await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
+      if (step1Ok) anySucceeded = true
+      else anyFailed = true
     }
 
     // STEP 2: apply status diff. Strict identity per (scryfallId, edition, condition, foil)
     // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
     const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave)
-    const idsByStatus = await applyStatusOperations(ops, cardData, existingCardsForSave)
+    const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed } =
+      await applyStatusOperations(ops, cardData, existingCardsForSave)
+    if (step2Succeeded) anySucceeded = true
+    if (step2Failed) anyFailed = true
 
     // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
     // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as
@@ -686,9 +728,16 @@ const handleSave = async () => {
     })
     for (const op of slotOps) {
       if (op.type === 'deallocate') {
-        await decksStore.deallocateCard(op.deckId, op.cardId, op.isInSideboard)
+        const ok = await decksStore.deallocateCard(op.deckId, op.cardId, op.isInSideboard)
+        if (ok) anySucceeded = true
+        else anyFailed = true
       } else {
-        await decksStore.allocateCardToDeck(op.deckId, op.cardId, op.quantity, op.isInSideboard)
+        const result = await decksStore.allocateCardToDeck(op.deckId, op.cardId, op.quantity, op.isInSideboard)
+        // allocate ops are only ever emitted with quantity > 0 (computeDeckSlotOps
+        // guards targetQty > 0), so both counters at 0 means the write failed —
+        // not a legitimate "nothing to allocate" outcome.
+        if (result.allocated > 0 || result.wishlisted > 0) anySucceeded = true
+        else anyFailed = true
       }
     }
 
@@ -706,10 +755,31 @@ const handleSave = async () => {
     })
     for (const op of binderSlotOps) {
       if (op.type === 'deallocate') {
-        await bindersStore.deallocateCard(op.binderId, op.cardId)
+        const ok = await bindersStore.deallocateCard(op.binderId, op.cardId)
+        if (ok) anySucceeded = true
+        else anyFailed = true
       } else {
-        await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
+        // allocate ops are only ever emitted with quantity > 0 (computeBinderSlotOps
+        // guards target > 0), so 0 back means the write failed, not "nothing to do".
+        const allocated = await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
+        if (allocated > 0) anySucceeded = true
+        else anyFailed = true
       }
+    }
+
+    // TASK-281 AC2/AC3/AC5: any failed write anywhere in the chain above
+    // means the user's change was NOT fully persisted — do not show
+    // success, do not emit saved/close (the modal stays open so the user
+    // can retry without losing what they entered). AC5: if something DID
+    // write before the failure, say so explicitly (savePartialError)
+    // instead of the generic saveError, since "nothing was saved" would be
+    // false in that case.
+    if (anyFailed) {
+      toastStore.show(
+        t(anySucceeded ? 'cards.detailModal.savePartialError' : 'cards.detailModal.saveError'),
+        'error',
+      )
+      return
     }
 
     // NOTE: do NOT call collectionStore.loadCollection() here.

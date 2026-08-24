@@ -804,6 +804,7 @@
       "editionPrintLabel": "Edição / Print",
       "updated": "Carta atualizada",
       "saveError": "Erro ao salvar alterações",
+      "savePartialError": "Salvamento incompleto — algumas alterações foram salvas, outras não. Verifique e tente novamente.",
       "priceHistory": {
         "toggle": "Histórico de preço",
         "noData": "Dados insuficientes ainda"

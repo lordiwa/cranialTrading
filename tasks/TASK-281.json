@@ -1,0 +1,29 @@
+{
+  "key": "TASK-281",
+  "title": "handleSave muestra toast de EXITO aunque las escrituras hayan fallado",
+  "description": "Hallazgo del developer de TASK-280, confirmado por el reviewer, y priorizado por Rafael el 2026-08-24.\n\n`CardDetailModal.handleSave` y `applyStatusOperations` (src/components/collection/CardDetailModal.vue) IGNORAN el valor de retorno de todas las operaciones que invocan. Varias de ellas fallan devolviendo `false` en vez de lanzar excepcion:\n\n- collectionStore.deleteCard -> Promise<boolean>\n- collectionStore.updateCard -> Promise<boolean>\n- collectionStore.addCard -> Promise<string | null>\n- decksStore.allocateCardToDeck / deallocateCard -> Promise<boolean> (decks.ts:596, 898)\n- bindersStore.allocateCardToBinder / deallocateCard -> Promise<boolean> (binders.ts:322, 511)\n- decksStore.reduceAllocationsForCard -> Promise<void> (no reporta fallo de ninguna forma; ver AC4)\n\nComo ninguna devuelve rechazo, el `catch` de handleSave no se dispara y el flujo llega igual a `toastStore.show(t('cards.detailModal.updated'), 'success')` seguido de `emit('saved')` y `emit('close')`. El usuario ve EXITO y el modal se cierra mientras el dato no se guardo.\n\nEsto importa especialmente ahora: TASK-280 acaba de poner techos de 20s a esas escrituras, asi que un cuelgue de red ya NO deja el boton colgado — termina, devuelve false, y con este defecto termina mostrando EXITO. O sea que el arreglo del boton convirtio un sintoma visible (boton trabado) en uno invisible (exito mentiroso). El mercado objetivo es 4G lenta, donde el timeout se va a alcanzar de verdad.\n\nALCANCE CERRADO: solo hacer que handleSave reporte fallo cuando una operacion falla. No cambiar la semantica de retorno de los stores, no agregar reintentos, no refactorizar nada adyacente, no tocar card_index.",
+  "acceptance_criteria": [
+    "AC1: applyStatusOperations propaga el resultado de cada op. Si deleteCard o updateCard devuelven false, o addCard devuelve null, handleSave se entera. Test: mockear updateCard devolviendo false y afirmar que NO se muestra el toast de exito.",
+    "AC2: handleSave muestra el toast de ERROR (no el de exito) cuando cualquier operacion de la cadena fallo, incluidas las allocations de mazos y carpetas (allocateCardToDeck, deallocateCard, allocateCardToBinder, deallocateCard de binders, todas Promise<boolean>). Test por cada superficie.",
+    "AC3: el modal NO se cierra en un save fallido — el usuario tiene que poder reintentar sin perder lo que cargo. isLoading vuelve a false igual (no se reintroduce el cuelgue de TASK-280). Test: fallo -> emit('close') no se emitio y isLoading es false.",
+    "AC4: reduceAllocationsForCard (decks.ts:1106) devuelve Promise<void> y hoy no puede reportar fallo de ninguna manera. Decidir y dejar ESCRITO en el ticket una de dos: (a) cambiar su firma a Promise<boolean> y que handleSave la mire, o (b) dejarla como esta y documentar en el codigo por que su fallo no bloquea el save. No dejarlo implicito.",
+    "AC5: mensaje al usuario accionable. Si el fallo es parcial (algunas ops si escribieron), el texto tiene que decir que el guardado quedo incompleto, no un error generico. Claves i18n verificadas en en.json, es.json y pt.json — las 3, en el mismo commit.",
+    "AC6: npm run test:unit verde y npx vite build verde. Ningun test existente roto, en particular los 5 archivos de test que agrego TASK-280."
+  ],
+  "status": "in_progress",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "collection",
+    "silent-failure"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-24T22:24:23.567Z",
+  "updated_at": "2026-08-24T22:24:26.110Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

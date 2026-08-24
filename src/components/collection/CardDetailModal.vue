@@ -320,9 +320,65 @@ const showPublicOption = computed(() => {
 
 // ========== METHODS ==========
 
+// TASK-280 HIGH-2: the modal stays mounted across opens (CollectionView
+// toggles it via the `show` prop) and its state was never reset in
+// handleClose. Before this fix, initializeForm awaited the server read
+// BEFORE touching relatedCards/statusDistribution/condition/foil, so during
+// that gap (>=1 RTT, up to CARD_WRITE_TIMEOUT_MS on the slow-4G target
+// market) the PREVIOUS card's data stayed on screen with SAVE already
+// enabled — a save fired in that window would write the previous card's
+// distribution under the NEW card's identity. initOpenToken discards a
+// server-read response that resolves after a newer open (or a close)
+// superseded it, so a stale response can never clobber whatever is current.
+let initOpenToken = 0
+
+// Applies a related-cards list (memory-only, then later memory+server
+// merged) to relatedCards/statusDistribution/deckAllocations/
+// binderAllocations. Factored out so initializeForm can apply the
+// synchronous memory-only snapshot immediately and refine it in place once
+// the server read resolves, without duplicating this logic.
+const applyRelatedCards = (list: Card[]) => {
+  relatedCards.value = list
+
+  statusDistribution.value = {
+    collection: 0,
+    sale: 0,
+    trade: 0,
+    wishlist: 0,
+  }
+  for (const card of list) {
+    statusDistribution.value[card.status] += card.quantity
+  }
+
+  // SCRUM-35 D2: load deck allocations as { mb, sb } slots per deck. Sums across ALL
+  // related cards (owned rows + wishlist rows) since they share the same physical card
+  // identity. The previous flat { quantity, isInSideboard } shape collapsed mb+sb into
+  // a single bucket and lost half the allocation data on save.
+  // SCRUM-40 (QA gap): useCardAllocation merges deck+binder allocations into one map keyed
+  // by the SAME deckId field (binders also use it). Split them up front using bindersStore
+  // ids to avoid binder allocs ending up in deckAllocations[binderId] (orphaned, never saved).
+  deckAllocations.value = {}
+  binderAllocations.value = {}
+  const binderIds = new Set(bindersStore.binders.map(b => b.id))
+  for (const card of list) {
+    const allocations = getAllocationsForCard(card.id)
+    for (const alloc of allocations) {
+      if (binderIds.has(alloc.deckId)) {
+        binderAllocations.value[alloc.deckId] = (binderAllocations.value[alloc.deckId] ?? 0) + alloc.quantity
+      } else {
+        const cur = deckAllocations.value[alloc.deckId] ?? { mb: 0, sb: 0 }
+        if (alloc.isInSideboard) cur.sb += alloc.quantity
+        else cur.mb += alloc.quantity
+        deckAllocations.value[alloc.deckId] = cur
+      }
+    }
+  }
+}
+
 // Initialize form when modal opens
 const initializeForm = async () => {
   if (!props.card) return
+  const myOpenToken = ++initOpenToken
 
   // Get fresh card data from store (props.card might be stale reference)
   const freshCard = collectionStore.cards.find(c => c.id === props.card?.id) ?? props.card
@@ -338,54 +394,26 @@ const initializeForm = async () => {
     c.foil === freshCard.foil
   )
 
-  // TASK-280 AC2: `collectionStore.cards` (memory) can be stale relative to
-  // Firestore — the production incident measured a `sale` doc missing from
-  // memory, so its quantity never showed in statusDistribution below. One
-  // server read per open, merged with memory (server wins on id collision).
-  const serverRelatedCards = await collectionStore.fetchServerCardsByPrint(
-    freshCard.scryfallId, freshCard.condition, freshCard.foil,
-  )
-  relatedCards.value = mergeServerCards(memoryRelatedCards, serverRelatedCards)
-
-  // Initialize status distribution from related cards
-  statusDistribution.value = {
-    collection: 0,
-    sale: 0,
-    trade: 0,
-    wishlist: 0,
-  }
-
-  for (const card of relatedCards.value) {
-    statusDistribution.value[card.status] += card.quantity
-  }
-
-  // Use condition and foil from the fresh card
+  // TASK-280 HIGH-2: apply the memory-only snapshot SYNCHRONOUSLY, before any
+  // await, so the modal never shows a previous card's data for this card's
+  // identity. condition/foil/isPublic must be set here too (not after the
+  // server read) for the same reason.
+  applyRelatedCards(memoryRelatedCards)
   condition.value = freshCard.condition
   foil.value = freshCard.foil
   isPublic.value = freshCard.public ?? false
 
-  // SCRUM-35 D2: load deck allocations as { mb, sb } slots per deck. Sums across ALL
-  // related cards (owned rows + wishlist rows) since they share the same physical card
-  // identity. The previous flat { quantity, isInSideboard } shape collapsed mb+sb into
-  // a single bucket and lost half the allocation data on save.
-  // SCRUM-40 (QA gap): useCardAllocation merges deck+binder allocations into one map keyed
-  // by the SAME deckId field (binders also use it). Split them up front using bindersStore
-  // ids to avoid binder allocs ending up in deckAllocations[binderId] (orphaned, never saved).
-  deckAllocations.value = {}
-  binderAllocations.value = {}
-  const binderIds = new Set(bindersStore.binders.map(b => b.id))
-  for (const card of relatedCards.value) {
-    const allocations = getAllocationsForCard(card.id)
-    for (const alloc of allocations) {
-      if (binderIds.has(alloc.deckId)) {
-        binderAllocations.value[alloc.deckId] = (binderAllocations.value[alloc.deckId] ?? 0) + alloc.quantity
-      } else {
-        const cur = deckAllocations.value[alloc.deckId] ?? { mb: 0, sb: 0 }
-        if (alloc.isInSideboard) cur.sb += alloc.quantity
-        else cur.mb += alloc.quantity
-        deckAllocations.value[alloc.deckId] = cur
-      }
-    }
+  // TASK-280 AC2: `collectionStore.cards` (memory) can be stale relative to
+  // Firestore — the production incident measured a `sale` doc missing from
+  // memory, so its quantity never showed in statusDistribution above. One
+  // server read per open, merged with memory (server wins on id collision)
+  // and applied in place once it resolves — guarded by myOpenToken so a
+  // late response from a superseded open cannot overwrite a newer one.
+  const serverRelatedCards = await collectionStore.fetchServerCardsByPrint(
+    freshCard.scryfallId, freshCard.condition, freshCard.foil,
+  )
+  if (myOpenToken === initOpenToken) {
+    applyRelatedCards(mergeServerCards(memoryRelatedCards, serverRelatedCards))
   }
 
   // Load available prints
@@ -505,7 +533,14 @@ const applyStatusOperations = async (
   }
   for (const op of ops) {
     if (op.type === 'delete' && op.cardId) {
-      await collectionStore.deleteCard(op.cardId)
+      // TASK-280 HIGH-1: deleteCard resolves the card from memory
+      // (cards.value/cardsById/paginatedCards) and silently returns false —
+      // no Firestore write — if it isn't found there. A delete op can target
+      // a row that exists ONLY on the server (existingCards is memory
+      // MERGED with a server read), so pass that row as a fallback the
+      // store can delete by even though memory never held it.
+      const fallbackCard = existingCards.find(c => c.id === op.cardId)
+      await collectionStore.deleteCard(op.cardId, fallbackCard)
       // eslint-disable-next-line security/detect-object-injection
       idsByStatus[op.status] = null
     } else if (op.type === 'update' && op.cardId) {
@@ -696,9 +731,16 @@ const handleSave = async () => {
 }
 
 const handleClose = () => {
+  // TASK-280 HIGH-2: invalidate any in-flight initializeForm server read
+  // (its response would otherwise still apply after close) and reset
+  // statusDistribution — the modal stays mounted, so without this a reopen
+  // could briefly render leftover state from whichever card was open before
+  // the next initializeForm's synchronous memory snapshot lands.
+  initOpenToken++
   availablePrints.value = []
   selectedPrint.value = null
   relatedCards.value = []
+  statusDistribution.value = { collection: 0, sale: 0, trade: 0, wishlist: 0 }
   deckAllocations.value = {}
   binderAllocations.value = {}
   showZoom.value = false

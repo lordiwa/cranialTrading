@@ -242,4 +242,99 @@ describe('CardDetailModal — TASK-280 save must check Firestore before creating
       vi.useRealTimers()
     }
   })
+
+  it('HIGH-1 regression: memory empty, server sale doc moved to collection — the server-only sale doc is actually DELETED (not silently kept)', async () => {
+    // The exact production repro: sale 5 -> collection 2, cross-status.
+    // computeStatusOperations emits delete(sale) + create(collection).
+    // Before HIGH-1, deleteCard('server-sale') could not find the id in
+    // memory (memory is empty) and returned false WITHOUT calling
+    // deleteDoc — the sale doc survived as a live duplicate.
+    mockGetDocs.mockResolvedValue({
+      empty: false,
+      docs: [
+        docWith('server-sale', {
+          scryfallId: 'sf-3', name: 'Grand Abolisher', edition: 'Commander Masters', setCode: 'CMM',
+          quantity: 5, condition: 'NM', foil: false, price: 1, image: '', status: 'sale', public: false,
+          createdAt: fakeTimestamp(1000), updatedAt: fakeTimestamp(1000),
+        }),
+      ],
+    })
+
+    const collectionStore = useCollectionStore()
+    collectionStore.cards = [] as any
+
+    const card = makeCard({
+      id: 'server-sale', scryfallId: 'sf-3', edition: 'Commander Masters', setCode: 'CMM',
+      condition: 'NM', foil: false, status: 'sale', quantity: 5,
+    })
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
+    await flushPromises()
+    expect(qtyText('qty-row-sale')).toBe('5')
+
+    // sale 5 -> 0
+    await clickInRow('qty-row-sale', 0, 5)
+    expect(qtyText('qty-row-sale')).toBe('0')
+    // collection 0 -> 2
+    await clickInRow('qty-row-collection', 1, 2)
+    expect(qtyText('qty-row-collection')).toBe('2')
+
+    const saveButton = findButtonByText('common.actions.save')
+    expect(saveButton).toBeTruthy()
+    saveButton!.click()
+    await flushPromises()
+    // deleteCard internally does `await import('../services/cloudFunctions')`
+    // (dynamic import, kept lazy on purpose — see the comment on that
+    // wrapper in collection.ts). The FIRST dynamic import of a module in
+    // this test environment takes real wall-clock time to compile, more
+    // than flushPromises' microtask-only drain covers — this delay is a
+    // test-harness artifact of that first-use compile, not app behavior
+    // (verified: the awaited call resolves correctly once given time, see
+    // the isolated collection.deleteCardFallback.test.ts which needs no
+    // such wait because it doesn't share a module graph with this mount).
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    // The server-only sale doc must actually be deleted from Firestore.
+    expect(mockDeleteDoc).toHaveBeenCalledTimes(1)
+    const [deleteRef] = mockDeleteDoc.mock.calls[0]!
+    expect(deleteRef.path).toContain('server-sale')
+    // collection never existed anywhere (memory or server) -> legitimate create.
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('HIGH-2 regression: opening a new card never shows the previous card\'s statusDistribution while the server read is still in flight', async () => {
+    const cardA = makeCard({
+      id: 'card-a', scryfallId: 'sf-a', edition: 'Edition A', setCode: 'AAA',
+      condition: 'NM', foil: false, status: 'collection', quantity: 3,
+    })
+    const collectionStore = useCollectionStore()
+    collectionStore.cards = [cardA] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: cardA }, attachTo: document.body })
+    await flushPromises()
+    expect(qtyText('qty-row-collection')).toBe('3')
+
+    // Card B: a DIFFERENT identity, memory already has it at qty 7. Stall
+    // the server read this new open triggers so we can inspect the state
+    // in the gap BEFORE it resolves.
+    const cardB = makeCard({
+      id: 'card-b', scryfallId: 'sf-b', edition: 'Edition B', setCode: 'BBB',
+      condition: 'NM', foil: false, status: 'collection', quantity: 7,
+    })
+    collectionStore.cards = [cardB] as any
+    mockGetDocs.mockImplementationOnce(() => new Promise(() => {})) // never resolves in this test
+
+    // Mirrors how CollectionView actually opens a different card: close then reopen.
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true, card: cardB })
+
+    // The server read for B is still pending — but the DOM must already
+    // reflect B's OWN memory-known state, never A's leftover numbers.
+    expect(qtyText('qty-row-collection')).toBe('7')
+
+    wrapper.unmount()
+  })
 })

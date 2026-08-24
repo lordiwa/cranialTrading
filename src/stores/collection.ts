@@ -2319,7 +2319,7 @@ export const useCollectionStore = defineStore('collection', () => {
      * Removes from UI immediately, then syncs with Firebase in background
      * If Firebase fails, restores the card and shows error
      */
-    const deleteCard = async (cardId: string): Promise<boolean> => {
+    const deleteCard = async (cardId: string, fallbackCard?: Card): Promise<boolean> => {
         if (!authStore.user) return false
 
         // Find and remove card optimistically (immediate UI update).
@@ -2332,11 +2332,19 @@ export const useCollectionStore = defineStore('collection', () => {
         // error, no toast. Resolve the card from wherever it actually is; the
         // bulk path (batchDeleteCards) has always deleted by id without this
         // gate, which is why bulk delete worked and single delete didn't.
+        //
+        // TASK-280 HIGH-1: `fallbackCard` covers one more source — a card that
+        // is on the SERVER but nowhere in memory (not in cards.value, cardsById,
+        // or paginatedCards). Without it, this silently `return false`d for a
+        // card CardDetailModal's server-merged diff correctly decided to
+        // delete, leaving the doc alive as a live duplicate. The caller is
+        // responsible for only passing a fallbackCard it has actually verified
+        // exists (CardDetailModal passes the exact row from its server read).
         const cardIndex = cards.value.findIndex(c => c.id === cardId)
         const deletedCard = cardIndex > -1
             // eslint-disable-next-line security/detect-object-injection
             ? cards.value[cardIndex]
-            : (cardsById.get(cardId) ?? paginatedCards.value.find(c => c.id === cardId))
+            : (cardsById.get(cardId) ?? paginatedCards.value.find(c => c.id === cardId) ?? fallbackCard)
         // Still nothing anywhere: there is no card under this id to delete.
         if (!deletedCard) return false
 

@@ -1,0 +1,28 @@
+{
+  "key": "TASK-280",
+  "title": "Editar cantidad en CardDetailModal duplica la carta y deja el boton en GUARDANDO",
+  "description": "MEDIDO EN PRODUCCION 2026-08-24 (cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1, 5766 docs). Rafael abrio Grand Abolisher, bajo la cantidad de 5 a 2, el boton quedo en GUARDANDO para siempre y quedaron DOS documentos:\n\n- tsjwkpJKbo5aDkg07x4V | qty 5 | status sale       | createdAt 15:58:03.466Z | updatedAt 15:58:03.466Z\n- BCdk4b6MnN7SiSfaVbHE | qty 2 | status collection | createdAt 15:59:43.958Z | updatedAt 15:59:43.958Z\n\nMismo scryfallId (86e30ca4-1769-4686-aa18-31610246cd80), misma edition (CMM), mismo NM/no-foil. createdAt == updatedAt en LOS DOS: ninguno fue actualizado nunca, los dos son creates.\n\ncard_index DESCARTADO POR MEDICION: la cuenta tiene 5766 docs y 5766 entradas de indice, divergencia 0, y las dos cartas estan indexadas (chunk_2). La hipotesis inicial de indice corrupto es FALSA.\n\nCAUSA (leida en codigo, no medida en vivo): CardDetailModal.initializeForm (CardDetailModal.vue:334) arma relatedCards y statusDistribution desde collectionStore.cards, estado EN MEMORIA del cliente. handleSave pasa esa misma lista a computeStatusOperations (CardDetailModal.vue:604), que decide create vs update. No hay ninguna verificacion contra Firestore antes de emitir un create. Si el doc de status sale no esta en esa lista en el momento del save, el bucket sale queda en 0 (no emite op, el doc de 5 sobrevive) y el 2 cae en el bucket collection, vacio, que emite create.\n\nBOTON TRABADO (leido en codigo): handleSave pone isLoading=true y solo lo baja en el finally. Los unicos awaits con timeout de toda la cadena son los tres writes crudos de TASK-255 (addDoc/updateDoc/deleteDoc, 20s). Verificado por grep: src/stores/decks.ts y src/stores/binders.ts no tienen NINGUNA llamada a withTimeout, y getCountFromServer en collection.ts:1741 esta dentro de un try/catch que no puede atrapar un cuelgue (una promesa colgada nunca rechaza). Cualquiera de esos awaits que no resuelva deja el boton en GUARDANDO indefinidamente, sin toast y sin error.\n\nALCANCE CERRADO: arreglar exactamente estos dos defectos. No agregar features, no refactorizar nada adyacente, no tocar el card_index.",
+  "acceptance_criteria": [
+    "AC1: applyStatusOperations no emite un create sin antes verificar contra Firestore que no existe ya un doc con esa identidad (scryfallId + condition + foil) en ese status dentro de users/{uid}/cards. Si existe, la op se convierte en update sobre ese doc. Test de regresion: con la lista en memoria VACIA pero el doc existente en el servidor, el save produce update y NO create.",
+    "AC2: initializeForm arma relatedCards con esa misma verificacion contra el servidor, de forma que statusDistribution refleje los docs reales y no solo los que hay en memoria. Test: con memoria vacia y un doc de qty 5 en status sale en el servidor, el modal muestra sale=5.",
+    "AC3: handleSave no puede quedar colgado. Un await que nunca resuelve tiene que terminar en el catch/finally: el boton se libera siempre y sale el toast de error. Test: mockear una promesa que nunca resuelve en la cadena y afirmar que isLoading vuelve a false.",
+    "AC4: las escrituras de src/stores/decks.ts y src/stores/binders.ts que handleSave invoca (reduceAllocationsForCard, allocateCardToDeck, deallocateCard, allocateCardToBinder, deallocateCard de binders) quedan envueltas en withTimeout, y getCountFromServer en collection.ts:1741 tambien. Verificable por grep: cero awaits sin techo en esa cadena.",
+    "AC5: npm run test:unit verde y npx vite build verde. Ningun test existente roto."
+  ],
+  "status": "in_progress",
+  "priority": "critical",
+  "labels": [
+    "bug",
+    "produccion",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-24T16:11:15.174Z",
+  "updated_at": "2026-08-24T16:11:17.535Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

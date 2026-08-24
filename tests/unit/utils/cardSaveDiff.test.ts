@@ -6,6 +6,7 @@ import {
   findCardByIdentity,
   findCardByPrint,
   findPrintMatches,
+  mergeServerCards,
   type CardIdentity,
 } from '@/utils/cardSaveDiff'
 import type { Card } from '@/types/card'
@@ -339,5 +340,65 @@ describe('computeStatusOperations — self-healing consolidation (SCRUM-35 D)', 
     // Only nm gets touched; lp is untouched (different condition)
     expect(ops).toContainEqual({ type: 'update', status: 'collection', cardId: 'nm', quantity: 5 })
     expect(ops.find(o => o.cardId === 'lp')).toBeUndefined()
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// TASK-280: mergeServerCards — fold a fresh server read into the (possibly
+// stale) in-memory list BEFORE computeStatusOperations decides create vs
+// update. Regression for the production duplicate-card incident.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('mergeServerCards', () => {
+  it('AC1 regression: memory EMPTY, server has the doc — computeStatusOperations produces update, not create', () => {
+    const serverCards: Card[] = [
+      makeCard({ id: 'server-sale', status: 'sale', scryfallId: '86e30ca4', condition: 'NM', foil: false, quantity: 5 }),
+    ]
+    const merged = mergeServerCards([], serverCards)
+    const ops = computeStatusOperations(
+      { collection: 2, sale: 0, trade: 0, wishlist: 0 },
+      ident({ scryfallId: '86e30ca4', condition: 'NM', foil: false }),
+      merged,
+    )
+    // sale 5 -> 0 must be a delete on the SERVER row, not a silent no-op;
+    // collection 0 -> 2 must be a create (no existing collection row).
+    expect(ops).toContainEqual({ type: 'delete', status: 'sale', cardId: 'server-sale', quantity: 0 })
+    expect(ops).toContainEqual({ type: 'create', status: 'collection', quantity: 2 })
+    // The bug this regresses: without the merge, sale's bucket reads empty
+    // (no op emitted, the qty-5 doc survives) AND collection still creates —
+    // net result is two live docs. Assert that does NOT happen: exactly the
+    // two ops above, nothing else.
+    expect(ops).toHaveLength(2)
+  })
+
+  it('AC1 literal wording: memory empty, server doc in the SAME status with a lower target quantity — produces update, not create', () => {
+    const serverCards: Card[] = [
+      makeCard({ id: 'server-sale', status: 'sale', scryfallId: '86e30ca4', condition: 'NM', foil: false, quantity: 5 }),
+    ]
+    const merged = mergeServerCards([], serverCards)
+    const ops = computeStatusOperations(
+      { collection: 0, sale: 2, trade: 0, wishlist: 0 },
+      ident({ scryfallId: '86e30ca4', condition: 'NM', foil: false }),
+      merged,
+    )
+    expect(ops).toEqual([{ type: 'update', status: 'sale', cardId: 'server-sale', quantity: 2 }])
+  })
+
+  it('server row wins on id collision (freshest truth)', () => {
+    const memory: Card[] = [makeCard({ id: 'x', status: 'sale', quantity: 5 })]
+    const server: Card[] = [makeCard({ id: 'x', status: 'sale', quantity: 2 })]
+    const merged = mergeServerCards(memory, server)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.quantity).toBe(2)
+  })
+
+  it('keeps memory-only rows the server read did not return', () => {
+    const memory: Card[] = [makeCard({ id: 'optimistic-only', status: 'wishlist', quantity: 1 })]
+    const merged = mergeServerCards(memory, [])
+    expect(merged.map(c => c.id)).toEqual(['optimistic-only'])
+  })
+
+  it('is a no-op union when both lists are empty', () => {
+    expect(mergeServerCards([], [])).toEqual([])
   })
 })

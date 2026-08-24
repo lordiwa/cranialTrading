@@ -14,7 +14,7 @@ import { db } from '../services/firestore'
 import { getCardsByIds } from '../services/scryfallCache'
 import { useAuthStore } from './auth'
 import { useToastStore } from './toast'
-import { useCollectionStore } from './collection'
+import { CARD_WRITE_TIMEOUT_MS, useCollectionStore } from './collection'
 import type { Card, CardCondition } from '../types/card'
 import type {
     CreateDeckInput,
@@ -26,6 +26,7 @@ import type {
 } from '../types/deck'
 import { t } from '../composables/useI18n'
 import { logSanitizedError } from '../utils/logSanitizedError'
+import { withTimeout } from '../utils/withTimeout'
 
 // Helper to remove undefined values from objects (Firebase doesn't accept undefined)
 const removeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
@@ -660,13 +661,18 @@ export const useDecksStore = defineStore('decks', () => {
             deck.updatedAt = new Date()
 
             // Save to Firestore
+            // TASK-280 AC3/AC4: this write had NO timeout — a hang here left
+            // CardDetailModal.handleSave's await permanently pending, so the
+            // SAVE button never left "GUARDANDO". withTimeout turns a hang
+            // into a TimeoutError, caught by this function's own try/catch
+            // below, same pattern as the raw writes in collection.ts (TASK-255).
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
-            await updateDoc(deckRef, {
+            await withTimeout(updateDoc(deckRef, {
                 allocations: deck.allocations,
                 wishlist: deck.wishlist || [],
                 stats: deck.stats,
                 updatedAt: Timestamp.now(),
-            })
+            }), CARD_WRITE_TIMEOUT_MS, 'updateDoc')
 
             if (currentDeck.value?.id === deckId) {
                 currentDeck.value = snapshotDeck(deck)
@@ -910,13 +916,13 @@ export const useDecksStore = defineStore('decks', () => {
             deck.stats = calculateStats(deck.allocations, deck.wishlist || [], collectionStore.cards)
             deck.updatedAt = new Date()
 
-            // Save to Firestore
+            // Save to Firestore (TASK-280 AC3/AC4: withTimeout — see allocateCardToDeck above)
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deckId)
-            await updateDoc(deckRef, {
+            await withTimeout(updateDoc(deckRef, {
                 allocations: deck.allocations,
                 stats: deck.stats,
                 updatedAt: Timestamp.now(),
-            })
+            }), CARD_WRITE_TIMEOUT_MS, 'updateDoc')
 
             if (currentDeck.value?.id === deckId) {
                 currentDeck.value = snapshotDeck(deck)
@@ -1124,12 +1130,16 @@ export const useDecksStore = defineStore('decks', () => {
             excessToRemove -= converted
             touchedDeckIds.push(deck.id)
 
+            // TASK-280 AC3/AC4: withTimeout — a hung updateDoc here would
+            // otherwise block Promise.allSettled below FOREVER (allSettled
+            // only resolves once every promise has settled), which was the
+            // exact mechanism that could stall handleSave's STEP 1 await.
             const deckRef = doc(db, 'users', authStore.user.id, 'decks', deck.id)
             updatePromises.push(
-                updateDoc(deckRef, {
+                withTimeout(updateDoc(deckRef, {
                     allocations: deck.allocations, wishlist: deck.wishlist || [],
                     stats: deck.stats, updatedAt: Timestamp.now(),
-                })
+                }), CARD_WRITE_TIMEOUT_MS, 'updateDoc')
             )
         }
 

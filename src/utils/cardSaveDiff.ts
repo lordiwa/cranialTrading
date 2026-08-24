@@ -52,6 +52,25 @@ export const findPrintMatches = (
   identity: CardIdentity,
 ): Card[] => cards.filter(c => c.status === status && samePrint(c, identity))
 
+// TASK-280: the in-memory `collectionStore.cards` list a save decides
+// create-vs-update against can be stale relative to Firestore — the
+// production incident (Grand Abolisher, 2026-08-24) happened because the
+// `sale` doc for this identity wasn't in memory at save time, so its bucket
+// read as empty and a second `collection` doc got CREATED instead of the
+// `sale` doc being UPDATED. mergeServerCards folds a fresh server read into
+// the memory list before any create/update decision is made. Server rows win
+// on id collision (freshest truth); any memory-only row (an optimistic write
+// not yet reflected by the read) is kept as-is.
+export const mergeServerCards = (
+  memoryCards: readonly Card[],
+  serverCards: readonly Card[],
+): Card[] => {
+  const byId = new Map<string, Card>()
+  for (const c of memoryCards) byId.set(c.id, c)
+  for (const c of serverCards) byId.set(c.id, c)
+  return Array.from(byId.values())
+}
+
 export const buildOriginalDistribution = (
   cards: readonly Card[],
   identity: CardIdentity,

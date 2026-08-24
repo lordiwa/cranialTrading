@@ -11,7 +11,7 @@ import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
 import { buildOriginalBinderSlots, computeBinderSlotOps } from '../../utils/binderSlotDiff'
-import { type CardIdentity, computeStatusOperations } from '../../utils/cardSaveDiff'
+import { type CardIdentity, computeStatusOperations, mergeServerCards } from '../../utils/cardSaveDiff'
 import { buildOriginalSlots, computeDeckSlotOps, type DeckSlot } from '../../utils/deckSlotDiff'
 import BaseButton from '../ui/BaseButton.vue'
 import IconV2 from '../ui/IconV2.vue'
@@ -332,11 +332,20 @@ const initializeForm = async () => {
   // duplicados legacy con edition mismatched ("ECL" vs "Lorwyn Eclipsed") creados por
   // bug previo, que aparecían como "missing" en el modal y se re-creaban al guardar.
   // Phase B1 (NM vs LP isolation) sigue intacta porque condition/foil siguen estrictos.
-  relatedCards.value = collectionStore.cards.filter(c =>
+  const memoryRelatedCards = collectionStore.cards.filter(c =>
     c.scryfallId === freshCard.scryfallId &&
     c.condition === freshCard.condition &&
     c.foil === freshCard.foil
   )
+
+  // TASK-280 AC2: `collectionStore.cards` (memory) can be stale relative to
+  // Firestore — the production incident measured a `sale` doc missing from
+  // memory, so its quantity never showed in statusDistribution below. One
+  // server read per open, merged with memory (server wins on id collision).
+  const serverRelatedCards = await collectionStore.fetchServerCardsByPrint(
+    freshCard.scryfallId, freshCard.condition, freshCard.foil,
+  )
+  relatedCards.value = mergeServerCards(memoryRelatedCards, serverRelatedCards)
 
   // Initialize status distribution from related cards
   statusDistribution.value = {
@@ -471,15 +480,20 @@ const adjustBinder = (binderId: string, delta: number) => {
 const applyStatusOperations = async (
   ops: ReturnType<typeof computeStatusOperations>,
   cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
+  existingCards: Card[],
 ): Promise<Record<CardStatus, string | null>> => {
   const idsByStatus: Record<CardStatus, string | null> = { collection: null, sale: null, trade: null, wishlist: null }
   // SCRUM-35 D: snapshot canonical id por status — ignora edition (identidad relajada)
   // para que survive cards con edition stale legacy. Prefiere la fila con edition
   // canónica si existe; si todas son stale, agarra la primera (que será actualizada
   // por la op de update con cardData.edition canónica → self-heal).
+  // TASK-280 AC1: `existingCards` is collectionStore.cards MERGED with a fresh
+  // server read (see handleSave) — not memory alone — so a doc missing from
+  // memory but present on the server still resolves to its real id here
+  // instead of applyStatusOperations creating a duplicate for it.
   for (const status of ['collection', 'sale', 'trade', 'wishlist'] as CardStatus[]) {
     // eslint-disable-next-line security/detect-object-injection
-    const matches = collectionStore.cards.filter(c =>
+    const matches = existingCards.filter(c =>
       c.status === status &&
       c.scryfallId === cardData.scryfallId &&
       c.condition === cardData.condition &&
@@ -580,6 +594,19 @@ const handleSave = async () => {
       foil: cardData.foil,
     }
 
+    // TASK-280 AC1: merge a fresh server read into collectionStore.cards
+    // before computing the create/update/delete diff. Without this,
+    // computeStatusOperations decides purely from memory — the exact gap
+    // the production incident (Grand Abolisher, 2026-08-24) fell through:
+    // a `sale` doc missing from memory read as "no existing row", so a
+    // second `collection` doc got CREATED instead of the `sale` doc being
+    // UPDATED. fetchServerCardsByPrint never hangs and never throws (it
+    // resolves to [] on failure/timeout), so this cannot stall handleSave.
+    const serverCardsForIdentity = await collectionStore.fetchServerCardsByPrint(
+      identity.scryfallId, identity.condition, identity.foil,
+    )
+    const existingCardsForSave = mergeServerCards(collectionStore.cards, serverCardsForIdentity)
+
     const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
 
     // SCRUM-35 D2: snapshot per-deck (mb, sb) totals BEFORE any mutation. We sum
@@ -597,8 +624,8 @@ const handleSave = async () => {
 
     // STEP 2: apply status diff. Strict identity per (scryfallId, edition, condition, foil)
     // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
-    const ops = computeStatusOperations(savedDistribution, identity, collectionStore.cards)
-    const idsByStatus = await applyStatusOperations(ops, cardData)
+    const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave)
+    const idsByStatus = await applyStatusOperations(ops, cardData, existingCardsForSave)
 
     // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
     // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as

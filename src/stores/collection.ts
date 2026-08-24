@@ -7,9 +7,11 @@ import {
     doc,
     getCountFromServer,
     getDocs,
+    query,
     setDoc,
     Timestamp,
     updateDoc,
+    where,
     writeBatch,
 } from 'firebase/firestore'
 import { db } from '../services/firestore'
@@ -61,7 +63,7 @@ import type { CardIndexDeltaMutation, QueryCardIndexRequest } from '../services/
  * 20s too short for a legitimate slow save, raise this constant; the
  * compensation path below stays correct for any value.
  */
-const CARD_WRITE_TIMEOUT_MS = 20000
+export const CARD_WRITE_TIMEOUT_MS = 20000
 
 /**
  * Commit a Firestore batch with retry logic (skips retries for permission errors)
@@ -1707,6 +1709,61 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     /**
+     * TASK-280 AC1/AC2. Reads Firestore directly for every doc sharing this
+     * scryfallId under users/{uid}/cards, narrowed client-side to the given
+     * condition+foil — the same edition-relaxed print identity `samePrint`
+     * already uses in cardSaveDiff.ts. A single `where('scryfallId', '==', ...)`
+     * needs no composite index.
+     *
+     * This exists to catch identity rows that exist on the server but are
+     * missing from the in-memory `cards` list at save/open time — the exact
+     * gap the production incident (Grand Abolisher, 2026-08-24) fell
+     * through: a `sale` doc absent from memory read as "no existing row",
+     * so a second `collection` doc got CREATED instead of the `sale` doc
+     * being UPDATED.
+     *
+     * One read per call (per the ticket's rule — no listener, no new
+     * cache). Never hangs and never throws to the caller: a hung or failed
+     * read is caught and resolves to [] within CARD_WRITE_TIMEOUT_MS, same
+     * reasoning as every other withTimeout call site in this file.
+     */
+    const fetchServerCardsByPrint = async (
+        scryfallId: string,
+        condition: CardCondition,
+        foil: boolean,
+    ): Promise<Card[]> => {
+        if (!authStore.user) return []
+
+        try {
+            const colRef = collection(db, 'users', authStore.user.id, 'cards')
+            const q = query(colRef, where('scryfallId', '==', scryfallId))
+            const snap = await withTimeout(getDocs(q), CARD_WRITE_TIMEOUT_MS, 'fetchServerCardsByPrint')
+
+            const toDate = (v: unknown): Date => {
+                if (v && typeof (v as { toDate?: unknown }).toDate === 'function') {
+                    return (v as { toDate: () => Date }).toDate()
+                }
+                return new Date()
+            }
+
+            return snap.docs
+                .map((d) => {
+                    const data = d.data() as Record<string, unknown>
+                    return {
+                        ...data,
+                        id: d.id,
+                        updatedAt: toDate(data.updatedAt),
+                        createdAt: toDate(data.createdAt),
+                    } as Card
+                })
+                .filter((c) => c.condition === condition && c.foil === foil)
+        } catch (err) {
+            logSanitizedError('[TASK-280] fetchServerCardsByPrint failed, treating as no server rows', err, 'warn')
+            return []
+        }
+    }
+
+    /**
      * Add a new card to collection
      */
     const addCard = async (cardData: Omit<Card, 'id' | 'updatedAt'>): Promise<string | null> => {
@@ -1737,7 +1794,14 @@ export const useCollectionStore = defineStore('collection', () => {
             // a hard network dependency it didn't have before this ticket.
             let chunkId: number | undefined
             try {
-                const cardCountSnap = await getCountFromServer(colRef)
+                // TASK-280 AC4: this try/catch only reacts to a REJECTION —
+                // a getCountFromServer call that HANGS (never resolves,
+                // never rejects) sailed straight through it, permanently
+                // stalling addCard and, transitively, CardDetailModal's
+                // "GUARDANDO" button. withTimeout turns a hang into a
+                // TimeoutError, which lands in the SAME catch that already
+                // handles a genuine failure — chunkId is omitted either way.
+                const cardCountSnap = await withTimeout(getCountFromServer(colRef), CARD_WRITE_TIMEOUT_MS, 'getCountFromServer')
                 chunkId = Math.floor(cardCountSnap.data().count / INDEX_CHUNK_SIZE)
             } catch (countError) {
                 logSanitizedError('[TASK-230] Could not read server card count, omitting chunkId', countError)
@@ -3052,6 +3116,7 @@ export const useCollectionStore = defineStore('collection', () => {
         // Core operations
         loadCollection,
         addCard,
+        fetchServerCardsByPrint,
         updateCard,
         batchUpdateCards,
         deleteCard,

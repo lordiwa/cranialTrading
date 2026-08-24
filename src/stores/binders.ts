@@ -12,10 +12,11 @@ import {
 } from 'firebase/firestore'
 import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
-import { useCollectionStore } from './collection'
+import { CARD_WRITE_TIMEOUT_MS, useCollectionStore } from './collection'
 import { useDecksStore } from './decks'
 import { useToastStore } from './toast'
 import { logSanitizedError } from '../utils/logSanitizedError'
+import { withTimeout } from '../utils/withTimeout'
 import type { Card } from '../types/card'
 import type {
     Binder,
@@ -362,13 +363,16 @@ export const useBindersStore = defineStore('binders', () => {
             binder.updatedAt = new Date()
 
             // Save to Firestore (compact map format + clean old array field)
+            // TASK-280 AC3/AC4: withTimeout — this write had no timeout; a
+            // hang left CardDetailModal.handleSave's await permanently
+            // pending, same mechanism as the deck-side fix in decks.ts.
             const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
-            await updateDoc(binderRef, {
+            await withTimeout(updateDoc(binderRef, {
                 allocationData: serializeAllocations(binder.allocations),
                 allocations: deleteField(),
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
-            })
+            }), CARD_WRITE_TIMEOUT_MS, 'updateDoc')
 
             // Replace the binder object AND the array so Vue computed properties
             // that read binders.value (e.g. BinderView.selectedBinder) are invalidated.
@@ -517,13 +521,14 @@ export const useBindersStore = defineStore('binders', () => {
             binder.stats = calculateStats(binder.allocations, collectionStore.cards)
             binder.updatedAt = new Date()
 
+            // TASK-280 AC3/AC4: withTimeout — see allocateCardToBinder above.
             const binderRef = doc(db, 'users', authStore.user.id, 'binders', binderId)
-            await updateDoc(binderRef, {
+            await withTimeout(updateDoc(binderRef, {
                 allocationData: serializeAllocations(binder.allocations),
                 allocations: deleteField(),
                 stats: binder.stats,
                 updatedAt: Timestamp.now(),
-            })
+            }), CARD_WRITE_TIMEOUT_MS, 'updateDoc')
 
             // SCRUM-40: replace binder slot + array reference.
             const idx = binders.value.indexOf(binder)

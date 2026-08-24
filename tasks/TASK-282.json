@@ -1,0 +1,32 @@
+{
+  "key": "TASK-282",
+  "title": "addCard reescribe el card_index entero desde el cliente y ahoga las escrituras del mismo save",
+  "description": "MEDIDO EN PRODUCCION 2026-08-24, cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1 (5765 cartas), reproducido por Rafael editando cartas en el modal.\n\nSINTOMA: al editar la cantidad de una carta, el deleteDoc expira con \"deleteDoc timed out after 20000ms\" (el techo que puso TASK-255/TASK-280). El borrado SI aterriza despues, tarde, y la compensacion deja el indice consistente — pero el usuario espera 20 s y recibe un mensaje de fallo por algo que en realidad se guardo.\n\nMEDICION QUE LO EXPLICA. Los tres chunks de card_index de esa cuenta fueron reescritos ENTEROS desde el cliente durante el mismo save:\n  chunk_0 | 1999 entradas | 557 KB | updatedAt 22:25:22.417Z\n  chunk_1 | 2000 entradas | 557 KB | updatedAt 22:24:22.541Z\n  chunk_2 | 1766 entradas | 492 KB | updatedAt 22:24:22.570Z\nTotal ~1,6 MB subiendo desde el navegador. Las dos cartas del usuario se escribieron a las 22:23:59 y 22:24:19, o sea inmediatamente antes.\n\nCADENA EN CODIGO: applyStatusOperations recorre STATUS_ORDER, con `collection` antes que `sale`, asi que mover 5 de venta a 2 de coleccion emite CREATE primero y DELETE despues. El create llama addCard, que ademas del backstop server-side (applyCardIndexDelta con allowInsert) sigue llamando syncIndexOrQueue + persistIndexToFirestore() — la reescritura de chunks completos desde el cliente, debounced 2 s y sin await. Recien despues corre el delete, cuyo deleteDoc tiene techo de 20 s y compite por la misma conexion con esos 1,6 MB.\n\nNUMERO YA MEDIDO EN EL PROPIO REPO (comentario de src/stores/collection.ts:1155, TASK-155): cada setDoc de chunk tardo 4-9 s contra la cuenta de 41k de dev, y uno tardo 61 s. Tres chunks son 12-27 s. El techo son 20.\n\nCAUSA DE FONDO: hay DOS escritores del card_index haciendo el mismo trabajo. TASK-232 movio las escrituras de chunk al servidor (updateCard y deleteCard ya usan solo el delta server-side); addCard quedo con LOS DOS caminos: el delta server-side allowInsert Y la reescritura completa desde el cliente. Es la familia de bugs que la memoria del proyecto llama \"dos escritores sin coordinar\".\n\nEFECTO SECUNDARIO MEDIDO: cada delete que expira dispara llamadas extra a applyCardIndexDelta (la compensacion que repone la entrada, mas la que la vuelve a quitar cuando la escritura aterriza tarde). Los logs de prod muestran 9 invocaciones en 2 minutos para dos ediciones, espaciadas ~20 s, y varias cayendo en el fallback scan que recorre el indice completo. Ademas la funcion arranco EN FRIO (sin instancia caliente desde 2 h antes).\n\nLO QUE NO ESTA MEDIDO, y hay que decirlo: que el ack del deleteDoc haya quedado detras de esas subidas EN PARTICULAR es inferencia, no medicion. Es el unico camino compartido entre ambas operaciones, pero no se instrumento el navegador. Ver AC1.\n\nCONTEXTO DE MERCADO: el mercado objetivo es 4G lenta y el 80% de las cuentas tiene 25k+ cartas (memoria project_market_collection_sizes). Con 25k cartas son 13 chunks, no 3. Esta cuenta de 5765 es de las CHICAS.",
+  "acceptance_criteria": [
+    "AC1 (medir antes de arreglar, obligatorio): instrumentar el navegador para registrar el tiempo entre el inicio y el ack de cada escritura de un save, con y sin la reescritura de chunks del cliente. Sin esta medicion el arreglo se apoya en una inferencia. Si la medicion CONTRADICE la hipotesis, se para y se reporta — no se implementa igual.",
+    "AC2: addCard deja de reescribir chunks completos desde el cliente cuando el delta server-side (applyCardIndexDelta con allowInsert) ya inserta la entrada. Un solo escritor del card_index, igual que updateCard y deleteCard despues de TASK-232.",
+    "AC3: la carta recien creada sigue apareciendo en el grid y en el indice sin recargar. Este es el riesgo real del cambio: la reescritura del cliente existia porque el backstop server-side llego despues (TASK-255 AC3 la dejo a proposito como camino primario). Test que falle si la carta nueva no queda indexada.",
+    "AC4: el camino en que getCountFromServer falla y chunkId queda sin escribir sigue cubierto — el backstop server-side no puede insertar una carta que no puede ubicar en un chunk (functions/index.js applyCardIndexDelta). Decidir y dejar ESCRITO que pasa en ese caso; no dejarlo implicito.",
+    "AC5: medir el antes y el despues sobre una cuenta de volumen comparable (5000+ cartas): bytes subidos por save y tiempo hasta el ack. El resultado va en el ticket como numero, no como afirmacion.",
+    "AC6: npm run test:unit verde y npx vite build verde. Ningun test roto, en particular los de TASK-280 y TASK-281."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "performance",
+    "card-index",
+    "produccion"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-281"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-24T22:43:01.625Z",
+  "updated_at": "2026-08-24T22:43:01.625Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

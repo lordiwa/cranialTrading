@@ -10,7 +10,7 @@
     "AC5: mensaje al usuario accionable. Si el fallo es parcial (algunas ops si escribieron), el texto tiene que decir que el guardado quedo incompleto, no un error generico. Claves i18n verificadas en en.json, es.json y pt.json — las 3, en el mismo commit.",
     "AC6: npm run test:unit verde y npx vite build verde. Ningun test existente roto, en particular los 5 archivos de test que agrego TASK-280."
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "high",
   "labels": [
     "bug",
@@ -19,11 +19,25 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "268fe1e",
+    "8efaafc"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-24T23:18:44.704Z",
+      "body": "PASS (ronda 2, sobre 8efaafc encima de 268fe1e). review_depth full.\n\nRonda 1 sobre 268fe1e: BLOQUEO por HIGH-1 — allocateCardToBinder devuelve 0 tanto cuando la escritura falla como cuando se alcanza el tope de disponibilidad por diseño (binders.ts:345), y el codigo nuevo los trataba igual. Falso error DETERMINISTA y alcanzable por UI (el boton + de carpeta no tiene tope): con 1 copia, 1 en un mazo y 1 en una carpeta, todas las escrituras salian bien y el usuario recibia \"guardado incompleto\" con el modal sin cerrar, y el reintento no podia pasar nunca porque el original seguia en 0 y el destino en 1. El mismo defecto que este ticket cierra, en la direccion contraria.\n\nCorreccion al ticket, registrada: los ACs afirmaban Promise<boolean> para allocateCardToDeck y allocateCardToBinder. Es FALSO. Medido contra las firmas reales: allocateCardToDeck devuelve Promise<{allocated, wishlisted}> (decks.ts:596) y allocateCardToBinder devolvia Promise<number> (binders.ts:322); solo los dos deallocateCard son Promise<boolean>. Los mocks del developer usaban las formas reales; el error estaba en el ticket, no en la implementacion.\n\nRonda 2: HIGH-1 y MEDIUM-2 cerrados.\n- Los 6 returns de allocateCardToBinder revisados uno por uno, no solo el diff: sin auth / binder inexistente / carta inexistente / catch (incluye el timeout de TASK-280) devuelven failed:true; el tope devuelve {allocated:0, failed:false}; el exito devuelve {allocated:toAllocate, failed:false}. Ningun camino cambio de categoria.\n- Los dos tests del HIGH-1 DISCRIMINAN: el del tope falla contra 268fe1e, el del fallo real falla contra cualquier implementacion que ignore `failed`. Ninguno puede pasar con las dos implementaciones a la vez.\n- Los otros dos llamadores intactos: AddCardModal.vue:306 no lee el retorno, useDiscoveryAddCard.ts:174 conserva su comportamiento. `npm run type-check` (vue-tsc) corrido por el reviewer: limpio, exit 0 — vite build NO type-checkea, por eso se corrio aparte.\n- MEDIUM-2 cubierto en dos niveles: componente y store (archivo nuevo decks.reduceAllocationsResult.test.ts, 3 casos incluido el no-op legitimo).\n\nAC6 medido sobre este mismo arbol: npm run test:unit 2293/2293 en 178 archivos (89.89s, sin rojos por carga) y npx vite build verde (16.01s). Los 4 archivos de test tocados 38/38 verdes.\n\nAlcance limpio: decks.ts y los 3 locales no estan en el rango de la ronda 2; allocateCardToDeck intacto; los toasts propios de las stores sin tocar; cero card_index.\n\nResiduos derivados a ticket, ninguno bloqueante: MEDIUM-1 y MEDIUM-3 (las stores de mazos reportan exito ante escrituras fallidas, y colapsan exito parcial en un boolean) en TASK-283; LOW-1 (doble toast) en TASK-284; la ambiguedad tope-vs-fallo que persiste en useDiscoveryAddCard.ts:174 y AddCardModal.vue:306 anotada en TASK-283 con linea exacta.\n\nConfianza 9/10. No reproducido en navegador: el flujo del tope real contra dev, hoy cubierto por test de componente."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-24T23:19:01.154Z",
+      "body": "Cerrado con review PASS en la ronda 2. review_depth full; inputs del rubro: 541 lineas cambiadas en la ronda 1 (umbral 150), logica core de tier tdd en CardDetailModal.vue y decks.ts, y cambio de firma publica de store.\n\nDos commits: 268fe1e (handleSave y applyStatusOperations propagan anySucceeded/anyFailed, no emiten saved/close ante fallo, reduceAllocationsForCard pasa a Promise<boolean>, clave savePartialError en los 3 locales) y 8efaafc (el HIGH-1 de la ronda 1: allocateCardToBinder devuelve {allocated, failed} para separar el tope de disponibilidad del fallo real, mas el MEDIUM-2).\n\nPOR QUE IMPORTABA: TASK-280 agravo este defecto sin querer. Al ponerle techo de 20s a las escrituras, un cuelgue de red dejo de trabar el boton y paso a terminar devolviendo false, que este codigo leia como exito. Un sintoma visible convertido en uno invisible. Y esta MEDIDO en produccion el 2026-08-24 que ese techo se alcanza de verdad en una cuenta de 5765 cartas, asi que no era un camino teorico.\n\nDECISION AC4: opcion (a), reduceAllocationsForCard pasa de Promise<void> a Promise<boolean>. Razon: tiene un solo caller real (medido por grep), y dejarla muda la volvia la unica excepcion silenciosa frente al chequeo de AC2. Documentada en codigo en decks.ts.\n\nERROR DEL TICKET, registrado para que no se repita: los ACs afirmaban Promise<boolean> para allocateCardToDeck y allocateCardToBinder, y era falso — devuelven {allocated, wishlisted} y number respectivamente. El orquestador lo escribio sin verificar las firmas. El developer uso las formas reales y el reviewer lo corrigio. Es el mismo modo de fallo que la leccion del 2026-08-21: algo LEIDO citado como MEDIDO.\n\nAC6 medido por el orquestador sobre el arbol final, no por el developer: npm run test:unit 2293/2293 en 178 archivos, npx vite build verde, y npm run type-check limpio corrido por el reviewer (vite build no type-checkea).\n\nPENDIENTE: no desplegado todavia. Falta bump de version, suite E2E completa y push.\n\nResiduos derivados: TASK-283 (las stores de mazos reportan exito ante escrituras fallidas y colapsan exito parcial en un boolean; incluye la ambiguedad tope-vs-fallo que sigue viva en useDiscoveryAddCard.ts:174 y AddCardModal.vue:306) y TASK-284 (doble toast de error)."
+    }
+  ],
   "created_at": "2026-08-24T22:24:23.567Z",
-  "updated_at": "2026-08-24T22:24:26.110Z",
+  "updated_at": "2026-08-24T23:19:01.154Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

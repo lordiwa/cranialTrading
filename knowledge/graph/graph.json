@@ -198,6 +198,12 @@
       "type": "task",
       "ref": "tasks/TASK-280.json",
       "label": "Editar cantidad en CardDetailModal duplica la carta y deja el boton en GUARDANDO"
+    },
+    {
+      "id": "task-281",
+      "type": "task",
+      "ref": "tasks/TASK-281.json",
+      "label": "handleSave muestra toast de EXITO aunque las escrituras hayan fallado"
     }
   ],
   "edges": [

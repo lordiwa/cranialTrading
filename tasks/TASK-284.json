@@ -1,0 +1,28 @@
+{
+  "key": "TASK-284",
+  "title": "Doble toast de error al fallar un guardado en el modal de carta",
+  "description": "LOW-1 del reviewer de TASK-281 (commit 268fe1e).\n\nLas stores ya muestran su propio toast de error cuando una escritura falla (allocateError y equivalentes). TASK-281 hizo que handleSave muestre ADEMAS el suyo. Resultado: ante un fallo el usuario ve dos toasts apilados diciendo lo mismo con distintas palabras.\n\nNo es un defecto de datos y no bloquea nada: es ruido de interfaz en el momento exacto en que el usuario necesita entender que paso. El mercado objetivo es movil, donde dos toasts apilados ocupan buena parte de la pantalla.\n\nDecidir cual de los dos habla: probablemente el de handleSave, que es el unico que conoce el resultado del save COMPLETO (parcial vs total) y puede dar el mensaje accionable; las stores individuales solo conocen su propia operacion. Pero eso hay que confirmarlo mirando quien llama a esas stores desde otras pantallas: silenciar su toast puede dejar MUDO otro flujo que hoy si avisa.\n\nNO empezar por silenciar sin medir eso ultimo. Es exactamente el modo de fallo de este proyecto: quitar un aviso y descubrir despues que era el unico que existia en otra pantalla.",
+  "acceptance_criteria": [
+    "AC1: un guardado fallido en CardDetailModal muestra UN solo toast, no dos.",
+    "AC2: antes de silenciar cualquier toast de store, medir con grep TODOS los llamadores de esa store y dejar escrito en el ticket cuales se quedarian sin aviso. Si alguno se queda mudo, ese flujo recibe su propio aviso en el mismo commit o no se silencia.",
+    "AC3: el toast que sobrevive es el accionable: distingue guardado incompleto de fallo total.",
+    "AC4: npm run test:unit verde y npx vite build verde."
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "ux",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-281"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-24T23:06:23.420Z",
+  "updated_at": "2026-08-24T23:06:23.420Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

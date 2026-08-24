@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-24T17:07:36.083Z",
+  "generated_at": "2026-08-24T23:19:01.154Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1560,6 +1560,30 @@
       "title": "Editar cantidad en CardDetailModal duplica la carta y deja el boton en GUARDANDO",
       "status": "done",
       "priority": "critical"
+    },
+    {
+      "key": "TASK-281",
+      "title": "handleSave muestra toast de EXITO aunque las escrituras hayan fallado",
+      "status": "done",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-282",
+      "title": "addCard reescribe el card_index entero desde el cliente y ahoga las escrituras del mismo save",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-283",
+      "title": "Las stores de mazos reportan exito ante escrituras que fallaron",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-284",
+      "title": "Doble toast de error al fallar un guardado en el modal de carta",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

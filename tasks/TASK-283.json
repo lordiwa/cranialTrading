@@ -1,0 +1,37 @@
+{
+  "key": "TASK-283",
+  "title": "Las stores de mazos reportan exito ante escrituras que fallaron",
+  "description": "Dos hallazgos MEDIUM del reviewer de TASK-281 (commit 268fe1e), dejados deliberadamente fuera de aquel ticket por prohibir cambiar semantica de stores. Los dos son la MISMA clase de defecto que TASK-281 cerro un nivel mas arriba: una escritura que falla y se reporta como exito. TASK-281 arreglo que handleSave mirara el resultado; estos dos son casos en que el resultado que mira YA VIENE MENTIDO desde la store, asi que el arreglo de arriba no los alcanza.\n\nMEDIUM-1 (src/stores/decks.ts, allocateCardToDeck). Cuando la cantidad pedida excede lo disponible, el sobrante va a wishlist via ensureCollectionWishlistCard. Si ESA escritura devuelve null (fallo real), la funcion igual retorna { allocated, wishlisted: toWishlist > 0 } — o sea reporta que hubo wishlist cuando no se escribio nada. handleSave lo lee como exito y la asignacion pedida se pierde EN SILENCIO. El comentario que TASK-281 dejo en CardDetailModal.vue afirmando que un fallo se ve como {allocated:0, wishlisted:0} SOBRE-AFIRMA: este camino devuelve wishlisted true con la escritura fallida.\n\nMEDIUM-3 (src/stores/decks.ts, reduceAllocationsForCard). Con N mazos afectados usa Promise.allSettled y colapsa todo en UN solo boolean. Puede escribir algunos mazos y fallar otros y devolver false. Si nada mas del save toco datos, handleSave concluye anySucceeded=false y muestra el error generico \"Error guardando cambios\" aunque algunos mazos SI se escribieron. Es el caso inverso del anterior: un exito parcial anunciado como fallo total.\n\nNinguno de los dos esta reproducido en navegador; los dos estan trazados en codigo por el reviewer de TASK-281 en contexto fresco.\n\nCONTEXTO DE POR QUE IMPORTA AHORA: TASK-280 puso techos de 20 s a las escrituras y esta MEDIDO que ese techo se alcanza de verdad en produccion (cuenta de 5765 cartas, 2026-08-24). O sea que el camino \"la escritura falla sin lanzar excepcion\" dejo de ser teorico y pasa a ser el camino normal en 4G lenta, que es el mercado objetivo.",
+  "acceptance_criteria": [
+    "AC1: allocateCardToDeck NO reporta wishlisted cuando ensureCollectionWishlistCard devolvio null. El fallo tiene que ser distinguible por el llamador. Test: mockear ensureCollectionWishlistCard devolviendo null y afirmar que el resultado se lee como fallo, no como exito.",
+    "AC2: reduceAllocationsForCard distingue exito total, fallo total y exito PARCIAL. Hoy colapsa los tres en un boolean. Test con N mazos donde uno falla y otros escriben.",
+    "AC3: handleSave (CardDetailModal.vue) consume esa distincion y elige el mensaje correcto: nada guardado vs guardado incompleto. Claves i18n verificadas en en.json, es.json y pt.json, las 3 en el mismo commit.",
+    "AC4: no reintroducir el falso positivo que bloqueo TASK-281. Un no-op legitimo (nada que reducir, nada que asignar) NUNCA se lee como fallo. Test explicito del no-op por cada superficie tocada.",
+    "AC5: revisar si allocateCardToBinder y los dos deallocateCard tienen la misma forma de mentira antes de dar el ticket por completo. No asumir que no la tienen — medirlo y dejarlo escrito.",
+    "AC6: npm run test:unit verde y npx vite build verde. Ningun test roto, en particular los de TASK-280 y TASK-281."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "silent-failure",
+    "decks"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-281"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-24T23:11:42.698Z",
+      "body": "SITIO CONCRETO PARA EL AC5, encontrado durante la ronda de arreglo de TASK-281 (2026-08-24).\n\nsrc/composables/useDiscoveryAddCard.ts:174 lee `const { allocated } = await deps.bindersStore.allocateCardToBinder(...)` y despues decide con `if (allocated === 0)`. Es la MISMA ambiguedad que el HIGH-1 de TASK-281: allocated 0 puede ser el tope de disponibilidad por diseño (binders.ts:345) o una escritura fallida, y ese flujo no los distingue.\n\nEl developer de TASK-281 lo dejo deliberadamente igual que antes — adaptado al tipo nuevo pero con el mismo comportamiento efectivo — para no meter scope creep sobre un flujo que el ticket no nombraba. Decision correcta: no introduce regresion, solo deja la ambiguedad preexistente donde estaba. Ahora la store SI puede distinguir (devuelve `failed`), asi que el arreglo aca es barato.\n\nLlamadores reales de allocateCardToBinder, medidos por grep en esa ronda (tres, ninguno mas):\n  src/components/collection/AddCardModal.vue:306 — await sin usar el retorno; no distingue nada, mismo hueco potencial\n  src/components/collection/CardDetailModal.vue:771 — ya lee { allocated, failed }, arreglado por TASK-281\n  src/composables/useDiscoveryAddCard.ts:174 — lee solo allocated, ambiguo\nviews/BinderView.vue y views/DeckView.vue solo pasan la referencia de la funcion, no la invocan.\n\nO sea que de los tres llamadores, uno esta arreglado y DOS siguen sin distinguir tope de fallo. AddCardModal es el mas silencioso de los dos: ni siquiera mira el resultado."
+    }
+  ],
+  "created_at": "2026-08-24T23:06:07.859Z",
+  "updated_at": "2026-08-24T23:11:42.698Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,0 +1,34 @@
+{
+  "key": "TASK-286",
+  "title": "El import debe completar los metadatos en el SERVIDOR, no en el navegador",
+  "description": "MEDIDO EN PRODUCCION 2026-08-26, cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1, despues de que Rafael borrara e reimportara su coleccion entera:\n\n- 5765 cartas creadas a las 22:49. type_line: 0/5766. colors: 0. rarity: 0. cmc: 0. scryfallId: 5766/5766 (todas lo tienen).\n- scryfall_cache NO crecio: 1501 documentos antes del import y 1501 despues, para ~5383 scryfallId unicos.\n- El deploy a prod de v1.59.8 (TASK-285) termino 22:35; el import fue 22:49.\n- El indice se reconstruyo solo a las 22:50 (los 3 chunks quedaron con version 3) y quedo con 1799/5766 entradas con type_line: exactamente lo que el join contra scryfall_cache podia aportar.\n\nINTERPRETACION, ETIQUETADA: que scryfall_cache no crezca ni un documento es la firma de que el _cacheFields del cliente nunca llego, o sea que corrio el camino VIEJO. La causa mas probable es una pestania abierta desde antes del deploy sirviendo el bundle anterior (el proyecto NO tiene service worker, pero un tab abierto sigue pidiendo los chunks por demanda con los hashes que cargo al abrirse). NO ESTA PROBADO y no se puede probar hacia atras.\n\nPOR QUE ESTE TICKET EXISTE IGUAL, independientemente de esa causa: TASK-285 puso el enriquecimiento en el CLIENTE. Eso lo deja expuesto a por lo menos tres cosas que no controlamos: que el navegador tenga codigo viejo, que Scryfall corte o limite por frecuencia a mitad de ~72 pedidos, y que el usuario no se entere en ninguno de los dos casos porque el import sigue adelante en silencio (comportamiento deliberado de TASK-285 AC4: no perder la carta). Un import de 5765 cartas que entra vacio y canta exito es el mismo modo de fallo que TASK-281.\n\nEL ARREGLO: mover el enriquecimiento a functions/index.js:bulkImportCards, que ya escribe los campos en el doc de usuario (USER_CARD_FIELDS incluye cmc/type_line/colors/rarity) y ya escribe scryfall_cache. Le falta completar lo que el cliente no mando.\n\nNO SE TOCA: el camino del cliente de TASK-285 se queda como esta. Es una segunda red, no un reemplazo; que el cliente mande los datos sigue siendo el camino rapido y ahorra pedidos.",
+  "acceptance_criteria": [
+    "AC1. En bulkImportCards, para toda carta entrante con scryfallId pero SIN type_line/colors/rarity/cmc, el servidor completa esos campos ANTES de escribir el documento: primero leyendo scryfall_cache (lote, con db.getAll, sin el limite de 10 del operador in), y para los ids que el cache no tenga, consultando /cards/collection de Scryfall en lotes de 75 desde la function.",
+    "AC2. Todo id que se resuelva contra Scryfall se escribe tambien en scryfall_cache, para que el proximo import y el buildCardIndex lo encuentren sin volver a salir a la red.",
+    "AC3. NO ROMPER lo que ya funciona: una carta que YA viene con metadatos del cliente se escribe igual que hoy, sin ninguna consulta extra. Test que lo pruebe contando llamadas: cero llamadas a Scryfall cuando todas las cartas vienen completas.",
+    "AC4. Si Scryfall falla o no resuelve un id, la carta se importa IGUAL (no se pierde), pero la function DEVUELVE cuantas quedaron sin metadatos, en un campo del resultado. El silencio es el defecto que este ticket ataca.",
+    "AC5. El cliente muestra ese numero al usuario cuando es mayor que cero, con una clave i18n nueva en en.json, es.json y pt.json. No hace falta pantalla nueva: alcanza el toast del final del import.",
+    "AC6. Tope de trabajo por llamada: bulkImportCards ya acepta hasta 5000 cartas y el cliente manda de a 500. Verificar y dejar escrito que el peor caso de 500 cartas sin cache entra en el timeout de 120s de la function; si no entra, subir el timeout o partir, pero MEDIDO, no supuesto.",
+    "AC7. Tests unitarios del helper de enriquecimiento (cache-hit, cache-miss con Scryfall OK, cache-miss con Scryfall caido, mezcla de los tres). Los tests de functions/ corren sin firebase-admin, como lib/cardIndexEntry.js — seguir ese patron.",
+    "AC8. npm run test:unit verde y npx vite build verde."
+  ],
+  "status": "in_progress",
+  "priority": "critical",
+  "labels": [
+    "import",
+    "functions",
+    "card_index",
+    "prod-bug"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-26T22:58:33.707Z",
+  "updated_at": "2026-08-26T22:58:36.252Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

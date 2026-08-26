@@ -691,6 +691,7 @@
       "batchDeleteError": "Erro ao excluir cartas",
       "imported": "{count} cartas importadas",
       "importError": "Erro ao importar cartas",
+      "importIncompleteMetadata": "{count} carta(s) importada(s) sem dados completos — revise-as depois",
       "synced": "Cartas sincronizadas para matches",
       "syncError": "Erro sincronizando cartas"
     }

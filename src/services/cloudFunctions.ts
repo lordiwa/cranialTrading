@@ -134,6 +134,13 @@ export async function notifyMatchUser(
 export interface BulkImportResponse {
   cardIds: string[]
   count: number
+  /**
+   * TASK-286: how many of these cards still have no type_line/colors/
+   * rarity/cmc after the server's own enrichment attempt (scryfall_cache,
+   * then Scryfall's /cards/collection). 0 in the common case — surfaced so
+   * an import can no longer land silently incomplete (TASK-285 gap).
+   */
+  unresolvedMetadataCount: number
 }
 
 export async function bulkImportCards(

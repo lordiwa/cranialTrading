@@ -60,8 +60,10 @@ describe('bulkImportCards — sticky chunkId on creation (TASK-230)', () => {
     // iteration) would assign the same chunkId range to every 500-card batch
     // instead of a monotonically increasing position across all `cards`.
     // Guard: the position variable must be declared OUTSIDE the outer
-    // `for (let i = 0; i < cards.length; i += BATCH_SIZE)` loop.
-    const outerLoopIdx = source.indexOf('for (let i = 0; i < cards.length; i += BATCH_SIZE)')
+    // `for (let i = 0; i < importCards.length; i += BATCH_SIZE)` loop.
+    // TASK-286 renamed the loop variable from `cards` to `importCards`
+    // (post-enrichment array) — same loop, same contract, new name.
+    const outerLoopIdx = source.indexOf('for (let i = 0; i < importCards.length; i += BATCH_SIZE)')
     expect(outerLoopIdx).toBeGreaterThan(-1)
     const beforeOuterLoop = source.slice(0, outerLoopIdx)
     expect(beforeOuterLoop).toMatch(/let\s+\w+\s*=\s*\(await\s+colRef\.count\(\)\.get\(\)\)/)

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-26T21:59:22.263Z",
+  "generated_at": "2026-08-26T22:58:36.252Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1589,6 +1589,12 @@
       "key": "TASK-285",
       "title": "El import de CSV entra cartas sin metadatos de Scryfall y deja los filtros vacios",
       "status": "done",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-286",
+      "title": "El import debe completar los metadatos en el SERVIDOR, no en el navegador",
+      "status": "in_progress",
       "priority": "critical"
     }
   ]

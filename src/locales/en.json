@@ -691,6 +691,7 @@
       "batchDeleteError": "Error deleting cards",
       "imported": "{count} cards imported",
       "importError": "Error importing cards",
+      "importIncompleteMetadata": "{count} card(s) imported without full card data — check them later",
       "synced": "Cards synced for matches",
       "syncError": "Error syncing cards"
     }

@@ -35,6 +35,10 @@ const { isDualFaced, buildIndexEntry } = require("./lib/cardIndexEntry");
 // can drift). This file only wires the self-only onCall wrapper below.
 const { reconcilePublicCardIndexForUser } = require("./lib/publicCardIndexReconciler");
 const { queryPublicCardIndexForUser } = require("./lib/publicCardIndexQuery");
+// TASK-286: bulkImportCards' second-net enrichment — cards missing Scryfall
+// metadata get one more chance server-side before being written. See the
+// module header for why this must stay dependency-free.
+const { enrichCardsForImport } = require("./lib/enrichImportCards");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -476,6 +480,25 @@ exports.bulkImportCards = onCall(
       throw new HttpsError("invalid-argument", "Maximum 5000 cards per call");
     }
 
+    // TASK-286: complete Scryfall metadata the client didn't send, BEFORE
+    // any doc is written — AC1. AC3: a card that already carries
+    // type_line/colors/rarity/cmc costs zero calls (enrichCardsForImport
+    // short-circuits when nothing needs it). AC6 measured worst case (500
+    // cards, 100% cache miss, 7 sequential /cards/collection batches of
+    // 75): 4.6s against the real Scryfall API (2026-08-26) — comfortably
+    // inside this function's 120s timeoutSeconds, no change needed there.
+    const enrichment = await enrichCardsForImport(cards, {
+      getCacheMap: fetchScryfallCacheMap,
+      fetchScryfallBatch: fetchScryfallCollectionBatch,
+    });
+    const importCards = enrichment.cards;
+    if (enrichment.unresolvedCount > 0) {
+      // AC4: the card is still imported below — this is visibility, not a
+      // block. TASK-286 exists because TASK-285's client-side version of
+      // this same gap failed silently.
+      logger.warn(`[bulkImportCards] ${enrichment.unresolvedCount} card(s) imported without full Scryfall metadata`);
+    }
+
     const colRef = db.collection(`users/${userId}/cards`);
     const createdIds = [];
     const BATCH_SIZE = 500;
@@ -489,8 +512,8 @@ exports.bulkImportCards = onCall(
     // chunkId stays a single monotonic sequence over this entire call.
     let position = (await colRef.count().get()).data().count;
 
-    for (let i = 0; i < cards.length; i += BATCH_SIZE) {
-      const chunk = cards.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < importCards.length; i += BATCH_SIZE) {
+      const chunk = importCards.slice(i, i + BATCH_SIZE);
       const batch = db.batch();
       const refs = [];
 
@@ -526,11 +549,19 @@ exports.bulkImportCards = onCall(
     // Write unique scryfallIds to cache (fire-and-forget, best-effort)
     // Only writes cards that have _cacheFields or enough Scryfall data
     const cacheWrites = new Map();
-    for (const card of cards) {
+    for (const card of importCards) {
       if (!card.scryfallId) continue;
       if (cacheWrites.has(card.scryfallId)) continue;
       if (card._cacheFields) {
         cacheWrites.set(card.scryfallId, card._cacheFields);
+      }
+    }
+    // AC2: ids the server resolved against Scryfall (enrichment.cacheWrites,
+    // raw Scryfall card objects) also get cached, so the next import and
+    // buildCardIndex find them without another network round-trip.
+    for (const [scryfallId, scryfallCard] of enrichment.cacheWrites) {
+      if (!cacheWrites.has(scryfallId)) {
+        cacheWrites.set(scryfallId, pickCacheFields(scryfallCard));
       }
     }
 
@@ -566,7 +597,13 @@ exports.bulkImportCards = onCall(
     }
 
     logger.info(`[bulkImportCards] ${createdIds.length} cards imported for user ${userId}`);
-    return { cardIds: createdIds, count: createdIds.length };
+    // AC4: unresolvedMetadataCount is 0 whenever nothing was missing (the
+    // common case) — the client only needs to surface it when > 0 (AC5).
+    return {
+      cardIds: createdIds,
+      count: createdIds.length,
+      unresolvedMetadataCount: enrichment.unresolvedCount,
+    };
   }
 );
 
@@ -763,6 +800,33 @@ function pickCacheFields(card) {
     }
   }
   return result;
+}
+
+/**
+ * TASK-286: Scryfall's /cards/collection endpoint, up to 75 identifiers
+ * per call. Used by bulkImportCards (via enrichCardsForImport) to complete
+ * metadata for cards scryfall_cache didn't have. An id Scryfall can't
+ * resolve is simply absent from `data` — not an error — so the caller
+ * treats it the same as "still unresolved" (AC4).
+ *
+ * @param {string[]} ids up to 75 Scryfall card ids
+ * @returns {Promise<object[]>}
+ */
+async function fetchScryfallCollectionBatch(ids) {
+  const res = await fetch('https://api.scryfall.com/cards/collection', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': CARD_IMAGE_USER_AGENT,
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ identifiers: ids.map((id) => ({ id })) }),
+  });
+  if (!res.ok) {
+    throw new Error(`Scryfall /cards/collection: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.data || [];
 }
 
 /**

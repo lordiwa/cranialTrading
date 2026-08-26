@@ -2799,6 +2799,9 @@ export const useCollectionStore = defineStore('collection', () => {
             const { bulkImportCards } = await import('../services/cloudFunctions')
             const CHUNK_SIZE = 500
             const createdIds: string[] = []
+            // TASK-286 AC5: summed across every chunk call so a multi-chunk
+            // import reports the full count, not just the last chunk's.
+            let unresolvedMetadataCount = 0
 
             for (let i = 0; i < cardsToSave.length; i += CHUNK_SIZE) {
                 const chunk = cardsToSave.slice(i, i + CHUNK_SIZE)
@@ -2811,6 +2814,7 @@ export const useCollectionStore = defineStore('collection', () => {
                 try {
                     const result = await bulkImportCards(cleanChunk)
                     createdIds.push(...result.cardIds)
+                    unresolvedMetadataCount += result.unresolvedMetadataCount ?? 0
                 } catch (chunkError) {
                     logSanitizedError(`[Import] Chunk ${i} failed`, chunkError)
                 }
@@ -2843,6 +2847,13 @@ export const useCollectionStore = defineStore('collection', () => {
 
             if (!silent) {
                 toastStore.show(t('collection.messages.imported', { count: createdIds.length }), 'success')
+            }
+            // AC5: shown regardless of `silent` — deck/binder flows suppress
+            // the generic "imported" toast in favor of their own
+            // deckComplete/binderComplete message, but this is a different,
+            // orthogonal warning (TASK-285's silent-incomplete-import gap).
+            if (unresolvedMetadataCount > 0) {
+                toastStore.show(t('collection.messages.importIncompleteMetadata', { count: unresolvedMetadataCount }), 'info')
             }
             return createdIds
         } catch (error) {

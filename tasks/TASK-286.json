@@ -12,7 +12,7 @@
     "AC7. Tests unitarios del helper de enriquecimiento (cache-hit, cache-miss con Scryfall OK, cache-miss con Scryfall caido, mezcla de los tres). Los tests de functions/ corren sin firebase-admin, como lib/cardIndexEntry.js — seguir ese patron.",
     "AC8. npm run test:unit verde y npx vite build verde."
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "import",
@@ -22,11 +22,24 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "9b838f847cd8935e383e91d34872923125e1acc2"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-26T23:19:33.393Z",
+      "body": "APROBADO (review_depth: full; insumos: 495 lineas cambiadas, 240 en functions/ y src/, toca una Cloud Function del camino de datos de produccion). 0 HIGH, 3 MEDIUM, 3 LOW. El arreglo si arregla el problema real y el tripwire NO quedo debilitado.\n\nMEDIDO: npm run test:unit 179 archivos / 2315 tests verdes (103 s); npm run type-check limpio; mas dos mutaciones manuales con el arbol restaurado despues.\n\nPunto 1, el tripwire (bulkImportCardsChunkId.test.ts): INTACTO. El unico cambio es el string localizador del loop externo (cards.length -> importCards.length) mas un comentario que documenta el rename. Las 6 aserciones y sus contratos son identicos y el string nuevo apunta al mismo loop renombrado en el fuente real. No se relajo ningun regex ni se borro ninguna asercion.\n\nPunto 2, secuencia de escritura: sin desalineamiento posible. enrichCardsForImport devuelve cards.map(...) — misma longitud, mismo orden, nunca filtra ni agrega. Los loops de escritura y de cacheWrites usan SOLO importCards, sin zipear contra el array original. `let position = count()` sigue fuera del loop externo y se lee antes de cualquier escritura: la semantica de chunkId pegajoso de TASK-230 queda intacta.\n\nPunto 3, AC3: MEDIDO POR MUTACION, no es verde vacio. Anular el short-circuit pone rojo el test de AC3; hacer que needsEnrichment devuelva siempre true pone rojos dos. El sensor detecta las dos formas de \"consultar siempre\".\n\nPunto 4, fallo parcial: cada lote de 75 tiene su try/catch. Si un lote falla, sus cartas vuelven sin tocar, suman a unresolvedCount y NO generan cacheWrites; los demas lotes siguen normal. Un id que Scryfall no resuelve esta ausente de data.data, no entra a scryfallResults y por lo tanto NO escribe documento de cache vacio: el envenenamiento del cache no puede ocurrir desde este codigo.\n\nPunto 5, User-Agent y endpoint: correctos. POST a /cards/collection con Content-Type, User-Agent real y Accept; cuerpo {identifiers:[{id}]}; lotes de 75, el limite documentado. Node 22 tiene fetch global. Un !res.ok lanza y cae en el catch de AC4.\n\nMEDIUM-1 (enrichImportCards.js): `colors: []` cuenta como \"falta\", asi que toda carta INCOLORA (tierras, artefactos) con datos completos dispara enrichment en cada import — lectura de cache siempre y Scryfall en cache-miss. AC3 literal solo vale para cartas con color; el fixture del test usa colors:['G'] deliberadamente. Peor consecuencia: incolora completa + cache miss + Scryfall caido suma a unresolvedMetadataCount y el toast reporta como incompletas cartas que estan completas.\n\nMEDIUM-2 (enrichImportCards.js): unresolvedCount cuenta \"no encontre fuente\", no \"sigue incompleta tras el merge\". Un doc de cache flaco (existe pero sin type_line) corta el fallback a Scryfall Y reporta la carta como resuelta: importa incompleta con contador en 0, que es justo la forma silenciosa que el ticket ataca. Caso real ya existente: las DFC — pickCacheFields no captura colors de un layout transform/modal_dfc porque Scryfall lo pone en card_faces, no en la raiz. Arreglo barato: contar unresolved con needsEnrichment(merged) en vez de !resolvedAgainst.\n\nMEDIUM-3 (cobertura): no existe tripwire de que bulkImportCards LLAME a enrichCardsForImport. Borrar la llamada deja todo verde. El repo ya usa aserciones de texto-fuente para exactamente esto; una linea expect(source).toMatch(/enrichCardsForImport\\(/) cerraria el agujero.\n\nLOW-1: si getCacheMap (db.getAll) lanza, no esta atrapado y el chunk entero de import falla donde antes habria importado — cambio de comportamiento no declarado. LOW-2: el JSDoc afirma un contrato de strip que no existe (el strip ocurre despues). LOW-3: una llamada directa con 5000 cartas 100% cache-miss son 67 lotes secuenciales, ~45-60 s: entra en los 120 s pero con menos margen que el caso medido de 500.\n\nConfianza 8/10. Lo que la baja: no se ejecuto bulkImportCards de punta a punta (no hay harness de functions en este repo) y el AC6 se toma del commit, no re-medido."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-26T23:20:06.359Z",
+      "body": "Cerrado con review APROBADO en contexto fresco. review_depth: full; insumos: 495 lineas cambiadas (240 en functions/ y src/), toca una Cloud Function del camino de datos de produccion y arregla un bug de produccion en curso. Tier: tests-after. v1.59.9.\n\n0 HIGH. Los dos riesgos que este ticket mas temia quedaron descartados POR MEDICION, no por lectura: el tripwire de chunkId sigue afirmando exactamente lo mismo (solo cambio el string localizador tras un rename de variable), y el sensor de AC3 se probo mutando el codigo en dos direcciones distintas — las dos se pusieron rojas.\n\nLos 3 MEDIUM se aceptan a sabiendas y van a ticket de seguimiento, NO se arreglan aca: el bug de produccion esta activo, el usuario esta esperando para reimportar su coleccion, y ninguno de los tres impide que el import complete los metadatos. Resumen: (1) las cartas incoloras disparan enrichment en cada import porque colors:[] cuenta como faltante — costo acotado, y ademas puede reportar como incompletas cartas que estan completas; (2) unresolvedCount cuenta 'no encontre fuente' en vez de 'sigue incompleta tras el merge', asi que un doc de cache flaco (caso real: las DFC, cuyo colors vive en card_faces) importa incompleta con el contador en cero, que es la forma silenciosa que este mismo ticket ataca; (3) no hay tripwire de que bulkImportCards LLAME al helper: borrar la llamada deja la suite verde.\n\nPENDIENTE OPERATIVO, y no es opcional: el CI de este repo despliega SOLO hosting. Esta function NO llega a produccion con el push. Hay que desplegarla a mano, acotada con --only functions:bulkImportCards, primero a dev y verificada con un import real, despues a prod. Hasta que eso pase, el arreglo NO esta vigente para el usuario y reimportar vuelve a entrar vacio.\n\nContexto de por que existio este ticket: TASK-285 puso el enriquecimiento en el cliente y en produccion no corrio — medido, 5765 cartas creadas con type_line 0/5766 y scryfall_cache sin crecer ni un documento. La causa mas probable fue una pestania con el bundle anterior, pero nunca se probo y no se puede probar hacia atras. Mover el enriquecimiento al servidor hace que esa causa deje de importar, que era el punto."
+    }
+  ],
   "created_at": "2026-08-26T22:58:33.707Z",
-  "updated_at": "2026-08-26T22:58:36.252Z",
+  "updated_at": "2026-08-26T23:20:06.359Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]",

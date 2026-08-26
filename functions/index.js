@@ -39,6 +39,10 @@ const { queryPublicCardIndexForUser } = require("./lib/publicCardIndexQuery");
 // metadata get one more chance server-side before being written. See the
 // module header for why this must stay dependency-free.
 const { enrichCardsForImport } = require("./lib/enrichImportCards");
+// TASK-286 REABIERTO: strips `key: undefined` (mergeScryfallMetadata's
+// `||`/`??` fallbacks produce these) out of the batch.set() payload —
+// Firestore rejects the entire write, not just the field, if it's there.
+const { pickDefinedFields } = require("./lib/pickDefinedFields");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -522,13 +526,12 @@ exports.bulkImportCards = onCall(
         // Strip any client-sent id/createdAt/updatedAt — server controls these
         const { id, createdAt, updatedAt, _cacheFields, ...cardData } = card;
 
-        // Write only user-specific fields + convenience copies to user doc
-        const userFields = {};
-        for (const [key, value] of Object.entries(cardData)) {
-          if (USER_CARD_FIELDS.has(key)) {
-            userFields[key] = value;
-          }
-        }
+        // Write only user-specific fields + convenience copies to user doc.
+        // pickDefinedFields also drops any key whose value is `undefined`
+        // (TASK-286 REABIERTO) — mergeScryfallMetadata's fallbacks assign
+        // e.g. `power: undefined` on a non-creature card, and Firestore
+        // rejects the WHOLE batch.set() if that reaches it.
+        const userFields = pickDefinedFields(cardData, USER_CARD_FIELDS);
 
         const chunkId = Math.floor(position / INDEX_CHUNK_SIZE);
         position += 1;

@@ -12,7 +12,7 @@
     "AC7. Tests unitarios del helper de enriquecimiento (cache-hit, cache-miss con Scryfall OK, cache-miss con Scryfall caido, mezcla de los tres). Los tests de functions/ corren sin firebase-admin, como lib/cardIndexEntry.js — seguir ese patron.",
     "AC8. npm run test:unit verde y npx vite build verde."
   ],
-  "status": "done",
+  "status": "in_progress",
   "priority": "critical",
   "labels": [
     "import",
@@ -36,10 +36,15 @@
       "author": "orchestrator",
       "at": "2026-08-26T23:20:06.359Z",
       "body": "Cerrado con review APROBADO en contexto fresco. review_depth: full; insumos: 495 lineas cambiadas (240 en functions/ y src/), toca una Cloud Function del camino de datos de produccion y arregla un bug de produccion en curso. Tier: tests-after. v1.59.9.\n\n0 HIGH. Los dos riesgos que este ticket mas temia quedaron descartados POR MEDICION, no por lectura: el tripwire de chunkId sigue afirmando exactamente lo mismo (solo cambio el string localizador tras un rename de variable), y el sensor de AC3 se probo mutando el codigo en dos direcciones distintas — las dos se pusieron rojas.\n\nLos 3 MEDIUM se aceptan a sabiendas y van a ticket de seguimiento, NO se arreglan aca: el bug de produccion esta activo, el usuario esta esperando para reimportar su coleccion, y ninguno de los tres impide que el import complete los metadatos. Resumen: (1) las cartas incoloras disparan enrichment en cada import porque colors:[] cuenta como faltante — costo acotado, y ademas puede reportar como incompletas cartas que estan completas; (2) unresolvedCount cuenta 'no encontre fuente' en vez de 'sigue incompleta tras el merge', asi que un doc de cache flaco (caso real: las DFC, cuyo colors vive en card_faces) importa incompleta con el contador en cero, que es la forma silenciosa que este mismo ticket ataca; (3) no hay tripwire de que bulkImportCards LLAME al helper: borrar la llamada deja la suite verde.\n\nPENDIENTE OPERATIVO, y no es opcional: el CI de este repo despliega SOLO hosting. Esta function NO llega a produccion con el push. Hay que desplegarla a mano, acotada con --only functions:bulkImportCards, primero a dev y verificada con un import real, despues a prod. Hasta que eso pase, el arreglo NO esta vigente para el usuario y reimportar vuelve a entrar vacio.\n\nContexto de por que existio este ticket: TASK-285 puso el enriquecimiento en el cliente y en produccion no corrio — medido, 5765 cartas creadas con type_line 0/5766 y scryfall_cache sin crecer ni un documento. La causa mas probable fue una pestania con el bundle anterior, pero nunca se probo y no se puede probar hacia atras. Mover el enriquecimiento al servidor hace que esa causa deje de importar, que era el punto."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-26T23:42:12.897Z",
+      "body": "REABIERTO. Defecto BLOQUEANTE encontrado en la UAT contra dev, DESPUES del cierre y ANTES de tocar produccion.\n\nMEDIDO el 2026-08-26T23:41:26Z en cranial-trading-dev, llamando a la function desplegada con una carta pelada (sin type_line/colors/rarity/cmc y sin _cacheFields — o sea, simulando el cliente viejo, que es exactamente el escenario que este ticket existe para cubrir):\n\n  FirebaseError: INTERNAL\n  Log de la function: Unhandled error Error: Value for argument \"data\" is not a valid\n  Firestore document. Cannot use \"undefined\" as a Firestore value (found in field \"power\").\n  at WriteBatch.set (write-batch.js:263) at /workspace/index.js:536\n\nCAUSA: mergeScryfallMetadata (functions/lib/cardIndexEntry.js) hace `power: data.power || cache.power`. Para toda carta que NO es criatura — instantaneos, conjuros, encantamientos, tierras, artefactos sin cuerpo — el cache no trae power ni toughness, asi que el objeto mezclado queda con power: undefined. USER_CARD_FIELDS incluye 'power' y 'toughness', asi que ese undefined viaja al batch.set y Firestore lo rechaza, tirando la llamada ENTERA.\n\nALCANCE REAL SI ESTO HUBIERA IDO A PRODUCCION: no es un caso borde. Habria roto el import de cualquier tanda que contenga una sola carta sin power. La coleccion de Rafael son 5765 cartas mayormente no-criatura: el import habria fallado entero, con INTERNAL, en la primera tanda de 500.\n\nPOR QUE NO LO VIO NADIE ANTES: el camino del CLIENTE nunca lo pisa porque confirmImport (src/stores/collection.ts) pasa cada carta por stripUndefined ANTES de mandarla. El camino nuevo del servidor no tiene ese paso. Y los 14 tests unitarios del helper no podian verlo: mockean Firestore, y un mock acepta undefined sin chistar. Solo lo detecto ejecutar la function real contra una base real. Vale como leccion propia: un helper con cobertura total puede seguir siendo incompatible con el sistema que lo consume, y ninguna cantidad de tests unitarios lo habria dicho."
     }
   ],
   "created_at": "2026-08-26T22:58:33.707Z",
-  "updated_at": "2026-08-26T23:20:06.359Z",
+  "updated_at": "2026-08-26T23:42:12.897Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]",

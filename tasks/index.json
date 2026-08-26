@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-26T23:20:35.152Z",
+  "generated_at": "2026-08-26T23:42:12.897Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1594,7 +1594,7 @@
     {
       "key": "TASK-286",
       "title": "El import debe completar los metadatos en el SERVIDOR, no en el navegador",
-      "status": "done",
+      "status": "in_progress",
       "priority": "critical"
     },
     {

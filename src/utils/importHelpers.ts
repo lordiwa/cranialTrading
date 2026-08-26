@@ -276,3 +276,45 @@ export const buildRawCsvCard = (
   if (card.language) cardData.language = card.language
   return cardData
 }
+
+/**
+ * Build an ImportCardData from a CSV row + optional Scryfall match (TASK-285).
+ *
+ * The CSV import path used to call buildRawCsvCard() unconditionally, so
+ * type_line/colors/rarity/cmc were never populated and _cacheFields was never
+ * attached — bulkImportCards (functions/index.js:496) only writes
+ * scryfall_cache from card._cacheFields, so card_index ended up with
+ * t='', co=[], r='', cm=0 for every CSV-imported card, and every filter that
+ * reads those fields came back empty.
+ *
+ * Starts from buildRawCsvCard so price/edition/image behavior (user's
+ * purchase price, proxy thumb, setCode-derived edition) is untouched, then
+ * layers on Scryfall metadata + _cacheFields when a match was found.
+ *
+ * When Scryfall data is missing (row has no scryfallId, the id didn't
+ * resolve on Scryfall, or the upfront batch fetch failed/rate-limited) this
+ * returns the raw card unchanged — the row still imports, just without
+ * metadata, exactly like before this fix.
+ */
+export const buildCsvCardWithScryfall = (
+  card: ParsedCsvCard,
+  scryfallData: ExtractedScryfallData | null | undefined,
+  status: CardStatus | undefined,
+  makePublic: boolean,
+): ImportCardData => {
+  const cardData = buildRawCsvCard(card, status, makePublic)
+  if (!scryfallData) return cardData
+
+  cardData.cmc = scryfallData.cmc
+  cardData.type_line = scryfallData.type_line
+  cardData.colors = scryfallData.colors
+  cardData.rarity = scryfallData.rarity
+  cardData.power = scryfallData.power
+  cardData.toughness = scryfallData.toughness
+  cardData.oracle_text = scryfallData.oracle_text
+  cardData.keywords = scryfallData.keywords
+  cardData.legalities = scryfallData.legalities
+  cardData.full_art = scryfallData.full_art
+  cardData._cacheFields = buildCacheFieldsFromScryfall(scryfallData)
+  return cardData
+}

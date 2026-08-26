@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTextImportLine, buildCollectionCardFromScryfall, buildRawMoxfieldCard, buildRawCsvCard } from '../../../src/utils/importHelpers'
+import { parseTextImportLine, buildCollectionCardFromScryfall, buildRawMoxfieldCard, buildRawCsvCard, buildCsvCardWithScryfall } from '../../../src/utils/importHelpers'
 
 describe('importHelpers', () => {
   describe('parseTextImportLine', () => {
@@ -193,6 +193,92 @@ describe('importHelpers', () => {
       }
       const result = buildRawCsvCard(csvCard, undefined, false)
       expect(result.status).toBe('collection')
+    })
+  })
+
+  // TASK-285: CSV import was calling buildRawCsvCard() unconditionally, so
+  // type_line/colors/rarity/cmc were never populated and _cacheFields was
+  // never attached (see functions/index.js:bulkImportCards, which only
+  // writes scryfall_cache from card._cacheFields). Filters read those exact
+  // card_index fields, so every CSV import landed unfilterable.
+  describe('buildCsvCardWithScryfall', () => {
+    const csvCard = {
+      name: 'Counterspell',
+      setCode: 'MH2',
+      quantity: 4,
+      foil: false,
+      scryfallId: 'xyz-789',
+      price: 2.50,
+      condition: 'NM' as const,
+    }
+
+    const mockScryfallData = {
+      scryfallId: 'xyz-789',
+      name: 'Counterspell',
+      image: 'https://cards.scryfall.io/normal/front/x/y/xyz-789.jpg',
+      price: 3.10,
+      edition: 'Modern Horizons 2',
+      setCode: 'MH2',
+      cmc: 2,
+      type_line: 'Instant',
+      colors: ['U'],
+      rarity: 'uncommon',
+      power: undefined,
+      toughness: undefined,
+      oracle_text: 'Counter target spell.',
+      keywords: [],
+      legalities: { modern: 'legal' },
+      full_art: false,
+      produced_mana: undefined,
+    }
+
+    // AC1 (sensor rojo primero)
+    it('AC1: attaches type_line, colors, rarity, cmc AND _cacheFields when Scryfall data is available', () => {
+      const result = buildCsvCardWithScryfall(csvCard, mockScryfallData, 'collection', false)
+
+      expect(result.type_line).toBe('Instant')
+      expect(result.colors).toEqual(['U'])
+      expect(result.rarity).toBe('uncommon')
+      expect(result.cmc).toBe(2)
+      expect(result._cacheFields).toBeDefined()
+      expect(result._cacheFields?.type_line).toBe('Instant')
+      expect(result._cacheFields?.colors).toEqual(['U'])
+      expect(result._cacheFields?.rarity).toBe('uncommon')
+      expect(result._cacheFields?.cmc).toBe(2)
+    })
+
+    // AC3: row with no Scryfall match (no scryfallId, or id doesn't resolve) still
+    // imports through the raw path — same as buildRawCsvCard — instead of breaking
+    // or dropping the row.
+    it('AC3: falls back to the raw card (no metadata, no _cacheFields) when scryfallData is null', () => {
+      const result = buildCsvCardWithScryfall(csvCard, null, 'collection', false)
+
+      expect(result.scryfallId).toBe('xyz-789')
+      expect(result.name).toBe('Counterspell')
+      expect(result.price).toBe(2.50) // user's purchase price, not Scryfall's
+      expect(result._cacheFields).toBeUndefined()
+      expect(result.type_line).toBeUndefined()
+      expect(result.colors).toBeUndefined()
+      expect(result.rarity).toBeUndefined()
+      expect(result.cmc).toBeUndefined()
+    })
+
+    it('AC3: falls back to the raw card when scryfallData is undefined (id did not resolve)', () => {
+      const result = buildCsvCardWithScryfall(csvCard, undefined, 'collection', false)
+      expect(result._cacheFields).toBeUndefined()
+    })
+
+    // AC5 (control negativo obligatorio): the AC1 sensor must go red for the right
+    // reason. With the fix in place but _cacheFields emptied by hand, AC1's
+    // assertions on _cacheFields must fail — proving the test actually inspects
+    // _cacheFields rather than passing regardless of its content.
+    it('AC5: control negativo — AC1 sensor fails when _cacheFields is emptied by hand', () => {
+      const result = buildCsvCardWithScryfall(csvCard, mockScryfallData, 'collection', false)
+      result._cacheFields = {}
+
+      expect(() => {
+        expect(result._cacheFields?.type_line).toBe('Instant')
+      }).toThrow()
     })
   })
 })

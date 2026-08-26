@@ -1,0 +1,39 @@
+{
+  "key": "TASK-285",
+  "title": "El import de CSV entra cartas sin metadatos de Scryfall y deja los filtros vacios",
+  "description": "MEDIDO EN PRODUCCION 2026-08-26 (solo lectura, cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1):\n\n- card_index: 3 chunks, 5764 entradas. 5764/5764 con t='' (type_line), co=[] (colors), r='' (rarity), cm=0. sc y e SI estan puestos.\n- documentos users/{uid}/cards: los campos existentes son chunkId, condition, createdAt, edition, foil, image, language, name, price, public, quantity, scryfallId, setCode, status, updatedAt. NO existe type_line, ni colors, ni rarity, ni cmc. Muestra de 400 docs: 400/400 sin los tres.\n- scryfall_cache: 1501 docs para 5383 scryfallId unicos del indice. En una muestra de 300 ids del indice, solo 164 tienen doc de cache (los 164 SI traen type_line/colors/rarity/cmc).\n\nCADENA DE CAUSA (LEIDA en el codigo, no supuesta):\n1. src/composables/useCollectionImport.ts:602 y :875 llaman buildRawCsvCard(...) INCONDICIONALMENTE. El camino de CSV nunca consulta Scryfall.\n2. buildRawCsvCard (src/utils/importHelpers.ts:~255) arma la carta solo con campos de usuario: no pone cmc/type_line/colors/rarity y NO adjunta _cacheFields.\n3. functions/index.js:bulkImportCards solo escribe en scryfall_cache lo que venga en card._cacheFields (linea ~530). Sin _cacheFields, el cache no se puebla.\n4. functions/lib/cardIndexEntry.js:mergeScryfallMetadata devuelve `data` intacto cuando no hay doc de cache, asi que buildIndexEntry produce t='', co=[], r='', cm=0.\n5. Los filtros consultan esos campos del indice -> resultado vacio en TODAS las pantallas.\n\nEL CAMINO DE MOXFIELD YA HACE LO CORRECTO y es el modelo a copiar: useCollectionImport.ts:434 hace getCardsByIds(identifiers) en lote y :469 llama buildMoxfieldCardWithScryfall, que usa buildCollectionCardFromScryfall + buildCacheFieldsFromScryfall (importHelpers.ts:~215-250).\n\nVIABILIDAD CONFIRMADA: las cartas ya importadas tienen scryfallId poblado (visible como `s` en cada entrada del indice), asi que el batch por id que usa Moxfield sirve igual para CSV. Para filas de CSV SIN scryfallId hay que decidir y documentar el comportamiento, no inventarlo en silencio.\n\nALCANCE EXPLICITO, ORDEN DE RAFAEL: arreglar el IMPORT. NO reparar ni tocar las cartas ya existentes en ninguna cuenta. La reparacion del historico es un ticket aparte y hoy NO se hace.\n\nNO AMPLIAR: no rediseniar el composable de import, no tocar el camino de Moxfield que ya funciona, no tocar buildIndexEntry ni las functions.",
+  "acceptance_criteria": [
+    "AC1 (sensor rojo primero). Test unitario que, con una fila de CSV con scryfallId y datos de Scryfall disponibles, exige que la ImportCardData resultante traiga type_line, colors, rarity y cmc Y ademas _cacheFields poblado. Tiene que FALLAR contra el codigo actual y hay que pegar la corrida roja verbatim en el hand-off.",
+    "AC2. El camino de CSV de useCollectionImport.ts (los DOS sitios: linea ~602 y linea ~875 — son hermanos paralelos, Regla 6 de CLAUDE.md, van en el mismo commit) hace el batch-fetch de Scryfall por scryfallId igual que el camino de Moxfield (getCardsByIds) y arma la carta con metadatos.",
+    "AC3. Una fila de CSV SIN scryfallId, o cuyo id no resuelve en Scryfall, sigue importandose por el camino crudo actual — sin romper, sin perder la carta y sin lanzar. El comportamiento elegido queda escrito en un comentario en el codigo. Test que lo cubra.",
+    "AC4. Fallo de red / rate-limit / timeout de Scryfall NO aborta el import: las cartas entran igual con lo que haya. Test con el fetch rechazando.",
+    "AC5 (control negativo obligatorio). Un test que pruebe que el sensor de AC1 puede ponerse rojo por la razon correcta: con el fix puesto pero el _cacheFields vaciado a mano, el test tiene que fallar. Sin esto no hay forma de distinguir un verde real de un verde vacio.",
+    "AC6. npm run test:unit verde y npx vite build verde. Pegar ambas salidas.",
+    "AC7. NO se modifica ningun dato de ninguna cuenta. Ni scripts de reparacion, ni backfills, ni escrituras a prod o dev. Solo codigo."
+  ],
+  "status": "in_progress",
+  "priority": "critical",
+  "labels": [
+    "import",
+    "collection",
+    "card_index",
+    "prod-bug"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-08-26T21:43:14.929Z",
+      "body": "Tier cambiado de `tdd` a `tests-after` por orden explicita de Rafael el 2026-08-26: implementar primero, probar al final. AC1 pierde el requisito de corrida roja previa. AC5 (control negativo) se MANTIENE tal cual, y es ahora el unico mecanismo que distingue un verde real de un verde vacio en este ticket, porque ya no hay evidencia de rojo previo. Avisado al developer por mensaje directo."
+    }
+  ],
+  "created_at": "2026-08-26T21:39:48.723Z",
+  "updated_at": "2026-08-26T21:43:14.929Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

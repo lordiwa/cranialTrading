@@ -17,8 +17,8 @@ import { getCardsByIds, type ScryfallCard, searchCards } from '../services/scryf
 import { cleanCardName, type ParsedCsvCard } from '../utils/cardHelpers'
 import {
   buildCollectionCardFromScryfall,
+  buildCsvCardWithScryfall,
   buildMoxfieldCardWithScryfall,
-  buildRawCsvCard,
   type ExtractedScryfallData,
   type ImportCardData,
   type MoxfieldImportCard,
@@ -271,6 +271,65 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
       console.warn(`No se pudo obtener datos de Scryfall para: ${cardName}`)
     }
     return null
+  }
+
+  /**
+   * Batch-fetch Scryfall metadata for a CSV import and return a per-row lookup
+   * (TASK-285). Mirrors the Moxfield upfront batch (see handleImportDeckMoxfield)
+   * so both CSV entry points (handleImportCsv, handleImportBinderCsv — hermanos
+   * paralelos, Regla 6) get the same type_line/colors/rarity/cmc + _cacheFields
+   * instead of importing bare rows.
+   */
+  const fetchScryfallForCsvCards = async (
+    cards: ParsedCsvCard[]
+  ): Promise<(card: ParsedCsvCard) => ExtractedScryfallData | null> => {
+    const identifiers: ({ id: string } | { name: string })[] = []
+    const seenIds = new Set<string>()
+    const seenNames = new Set<string>()
+    for (const c of cards) {
+      if (c.scryfallId) {
+        if (!seenIds.has(c.scryfallId)) {
+          seenIds.add(c.scryfallId)
+          identifiers.push({ id: c.scryfallId })
+        }
+      } else if (c.name) {
+        const lowerKey = c.name.toLowerCase()
+        if (!seenNames.has(lowerKey)) {
+          seenNames.add(lowerKey)
+          identifiers.push({ name: c.name })
+        }
+      }
+    }
+
+    const scryfallByName = new Map<string, ExtractedScryfallData>()
+    const scryfallById = new Map<string, ExtractedScryfallData>()
+    if (identifiers.length > 0) {
+      try {
+        const scryfallCards = await getCardsByIds(identifiers)
+        for (const sc of scryfallCards) {
+          const data = extractScryfallCardData(sc)
+          scryfallById.set(sc.id, data)
+          if (sc.name) scryfallByName.set(sc.name.toLowerCase(), data)
+        }
+      } catch (err) {
+        // AC4: a network/rate-limit/timeout failure here must NOT abort the
+        // import — every row still lands via buildCsvCardWithScryfall's raw
+        // fallback (AC3), just without metadata.
+        console.warn('[CSV Import] Upfront Scryfall batch failed, falling back to raw:', err)
+      }
+    }
+
+    return (card: ParsedCsvCard): ExtractedScryfallData | null => {
+      if (card.scryfallId) {
+        const byId = scryfallById.get(card.scryfallId)
+        if (byId) return byId
+      }
+      if (card.name) {
+        const byName = scryfallByName.get(card.name.toLowerCase())
+        if (byName) return byName
+      }
+      return null
+    }
   }
 
   // ============================================================
@@ -591,6 +650,12 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
 
       cancelPriceFetch()
 
+      // TASK-285: upfront batch-fetch Scryfall metadata by scryfallId, same as
+      // the Moxfield path — a network failure here falls through to raw rows
+      // (AC4), it never aborts the import.
+      progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
+      const lookupScryfall = await fetchScryfallForCsvCards(cards)
+
       progressToast.update(15, t('common.import.processing'))
       const collectionCardsToAdd: ImportCardData[] = []
       const cardMeta: { quantity: number; isInSideboard: boolean }[] = []
@@ -599,7 +664,7 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false))
+        collectionCardsToAdd.push(buildCsvCardWithScryfall(card, lookupScryfall(card), status, makePublic ?? false))
         cardMeta.push({ quantity: card.quantity, isInSideboard: false })
 
         if (i % 100 === 0) {
@@ -865,6 +930,12 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
 
       cancelPriceFetch()
 
+      // TASK-285: upfront batch-fetch Scryfall metadata by scryfallId, same as
+      // the Moxfield path and the deck CSV path above — a network failure here
+      // falls through to raw rows (AC4), it never aborts the import.
+      progressToast.update(10, t('common.import.fetchingData', { count: cards.length }))
+      const lookupScryfall = await fetchScryfallForCsvCards(cards)
+
       progressToast.update(15, t('common.import.processing'))
       const collectionCardsToAdd: ImportCardData[] = []
 
@@ -872,7 +943,7 @@ export function useCollectionImport(opts: UseCollectionImportOptions) {
         // eslint-disable-next-line security/detect-object-injection
         const card = cards[i]
         if (!card) continue
-        collectionCardsToAdd.push(buildRawCsvCard(card, status, makePublic ?? false))
+        collectionCardsToAdd.push(buildCsvCardWithScryfall(card, lookupScryfall(card), status, makePublic ?? false))
 
         if (i % 100 === 0) {
           const pct = 15 + Math.round((i / cards.length) * 25)

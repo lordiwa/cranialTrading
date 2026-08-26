@@ -8,6 +8,7 @@ import { ref } from 'vue'
 
 vi.mock('@/services/scryfallCache', () => ({
   searchCards: vi.fn().mockResolvedValue([]),
+  getCardsByIds: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('@/composables/useCollectionTotals', () => ({
   cancelPriceFetch: vi.fn(),
@@ -19,14 +20,20 @@ vi.mock('@/composables/useI18n', () => ({
 
 // We import after mocks are set up
 import { useCollectionImport } from '@/composables/useCollectionImport'
+import { getCardsByIds } from '@/services/scryfallCache'
 
 const IMPORT_KEY = 'cranial_deck_import_progress'
+
+let capturedConfirmImportCards: any[] = []
 
 function makeStores() {
   return {
     collectionStore: {
       importing: false,
-      confirmImport: vi.fn().mockResolvedValue([]),
+      confirmImport: vi.fn().mockImplementation((cards: any[]) => {
+        capturedConfirmImportCards = cards.map(c => ({ ...c }))
+        return Promise.resolve(cards.map((_, i) => `card-${i}`))
+      }),
       refreshCards: vi.fn(),
       enrichCardsWithMissingMetadata: vi.fn().mockResolvedValue(undefined),
       queryPage: vi.fn(),
@@ -58,6 +65,7 @@ describe('useCollectionImport', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
+    capturedConfirmImportCards = []
   })
 
   describe('localStorage persistence', () => {
@@ -266,6 +274,106 @@ describe('useCollectionImport', () => {
       // Should be a function that returns boolean
       expect(typeof isImportRunning).toBe('function')
       expect(typeof isImportRunning()).toBe('boolean')
+    })
+  })
+
+  // TASK-285: the CSV path used to call buildRawCsvCard() unconditionally and
+  // never touched Scryfall, so card_index ended up with t='', co=[], r='',
+  // cm=0 for every CSV-imported card. Both CSV entry points (handleImportCsv,
+  // handleImportBinderCsv — hermanos paralelos, Regla 6) must now batch-fetch
+  // Scryfall metadata like the Moxfield path does.
+  describe('CSV import batch-fetches Scryfall metadata (TASK-285)', () => {
+    const csvCard = {
+      name: 'Counterspell',
+      setCode: 'MH2',
+      quantity: 4,
+      foil: false,
+      scryfallId: 'xyz-789',
+      price: 2.50,
+      condition: 'NM' as const,
+    }
+
+    const mockScryfallCard = {
+      id: 'xyz-789',
+      name: 'Counterspell',
+      set: 'mh2',
+      set_name: 'Modern Horizons 2',
+      image_uris: { normal: 'https://cards.scryfall.io/normal/front/x/y/xyz-789.jpg' },
+      prices: { usd: '3.10' },
+      cmc: 2,
+      type_line: 'Instant',
+      colors: ['U'],
+      rarity: 'uncommon',
+      keywords: [],
+      legalities: { modern: 'legal' },
+      full_art: false,
+    }
+
+    // AC2: handleImportCsv (deck CSV import, ~line 602 before the fix) batch-fetches
+    // by scryfallId and attaches metadata + _cacheFields to the saved cards.
+    it('AC2: handleImportCsv batch-fetches by scryfallId and confirmImport receives metadata + _cacheFields', async () => {
+      vi.mocked(getCardsByIds).mockResolvedValueOnce([mockScryfallCard as any])
+      const stores = makeStores()
+      const { handleImportCsv } = useCollectionImport(stores)
+
+      await handleImportCsv([csvCard], 'Test Deck')
+
+      expect(getCardsByIds).toHaveBeenCalledWith([{ id: 'xyz-789' }])
+      const savedCards = capturedConfirmImportCards
+      expect(savedCards).toHaveLength(1)
+      expect(savedCards[0].type_line).toBe('Instant')
+      expect(savedCards[0].colors).toEqual(['U'])
+      expect(savedCards[0].rarity).toBe('uncommon')
+      expect(savedCards[0].cmc).toBe(2)
+      expect(savedCards[0]._cacheFields).toBeDefined()
+      expect(savedCards[0]._cacheFields.type_line).toBe('Instant')
+    })
+
+    // AC2: handleImportBinderCsv (binder CSV import, ~line 875 before the fix) does
+    // the same batch-fetch — hermano paralelo of handleImportCsv.
+    it('AC2: handleImportBinderCsv batch-fetches by scryfallId and confirmImport receives metadata + _cacheFields', async () => {
+      vi.mocked(getCardsByIds).mockResolvedValueOnce([mockScryfallCard as any])
+      const stores = makeStores()
+      const { handleImportBinderCsv } = useCollectionImport(stores)
+
+      await handleImportBinderCsv([csvCard], 'Test Binder')
+
+      expect(getCardsByIds).toHaveBeenCalledWith([{ id: 'xyz-789' }])
+      const savedCards = capturedConfirmImportCards
+      expect(savedCards).toHaveLength(1)
+      expect(savedCards[0]._cacheFields).toBeDefined()
+      expect(savedCards[0]._cacheFields.rarity).toBe('uncommon')
+    })
+
+    // AC3: a row with no scryfallId is not sent to Scryfall by id and still
+    // imports through the raw path — not lost, not thrown.
+    it('AC3: a CSV row without scryfallId still imports via the raw path', async () => {
+      const noIdCard = { ...csvCard, scryfallId: '' }
+      const stores = makeStores()
+      const { handleImportCsv } = useCollectionImport(stores)
+
+      await handleImportCsv([noIdCard], 'Test Deck')
+
+      const savedCards = capturedConfirmImportCards
+      expect(savedCards).toHaveLength(1)
+      expect(savedCards[0].name).toBe('Counterspell')
+      expect(savedCards[0]._cacheFields).toBeUndefined()
+    })
+
+    // AC4: a Scryfall batch-fetch rejection (network/rate-limit/timeout) must not
+    // abort the import — cards still land via the raw fallback.
+    it('AC4: Scryfall batch-fetch failure does not abort the import', async () => {
+      vi.mocked(getCardsByIds).mockRejectedValueOnce(new Error('network timeout'))
+      const stores = makeStores()
+      const { handleImportCsv } = useCollectionImport(stores)
+
+      await handleImportCsv([csvCard], 'Test Deck')
+
+      expect(stores.toastStore.showProgress).toHaveBeenCalled()
+      const savedCards = capturedConfirmImportCards
+      expect(savedCards).toHaveLength(1)
+      expect(savedCards[0].name).toBe('Counterspell')
+      expect(savedCards[0]._cacheFields).toBeUndefined()
     })
   })
 })

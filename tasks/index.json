@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-24T23:19:01.154Z",
+  "generated_at": "2026-08-26T21:59:22.263Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1584,6 +1584,12 @@
       "title": "Doble toast de error al fallar un guardado en el modal de carta",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-285",
+      "title": "El import de CSV entra cartas sin metadatos de Scryfall y deja los filtros vacios",
+      "status": "done",
+      "priority": "critical"
     }
   ]
 }

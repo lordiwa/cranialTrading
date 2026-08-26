@@ -204,6 +204,12 @@
       "type": "task",
       "ref": "tasks/TASK-281.json",
       "label": "handleSave muestra toast de EXITO aunque las escrituras hayan fallado"
+    },
+    {
+      "id": "task-285",
+      "type": "task",
+      "ref": "tasks/TASK-285.json",
+      "label": "El import de CSV entra cartas sin metadatos de Scryfall y deja los filtros vacios"
     }
   ],
   "edges": [

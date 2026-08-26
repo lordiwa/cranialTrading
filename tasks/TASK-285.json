@@ -11,7 +11,7 @@
     "AC6. npm run test:unit verde y npx vite build verde. Pegar ambas salidas.",
     "AC7. NO se modifica ningun dato de ninguna cuenta. Ni scripts de reparacion, ni backfills, ni escrituras a prod o dev. Solo codigo."
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "import",
@@ -21,17 +21,29 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "095836f9c17be0de65cad93b15817afd276d4483"
+  ],
   "linked_prs": [],
   "comments": [
     {
       "author": "orchestrator",
       "at": "2026-08-26T21:43:14.929Z",
       "body": "Tier cambiado de `tdd` a `tests-after` por orden explicita de Rafael el 2026-08-26: implementar primero, probar al final. AC1 pierde el requisito de corrida roja previa. AC5 (control negativo) se MANTIENE tal cual, y es ahora el unico mecanismo que distingue un verde real de un verde vacio en este ticket, porque ya no hay evidencia de rojo previo. Avisado al developer por mensaje directo."
+    },
+    {
+      "author": "reviewer",
+      "at": "2026-08-26T21:58:02.467Z",
+      "body": "APROBADO (review_depth: full; insumos de la rubrica: 351 lineas cambiadas, 116 en src/, y el diff toca el camino de datos de produccion de la coleccion). Sin hallazgos HIGH ni MEDIUM.\n\nMEDIDO en HEAD=095836f: npm run test:unit 178 archivos / 2301 tests todos verdes; npm run type-check limpio; npx vite build verde en 13,6 s. AC7 confirmado: el diff toca solo src/, tests/ y tasks/TASK-285.json.\n\nPunto 1 (eficacia real, era el que podia bloquear). MEDIDO en el parser (cardHelpers.ts:391-556): scryfallId sale de la columna \"Scryfall ID\", que traen ManaBox y Urza's Gatherer pero NO el CSV de Moxfield. Aun asi el fix NO cae al camino crudo ahi: fetchScryfallForCsvCards empuja {name} como identificador cuando no hay id, y getCardsByIds soporta identificadores por nombre contra /cards/collection en lotes de 75. El parser descarta toda fila sin name, asi que cada fila parseada entra al batch con id o con name. Ademas el metadato llega al indice aunque no haya scryfallId, porque bulkImportCards copia cmc/type_line/colors/rarity al doc de usuario (USER_CARD_FIELDS) y buildIndexEntry lee del doc, sin depender del join con scryfall_cache.\n\nPunto 2 (AC5, control negativo). El test construye la carta CON el fix, vacia _cacheFields y afirma que la asercion sobre type_line lanza. No es vacuo: el optional chaining descarta el TypeError, asi que el unico throw posible es el fallo por contenido. El PAR AC1+AC5 demuestra sensibilidad al contenido. LOW: AC5 reimplementa inline UNA sola asercion de AC1 (type_line) y no cubre colors/rarity/cmc.\n\nPunto 3 (Regla 6). MEDIDO con grep: buildRawCsvCard tiene hoy UN solo llamador, buildCsvCardWithScryfall. Los dos sitios CSV (handleImportCsv, handleImportBinderCsv) usan ambos el mismo helper y el mismo lookup compartido, asi que no pueden divergir. No hay tercer camino CSV.\n\nPunto 4 (regresion). LEIDO linea a linea: buildCsvCardWithScryfall arranca de buildRawCsvCard y SOLO agrega metadatos. scryfallId, name, edition, setCode, price, image, language, condition, foil y quantity salen identicos. edition sigue siendo setCode.toUpperCase() ?? 'Unknown'.\n\nLOW registrados, ninguno bloqueante: (1) el fallback por nombre matchea por igualdad exacta en minusculas, asi que una carta doble cara en CSV de Moxfield puede no matchear y caer al camino crudo (seguro, pero sin metadatos), y ese camino por name no tiene test propio; (2) el test de AC4 solo cubre handleImportCsv, el hermano binder queda cubierto indirectamente por el catch en el helper compartido; (3) inconsistencia PRE-EXISTENTE: el CSV guarda edition=codigo de set mientras el camino Moxfield-con-Scryfall guarda edition=set_name; ticket aparte si molesta; (4) las filas resueltas por nombre quedan con scryfallId='' e image='' en el doc, igual que antes.\n\nConfianza 8/10. Lo que la baja: no se midio contra Scryfall real el fallback por nombre (solo leido que el endpoint acepta identificadores {name}), y no hubo verificacion de un import real de punta a punta en navegador. Recomendacion: importar un CSV chico de ManaBox en dev y mirar el card_index."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-26T21:59:22.263Z",
+      "body": "Cerrado con review APROBADO en contexto fresco. review_depth: full; insumos de la rubrica: 351 lineas cambiadas (116 en src/) y el diff toca el camino de datos de produccion de la coleccion — cualquiera de las dos condiciones ya forzaba full.\n\nTier: tests-after (cambiado desde tdd durante el ticket por orden explicita de Rafael). Se mantuvo el control negativo de AC5 porque, sin corrida roja previa, era lo unico que separaba un verde real de un verde vacio.\n\nEl reviewer no encontro HIGH ni MEDIUM. El hallazgo que podia haber bloqueado — que los CSV reales no traigan scryfallId y el fix cayera siempre al camino crudo — se midio en el parser y quedo descartado: ManaBox y Urza's Gatherer traen la columna Scryfall ID, y el CSV de Moxfield, que no la trae, se resuelve por identificador {name} contra /cards/collection. Los tres formatos quedan cubiertos.\n\nCuatro LOW registrados y NO arreglados a proposito, para no ampliar alcance: (1) el fallback por nombre matchea por igualdad exacta y una carta doble cara de un CSV de Moxfield puede caer al camino crudo, y ese camino no tiene test propio; (2) el test de AC4 solo cubre handleImportCsv; (3) inconsistencia PRE-EXISTENTE de edition entre el camino CSV (codigo de set) y el camino Moxfield-con-Scryfall (set_name); (4) las filas resueltas por nombre quedan con scryfallId e image vacios en el doc, igual que antes.\n\nPENDIENTE QUE ESTE TICKET NO RESUELVE, dicho explicitamente para que nadie lo lea como cerrado: las 5764 cartas YA EXISTENTES en la cuenta de produccion siguen con el indice sin type_line/colors/rarity, y sus filtros van a seguir dando vacio. Rafael prohibio tocar cartas existentes. Camino elegido por el: borrar y reimportar DESPUES del deploy, con export en formato ManaBox. Medido para dimensionar ese camino: 5762 en venta y 2 en coleccion, todas NM, 0 mazos, 1 carpeta con 0 asignaciones, 0 cartas sin scryfallId — o sea que reimportar pierde solo esas 2. El riesgo real esta en el BORRADO masivo (5 fallos historicos por el limite de 10 MiB del writeBatch), no en el import; hay que verificarlo antes.\n\nVerificacion pendiente antes de promover a main: UAT de un import real de CSV en el entorno dev, mirando el card_index resultante. Lo recomendo el reviewer y es lo unico que este ticket no probo de punta a punta."
     }
   ],
   "created_at": "2026-08-26T21:39:48.723Z",
-  "updated_at": "2026-08-26T21:43:14.929Z",
+  "updated_at": "2026-08-26T21:59:22.263Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]",

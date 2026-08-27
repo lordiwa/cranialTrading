@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T15:47:47.333Z",
+  "generated_at": "2026-08-27T17:57:39.039Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1608,6 +1608,12 @@
       "title": "El filtro de tipo asigna UNA sola categoria por carta y esconde las tierras que no empiezan con Land",
       "status": "done",
       "priority": "high"
+    },
+    {
+      "key": "TASK-289",
+      "title": "El filtro de tipo del perfil publico esconde cartas de tipo multiple (cuarta superficie de TASK-288)",
+      "status": "done",
+      "priority": "medium"
     }
   ]
 }

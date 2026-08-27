@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "session_id": "20260612T043009Z-4b555c2a",
-  "lifecycle_state": "paused",
-  "updated_at": "2026-08-27T16:50:09.053Z",
-  "active_task": null,
-  "workflow_step": "idle",
-  "next_action": "DOS PREGUNTAS ABIERTAS ESPERANDO A RAFAEL, no avanzar sin respuesta. (1) Promover TASK-288 a main: develop ya esta pusheado (3346657), CI verde con deploy-dev corrido y suite E2E completa 124/0. Solo falta su visto bueno para tocar main; el checklist del proyecto lo exige explicito. Al promover, verificar que deploy-prod NO quede SKIPPED. (2) El perfil publico sigue con la regla de tipo EXCLUSIVA (functions/lib/publicCardType.js), asi que un Artifact Land no aparece bajo el chip land en el perfil de un vendedor: se le ofrecieron 3 opciones (igualar a la coleccion, dejarlo, o filtrar multiple y contar por primaria) y NO respondio. Choca con una decision previa suya sobre consistencia de conteos, por eso no se toco. DESPUES, POR IMPACTO: TASK-282 (los 20s por edicion, con AC1 que EXIGE medir antes de arreglar), TASK-287 (los MEDIUM del enriquecimiento server-side, incluido que las DFC entran sin color y se reportan como resueltas), TASK-283, TASK-284. TAREA PENDIENTE DEL USUARIO: sus 49 tierras siguen en venta; las pasa el mismo cuando 288 este en prod.",
+  "lifecycle_state": "active",
+  "updated_at": "2026-08-27T17:52:22.257Z",
+  "active_task": "TASK-289",
+  "workflow_step": "review",
+  "next_action": "ESPERANDO A RAFAEL: si desplegar queryPublicCardIndex a PRODUCCION. El arreglo esta SOLO en dev; el CI no despliega functions, asi que el perfil publico de prod sigue escondiendo las cartas de tipo multiple. Comando exacto ya probado en dev: firebase deploy --only functions:queryPublicCardIndex --project cranial-trading. Y falta el veredicto de rev-289 sobre d8bb642 para cerrar TASK-289 (transition a in_review ya no hace falta, se hace al cerrar). SIN CAUSA MEDIDA, NO SE ABRIO TICKET: el public_card_index del vendedor 90Pkd de dev se achico de 9 chunks/2202 entradas a 8/1802 durante la sesion, con los 2202 documentos public=true intactos, divergencia -400. Se descarto que lo causara la consulta (publicCardIndexQuery.js no tiene una sola escritura). Hay un vigia puesto. DESPUES, POR IMPACTO: TASK-282, TASK-287, TASK-283, TASK-284.",
   "handoff_summary": "SESION DEL 2026-08-26/27. Arranco con Rafael reportando que los filtros no devolvian nada en produccion. CADENA COMPLETA, TODA MEDIDA: sus 5764 entradas de card_index tenian type_line, colors y rarity vacios porque el import de CSV llamaba buildRawCsvCard incondicionalmente y NUNCA consultaba Scryfall (el camino de Moxfield si lo hacia); sin metadatos no se poblaba scryfall_cache y el indice se armaba vacio. TASK-285 (v1.59.8) lo arreglo en el CLIENTE, verificado importando un CSV real en dev, y se desplegó a prod. Rafael borro y reimporto: ENTRO IGUAL DE VACIO. Medido: 5765 cartas con type_line 0/5766 y el cache sin crecer ni un documento, o sea que corrio el codigo viejo, probablemente por una pestania abierta desde antes del deploy (NO PROBADO, no se puede probar hacia atras). Por eso TASK-286 (v1.59.10) movio el enriquecimiento al SERVIDOR, donde la version del navegador deja de importar. Ese ticket se cerro, la UAT contra dev lo REABRIO con un defecto que habria roto el import ENTERO en produccion (mergeScryfallMetadata dejaba power: undefined para toda carta sin cuerpo y Firestore rechazaba el batch completo), se arreglo con pickDefinedFields, y una segunda ronda de review encontro que revertir el arreglo dejaba los 2331 tests en verde: se agregaron los dos tripwires de call-site que faltaban. La function se desplego A MANO a dev y a prod (el CI solo hace hosting) y se VERIFICO EN PRODUCCION llamandola con una carta pelada contra la cuenta qa@, no la de Rafael. Rafael reimporto y CONFIRMO que los filtros andan. Despues reporto que al filtrar tierras y cambiar todas a coleccion quedaron algunas: medido, 422 tierras, 373 cambiadas, 49 afuera, y NO era el cambio masivo sino el filtro — getCardTypeCategory asignaba UNA categoria con primera-coincidencia-gana y land era la ultima, asi que un Artifact Land contaba como artefacto y nunca como tierra. TASK-288 (a5d7b70) separa pertenencia MULTIPLE para filtrar de una primaria para agrupar; aprobado sin HIGH, con DOS mutantes muertos.",
   "open_questions": [
     "[2026-08-19] Ensayo de restauracion de backups: PENDIENTE. Hacerlo con el backup de PROD (0,587 GiB x USD 0,286/GiB = ~USD 0,17), NO con el de dev (4,192 GiB = USD 1,68). Mas barato y ensaya la base que importa. Dentro de los primeros 7 dias de PITR (activado 2026-08-19). Un backup sin ensayar es una suposicion.",
@@ -65,11 +65,6 @@
   ],
   "blockers": [],
   "decisions": [
-    {
-      "at": "2026-08-18T21:55:00.000Z",
-      "decision": "Invertir el orden de medicion de AC7: reparar el indice con buildCardIndex PRIMERO y recien despues hacer el cambio masivo. El developer habia recomendado lo contrario (medir sobre la cuenta rota) y el orquestador lo avalo; el reviewer lo refuto con un HIGH: sobre cartas ya vaciadas el instrumento compara '' contra '' y dice PASA aunque el arreglo no funcione.",
-      "rationale": "HIGH-1 de la revision FULL de 2bb00ff, scripts/measure-card-index-metadata.mjs:167-172"
-    },
     {
       "at": "2026-08-19T04:20:00.000Z",
       "decision": "Desplegar a produccion en orden estricto: primero las Cloud Functions (cardImage, applyCardIndexDelta, buildCardIndex) y las reglas de Storage a mano y de a una, verificando que la memoria no quedara en guiones, despues verificar por curl que /img/** respondia, y RECIEN AHI mergear develop a main para publicar el frontend. El orden inverso habria dejado cada imagen de produccion pidiendo una URL inexistente, y habria puesto el frontend con 0abf5cb contra las functions viejas, que es la combinacion que vacia metadatos al 100%.",
@@ -139,15 +134,13 @@
       "at": "2026-08-22T23:05:43.685Z",
       "decision": "2026-08-22 Rafael autorizo el ensayo de restore (AC2 de TASK-267) y ordeno borrar la base del ensayo despues de medir. Tambien eligio PUSHEAR a develop con la suite E2E en ROJO, con los tres rojos documentados en TASK-278; mismo precedente que el 2026-08-21 con help-legal.",
       "rationale": "El ensayo dejo de ser opcional: el vaciado de TASK-267 lo tiene como pre-requisito por su AC2, y un backup sin ensayar es una suposicion. El push con rojo se apoya en que los tres fallos estan MEDIDOS como no-regresion (el commit no toca ningun archivo de search y los 10 tests del spec pasan en aislado), no en que se les reste importancia. La base del ensayo se borro porque lo que vale es el BACKUP, que sigue vivo hasta el 27: borrar la copia restaurada no pierde nada."
+    },
+    {
+      "at": "2026-08-27T17:29:24.977Z",
+      "decision": "2026-08-27 Rafael autorizo promover TASK-288 a main: mergeado por fast-forward (d472a0a, v1.59.12) y CI de main VERDE con deploy-prod success, o sea que el arreglo del filtro de tierras esta EN PRODUCCION y el gate contra prod no quedo SKIPPED. Y respondio la pregunta abierta del perfil publico eligiendo igualar el filtro a la coleccion: pertenencia MULTIPLE para filtrar, categoria PRIMARIA para contar. La eligio con un dato medido a la vista que su objecion original ya no aplica: los facets de tipo se calculan en el servidor pero NINGUN componente los pinta (grep facets sobre src/views/UserProfileView.vue y src/components/ no devuelve nada), asi que el conteo inflado que motivo la regla exclusiva no es observable hoy, mientras que esconder un Artifact Land del chip land si lo es. Abierto TASK-289, tier tdd, delegado al developer."
     }
   ],
   "subagent_results": [
-    {
-      "at": "2026-08-18T21:50:44.000Z",
-      "agent": "reviewer",
-      "task": "TASK-245",
-      "summary": "Revision FULL de 2bb00ff. Arreglo de produccion APROBADO (rojo de AC6 reproducido de forma independiente 5/24 -> 29/29; buildCardIndex sin regresion verificado linea por linea; insert/update/camino rapido/scan de respaldo confluyen en un unico entryFor; limites de Firestore OK). AC4/AC5/AC6 cumplidos. BLOQUEA 1 HIGH en el instrumento de AC7. Ademas MEDIUM-1 (mide 5 de 24 campos), MEDIUM-2 (el control se define por resultado y absorbe fallos; 10 s de espera son cortos), MEDIUM-3 (asimetria de df entre los dos escritores sobrevive), MEDIUM-4 (src/stores/collection.ts:778, camino de cliente que reproduce el vaciado; pre-existente, fuera de alcance), y 3 LOW. Confianza 7/10."
-    },
     {
       "at": "2026-08-19T03:42:58.000Z",
       "agent": "researcher",
@@ -227,6 +220,12 @@
       "agent": "developer",
       "at": "2026-08-23T03:40:00Z",
       "summary": "TASK-267: sembro 2202 cartas publicas en la cuenta E2E de dev por el camino de la app (import CSV por UI + bulkImportCards/buildCardIndex por Cloud Function autenticada), sin escribir documentos a mano. Suite completa VERDE: 124 pasan, 13 skipped, 0 fallos. El umbral de 1000 de user-profile NO se toco. Verificado de forma independiente por el orquestador: cards 2202, entradas reales en card_index 2202, _meta.count 2202, public_cards 2202, los cuatro coinciden. Commit 4315d28 (scripts/seed-e2e-bulk-cards.mjs). DOS HALLAZGOS: parseTextImportLine trunca nombres sin (SET) a su primera palabra -> TASK-279 abierto con medicion propia (7 de 10); y el card_index se corrompio por un rebuild client-side parcial de una pestana colgada -> evidencia agregada a TASK-226."
+    },
+    {
+      "at": "2026-08-27T17:52:22.254Z",
+      "agent": "dev-289 + rev-289",
+      "ticket": "TASK-289",
+      "summary": "dev-289 implemento en 2532733 (4 archivos): publicTypeCategories plural en functions/lib/publicCardType.js sin borrar la singular, filtro por pertenencia multiple en publicCardIndexQuery.js:597, facets sin tocar, y el test de paridad atando DOS pares sobre las 127 combinaciones. rev-289 aprobo con depth FULL y CERO HIGH, reproduciendo el mutante del AC6 por su cuenta (revirtio el call-site: 3 rojos, 115 verdes, o sea asercion semantica y no import roto). Levanto 1 MEDIUM (usePublicProfileIndex.ts:67-72 quedo afirmando la regla exclusiva vieja, mismo doc-drift que el numero de @smoke del 2026-08-21) y 2 LOW. dev-289 cerro MEDIUM y LOW-1 en d8bb642 con su propio control negativo del fallback other. LOW-2 (matching por substring, un Island Fish saldria bajo land) ACEPTADO POR DISENO: es espejo exacto del cliente y la paridad es el AC. Gate corrido por el orquestador: 2375/2375."
     }
   ],
   "pending_human_confirmation": "TASK-275: elegir entre (A) chequeo de cardinalidad SOLO como deteccion —recomendada—, (B) atacar la carrera cliente-vs-servidor, o (C) dejarlo documentado y pasar a produccion. NO empezar ninguna sin que Rafael lo diga.",

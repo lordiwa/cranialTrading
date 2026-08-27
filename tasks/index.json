@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T00:04:24.490Z",
+  "generated_at": "2026-08-27T15:47:47.333Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1601,6 +1601,12 @@
       "key": "TASK-287",
       "title": "Cerrar los 3 MEDIUM del enriquecimiento server-side del import (TASK-286)",
       "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-288",
+      "title": "El filtro de tipo asigna UNA sola categoria por carta y esconde las tierras que no empiezan con Land",
+      "status": "done",
       "priority": "high"
     }
   ]

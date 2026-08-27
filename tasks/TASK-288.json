@@ -11,7 +11,7 @@
     "AC6. Control negativo obligatorio: mostrar que cada test nuevo se pone rojo por la razon correcta, revirtiendo el arreglo.",
     "AC7. npm run test:unit verde y npx vite build verde."
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "high",
   "labels": [
     "collection",
@@ -20,11 +20,24 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "a5d7b70"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-08-27T15:47:21.674Z",
+      "body": "APROBADO (review_depth: full; insumos: 258 lineas, toca el filtrado de la vista principal, bug de produccion reportado por el usuario). Ningun HIGH. 2 MEDIUM, 3 LOW. Arbol restaurado limpio tras los controles.\n\nNOTA DE PROCEDENCIA: el autor quedo idle sin hand-off y su proceso de commit murio dejando un index.lock huerfano; el commit lo hizo el orquestador tras correr los tests. O sea que NADIE habia verificado los controles negativos que el ticket exigia. Este review los corrio.\n\nAC6, MEDIDO y es DOBLE: (a) revertir passesTypeFilter al singular pone 12 tests rojos, exactamente los fixtures de las 49 y los de paridad — rojo por la razon correcta, no verde vacio; (b) los tests espejo de AC3 NO mueren con ese revert (esperable), asi que se corrio el SEGUNDO mutante, el arreglo ingenuo de land-primero, y ahi mueren 4 espejo mas 6 de paridad. Los dos mutantes mueren; ninguno deja la suite verde. Esto es lo que faltaba verificar y esta verificado.\n\nAC3 espejo, MEDIDO con fixtures reales: 'Artifact Land' pasa Artefactos Y Tierras; 'Creature — Eldrazi // Land' pasa Criaturas Y Tierras.\n\nAgrupamiento (el riesgo de duplicar una carta en la grilla): LEIDO con grep exhaustivo. Los cuatro `case 'type'` usan la funcion SINGULAR — useCardFilter.ts:539, CollectionView.vue:424, UserProfileView.vue:278, DeckEditorGrid.vue:83 — asi que un solo bucket por carta y es imposible que se duplique. En DeckEditorGrid el caso Commander se preserva exacto contra el comportamiento anterior.\n\nAC5, grep propio del reviewer. Migrados: useCardFilter.ts:329, CollectionView.vue:414, DeckEditorGrid.vue:171 (que cubre BinderView via binder-mode). El servidor (functions/index.js:1733) ya era substring-multiple y esta bien sin tocar. El panel de descubrimiento no filtra por tipo.\n\nMEDIUM-1, EL SITIO NO MIGRADO — el PERFIL PUBLICO. functions/lib/publicCardType.js (los chips de tipo de usePublicProfileIndex) sigue siendo EXCLUSIVO por precedencia creature > ... > land, asi que Tree of Tales NO aparece bajo el chip 'land' en el perfil de un vendedor. Es exactamente el mismo sintoma que Rafael llamo indiscutible, en una CUARTA superficie. No se bloquea porque el ticket dijo NO AMPLIAR y porque lo exclusivo ahi viene de una decision previa del propio Rafael sobre consistencia de conteos. PERO el comentario de ese archivo justifica la regla exclusiva diciendo \"hacer lo que el producto ya hace\", y este commit acaba de volver FALSA esa premisa. Necesita decision de Rafael y ticket propio; como minimo, actualizar ese comentario para que deje de justificarse en algo que ya no es cierto.\n\nMEDIUM-2: el test de paridad NO es paridad consigo mismo (passesTypeFilter y filterIndexCards son implementaciones independientes, y el mutante (a) rompe la paridad, verificado). Pero compara contra src/functions/queryCardIndexHelpers.ts, que es el ESPEJO TS del servidor, no contra el functions/index.js desplegado. Los dos bloques se compararon a mano hoy y son identicos. Ningun test ata el espejo con el JS desplegado — a diferencia de publicCardTypeParity, que si ata sus dos copias. Riesgo PREEXISTENTE del repo, no introducido por este commit.\n\nLOW: (i) no existe el hand-off del AC5 porque el autor quedo idle; la lista de arriba lo suple. (ii) el chip 'Other' no tiene termino de servidor en typeToServerMap — gap preexistente, sin cambio de comportamiento, documentado en el test. (iii) quedan scratch de medicion sin trackear en el working tree, del orquestador, no del commit.\n\nAC1 escrito en el codigo (doc de TYPE_KEYWORDS). AC7 MEDIDO por el reviewer: test:unit 2372/2372 verde, type-check verde, vite build verde.\n\nConfianza 9/10 en lo medido; 8/10 en AC5, porque la superficie del perfil publico se juzgo por lectura y no por navegador."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-27T15:47:47.333Z",
+      "body": "Cerrado con review APROBADO en contexto fresco, sin HIGH. review_depth: full. Tier: tests-after. Commit a5d7b70.\n\nEL ARREGLO: se separan dos preguntas que antes eran una sola. Para FILTRAR, la carta pertenece a TODOS sus tipos (getCardTypeCategories + passesTypeFilter), asi que un Artifact Land pasa el filtro Tierras Y el de Artefactos. Para AGRUPAR en la grilla sigue habiendo UNA categoria primaria (getCardTypeCategory, primera coincidencia), porque una carta no puede aparecer dos veces en pantalla. Eso es lo que evita el arreglo espejado que el ticket advertia.\n\nLO QUE MAS VALE DE ESTE CIERRE: nadie habia verificado los controles negativos, porque el developer quedo idle sin hand-off y su proceso de commit murio dejando un index.lock huerfano (octava vez de ese patron en el proyecto; se destrabo, se corrieron los tests y se commiteo desde el orquestador). El reviewer los corrio y mato DOS mutantes distintos: revertir el arreglo pone 12 tests en rojo, y el arreglo ingenuo de land-primero pone 10. Ninguno de los dos deja la suite verde, o sea que los tests miden de verdad.\n\nPENDIENTE QUE ESTE TICKET NO CIERRA, y es una DECISION DE RAFAEL, no un olvido: MEDIUM-1, el PERFIL PUBLICO. functions/lib/publicCardType.js sigue con la regla exclusiva por precedencia, asi que Tree of Tales NO aparece bajo el chip 'land' en el perfil de un vendedor — el mismo sintoma que Rafael llamo indiscutible, en una cuarta superficie. No se toco porque el ticket dijo NO AMPLIAR y porque esa regla viene de una decision previa del propio Rafael sobre consistencia de conteos. Dato que obliga a revisarla: el comentario de ese archivo justifica lo exclusivo diciendo que hace 'lo que el producto ya hace', y este commit acaba de volver falsa esa premisa. Preguntado a Rafael; si dice que si, ticket propio.\n\nMEDIUM-2, riesgo PREEXISTENTE no introducido aca: el test de paridad compara contra el espejo TS del servidor, no contra el functions/index.js desplegado. Hoy los dos bloques son identicos (comparados a mano), pero nada los ata — a diferencia de publicCardTypeParity, que si ata sus dos copias."
+    }
+  ],
   "created_at": "2026-08-27T13:51:28.331Z",
-  "updated_at": "2026-08-27T15:18:39.834Z",
+  "updated_at": "2026-08-27T15:47:47.333Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]",

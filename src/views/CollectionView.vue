@@ -28,7 +28,7 @@ import HelpTooltip from '../components/ui/HelpTooltip.vue'
 import FloatingActionButton from '../components/ui/FloatingActionButton.vue'
 import CardFilterBar from '../components/ui/CardFilterBar.vue'
 import AdvancedFilterModal, { type AdvancedFilters } from '../components/search/AdvancedFilterModal.vue'
-import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
+import { colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, passesTypeFilter, rarityOrder, typeOrder, useCardFilter } from '../composables/useCardFilter'
 import { cancelPriceFetch, useCollectionTotals } from '../composables/useCollectionTotals'
 import { useCollectionFilterUrl } from '../composables/useCollectionFilterUrl'
 import { useCollectionPagination } from '../composables/useCollectionPagination'
@@ -411,8 +411,7 @@ const passesChipFilters = (card: Card): boolean => {
   if (selectedColors.value.size > 0 && selectedColors.value.size < colorOrder.length && !passesColorFilter(card, selectedColors.value, exactColorMode.value)) return false
   const mana = getCardManaCategory(card)
   if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
-  const type = getCardTypeCategory(card)
-  if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !selectedTypes.value.has(type)) return false
+  if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !passesTypeFilter(card, selectedTypes.value)) return false
   const rarity = getCardRarityCategory(card)
   if (selectedRarities.value.size > 0 && selectedRarities.value.size < rarityOrder.length && !selectedRarities.value.has(rarity)) return false
   return true

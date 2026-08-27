@@ -43,16 +43,64 @@ export const getCardRarityCategory = (card: FilterableCard): string => {
   return 'Unknown'
 }
 
+/**
+ * Shared keyword → display-category table for type classification
+ * (TASK-288). A single MTG card can have several types at once (an
+ * "Artifact Land" is both an Artifact and a Land — it plays as a land
+ * regardless of what a filter thinks), so this list backs two different
+ * functions with two different membership rules:
+ *
+ *   - getCardTypeCategory  (singular, first match wins) — the card's ONE
+ *     PRIMARY category, used only to GROUP cards into a single visual
+ *     bucket (a card can't appear twice in a grouped grid).
+ *   - getCardTypeCategories (plural, every match) — ALL categories the
+ *     card belongs to, used to FILTER (AC1: membership is MULTIPLE for
+ *     filtering — a card passes if ANY of its types is selected).
+ *
+ * Order matters only for getCardTypeCategory's tie-break; getCardTypeCategories
+ * ignores it. Kept in this order (land last) to match the order the server's
+ * substring filter (src/functions/queryCardIndexHelpers.ts) checks in, and
+ * kept as substring/`.includes()` matching (not a word-boundary check) to
+ * mirror that same server logic exactly — see AC4 and
+ * tests/unit/composables/useCardFilter.test.ts.
+ */
+const TYPE_KEYWORDS: readonly [string, string][] = [
+  ['creature', 'Creatures'],
+  ['instant', 'Instants'],
+  ['sorcery', 'Sorceries'],
+  ['enchantment', 'Enchantments'],
+  ['artifact', 'Artifacts'],
+  ['planeswalker', 'Planeswalkers'],
+  ['land', 'Lands'],
+]
+
+/**
+ * The card's single PRIMARY type category (first keyword match wins).
+ * ONLY for grouping/ordering — never for filtering, see getCardTypeCategories.
+ */
 export const getCardTypeCategory = (card: FilterableCard): string => {
   const typeLine = card.type_line?.toLowerCase() ?? ''
-  if (typeLine.includes('creature')) return 'Creatures'
-  if (typeLine.includes('instant')) return 'Instants'
-  if (typeLine.includes('sorcery')) return 'Sorceries'
-  if (typeLine.includes('enchantment')) return 'Enchantments'
-  if (typeLine.includes('artifact')) return 'Artifacts'
-  if (typeLine.includes('planeswalker')) return 'Planeswalkers'
-  if (typeLine.includes('land')) return 'Lands'
+  for (const [keyword, category] of TYPE_KEYWORDS) {
+    if (typeLine.includes(keyword)) return category
+  }
   return 'Other'
+}
+
+/**
+ * ALL type categories the card belongs to (AC1: multiple membership).
+ * Use this — via passesTypeFilter — for filtering, so an "Artifact Land"
+ * still matches both the Artifacts and the Lands filter (AC3), instead of
+ * getCardTypeCategory's single first-match category.
+ */
+export const getCardTypeCategories = (card: FilterableCard): string[] => {
+  const typeLine = card.type_line?.toLowerCase() ?? ''
+  const matches = TYPE_KEYWORDS.filter(([keyword]) => typeLine.includes(keyword)).map(([, category]) => category)
+  return matches.length > 0 ? matches : ['Other']
+}
+
+/** Does the card pass a type chip filter? Membership is MULTIPLE (AC1): passes if ANY of its types is selected. */
+export const passesTypeFilter = (card: FilterableCard, selected: Set<string>): boolean => {
+  return getCardTypeCategories(card).some(category => selected.has(category))
 }
 
 export const getCardNameCategory = (card: FilterableCard): string => {
@@ -278,8 +326,7 @@ export function useCardFilter<T extends FilterableCard>(
     }
     const mana = getCardManaCategory(card)
     if (selectedManaValues.value.size > 0 && selectedManaValues.value.size < manaOrder.length && !selectedManaValues.value.has(mana)) return false
-    const type = getCardTypeCategory(card)
-    if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !selectedTypes.value.has(type)) return false
+    if (selectedTypes.value.size > 0 && selectedTypes.value.size < typeOrder.length && !passesTypeFilter(card, selectedTypes.value)) return false
     const rarity = getCardRarityCategory(card)
     if (selectedRarities.value.size > 0 && selectedRarities.value.size < rarityOrder.length && !selectedRarities.value.has(rarity)) return false
     return true

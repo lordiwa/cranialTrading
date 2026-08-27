@@ -2,6 +2,8 @@ import { ref, nextTick, effectScope } from 'vue'
 import {
   getCardRarityCategory,
   getCardTypeCategory,
+  getCardTypeCategories,
+  passesTypeFilter,
   getCardManaCategory,
   getCardColorCategory,
   passesColorFilter,
@@ -67,6 +69,84 @@ describe('getCardTypeCategory', () => {
 
   it('returns Other for unrecognized type line', () => {
     expect(getCardTypeCategory(makeFilterableCard({ type_line: 'Tribal' }))).toBe('Other')
+  })
+})
+
+// TASK-288: getCardTypeCategory returns a single PRIMARY category (cascade,
+// first match wins) — still correct for grouping, but wrong for filtering,
+// which needs getCardTypeCategories / passesTypeFilter below.
+describe('getCardTypeCategories', () => {
+  it('returns only Artifacts for a plain artifact (single category, unaffected)', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Artifact' }))).toEqual(['Artifacts'])
+  })
+
+  // Real fixtures measured in production (TASK-288 description) — an
+  // Artifact Land is BOTH categories, not just whichever the cascade hits first.
+  it('returns both Artifacts and Lands for "Artifact Land"', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Artifact Land' }))).toEqual(['Artifacts', 'Lands'])
+  })
+
+  it('returns both Instants and Lands for "Instant // Land"', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Instant // Land' }))).toEqual(['Instants', 'Lands'])
+  })
+
+  it('returns both Creatures and Lands for "Creature — Eldrazi // Land"', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Creature — Eldrazi // Land' }))).toEqual(['Creatures', 'Lands'])
+  })
+
+  it('returns both Enchantments and Lands for "Enchantment Land — Urza\'s Saga"', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: "Enchantment Land — Urza's Saga" }))).toEqual(['Enchantments', 'Lands'])
+  })
+
+  it('returns both Creatures and Lands for "Land Creature — Forest Dryad"', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Land Creature — Forest Dryad' }))).toEqual(['Creatures', 'Lands'])
+  })
+
+  it('returns Sorceries and Lands for "Land — Town // Sorcery — Adventure"', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Land — Town // Sorcery — Adventure' }))).toEqual(['Sorceries', 'Lands'])
+  })
+
+  it('returns Other for an unrecognized type line', () => {
+    expect(getCardTypeCategories(makeFilterableCard({ type_line: 'Tribal' }))).toEqual(['Other'])
+  })
+})
+
+describe('passesTypeFilter', () => {
+  // AC2: the 49 cards from production must appear when the Lands filter is applied.
+  const landsFilter = new Set(['Lands'])
+
+  it.each([
+    'Artifact Land',
+    'Instant // Land',
+    'Creature — Eldrazi // Land',
+    "Enchantment Land — Urza's Saga",
+    'Land Creature — Forest Dryad',
+    'Land — Town // Sorcery — Adventure',
+  ])('"%s" passes the Lands filter', (typeLine) => {
+    expect(passesTypeFilter(makeFilterableCard({ type_line: typeLine }), landsFilter)).toBe(true)
+  })
+
+  // AC3: the mirror case — these same cards must NOT disappear from their
+  // other type's filter. This is the check that rules out reordering the
+  // cascade (which would only move the bug, not fix it).
+  it('"Artifact Land" still passes the Artifacts filter', () => {
+    expect(passesTypeFilter(makeFilterableCard({ type_line: 'Artifact Land' }), new Set(['Artifacts']))).toBe(true)
+  })
+
+  it('"Creature — Eldrazi // Land" still passes the Creatures filter', () => {
+    expect(passesTypeFilter(makeFilterableCard({ type_line: 'Creature — Eldrazi // Land' }), new Set(['Creatures']))).toBe(true)
+  })
+
+  it('"Instant // Land" still passes the Instants filter', () => {
+    expect(passesTypeFilter(makeFilterableCard({ type_line: 'Instant // Land' }), new Set(['Instants']))).toBe(true)
+  })
+
+  it('"Land — Town // Sorcery — Adventure" still passes the Sorceries filter', () => {
+    expect(passesTypeFilter(makeFilterableCard({ type_line: 'Land — Town // Sorcery — Adventure' }), new Set(['Sorceries']))).toBe(true)
+  })
+
+  it('a plain Instant does NOT pass the Lands filter', () => {
+    expect(passesTypeFilter(makeFilterableCard({ type_line: 'Instant' }), landsFilter)).toBe(false)
   })
 })
 

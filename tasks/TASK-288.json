@@ -1,0 +1,32 @@
+{
+  "key": "TASK-288",
+  "title": "El filtro de tipo asigna UNA sola categoria por carta y esconde las tierras que no empiezan con Land",
+  "description": "REPORTADO POR RAFAEL 2026-08-27 sobre su cuenta de produccion: filtro Tierras, \"seleccionar todas\", cambiar a coleccion. Cambiaron 373 y quedaron 49 afuera.\n\nMEDIDO en produccion (cuenta Rt5DOfZXBtPZkEpK4N5pW6a5FXs1, solo lectura): 422 entradas del indice cuyo type_line contiene \"Land\". 373 quedaron en collection, 49 siguen en sale.\n\nLAS 49 NO SON AZAR NI UN FALLO DEL CAMBIO MASIVO. El cambio masivo hizo exactamente lo que se le pidio: el filtro nunca mostro esas 49. Composicion medida por type_line:\n  11 Instant // Land\n  7  Sorcery // Land\n  6  Artifact Land          <- estas son tierras sin ninguna ambiguedad (Tree of Tales, etc.)\n  4  Land — Town // Sorcery — Adventure\n  2  Artifact // Land\n  2  Land — Town // Instant — Adventure\n  2  Enchantment — Aura // Land\n  2  Legendary Enchantment // Legendary Land\n  1  Enchantment Land — Urza's Saga\n  1  Land Creature — Forest Dryad\n  y 11 mas del mismo patron (Creature — ... // Land, Enchantment // Land, Artifact // Land — Cave, ...)\n\nLas 373 que SI cambiaron empiezan todas con Land: Land (218), Legendary Land (18), Land // Land (14), Basic Land — Plains (12), Land — Mountain Forest (8), etc.\n\nCAUSA, LEIDA EN EL CODIGO: src/composables/useCardFilter.ts:46, getCardTypeCategory devuelve UNA sola categoria con if/else en cascada y gana la primera coincidencia, en este orden: creature, instant, sorcery, enchantment, artifact, planeswalker, land. \"land\" es la ULTIMA. Entonces \"Artifact Land\" cae en Artefactos, \"Instant // Land\" en Instantaneos, \"Creature — Eldrazi // Land\" en Criaturas. Ninguna llega nunca a Tierras. src/views/CollectionView.vue:414 usa exactamente esa funcion para filtrar, asi que es la superficie que Rafael uso.\n\nDOS SUPERFICIES QUE NO COINCIDEN, y conviene decidir esto a conciencia y no arreglar una sola: src/functions/queryCardIndexHelpers.ts:158 (el filtro del SERVIDOR, el de la coleccion paginada) hace substring sobre type_line, asi que ahi \"Artifact Land\" SI cuenta como tierra. O sea que las dos superficies dan respuestas distintas para la misma carta. Ver la memoria del proyecto sobre las 5 superficies de busqueda: todo arreglo de esta familia va a todas.\n\nEL PROBLEMA DE FONDO es el modelo, no el orden del if: en Magic una carta tiene VARIOS tipos a la vez. Un Artifact Land es artefacto Y tierra. Una MDFC con dorso de tierra se juega como tierra. Reordenar el if para que \"land\" gane primero NO lo arregla: pasaria a esconder los Artifact Land del filtro Artefactos, que es el mismo bug espejado.\n\nNO AMPLIAR: no rediseniar el panel de filtros ni tocar el agrupamiento visual mas de lo que haga falta.\n\nPRECISION DE RAFAEL 2026-08-27, y es el caso que manda: el sintoma concreto e indiscutible es que un ARTIFACT LAND sale clasificado como NO-tierra. Tree of Tales entra a jugar como tierra; que el filtro Tierras no lo muestre no es un caso opinable como las de doble cara, es directamente incorrecto. Cualquier arreglo que deje esto sin resolver NO cierra el ticket, por mas elegante que sea el modelo que proponga.\n\nTERCERA SUPERFICIE, medida despues de abrir el ticket: dentro del MISMO archivo useCardFilter.ts conviven las dos reglas. getCardTypeCategory (linea 46) es la de una-sola-categoria en cascada y deja el Artifact Land afuera de Tierras; pero getCardManaCategory (linea 64), getCardColorCategory (linea 95) y la de mana producido (linea 113) usan typeLine.includes('land'), o sea que PARA LA CURVA DE MANA Y EL COLOR el mismo Artifact Land SI es tierra. La misma carta es tierra o no segun que parte de la pantalla la mire, y las dos reglas estan a 20 lineas de distancia. Eso refuerza AC4: la respuesta tiene que ser UNA, y el test tiene que compararlas.",
+  "acceptance_criteria": [
+    "AC1. Decidir y DEJAR ESCRITO en el codigo que significa pertenecer a una categoria de tipo cuando la carta tiene varios. La recomendacion es pertenencia MULTIPLE para filtrar (una carta pasa el filtro si CUALQUIERA de sus tipos esta seleccionado), conservando una categoria primaria para agrupar y ordenar si el agrupamiento la necesita. Si se elige otra cosa, justificarlo por escrito.",
+    "AC2. Con el filtro Tierras aplicado sobre la coleccion, las 49 cartas medidas arriba aparecen. Test con fixtures de los casos reales medidos: 'Artifact Land', 'Instant // Land', 'Creature — Eldrazi // Land', 'Enchantment Land — Urza's Saga', 'Land Creature — Forest Dryad', 'Land — Town // Sorcery — Adventure'.",
+    "AC3. NO ROMPER EL ESPEJO: un 'Artifact Land' tiene que seguir apareciendo con el filtro Artefactos, y un 'Creature — Eldrazi // Land' con el filtro Criaturas. Test explicito de cada uno. Este AC es el que impide el arreglo ingenuo de reordenar el if.",
+    "AC4. Las dos superficies dan la MISMA respuesta para la misma carta: la del cliente (useCardFilter.getCardTypeCategory, usada por CollectionView.vue:414) y la del servidor (queryCardIndexHelpers.ts:158). Test que corra el mismo conjunto de fixtures contra las dos y compare, para que no puedan divergir en silencio otra vez.",
+    "AC5. Grep de TODOS los usos de getCardTypeCategory y del filtro de tipo del servidor, y aplicar el cambio a todos los sitios en el mismo commit (Regla 6 del proyecto: los puntos paralelos son un cambio atomico). Listar los sitios encontrados en el hand-off.",
+    "AC6. Control negativo obligatorio: mostrar que cada test nuevo se pone rojo por la razon correcta, revirtiendo el arreglo.",
+    "AC7. npm run test:unit verde y npx vite build verde."
+  ],
+  "status": "in_progress",
+  "priority": "high",
+  "labels": [
+    "collection",
+    "filters",
+    "prod-bug"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-08-27T13:51:28.331Z",
+  "updated_at": "2026-08-27T15:18:39.834Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

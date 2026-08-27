@@ -5,7 +5,7 @@ import { useContextMenu } from '../../composables/useContextMenu'
 import { useCollectionStore } from '../../stores/collection'
 import { sharedCardPrices } from '../../composables/useCollectionTotals'
 import { formatPrice } from '../../services/mtgjson'
-import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, rarityOrder, typeOrder } from '../../composables/useCardFilter'
+import { translateCategory as baseTranslateCategory, colorOrder, getCardColorCategory, getCardManaCategory, getCardRarityCategory, getCardTypeCategory, manaOrder, passesColorFilter, passesTypeFilter, rarityOrder, typeOrder } from '../../composables/useCardFilter'
 import { useVirtualGrid } from '../../composables/useVirtualGrid'
 import ContextMenu from '../ui/ContextMenu.vue'
 import type { ContextMenuItem } from '../../types/contextMenu'
@@ -152,13 +152,23 @@ const passesFilterSet = (selected: Set<string> | undefined, maxSize: number, val
   return !selected || selected.size >= maxSize || selected.has(value)
 }
 
+// Type filter check: MULTIPLE membership (TASK-288 AC1/AC3) — a card passes
+// if ANY of its types is selected, so an Artifact Land still matches both
+// the Artifacts and the Lands filter. Commander is still a single category
+// (a card can't be a commander AND a creature for filtering purposes here).
+const passesTypeFilterSet = (selected: Set<string> | undefined, maxSize: number, card: DisplayDeckCard): boolean => {
+  if (!selected || selected.size >= maxSize) return true
+  if (isCommander(card)) return selected.has('Commander')
+  return passesTypeFilter(card, selected)
+}
+
 // Check if a card passes all cross-filters
 const passesFilters = (card: DisplayDeckCard): boolean => {
   // Color filter: lands with produced_mana match if ANY produced color is selected
   const colorOk = !props.selectedColors || props.selectedColors.size >= deckColorOrder.length || passesColorFilter(card, props.selectedColors, props.exactColorMode)
   return colorOk
     && passesFilterSet(props.selectedManaValues, deckManaOrder.length, getManaCategory(card))
-    && passesFilterSet(props.selectedTypes, deckTypeOrder.length, getTypeCategory(card))
+    && passesTypeFilterSet(props.selectedTypes, deckTypeOrder.length, card)
     && passesFilterSet(props.selectedRarities, rarityOrder.length, getCardRarityCategory(card))
 }
 

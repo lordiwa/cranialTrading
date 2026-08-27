@@ -86,6 +86,22 @@ describe('the server and the browser classify a type line identically', () => {
     expect(getCardTypeCategories({ name: '', edition: '', type_line: 'Artifact Land' }).sort()).toEqual(['Artifacts', 'Lands'])
   })
 
+  /**
+   * LOW-1 (TASK-289 review). `everyCombination()` only produces the 127
+   * NON-EMPTY subsets, so the no-match case was never exercised for the
+   * PLURAL pair — a mutant that changes `publicTypeCategories`' fallback
+   * from `['other']` to `matches` (or the client's to `[]`) survives the
+   * whole suite otherwise, because an empty array vs `['other']` is never
+   * compared. Ties both sides down for a type line with none of the seven
+   * keywords.
+   */
+  it("the plural rule's no-match fallback agrees with the client's — both say ['other'] / ['Other'], never an empty array", () => {
+    for (const line of ['', 'Conspiracy', 'Battle — Siege']) {
+      expect(publicTypeCategories(line)).toEqual(['other'])
+      expect(getCardTypeCategories({ name: '', edition: '', type_line: line })).toEqual(['Other'])
+    }
+  })
+
   it('agrees on real cards, including the ones whose category is not the first word', () => {
     const realCards = [
       'Legendary Creature — Goblin Shaman',

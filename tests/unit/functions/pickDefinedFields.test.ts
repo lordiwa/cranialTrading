@@ -24,19 +24,45 @@ const USER_CARD_FIELDS = new Set([
 ])
 
 /**
- * Mirrors Firestore's own `WriteBatch.set` validation: a document value
- * of `undefined` is rejected, naming the offending field, exactly like
- * the real SDK error captured above. Passing this is what actually proves
- * a payload is safe to batch.set — a mock that silently accepts undefined
- * proves nothing.
+ * Mirrors Firestore's own `WriteBatch.set` validation, RECURSIVELY —
+ * TASK-286 REABIERTO review round (MEDIUM-1): a first-level-only version
+ * of this function lied about what it covered. MEASURED against the real
+ * @google-cloud/firestore (functions/node_modules, admin.firestore().batch()
+ * .set(ref, ...), 2026-08-26):
+ *
+ *   { power: undefined }              -> field "power"
+ *   { legalities: { modern: undefined } } -> field "legalities.modern"
+ *   { colors: ['R', undefined] }      -> field "colors.`1`"
+ *
+ * — nested objects use dot paths, array indices are backtick-quoted. This
+ * walks the same way, so it produces the identical path for the identical
+ * shape of input; this IS what "mirrors Firestore's own validation" means,
+ * not an approximation of it. Not currently reachable through
+ * bulkImportCards' onCall payload (JSON can't carry `undefined` at all,
+ * nested or not), so this recursion doesn't change today's PRODUCTION
+ * behavior — it changes what this helper is honestly allowed to claim,
+ * and stays correct if a future caller ever builds a payload in-process
+ * instead of over JSON.
  */
 function assertFirestoreSafe(doc: Record<string, unknown>) {
-  for (const [key, value] of Object.entries(doc)) {
+  function walk(value: unknown, path: string): void {
     if (value === undefined) {
       throw new Error(
-        `Value for argument "data" is not a valid Firestore document. Cannot use "undefined" as a Firestore value (found in field "${key}").`
+        `Value for argument "data" is not a valid Firestore document. Cannot use "undefined" as a Firestore value (found in field "${path}"). If you want to ignore undefined values, enable \`ignoreUndefinedProperties\`.`
       )
     }
+    if (Array.isArray(value)) {
+      value.forEach((item, i) => walk(item, `${path}.\`${i}\``))
+      return
+    }
+    if (value !== null && typeof value === 'object') {
+      for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+        walk(v, `${path}.${key}`)
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(doc)) {
+    walk(value, key)
   }
 }
 
@@ -62,6 +88,41 @@ describe('pickDefinedFields', () => {
     const withUndefined = { name: 'Lightning Bolt', power: undefined }
     expect(() => permissiveMock.set(withUndefined)).not.toThrow() // the trap TASK-286's first pass fell into
     expect(() => assertFirestoreSafe(withUndefined)).toThrow(/power/)
+  })
+})
+
+describe('assertFirestoreSafe — recursion (TASK-286 REABIERTO MEDIUM-1)', () => {
+  // MEASURED against the real @google-cloud/firestore (functions/node_modules,
+  // admin.firestore().batch().set(ref, doc), 2026-08-26) — these three cases
+  // are the exact inputs and exact messages the real SDK produced. A
+  // first-level-only assertFirestoreSafe (the original version of this
+  // helper) passes the top-level case and silently misses the other two —
+  // that's the defect the review round found: the docstring claimed to
+  // "mirror" Firestore's validation while only covering one layer of it.
+  it('still catches a top-level undefined', () => {
+    expect(() => assertFirestoreSafe({ power: undefined })).toThrow(
+      'Value for argument "data" is not a valid Firestore document. Cannot use "undefined" as a Firestore value (found in field "power"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.'
+    )
+  })
+
+  it('catches undefined nested inside an object, with the real dot-path field name', () => {
+    expect(() => assertFirestoreSafe({ legalities: { modern: undefined } })).toThrow(
+      'Value for argument "data" is not a valid Firestore document. Cannot use "undefined" as a Firestore value (found in field "legalities.modern"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.'
+    )
+  })
+
+  it('catches undefined nested inside an array, with the real backtick-quoted index', () => {
+    expect(() => assertFirestoreSafe({ colors: ['R', undefined] })).toThrow(
+      'Value for argument "data" is not a valid Firestore document. Cannot use "undefined" as a Firestore value (found in field "colors.`1`"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.'
+    )
+  })
+
+  it('does not false-positive on a clean nested document', () => {
+    expect(() => assertFirestoreSafe({
+      legalities: { modern: 'legal', standard: 'not_legal' },
+      colors: ['R'],
+      keywords: [],
+    })).not.toThrow()
   })
 })
 

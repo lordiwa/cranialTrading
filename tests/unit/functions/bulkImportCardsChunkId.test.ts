@@ -104,3 +104,47 @@ describe('bulkImportCards — sticky chunkId on creation (TASK-230)', () => {
     expect(chunkIdIdx).toBeGreaterThan(perCardLoopIdx)
   })
 })
+
+/**
+ * TASK-286 REABIERTO review round (HIGH-1) / TASK-287 AC1 (MEDIUM-3, same
+ * defect, closed here instead of separately since it's the same line of
+ * reasoning): enrichCardsForImport.test.ts and pickDefinedFields.test.ts
+ * both execute their helper in isolation and prove the HELPER is correct
+ * — neither proves bulkImportCards actually calls it. MEASURED by the
+ * reviewer: restoring the pre-fix `Object.entries(cardData)` loop in
+ * functions/index.js while leaving pickDefinedFields.js untouched left
+ * every test in tests/unit/functions/, including pickDefinedFields.test.ts
+ * itself, green — the exact "vacuous lock" class TASK-230's chunkId tests
+ * above already guard against for a different field. Same static-source-
+ * assertion technique, same file, so both call sites are covered by one
+ * consistent pattern instead of two.
+ */
+describe('bulkImportCards — call sites for TASK-286\'s server-side enrichment', () => {
+  const source = extractOnCallSource('bulkImportCards')
+
+  it('calls enrichCardsForImport on the incoming cards before anything is written (TASK-287 AC1)', () => {
+    // RED PLANTED AND CAPTURED (2026-08-26): commenting out this call and
+    // using the raw `cards` param in its place —
+    //   // const enrichment = await enrichCardsForImport(cards, {...})
+    //   const importCards = cards
+    // — reds this single assertion out (`Cannot read properties of
+    // undefined (reading 'toMatch')` is NOT what fails; the regex simply
+    // finds nothing), while every other test in this file and in
+    // enrichImportCards.test.ts stays green, because none of them touch
+    // functions/index.js's actual call site.
+    expect(source).toMatch(/const\s+enrichment\s*=\s*await\s+enrichCardsForImport\(\s*cards\s*,/)
+  })
+
+  it('builds userFields through pickDefinedFields, not a bare Object.entries loop (TASK-286 REABIERTO HIGH-1)', () => {
+    // RED PLANTED AND CAPTURED (2026-08-26): restoring the pre-fix loop —
+    //   const userFields = {};
+    //   for (const [key, value] of Object.entries(cardData)) {
+    //     if (USER_CARD_FIELDS.has(key)) userFields[key] = value;
+    //   }
+    // — while leaving functions/lib/pickDefinedFields.js completely
+    // untouched, reds this assertion out and nothing else in
+    // tests/unit/functions/ (16 files / 446 tests, per the reviewer's own
+    // measurement) — reproducing exactly the gap the review found.
+    expect(source).toMatch(/const\s+userFields\s*=\s*pickDefinedFields\(\s*cardData\s*,\s*USER_CARD_FIELDS\s*\)/)
+  })
+})

@@ -210,6 +210,12 @@
       "type": "task",
       "ref": "tasks/TASK-285.json",
       "label": "El import de CSV entra cartas sin metadatos de Scryfall y deja los filtros vacios"
+    },
+    {
+      "id": "task-286",
+      "type": "task",
+      "ref": "tasks/TASK-286.json",
+      "label": "El import debe completar los metadatos en el SERVIDOR, no en el navegador"
     }
   ],
   "edges": [

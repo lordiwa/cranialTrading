@@ -1,25 +1,34 @@
 /**
  * TASK-247 tanda 4 ronda 2 — MEDIUM-2, and the RISK that comes with it.
+ * Extended by TASK-289: there are now TWO rules, not one, each with its own
+ * server/browser pair, and both pairs must stay bound.
  *
  * The public profile's type filter runs on the SERVER (functions/lib, plain
  * CommonJS, no Vite module graph) while the owner's own collection views run
- * `getCardTypeCategory` in the BROWSER (src/composables/useCardFilter.ts,
- * TypeScript). Rafael's DECISION 10 is that the two must agree — the public
- * counts had started exceeding the owner's counts over the same cards.
+ * the equivalent logic in the BROWSER (src/composables/useCardFilter.ts,
+ * TypeScript). TASK-289 copied the client's plural/singular split to the
+ * server:
+ *   - SINGULAR pair: `publicTypeCategory` (server) vs `getCardTypeCategory`
+ *     (client) — first-match-wins by precedence, used only for facet counts
+ *     / grouping.
+ *   - PLURAL pair: `publicTypeCategories` (server) vs `getCardTypeCategories`
+ *     (client) — every matching category, used for FILTERING (an Artifact
+ *     Land must answer to both the `artifact` and the `land` chip).
  *
  * Two definitions of one rule is exactly how this ticket already earned a
  * HIGH that had to be fixed in two places. The build cannot share one module
- * across those two worlds, so THIS FILE is the binding instead: it runs both
- * implementations over EVERY combination of the seven type words plus a
- * handful of real cards, and reddens the moment they disagree — including on
- * precedence, which is the part that is easy to get subtly wrong.
+ * across those two worlds, so THIS FILE is the binding instead: it runs BOTH
+ * pairs over EVERY combination of the seven type words plus a handful of
+ * real cards, and reddens the moment either pair disagrees — including on
+ * precedence (singular pair) or on membership (plural pair).
  *
  * If a future change adds a category to one side only, or reorders the
- * precedence in one side only, this file fails. That is its whole job.
+ * precedence in one side only, or drops a match from one side's plural set,
+ * this file fails. That is its whole job.
  */
 import { describe, expect, it } from 'vitest'
-import { PUBLIC_TYPE_CATEGORIES, publicTypeCategory } from '../../../functions/lib/publicCardType.js'
-import { getCardTypeCategory } from '@/composables/useCardFilter'
+import { PUBLIC_TYPE_CATEGORIES, publicTypeCategory, publicTypeCategories } from '../../../functions/lib/publicCardType.js'
+import { getCardTypeCategory, getCardTypeCategories } from '@/composables/useCardFilter'
 
 /** The client's display categories, in the server's own vocabulary. */
 const CLIENT_TO_SERVER: Record<string, string> = {
@@ -56,6 +65,25 @@ describe('the server and the browser classify a type line identically', () => {
       if (client !== server) disagreements.push(`${line}: browser=${client} server=${server}`)
     }
     expect(disagreements).toEqual([])
+  })
+
+  it('agrees on all 127 combinations for the PLURAL (filtering) rule — every matching category, not just the primary', () => {
+    const disagreements: string[] = []
+    for (const line of everyCombination()) {
+      const client = getCardTypeCategories({ name: '', edition: '', type_line: line })
+        .map((c) => CLIENT_TO_SERVER[c])
+        .sort()
+      const server = publicTypeCategories(line).sort()
+      if (JSON.stringify(client) !== JSON.stringify(server)) {
+        disagreements.push(`${line}: browser=${JSON.stringify(client)} server=${JSON.stringify(server)}`)
+      }
+    }
+    expect(disagreements).toEqual([])
+  })
+
+  it('the plural rule keeps an Artifact Land under BOTH artifact and land — the bug this ticket closes', () => {
+    expect(publicTypeCategories('Artifact Land').sort()).toEqual(['artifact', 'land'])
+    expect(getCardTypeCategories({ name: '', edition: '', type_line: 'Artifact Land' }).sort()).toEqual(['Artifacts', 'Lands'])
   })
 
   it('agrees on real cards, including the ones whose category is not the first word', () => {

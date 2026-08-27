@@ -213,7 +213,7 @@
  * it is the only thing standing between a client string and an arbitrary
  * Firestore collection path.
  */
-const { PUBLIC_TYPE_CATEGORIES, publicTypeCategory } = require('./publicCardType');
+const { PUBLIC_TYPE_CATEGORIES, publicTypeCategory, publicTypeCategories } = require('./publicCardType');
 
 const PUBLIC_USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -583,15 +583,18 @@ function filterPublicIndexEntries(entries, filters, options = {}) {
   }
 
   if (skip !== 'type' && Array.isArray(f.type) && f.type.length > 0) {
-    // MEDIUM-2 (tanda 4 ronda 2), Rafael's DECISION 10: EXCLUSIVE categories,
-    // at parity with useCardFilter.getCardTypeCategory — the rule the owner's
-    // own collection views already use. The previous substring match put an
-    // Artifact Creature under BOTH chips, which made the public profile's
-    // per-type counts exceed the owner's over the same cards. The two
+    // TASK-289, Rafael's DECISION 2026-08-27: MULTIPLE membership, at parity
+    // with useCardFilter.getCardTypeCategories — the rule the owner's own
+    // collection views use for filtering since TASK-288. A card passes if
+    // ANY of its categories is among the ones requested, so an Artifact Land
+    // answers to both the `artifact` chip and the `land` chip. This
+    // supersedes MEDIUM-2's exclusive rule for FILTERING only; facet counts
+    // below still use the single primary category (publicTypeCategory), so
+    // the facet sum still can never exceed the total. The two
     // implementations are bound by tests/unit/functions/publicCardTypeParity
-    // .test.ts (all 127 combinations of the seven type words).
+    // .test.ts (all 127 combinations of the seven type words, both pairs).
     const wanted = new Set(f.type.map((t) => String(t).toLowerCase()));
-    result = result.filter((e) => wanted.has(publicTypeCategory(e.t)));
+    result = result.filter((e) => publicTypeCategories(e.t).some((category) => wanted.has(category)));
   }
 
   if (skip !== 'manaValue' && Array.isArray(f.manaValue) && f.manaValue.length > 0) {

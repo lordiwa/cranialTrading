@@ -12,7 +12,7 @@
     "AC7. Tests unitarios del helper de enriquecimiento (cache-hit, cache-miss con Scryfall OK, cache-miss con Scryfall caido, mezcla de los tres). Los tests de functions/ corren sin firebase-admin, como lib/cardIndexEntry.js — seguir ese patron.",
     "AC8. npm run test:unit verde y npx vite build verde."
   ],
-  "status": "in_progress",
+  "status": "done",
   "priority": "critical",
   "labels": [
     "import",
@@ -23,7 +23,10 @@
   "assignee": null,
   "depends_on": [],
   "linked_commits": [
-    "9b838f847cd8935e383e91d34872923125e1acc2"
+    "9b838f847cd8935e383e91d34872923125e1acc2",
+    "9b838f847cd8935e383e91d34872923125e1acc2",
+    "23ec6b486e07a87997372195f1ee4b7b1b521778",
+    "be1d9b1f9b4e1e489070bc85b67497486292a4b8"
   ],
   "linked_prs": [],
   "comments": [
@@ -41,10 +44,20 @@
       "author": "orchestrator",
       "at": "2026-08-26T23:42:12.897Z",
       "body": "REABIERTO. Defecto BLOQUEANTE encontrado en la UAT contra dev, DESPUES del cierre y ANTES de tocar produccion.\n\nMEDIDO el 2026-08-26T23:41:26Z en cranial-trading-dev, llamando a la function desplegada con una carta pelada (sin type_line/colors/rarity/cmc y sin _cacheFields — o sea, simulando el cliente viejo, que es exactamente el escenario que este ticket existe para cubrir):\n\n  FirebaseError: INTERNAL\n  Log de la function: Unhandled error Error: Value for argument \"data\" is not a valid\n  Firestore document. Cannot use \"undefined\" as a Firestore value (found in field \"power\").\n  at WriteBatch.set (write-batch.js:263) at /workspace/index.js:536\n\nCAUSA: mergeScryfallMetadata (functions/lib/cardIndexEntry.js) hace `power: data.power || cache.power`. Para toda carta que NO es criatura — instantaneos, conjuros, encantamientos, tierras, artefactos sin cuerpo — el cache no trae power ni toughness, asi que el objeto mezclado queda con power: undefined. USER_CARD_FIELDS incluye 'power' y 'toughness', asi que ese undefined viaja al batch.set y Firestore lo rechaza, tirando la llamada ENTERA.\n\nALCANCE REAL SI ESTO HUBIERA IDO A PRODUCCION: no es un caso borde. Habria roto el import de cualquier tanda que contenga una sola carta sin power. La coleccion de Rafael son 5765 cartas mayormente no-criatura: el import habria fallado entero, con INTERNAL, en la primera tanda de 500.\n\nPOR QUE NO LO VIO NADIE ANTES: el camino del CLIENTE nunca lo pisa porque confirmImport (src/stores/collection.ts) pasa cada carta por stripUndefined ANTES de mandarla. El camino nuevo del servidor no tiene ese paso. Y los 14 tests unitarios del helper no podian verlo: mockean Firestore, y un mock acepta undefined sin chistar. Solo lo detecto ejecutar la function real contra una base real. Vale como leccion propia: un helper con cobertura total puede seguir siendo incompatible con el sistema que lo consume, y ninguna cantidad de tests unitarios lo habria dicho."
+    },
+    {
+      "author": "reviewer",
+      "at": "2026-08-27T00:03:59.792Z",
+      "body": "RONDA 2 (commit be1d9b1) — HIGH-1 y MEDIUM-1 CERRADOS. Veredicto de la ronda anterior (23ec6b4) sobre el arreglo en si: correcto y sin regresion; lo unico que bloqueaba era la ausencia de sensor.\n\nHIGH-1 cerrado. Se agregaron dos tripwires de texto-fuente en bulkImportCardsChunkId.test.ts, con el mismo patron de extractOnCallSource que el archivo ya usaba para chunkId: uno afirma que bulkImportCards llama a enrichCardsForImport, el otro que arma userFields via pickDefinedFields(cardData, USER_CARD_FIELDS). Las corridas rojas se plantaron DE VERDAD, parcheando functions/index.js a su forma pre-fix, una mutacion por vez, y restaurando el archivo byte a byte despues de cada una: sacar la llamada a enrichCardsForImport da 1 failed / 447 passed, y restaurar el loop viejo de Object.entries da 1 failed / 447 passed. En los dos casos el unico rojo es el tripwire correspondiente, que es exactamente el comportamiento buscado.\n\nEsto cierra tambien el MEDIUM-3 del review de 9b838f8 (\"nada prueba que bulkImportCards LLAME a enrichCardsForImport\"), que estaba anotado como AC1 de TASK-287: era el mismo agujero y se cerro aca.\n\nMEDIUM-1 cerrado por la via preferida (hacer la funcion honesta, no suavizar el docstring). Antes de tocar nada se MIDIO contra @google-cloud/firestore real — validacion local, sin credenciales — que WriteBatch.set rechaza tambien el undefined anidado, y con que forma exacta de path: { power: undefined } da \"power\", { legalities: { modern: undefined } } da \"legalities.modern\", { colors: ['R', undefined] } da \"colors.`1`\" con el indice entre backticks. assertFirestoreSafe ahora recorre objetos y arrays y reproduce ese mismo formato, verificado con esos 3 casos como tests mas un control negativo. El docstring ademas explicita que hoy el caso anidado NO es alcanzable via el payload onCall (JSON no transporta undefined), asi que esto no cambia comportamiento de produccion: cambia que la funcion deje de afirmar una cobertura que no tenia.\n\nVERIFICADO POR EL ORQUESTADOR sobre el commit: be1d9b1 toca UNICAMENTE package.json/lock y dos archivos de test — ni una linea de functions/ ni de src/. Por lo tanto la function que se probo contra el entorno dev sigue siendo byte por byte la misma, y la verificacion de esa prueba sigue siendo valida para este commit.\n\nLOW-1 (USER_CARD_FIELDS duplicado como literal en el test, sin aviso si el set real crece) y LOW-2 (titulo con doble negacion) quedan sin tocar, documentados en TASK-287 con el arreglo ya propuesto.\n\ntest:unit: 180 archivos / 2337 tests verdes. vite build verde."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-08-27T00:04:24.490Z",
+      "body": "Cerrado tras DOS rondas de arreglo. v1.59.10. Commits: 9b838f8 (implementacion), 23ec6b4 (defecto bloqueante encontrado en UAT), be1d9b1 (los dos sensores que faltaban).\n\nLO QUE MAS VALE DE ESTE TICKET, y conviene que sobreviva: el defecto que casi llega a produccion NO lo encontro ningun test. Los 2331 tests estaban en verde mientras la function desplegada no podia escribir NI UNA carta que no fuera criatura — mergeScryfallMetadata dejaba power: undefined y Firestore rechazaba el batch entero. Lo encontro llamar a la function real, desplegada en dev, con una carta real y pelada. Los tests unitarios no podian verlo porque mockean Firestore, y un mock acepta undefined sin chistar. Si esto se hubiera desplegado directo a prod por apuro, el import de las 5765 cartas habria muerto en la primera tanda de 500 con un INTERNAL opaco.\n\nSEGUNDA LECCION, del HIGH-1: el primer intento de arreglo tenia 16 tests nuevos y aun asi revertir el arreglo en su punto real dejaba TODO en verde, porque los tests sensaban el helper y el defecto vivia en el call-site. El mismo agujero ya lo habia levantado el review anterior como MEDIUM-3 y se habia postergado a TASK-287. Aparecio dos veces en el mismo ticket antes de cerrarse. Un helper con cobertura total no prueba que alguien lo llame.\n\nVERIFICACION DE PUNTA A PUNTA (MEDIDA, no inferida): con la function desplegada en cranial-trading-dev se llamo a bulkImportCards con una carta PELADA — sin type_line/colors/rarity/cmc y sin _cacheFields, o sea el escenario del cliente viejo que motivo este ticket. Resultado: la carta quedo escrita con type_line 'Instant', colors ['R'], rarity 'uncommon', cmc 1, con power y toughness AUSENTES (no undefined) y con foil:false y price:1.5 conservados — o sea que el filtro de undefined no se comio los valores falsy legitimos, que era el riesgo del arreglo. unresolvedMetadataCount: 0. La carta de prueba se borro despues y el indice de la cuenta de dev se reconstruyo y verifico convergente (2202 = 2202, cero fantasmas).\n\nDEUDA REGISTRADA, no olvidada: TASK-287 sigue abierto con los MEDIUM-1 y MEDIUM-2 del primer review (las cartas incoloras re-disparan enrichment en cada import; y unresolvedCount cuenta 'no encontre fuente' en vez de 'sigue incompleta', que hace que una DFC entre sin color y se reporte como resuelta) mas los dos LOW de esta ronda. Su AC1 YA NO APLICA: se cerro aca.\n\nPENDIENTE OPERATIVO INMEDIATO: desplegar la function a PRODUCCION a mano (el CI solo hace hosting). Hasta que eso pase, este arreglo no existe para el usuario."
     }
   ],
   "created_at": "2026-08-26T22:58:33.707Z",
-  "updated_at": "2026-08-26T23:42:12.897Z",
+  "updated_at": "2026-08-27T00:04:24.490Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "marker": "[EXPLICIT]",

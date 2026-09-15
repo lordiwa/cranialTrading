@@ -1,26 +1,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useExchangeCartStore } from '../../stores/exchangeCart'
+import { useBuyRequestsStore } from '../../stores/buyRequests'
+import { useToastStore } from '../../stores/toast'
 import { useI18n } from '../../composables/useI18n'
 import IconV2 from '../ui/IconV2.vue'
 import BaseButton from '../ui/BaseButton.vue'
-import type { BuyerContact } from '../../types/buyRequest'
 
 const props = defineProps<{
   username: string
   show: boolean
+  /** Uid del dueño del perfil — necesario para persistir el BuyRequest. */
+  ownerId: string | null
 }>()
 
 const emit = defineEmits<{
   close: []
   share: []
-  sendRequest: [contact: BuyerContact]
   loginToMatch: []
   registerToMatch: []
 }>()
 
 const { t } = useI18n()
 const cartStore = useExchangeCartStore()
+const buyRequestsStore = useBuyRequestsStore()
+const toastStore = useToastStore()
 
 const cart = computed(() => cartStore.getCart(props.username))
 const items = computed(() => cart.value?.items ?? [])
@@ -36,9 +40,35 @@ const canSend = computed(() => buyerPhone.value.trim().length > 0 && emailValid.
 // presentational (border/glow color), reuses the existing emailValid/canSend logic above.
 const emailHasError = computed(() => buyerEmail.value.trim().length > 0 && !emailValid.value)
 
-const submitRequest = () => {
-  if (!canSend.value) return
-  emit('sendRequest', { name: buyerName.value.trim(), phone: buyerPhone.value.trim(), email: buyerEmail.value.trim() })
+// TASK-291 (wargaming WG-001): guarda de vuelo. `sending` se lee y se pone en
+// true de forma SINCRONICA, antes de cualquier await, en el mismo cuerpo de
+// submitRequest — el manejador real que dispara la escritura, no un helper
+// aparte. Un doble clic (o dos clics que le ganan al re-render de Vue sobre
+// el atributo disabled) reentra a esta función; el segundo reentra con
+// `sending.value` ya en true y retorna sin volver a llamar a
+// submitBuyRequest. `finally` limpia el flag tanto en éxito como en error —
+// un envío fallido no debe dejar el botón inutilizable para siempre (AC2).
+const sending = ref(false)
+
+const submitRequest = async () => {
+  if (!canSend.value || sending.value) return
+  const currentCart = cart.value
+  if (!props.ownerId || !currentCart || currentCart.items.length === 0) return
+
+  sending.value = true
+  try {
+    const contact = { name: buyerName.value.trim(), phone: buyerPhone.value.trim(), email: buyerEmail.value.trim() }
+    const res = await buyRequestsStore.submitBuyRequest(props.ownerId, contact, currentCart.items, currentCart.createdAt)
+    if (res.ok) {
+      cartStore.clearCart(props.username)
+      toastStore.show(t('cart.requestSent'), 'success')
+      emit('close')
+    } else {
+      toastStore.show(t('cart.requestError'), 'error')
+    }
+  } finally {
+    sending.value = false
+  }
 }
 
 const updateQty = (scryfallId: string, cardId: string, qty: number) => {
@@ -223,8 +253,8 @@ const removeItem = (scryfallId: string, cardId: string) => {
 
           <!-- Actions -->
           <div class="flex flex-col gap-2">
-            <BaseButton variant="filled" class="w-full" :disabled="!canSend" @click="submitRequest">
-              {{ t('cart.sendRequest') }}
+            <BaseButton variant="filled" class="w-full" :disabled="!canSend || sending" :aria-busy="sending" @click="submitRequest">
+              {{ sending ? t('cart.sending') : t('cart.sendRequest') }}
             </BaseButton>
             <BaseButton variant="secondary" class="w-full" @click="emit('share')">
               {{ t('cart.share') }}

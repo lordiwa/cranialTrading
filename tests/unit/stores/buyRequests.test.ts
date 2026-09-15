@@ -7,10 +7,13 @@ import { createPinia, setActivePinia } from 'pinia'
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   getDocs: vi.fn().mockResolvedValue({ docs: [] }),
-  addDoc: vi.fn().mockResolvedValue({ id: 'req-1' }),
+  setDoc: vi.fn().mockResolvedValue(undefined),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),
-  doc: vi.fn(() => ({})),
+  // TASK-291 AC3: submitBuyRequest now targets doc(db, ..., id) with a
+  // deterministic id (setDoc), not addDoc. Echo the path segments (incl. the
+  // id) so tests can assert on the id without needing a real Firestore ref.
+  doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
 }))
 
 vi.mock('@/services/firebase', () => ({ db: {} }))
@@ -33,7 +36,7 @@ vi.mock('@/stores/collection', () => ({
   }),
 }))
 
-import { addDoc, updateDoc } from 'firebase/firestore'
+import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { useBuyRequestsStore } from '@/stores/buyRequests'
 
 const item = (over: Partial<any> = {}) => ({
@@ -43,7 +46,7 @@ const item = (over: Partial<any> = {}) => ({
 })
 
 describe('useBuyRequestsStore — submitBuyRequest (SCRUM-70.1)', () => {
-  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks(); (addDoc as any).mockResolvedValue({ id: 'req-1' }) })
+  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks(); (setDoc as any).mockResolvedValue(undefined) })
 
   it('escribe un doc con status pending, totalValue y contacto', async () => {
     const store = useBuyRequestsStore()
@@ -51,9 +54,10 @@ describe('useBuyRequestsStore — submitBuyRequest (SCRUM-70.1)', () => {
       'owner-id',
       { name: 'Rafa', phone: '099123', email: 'a@b.com' },
       [item({ price: 2, quantity: 3 })],
+      1000,
     )
     expect(res.ok).toBe(true)
-    const payload = (addDoc as any).mock.calls[0][1]
+    const payload = (setDoc as any).mock.calls[0][1]
     expect(payload.status).toBe('pending')
     expect(payload.totalValue).toBe(6)
     expect(payload.buyerName).toBe('Rafa')
@@ -63,9 +67,37 @@ describe('useBuyRequestsStore — submitBuyRequest (SCRUM-70.1)', () => {
 
   it('usa "Guest" cuando el nombre viene vacío y rechaza carrito vacío', async () => {
     const store = useBuyRequestsStore()
-    expect((await store.submitBuyRequest('owner-id', { name: '   ', phone: '1', email: 'a@b.com' }, [item()])).ok).toBe(true)
-    expect((addDoc as any).mock.calls[0][1].buyerName).toBe('Guest')
-    expect((await store.submitBuyRequest('owner-id', { name: 'x', phone: '1', email: 'a@b.com' }, [])).ok).toBe(false)
+    expect((await store.submitBuyRequest('owner-id', { name: '   ', phone: '1', email: 'a@b.com' }, [item()], 1000)).ok).toBe(true)
+    expect((setDoc as any).mock.calls[0][1].buyerName).toBe('Guest')
+    expect((await store.submitBuyRequest('owner-id', { name: 'x', phone: '1', email: 'a@b.com' }, [], 1000)).ok).toBe(false)
+  })
+
+  it('AC3: dos envios del MISMO carrito (mismo contacto+items+createdAt) escriben en el MISMO doc id', async () => {
+    const store = useBuyRequestsStore()
+    const contact = { name: 'Rafa', phone: '099123', email: 'a@b.com' }
+    const items = [item({ price: 2, quantity: 3 })]
+
+    await store.submitBuyRequest('owner-id', contact, items, 555)
+    await store.submitBuyRequest('owner-id', contact, items, 555)
+
+    expect(setDoc).toHaveBeenCalledTimes(2)
+    const [ref1] = (setDoc as any).mock.calls[0]
+    const [ref2] = (setDoc as any).mock.calls[1]
+    expect(ref1.path).toBe(ref2.path)
+    expect(doc).toHaveBeenCalledTimes(2)
+  })
+
+  it('AC3: un carrito con distinto createdAt (una sesion de carrito distinta) produce un id distinto', async () => {
+    const store = useBuyRequestsStore()
+    const contact = { name: 'Rafa', phone: '099123', email: 'a@b.com' }
+    const items = [item({ price: 2, quantity: 3 })]
+
+    await store.submitBuyRequest('owner-id', contact, items, 111)
+    await store.submitBuyRequest('owner-id', contact, items, 222)
+
+    const [ref1] = (setDoc as any).mock.calls[0]
+    const [ref2] = (setDoc as any).mock.calls[1]
+    expect(ref1.path).not.toBe(ref2.path)
   })
 })
 

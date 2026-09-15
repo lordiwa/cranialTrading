@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { addDoc, collection, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
 import { useCollectionStore } from './collection'
-import { computeTotalValue, planFulfillment } from '../utils/buyRequest'
+import { buildBuyRequestId, computeTotalValue, planFulfillment } from '../utils/buyRequest'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import type { ExchangeCartItem } from '../types/exchangeCart'
 import type { BuyerContact, BuyRequest, BuyRequestStatus } from '../types/buyRequest'
@@ -29,13 +29,28 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
   /**
    * SCRUM-70.1: un visitante (posiblemente anónimo) envía su carrito al dueño.
    * Persiste bajo /users/{ownerUid}/buyRequests. NO depende de authStore.
+   *
+   * TASK-291 AC3: `cartCreatedAt` (el `createdAt` del carrito en
+   * exchangeCart.ts, único por sesión de carrito) entra en un id
+   * determinista (buildBuyRequestId) y el alta usa `setDoc` sobre ese id en
+   * vez de `addDoc`. Dos envíos del MISMO carrito apuntan al MISMO
+   * documento: el reenvío no crea un segundo BuyRequest. Nota de reglas: la
+   * regla `create` de firestore.rules no distingue un id generado por el
+   * cliente (addDoc) de uno elegido por el cliente (setDoc) — ambos son
+   * "el cliente elige el id antes de escribir", y ambos evalúan `create`
+   * mientras el documento no exista. Un reenvío que SÍ colisiona con un
+   * documento existente pasa a evaluarse como `update`, que exige
+   * `request.auth.uid == userId` (el dueño) — un comprador anónimo nunca lo
+   * cumple, así que el reenvío falla con permission-denied en vez de
+   * pisar el documento original. No hizo falta tocar firestore.rules.
    */
-  const submitBuyRequest = async (ownerUid: string, contact: BuyerContact, items: ExchangeCartItem[]): Promise<{ ok: boolean; error?: string }> => {
+  const submitBuyRequest = async (ownerUid: string, contact: BuyerContact, items: ExchangeCartItem[], cartCreatedAt: number): Promise<{ ok: boolean; error?: string }> => {
     if (!ownerUid) return { ok: false, error: 'no-owner-uid' }
     if (items.length === 0) return { ok: false, error: 'empty-cart' }
     try {
-      const ref_ = collection(db, 'users', ownerUid, 'buyRequests')
-      await addDoc(ref_, {
+      const id = buildBuyRequestId(contact, items, cartCreatedAt)
+      const ref_ = doc(db, 'users', ownerUid, 'buyRequests', id)
+      await setDoc(ref_, {
         buyerName: contact.name.trim() || 'Guest',
         buyerPhone: contact.phone.trim(),
         buyerEmail: contact.email.trim(),

@@ -40,15 +40,21 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     return cart.items.find(i => i.scryfallId === scryfallId && i.cardId === cardId) ?? null
   }
 
-  // Background CK-first price upgrade (TASK-119). addItem captures card.price
-  // (TCG) synchronously for zero perceived latency; this fires-and-forget from
-  // addItem and upgrades the item's price in place once the CK lookup resolves.
-  // Explicit fallback: if CK has no data for the set/card, or the lookup fails,
-  // the captured TCG price is left untouched. Foil-aware: foil items only
-  // upgrade when CK publishes an actual retailFoil price — a missing
-  // retailFoil does NOT fall back to the non-foil retail (that would
-  // misrepresent a foil card's price), so the captured TCG price wins
-  // instead (owner decision). Non-foil items use retail as before.
+  // Background CK reference-price lookup. TASK-119 originally made this
+  // OVERWRITE item.price with the CK retail ("the cart is ephemeral and the
+  // amount is indicative"). TASK-298 (wargaming 2026-09-15, WG-008) reverted
+  // that: the cart persists a real BuyRequest the seller acts on
+  // (fulfillRequest decrements their collection), so the transaction price
+  // must always be the one the seller published — see
+  // docs/DECISIONES-DE-PRODUCTO.md. addItem still captures the seller's
+  // card.price synchronously for zero perceived latency; this fires-and-
+  // forget from addItem and, once the CK lookup resolves, populates the
+  // SEPARATE, labeled `ckReferencePrice` field — item.price is never
+  // touched. If CK has no data for the set/card, or the lookup fails,
+  // ckReferencePrice is simply left unset. Foil-aware: foil items only
+  // populate ckReferencePrice when CK publishes an actual retailFoil price —
+  // a missing retailFoil does NOT fall back to the non-foil retail (that
+  // would misrepresent a foil card's market reference).
   async function _upgradePriceFromCK(username: string, scryfallId: string, cardId: string, setCode?: string) {
     try {
       const prices = await getCardPrices(scryfallId, setCode)
@@ -61,13 +67,13 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
       if (!item) return
 
       const ckRetail = item.foil ? ck.retailFoil : ck.retail
-      // Guard against a 0/null CK price clobbering a real captured TCG price.
+      // Guard against a 0/null CK price being recorded as a bogus reference.
       if (ckRetail == null || ckRetail <= 0) return
 
-      item.price = ckRetail
+      item.ckReferencePrice = ckRetail
       _persist()
     } catch {
-      // Network/parse failure — keep the captured TCG price, no toast spam.
+      // Network/parse failure — no reference price, no toast spam.
     }
   }
 

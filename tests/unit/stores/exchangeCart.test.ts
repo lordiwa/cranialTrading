@@ -328,10 +328,18 @@ describe('exchangeCart store', () => {
     })
   })
 
-  // ─── CK-first price upgrade (TASK-119) ──────────────────────────────
+  // ─── CK reference-price lookup (TASK-119, REVERTIDO por TASK-298) ────
+  //
+  // TASK-119 hacía que este lookup PISARA item.price ("el carrito es efímero
+  // y el monto es indicativo"). TASK-298 (wargaming 2026-09-15, WG-008) mató
+  // esa premisa: el carrito persiste un BuyRequest real sobre el que el
+  // vendedor actúa (fulfillRequest descuenta inventario), así que el precio
+  // de la transacción tiene que ser SIEMPRE el que el vendedor publicó. El
+  // retail de CK ahora solo puebla el campo aparte y rotulado
+  // `ckReferencePrice` — nunca `item.price`. Ver docs/DECISIONES-DE-PRODUCTO.md.
 
-  describe('CK-first price upgrade', () => {
-    it('captures the TCG price immediately, before the CK lookup resolves', () => {
+  describe('CK reference-price lookup (item.price nunca se pisa — TASK-298)', () => {
+    it('captures the seller price immediately, before the CK lookup resolves', () => {
       // Never-resolving lookup — proves addItem does not await it.
       mockGetCardPrices.mockReturnValue(new Promise(() => {}))
       const store = useExchangeCartStore()
@@ -341,17 +349,36 @@ describe('exchangeCart store', () => {
       expect(cart!.items[0].price).toBe(3.5)
     })
 
-    it('upgrades the item price (and total) once the CK lookup resolves', async () => {
+    // AC2 + AC1 (equivalente determinista): el precio de la línea del
+    // carrito nunca cambia solo — ni en t=0 ni después de que el lookup CK
+    // resuelve. Hoy (bug) esto reddena: priceAfterResolve queda en 9.99.
+    it('AC1/AC2: el precio de la línea NO cambia solo entre t=0 y post-resolución del lookup CK', async () => {
       mockGetCardPrices.mockResolvedValue({
         cardKingdom: { retail: 9.99, retailFoil: null, buylist: null, buylistFoil: null },
       })
       const store = useExchangeCartStore()
       store.addItem('alice', makeItem({ price: 3.5, quantity: 2, maxQuantity: 5 }))
+
+      const priceAtT0 = store.getCart('alice')!.items[0].price
+      await flushCKLookup()
+      const priceAfterResolve = store.getCart('alice')!.items[0].price
+
+      expect(priceAtT0).toBe(3.5)
+      expect(priceAfterResolve).toBe(3.5)
+      expect(store.getCartTotalValue('alice')).toBe(7) // 3.5 * 2, nunca 9.99 * 2
+    })
+
+    it('AC4: guarda el retail de CK en el campo aparte ckReferencePrice, sin tocar item.price', async () => {
+      mockGetCardPrices.mockResolvedValue({
+        cardKingdom: { retail: 9.99, retailFoil: null, buylist: null, buylistFoil: null },
+      })
+      const store = useExchangeCartStore()
+      store.addItem('alice', makeItem({ price: 3.5 }))
       await flushCKLookup()
 
-      const cart = store.getCart('alice')
-      expect(cart!.items[0].price).toBe(9.99)
-      expect(store.getCartTotalValue('alice')).toBe(19.98)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBe(9.99)
     })
 
     it('passes setCode through to getCardPrices for the CK lookup', async () => {
@@ -363,25 +390,29 @@ describe('exchangeCart store', () => {
       expect(mockGetCardPrices).toHaveBeenCalledWith('scry-9', 'MH2')
     })
 
-    it('keeps the TCG price when CK has no data for the card (returns null)', async () => {
+    it('leaves ckReferencePrice unset when CK has no data for the card (returns null)', async () => {
       mockGetCardPrices.mockResolvedValue(null)
       const store = useExchangeCartStore()
       store.addItem('alice', makeItem({ price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBeUndefined()
     })
 
-    it('keeps the TCG price when the CK lookup rejects', async () => {
+    it('leaves ckReferencePrice unset when the CK lookup rejects', async () => {
       mockGetCardPrices.mockRejectedValue(new Error('network down'))
       const store = useExchangeCartStore()
       store.addItem('alice', makeItem({ price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBeUndefined()
     })
 
-    it('keeps the TCG price when CK retail is null for that print', async () => {
+    it('leaves ckReferencePrice unset when CK retail is null for that print', async () => {
       mockGetCardPrices.mockResolvedValue({
         cardKingdom: { retail: null, retailFoil: null, buylist: null, buylistFoil: null },
       })
@@ -389,10 +420,12 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem({ price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBeUndefined()
     })
 
-    it('prefers CK retailFoil for foil items', async () => {
+    it('prefers CK retailFoil for foil items when populating ckReferencePrice', async () => {
       mockGetCardPrices.mockResolvedValue({
         cardKingdom: { retail: 5, retailFoil: 12.5, buylist: null, buylistFoil: null },
       })
@@ -400,10 +433,12 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem({ foil: true, price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(12.5)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBe(12.5)
     })
 
-    it('keeps the captured TCG price for foil items when retailFoil is unavailable (does not fall back to non-foil retail)', async () => {
+    it('leaves ckReferencePrice unset for foil items when retailFoil is unavailable (does not fall back to non-foil retail)', async () => {
       mockGetCardPrices.mockResolvedValue({
         cardKingdom: { retail: 5, retailFoil: null, buylist: null, buylistFoil: null },
       })
@@ -411,10 +446,12 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem({ foil: true, price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBeUndefined()
     })
 
-    it('keeps the captured TCG price when CK retail resolves to 0', async () => {
+    it('leaves ckReferencePrice unset when CK retail resolves to 0', async () => {
       mockGetCardPrices.mockResolvedValue({
         cardKingdom: { retail: 0, retailFoil: null, buylist: null, buylistFoil: null },
       })
@@ -422,7 +459,9 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem({ price: 3.5 }))
       await flushCKLookup()
 
-      expect(store.getCart('alice')!.items[0].price).toBe(3.5)
+      const item = store.getCart('alice')!.items[0]
+      expect(item.price).toBe(3.5)
+      expect(item.ckReferencePrice).toBeUndefined()
     })
 
     it('does not resurrect an item removed from the cart before the lookup resolves', async () => {

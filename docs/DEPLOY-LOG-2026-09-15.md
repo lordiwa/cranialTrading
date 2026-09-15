@@ -162,8 +162,23 @@ semanas mergeado pero desplegado a medias**. Ahí es donde hay que apretar.
 | Tests unitarios | 2375/2375 verdes |
 | Build | OK |
 
-Verificación de hosting posterior al merge: el CI de `main` publica el bundle; ver la sección
-de cierre del reporte de sesión para el hash del bundle nuevo.
+### Cierre del deploy de hosting (CI run 34924014326, rama `main`)
+
+| Job | Resultado |
+|---|---|
+| type-check | success |
+| unit-tests | success |
+| build | success |
+| e2e (@smoke sobre el bundle de producción) | success |
+| deploy-prod | success |
+| deploy-dev | skipped (correcto: sólo corre en `develop`) |
+
+- Bundle en producción ANTES: `assets/index-DTAdWei0.js`
+- Bundle en producción DESPUÉS: `assets/index-CuGIZsPj.js`
+- https://cranial-trading.web.app → HTTP 200
+
+El merge quedó en `main` como `ad1e749`. Este bloque de cierre se escribió después del deploy,
+así que vive en `develop` y llegará a `main` con la próxima promoción.
 
 ---
 

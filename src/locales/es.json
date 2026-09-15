@@ -255,6 +255,7 @@
     "total": "Total",
     "share": "COMPARTIR",
     "sendRequest": "ENVIAR PEDIDO AL DUEÑO",
+    "sending": "ENVIANDO...",
     "contactPrompt": "Deja tu contacto para que el dueño pueda responderte por este carrito:",
     "namePlaceholder": "Tu nombre (opcional)",
     "phonePlaceholder": "WhatsApp / teléfono",

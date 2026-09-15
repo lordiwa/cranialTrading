@@ -255,6 +255,7 @@
     "total": "Total",
     "share": "SHARE CART",
     "sendRequest": "SEND REQUEST TO OWNER",
+    "sending": "SENDING...",
     "contactPrompt": "Leave your contact so the owner can reply about this cart:",
     "namePlaceholder": "Your name (optional)",
     "phonePlaceholder": "WhatsApp / phone",

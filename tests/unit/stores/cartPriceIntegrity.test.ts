@@ -3,7 +3,8 @@
  *
  * Regresión cruzada exchangeCart (addItem + upgrade CK en background) ->
  * buyRequests (submitBuyRequest). La aserción va sobre el DOCUMENTO
- * PERSISTIDO (el payload que recibe addDoc, mockeado) — nunca sobre la
+ * PERSISTIDO (el payload que recibe setDoc, mockeado — TASK-291 cambió el
+ * alta de addDoc a setDoc sobre un id determinista) — nunca sobre la
  * pantalla, y nunca contra Firebase real.
  *
  * Revierte la premisa de TASK-119 ("el carrito es efímero y el monto es
@@ -25,7 +26,9 @@ vi.mock('@/services/mtgjson', () => ({
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
-  addDoc: vi.fn().mockResolvedValue({ id: 'req-1' }),
+  // TASK-291 AC3: submitBuyRequest now targets a deterministic doc id via
+  // setDoc, not addDoc — see stores/buyRequests.ts.
+  setDoc: vi.fn().mockResolvedValue(undefined),
   getDocs: vi.fn().mockResolvedValue({ docs: [] }),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),
@@ -34,10 +37,10 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ user: null }) }))
 
-import { addDoc } from 'firebase/firestore'
+import { setDoc } from 'firebase/firestore'
 
 const mockGetCardPrices = vi.mocked(getCardPrices)
-const mockAddDoc = vi.mocked(addDoc)
+const mockSetDoc = vi.mocked(setDoc)
 
 // Flush the fire-and-forget CK lookup promise chain (addItem does not await it).
 async function flushCKLookup() {
@@ -75,8 +78,8 @@ beforeEach(() => {
   })
   setActivePinia(createPinia())
   mockGetCardPrices.mockReset()
-  mockAddDoc.mockReset()
-  mockAddDoc.mockResolvedValue({ id: 'req-1' } as any)
+  mockSetDoc.mockReset()
+  mockSetDoc.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -102,10 +105,11 @@ describe('TASK-298 — el precio de la transacción persistida es el del vendedo
       'owner-uid',
       { name: 'Comprador', phone: '099123', email: 'a@b.com' },
       cart!.items,
+      cart!.createdAt,
     )
     expect(res.ok).toBe(true)
 
-    const payload = mockAddDoc.mock.calls[0][1] as { items: ExchangeCartItem[]; totalValue: number }
+    const payload = mockSetDoc.mock.calls[0][1] as { items: ExchangeCartItem[]; totalValue: number }
     expect(payload.items[0].price).toBe(4.5) // documento persistido, no la pantalla
     expect(payload.totalValue).toBe(4.5)
   })
@@ -139,9 +143,10 @@ describe('TASK-298 — el precio de la transacción persistida es el del vendedo
       'owner-uid',
       { name: 'Comprador', phone: '099123', email: 'a@b.com' },
       cart!.items,
+      cart!.createdAt,
     )
 
-    const payload = mockAddDoc.mock.calls[0][1] as { items: ExchangeCartItem[]; totalValue: number }
+    const payload = mockSetDoc.mock.calls[0][1] as { items: ExchangeCartItem[]; totalValue: number }
     expect(payload.items.map(i => i.price)).toEqual([4.5, 29.99])
     // toBeCloseTo: 4.5 + 29.99 en IEEE-754 double da 34.489999999999995, no
     // 34.49 exacto — precisión de punto flotante de JS, no del cálculo (mismo

@@ -724,7 +724,7 @@
       "priceBuylist": "BL: {price}",
       "submit": "ADICIONAR",
       "submitting": "SALVANDO…",
-      "success": "✓ {name} adicionada",
+      "success": "{name} adicionada",
       "splitCardSide": "Lado {current} de {total}",
       "decreaseQty": "Diminuir em um",
       "increaseQty": "Aumentar em um",

@@ -12,7 +12,7 @@
     "AC6 (mata-mutantes): revertir el arreglo en su punto real (la asignacion item.price del upgrade) deja la prueba del AC5 en rojo.",
     "AC7: UAT contra el entorno desplegado — el vendedor abre la solicitud recibida y los precios son exactamente los que publico."
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "labels": [
     "cart",
@@ -24,11 +24,22 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "4f6e717",
+    "f17f0c0",
+    "64b3f49",
+    "34863b9"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "operator",
+      "at": "2026-09-15T16:16:36Z",
+      "body": "Implementado y verificado (ronda fix 1, el grave). fix 4f6e717 via f17f0c0: el carrito deja de pisar el precio que puso el vendedor con el retail de Card Kingdom. fix 64b3f49 via 34863b9: invalida los carritos envenenados pre-fix y corrige las cifras del documento de decision. Verificacion local: cartPriceIntegrity + exchangeCart (TASK-298), suite unit 2414/2414 verde con Node 20, type-check verde, lint 0 errores. Pendiente del ciclo: re-verificacion de QA en dev (carrito con retail de Card Kingdom)."
+    }
+  ],
   "created_at": "2026-09-15T08:30:00.000Z",
-  "updated_at": "2026-09-15T08:30:00.000Z",
+  "updated_at": "2026-09-15T16:16:36Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

@@ -10,7 +10,7 @@
     "AC5 (mata-mutantes): revertir el arreglo en su punto real (el manejador del envio, no un helper) deja la prueba del AC4 en rojo. Un helper con cobertura total no prueba que alguien lo llame.",
     "AC6: UAT contra el entorno desplegado repitiendo la secuencia del AC1 y verificando en la pestana SOLICITUDES del vendedor que aparece UNA sola tarjeta."
   ],
-  "status": "todo",
+  "status": "done",
   "priority": "high",
   "labels": [
     "buy-request",
@@ -22,11 +22,20 @@
   ],
   "assignee": null,
   "depends_on": [],
-  "linked_commits": [],
+  "linked_commits": [
+    "9fcecf9",
+    "eae42df"
+  ],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "operator",
+      "at": "2026-09-15T16:16:36Z",
+      "body": "Implementado y verificado (ronda fix 1, ciclo QA autonomo). fix 9fcecf9: guarda de vuelo en el envio del pedido de compra + alta idempotente del BuyRequest (un solo pedido ante doble clic); merge eae42df. Verificacion local: suite unit 2414/2414 verde con Node 20 (incluye ExchangeCartDrawer TASK-291 AC2 y AC4), type-check verde, lint 0 errores. Pendiente del ciclo: re-verificacion de QA en dev (wg-001 cuenta documentos BuyRequest en Firestore, AC6 UAT)."
+    }
+  ],
   "created_at": "2026-09-15T04:10:00.000Z",
-  "updated_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-15T16:16:36Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

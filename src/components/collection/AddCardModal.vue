@@ -782,7 +782,7 @@ const handleClose = () => {
         <BaseButton variant="secondary" class="uppercase tracking-[.1em] !text-[12px]" @click="handleClose">
           {{ t('common.actions.cancel') }}
         </BaseButton>
-        <BaseButton variant="filled" class="uppercase tracking-[.1em] !text-[12px] gap-2" @click="handleAddCard" :disabled="loading">
+        <BaseButton variant="filled" class="uppercase tracking-[.1em] !text-[12px] gap-2" @click="handleAddCard" :disabled="loading || !selectedPrint">
           <IconV2 v-if="!loading" name="plus" :size="16" />
           {{ loading ? t('cards.addModal.submitting') : t('cards.addModal.submit') }}
         </BaseButton>

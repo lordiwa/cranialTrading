@@ -62,7 +62,14 @@ const getProgressBarClass = (toast: Toast) => {
             </svg>
 
             <div class="flex-1 min-w-0">
-              <span class="text-small block truncate">{{ toast.message }}</span>
+              <!-- TASK-296: "truncate" (overflow-hidden + ellipsis + nowrap) cortaba
+                   cualquier aviso mas largo que el ancho del toast (max-w-sm) en
+                   viewport movil -- perdiendo la parte del mensaje que explica la
+                   regla de validacion. Este <span> es el unico punto de render de
+                   TODOS los avisos de la app (toastStore.show es la unica fuente),
+                   asi que dejarlo envolver en varias lineas arregla la familia
+                   entera de una vez, no solo este mensaje. -->
+              <span class="text-small block whitespace-normal break-words">{{ toast.message }}</span>
               <!-- Progress percentage for progress toasts -->
               <span
                   v-if="isProgressToast(toast) && toast.status === 'active'"

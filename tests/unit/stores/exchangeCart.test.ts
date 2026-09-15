@@ -12,6 +12,13 @@ const mockGetCardPrices = vi.mocked(getCardPrices)
 
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
 
+// Debe reflejar STORAGE_KEY en src/stores/exchangeCart.ts. OLD_STORAGE_KEY es
+// deliberadamente literal (no importado): es la clave bajo la que un carrito
+// envenenado pre-TASK-298-follow-up vive HOY en un navegador real, y tiene
+// que seguir existiendo como string aunque el store la abandone.
+const OLD_STORAGE_KEY = 'cranial_exchange_carts'
+const STORAGE_KEY = 'cranial_exchange_carts_v2'
+
 // Flush the fire-and-forget CK lookup promise chain (addItem does not await it).
 async function flushCKLookup() {
   await new Promise(resolve => setTimeout(resolve, 0))
@@ -262,7 +269,7 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem())
       store.clearCart('alice')
 
-      const stored = JSON.parse(mockStorage['cranial_exchange_carts'] || '{}')
+      const stored = JSON.parse(mockStorage[STORAGE_KEY] || '{}')
       expect(stored.carts['alice']).toBeUndefined()
     })
   })
@@ -291,7 +298,7 @@ describe('exchangeCart store', () => {
       store.addItem('alice', makeItem())
 
       expect(localStorage.setItem).toHaveBeenCalledWith(
-        'cranial_exchange_carts',
+        STORAGE_KEY,
         expect.any(String)
       )
     })
@@ -308,7 +315,7 @@ describe('exchangeCart store', () => {
           },
         },
       }
-      mockStorage['cranial_exchange_carts'] = JSON.stringify(preloaded)
+      mockStorage[STORAGE_KEY] = JSON.stringify(preloaded)
 
       // New pinia + store should load from localStorage
       setActivePinia(createPinia())
@@ -319,7 +326,7 @@ describe('exchangeCart store', () => {
     })
 
     it('handles corrupted localStorage data gracefully', () => {
-      mockStorage['cranial_exchange_carts'] = 'not-valid-json'
+      mockStorage[STORAGE_KEY] = 'not-valid-json'
 
       setActivePinia(createPinia())
       const store = useExchangeCartStore()
@@ -475,6 +482,63 @@ describe('exchangeCart store', () => {
       await flushCKLookup()
 
       expect(store.getCart('alice')).toBeNull()
+    })
+  })
+
+  // ─── storage-key migration (TASK-298 follow-up, 2026-09-15) ──────────
+  //
+  // El fix de TASK-298 no repara los carritos que YA estaban guardados en
+  // el localStorage de un visitante con item.price pisado por el retail de
+  // CK — el bug estuvo en producción. _load() hacía un Object.assign sin
+  // chequeo de esquema, así que esos carritos envenenados seguían cargando
+  // (y podían enviarse como un BuyRequest con precio equivocado) incluso
+  // después de desplegado el fix. Solución: rotar STORAGE_KEY para que
+  // _load() nunca vea datos guardados bajo la clave vieja — un carrito
+  // envenenado se descarta en vez de seguir sirviendo un precio equivocado.
+  // Ver docs/DECISIONES-DE-PRODUCTO.md.
+
+  describe('migración de clave de storage (carritos envenenados pre-fix, TASK-298 follow-up)', () => {
+    it('NO carga un carrito guardado bajo la clave vieja (potencialmente envenenado)', () => {
+      const now = Date.now()
+      mockStorage[OLD_STORAGE_KEY] = JSON.stringify({
+        carts: {
+          alice: {
+            username: 'alice',
+            // Simula el bug de la era TASK-119: item.price ya pisado por el
+            // retail de CK, sin el campo ckReferencePrice (forma pre-TASK-298).
+            items: [makeItem({ price: 9.99 })],
+            createdAt: now,
+            expiresAt: now + SEVEN_DAYS,
+          },
+        },
+      })
+
+      setActivePinia(createPinia())
+      const store = useExchangeCartStore()
+
+      expect(store.getCart('alice')).toBeNull()
+    })
+
+    it('carga un carrito guardado bajo la clave actual (post-fix)', () => {
+      const now = Date.now()
+      mockStorage[STORAGE_KEY] = JSON.stringify({
+        carts: {
+          alice: {
+            username: 'alice',
+            items: [makeItem({ price: 3.5, ckReferencePrice: 9.99 })],
+            createdAt: now,
+            expiresAt: now + SEVEN_DAYS,
+          },
+        },
+      })
+
+      setActivePinia(createPinia())
+      const store = useExchangeCartStore()
+
+      const cart = store.getCart('alice')
+      expect(cart).not.toBeNull()
+      expect(cart!.items[0].price).toBe(3.5)
+      expect(cart!.items[0].ckReferencePrice).toBe(9.99)
     })
   })
 

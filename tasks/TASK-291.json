@@ -1,0 +1,32 @@
+{
+  "key": "TASK-291",
+  "title": "Un pedido de compra enviado deja DOS solicitudes identicas en la bandeja del vendedor",
+  "description": "ORIGEN: wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents, lordiwa/qa-agents). Hallazgo WG-001. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/carrito/09-tras-enviar.png, carrito/11-saved-matches.png, carrito/12-solicitudes.png. Triaje completo: qa-agents/wargames/cranialtrading/2026-09-15/01-triaje.md. Definicion que sirvio de mapa del ataque: qa-agents/docs/sut/cranialtrading/DEFINICION.md.\n\nMEDIDO EN PRODUCCION POR PANTALLA, sin sesion, sobre /@qa_buyer.\n\nLA SECUENCIA, CON MARCAS DE TIEMPO REALES DE LAS CAPTURAS:\n1. 03:53:40Z - se pulsa ENVIAR PEDIDO AL DUENO con 2 items (1x Serra Angel $0.35 y 1x Elspeth, Storm Slayer $57.99, Total $58.34). Sale UN solo aviso de exito: \"Pedido enviado! El dueno te contactara.\" El carrito queda vacio y el cajon se cierra.\n2. 03:54:12Z - el atacante ya esta en la sesion del vendedor (/inicio autenticado).\n3. 03:54:21Z - en /saved-matches, la pestana SOLICITUDES muestra la insignia 2 SIN haberla abierto.\n4. 03:55:58Z - abierta la pestana, hay DOS tarjetas IDENTICAS: mismo comprador \"Wargamer Uno\", mismo telefono, mismo correo, las mismas dos cartas y el mismo Total $58.34.\n\nPOR QUE NO SE EXPLICA CON \"envio dos veces a proposito\": entre el envio y la insignia en 2 pasan 41 segundos, y en el medio el atacante se logueo como vendedor y navego a /saved-matches (captura de las 03:54:12Z). Reconstruir un carrito identico habria exigido volver al perfil anonimo, re-agregar las dos cartas y re-escribir nombre, telefono y correo. Y si lo que hubo fue un doble clic, el defecto es el mismo: el path de abuso declarado de este flujo dice \"doble clic en ENVIAR PEDIDO AL DUENO -> un solo pedido, no dos\".\n\nPOR QUE ES ALTA Y NO COSMETICO: \"Marcar como vendida\" descuenta las cartas de la coleccion del dueno, lo avisa el propio dialogo. Dos solicitudes identicas invitan a descontar dos veces el mismo inventario, y no hay forma en la interfaz de devolver una solicitud de Vendida o Vista a Nueva.\n\nLO QUE LA EVIDENCIA NO REGISTRA, Y HAY QUE MEDIRLO ANTES DE ARREGLAR: cuantos clics se dieron y cuantas escrituras salieron. El AC1 existe para eso.\n\nCONTEXTO DE COBERTURA: UC-21A no tiene ni una prueba E2E. Tiene 58 unitarias de su logica interna que no ejercitan la pantalla, y ninguna de ellas puede ver esto.",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): reproducir en un entorno no productivo instrumentando la red - armar un carrito como visitante, pulsar ENVIAR PEDIDO AL DUENO UNA sola vez y contar los documentos BuyRequest creados; despues repetir con doble clic rapido. Dejar registrado el conteo de cada caso. Sin esta medicion no se sabe si el defecto es el doble submit o una doble escritura por un solo clic, y el arreglo no tiene con que compararse.",
+    "AC2: el boton de enviar el pedido queda deshabilitado en cuanto se dispara el envio y hasta que el envio termina (exito o error), de modo que un segundo clic no puede entrar. El estado de envio en curso es visible para el usuario.",
+    "AC3: la creacion del BuyRequest es idempotente frente a un reenvio del mismo carrito - dos envios del mismo contenido dentro de la misma sesion de carrito no producen dos documentos.",
+    "AC4: prueba automatizada que REDDENA hoy: simula el doble clic sobre el boton de enviar y asevera que se crea exactamente UN BuyRequest. La asercion va sobre el conteo de documentos persistidos, no sobre el numero de avisos en pantalla.",
+    "AC5 (mata-mutantes): revertir el arreglo en su punto real (el manejador del envio, no un helper) deja la prueba del AC4 en rojo. Un helper con cobertura total no prueba que alguien lo llame.",
+    "AC6: UAT contra el entorno desplegado repitiendo la secuencia del AC1 y verificando en la pestana SOLICITUDES del vendedor que aparece UNA sola tarjeta."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "buy-request",
+    "cart",
+    "public-profile",
+    "saved-matches",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-15T04:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

@@ -1,0 +1,32 @@
+{
+  "key": "TASK-299",
+  "title": "El valor EN VENTA de la coleccion no se actualiza al agregar una carta y solo cambia si se recarga la pagina",
+  "description": "ORIGEN: cierre del paso 5 del wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents). Candidato WG-N1 del triaje, cerrado por medicion. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/candidatos/n1-01-antes-de-agregar.png, n1-02-t6s-sin-recargar.png, n1-03-t51s-sin-recargar.png, n1-04-tras-recargar.png. Medicion: qa-agents/wargames/cranialtrading/2026-09-15/mediciones-candidatos.json.\\n\\nQUE SE MIDIO, CON SESION, EN /collection DE PRODUCCION. Se agregaron 3 Counterspell en estado A LA VENTA y se leyo la barra de totales del pie en cuatro momentos:\\n\\n| momento | Cartas | Unicas | EN VENTA | TOTAL |\\n| antes de agregar | 44 | 17 | $270.62 | $338.09 |\\n| t+6 s, sin recargar | 47 | 18 | $270.62 | $338.09 |\\n| t+51 s, sin recargar | 47 | 18 | $270.62 | $338.09 |\\n| tras recargar | 47 | 18 | $450.59 | $518.06 |\\n\\nLOS CONTADORES SE ACTUALIZAN AL INSTANTE; EL DINERO NO SE ACTUALIZA NUNCA hasta que se recarga. El triaje habia dejado abierto si era lentitud: no lo es. A los 51 segundos el numero seguia identico. La diferencia tras recargar es $179.97, exactamente 3 x $59.99, el retail de Card Kingdom de la carta agregada.\\n\\nLA MISMA PANTALLA AFIRMA DOS COSAS INCOMPATIBLES: dice que hay 47 cartas y valua 44. El usuario no tiene ninguna senal de que uno de los dos numeros esta viejo.\\n\\nCAUSA, LEIDA EN EL CODIGO: src/components/collection/CollectionTotalsPanel.vue:44-54 — fetchAllPrices() se dispara SOLO al montar y en el watch de cards.length que exige oldLen === 0. Una carta agregada despues no entra jamas en ese fetch, de modo que su precio no existe en sharedCardPrices y suma 0 a los totales de Card Kingdom (src/composables/useCollectionTotals.ts:325-352). El contador de cartas, en cambio, sale directo del store y si se mueve.\\n\\nALCANCE: afecta a las cinco cifras de dinero de la barra (COLECCION, WISHLIST, EN VENTA, CAMBIO, TOTAL) y al valor del hero, que lee el mismo mapa compartido (src/views/CollectionView.vue:165-183). No es exclusivo del alta: cualquier cambio de cantidad o de estado posterior al montaje tiene el mismo problema.",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, leer la barra de totales, agregar una carta con precio de Card Kingdom conocido y volver a leerla a t+5 s y t+60 s sin recargar. Dejar los tres numeros registrados.",
+    "AC2: al agregar, borrar o cambiar la cantidad de una carta, las cifras de dinero de la barra de totales y del hero se recalculan sin recargar la pagina.",
+    "AC3: el precio de una carta recien agregada se busca cuando hace falta, sin re-pedir los precios de toda la coleccion.",
+    "AC4: mientras el precio de una carta todavia no llego, la pantalla lo dice. Nunca muestra un total que el usuario pueda leer como definitivo cuando esta incompleto.",
+    "AC5: prueba automatizada que REDDENA hoy: monta la coleccion, agrega una carta con precio conocido y asevera que el total EN VENTA subio exactamente ese precio por la cantidad, sin recargar.",
+    "AC6 (mata-mutantes): revertir el arreglo en su punto real deja la prueba del AC5 en rojo.",
+    "AC7: UAT contra el entorno desplegado repitiendo la secuencia del AC1."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "collection",
+    "totals",
+    "pricing",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-15T08:30:00.000Z",
+  "updated_at": "2026-09-15T08:30:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

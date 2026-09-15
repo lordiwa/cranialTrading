@@ -1,0 +1,29 @@
+{
+  "key": "TASK-293",
+  "title": "Abrir la pestana SOLICITUDES marca TODAS las solicitudes como vistas sin abrir ninguna",
+  "description": "ORIGEN: wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents, lordiwa/qa-agents). Hallazgo WG-003. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/carrito/11-saved-matches.png, carrito/12-solicitudes.png. Triaje completo: qa-agents/wargames/cranialtrading/2026-09-15/01-triaje.md. Definicion que sirvio de mapa del ataque: qa-agents/docs/sut/cranialtrading/DEFINICION.md.\n\nMEDIDO EN PRODUCCION, en la sesion del vendedor.\n\nANTES (03:54:21Z): en /saved-matches la pestana SOLICITUDES lleva la insignia 2 y el vendedor esta parado en la pestana MATCHES. No abrio ninguna solicitud.\n\nDESPUES (03:55:58Z), con solo abrir la pestana: las DOS tarjetas dicen VISTA y la insignia de la pestana desaparecio. El vendedor no abrio ninguna tarjeta, no leyo ningun contacto y no toco nada.\n\nCONSECUENCIA: el vendedor pierde la unica senal de \"esto es nuevo\" por el solo hecho de mirar la lista, y no hay forma en la interfaz de devolver una solicitud a Nueva. Si entra al hub por cualquier otro motivo, se le vacia el contador y no vuelve.\n\nESTE TICKET NO PRESUPONE CUAL ES EL COMPORTAMIENTO CORRECTO. La documentacion del proyecto no declara cuando una solicitud pasa a Vista. Si marcar en masa al montar es lo que el producto quiere, hay que decirlo en la documentacion y darle al vendedor otra senal de novedad que sobreviva; si no lo es, hay que marcar por tarjeta y no por pestana. Lo que no puede quedar es el estado actual: un comportamiento no declarado que destruye informacion del usuario.\n\nLO QUE SI FUNCIONA, medido y vale registrarlo: el pedido llega completo - nombre, telefono enlazado a WhatsApp, correo como enlace, las cartas con imagen y cantidad, y el Total. Ese lado del flujo cumple.",
+  "acceptance_criteria": [
+    "AC1: decidir y DEJAR ESCRITO en la documentacion del proyecto cual es la regla de transicion a Vista, con su motivo. Sin esa decision escrita el resto de los AC no se pueden evaluar.",
+    "AC2: si la regla elegida es marcar por tarjeta, montar la pestana NO cambia el estado de ninguna solicitud pendiente.",
+    "AC3: si la regla elegida es marcar en masa al abrir la pestana, existe otra senal de novedad para el vendedor que NO se destruya con esa misma accion, y el usuario puede distinguir una solicitud que todavia no leyo.",
+    "AC4: prueba automatizada que REDDENA hoy si la regla elegida es la del AC2: con dos solicitudes pendientes, montar la pestana y aseverar que siguen pendientes.",
+    "AC5: UAT contra el entorno desplegado: dejar dos solicitudes pendientes, abrir el hub por la pestana MATCHES, pasar a SOLICITUDES y verificar el comportamiento elegido."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "buy-request",
+    "saved-matches",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-15T04:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

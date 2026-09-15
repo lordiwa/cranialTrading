@@ -1,0 +1,31 @@
+{
+  "key": "TASK-295",
+  "title": "El unico flujo comercial deja su boton de enviar deshabilitado sin decir que falta",
+  "description": "ORIGEN: wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents, lordiwa/qa-agents). Hallazgo WG-005. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/carrito/05-carrito-13-items.png, carrito/06-email-invalido.png, carrito/07-telefono-espacios.png, carrito/08-form-completo.png. Triaje completo: qa-agents/wargames/cranialtrading/2026-09-15/01-triaje.md. Definicion que sirvio de mapa del ataque: qa-agents/docs/sut/cranialtrading/DEFINICION.md.\n\nMEDIDO EN PRODUCCION, sin sesion, en el cajon del carrito de /@qa_buyer. Las cuatro combinaciones del formulario de contacto:\n\n- todo vacio: boton ENVIAR PEDIDO AL DUENO deshabilitado, CERO explicacion en pantalla.\n- correo con formato invalido: aviso inline \"Ingresa un correo valido (ej. nombre@correo.com)\". Esto esta BIEN.\n- telefono con solo espacios y correo valido: boton deshabilitado, CERO explicacion. Peor: el campo se ve vacio pero no lo esta, asi que el usuario ni siquiera tiene la pista de un campo en blanco.\n- los tres campos completos: el boton se habilita.\n\nEL CONTRASTE ES EL HALLAZGO: el correo avisa y el telefono no. Y la pantalla SOLO marca \"(opcional)\" en el nombre - el telefono y el correo, que son los obligatorios, no llevan asterisco ni ninguna marca. El comprador que dejo el telefono en blanco ve un boton apagado, ningun mensaje, y no tiene forma de saber que le falta.\n\nPOR QUE NO ES UN DETALLE: este es el unico flujo que genera negocio en la app y el unico que atiende a alguien sin cuenta. Un comprador que no entiende por que no puede enviar, se va, y ni el vendedor ni el producto se enteran de que existio.\n\nAdemas, el telefono no valida formato en absoluto: un solo caracter o letras se aceptan. Eso puede estar bien a proposito (un telefono internacional es dificil de validar), pero entonces tiene que estar escrito en algun lado.",
+  "acceptance_criteria": [
+    "AC1: los campos obligatorios del formulario del pedido estan marcados como obligatorios en la pantalla, no solo en el codigo.",
+    "AC2: cuando el boton de enviar esta deshabilitado, la pantalla dice que falta. El mensaje aparece sin que el usuario tenga que adivinar, con el mismo criterio con el que ya avisa el correo invalido.",
+    "AC3: un telefono compuesto solo de espacios se trata como vacio y produce el mismo mensaje que un telefono vacio.",
+    "AC4: queda escrito en la documentacion del proyecto si el telefono valida formato o no, con su motivo.",
+    "AC5: prueba automatizada que REDDENA hoy: con el telefono vacio y el correo valido, aseverar que hay un mensaje visible que explica que falta el telefono.",
+    "AC6: UAT contra el entorno desplegado recorriendo las cuatro combinaciones de la evidencia."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "cart",
+    "buy-request",
+    "forms",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-15T04:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

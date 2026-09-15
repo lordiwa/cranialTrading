@@ -1,0 +1,32 @@
+{
+  "key": "TASK-290",
+  "title": "Reactivar el Nightly E2E: recrear en dev la cuenta de prueba con cartas publicas",
+  "description": "El Nightly E2E lleva CINCO NOCHES ROJO (10 al 14 de septiembre de 2026). El sensor que falla es e2e/specs/user-profile/user-profile.spec.ts, el test \"browse public cards on profile with text search filter\": su piso es expect(Number(initialTotal)).toBeGreaterThan(1000) sobre el perfil publico de qa_mtg, y contra dev devuelve un total por debajo de ese piso.\n\nCAUSA MEDIDA, Y NO ES UN BUG DE PRODUCTO (confirmado por Mato): dev quedo vacio de datos de prueba. Se borraron cuentas de dev durante pruebas y con ellas se fue la cuenta que tenia las cartas publicas. La coleccion raiz public_cards quedo en 0 documentos contra las 2202 cartas public=true que habia. El comentario del propio test registra 1878 cartas publicas medidas el 2026-08-21 en qa_mtg y explica que el piso de 1000 se eligio holgado a proposito: lo bastante bajo para tolerar que la cuenta crezca o se pode, lo bastante alto para que un indice vacio o roto no pueda pasar. El sensor esta funcionando exactamente como se diseno: detecto que los datos desaparecieron. Lo que hay que reponer son los datos, no bajar el piso ni tocar el test.\n\nALCANCE: reponer en dev la cuenta de prueba con su coleccion publica, dejar el nightly verde otra vez con una corrida completa medida (no inferida), y documentar el procedimiento de recreacion para que la proxima vez que se borre dev no haya que redescubrirlo. NO entra bajar el piso del test, ni relajar el sensor, ni tocar codigo de producto.\n\nCUIDADO CON EL NOMBRE DE USUARIO: el test resuelve el perfil por username literal (PUBLIC_PROFILE_USERNAME = 'qa_mtg'), asi que la cuenta recreada tiene que quedar con ese mismo username, y con la reserva en /usernames/{usernameNorm} coherente — un /usernames huerfano apuntando a un uid borrado es justamente la forma en que se fabrica el problema que investiga TASK-268. El teardown admin de e2e/helpers/admin.ts (TASK-271) ya borra las tres piezas de una cuenta (Auth, /users/{uid} y /usernames) y es la referencia de como estan acopladas.\n\nHALLAZGO LATERAL QUE ENTRA COMO AC7 (opcional): artifacts/scratch-289-divergencia.mjs compara contra la coleccion equivocada — lee users/<seller>/public_card_index (lineas 9-10) y la contrasta con users/<seller>/cards where public==true (linea 13), pero nunca mira la coleccion RAIZ public_cards, que es la que quedo en 0. Por eso el 2026-08-27 subdiagnostico este mismo vaciado. Si al reactivar el nightly se usa ese script como herramienta de medicion, hay que corregirlo primero; si no se usa, alcanza con dejar constancia de la limitacion en el propio archivo.\n\nTIER: uat-only. El entregable central son datos en dev y una corrida de nightly observada; no hay logica de producto nueva que testear unitariamente. Si al ejecutarlo aparece codigo de seed reutilizable o se toca el AC7, reevaluar a tests-after ANTES de implementar.\n\nNO IMPLEMENTAR TODAVIA: este ticket se crea en estado todo a pedido de Mato (\"Crea una tarea para reactivar las nightly y arreglarlas luego\").",
+  "acceptance_criteria": [
+    "AC1 (control negativo, ANTES de reponer nada): medir y dejar registrado el estado actual de dev — conteo de documentos de la coleccion raiz public_cards, conteo de users/<uid>/cards where public==true para la cuenta qa_mtg (o la constancia de que la cuenta no existe), y el total que hoy devuelve el perfil publico. Sin esta medicion previa no hay contra que comparar el arreglo. Medir, no inferir del bundle ni de este ticket.",
+    "AC2: existe en dev una cuenta de prueba con username qa_mtg (el literal que resuelve user-profile.spec.ts), con su documento /users/{uid}, su reserva coherente en /usernames/{usernameNorm} sin huerfanos, y una coleccion de cartas con public=true suficiente para superar con holgura el piso de 1000 del sensor — referencia historica: 1878 cartas publicas medidas el 2026-08-21, 2202 documentos en public_cards antes del borrado. Verificado por conteo directo en Firestore, no por que el test pase.",
+    "AC3: la coleccion raiz public_cards esta poblada y consistente con las cartas public=true de la cuenta (el indice y los documentos dicen lo mismo). Medido con un conteo de ambos lados, no asumido a partir de que la escritura del cliente se haya ejecutado.",
+    "AC4: user-profile.spec.ts pasa contra dev — en particular 'browse public cards on profile with text search filter' con su piso >1000 y 'view public user profile' — ejecutado con E2E_BASE_URL=https://cranial-trading-dev.web.app, con la salida adjunta al ticket.",
+    "AC5: al menos UNA corrida completa del nightly (npm run e2e:nightly, o el workflow nightly-e2e.yml contra dev) termina verde, con el enlace o el resumen de la corrida registrado en el ticket. Verde medido en una corrida real, no deducido de que el spec suelto pase.",
+    "AC6: queda documentado como se recrean los datos de prueba de dev — donde vive el procedimiento (script en scripts/ o e2e/helpers/, o seccion en CLAUDE.md), que cuenta crea, que username usa y por que ese literal importa, cuantas cartas publicas siembra y como se verifica el resultado. El criterio es que un tercero pueda repetirlo sin adivinar la proxima vez que se vacie dev.",
+    "AC7 (opcional, solo si se usa esa herramienta al reactivar): artifacts/scratch-289-divergencia.mjs deja de comparar contra la coleccion equivocada — hoy lee users/<seller>/public_card_index contra users/<seller>/cards where public==true y nunca mira la coleccion raiz public_cards, que es la que quedo vacia. Corregirlo, o si no se usa, dejar escrita la limitacion en el propio archivo para que no vuelva a subdiagnosticar."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "e2e",
+    "nightly",
+    "dev-environment",
+    "test-data",
+    "public-profile"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-15T02:52:29.000Z",
+  "updated_at": "2026-09-15T02:52:29.000Z",
+  "jira_key": null,
+  "verification_tier": "uat-only"
+}

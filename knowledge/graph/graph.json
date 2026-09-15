@@ -222,6 +222,12 @@
       "type": "task",
       "ref": "tasks/TASK-288.json",
       "label": "El filtro de tipo asigna UNA sola categoria por carta y esconde las tierras que no empiezan con Land"
+    },
+    {
+      "id": "task-289",
+      "type": "task",
+      "ref": "tasks/TASK-289.json",
+      "label": "El filtro de tipo del perfil publico esconde cartas de tipo multiple (cuarta superficie de TASK-288)"
     }
   ],
   "edges": [

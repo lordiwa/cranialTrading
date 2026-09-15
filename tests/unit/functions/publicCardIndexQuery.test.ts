@@ -1024,48 +1024,48 @@ describe('the rest of the filter set', () => {
   })
 
   /**
-   * MEDIUM-2 (tanda 4 ronda 2). Round 1 made this filter a plain
-   * `type_line.includes(t)`, which is NOT what the shipped product does: the
-   * owner's own collection views categorize through
-   * useCardFilter.getCardTypeCategory, where a card falls in EXACTLY ONE
-   * category by a fixed precedence. Under substring matching an Artifact
-   * Creature answers to 'artifact' AND to 'creature', so the public
-   * profile's per-type counts EXCEED the owner's own counts over the very
-   * same cards — a discrepancy the user can see and nobody can explain.
-   * Rafael's DECISION 10: back to exclusive categories, at parity with the
-   * owner's view. (The colour filter's OR-inclusive semantics is not a
-   * contradiction: there too the rule was "match the shipped product".)
+   * TASK-289, superseding the "EXCLUSIVE category" tests this block used to
+   * have. MEDIUM-2 (tanda 4 ronda 2) made the type filter exclusive because
+   * a plain substring match made the public profile's per-type counts
+   * EXCEED the owner's own counts over the same cards — but that objection
+   * was about a user-VISIBLE number, and the facet counts are not: no
+   * component ever renders them (`grep -rn facets src/views/UserProfileView
+   * .vue src/components/` returns nothing). Meanwhile TASK-288 fixed the
+   * identical bug on the client for FILTERING: `useCardFilter.ts` filters by
+   * MULTIPLE membership (`getCardTypeCategories`) and only GROUPS by the
+   * single primary category (`getCardTypeCategory`). Rafael's DECISION
+   * 2026-08-27: match that split here too — filter multiple, count facets
+   * by primary (see the 'counts a type facet' test below, unchanged).
    */
-  it("filters by type as an EXCLUSIVE category, exactly as the owner's own view does", () => {
+  it("filters by type as MULTIPLE membership, exactly as the owner's own view does", () => {
     const entries = [
       makeEntry(1, ['R'], { t: 'Legendary Creature — Goblin Shaman' }),
       makeEntry(2, ['R'], { t: 'Instant' }),
     ]
     expect(filterPublicIndexEntries(entries, { type: ['creature'] })).toHaveLength(1)
-    // 'goblin' is a creature SUBTYPE, not a category — under the old
-    // substring rule this returned 1.
+    // 'goblin' is a creature SUBTYPE, not a category.
     expect(filterPublicIndexEntries(entries, { type: ['goblin'] })).toHaveLength(0)
   })
 
-  it('puts an Artifact Creature under creatures ONLY, never under both chips', () => {
+  it('puts an Artifact Creature under BOTH the artifact and the creature chip', () => {
     const entries = [makeEntry(3, [], { t: 'Artifact Creature — Golem' })]
     expect(filterPublicIndexEntries(entries, { type: ['creature'] })).toHaveLength(1)
-    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(0)
+    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(1)
   })
 
-  it('puts an Enchantment Artifact under enchantments, following the same precedence as the owner view', () => {
+  it('puts an Enchantment Artifact under BOTH the enchantment and the artifact chip', () => {
     const entries = [makeEntry(4, [], { t: 'Enchantment Artifact' })]
     expect(filterPublicIndexEntries(entries, { type: ['enchantment'] })).toHaveLength(1)
-    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(0)
+    expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(1)
   })
 
-  it('an artifact land is a creature-less artifact, not a land', () => {
+  it('AC1/AC6: an Artifact Land surfaces under BOTH the artifact chip AND the land chip — the bug TASK-289 closes', () => {
     const entries = [makeEntry(5, [], { t: 'Artifact Land' })]
     expect(filterPublicIndexEntries(entries, { type: ['artifact'] })).toHaveLength(1)
-    expect(filterPublicIndexEntries(entries, { type: ['land'] })).toHaveLength(0)
+    expect(filterPublicIndexEntries(entries, { type: ['land'] })).toHaveLength(1)
   })
 
-  it('counts a type facet the same exclusive way it filters', () => {
+  it('counts a type facet the same exclusive way it always has — facets stay PRIMARY-only so the sum never exceeds the total', () => {
     const entries = [
       makeEntry(6, [], { t: 'Artifact Creature — Golem' }),
       makeEntry(7, [], { t: 'Artifact' }),

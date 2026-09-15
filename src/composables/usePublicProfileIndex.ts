@@ -64,12 +64,17 @@ const MIN_SEARCH_LEN = 2
 export const PUBLIC_COLOR_LETTERS = ['W', 'U', 'B', 'R', 'G', 'C'] as const
 export const PUBLIC_RARITIES = ['common', 'uncommon', 'rare', 'mythic'] as const
 /**
- * Resolved server-side into EXCLUSIVE categories, at parity with
- * `useCardFilter.getCardTypeCategory` — a card falls in exactly one
- * (Rafael's DECISION 10; tanda 4's substring rule put an Artifact Creature
- * under two chips and made the public counts exceed the owner's). The
- * precedence lives in functions/lib/publicCardType.js and is bound to the
- * browser's copy by tests/unit/functions/publicCardTypeParity.test.ts.
+ * Resolved server-side by MULTIPLE membership (TASK-289, Rafael's DECISION
+ * 2026-08-27): `publicTypeCategories`, at parity with this file's own
+ * `useCardFilter.getCardTypeCategories` — a card passes the filter if ANY of
+ * its categories is among the ones requested, so an Artifact Land answers
+ * to both the `artifact` chip and the `land` chip. Facet counts are the
+ * exception and stay EXCLUSIVE: `publicTypeCategory` picks the single
+ * PRIMARY category by precedence, so a facet sum can never exceed the
+ * total — that half of tanda 4's original decision (DECISION 10) is
+ * unchanged. Both the plural (filter) and singular (facet) precedence live
+ * in functions/lib/publicCardType.js and are bound to the browser's copies
+ * by tests/unit/functions/publicCardTypeParity.test.ts.
  *
  * KNOWN GAP, stated rather than hidden: the owner's own chip list
  * (`typeOrder`) has an eighth entry, 'Other', for cards in none of these

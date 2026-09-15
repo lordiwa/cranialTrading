@@ -3,7 +3,21 @@ import { reactive } from 'vue'
 import { getCardPrices } from '@/services/mtgjson'
 import type { ExchangeCart, ExchangeCartItem, ExchangeCartStorage } from '@/types/exchangeCart'
 
-const STORAGE_KEY = 'cranial_exchange_carts'
+// TASK-298 follow-up (2026-09-15, wargaming WG-008 residual): the bug this
+// file's fix reverts was live in production, so some browsers still hold
+// carts saved under the OLD key with item.price already overwritten by CK
+// retail. Nothing on the read path repairs them — _upgradePriceFromCK only
+// ever writes ckReferencePrice, never price, and addItem on an existing
+// item only bumps quantity. Re-deriving the seller's price at load time
+// isn't possible either: it was lost the moment CK overwrote it, so
+// "recovering" it would mean a fresh per-item network lookup with its own
+// failure modes — the same class of bug this ticket fixes. Rotating the key
+// is the cleanest fix: _load() below simply never sees data saved under the
+// old key, so a poisoned cart is dropped instead of silently persisting a
+// wrong-priced BuyRequest. Cost, accepted: a visitor with a half-built cart
+// at deploy time loses it once and re-adds — visible and understood, unlike
+// a silently wrong price. See docs/DECISIONES-DE-PRODUCTO.md.
+const STORAGE_KEY = 'cranial_exchange_carts_v2'
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
 
 export const useExchangeCartStore = defineStore('exchangeCart', () => {

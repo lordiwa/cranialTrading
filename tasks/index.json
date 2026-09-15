@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T17:57:39.039Z",
+  "generated_at": "2026-09-15T02:52:29.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1614,6 +1614,12 @@
       "title": "El filtro de tipo del perfil publico esconde cartas de tipo multiple (cuarta superficie de TASK-288)",
       "status": "done",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-290",
+      "title": "Reactivar el Nightly E2E: recrear en dev la cuenta de prueba con cartas publicas",
+      "status": "todo",
+      "priority": "high"
     }
   ]
 }

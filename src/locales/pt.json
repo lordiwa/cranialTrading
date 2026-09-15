@@ -1199,13 +1199,13 @@
       "loadError": "Erro ao carregar decks",
       "notFound": "Deck não encontrado",
       "loadDeckError": "Erro ao carregar deck",
-      "created": "✓ Deck \"{name}\" criado",
+      "created": "Deck \"{name}\" criado",
       "createError": "Erro ao criar deck",
       "updateError": "Erro ao atualizar deck",
       "commanderSet": "{name} agora é Comandante",
       "commanderRemoved": "{name} não é mais Comandante",
       "commanderError": "Erro ao mudar comandante",
-      "deleted": "✓ Deck excluído",
+      "deleted": "Deck excluído",
       "deletedCardsKept": "Deck excluído (cartas mantidas)",
       "deletedWithCards": "Deck e {count} cartas excluídas",
       "deletedWithCardWarning": "Deck excluído. {deleted} cartas removidas, {failed} não puderam ser excluídas",
@@ -1374,8 +1374,8 @@
       "copyEmail": "COPIAR EMAIL",
       "saveContact": "SALVAR CONTATO",
       "close": "FECHAR",
-      "emailCopied": "✓ Email copiado",
-      "contactSaved": "✓ Contato salvo: @{username}"
+      "emailCopied": "Email copiado",
+      "contactSaved": "Contato salvo: @{username}"
     },
     "countdown": {
       "new": "NOVO",
@@ -1473,7 +1473,7 @@
       "action": "VER MEUS MATCHES"
     },
     "messages": {
-      "saved": "✓ Contato salvo",
+      "saved": "Contato salvo",
       "saveError": "Erro ao salvar contato",
       "deleted": "Contato excluído",
       "deleteError": "Erro ao excluir contato",

@@ -133,6 +133,7 @@ async function main() {
     throw new Error(`users/${targetUid} has no username field — buildPublicCardDoc requires one.`);
   }
   const location = userData.location ?? '';
+  const avatarUrl = userData.avatarUrl ?? null;
 
   const cardsSnap = await db.collection('users').doc(targetUid).collection('cards').get();
   const cards = cardsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -158,7 +159,7 @@ async function main() {
     const batch = db.batch();
     for (const card of chunk) {
       const docId = computePublicCardId(targetUid, card.id);
-      const built = buildPublicCardDoc(card, targetUid, username, location, null);
+      const built = buildPublicCardDoc(card, targetUid, username, location, avatarUrl);
       const adminDoc = { ...built, updatedAt: toAdminWritableDate(built.updatedAt) };
       assertNoUndefinedFields(adminDoc, docId);
       batch.set(db.collection('public_cards').doc(docId), adminDoc);

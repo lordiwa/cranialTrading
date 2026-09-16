@@ -1,0 +1,45 @@
+{
+  "key": "TASK-298",
+  "title": "El carrito pisa el precio que puso el vendedor con el retail de Card Kingdom y el pedido viaja con ese precio",
+  "description": "ORIGEN: cierre del paso 5 (corroboracion) del wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents, lordiwa/qa-agents). Hallazgo WG-008, surgido al auditar linea por linea el carrito para cerrar el candidato WG-N2. Medicion completa: qa-agents/wargames/cranialtrading/2026-09-15/03-candidatos.md y mediciones-candidatos.json. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/candidatos/n2-01-grilla-tras-agregar-todo.png y n2-02-cajon-abierto.png.\\n\\nQUE SE MIDIO, SIN SESION, SOBRE /@qa_buyer EN PRODUCCION: se agregaron al carrito las 14 cartas publicas y se leyo cada linea del cajon contra el precio que el vendedor tiene guardado en su propia coleccion (leido con el Admin SDK). DOCE de las CATORCE lineas cobran un precio que el vendedor NUNCA puso.\\n\\n| carta | el vendedor puso | el carrito cobra |\\n| Wrath of God | $18.99 | $6.99 |\\n| Lightning Bolt | $12.00 | $3.99 |\\n| Serra Angel | $4.50 | $0.35 |\\n| Elspeth, Storm Slayer | $29.99 | $57.99 |\\n| Sol Ring | $3.25 | $5.99 |\\n| Swamp | $0.05 | $0.69 |\\n| Aether Charge | $1.20 | $0.35 |\\n| Giant Growth | $0.75 | $0.35 |\\n| Echoing Ruin | $0.10 | $0.35 |\\n| Darksteel Citadel | $1.75 | $1.99 |\\n| Dazzling Angel | $0.25 | $0.35 |\\n| Angel of the Ruins | $2.40 | $0.49 |\\n\\nVA EN LAS DOS DIRECCIONES: hay cartas que se cobran MUCHO MENOS de lo que el vendedor pide (Wrath of God $18.99 -> $6.99, Lightning Bolt $12.00 -> $3.99, Serra Angel $4.50 -> $0.35) y otras MUCHO MAS (Elspeth $29.99 -> $57.99). No es un redondeo ni un formato: es otra fuente de precio.\\n\\nY EL PEDIDO SE PERSISTE CON ESE PRECIO. Los dos BuyRequest que el ataque dejo en la bandeja de qa_buyer el 2026-09-15T03:53Z lo prueban, releidos del Firestore de produccion: ambos dicen Serra Angel $0.35 y Elspeth $57.99, totalValue $58.34. Con los precios que el vendedor realmente publico ese pedido vale $34.49. El vendedor recibe una orden por un precio que nunca acepto.\\n\\nCAUSA, LEIDA EN EL CODIGO (no deducida): src/stores/exchangeCart.ts:100 - addItem() dispara _upgradePriceFromCK() como fire-and-forget; src/stores/exchangeCart.ts:52-72 - esa funcion sobreescribe item.price con ck.retail (o ck.retailFoil si la carta es foil) apenas la consulta de precios vuelve. El precio original, el del vendedor, llega desde src/views/UserProfileView.vue:512 (price: card.price) y se pierde. src/stores/buyRequests.ts:42-43 persiste items y totalValue ya pisados.\\n\\nLA PANTALLA ADEMAS SE CONTRADICE SOLA: la baldosa del perfil publico muestra el precio del vendedor como \"TCG: $18.99\" (src/components/collection/CollectionGridCardFull.vue:501) y ademas \"CK: $6.99\". El visitante agrega la carta que vio a $18.99 y el carrito le cobra $6.99.\\n\\nPOR QUE PASO DESAPERCIBIDO HASTA AHORA: el triaje del paso 4 cito los numeros del pedido (Serra Angel $0.35, Elspeth $57.99) sin cruzarlos contra el documento de terreno, que lista esas dos cartas a $4.50 y $29.99. La contradiccion estaba en la evidencia desde el primer dia.\\n\\nDECISION DE PRODUCTO QUE HAY QUE TOMAR PRIMERO: cual es el precio de la transaccion. Si es el del vendedor, el upgrade a CK no debe tocar item.price nunca. Si CK es solo referencia de mercado, se muestra aparte y con su etiqueta. Lo que no puede quedar es que el numero que se cobra cambie solo despues de que el comprador agrego la carta.",
+  "acceptance_criteria": [
+    "AC0 (decision de producto, antes de codigo): queda escrito en la documentacion cual es el precio de la transaccion — el que publica el vendedor — y que papel juega el retail de Card Kingdom. Sin esto, cualquier arreglo es una preferencia.",
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, sembrar una carta con un precio de vendedor que NO coincida con su precio de Card Kingdom, agregarla al carrito y registrar el precio de la linea en t=0 y en t=10 s. Dejar los dos numeros registrados: es lo que demuestra que el precio cambia solo.",
+    "AC2: el precio de cada linea del carrito es SIEMPRE el que publico el vendedor. _upgradePriceFromCK no puede escribir item.price.",
+    "AC3: el BuyRequest persistido — items[].price y totalValue — lleva el precio del vendedor. Un pedido de 1x Serra Angel a $4.50 y 1x Elspeth a $29.99 persiste totalValue $34.49.",
+    "AC4: si se decide seguir mostrando el precio de Card Kingdom, va en un campo aparte y rotulado, nunca pisando el precio de la transaccion.",
+    "AC5: prueba automatizada que REDDENA hoy: agrega al carrito una carta cuyo precio de vendedor difiere del de CK y asevera que el precio de la linea y el total del BuyRequest persistido son los del vendedor. La asercion va sobre el documento persistido, no sobre la pantalla.",
+    "AC6 (mata-mutantes): revertir el arreglo en su punto real (la asignacion item.price del upgrade) deja la prueba del AC5 en rojo.",
+    "AC7: UAT contra el entorno desplegado — el vendedor abre la solicitud recibida y los precios son exactamente los que publico."
+  ],
+  "status": "done",
+  "priority": "high",
+  "labels": [
+    "cart",
+    "buy-request",
+    "pricing",
+    "public-profile",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "4f6e717",
+    "f17f0c0",
+    "64b3f49",
+    "34863b9"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "operator",
+      "at": "2026-09-15T16:16:36Z",
+      "body": "Implementado y verificado (ronda fix 1, el grave). fix 4f6e717 via f17f0c0: el carrito deja de pisar el precio que puso el vendedor con el retail de Card Kingdom. fix 64b3f49 via 34863b9: invalida los carritos envenenados pre-fix y corrige las cifras del documento de decision. Verificacion local: cartPriceIntegrity + exchangeCart (TASK-298), suite unit 2414/2414 verde con Node 20, type-check verde, lint 0 errores. Pendiente del ciclo: re-verificacion de QA en dev (carrito con retail de Card Kingdom)."
+    }
+  ],
+  "created_at": "2026-09-15T08:30:00.000Z",
+  "updated_at": "2026-09-15T16:16:36Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

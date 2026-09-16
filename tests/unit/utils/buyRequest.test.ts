@@ -4,7 +4,7 @@
  *  - planFulfillment: decide por carta si decrementar, borrar (queda 0) o marcar
  *    como faltante (la carta ya no existe en la colección).
  */
-import { computeTotalValue, planFulfillment } from '@/utils/buyRequest'
+import { buildBuyRequestId, computeTotalValue, planFulfillment } from '@/utils/buyRequest'
 
 const item = (over: Partial<any> = {}) => ({
   scryfallId: 's', cardId: 'c1', name: 'N', edition: '', quantity: 1,
@@ -18,6 +18,35 @@ describe('computeTotalValue', () => {
   })
   it('devuelve 0 para carrito vacío', () => {
     expect(computeTotalValue([])).toBe(0)
+  })
+})
+
+describe('buildBuyRequestId (TASK-291 AC3)', () => {
+  const contact = { phone: ' 099123 ', email: ' A@B.com ' }
+  const items = [item({ scryfallId: 's1', cardId: 'c1', quantity: 2 }), item({ scryfallId: 's2', cardId: 'c2', quantity: 1 })]
+
+  it('is stable regardless of item array order (a re-render can reorder the cart)', () => {
+    const id1 = buildBuyRequestId(contact, items, 1000)
+    const id2 = buildBuyRequestId(contact, [...items].reverse(), 1000)
+    expect(id1).toBe(id2)
+  })
+
+  it('is insensitive to contact whitespace/casing (same buyer, same result)', () => {
+    const id1 = buildBuyRequestId({ phone: '099123', email: 'a@b.com' }, items, 1000)
+    const id2 = buildBuyRequestId(contact, items, 1000)
+    expect(id1).toBe(id2)
+  })
+
+  it('changes when the cart createdAt changes (a new cart session must not collide)', () => {
+    const id1 = buildBuyRequestId(contact, items, 1000)
+    const id2 = buildBuyRequestId(contact, items, 2000)
+    expect(id1).not.toBe(id2)
+  })
+
+  it('changes when the item quantities change', () => {
+    const id1 = buildBuyRequestId(contact, items, 1000)
+    const id2 = buildBuyRequestId(contact, [item({ scryfallId: 's1', cardId: 'c1', quantity: 3 }), items[1]], 1000)
+    expect(id1).not.toBe(id2)
   })
 })
 

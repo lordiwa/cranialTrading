@@ -1,0 +1,31 @@
+{
+  "key": "TASK-294",
+  "title": "La carta en wishlist se cuenta y se dibuja dentro de CARTAS QUE TENGO, y la misma pantalla muestra 14, 15 y 40",
+  "description": "ORIGEN: wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents, lordiwa/qa-agents). Hallazgo WG-004. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/coleccion/01-collection-inicial.png, coleccion/03-tile15-tragedy.png, coleccion/13-despues-guardar.png. Triaje completo: qa-agents/wargames/cranialtrading/2026-09-15/01-triaje.md. Definicion que sirvio de mapa del ataque: qa-agents/docs/sut/cranialtrading/DEFINICION.md.\n\nMEDIDO EN PRODUCCION sobre /collection de una cuenta con 15 cartas: 11 en venta, 3 en cambio, 1 en wishlist (Tragedy Feaster) y 0 en coleccion.\n\nCUATRO NUMEROS PARA LA MISMA COLECCION, EN UNA SOLA PANTALLA:\n- encabezado de seccion: CARTAS QUE TENGO (15)\n- hero: 14 CARTAS y 14 EN VENTA\n- chip de filtro: TODAS 15\n- barra inferior: Cartas 40, Unicas 15\n\nSe explican asi, y nada en pantalla lo explica: el hero cuenta 14 porque EXCLUYE la carta en wishlist, la seccion y el chip cuentan 15 porque la INCLUYEN, y la barra inferior cuenta 40 porque suma cantidades.\n\nLO MAS CARO NO ES LA ARITMETICA. Tragedy Feaster, con su insignia DESEADO, se dibuja DENTRO de la grilla principal (es la primera baldosa con el orden Recientes) y OTRA VEZ mas abajo, en su propia seccion MI WISHLIST (1). La misma carta, dos veces, bajo un titulo que afirma que el usuario la tiene cuando lo que la carta dice es que la busca.\n\nPROMESA ROTA, LITERAL: el path alternativo declarado de agregar una carta dice que guardarla con estado Wishlist la hace aparecer bajo NECESITO y NO en la grilla principal.\n\nSEGUNDO RENGLON DEL MISMO DEFECTO: el rotulo \"14 EN VENTA\" del hero cuenta tambien las 3 cartas en cambio. El perfil publico de esa misma cuenta separa bien y muestra \"10 EN VENTA / 3 EN CAMBIO\". Dos pantallas del mismo producto llaman \"en venta\" a cosas distintas.",
+  "acceptance_criteria": [
+    "AC1 (control negativo, ANTES de tocar nada): con una cuenta de prueba de composicion conocida (n cartas en venta, m en cambio, k en wishlist), capturar los cuatro numeros de /collection y dejar registrado cual cuenta que.",
+    "AC2: una carta en wishlist NO se dibuja en la grilla principal - aparece solo en su seccion. La misma carta no puede estar dos veces en la misma pantalla.",
+    "AC3: el encabezado de la grilla principal y su numero cuentan lo mismo que el hero. Si hay dos magnitudes legitimas (cartas unicas y suma de cantidades), cada una se rotula de forma que el usuario sepa cual es cual.",
+    "AC4: el rotulo EN VENTA del hero cuenta solo cartas en venta, o cambia de nombre para reflejar que agrupa venta y cambio. La eleccion queda igualada con lo que muestra el perfil publico.",
+    "AC5: prueba automatizada que REDDENA hoy: con una coleccion de composicion conocida, aseverar que la grilla principal no contiene la carta en wishlist y que el numero del encabezado coincide con el del hero. El ancla es algo derivado del estado completo, nunca la baldosa de un indice de la grilla virtualizada.",
+    "AC6: UAT contra el entorno desplegado con la misma cuenta del AC1."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "collection",
+    "wishlist",
+    "counters",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-15T04:10:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

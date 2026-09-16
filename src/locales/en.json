@@ -255,6 +255,7 @@
     "total": "Total",
     "share": "SHARE CART",
     "sendRequest": "SEND REQUEST TO OWNER",
+    "sending": "SENDING...",
     "contactPrompt": "Leave your contact so the owner can reply about this cart:",
     "namePlaceholder": "Your name (optional)",
     "phonePlaceholder": "WhatsApp / phone",
@@ -724,7 +725,7 @@
       "priceBuylist": "BL: {price}",
       "submit": "ADD",
       "submitting": "SAVING…",
-      "success": "✓ {name} added",
+      "success": "{name} added",
       "splitCardSide": "Side {current} of {total}",
       "decreaseQty": "Decrease by one",
       "increaseQty": "Increase by one",
@@ -1199,13 +1200,13 @@
       "loadError": "Error loading decks",
       "notFound": "Deck not found",
       "loadDeckError": "Error loading deck",
-      "created": "✓ Deck \"{name}\" created",
+      "created": "Deck \"{name}\" created",
       "createError": "Error creating deck",
       "updateError": "Error updating deck",
       "commanderSet": "{name} is now Commander",
       "commanderRemoved": "{name} is no longer Commander",
       "commanderError": "Error changing commander",
-      "deleted": "✓ Deck deleted",
+      "deleted": "Deck deleted",
       "deletedCardsKept": "Deck deleted (cards kept)",
       "deletedWithCards": "Deck and {count} cards deleted",
       "deletedWithCardWarning": "Deck deleted. {deleted} cards removed, {failed} cards could not be deleted",
@@ -1374,8 +1375,8 @@
       "copyEmail": "COPY EMAIL",
       "saveContact": "SAVE CONTACT",
       "close": "CLOSE",
-      "emailCopied": "✓ Email copied",
-      "contactSaved": "✓ Contact saved: @{username}"
+      "emailCopied": "Email copied",
+      "contactSaved": "Contact saved: @{username}"
     },
     "countdown": {
       "new": "NEW",
@@ -1473,7 +1474,7 @@
       "action": "VIEW MY MATCHES"
     },
     "messages": {
-      "saved": "✓ Contact saved",
+      "saved": "Contact saved",
       "saveError": "Error saving contact",
       "deleted": "Contact deleted",
       "deleteError": "Error deleting contact",

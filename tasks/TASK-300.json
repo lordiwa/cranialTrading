@@ -1,0 +1,40 @@
+{
+  "key": "TASK-300",
+  "title": "El boton AGREGAR del modal de alta se ofrece habilitado sin ninguna carta elegida y al pulsarlo no hace ni dice nada",
+  "description": "ORIGEN: cierre del paso 5 del wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents). Candidato WG-N4 del triaje, cerrado por medicion. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/candidatos/n4-01-modal-vacio.png y n4-02-tras-pulsar.png, mas la captura original coleccion/05-modal-vacio.png.\\n\\nQUE SE MIDIO, CON SESION, EN /collection DE PRODUCCION. Se abrio AGREGAR CARTA sin buscar ni elegir nada y se pulso el boton AGREGAR:\\n\\n- el boton esta habilitado (enabled = true, sin aria-disabled)\\n- tras pulsarlo no sale ningun aviso\\n- el modal sigue abierto, sin ningun cambio visible\\n- no se creo ningun documento: se contaron las cartas de la coleccion con el Admin SDK antes y despues, y el numero es el mismo\\n\\nEs un control muerto: la interfaz ofrece una accion, el usuario la ejecuta y no pasa absolutamente nada. El usuario no puede distinguir eso de que la aplicacion se haya colgado.\\n\\nCAUSA, LEIDA EN EL CODIGO: src/components/collection/AddCardModal.vue:785 — el boton declara :disabled=\"loading\" y nada mas, asi que la unica condicion que lo apaga es que haya un guardado en curso. src/components/collection/AddCardModal.vue:233 — handleAddCard() arranca con if (!selectedPrint.value || !authStore.user) return, es decir, se va en silencio. Ni toast, ni mensaje, ni foco al buscador.\\n\\nCONTRASTE DENTRO DEL MISMO MODAL: el boton BUSCAR si esta bien resuelto — :disabled=\"searching || !searchQuery.trim()\" (AddCardModal.vue:484). El patron correcto ya existe a 300 lineas de distancia.",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, abrir el modal sin elegir carta, pulsar AGREGAR y registrar el estado del boton, los avisos en pantalla y el conteo de documentos antes y despues.",
+    "AC2: sin carta elegida el boton AGREGAR esta deshabilitado, con el mismo criterio que ya usa BUSCAR en este mismo modal.",
+    "AC3: el estado deshabilitado es perceptible tambien fuera de lo visual (aria-disabled o disabled real), no solo por opacidad.",
+    "AC4: prueba automatizada que REDDENA hoy: abre el modal sin seleccionar carta y asevera que AGREGAR esta deshabilitado.",
+    "AC5 (mata-mutantes): revertir el arreglo en su punto real (la condicion del :disabled del boton) deja la prueba del AC4 en rojo.",
+    "AC6: UAT contra el entorno desplegado repitiendo la secuencia del AC1."
+  ],
+  "status": "done",
+  "priority": "low",
+  "labels": [
+    "collection",
+    "add-card",
+    "modal",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "2d365b7",
+    "e75ade5"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "operator",
+      "at": "2026-09-15T16:16:36Z",
+      "body": "Implementado y verificado (ronda fix 1). fix 2d365b7 via e75ade5: el boton AGREGAR del modal de alta queda deshabilitado cuando no hay carta elegida. Verificacion local: suite unit 2414/2414 verde con Node 20, type-check verde, lint 0 errores. Pendiente del ciclo: re-verificacion de QA en dev."
+    }
+  ],
+  "created_at": "2026-09-15T08:30:00.000Z",
+  "updated_at": "2026-09-15T16:16:36Z",
+  "jira_key": null,
+  "verification_tier": "tdd"
+}

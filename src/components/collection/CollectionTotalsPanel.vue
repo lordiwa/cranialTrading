@@ -41,9 +41,21 @@ const history = ref<PriceSnapshot[]>([])
 // instead of at max priority from the moment cards.length flips.
 const INITIAL_PRICE_FETCH_DELAY_MS = 3000
 
-// Fetch prices when collection loads (but not during import)
+// Fetch prices when collection loads, AND whenever the collection grows
+// after that (but not during import).
+//
+// TASK-299: this used to require `oldLen === 0` — i.e. it only ever fired on
+// the very first 0 -> N transition. A card added later changes
+// `cards.length` again but that transition is never `oldLen === 0`, so the
+// watch silently did nothing for it: the new card's price was never
+// fetched and it contributed $0 to every CK-priced total forever, until a
+// full reload re-ran the initial fetch. `fetchAllPrices()` itself already
+// skips any card whose id is already in the shared `cardPrices` map (see
+// useCollectionTotals.ts), so re-running it here on every growth is not a
+// re-fetch of the whole collection's prices — only cards missing a price
+// (i.e. the ones just added) actually hit the network.
 watch(() => collectionStore.cards.length, (newLen, oldLen) => {
-  if (newLen > 0 && oldLen === 0 && !collectionStore.importing) {
+  if (newLen > oldLen && !collectionStore.importing) {
     setTimeout(() => void fetchAllPrices(), INITIAL_PRICE_FETCH_DELAY_MS)
   }
 })
@@ -80,6 +92,21 @@ watch(loading, (newVal, oldVal) => {
 })
 
 const fmt = (val: number) => `$${val.toFixed(2)}`
+
+// TASK-299 AC4: `cards()` can contain a card whose price hasn't resolved
+// yet (just added, or waiting out the delayed re-fetch above) — the money
+// totals are incomplete for that whole window, not just while `loading` is
+// literally true (loading only becomes true once fetchAllPrices actually
+// starts, INITIAL_PRICE_FETCH_DELAY_MS after the card appears). This says
+// so on screen instead of letting the totals look final.
+const hasPendingPrices = computed(() =>
+  collectionStore.cards.some(c => !cardPrices.value.has(c.id))
+)
+// While a fetch is actually running, the existing `progress`% is the more
+// useful signal; before it starts (still inside the delay window, or
+// `progress` is a stale value left over from a previous run), the numeric
+// percentage would be misleading, so it falls back to a plain ellipsis.
+const pendingIndicatorText = computed(() => loading.value ? `${progress.value}%` : '…')
 
 // Total card count (sum of quantities)
 const totalCardCount = computed(() =>
@@ -352,7 +379,7 @@ async function toggleChart() {
         <span class="text-silver-50">{{ t('collection.totals.headers.forTrade') }} <span class="font-display font-tnum font-bold text-small" :class="sourceColor">{{ fmt(tradeValue) }}</span></span>
         <span class="text-silver-30">|</span>
         <span class="text-silver-50 ml-auto">{{ t('collection.totals.headers.total') }} <span class="font-display font-tnum font-bold text-[18px]" :class="sourceColor">{{ fmt(totalValue) }}</span></span>
-        <span v-if="loading" class="text-tiny text-silver-50 ml-auto">{{ progress }}%</span>
+        <span v-if="loading || hasPendingPrices" class="text-tiny text-silver-50 ml-auto">{{ pendingIndicatorText }}</span>
       </div>
 
       <!-- Mobile: thin collapsed bar + expandable detail -->
@@ -366,7 +393,7 @@ async function toggleChart() {
             <span class="font-bold uppercase" :class="sourceColor">{{ activeSourceLabel }}</span>
             <span class="text-silver-30">|</span>
             <span class="font-display font-tnum font-bold text-neon">{{ fmt(totalValue) }}</span>
-            <span v-if="loading" class="text-silver-50">({{ progress }}%)</span>
+            <span v-if="loading || hasPendingPrices" class="text-silver-50">({{ pendingIndicatorText }})</span>
           </div>
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                class="text-silver-50 transition-transform duration-200" :class="mobileExpanded ? 'rotate-180' : ''">

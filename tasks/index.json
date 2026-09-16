@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T02:52:29.000Z",
+  "generated_at": "2026-09-15T08:30:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1620,6 +1620,66 @@
       "title": "Reactivar el Nightly E2E: recrear en dev la cuenta de prueba con cartas publicas",
       "status": "todo",
       "priority": "high"
+    },
+    {
+      "key": "TASK-291",
+      "title": "Un pedido de compra enviado deja DOS solicitudes identicas en la bandeja del vendedor",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-292",
+      "title": "Una busqueda larga en el perfil publico tumba la coleccion, REINTENTAR no la levanta y el buscador desaparece",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-293",
+      "title": "Abrir la pestana SOLICITUDES marca TODAS las solicitudes como vistas sin abrir ninguna",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-294",
+      "title": "La carta en wishlist se cuenta y se dibuja dentro de CARTAS QUE TENGO, y la misma pantalla muestra 14, 15 y 40",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-295",
+      "title": "El unico flujo comercial deja su boton de enviar deshabilitado sin decir que falta",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-296",
+      "title": "En viewport movil el aviso de validacion del username se corta y el usuario nunca lee la regla",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-297",
+      "title": "INICIAR SESION sin tilde en el carrito y aviso de exito con doble tilde de verificacion",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-298",
+      "title": "El carrito pisa el precio que puso el vendedor con el retail de Card Kingdom y el pedido viaja con ese precio",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-299",
+      "title": "El valor EN VENTA de la coleccion no se actualiza al agregar una carta y solo cambia si se recarga la pagina",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-300",
+      "title": "El boton AGREGAR del modal de alta se ofrece habilitado sin ninguna carta elegida y al pulsarlo no hace ni dice nada",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

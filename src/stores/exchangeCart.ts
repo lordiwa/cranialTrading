@@ -3,7 +3,21 @@ import { reactive } from 'vue'
 import { getCardPrices } from '@/services/mtgjson'
 import type { ExchangeCart, ExchangeCartItem, ExchangeCartStorage } from '@/types/exchangeCart'
 
-const STORAGE_KEY = 'cranial_exchange_carts'
+// TASK-298 follow-up (2026-09-15, wargaming WG-008 residual): the bug this
+// file's fix reverts was live in production, so some browsers still hold
+// carts saved under the OLD key with item.price already overwritten by CK
+// retail. Nothing on the read path repairs them — _upgradePriceFromCK only
+// ever writes ckReferencePrice, never price, and addItem on an existing
+// item only bumps quantity. Re-deriving the seller's price at load time
+// isn't possible either: it was lost the moment CK overwrote it, so
+// "recovering" it would mean a fresh per-item network lookup with its own
+// failure modes — the same class of bug this ticket fixes. Rotating the key
+// is the cleanest fix: _load() below simply never sees data saved under the
+// old key, so a poisoned cart is dropped instead of silently persisting a
+// wrong-priced BuyRequest. Cost, accepted: a visitor with a half-built cart
+// at deploy time loses it once and re-adds — visible and understood, unlike
+// a silently wrong price. See docs/DECISIONES-DE-PRODUCTO.md.
+const STORAGE_KEY = 'cranial_exchange_carts_v2'
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
 
 export const useExchangeCartStore = defineStore('exchangeCart', () => {
@@ -40,15 +54,21 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     return cart.items.find(i => i.scryfallId === scryfallId && i.cardId === cardId) ?? null
   }
 
-  // Background CK-first price upgrade (TASK-119). addItem captures card.price
-  // (TCG) synchronously for zero perceived latency; this fires-and-forget from
-  // addItem and upgrades the item's price in place once the CK lookup resolves.
-  // Explicit fallback: if CK has no data for the set/card, or the lookup fails,
-  // the captured TCG price is left untouched. Foil-aware: foil items only
-  // upgrade when CK publishes an actual retailFoil price — a missing
-  // retailFoil does NOT fall back to the non-foil retail (that would
-  // misrepresent a foil card's price), so the captured TCG price wins
-  // instead (owner decision). Non-foil items use retail as before.
+  // Background CK reference-price lookup. TASK-119 originally made this
+  // OVERWRITE item.price with the CK retail ("the cart is ephemeral and the
+  // amount is indicative"). TASK-298 (wargaming 2026-09-15, WG-008) reverted
+  // that: the cart persists a real BuyRequest the seller acts on
+  // (fulfillRequest decrements their collection), so the transaction price
+  // must always be the one the seller published — see
+  // docs/DECISIONES-DE-PRODUCTO.md. addItem still captures the seller's
+  // card.price synchronously for zero perceived latency; this fires-and-
+  // forget from addItem and, once the CK lookup resolves, populates the
+  // SEPARATE, labeled `ckReferencePrice` field — item.price is never
+  // touched. If CK has no data for the set/card, or the lookup fails,
+  // ckReferencePrice is simply left unset. Foil-aware: foil items only
+  // populate ckReferencePrice when CK publishes an actual retailFoil price —
+  // a missing retailFoil does NOT fall back to the non-foil retail (that
+  // would misrepresent a foil card's market reference).
   async function _upgradePriceFromCK(username: string, scryfallId: string, cardId: string, setCode?: string) {
     try {
       const prices = await getCardPrices(scryfallId, setCode)
@@ -61,13 +81,13 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
       if (!item) return
 
       const ckRetail = item.foil ? ck.retailFoil : ck.retail
-      // Guard against a 0/null CK price clobbering a real captured TCG price.
+      // Guard against a 0/null CK price being recorded as a bogus reference.
       if (ckRetail == null || ckRetail <= 0) return
 
-      item.price = ckRetail
+      item.ckReferencePrice = ckRetail
       _persist()
     } catch {
-      // Network/parse failure — keep the captured TCG price, no toast spam.
+      // Network/parse failure — no reference price, no toast spam.
     }
   }
 

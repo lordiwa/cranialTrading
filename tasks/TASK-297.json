@@ -1,0 +1,40 @@
+{
+  "key": "TASK-297",
+  "title": "INICIAR SESION sin tilde en el carrito y aviso de exito con doble tilde de verificacion",
+  "description": "ORIGEN: wargaming de usabilidad adversarial contra PRODUCCION del 2026-09-15 (repo qa-agents, lordiwa/qa-agents). Hallazgo WG-007. Evidencia: qa-agents/wargames/cranialtrading/2026-09-15/evidencia/carrito/05-carrito-13-items.png, coleccion/13-despues-guardar.png. Triaje completo: qa-agents/wargames/cranialtrading/2026-09-15/01-triaje.md. Definicion que sirvio de mapa del ataque: qa-agents/docs/sut/cranialtrading/DEFINICION.md.\n\nMEDIDO EN PRODUCCION, dos cadenas que se ven en pantalla:\n\n1. El cajon del carrito ofrece el boton \"INICIAR SESION\", sin tilde, mientras el panel del header dice \"INICIAR SESION\" con tilde en la O. Dos escrituras del mismo boton, en el mismo idioma, en la misma sesion.\n\n2. El aviso de exito al agregar una carta a la coleccion sale con DOBLE tilde de verificacion: se lee \"check check Counterspell agregada\". El recuadro del aviso dibuja su propio icono de exito y el texto del mensaje ya trae el suyo.\n\nCONTEXTO: la suite automatizada del proyecto fuerza el idioma a ingles al arrancar, asi que los defectos de traduccion y de copy en espanol son terreno virgen - y el espanol es el idioma por defecto del producto. Hay mas de la misma familia ya identificados por lectura y todavia no medidos por pantalla: el estado vacio del carrito sin tildes, el texto de carrito compartido enteramente en ingles, el nombre \"Guest\" para un comprador anonimo, el indicador de paginacion \"Loading more...\" y el aviso \"Status cambiado a sale\" con el valor interno sin traducir. Este ticket cierra los dos medidos; los otros valen una pasada aparte.",
+  "acceptance_criteria": [
+    "AC1: el boton del cajon del carrito dice INICIAR SESION con la misma ortografia que el resto de la aplicacion, y el texto sale del archivo de idioma y no esta escrito a mano en el componente.",
+    "AC2: el aviso de exito muestra UN solo icono de verificacion - o lo pone el recuadro, o lo trae el texto, no los dos.",
+    "AC3: una pasada por el archivo de idioma espanol buscando la misma familia (tildes faltantes y texto escrito a mano en componentes del carrito), con lo encontrado listado en el ticket aunque se arregle despues.",
+    "AC4: UAT en espanol recorriendo el cajon del carrito y el alta de una carta."
+  ],
+  "status": "done",
+  "priority": "low",
+  "labels": [
+    "i18n",
+    "cart",
+    "toast",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [
+    "76784c0",
+    "7eb3368",
+    "e75ade5",
+    "1aec230"
+  ],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "operator",
+      "at": "2026-09-15T16:16:36Z",
+      "body": "Implementado y verificado (ronda fix 1). Parte A, 76784c0 via e75ade5: tilde de INICIAR SESION en el carrito y doble tilde de verificacion de cards.addModal.success. Parte B, 7eb3368 via 1aec230: mismo arreglo para el resto de la familia (decks.messages.created/deleted, matches.contactModal.emailCopied/contactSaved, contacts.messages.saved) en los 3 idiomas, con doc PASADA-CADENAS-ES-2026-09-15.md. Verificacion local: brokenStrings.task297 (20 tests) + BaseToast.messageWrap, suite unit 2414/2414 verde con Node 20, type-check verde, lint 0 errores. Pendiente del ciclo: re-verificacion de QA en dev (wg-007)."
+    }
+  ],
+  "created_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-15T16:16:36Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

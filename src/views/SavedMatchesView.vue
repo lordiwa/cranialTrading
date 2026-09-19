@@ -675,22 +675,44 @@ const handleDeleteContact = async (contactId: string) => {
 }
 
 // SCRUM-70.2/70.3: acciones sobre buy requests
+
+// TASK-316 AC5: guarda de vuelo único — un doble click sobre "marcar como
+// vendida" no debe disparar fulfillRequest dos veces para el MISMO pedido.
+// La guarda se arma en el MISMO tick del primer click (antes de cualquier
+// await), porque el :disabled del botón solo se refleja en el DOM en el
+// siguiente tick — por sí solo no alcanza para un doble click rápido.
+const fulfillingRequestIds = ref(new Set<string>())
+
 const handleFulfillBuyRequest = async (requestId: string) => {
-  const confirmed = await confirmStore.show({
-    title: t('matches.buyRequests.fulfillTitle'),
-    message: t('matches.buyRequests.fulfillMessage'),
-  })
-  if (!confirmed) return
-  const res = await buyRequestsStore.fulfillRequest(requestId)
-  if (res.ok) {
-    toastStore.show(
-      res.missing.length > 0
-        ? t('matches.buyRequests.fulfilledPartial', { count: res.missing.length })
-        : t('matches.buyRequests.fulfilled'),
-      res.missing.length > 0 ? 'info' : 'success',
-    )
-  } else {
-    toastStore.show(t('matches.buyRequests.fulfillError'), 'error')
+  if (fulfillingRequestIds.value.has(requestId)) return
+  fulfillingRequestIds.value.add(requestId)
+  try {
+    const confirmed = await confirmStore.show({
+      title: t('matches.buyRequests.fulfillTitle'),
+      message: t('matches.buyRequests.fulfillMessage'),
+    })
+    if (!confirmed) return
+    const res = await buyRequestsStore.fulfillRequest(requestId)
+    if (res.alreadyFulfilled) {
+      // TASK-316 AC3: la relectura dentro de la transacción encontró el
+      // pedido ya cumplido (otra pestaña se adelantó) — nunca el aviso de
+      // éxito sobre algo que esta pestaña no cumplió.
+      toastStore.show(t('matches.buyRequests.alreadyFulfilled'), 'info')
+    } else if (res.ok) {
+      // TASK-307 AC4: el aviso de éxito completo SOLO se muestra cuando no
+      // faltó nada — un pedido con `missing` no entero nunca dice "Cartas
+      // descontadas de tu colección".
+      toastStore.show(
+        res.missing.length > 0
+          ? t('matches.buyRequests.fulfilledPartial', { count: res.missing.length })
+          : t('matches.buyRequests.fulfilled'),
+        res.missing.length > 0 ? 'info' : 'success',
+      )
+    } else {
+      toastStore.show(t('matches.buyRequests.fulfillError'), 'error')
+    }
+  } finally {
+    fulfillingRequestIds.value.delete(requestId)
   }
 }
 
@@ -987,6 +1009,7 @@ onUnmounted(() => {
             v-else
             :key="req.id"
             :request="req"
+            :fulfilling="fulfillingRequestIds.has(req.id)"
             @seen="handleSeenBuyRequest"
             @fulfill="handleFulfillBuyRequest"
             @delete="handleDeleteBuyRequest"

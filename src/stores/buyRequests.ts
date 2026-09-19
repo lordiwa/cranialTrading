@@ -1,16 +1,17 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
-import { useCollectionStore } from './collection'
 import {
   buildBuyRequestId,
   computeTotalValue,
+  type FulfillmentShortfall,
   planFulfillment,
   type PriceResolutionResult,
   type PublishedCardPrice,
   resolvePublishedPrices,
+  shortfallsOf,
 } from '../utils/buyRequest'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import type { ExchangeCartItem } from '../types/exchangeCart'
@@ -34,13 +35,13 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
   const pendingCount = computed(() => buyRequests.value.filter(r => r.status === 'pending').length)
 
   /**
-   * TASK-306: lee lo que el VENDEDOR tiene publicado HOY para cada linea del
-   * carrito, directamente desde `public_cards/{ownerUid}_{item.cardId}` — el
-   * mismo id que syncCardToPublic/removeCardFromPublic usan para escribir y
-   * borrar ese doc (services/publicCards.ts), asi que es la fuente de verdad
-   * del precio, nunca `items` (que viene del navegador del comprador). Un
-   * doc ausente (carta despublicada) resuelve a `undefined` a proposito —
-   * resolvePublishedPrices lo trata como no-vendible (AC5).
+   * TASK-306/TASK-307: lee lo que el VENDEDOR tiene publicado HOY para cada
+   * linea del carrito, directamente desde `public_cards/{ownerUid}_{item.cardId}`
+   * — el mismo id que syncCardToPublic/removeCardFromPublic usan para escribir
+   * y borrar ese doc (services/publicCards.ts), asi que es la fuente de verdad
+   * del precio Y de la cantidad, nunca `items` (que viene del navegador del
+   * comprador). Un doc ausente (carta despublicada) resuelve a `undefined` a
+   * proposito — resolvePublishedPrices lo trata como no-vendible (AC5).
    */
   const fetchPublishedPriceMap = async (
     ownerUid: string,
@@ -50,8 +51,8 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
       items.map(async (item): Promise<readonly [string, PublishedCardPrice | undefined]> => {
         const snap = await getDoc(doc(db, 'public_cards', `${ownerUid}_${item.cardId}`))
         if (!snap.exists()) return [item.cardId, undefined] as const
-        const data = snap.data() as { price?: number; status?: string }
-        return [item.cardId, { price: data.price ?? 0, status: data.status ?? '' }] as const
+        const data = snap.data() as { price?: number; status?: string; quantity?: number }
+        return [item.cardId, { price: data.price ?? 0, status: data.status ?? '', quantity: data.quantity ?? 0 }] as const
       })
     )
     return Object.fromEntries(entries)
@@ -182,36 +183,110 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
   }
 
   /**
-   * SCRUM-70.3: marcar como vendido → descontar cada carta de la colección del
-   * dueño (reutiliza updateCard/deleteCard) y marcar la solicitud como 'fulfilled'.
-   * Devuelve la lista de cardIds faltantes (fallback) por si la UI quiere avisar.
+   * SCRUM-70.3 / TASK-307 / TASK-316: marcar como vendido → descontar cada
+   * carta de la colección del dueño y marcar la solicitud como 'fulfilled'.
+   *
+   * TASK-316 hallazgo: la version anterior calculaba `newQuantity` contra el
+   * SNAPSHOT LOCAL de collectionStore (cargado una vez al abrir la pestaña) y
+   * escribia una cantidad ABSOLUTA con updateCard/deleteCard — dos pestañas
+   * que cumplen pedidos distintos sobre la MISMA carta pisan la escritura de
+   * la otra (lost update). Ahora todo el descuento corre DENTRO de un
+   * runTransaction: se relee el doc del pedido y el de cada carta FRESCOS en
+   * el momento del commit — nunca el cache local — y Firestore reintenta la
+   * funcion entera si algun doc leido cambio antes de comitear, asi que dos
+   * cumplimientos concurrentes de la misma carta nunca se pisan (AC2).
+   *
+   * TASK-316 AC3: guarda de estado explicita, igual que markSeen — un pedido
+   * ya 'fulfilled' se rechaza, tanto en el chequeo local (doble click en la
+   * MISMA pestaña) como releido dentro de la transaccion (dos pestañas).
+   *
+   * TASK-307 hallazgo: planFulfillment distingue 'insufficient' (existe pero
+   * no alcanza) de 'missing' (no existe) — 'insufficient' NUNCA cae en
+   * 'delete', asi que una carta con stock insuficiente para el pedido no se
+   * borra entera. Las lineas 'missing'/'insufficient' no escriben nada y se
+   * reportan en `shortfalls` con la cantidad que faltó (AC3); las demas
+   * lineas del MISMO pedido, si alcanzan, se descuentan igual dentro de la
+   * misma transaccion.
    */
-  const fulfillRequest = async (requestId: string): Promise<{ ok: boolean; missing: string[] }> => {
-    if (!authStore.user) return { ok: false, missing: [] }
+  const fulfillRequest = async (requestId: string): Promise<{
+    ok: boolean
+    missing: string[]
+    shortfalls: FulfillmentShortfall[]
+    alreadyFulfilled?: boolean
+  }> => {
+    if (!authStore.user) return { ok: false, missing: [], shortfalls: [] }
+    const uid = authStore.user.id
     const target = buyRequests.value.find(r => r.id === requestId)
-    if (!target) return { ok: false, missing: [] }
+    if (!target) return { ok: false, missing: [], shortfalls: [] }
 
-    const collectionStore = useCollectionStore()
-    const plan = planFulfillment(target.items, (cardId) => collectionStore.getCardById(cardId))
-    const missing: string[] = []
+    // TASK-316 AC3: chequeo LOCAL primero — cubre el doble click en la MISMA
+    // pestaña sin ni siquiera abrir una transaccion. La relectura fresca
+    // dentro de la transaccion, mas abajo, cubre dos pestañas distintas.
+    if (target.status === 'fulfilled') {
+      return { ok: false, missing: [], shortfalls: [], alreadyFulfilled: true }
+    }
+
+    const requestRef = doc(db, 'users', uid, 'buyRequests', requestId)
 
     try {
-      for (const step of plan) {
-        if (step.action === 'missing') {
-          missing.push(step.cardId)
-        } else if (step.action === 'delete') {
-          await collectionStore.deleteCard(step.cardId)
-        } else {
-          await collectionStore.updateCard(step.cardId, { quantity: step.newQuantity })
+      const outcome = await runTransaction(db, async (tx) => {
+        const requestSnap = await tx.get(requestRef)
+        if (!requestSnap.exists()) {
+          return { notFound: true, alreadyFulfilled: false, shortfalls: [] as FulfillmentShortfall[] }
         }
+        const requestData = requestSnap.data() as { status?: BuyRequestStatus; items?: ExchangeCartItem[] }
+        if (requestData.status === 'fulfilled') {
+          return { notFound: false, alreadyFulfilled: true, shortfalls: [] as FulfillmentShortfall[] }
+        }
+
+        const items = requestData.items ?? []
+        // TASK-316 AC2: lectura fresca de CADA carta, dentro de la misma
+        // transaccion — nunca collectionStore.getCardById (el snapshot local
+        // de esta pestaña). Se indexa por cardId con Maps (no por posicion de
+        // array) para no depender de que dos arrays paralelos conserven el
+        // mismo largo/orden bajo noUncheckedIndexedAccess.
+        const cardRefByCardId = new Map(items.map(item => [item.cardId, doc(db, 'users', uid, 'cards', item.cardId)] as const))
+        const cardSnaps = await Promise.all([...cardRefByCardId.values()].map(ref => tx.get(ref)))
+        const quantityByCardId = new Map<string, number>()
+        ;[...cardRefByCardId.keys()].forEach((cardId, i) => {
+          const snap = cardSnaps[i]
+          if (snap?.exists()) {
+            const data = snap.data() as { quantity?: number }
+            quantityByCardId.set(cardId, data.quantity ?? 0)
+          }
+        })
+
+        const plan = planFulfillment(items, (cardId) => {
+          const quantity = quantityByCardId.get(cardId)
+          return quantity === undefined ? undefined : { quantity }
+        })
+
+        for (const step of plan) {
+          const cardRef = cardRefByCardId.get(step.cardId)
+          if (!cardRef) continue // no debería pasar — cardRefByCardId se construyó a partir de estos mismos items
+          if (step.action === 'delete') {
+            tx.delete(cardRef)
+          } else if (step.action === 'update') {
+            tx.update(cardRef, { quantity: step.newQuantity, updatedAt: new Date() })
+          }
+          // 'missing' / 'insufficient' → no se escribe nada para esa linea.
+        }
+        tx.update(requestRef, { status: 'fulfilled' as BuyRequestStatus })
+
+        return { notFound: false, alreadyFulfilled: false, shortfalls: shortfallsOf(plan) }
+      })
+
+      if (outcome.notFound) return { ok: false, missing: [], shortfalls: [] }
+      if (outcome.alreadyFulfilled) {
+        target.status = 'fulfilled'
+        return { ok: false, missing: [], shortfalls: [], alreadyFulfilled: true }
       }
 
-      await updateDoc(doc(db, 'users', authStore.user.id, 'buyRequests', requestId), { status: 'fulfilled' })
       target.status = 'fulfilled'
-      return { ok: true, missing }
+      return { ok: true, missing: outcome.shortfalls.map(s => s.cardId), shortfalls: outcome.shortfalls }
     } catch (err) {
       logSanitizedError('fulfillRequest error', err)
-      return { ok: false, missing }
+      return { ok: false, missing: [], shortfalls: [] }
     }
   }
 

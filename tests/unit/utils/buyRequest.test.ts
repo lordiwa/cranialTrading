@@ -6,7 +6,7 @@
  *  - resolvePublishedPrices (TASK-306): re-resuelve el precio de cada línea
  *    contra lo publicado por el vendedor, nunca contra lo que vino del carrito.
  */
-import { buildBuyRequestId, computeTotalValue, planFulfillment, resolvePublishedPrices } from '@/utils/buyRequest'
+import { buildBuyRequestId, computeTotalValue, planFulfillment, resolvePublishedPrices, shortfallsOf } from '@/utils/buyRequest'
 
 const item = (over: Partial<any> = {}) => ({
   scryfallId: 's', cardId: 'c1', name: 'N', edition: '', quantity: 1,
@@ -55,7 +55,7 @@ describe('buildBuyRequestId (TASK-291 AC3)', () => {
 describe('resolvePublishedPrices (TASK-306 — hallazgo WG4-O3A-02)', () => {
   it('reemplaza el precio del carrito por el publicado por el vendedor cuando difieren — previene que un comprador fije el precio de su propio pedido', () => {
     const cartItems = [item({ cardId: 'c1', name: 'Angel of the Ruins', price: 0.01, quantity: 1 })]
-    const getPublished = (cardId: string) => (cardId === 'c1' ? { price: 2.4, status: 'sale' } : undefined)
+    const getPublished = (cardId: string) => (cardId === 'c1' ? { price: 2.4, status: 'sale', quantity: 9 } : undefined)
 
     const result = resolvePublishedPrices(cartItems, getPublished)
 
@@ -70,7 +70,7 @@ describe('resolvePublishedPrices (TASK-306 — hallazgo WG4-O3A-02)', () => {
       item({ cardId: 'c2', name: 'Serra Angel', price: 4.5, quantity: 2 }),
     ]
     const getPublished = (cardId: string) =>
-      ({ c1: { price: 2.4, status: 'sale' }, c2: { price: 4.5, status: 'sale' } })[cardId]
+      ({ c1: { price: 2.4, status: 'sale', quantity: 9 }, c2: { price: 4.5, status: 'sale', quantity: 9 } })[cardId]
 
     const result = resolvePublishedPrices(cartItems, getPublished)
 
@@ -94,45 +94,90 @@ describe('resolvePublishedPrices (TASK-306 — hallazgo WG4-O3A-02)', () => {
       item({ cardId: 'c2', name: 'Now Wishlist', price: 3, quantity: 1 }),
     ]
     const getPublished = (cardId: string) =>
-      ({ c1: { price: 0, status: 'sale' }, c2: { price: 3, status: 'wishlist' } })[cardId]
+      ({ c1: { price: 0, status: 'sale', quantity: 9 }, c2: { price: 3, status: 'wishlist', quantity: 9 } })[cardId]
 
     const result = resolvePublishedPrices(cartItems, getPublished)
 
     expect(result.ok).toBe(false)
     expect(result.unavailable.map(u => u.cardId).sort()).toEqual(['c1', 'c2'])
   })
+
+  it('TASK-307 AC5: una cantidad pedida por encima del stock publicado se trunca al stock real, nunca verbatim — previene que el navegador del comprador fije su propia cantidad', () => {
+    const cartItems = [item({ cardId: 'c1', name: 'Angel of the Ruins', price: 2.4, quantity: 5 })]
+    const getPublished = () => ({ price: 2.4, status: 'sale', quantity: 1 }) // el vendedor solo tiene 1
+
+    const result = resolvePublishedPrices(cartItems, getPublished)
+
+    expect(result.ok).toBe(true)
+    expect(result.resolved[0].quantity).toBe(1) // nunca 5
+  })
+
+  it('un stock publicado en 0 tampoco resuelve — sin stock no hay transaccion valida aunque el precio y el status sean vendibles', () => {
+    const cartItems = [item({ cardId: 'c1', name: 'Out of Stock', price: 3, quantity: 1 })]
+    const getPublished = () => ({ price: 3, status: 'sale', quantity: 0 })
+
+    const result = resolvePublishedPrices(cartItems, getPublished)
+
+    expect(result.ok).toBe(false)
+    expect(result.unavailable).toEqual([{ cardId: 'c1', name: 'Out of Stock' }])
+  })
 })
 
-describe('planFulfillment', () => {
+describe('planFulfillment (TASK-307 — antes solo distinguia missing/delete/update)', () => {
   it('decrementa cuando quedan unidades', () => {
     const getCard = (id: string) => (id === 'c1' ? { id: 'c1', quantity: 5 } : undefined)
     const plan = planFulfillment([item({ cardId: 'c1', quantity: 2 })], getCard as any)
     expect(plan).toEqual([{ cardId: 'c1', action: 'update', newQuantity: 3 }])
   })
 
-  it('borra cuando la cantidad llega a 0 o menos', () => {
+  it('borra cuando la cantidad llega a 0 exacto sobre un stock que alcanzaba entero', () => {
     const getCard = (id: string) => (id === 'c1' ? { id: 'c1', quantity: 2 } : undefined)
     const plan = planFulfillment([item({ cardId: 'c1', quantity: 2 })], getCard as any)
     expect(plan).toEqual([{ cardId: 'c1', action: 'delete' }])
   })
 
-  it('marca faltante cuando la carta ya no existe (fallback)', () => {
+  it('marca faltante (con la cantidad pedida) cuando la carta ya no existe', () => {
     const getCard = () => undefined
     const plan = planFulfillment([item({ cardId: 'gone', quantity: 1 })], getCard as any)
-    expect(plan).toEqual([{ cardId: 'gone', action: 'missing' }])
+    expect(plan).toEqual([{ cardId: 'gone', action: 'missing', requested: 1 }])
   })
 
-  it('maneja varios items a la vez', () => {
-    const cards: Record<string, any> = { c1: { id: 'c1', quantity: 1 }, c2: { id: 'c2', quantity: 10 } }
+  it('TASK-307 AC2: una carta que EXISTE pero no alcanza para la cantidad pedida es "insufficient", nunca "delete" — previene borrar la fila entera sobre un pedido que no se pudo cumplir', () => {
+    const getCard = (id: string) => (id === 'c1' ? { id: 'c1', quantity: 1 } : undefined)
+    const plan = planFulfillment([item({ cardId: 'c1', quantity: 2 })], getCard as any)
+    expect(plan).toEqual([{ cardId: 'c1', action: 'insufficient', available: 1, requested: 2 }])
+  })
+
+  it('maneja varios items a la vez, cada uno con su propia accion', () => {
+    const cards: Record<string, any> = { c1: { id: 'c1', quantity: 1 }, c2: { id: 'c2', quantity: 10 }, c4: { id: 'c4', quantity: 1 } }
     const getCard = (id: string) => cards[id]
     const plan = planFulfillment(
-      [item({ cardId: 'c1', quantity: 1 }), item({ cardId: 'c2', quantity: 3 }), item({ cardId: 'c3', quantity: 1 })],
+      [
+        item({ cardId: 'c1', quantity: 1 }),
+        item({ cardId: 'c2', quantity: 3 }),
+        item({ cardId: 'c3', quantity: 1 }),
+        item({ cardId: 'c4', quantity: 5 }),
+      ],
       getCard as any,
     )
     expect(plan).toEqual([
       { cardId: 'c1', action: 'delete' },
       { cardId: 'c2', action: 'update', newQuantity: 7 },
-      { cardId: 'c3', action: 'missing' },
+      { cardId: 'c3', action: 'missing', requested: 1 },
+      { cardId: 'c4', action: 'insufficient', available: 1, requested: 5 },
+    ])
+  })
+})
+
+describe('shortfallsOf (TASK-307 AC3)', () => {
+  it('extrae missing e insufficient con su cantidad, ignora update/delete', () => {
+    const plan = planFulfillment(
+      [item({ cardId: 'c1', quantity: 1 }), item({ cardId: 'c2', quantity: 5 }), item({ cardId: 'gone', quantity: 2 })],
+      (id: string) => ({ c1: { quantity: 1 }, c2: { quantity: 2 } } as Record<string, { quantity: number }>)[id],
+    )
+    expect(shortfallsOf(plan)).toEqual([
+      { cardId: 'c2', requested: 5, available: 2 },
+      { cardId: 'gone', requested: 2, available: 0 },
     ])
   })
 })

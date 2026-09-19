@@ -17,10 +17,13 @@ import { createPinia, setActivePinia } from 'pinia'
 // el factory de vi.mock (que corre hoisted, antes de cualquier `let`/`const`
 // de este archivo) como para el cuerpo de los tests, que lo siembran.
 const { setPublishedPrice, resetPublishedPrices, mockDoc, mockGetDoc } = vi.hoisted(() => {
-  const publishedPrices: Record<string, { price: number; status: string } | undefined> = {}
+  const publishedPrices: Record<string, { price: number; status: string; quantity: number } | undefined> = {}
   return {
-    setPublishedPrice: (docPath: string, price: number, status = 'sale') => {
-      publishedPrices[docPath] = { price, status }
+    // TASK-307 AC5: por defecto se publica stock de sobra (99) — los tests de
+    // este archivo verifican PRECIO, no cantidad; la cantidad se cubre en
+    // buyRequestQuantityIntegrity.test.ts.
+    setPublishedPrice: (docPath: string, price: number, status = 'sale', quantity = 99) => {
+      publishedPrices[docPath] = { price, status, quantity }
     },
     resetPublishedPrices: () => {
       for (const key of Object.keys(publishedPrices)) delete publishedPrices[key]

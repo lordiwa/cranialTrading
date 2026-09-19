@@ -6,7 +6,11 @@ import BaseButton from '../ui/BaseButton.vue'
 import IconV2 from '../ui/IconV2.vue'
 import type { BuyRequest } from '../../types/buyRequest'
 
-const props = defineProps<{ request: BuyRequest }>()
+const props = defineProps<{
+  request: BuyRequest
+  /** TASK-316 AC5: guarda de vuelo único — deshabilita el botón mientras fulfillRequest está en curso para este pedido. */
+  fulfilling?: boolean
+}>()
 const emit = defineEmits<{
   seen: [requestId: string]
   fulfill: [requestId: string]
@@ -115,6 +119,7 @@ const avatarInitial = computed(() => (props.request.buyerName || '?').charAt(0).
             v-if="request.status !== 'fulfilled'"
             size="small"
             class="flex items-center gap-1.5"
+            :disabled="fulfilling"
             @click="emit('fulfill', request.id)"
         >
           <IconV2 name="check" :size="15" />

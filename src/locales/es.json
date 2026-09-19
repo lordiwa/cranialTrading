@@ -1312,8 +1312,9 @@
       "fulfillTitle": "¿Marcar como vendida?",
       "fulfillMessage": "Esto descontará estas cartas de tu colección.",
       "fulfilled": "Cartas descontadas de tu colección",
-      "fulfilledPartial": "Listo — {count} carta(s) ya no estaban en tu colección",
+      "fulfilledPartial": "Listo — no había stock suficiente para {count} carta(s) de este pedido",
       "fulfillError": "No se pudo completar la venta",
+      "alreadyFulfilled": "Este pedido ya había sido marcado como vendido",
       "deleteTitle": "¿Borrar solicitud?",
       "deleteMessage": "Esta solicitud de compra se eliminará."
     },

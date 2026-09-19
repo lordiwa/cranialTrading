@@ -333,6 +333,30 @@ describe('exchangeCart store', () => {
       // Should not throw, should start with empty carts
       expect(store.getCart('alice')).toBeNull()
     })
+
+    it('TASK-307: clamps a rehydrated quantity above maxQuantity — previene el ataque medido en dev (localStorage editado a mano por encima del tope, saltando el clamp de addItem/updateItemQuantity)', () => {
+      const now = Date.now()
+      const preloaded = {
+        carts: {
+          alice: {
+            username: 'alice',
+            // Editado a mano por fuera de addItem/updateItemQuantity: quantity
+            // (2) excede maxQuantity (1), algo que ningun setter del store
+            // permite producir.
+            items: [makeItem({ quantity: 2, maxQuantity: 1 })],
+            createdAt: now,
+            expiresAt: now + SEVEN_DAYS,
+          },
+        },
+      }
+      mockStorage[STORAGE_KEY] = JSON.stringify(preloaded)
+
+      setActivePinia(createPinia())
+      const store = useExchangeCartStore()
+      const cart = store.getCart('alice')
+
+      expect(cart!.items[0].quantity).toBe(1) // nunca 2 — clampeado igual que addItem/updateItemQuantity
+    })
   })
 
   // ─── CK reference-price lookup (TASK-119, REVERTIDO por TASK-298) ────

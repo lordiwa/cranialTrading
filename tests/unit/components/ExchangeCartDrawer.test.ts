@@ -37,7 +37,7 @@ vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   getDocs: vi.fn().mockResolvedValue({ docs: [] }),
   doc: vi.fn(() => ({})),
-  getDoc: vi.fn().mockResolvedValue({ exists: () => true, data: () => ({ price: 0.35, status: 'sale' }) }),
+  getDoc: vi.fn().mockResolvedValue({ exists: () => true, data: () => ({ price: 0.35, status: 'sale', quantity: 99 }) }),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),

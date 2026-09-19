@@ -1312,8 +1312,9 @@
       "fulfillTitle": "Mark as sold?",
       "fulfillMessage": "This will subtract these cards from your collection.",
       "fulfilled": "Cards subtracted from your collection",
-      "fulfilledPartial": "Done — {count} card(s) were no longer in your collection",
+      "fulfilledPartial": "Done — {count} card(s) in this order didn't have enough stock",
       "fulfillError": "Could not complete the sale",
+      "alreadyFulfilled": "This request was already marked as sold",
       "deleteTitle": "Delete request?",
       "deleteMessage": "This buy request will be removed."
     },

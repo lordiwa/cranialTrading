@@ -40,6 +40,26 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
         const parsed = JSON.parse(raw) as ExchangeCartStorage
         if (parsed?.carts) {
           Object.assign(state.carts, parsed.carts)
+          // TASK-307: addItem/updateItemQuantity clampean quantity contra
+          // maxQuantity, pero un carrito rehidratado desde localStorage puede
+          // haber sido editado a mano (medido en dev: item.quantity escrito
+          // directo por encima de maxQuantity, sin pasar por ningun setter).
+          // _load() era la unica puerta de entrada que no clampeaba — el
+          // ataque real solo necesitaba abrir el carrito una vez despues de
+          // editar el storage. submitBuyRequest (AC5) revalida esto de nuevo
+          // contra el stock publicado antes de persistir; este clamp es la
+          // primera linea de defensa, en el cliente.
+          let changed = false
+          for (const cart of Object.values(state.carts)) {
+            for (const item of cart.items) {
+              const bounded = Math.min(Math.max(1, item.quantity), item.maxQuantity)
+              if (bounded !== item.quantity) {
+                item.quantity = bounded
+                changed = true
+              }
+            }
+          }
+          if (changed) _persist()
         }
       }
     } catch {

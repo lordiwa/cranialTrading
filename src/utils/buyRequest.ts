@@ -48,6 +48,12 @@ const fnv1a = (str: string): string => {
 export interface PublishedCardPrice {
   price: number
   status: string
+  /**
+   * TASK-307 AC5: stock publicado por el vendedor. Igual que el precio, la
+   * cantidad del carrito se valida contra este numero al ENVIAR el pedido
+   * — nunca se persiste verbatim lo que trae el navegador del comprador.
+   */
+  quantity: number
 }
 
 export interface ResolvedPriceChange {
@@ -81,10 +87,17 @@ export interface PriceResolutionResult {
  * Firestore y pasa el lookup ya resuelto, para que esto sea testeable sin
  * mockear Firebase.
  *
- * Guarda AC5: una carta sin doc publicado, sin status vendible (sale/trade),
- * o con precio <= 0 no "resuelve" — va a `unavailable` y el item NO entra en
- * `resolved`. El caller debe rechazar el pedido entero en ese caso, nunca
- * persistir un precio inventado para esa linea.
+ * Guarda AC5 (306): una carta sin doc publicado, sin status vendible
+ * (sale/trade), sin stock (quantity <= 0), o con precio <= 0 no "resuelve"
+ * — va a `unavailable` y el item NO entra en `resolved`. El caller debe
+ * rechazar el pedido entero en ese caso, nunca persistir un precio
+ * inventado para esa linea.
+ *
+ * TASK-307 AC5: la CANTIDAD tambien se valida contra lo publicado, del mismo
+ * modo que el precio — `resolved[i].quantity` nunca excede `published.quantity`.
+ * Una cantidad manipulada en el navegador del comprador (p.ej. editada a mano
+ * en localStorage, sin pasar por el clamp de addItem/setQuantity) queda
+ * truncada al stock real antes de persistirse, nunca verbatim.
  */
 export const resolvePublishedPrices = (
   items: ExchangeCartItem[],
@@ -96,7 +109,10 @@ export const resolvePublishedPrices = (
 
   for (const item of items) {
     const published = getPublished(item.cardId)
-    const sellable = published && (published.status === 'sale' || published.status === 'trade') && published.price > 0
+    const sellable = published
+      && (published.status === 'sale' || published.status === 'trade')
+      && published.price > 0
+      && published.quantity > 0
     if (!sellable || !published) {
       unavailable.push({ cardId: item.cardId, name: item.name })
       continue
@@ -104,7 +120,8 @@ export const resolvePublishedPrices = (
     if (published.price !== item.price) {
       changed.push({ cardId: item.cardId, name: item.name, cartPrice: item.price, publishedPrice: published.price })
     }
-    resolved.push({ ...item, price: published.price })
+    const boundedQuantity = Math.min(item.quantity, published.quantity)
+    resolved.push({ ...item, price: published.price, quantity: boundedQuantity })
   }
 
   return { ok: unavailable.length === 0, resolved, changed, unavailable }
@@ -113,15 +130,35 @@ export const resolvePublishedPrices = (
 export type FulfillAction =
   | { cardId: string; action: 'update'; newQuantity: number }
   | { cardId: string; action: 'delete' }
-  | { cardId: string; action: 'missing' }
+  | { cardId: string; action: 'missing'; requested: number }
+  | { cardId: string; action: 'insufficient'; available: number; requested: number }
 
 /**
- * SCRUM-70.3: decide, por cada item vendido, qué hacer con la colección del dueño:
- *  - 'update'  → decrementar la cantidad (quedan unidades),
- *  - 'delete'  → borrar la carta (la cantidad llega a 0 o menos),
- *  - 'missing' → la carta ya no existe (fallback: se omite el descuento).
+ * TASK-307 AC3: una linea que no se puede cumplir entera — sea porque la
+ * carta ya no existe (`available: 0`) o porque existe pero no alcanza —
+ * junto con CUANTO faltó, no solo cuál carta.
+ */
+export interface FulfillmentShortfall {
+  cardId: string
+  requested: number
+  available: number
+}
+
+/**
+ * SCRUM-70.3 / TASK-307: decide, por cada item vendido, qué hacer con la
+ * colección del dueño:
+ *  - 'update'      → decrementar la cantidad (quedan unidades),
+ *  - 'delete'      → borrar la carta — SOLO cuando el decremento da
+ *                    EXACTAMENTE 0 sobre un stock que alcanzaba entero
+ *                    (TASK-307 AC2: nunca sobre un pedido insuficiente),
+ *  - 'missing'     → la carta ya no existe,
+ *  - 'insufficient'→ la carta existe pero el stock no alcanza para la
+ *                    cantidad pedida (TASK-307 hallazgo: antes esta rama
+ *                    caía en 'delete' y borraba la fila entera).
  *
- * Pura: recibe un lookup `getCard` en lugar de tocar el store.
+ * Pura: recibe un lookup `getCard` en lugar de tocar el store — el caller
+ * (stores/buyRequests.ts) es quien decide de dónde viene esa lectura (fresca,
+ * dentro de una transacción, nunca un snapshot local — TASK-316 AC2).
  */
 export const planFulfillment = (
   items: Pick<ExchangeCartItem, 'cardId' | 'quantity'>[],
@@ -129,8 +166,22 @@ export const planFulfillment = (
 ): FulfillAction[] =>
   items.map(item => {
     const card = getCard(item.cardId)
-    if (!card) return { cardId: item.cardId, action: 'missing' }
+    if (!card) return { cardId: item.cardId, action: 'missing', requested: item.quantity }
+    if (item.quantity > card.quantity) {
+      return { cardId: item.cardId, action: 'insufficient', available: card.quantity, requested: item.quantity }
+    }
     const newQuantity = card.quantity - item.quantity
     if (newQuantity <= 0) return { cardId: item.cardId, action: 'delete' }
     return { cardId: item.cardId, action: 'update', newQuantity }
   })
+
+/** TASK-307 AC3: extrae del plan las lineas que no se pudieron cumplir enteras, con la cantidad que faltó. */
+export const shortfallsOf = (plan: FulfillAction[]): FulfillmentShortfall[] =>
+  plan
+    .filter((step): step is Extract<FulfillAction, { action: 'missing' | 'insufficient' }> =>
+      step.action === 'missing' || step.action === 'insufficient')
+    .map(step => ({
+      cardId: step.cardId,
+      requested: step.requested,
+      available: step.action === 'insufficient' ? step.available : 0,
+    }))

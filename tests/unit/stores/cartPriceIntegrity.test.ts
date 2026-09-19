@@ -33,10 +33,13 @@ vi.mock('@/services/mtgjson', () => ({
 // is deliberately set equal to the cart's own price, so this re-resolution
 // step changes nothing about what TASK-298 already asserts.
 const { setPublishedPrice, mockDoc, mockGetDoc } = vi.hoisted(() => {
-  const publishedPrices: Record<string, { price: number; status: string }> = {}
+  const publishedPrices: Record<string, { price: number; status: string; quantity: number }> = {}
   return {
-    setPublishedPrice: (docPath: string, price: number, status = 'sale') => {
-      publishedPrices[docPath] = { price, status }
+    // TASK-307: la cantidad publicada tambien se valida contra `resolvePublishedPrices`
+    // (igual que el precio) — este archivo no ejercita esa validacion, asi
+    // que basta con publicar stock de sobra (99) para no interferir.
+    setPublishedPrice: (docPath: string, price: number, status = 'sale', quantity = 99) => {
+      publishedPrices[docPath] = { price, status, quantity }
     },
     mockDoc: (...args: unknown[]) => ({ path: args.slice(1).join('/') }),
     mockGetDoc: async (ref: { path: string }) => {

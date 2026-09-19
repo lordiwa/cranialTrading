@@ -1,0 +1,30 @@
+{
+  "key": "TASK-317",
+  "title": "El decremento de cantidad no se propaga al indice publico: tras cumplir pedidos la vitrina sigue ofreciendo x12 con 7 en stock, y el carrito hereda ese maxQuantity",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. Causa raiz de la incompletitud original y cambio de proceso: qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B1-03, veredicto ROTURA REAL, severidad MEDIA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B1-03-vitrina-publica-desactualizada.md\n\nPATH AFECTADO: UC-21B.2 como efecto lateral de la postcondicion \"coleccion decrementada\", y el canal C5 de SUPERFICIE-DE-ATAQUE.md (paridad entre las tres colecciones).\n\nLO QUE PROMETE LA DEFINICION: 21B.2 exige \"fulfilled y coleccion decrementada EXACTAMENTE por lo pedido\". La coleccion es lo que la vitrina publica publica: si el decremento no llega ahi, el efecto declarado del cumplimiento no se consumo donde el comprador lo ve.\n\nQUE PASA EN REALIDAD, MEDIDO EN DEV: se partio de Swamp con 10 copias, se cumplieron dos pedidos y el inventario real quedo en 7 (verificado en /collection: Cartas 38 / Unicas 15). Abierto el perfil publico en un contexto SIN SESION, la vitrina mostraba \"VENDO x12 Swamp - Lorwyn Eclipsed - NM\" y el encabezado seguia diciendo \"Coleccion publica 12 / 9 EN VENTA\".\nCONSECUENCIA ACCIONABLE, no solo cosmetica: el carrito que arma esa vitrina HEREDA ese numero — el item se guarda con maxQuantity: 12, asi que el control + del cajon deja pedir hasta 12 unidades de una carta de la que quedan 7, SIN TOCAR localStorage. Es decir, se puede armar un pedido imposible por el camino normal del usuario, que despues cae en el defecto de TASK-307.\n\nCONTRASTE QUE AISLA LA CAUSA, medido en la misma corrida: Angel of the Ruins, que fue BORRADA de la coleccion por el bug de TASK-307, SI desaparecio de la vitrina publica. El indice publico se reconstruye ante un BORRADO de carta, pero NO ante un CAMBIO DE CANTIDAD.\n\nRELACION: encadena con TASK-307 y TASK-316. Este ticket es el que convierte un pedido imposible en algo que un usuario honesto puede armar sin manipular nada.\n\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/evidencia/o3b1-08-vitrina-publica.png (vitrina con x12) y o3b1-07-M2.png (inventario real en 7). Script: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b1-08-vitrina.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio): cumplir un pedido en un entorno no productivo y comparar, en la misma ventana de tiempo, la cantidad en /collection contra la que muestra /@usuario sin sesion y contra el maxQuantity que guarda el carrito.",
+    "AC2: un cambio de CANTIDAD en la coleccion se propaga al indice publico, igual que hoy se propaga un borrado de carta.",
+    "AC3: el maxQuantity que hereda el carrito corresponde al stock real publicado en ese momento.",
+    "AC4: si el indice publico puede quedar desfasado por diseno (reconstruccion diferida), el envio del pedido revalida la cantidad contra el stock vigente — coordinar con el AC5 de TASK-307.",
+    "AC5: prueba de regresion (tests-after) que cumple un pedido y asevera la paridad entre /collection y la vitrina publica. Debe fallar contra el codigo actual."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "buy-request",
+    "public-index",
+    "parity",
+    "inventory",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:29:02.895Z",
+  "updated_at": "2026-09-19T17:29:02.895Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

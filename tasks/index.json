@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T17:24:46.031Z",
+  "generated_at": "2026-09-19T17:29:02.895Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1768,6 +1768,18 @@
     {
       "key": "TASK-315",
       "title": "Market: un mismo texto para tres causas distintas — con la cartera vacia dice que ninguna carta coincide, en vez de decir que no hay cartas",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-316",
+      "title": "fulfillRequest no es atomico: cumplir dos pedidos de la misma carta desde dos pestanas descuenta 3 de 5 unidades — la segunda escritura absoluta pisa a la primera",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-317",
+      "title": "El decremento de cantidad no se propaga al indice publico: tras cumplir pedidos la vitrina sigue ofreciendo x12 con 7 en stock, y el carrito hereda ese maxQuantity",
       "status": "todo",
       "priority": "medium"
     }

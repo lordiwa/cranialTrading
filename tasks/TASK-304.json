@@ -23,9 +23,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orquestador-qa",
+      "created_at": "2026-09-19T17:43:22.716Z",
+      "body": "EVIDENCIA NUEVA Y MAS FUERTE, medida el 2026-09-19 al correr la regresion del paso 5 (qa-agents/tests/regression/cranialtrading/wg4-o2-03-paridad-de-precios-dueno-vs-publico.spec.ts, en ROJO contra dev). El hallazgo original reporto 2 cartas discrepantes sobre 13. La regresion, que lee las dos vistas en la misma corrida con 14 s de espera en cada lado, midio 10 DISCREPANTES SOBRE 12 CARTAS COMPARADAS. Y la deriva NO es en una sola direccion, como se suponia: va en las dos.\n\nEl publico sabe mas que el dueno en: Darksteel Citadel (CK 1.99 vs guion), Swamp (CK 0.69 y BL 0.09 vs guion), Elspeth Storm Slayer (CK 57.99 vs guion), Sol Ring (CK 2.99 vs guion), Aether Charge (CK 0.35 vs guion).\nEl DUENO sabe mas que el publico en: Wrath of God (CK 7.49 y BL 3.80 vs guion), Giant Growth (CK 0.35 vs guion), Lightning Bolt (CK 2.49 y BL 0.65 vs guion), Dazzling Angel (CK 0.35 y BL 0.02 vs guion), Serra Angel (CK 0.35 y BL 0.01 vs guion).\n\nEn los cuatro dias entre una medicion y otra, Wrath of God y Giant Growth DIERON VUELTA la direccion de su discrepancia: en el hallazgo original el publico tenia el dato de CK y el dueno no; ahora es al reves.\n\nQUE CAMBIA ESTO PARA EL ARREGLO: la hipotesis del hallazgo —\"el enriquecimiento de CK correria solo sobre el indice publico\"— YA NO ALCANZA para explicar lo medido, porque hay cinco cartas donde el dato vive del lado del dueno y falta del lado publico. Lo que la evidencia sostiene ahora es que las dos colecciones se enriquecen por caminos independientes y ninguna reconcilia contra la otra, asi que cual de las dos \"sabe\" depende de cual corrio ultimo. El AC1 del ticket (leer las tres colecciones con el Admin SDK) sigue siendo el paso correcto, pero el diagnostico que tiene que confirmar es otro.\n\nTambien sube la severidad efectiva: no son dos cartas de borde, son 10 de 12 — practicamente toda la vitrina."
+    }
+  ],
   "created_at": "2026-09-19T12:00:00.000Z",
-  "updated_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T17:43:22.716Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

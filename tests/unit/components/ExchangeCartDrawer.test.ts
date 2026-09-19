@@ -26,10 +26,18 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 const mockSetDoc = vi.fn().mockResolvedValue(undefined)
+// TASK-306: submitRequest() now re-checks the published price
+// (checkPriceChanges) before calling submitBuyRequest, and submitBuyRequest
+// itself re-resolves against `public_cards` via getDoc before persisting.
+// Every test in this file seeds the SAME card at the SAME published price
+// (0.35 — see seedCart below), so getDoc always reports "still published,
+// same price" and none of these AC2/AC4 sequencing tests have to change
+// their click choreography to account for the new confirm-again step.
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   getDocs: vi.fn().mockResolvedValue({ docs: [] }),
   doc: vi.fn(() => ({})),
+  getDoc: vi.fn().mockResolvedValue({ exists: () => true, data: () => ({ price: 0.35, status: 'sale' }) }),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),

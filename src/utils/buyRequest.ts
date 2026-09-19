@@ -44,6 +44,72 @@ const fnv1a = (str: string): string => {
   return (hash >>> 0).toString(36)
 }
 
+/** Lo que `public_cards/{ownerUid}_{cardId}` (fuente publicada del vendedor) tiene HOY para una carta. */
+export interface PublishedCardPrice {
+  price: number
+  status: string
+}
+
+export interface ResolvedPriceChange {
+  cardId: string
+  name: string
+  cartPrice: number
+  publishedPrice: number
+}
+
+export interface UnresolvedCartItem {
+  cardId: string
+  name: string
+}
+
+export interface PriceResolutionResult {
+  /** false si alguna linea no resuelve contra lo publicado — nada debe persistirse en ese caso (AC5). */
+  ok: boolean
+  /** Items con `price` REEMPLAZADO por el publicado — nunca el que vino del carrito (AC2/AC3). */
+  resolved: ExchangeCartItem[]
+  /** Lineas cuyo precio publicado difiere del capturado al agregar al carrito (AC4). */
+  changed: ResolvedPriceChange[]
+  /** Lineas que ya no tienen un precio publicado resoluble (AC5). */
+  unavailable: UnresolvedCartItem[]
+}
+
+/**
+ * TASK-306: re-resuelve el precio de cada linea del carrito contra lo que el
+ * VENDEDOR tiene publicado (inyectado via `getPublished`, nunca leido de
+ * `items`), en vez de confiar en `item.price` tal como llego del navegador
+ * del comprador. Pura — el caller (stores/buyRequests.ts) es quien lee
+ * Firestore y pasa el lookup ya resuelto, para que esto sea testeable sin
+ * mockear Firebase.
+ *
+ * Guarda AC5: una carta sin doc publicado, sin status vendible (sale/trade),
+ * o con precio <= 0 no "resuelve" — va a `unavailable` y el item NO entra en
+ * `resolved`. El caller debe rechazar el pedido entero en ese caso, nunca
+ * persistir un precio inventado para esa linea.
+ */
+export const resolvePublishedPrices = (
+  items: ExchangeCartItem[],
+  getPublished: (cardId: string) => PublishedCardPrice | undefined,
+): PriceResolutionResult => {
+  const resolved: ExchangeCartItem[] = []
+  const changed: ResolvedPriceChange[] = []
+  const unavailable: UnresolvedCartItem[] = []
+
+  for (const item of items) {
+    const published = getPublished(item.cardId)
+    const sellable = published && (published.status === 'sale' || published.status === 'trade') && published.price > 0
+    if (!sellable || !published) {
+      unavailable.push({ cardId: item.cardId, name: item.name })
+      continue
+    }
+    if (published.price !== item.price) {
+      changed.push({ cardId: item.cardId, name: item.name, cartPrice: item.price, publishedPrice: published.price })
+    }
+    resolved.push({ ...item, price: published.price })
+  }
+
+  return { ok: unavailable.length === 0, resolved, changed, unavailable }
+}
+
 export type FulfillAction =
   | { cardId: string; action: 'update'; newQuantity: number }
   | { cardId: string; action: 'delete' }

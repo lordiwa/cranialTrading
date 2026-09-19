@@ -50,6 +50,13 @@ const emailHasError = computed(() => buyerEmail.value.trim().length > 0 && !emai
 // un envío fallido no debe dejar el botón inutilizable para siempre (AC2).
 const sending = ref(false)
 
+// TASK-306 AC4: cuando el precio publicado cambió desde que la carta entró
+// al carrito, el comprador tiene que VERLO antes de enviar. Se llena con las
+// líneas que cambiaron y se limpia en cuanto el pedido se envía (o el
+// comprador cierra el carrito) — mientras tiene contenido, el botón "ENVIAR
+// PEDIDO" pide un segundo click para confirmar el número ya actualizado.
+const priceChangeNotice = ref<{ cardId: string; name: string; cartPrice: number; publishedPrice: number }[]>([])
+
 const submitRequest = async () => {
   if (!canSend.value || sending.value) return
   const currentCart = cart.value
@@ -57,12 +64,36 @@ const submitRequest = async () => {
 
   sending.value = true
   try {
+    // Re-chequeo SIN persistir contra lo publicado por el vendedor. Si algo
+    // cambió, el comprador ve el número nuevo (el total en pantalla se
+    // recalcula solo, vía applyResolvedPrices) y tiene que volver a tocar
+    // ENVIAR PEDIDO para confirmarlo — nunca se envía a ciegas con el precio
+    // viejo. submitBuyRequest vuelve a resolver esto mismo antes de
+    // persistir, así que este paso es sólo para que la UI muestre el número
+    // vigente, no la única guarda contra un precio manipulado.
+    const check = await buyRequestsStore.checkPriceChanges(props.ownerId, currentCart.items)
+
+    if (check.unavailable.length > 0) {
+      toastStore.show(t('cart.itemsUnavailable', { names: check.unavailable.map(u => u.name).join(', ') }), 'error')
+      return
+    }
+
+    if (check.changed.length > 0) {
+      cartStore.applyResolvedPrices(props.username, check.changed.map(c => ({ cardId: c.cardId, price: c.publishedPrice })))
+      priceChangeNotice.value = check.changed
+      toastStore.show(t('cart.priceChangedConfirm'), 'info')
+      return
+    }
+
+    priceChangeNotice.value = []
     const contact = { name: buyerName.value.trim(), phone: buyerPhone.value.trim(), email: buyerEmail.value.trim() }
     const res = await buyRequestsStore.submitBuyRequest(props.ownerId, contact, currentCart.items, currentCart.createdAt)
     if (res.ok) {
       cartStore.clearCart(props.username)
       toastStore.show(t('cart.requestSent'), 'success')
       emit('close')
+    } else if (res.error === 'unavailable-items' && res.unavailable) {
+      toastStore.show(t('cart.itemsUnavailable', { names: res.unavailable.map(u => u.name).join(', ') }), 'error')
     } else {
       toastStore.show(t('cart.requestError'), 'error')
     }
@@ -73,10 +104,13 @@ const submitRequest = async () => {
 
 const updateQty = (scryfallId: string, cardId: string, qty: number) => {
   cartStore.updateItemQuantity(props.username, scryfallId, cardId, qty)
+  // El carrito cambió — el aviso de "revisá y confirmá" ya no describe lo que hay en pantalla.
+  priceChangeNotice.value = []
 }
 
 const removeItem = (scryfallId: string, cardId: string) => {
   cartStore.removeItem(props.username, scryfallId, cardId)
+  priceChangeNotice.value = []
   if (items.value.length === 0) emit('close')
 }
 </script>
@@ -196,6 +230,16 @@ const removeItem = (scryfallId: string, cardId: string) => {
           <div class="flex items-baseline justify-between">
             <span class="text-[13px] font-bold uppercase tracking-[.08em] text-silver-50">{{ t('cart.total') }}</span>
             <span class="font-display font-tnum text-[26px] font-bold text-neon">${{ totalValue.toFixed(2) }}</span>
+          </div>
+
+          <!-- TASK-306 AC4: precios re-validados contra lo publicado; requiere un segundo click en ENVIAR PEDIDO para confirmar -->
+          <div v-if="priceChangeNotice.length > 0" class="rounded-md border border-neon-40 bg-surface-1 px-3 py-2 flex flex-col gap-1">
+            <p class="text-tiny font-bold text-neon">{{ t('cart.priceChangedConfirm') }}</p>
+            <ul class="text-tiny text-silver-70">
+              <li v-for="change in priceChangeNotice" :key="change.cardId">
+                {{ change.name }}: ${{ change.cartPrice.toFixed(2) }} → ${{ change.publishedPrice.toFixed(2) }}
+              </li>
+            </ul>
           </div>
 
           <!-- Contact form (SCRUM-70: para que el dueño pueda responder este pedido) -->

@@ -24,15 +24,38 @@ vi.mock('@/services/mtgjson', () => ({
   getCardPrices: vi.fn(),
 }))
 
+// TASK-306: submitBuyRequest now re-resolves each line's price against
+// `public_cards/{ownerUid}_{cardId}` via getDoc before persisting. vi.hoisted
+// keeps this lookup table reachable from both the mock factory (hoisted
+// above any top-level `let`/`const`) and the test bodies that seed it — each
+// test here represents "what the vendor has published right now", which for
+// THIS file's own purpose (CK reference price must never leak into `price`)
+// is deliberately set equal to the cart's own price, so this re-resolution
+// step changes nothing about what TASK-298 already asserts.
+const { setPublishedPrice, mockDoc, mockGetDoc } = vi.hoisted(() => {
+  const publishedPrices: Record<string, { price: number; status: string }> = {}
+  return {
+    setPublishedPrice: (docPath: string, price: number, status = 'sale') => {
+      publishedPrices[docPath] = { price, status }
+    },
+    mockDoc: (...args: unknown[]) => ({ path: args.slice(1).join('/') }),
+    mockGetDoc: async (ref: { path: string }) => {
+      const published = publishedPrices[ref.path]
+      return { exists: () => !!published, data: () => published ?? {} }
+    },
+  }
+})
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   // TASK-291 AC3: submitBuyRequest now targets a deterministic doc id via
   // setDoc, not addDoc — see stores/buyRequests.ts.
   setDoc: vi.fn().mockResolvedValue(undefined),
+  getDoc: vi.fn(mockGetDoc),
   getDocs: vi.fn().mockResolvedValue({ docs: [] }),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),
-  doc: vi.fn(() => ({})),
+  doc: vi.fn(mockDoc),
 }))
 vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ user: null }) }))
@@ -92,6 +115,10 @@ describe('TASK-298 — el precio de la transacción persistida es el del vendedo
     mockGetCardPrices.mockResolvedValue({
       cardKingdom: { retail: 0.35, retailFoil: null, buylist: null, buylistFoil: null },
     })
+    // TASK-306: lo que public_cards tiene HOY para esta carta — igual al
+    // precio del carrito, porque este test verifica CK vs. vendedor, no
+    // drift entre el carrito y lo publicado (eso lo cubre priceResolution.test.ts).
+    setPublishedPrice('public_cards/owner-uid_card-serra', 4.5)
 
     const cartStore = useExchangeCartStore()
     cartStore.addItem('vendedor', makeItem({ price: 4.5 }))
@@ -127,6 +154,8 @@ describe('TASK-298 — el precio de la transacción persistida es el del vendedo
       }
       return null
     })
+    setPublishedPrice('public_cards/owner-uid_card-serra', 4.5)
+    setPublishedPrice('public_cards/owner-uid_card-elspeth', 29.99)
 
     const cartStore = useExchangeCartStore()
     cartStore.addItem('vendedor', makeItem({

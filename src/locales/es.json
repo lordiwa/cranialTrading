@@ -277,7 +277,9 @@
     "each": "c/u",
     "qtyLabel": "Cant",
     "decreaseQty": "Restar cantidad",
-    "increaseQty": "Sumar cantidad"
+    "increaseQty": "Sumar cantidad",
+    "priceChangedConfirm": "El precio cambió desde que agregaste estas cartas. Revisá el total actualizado y presioná ENVIAR PEDIDO de nuevo para confirmar.",
+    "itemsUnavailable": "Estas cartas ya no están disponibles al precio publicado: {names}. Quitalas del carrito para poder enviar el pedido."
   },
   "landing": {
     "tagline": "From Trash to Treasures",

@@ -4,16 +4,40 @@
  */
 import { createPinia, setActivePinia } from 'pinia'
 
+// TASK-306: submitBuyRequest now re-resolves each line's price against
+// `public_cards/{ownerUid}_{cardId}` via getDoc before persisting (see
+// stores/buyRequests.ts). vi.hoisted keeps this lookup table reachable from
+// both the mock factory below (which runs hoisted, before any top-level
+// `let`/`const` in this file would otherwise be initialized) and the test
+// bodies further down that need to seed/reset it.
+const { setPublishedPrice, resetPublishedPrices, mockDoc, mockGetDoc } = vi.hoisted(() => {
+  const publishedPrices: Record<string, { price: number; status: string }> = {}
+  return {
+    setPublishedPrice: (docPath: string, price: number, status = 'sale') => {
+      publishedPrices[docPath] = { price, status }
+    },
+    resetPublishedPrices: () => {
+      for (const key of Object.keys(publishedPrices)) delete publishedPrices[key]
+    },
+    // TASK-291 AC3: submitBuyRequest now targets doc(db, ..., id) with a
+    // deterministic id (setDoc), not addDoc. Echo the path segments (incl. the
+    // id) so tests can assert on the id without needing a real Firestore ref.
+    mockDoc: (...args: unknown[]) => ({ path: args.slice(1).join('/') }),
+    mockGetDoc: async (ref: { path: string }) => {
+      const published = publishedPrices[ref.path]
+      return { exists: () => !!published, data: () => published ?? {} }
+    },
+  }
+})
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   getDocs: vi.fn().mockResolvedValue({ docs: [] }),
+  getDoc: vi.fn(mockGetDoc),
   setDoc: vi.fn().mockResolvedValue(undefined),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),
-  // TASK-291 AC3: submitBuyRequest now targets doc(db, ..., id) with a
-  // deterministic id (setDoc), not addDoc. Echo the path segments (incl. the
-  // id) so tests can assert on the id without needing a real Firestore ref.
-  doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
+  doc: vi.fn(mockDoc),
 }))
 
 vi.mock('@/services/firebase', () => ({ db: {} }))
@@ -46,7 +70,17 @@ const item = (over: Partial<any> = {}) => ({
 })
 
 describe('useBuyRequestsStore — submitBuyRequest (SCRUM-70.1)', () => {
-  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks(); (setDoc as any).mockResolvedValue(undefined) })
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    ;(setDoc as any).mockResolvedValue(undefined)
+    resetPublishedPrices()
+    // TASK-306: por defecto el vendedor tiene publicado exactamente lo que
+    // item() carga en el carrito (price: 2, status: 'sale') — estos tests no
+    // ejercitan la re-resolución en sí (eso lo hace priceResolution.test.ts),
+    // así que el lookup no debe alterar lo que ya se está asertando aquí.
+    setPublishedPrice('public_cards/owner-id_c1', 2)
+  })
 
   it('escribe un doc con status pending, totalValue y contacto', async () => {
     const store = useBuyRequestsStore()
@@ -84,7 +118,10 @@ describe('useBuyRequestsStore — submitBuyRequest (SCRUM-70.1)', () => {
     const [ref1] = (setDoc as any).mock.calls[0]
     const [ref2] = (setDoc as any).mock.calls[1]
     expect(ref1.path).toBe(ref2.path)
-    expect(doc).toHaveBeenCalledTimes(2)
+    // TASK-306: cada submit ahora también hace un doc() por línea para
+    // leer el precio publicado (fetchPublishedPriceMap) antes del doc()
+    // del propio BuyRequest — 1 item + 1 ref por submit, 2 submits = 4.
+    expect(doc).toHaveBeenCalledTimes(4)
   })
 
   it('AC3: un carrito con distinto createdAt (una sesion de carrito distinta) produce un id distinto', async () => {

@@ -3,8 +3,10 @@
  *  - computeTotalValue: suma price*quantity.
  *  - planFulfillment: decide por carta si decrementar, borrar (queda 0) o marcar
  *    como faltante (la carta ya no existe en la colección).
+ *  - resolvePublishedPrices (TASK-306): re-resuelve el precio de cada línea
+ *    contra lo publicado por el vendedor, nunca contra lo que vino del carrito.
  */
-import { buildBuyRequestId, computeTotalValue, planFulfillment } from '@/utils/buyRequest'
+import { buildBuyRequestId, computeTotalValue, planFulfillment, resolvePublishedPrices } from '@/utils/buyRequest'
 
 const item = (over: Partial<any> = {}) => ({
   scryfallId: 's', cardId: 'c1', name: 'N', edition: '', quantity: 1,
@@ -47,6 +49,57 @@ describe('buildBuyRequestId (TASK-291 AC3)', () => {
     const id1 = buildBuyRequestId(contact, items, 1000)
     const id2 = buildBuyRequestId(contact, [item({ scryfallId: 's1', cardId: 'c1', quantity: 3 }), items[1]], 1000)
     expect(id1).not.toBe(id2)
+  })
+})
+
+describe('resolvePublishedPrices (TASK-306 — hallazgo WG4-O3A-02)', () => {
+  it('reemplaza el precio del carrito por el publicado por el vendedor cuando difieren — previene que un comprador fije el precio de su propio pedido', () => {
+    const cartItems = [item({ cardId: 'c1', name: 'Angel of the Ruins', price: 0.01, quantity: 1 })]
+    const getPublished = (cardId: string) => (cardId === 'c1' ? { price: 2.4, status: 'sale' } : undefined)
+
+    const result = resolvePublishedPrices(cartItems, getPublished)
+
+    expect(result.ok).toBe(true)
+    expect(result.resolved[0].price).toBe(2.4) // nunca 0.01
+    expect(result.changed).toEqual([{ cardId: 'c1', name: 'Angel of the Ruins', cartPrice: 0.01, publishedPrice: 2.4 }])
+  })
+
+  it('computeTotalValue sobre las lineas resueltas da el total del vendedor, no el manipulado del carrito', () => {
+    const cartItems = [
+      item({ cardId: 'c1', name: 'Angel of the Ruins', price: 0.01, quantity: 1 }),
+      item({ cardId: 'c2', name: 'Serra Angel', price: 4.5, quantity: 2 }),
+    ]
+    const getPublished = (cardId: string) =>
+      ({ c1: { price: 2.4, status: 'sale' }, c2: { price: 4.5, status: 'sale' } })[cardId]
+
+    const result = resolvePublishedPrices(cartItems, getPublished)
+
+    expect(computeTotalValue(result.resolved)).toBe(11.4) // 2.40*1 + 4.50*2, no 0.01 + 9.00
+  })
+
+  it('una carta despublicada (sin doc, o sin precio vendible) queda "unavailable" y ok=false — no se inventa un precio para persistirla', () => {
+    const cartItems = [item({ cardId: 'gone', name: 'Old Card', price: 5, quantity: 1 })]
+    const getPublished = () => undefined // carta ya no está en public_cards
+
+    const result = resolvePublishedPrices(cartItems, getPublished)
+
+    expect(result.ok).toBe(false)
+    expect(result.resolved).toEqual([])
+    expect(result.unavailable).toEqual([{ cardId: 'gone', name: 'Old Card' }])
+  })
+
+  it('un precio publicado en 0 o un status no vendible tampoco resuelve — un "gratis" o "collection" no es un precio de transaccion valido', () => {
+    const cartItems = [
+      item({ cardId: 'c1', name: 'Zero Price', price: 3, quantity: 1 }),
+      item({ cardId: 'c2', name: 'Now Wishlist', price: 3, quantity: 1 }),
+    ]
+    const getPublished = (cardId: string) =>
+      ({ c1: { price: 0, status: 'sale' }, c2: { price: 3, status: 'wishlist' } })[cardId]
+
+    const result = resolvePublishedPrices(cartItems, getPublished)
+
+    expect(result.ok).toBe(false)
+    expect(result.unavailable.map(u => u.cardId).sort()).toEqual(['c1', 'c2'])
   })
 })
 

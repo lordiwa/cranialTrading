@@ -1,10 +1,17 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { collection, deleteDoc, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../services/firestore'
 import { useAuthStore } from './auth'
 import { useCollectionStore } from './collection'
-import { buildBuyRequestId, computeTotalValue, planFulfillment } from '../utils/buyRequest'
+import {
+  buildBuyRequestId,
+  computeTotalValue,
+  planFulfillment,
+  type PriceResolutionResult,
+  type PublishedCardPrice,
+  resolvePublishedPrices,
+} from '../utils/buyRequest'
 import { logSanitizedError } from '../utils/logSanitizedError'
 import type { ExchangeCartItem } from '../types/exchangeCart'
 import type { BuyerContact, BuyRequest, BuyRequestStatus } from '../types/buyRequest'
@@ -27,6 +34,43 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
   const pendingCount = computed(() => buyRequests.value.filter(r => r.status === 'pending').length)
 
   /**
+   * TASK-306: lee lo que el VENDEDOR tiene publicado HOY para cada linea del
+   * carrito, directamente desde `public_cards/{ownerUid}_{item.cardId}` — el
+   * mismo id que syncCardToPublic/removeCardFromPublic usan para escribir y
+   * borrar ese doc (services/publicCards.ts), asi que es la fuente de verdad
+   * del precio, nunca `items` (que viene del navegador del comprador). Un
+   * doc ausente (carta despublicada) resuelve a `undefined` a proposito —
+   * resolvePublishedPrices lo trata como no-vendible (AC5).
+   */
+  const fetchPublishedPriceMap = async (
+    ownerUid: string,
+    items: ExchangeCartItem[],
+  ): Promise<Record<string, PublishedCardPrice | undefined>> => {
+    const entries = await Promise.all(
+      items.map(async (item): Promise<readonly [string, PublishedCardPrice | undefined]> => {
+        const snap = await getDoc(doc(db, 'public_cards', `${ownerUid}_${item.cardId}`))
+        if (!snap.exists()) return [item.cardId, undefined] as const
+        const data = snap.data() as { price?: number; status?: string }
+        return [item.cardId, { price: data.price ?? 0, status: data.status ?? '' }] as const
+      })
+    )
+    return Object.fromEntries(entries)
+  }
+
+  /**
+   * TASK-306 AC4: re-chequeo de precio SIN persistir — lo usa la UI del
+   * carrito antes de enviar, para mostrarle al comprador el precio nuevo (o
+   * que la carta ya no esta disponible) y pedirle que confirme con el numero
+   * vigente en vez de enviar a ciegas. submitBuyRequest hace este mismo
+   * re-chequeo de forma independiente al persistir (defensa en profundidad:
+   * AC2/AC3/AC5 valen aunque este paso de UI se salte).
+   */
+  const checkPriceChanges = async (ownerUid: string, items: ExchangeCartItem[]): Promise<PriceResolutionResult> => {
+    const priceMap = await fetchPublishedPriceMap(ownerUid, items)
+    return resolvePublishedPrices(items, (cardId) => priceMap[cardId])
+  }
+
+  /**
    * SCRUM-70.1: un visitante (posiblemente anónimo) envía su carrito al dueño.
    * Persiste bajo /users/{ownerUid}/buyRequests. NO depende de authStore.
    *
@@ -44,18 +88,35 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
    * cumple, así que el reenvío falla con permission-denied en vez de
    * pisar el documento original. No hizo falta tocar firestore.rules.
    */
-  const submitBuyRequest = async (ownerUid: string, contact: BuyerContact, items: ExchangeCartItem[], cartCreatedAt: number): Promise<{ ok: boolean; error?: string }> => {
+  const submitBuyRequest = async (
+    ownerUid: string,
+    contact: BuyerContact,
+    items: ExchangeCartItem[],
+    cartCreatedAt: number,
+  ): Promise<{ ok: boolean; error?: string; unavailable?: { cardId: string; name: string }[] }> => {
     if (!ownerUid) return { ok: false, error: 'no-owner-uid' }
     if (items.length === 0) return { ok: false, error: 'empty-cart' }
     try {
+      // TASK-306 AC2/AC3/AC5: el precio que se persiste es SIEMPRE el
+      // resuelto contra `public_cards` en este mismo instante, nunca
+      // `item.price` tal como llego del carrito del comprador. Si alguna
+      // linea no resuelve (carta despublicada / sin precio vendible), el
+      // pedido ENTERO se rechaza en vez de persistir un numero inventado
+      // para esa linea — no hay alta parcial silenciosa.
+      const priceMap = await fetchPublishedPriceMap(ownerUid, items)
+      const resolution = resolvePublishedPrices(items, (cardId) => priceMap[cardId])
+      if (!resolution.ok) {
+        return { ok: false, error: 'unavailable-items', unavailable: resolution.unavailable }
+      }
+
       const id = buildBuyRequestId(contact, items, cartCreatedAt)
       const ref_ = doc(db, 'users', ownerUid, 'buyRequests', id)
       await setDoc(ref_, {
         buyerName: contact.name.trim() || 'Guest',
         buyerPhone: contact.phone.trim(),
         buyerEmail: contact.email.trim(),
-        items,
-        totalValue: computeTotalValue(items),
+        items: resolution.resolved,
+        totalValue: computeTotalValue(resolution.resolved),
         status: 'pending' as BuyRequestStatus,
         createdAt: new Date(),
       })
@@ -159,6 +220,7 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
     loading,
     pendingCount,
     submitBuyRequest,
+    checkPriceChanges,
     loadBuyRequests,
     markSeen,
     deleteRequest,

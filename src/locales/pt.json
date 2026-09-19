@@ -276,6 +276,8 @@
     "emailInvalid": "Digite um e-mail válido (ex. nome@email.com)",
     "each": "cada",
     "qtyLabel": "Qtd",
+    "priceChangedConfirm": "O preço mudou desde que você adicionou essas cartas. Revise o total atualizado e pressione ENVIAR PEDIDO novamente para confirmar.",
+    "itemsUnavailable": "Essas cartas não estão mais disponíveis pelo preço publicado: {names}. Remova-as do carrinho para enviar o pedido.",
     "decreaseQty": "Diminuir quantidade",
     "increaseQty": "Aumentar quantidade"
   },

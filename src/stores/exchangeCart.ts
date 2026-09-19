@@ -178,6 +178,29 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     return cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   }
 
+  /**
+   * TASK-306 AC4: aplica al carrito en pantalla los precios que
+   * buyRequestsStore.checkPriceChanges resolvió contra lo publicado por el
+   * vendedor, para que el comprador VEA el número nuevo (y el total
+   * recalculado) antes de confirmar el envío. Nunca escribe un precio que no
+   * vino de esa resolución — el llamador (ExchangeCartDrawer) es quien pidió
+   * el re-chequeo primero.
+   */
+  function applyResolvedPrices(username: string, updates: { cardId: string; price: number }[]) {
+    // eslint-disable-next-line security/detect-object-injection
+    const cart = state.carts[username]
+    if (!cart) return
+    let changed = false
+    for (const update of updates) {
+      const item = cart.items.find(i => i.cardId === update.cardId)
+      if (item && item.price !== update.price) {
+        item.price = update.price
+        changed = true
+      }
+    }
+    if (changed) _persist()
+  }
+
   function clearCart(username: string) {
     // eslint-disable-next-line security/detect-object-injection
     delete state.carts[username]
@@ -215,6 +238,7 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     getCart,
     getCartItemCount,
     getCartTotalValue,
+    applyResolvedPrices,
     clearCart,
     isItemInCart,
     cleanExpiredCarts,

@@ -276,6 +276,8 @@
     "emailInvalid": "Enter a valid email (e.g. name@email.com)",
     "each": "each",
     "qtyLabel": "Qty",
+    "priceChangedConfirm": "The price changed since you added these cards. Review the updated total and press SEND REQUEST again to confirm.",
+    "itemsUnavailable": "These cards are no longer available at the published price: {names}. Remove them from the cart to send the request.",
     "decreaseQty": "Decrease quantity",
     "increaseQty": "Increase quantity"
   },

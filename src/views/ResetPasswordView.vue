@@ -26,24 +26,52 @@ const password = ref('');
 const passwordConfirm = ref('');
 const loading = ref(false);
 const invalidCode = ref(false);
+// TASK-301 (WG4-O1-01 fix): the oobCode is validated against Firebase Auth
+// (verifyPasswordResetCode) BEFORE the new-password form is trusted. Without
+// this intermediate state, the form would render usable — strength meter,
+// enabled RESTABLECER button — during the async validation call, i.e. the
+// same defect in miniature: a form enabled over a code nobody has confirmed
+// is valid yet.
+const verifying = ref(true);
 // TASK-103: shows the v2 success card (proto's "ESTADO 2: éxito") for the
 // same 1.5s window the auto-redirect already waited silently before this
 // ticket — presentational only, resetPassword() itself is unchanged.
 const success = ref(false);
 
-onMounted(() => {
-  const oobCode = route.query.oobCode as string;
-  if (oobCode) {
+// TASK-301: async work started from onMounted must NOT be awaited inside it
+// (CLAUDE.md Rule 8 — an awaited onMounted broke anonymous-profile loading
+// in production). verifyOobCode() is invoked fire-and-forget below.
+const verifyOobCode = async (oobCode: string) => {
+  const isValid = await authStore.verifyResetCode(oobCode);
+  if (isValid) {
     code.value = oobCode;
   } else {
     invalidCode.value = true;
   }
+  verifying.value = false;
+};
+
+onMounted(() => {
+  const oobCode = route.query.oobCode as string;
+  if (!oobCode) {
+    invalidCode.value = true;
+    verifying.value = false;
+    return;
+  }
+  void verifyOobCode(oobCode);
 });
 
 const passwordScore = computed(() => getPasswordStrengthScore(password.value));
 const passwordStrengthKey = computed(() => getPasswordStrengthLabel(passwordScore.value));
 
 const handleReset = async () => {
+  // TASK-301 AC4: defense in depth — the form template already hides this
+  // button behind v-else (unreachable while verifying/invalidCode is true),
+  // but a code known-invalid must never reach the backend regardless of how
+  // this is invoked.
+  if (verifying.value || invalidCode.value || !code.value) {
+    return;
+  }
   if (!password.value || password.value !== passwordConfirm.value) {
     return;
   }
@@ -74,8 +102,17 @@ const handleReset = async () => {
           <IconV2 :name="success ? 'check' : 'lock'" :size="28" />
         </div>
 
+        <!-- TASK-301: oobCode being validated — no form, no error, so the
+             RESTABLECER button can never be enabled over an unconfirmed
+             code, not even for the async gap. -->
+        <div v-if="verifying" class="w-full bg-surface-1 border border-line rounded-xl p-8 md:p-9 shadow-medium text-center" data-testid="reset-verifying">
+          <p class="text-small text-silver-50">
+            {{ t('common.actions.loading') }}
+          </p>
+        </div>
+
         <!-- Invalid / expired link -->
-        <div v-if="invalidCode" class="w-full bg-surface-1 border border-rust rounded-xl p-8 md:p-9 shadow-medium text-center">
+        <div v-else-if="invalidCode" class="w-full bg-surface-1 border border-rust rounded-xl p-8 md:p-9 shadow-medium text-center">
           <p class="text-body text-rust mb-3">
             ✗ {{ t('auth.resetPassword.invalidLink') }}
           </p>

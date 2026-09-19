@@ -669,6 +669,22 @@ export const useAuthStore = defineStore('auth', () => {
         }
     };
 
+    // TASK-301: validates an oobCode BEFORE the new-password form is trusted.
+    // Deliberately no toast here — the caller (ResetPasswordView) owns the
+    // persistent-error UI (the same invalidCode branch the no-oobCode path
+    // already renders), not a 4s auto-dismissing toast that leaves the user
+    // stuck on a live, submittable form.
+    const verifyResetCode = async (code: string) => {
+        try {
+            const { authFns, auth } = await loadFirebaseDeps();
+            await authFns.verifyPasswordResetCode(auth, code);
+            return true;
+        } catch (error: unknown) {
+            logSanitizedError('Reset code verification error', error);
+            return false;
+        }
+    };
+
     const resetPassword = async (code: string, newPassword: string) => {
         try {
             const { authFns, auth } = await loadFirebaseDeps();
@@ -1174,6 +1190,7 @@ export const useAuthStore = defineStore('auth', () => {
         loginWithGoogle,
         logout,
         sendResetPasswordEmail,
+        verifyResetCode,
         resetPassword,
         changePassword,
         sendVerificationEmail,

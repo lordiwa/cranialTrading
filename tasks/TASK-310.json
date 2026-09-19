@@ -1,0 +1,31 @@
+{
+  "key": "TASK-310",
+  "title": "Las pestanas de matches no son conjuntos disjuntos: Guardados es un subconjunto de Enviados y muestra como guardado lo que el usuario nunca guardo",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. La ola 3-B original nunca entrego y nueve casos de uso habian quedado sin atacar; la causa raiz y el cambio de proceso estan en qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B2-03, veredicto ROTURA REAL, severidad ALTA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B2-03-enviados-y-guardados-se-contradicen.md\\n\\nPATH AFECTADO: UC-17.6 (recorrer las seis pestanas) y UC-17.11 (un solo estado final coherente entre pestanas).\\n\\nLO QUE PROMETE LA DEFINICION: 17.6 exige que cada pestana muestre \"LO SUYO\" y que los contadores cuadren con el contenido. 17.11 exige \"un solo estado final, coherente entre las dos pestanas\".\\n\\nQUE PASA EN REALIDAD, MEDIDO EN DEV CON LINEA BASE LIMPIA (cuatro contadores en cero, cero filas):\\nContadores contra filas renderizadas: Nuevos 0/0, Enviados 4/4, Guardados 2/2, Eliminados 0/0. Los contadores SI cuadran con sus filas — ese no es el defecto.\\nEl defecto son los conjuntos. IDs medidos: ENVIADOS = [5sgVsXrcGEGZBQMnjbBS, Wj9UNW5vs7jNlQa9OzYf, ccvEPIVmO4lpcC2H3m8i, hwM0Dv4UrXkvlEKZo93j]; GUARDADOS = [5sgVsXrcGEGZBQMnjbBS, ccvEPIVmO4lpcC2H3m8i]. Guardados es un SUBCONJUNTO de Enviados: no tiene contenido propio, es una copia parcial. Ninguna pestana \"muestra lo suyo\".\\nY el atacante NUNCA GUARDO NADA: no pulso ME INTERESA dentro de un match ni ninguna accion de guardar en /saved-matches. Su unica accion fue expresar interes desde el perfil publico. Aun asi aparecieron 2 matches en Guardados. El usuario ve como guardado algo que jamas guardo.\\n\\nVERIFICADO EN EL CODIGO POR EL ORQUESTADOR, en solo lectura: src/stores/matches.ts. Las dos pestanas se calculan sobre EL MISMO array: \"sentMatches.value = sharedForSent\" (sin deduplicar) y, tres lineas despues, \"savedMatches.value = dedupeMatchesByIdentity([...savedFromFirestore, ...sharedForSent])\" (deduplicado). De ahi salen los dos numeros distintos sobre los mismos datos, y de ahi sale que Guardados contenga lo enviado sin que el usuario lo haya guardado: sharedForSent se vuelca en savedMatches por diseno. El comentario del propio codigo lo llama \"combined view\". Confirmado exactamente como lo reporto el atacante.\\n\\nNOTA DE ALCANCE DEL TRIAJE: los 4 documentos de Enviados provienen del defecto de TASK-309 (tres clics rapidos = tres documentos). Eso afecta al NUMERO 4, no al hallazgo: el solapamiento entre pestanas y la aparicion de matches no guardados se sostienen con cualquier cantidad de documentos. Se abren como tickets separados porque los arreglos son distintos — uno es una guarda de vuelo unico, el otro es el criterio de particion de las pestanas.\\n\\nPOR QUE IMPORTA: las pestanas son el modelo mental que la app le ofrece al usuario para saber en que estado esta cada negociacion. Si Guardados repite lo de Enviados y ademas se llena solo, el usuario no puede confiar en ninguna de las dos para decidir a quien le falta responder.\\n\\nEVIDENCIA Y SCRIPT: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b2-03-uc17-contadores.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio): con una cuenta de linea base limpia, generar matches por una sola via y registrar los data-match-id de cada pestana por separado.",
+    "AC2: las pestanas de estado son disjuntas o su solapamiento esta declarado en la UI. Un match no aparece a la vez en Enviados y en Guardados sin que la pantalla explique por que.",
+    "AC3: un match solo entra en Guardados por una accion explicita de guardar del usuario. Expresar interes desde el perfil publico no lo guarda.",
+    "AC4: recorrer las seis pestanas deja cada match en un solo estado final coherente, incluido el caso de guardar y descartar el mismo match en rapida sucesion (UC-17.11).",
+    "AC5: prueba de regresion (tests-after) que genera matches por una via y asevera la particion por pestana comparando conjuntos de ids, no contadores. Debe fallar contra el codigo actual.",
+    "AC6: UAT recorriendo las seis pestanas con una cuenta de prueba y contrastando con lo que el usuario efectivamente hizo."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "matches",
+    "tabs",
+    "state",
+    "ux",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:24:00.878Z",
+  "updated_at": "2026-09-19T17:24:00.878Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

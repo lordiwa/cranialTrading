@@ -1,0 +1,30 @@
+{
+  "key": "TASK-314",
+  "title": "Market: con la fuente de precios caida no se muestra ningun aviso — 0 toasts, sin fecha de actualizacion, y el unico texto en pantalla le echa la culpa a la coleccion del usuario",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. Causa raiz de la incompletitud original y cambio de proceso: qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B3-03, veredicto ROTURA REAL, severidad ALTA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B3-03-market-caido-cero-avisos.md\n\nPATH AFECTADO: UC-22.9 (dependencia externa caida o con datos parciales). Rompe tambien UC-25.2 (accion fallida).\n\nLO QUE PROMETE LA DEFINICION: 22.9 exige \"Error entendible y la fecha de actualizacion dice la verdad\". 25.2 exige \"un aviso de error ENTENDIBLE, no el error crudo de Firebase\".\n\nQUE PASA EN REALIDAD, MEDIDO EN DEV: se intercepto la red SOLO en el navegador del atacante (route.abort sobre firestore.googleapis.com) para reproducir lo que ve un usuario cuando la fuente de datos no esta disponible. No se toco el backend. Se abrio /market, se esperaron 18 s y no se hizo clic en nada.\nRequests abortadas: 2. AVISOS MOSTRADOS AL USUARIO: 0 (array vacio, contando hijos directos de [role=status][aria-live=polite], el contenedor real de toasts de src/components/ui/BaseToast.vue). Tabla de datos: no renderizada (querySelector(table) = null). Etiqueta \"Actualizado:\": AUSENTE.\nEl unico texto que la pantalla le ofrece al usuario es: \"Ninguna de tus cartas coincide con los movimientos de precio actuales.\" Es decir, con la fuente caida la app le dice al usuario que el problema es SU COLECCION.\nEl fallo si se registro, pero solo en la consola, invisible para el usuario: \"Error fetching price movers: FirebaseError: Failed to get document because the client is offline.\"\n\nMATIZ A FAVOR DEL SUT, MEDIDO Y DECLARADO POR EL ATACANTE: no hay una fecha de actualizacion MINTIENDO (que es el defecto que 22.9 llama grave), porque no hay fecha en absoluto. El defecto es la ausencia de aviso, no un dato viejo presentado como actual.\n\nRELACION CON TASK-315: el mismo texto se muestra en tres situaciones distintas — fuente caida, cartera vacia, y cartera con cartas que no se movieron. Los dos tickets atacan mitades distintas del mismo problema de comunicacion; se abren separados porque los arreglos son distintos (reportar el fallo vs. distinguir vacio de sin-coincidencias).\n\nEVIDENCIA Y SCRIPT: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b3-02-uc22-market.mjs y la evidencia o3b3-* de la misma carpeta\n\nVERIFICADO EN EL CODIGO POR EL ORQUESTADOR tras el cierre del adversario, en solo lectura, y explica por que no hay NINGUN aviso: src/services/market.ts captura el fallo y lo TRAGA — \"catch (error) { console.error(...); return null }\" — en vez de relanzarlo. Como el servicio devuelve null en lugar de propagar la excepcion, el catch del store (src/stores/market.ts:345-348) que mostraria el toast de error NUNCA SE EJECUTA: el aviso de error es CODIGO MUERTO. El mismo patron esta en getFormatStaples y en getPriceMovers. Esto convierte el AC2 en un cambio concreto: el servicio tiene que propagar el fallo (o devolver un resultado que distinga fallo de vacio) para que el camino de aviso vuelva a ser alcanzable. EFECTO LATERAL REPORTADO POR EL ADVERSARIO, no triado como hallazgo aparte: con la fuente caida el modal de tour reaparece y bloquea los clics de la pagina.",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio): reproducir el fallo de la fuente de datos en un entorno no productivo y registrar avisos mostrados, presencia de la fecha de actualizacion y texto exacto en pantalla.",
+    "AC2: cuando la fuente de precios falla, el usuario recibe un aviso entendible que dice que el dato no se pudo cargar. No el error crudo de Firebase y no silencio.",
+    "AC3: el estado de fallo NO se comunica con un texto que atribuya la causa a la coleccion del usuario.",
+    "AC4: la fecha de actualizacion dice la verdad: o corresponde al dato mostrado, o se declara que no hay dato. Nunca un precio viejo presentado como actual.",
+    "AC5: el estado de fallo es distinguible en pantalla del estado \"no hay coincidencias\" y del estado \"cartera vacia\" (ver TASK-315).",
+    "AC6: prueba de regresion (tests-after) que intercepta la fuente de datos, abre /market y asevera al menos un aviso de error. Debe fallar contra el codigo actual."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "market",
+    "error-handling",
+    "toasts",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:24:46.006Z",
+  "updated_at": "2026-09-19T17:25:50.252Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

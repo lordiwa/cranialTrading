@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T12:00:00.000Z",
+  "generated_at": "2026-09-19T17:24:46.031Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1716,6 +1716,60 @@
       "title": "El precio del pedido lo fija el COMPRADOR: submitBuyRequest persiste los items verbatim desde el navegador del visitante y el vendedor descuenta inventario contra ese numero",
       "status": "todo",
       "priority": "critical"
+    },
+    {
+      "key": "TASK-307",
+      "title": "fulfillRequest: cumplir un pedido por mas unidades de las que hay BORRA la carta entera de la coleccion y reporta exito completo sin informar nada faltante",
+      "status": "todo",
+      "priority": "critical"
+    },
+    {
+      "key": "TASK-308",
+      "title": "Matches: un usuario sin nada publicado encuentra ACTUALIZAR deshabilitado, cinco ceros sin contexto y un cartel que le dice que espere, cuando el bloqueo es suyo",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-309",
+      "title": "ME INTERESA no tiene guarda de vuelo unico: tres clics rapidos crean tres matches distintos en Firestore y tres notificaciones al otro usuario",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-310",
+      "title": "Las pestanas de matches no son conjuntos disjuntos: Guardados es un subconjunto de Enviados y muestra como guardado lo que el usuario nunca guardo",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-311",
+      "title": "Market: la pestana STAPLES no muestra ningun precio — cero tokens monetarios en toda la tabla, y la columna de precio no existe",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-312",
+      "title": "Market: la tabla de movimientos de precio repite filas identicas — 3 duplicados medidos sobre 30 filas, y el ranking esconde cartas reales",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-313",
+      "title": "Abrir el modal de CONTACTAR y cerrarlo sin escribir persiste una conversacion vacia e imborrable, y el encabezado la cuenta como 1 conversaciones activas",
+      "status": "todo",
+      "priority": "low"
+    },
+    {
+      "key": "TASK-314",
+      "title": "Market: con la fuente de precios caida no se muestra ningun aviso — 0 toasts, sin fecha de actualizacion, y el unico texto en pantalla le echa la culpa a la coleccion del usuario",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-315",
+      "title": "Market: un mismo texto para tres causas distintas — con la cartera vacia dice que ninguna carta coincide, en vez de decir que no hay cartas",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

@@ -1,0 +1,29 @@
+{
+  "key": "TASK-315",
+  "title": "Market: un mismo texto para tres causas distintas — con la cartera vacia dice que ninguna carta coincide, en vez de decir que no hay cartas",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. Causa raiz de la incompletitud original y cambio de proceso: qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B3-04, veredicto ROTURA REAL, severidad MEDIA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B3-04-cartera-vacia-mensaje-enganoso.md\n\nPATH AFECTADO: UC-22.8 (cartera vacia) y deja UC-22.3 sin cumplir.\n\nLO QUE PROMETE LA DEFINICION: 22.8 exige \"Estado vacio EXPLICATIVO, no un total de $0 sin contexto\". 22.3 exige \"Valor total y variacion sobre las cartas que realmente tiene\".\n\nQUE PASA EN REALIDAD, MEDIDO EN DEV con una cuenta descartable recien registrada (qa_wg4b3_4b3a), que arranca con coleccion vacia — el caso 22.8 exacto, sin borrarle nada a nadie. Se confirmo el cero: /collection reporta Cartas 0 / Unicas 0 y la consola loguea \"[loadCollection] Loaded card_index: 0 cards from 1 chunks (v3)\".\nPestana MI PORTAFOLIO con 0 cartas: \"Ninguna de tus cartas coincide con los movimientos de precio actuales.\"\nPestana DESEADOS con 0 deseados: \"Ninguna de tus cartas deseadas coincide con los movimientos actuales.\"\nTokens monetarios visibles: 0. Tokens NaN/undefined: 0.\n\nMATIZ A FAVOR DEL SUT, MEDIDO Y DECLARADO POR EL ATACANTE: NO aparece el \"total de $0 sin contexto\" que el documento marca como el anti-patron de 22.8. En /market no hay ningun $0. Por eso este hallazgo es MEDIA y no alta.\n\nLO QUE SI FALLA, y son dos cosas distintas:\n1. El mensaje es ENGANOSO: dice que las cartas del usuario no coinciden cuando el usuario NO TIENE cartas. Le atribuye al dato una propiedad que el dato no tiene porque no existe.\n2. Un mismo texto para TRES causas: cartera vacia, cartera con cartas que no se movieron, y —medido en WG4-O3B3-03 / TASK-314— fuente de precios caida. El usuario no puede distinguir \"no tengo cartas\" de \"no hay movimientos\" de \"el sistema esta roto\".\nAdemas, la mitad medible de 22.3 (valor total y variacion) no se muestra en ningun estado.\n\nEVIDENCIA Y SCRIPT: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b3-02-uc22-market.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio): con una cuenta de coleccion vacia, registrar el texto exacto de MI PORTAFOLIO y de DESEADOS en /market.",
+    "AC2: con la cartera vacia, el estado vacio dice que no hay cartas y nombra la accion para tenerlas. No dice que las cartas no coinciden.",
+    "AC3: los tres estados —cartera vacia, sin coincidencias, fuente caida— tienen textos distinguibles entre si (coordinar con TASK-314).",
+    "AC4: con cartera no vacia se muestran valor total y variacion (UC-22.3), que hoy no aparecen en ningun estado.",
+    "AC5: prueba de regresion (tests-after) con una cuenta de coleccion vacia que asevera el texto del estado vacio correcto. Debe fallar contra el codigo actual."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "market",
+    "empty-state",
+    "ux",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:24:46.031Z",
+  "updated_at": "2026-09-19T17:24:46.031Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

@@ -1,0 +1,31 @@
+{
+  "key": "TASK-309",
+  "title": "ME INTERESA no tiene guarda de vuelo unico: tres clics rapidos crean tres matches distintos en Firestore y tres notificaciones al otro usuario",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. La ola 3-B original nunca entrego y nueve casos de uso habian quedado sin atacar; la causa raiz y el cambio de proceso estan en qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B2-02, veredicto ROTURA REAL, severidad ALTA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B2-02-me-interesa-duplica-por-clic.md\\n\\nPATH AFECTADO: UC-17.10 (doble clic en ME INTERESA).\\n\\nLO QUE PROMETE LA DEFINICION: 17.10 exige \"UNA entrada en Guardados y UNA notificacion\".\\n\\nQUE PASA EN REALIDAD, MEDIDO EN DEV CON LINEA BASE LIMPIA: se partio de los cuatro contadores en cero y cero filas [data-match-id]. Control: un solo clic en ME INTERESA de la carta #0 del perfil publico del vendedor -> toast INTERES ENVIADO. Ataque: tres click() sincronicos seguidos sobre el boton de la carta #1, sin ceder el hilo entre uno y otro (el equivalente a un triple clic humano mas rapido que la latencia de red).\\nResultado: Enviados paso de 0 a 4 y se renderizaron 4 filas [data-match-id]. El esperado era 2 (una por carta). Los tres clics rapidos generaron TRES entradas distintas.\\nLos cuatro son documentos DISTINTOS en Firestore, con docId propio, no un problema de render duplicado: 5sgVsXrcGEGZBQMnjbBS, Wj9UNW5vs7jNlQa9OzYf, ccvEPIVmO4lpcC2H3m8i, hwM0Dv4UrXkvlEKZo93j.\\nEl boton NO SE DESHABILITA NUNCA. Medido en el mismo tick del primer clic: { texto: \"ME INTERESA\", disabled: false }.\\n\\nVERIFICADO EN EL CODIGO POR EL ORQUESTADOR, en solo lectura: src/views/UserProfileView.vue, handleInterest. La guarda es \"if (interestedCards.value.has(cardKey)) return\" y el \"interestedCards.value.add(cardKey)\" que la puebla esta DESPUES del await addDoc(sharedMatchesRef, ...). Es un check-then-act sobre la red: los tres clics pasan la guarda antes de que el primero termine de escribir. Confirmado exactamente como lo reporto el atacante.\\n\\nPATRON CONOCIDO EN ESTE SUT: es la misma familia que WG-001 / TASK-291, donde el envio del carrito escribia dos documentos separados por 4 ms. La guarda de vuelo unico no esta puesta en este control.\\n\\nPOR QUE IMPORTA: el otro usuario recibe tres notificaciones por un solo interes, lo que lo lee como insistencia o como spam de la plataforma. Y la bandeja del que pulso queda con entradas duplicadas que tiene que limpiar a mano.\\n\\nEVIDENCIA Y SCRIPT: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b2-03-uc17-contadores.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio): registrar la linea base de contadores y de docIds en Firestore, despachar N clics rapidos sobre ME INTERESA y contar los documentos creados.",
+    "AC2: N clics rapidos sobre ME INTERESA producen UN documento de match, no N. La guarda es de vuelo unico (in-flight), no solo un debounce visual.",
+    "AC3: el boton refleja el estado: se deshabilita o cambia de estado en el mismo tick del primer clic, de modo que el usuario no pueda despachar el segundo.",
+    "AC4: se emite UNA sola notificacion al otro usuario por interes expresado.",
+    "AC5: idempotencia del lado del dato: expresar interes dos veces sobre el MISMO match no crea un segundo documento aunque los clics esten separados por segundos.",
+    "AC6: prueba de regresion (tests-after) que despacha tres clics sincronicos y asevera un solo documento. Debe fallar contra el codigo actual.",
+    "AC7 (mata-mutantes): quitar la guarda deja la prueba del AC6 en rojo."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "matches",
+    "double-submit",
+    "integrity",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:24:00.852Z",
+  "updated_at": "2026-09-19T17:24:00.852Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

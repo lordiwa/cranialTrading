@@ -1,0 +1,29 @@
+{
+  "key": "TASK-313",
+  "title": "Abrir el modal de CONTACTAR y cerrarlo sin escribir persiste una conversacion vacia e imborrable, y el encabezado la cuenta como 1 conversaciones activas",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. La ola 3-B original nunca entrego y nueve casos de uso habian quedado sin atacar; la causa raiz y el cambio de proceso estan en qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B2-04, veredicto ROTURA REAL, severidad BAJA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B2-04-contactar-crea-conversacion-vacia.md\\n\\nPATH AFECTADO: UC-19.10 (sin conversaciones) y UC-19.3 (iniciar una conversacion nueva).\\n\\nLO QUE PROMETE LA DEFINICION: 19.10 exige \"Estado vacio explicativo\". El estado vacio verdadero SI funciona y esta bien redactado: lo que se rompe es su frontera, porque el sistema sale del estado vacio sin que exista ninguna conversacion real.\\n\\nQUE PASA EN REALIDAD, MEDIDO EN DEV: con la cuenta atacante sin ninguna conversacion, /messages mostraba correctamente \"Cuando contactes usuarios, apareceran aqui\". Se abrio el perfil publico del vendedor, se pulso CONTACTAR una sola vez, se abrio el modal de chat y SE CERRO SIN ESCRIBIR NI ENVIAR NADA. Al volver a /messages el encabezado decia \"0 sin leer - 1 conversaciones activas\" y la lista tenia 1 entrada ([data-testid=messages-conv-item], conteo 1) cuya previsualizacion es el propio texto de \"No hay mensajes aun. Se el primero en escribir\".\\nLa conversacion quedo PERSISTIDA en Firestore: sobrevivio a una recarga completa y siguio ahi en corridas posteriores con navegador nuevo. El atacante la reporta ademas como imborrable desde la interfaz.\\n\\nSEVERIDAD: baja y asi se triò. No hay perdida de datos ni de dinero; es suciedad de estado que degrada la lista y el contador. Se abre igual porque es barato de arreglar y porque el contador de conversaciones es un sensor que otros casos de uso usan.\\n\\nEVIDENCIA Y SCRIPT: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b2-01-abrir-chat.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio): con una cuenta sin conversaciones, abrir el modal de CONTACTAR, cerrarlo sin escribir y registrar el estado de /messages y de Firestore.",
+    "AC2: abrir y cerrar el modal sin enviar un mensaje NO persiste una conversacion. La conversacion se crea con el primer mensaje enviado, no con la apertura del modal.",
+    "AC3: el contador \"N conversaciones activas\" cuenta conversaciones con al menos un mensaje.",
+    "AC4: si por compatibilidad se decide seguir creando la conversacion al abrir, entonces tiene que poder BORRARSE desde la interfaz. Hoy no se puede.",
+    "AC5: prueba de regresion (tests-after) que abre y cierra el modal y asevera que /messages sigue en estado vacio. Debe fallar contra el codigo actual."
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "messages",
+    "state",
+    "ux",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:24:00.959Z",
+  "updated_at": "2026-09-19T17:24:00.959Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

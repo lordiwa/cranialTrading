@@ -1,0 +1,32 @@
+{
+  "key": "TASK-308",
+  "title": "Matches: un usuario sin nada publicado encuentra ACTUALIZAR deshabilitado, cinco ceros sin contexto y un cartel que le dice que espere, cuando el bloqueo es suyo",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents), RELANZAMIENTO DE LA OLA 3-B. La ola 3-B original nunca entrego y nueve casos de uso habian quedado sin atacar; la causa raiz y el cambio de proceso estan en qa-agents/wargames/cranialtrading/2026-09-19/05-lecciones.md. Hallazgo WG4-O3B2-01, veredicto ROTURA REAL, severidad ALTA. Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3B2-01-actualizar-matches-deshabilitado-sin-explicacion.md\\n\\nPATH AFECTADO: UC-16.4 (actualizar sin nada publicado), roza UC-16.3.\\n\\nLO QUE PROMETE LA DEFINICION: 16.4 exige \"Mensaje que explica que hay que publicar, no un cero sin contexto\".\\n\\nQUE PASA EN REALIDAD, MEDIDO EN DEV: con una cuenta sin cartas en sale/trade ni preferencias en wishlist, el disparador del path NO SE PUEDE EJECUTAR. El boton ACTUALIZAR esta disabled=true, con aria-label null, sin title y sin aria-describedby: no comunica nada, y un lector de pantalla anuncia \"ACTUALIZAR, no disponible\" y se termina ahi.\\nEl innerText completo de la pantalla en ese estado: \"TU VITRINA DE INTERCAMBIOS | Matches | 0 | MATCHES NUEVOS | $0 | VALOR POTENCIAL | 9 | TRADERS ACTIVOS | ACTUALIZAR | MATCHES | SOLICITUDES | CONTACTOS | Nuevos 0 | Enviados 0 | Guardados 0 | Eliminados 0 | No tienes matches nuevos | Cuando alguien se interese en tus cartas, aparecera aqui.\"\\nLos numeros son exactamente el \"cero sin contexto\" que el documento prohibe. Y el unico texto explicativo dice lo CONTRARIO de lo que corresponde: le pide al usuario ESPERAR a que un tercero actue, cuando el sistema esta bloqueado porque EL no publico nada. Dos lineas mas arriba la misma pantalla le dice que hay 9 TRADERS ACTIVOS: el mensaje y el dato se contradicen entre si. En ningun lugar del innerText aparecen las palabras publica, publicar, coleccion ni wishlist: cero cadenas accionables.\\n\\nVERIFICADO EN EL CODIGO POR EL ORQUESTADOR, en solo lectura:\\n- src/views/SavedMatchesView.vue: canRefresh = !refreshing.value && (collectionStore.cards.length > 0 || preferencesStore.preferences.length > 0). Confirmado: sin cartas ni preferencias es false para siempre.\\n- src/views/SavedMatchesView.vue: el boton se ata a :disabled=\"!canRefresh\" y la rama false no tiene ningun acompanamiento: ni tooltip, ni texto alternativo, ni estado vacio distinto.\\n- El estado vacio del chip new es un par titulo/mensaje fijo (matches.empty.new.*), identico tenga el usuario cartas publicadas o no. No existe variante para \"no publicaste nada\".\\nEl codigo nunca contemplo 16.4 como un estado con mensaje propio: lo resolvio deshabilitando el boton, que es justamente un cero sin contexto.\\n\\nPOR QUE IMPORTA: es el callejon sin salida del onboarding y le pega al usuario nuevo, el unico que todavia no decidio si la plataforma sirve. Llega a MATCHES, que es la promesa central del producto, ve todo en cero, ve un boton muerto y lee un cartel que le dice que espere. La accion correcta (cargar la coleccion o la wishlist) no esta nombrada ni enlazada en ninguna parte de la pantalla.\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/evidencia/o3b2-00-saved-matches.png y o3b2-00-recon.json (clave smDump). Script: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/scripts/o3b2-00-login.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo): con una cuenta sin cartas publicadas ni preferencias, registrar el estado actual de /saved-matches: estado del boton ACTUALIZAR y texto completo de la pantalla.",
+    "AC2: el estado vacio distingue \"todavia no publicaste nada\" de \"publicaste y no hay coincidencias\". Son dos causas distintas y hoy comparten el mismo par titulo/mensaje.",
+    "AC3: el caso \"no publicaste nada\" nombra la accion correcta y la enlaza: cargar la coleccion o la wishlist. No alcanza con explicar; tiene que haber a donde ir.",
+    "AC4: si el boton ACTUALIZAR sigue deshabilitado, comunica POR QUE de forma accesible (aria-label o aria-describedby y un texto visible). Un control deshabilitado y mudo no es un estado valido.",
+    "AC5: la pantalla no se contradice: no se le pide al usuario esperar a terceros mientras se le informa que hay traders activos y el bloqueo es suyo.",
+    "AC6: prueba de regresion (tests-after) con una cuenta sin publicar que asevera la presencia del mensaje accionable. Debe fallar contra el codigo actual.",
+    "AC7: UAT con una cuenta recien registrada, recorriendo el camino desde el registro hasta MATCHES."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "matches",
+    "onboarding",
+    "empty-state",
+    "ux",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T17:24:00.825Z",
+  "updated_at": "2026-09-19T17:24:00.825Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

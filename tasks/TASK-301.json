@@ -23,9 +23,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-09-19T19:15:22.929Z",
+      "body": "[BLOQUEA EL CIERRE — regresion de spec medida en CI, predicha por el reviewer]\n\nEl reviewer de este ticket dejo escrito como condicion de cierre que al ejecutar los e2e afectados \"el spec del MEDIUM-1 ira a rojo y debe quedar resuelto o ticketeado\". PASO EXACTAMENTE ESO. Medido, no leido:\n\nCORRIDA: CI/CD run 35463152299 sobre develop (commit d842f95), job e2e, 2026-09-19T19:14Z.\nRESULTADO: 1 failed, 123 passed. El unico rojo es\n  e2e/specs/auth/forgot-password.spec.ts:29 \"Reset Password > reset password page rejects mismatched passwords\"\nFALLO: TimeoutError: locator.fill: Timeout 10000ms exceeded, waiting for locator('input[type=\"password\"]').first(), en la linea 31 del page object (await this.passwordInput.fill(password)). Fallo las 3 veces (original + 2 reintentos).\n\nCAUSA, que es el fix de este ticket funcionando como se pidio: el spec navega a la pagina de reset SIN un oobCode valido y espera que se pinte el formulario. Despues de este fix el oobCode se valida AL MONTAR y se pinta la tarjeta de error con la salida a solicitar un enlace nuevo, asi que ya no hay ningun input de contrasena que llenar. El fix no esta mal; el spec quedo describiendo el comportamiento viejo.\n\nCONSECUENCIA OPERATIVA, que es lo que mas importa y no es obvia: con el job e2e en rojo, deploy-dev queda SKIPPED y el sitio de dev NO recibe este codigo. O sea que el AC7 de este ticket (UAT contra el entorno desplegado) y la re-verificacion del Wrecker son IMPOSIBLES hasta que este spec se resuelva. Este rojo es hoy el tapon de todo el ciclo de la tanda, no un detalle de limpieza.\n\nQUE HAY QUE HACER (implementacion, va al developer, no al orquestador): que el spec ejerza el camino que dice ejercer — o bien generar/usar un oobCode valido para llegar al formulario y recien ahi probar el rechazo de contrasenas que no coinciden, o bien re-alcanzar el spec a afirmar la tarjeta de error, que es el comportamiento nuevo, y mover la verificacion de contrasenas que no coinciden a un caso con codigo valido. Lo segundo es mas barato; lo primero es lo que de verdad cubre el camino.\n\nOJO CON EL ATAJO EQUIVOCADO: envolver la asercion en un if isVisible() para que deje de rojear seria fabricar justo el defecto que TASK-303 esta abierto para arreglar. No se admite.\n\nESTADO DEL TICKET: el fix esta commiteado (5295962) y mergeado (233499d) y pusheado a develop. Lo que falta para cerrar es este spec, despues el deploy a dev, despues el AC7 y la re-verificacion del Wrecker."
+    }
+  ],
   "created_at": "2026-09-19T12:00:00.000Z",
-  "updated_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T19:15:22.929Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

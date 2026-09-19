@@ -1,0 +1,31 @@
+{
+  "key": "TASK-304",
+  "title": "El comprador ve precios de referencia que el vendedor no ve: la coleccion del dueno y el indice publico no estan en paridad",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents). Hallazgo WG4-O2-03, veredicto ROTURA REAL. Reporte completo: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/hallazgos/WG4-O2-03-precio-que-ve-el-comprador-no-es-el-que-ve-el-vendedor.md\\n\\nPATH AFECTADO: UC-07 path 07.2 y UC-06 path 06.2. Canal C5 de la superficie de ataque: paridad entre coleccion, public_cards y public_card_index.\\n\\nQUE SE MIDIO, MISMO DIA, MISMA CORRIDA, MISMA CARTA. La grilla del dueno en /collection y el perfil publico /@usuario muestran precios de referencia DISTINTOS. El perfil publico tiene datos de Card Kingdom y de buylist que la vista del propio dueno NO tiene:\\n\\n- Wrath of God (Battle Royale Box Set, HP): dueno CK vacio, TCG $18.99, BL vacio | visitante CK $6.99, TCG $18.99, BL $3.50\\n- Giant Growth (Secrets of Strixhaven Mystical Archive, MP): dueno CK vacio, TCG $0.75, BL vacio | visitante CK $0.35, TCG $0.75, BL vacio\\n\\nNO ES UN ARTEFACTO DE LA VISTA NI DE LA CARGA: las otras 11 cartas publicas coinciden en las tres fuentes; ambas vistas renderizan las tres columnas y ambas muestran vacio cuando de verdad no hay dato (Lightning Bolt, Dazzling Angel y Serra Angel dan CK vacio en las dos). Se midio con esperas de 8, 11 y 14 segundos, en 2 corridas independientes: el valor nunca llega del lado del dueno. La divergencia es del DATO.\\n\\nLA DIRECCION DE LA DERIVA ES LA QUE MAS DUELE: el que menos sabe es el VENDEDOR. El dueno de la carta ve \"sin precio de Card Kingdom\" y no tiene con que tasarla; el comprador que mira el perfil publico ve $6.99 y un buylist de $3.50.\\n\\nHIPOTESIS NO VERIFICADA, marcada como tal por el atacante y NO como hallazgo: la asimetria es compatible con que la coleccion y el indice publico se pueblen por escritores distintos y el enriquecimiento de precios de Card Kingdom solo corra sobre el indice. No se midio contra Firestore. La primera tarea de este ticket es cerrar esa pregunta leyendo las tres colecciones.\\n\\nRELACION CON EL HISTORIAL: mismo mecanismo que la peor rotura de la corrida #3 (TASK-298, precio del vendedor pisado por otra fuente), pero aqui se manifiesta como AUSENCIA en un lado en vez de sobreescritura.\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/evidencia/01-perfil-publico-visitante.png, 01-grilla-dueno.png y 05-toggle-Wrath-of-God.png. Script: ola-2/scripts/06-export-y-precios.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, leer con el Admin SDK el documento de la carta en la coleccion del dueno, en public_cards y en public_card_index, y registrar que campo de precio tiene cada uno. Esto cierra la hipotesis del escritor asimetrico antes de tocar codigo.",
+    "AC2: para la misma carta, la grilla del dueno en /collection y el perfil publico /@usuario muestran los MISMOS valores de CK, TCG y buylist.",
+    "AC3: si una fuente de precio no esta disponible, ambas vistas lo muestran vacio de la misma manera. No se admite que una vista tenga dato y la otra no.",
+    "AC4: el enriquecimiento de precios corre sobre las tres colecciones o se lee desde una unica fuente; la decision queda registrada en el ticket.",
+    "AC5: prueba de regresion (tests-after) que compara las tres lecturas de la misma carta y falla si divergen.",
+    "AC6 (mata-mutantes): revertir el arreglo en su punto real deja la prueba del AC5 en rojo.",
+    "AC7: UAT contra el entorno desplegado repitiendo la lectura cruzada de Wrath of God del AC1."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "prices",
+    "public-profile",
+    "parity",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

@@ -1,0 +1,33 @@
+{
+  "key": "TASK-306",
+  "title": "El precio del pedido lo fija el COMPRADOR: submitBuyRequest persiste los items verbatim desde el navegador del visitante y el vendedor descuenta inventario contra ese numero",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents). Hallazgo WG4-O3A-02, veredicto ROTURA REAL, severidad CRITICA. Reporte completo: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3A-02-precio-del-pedido-lo-fija-el-comprador.md\\n\\nPATH AFECTADO: UC-21A paths 21A.1 y 21A.12, y UC-20 path 20.1. Es el UNICO flujo que factura de la aplicacion.\\n\\nLO QUE PROMETE LA DEFINICION: la postcondicion del happy path de UC-21A exige \"exactamente un BuyRequest bajo el vendedor, en estado pending, cuyas lineas tienen EL PRECIO QUE EL VENDEDOR FIJO\". El paquete UC-21A declara order.price_source = vendedor con el comentario \"El pedido viaja con el precio que puso el VENDEDOR, no con un retail ajeno\". UC-20 llama a esa clausula \"la mas cara del documento entero\". Y el propio codigo del SUT lo dice en src/stores/buyRequests.ts:57-63: \"el precio de la transaccion tiene que ser siempre el que el vendedor publico\".\\n\\nQUE PASA EN REALIDAD, VERIFICADO EN EL CODIGO por el Orquestador: submitBuyRequest (src/stores/buyRequests.ts:47-62) recibe items y los escribe VERBATIM en el documento, y calcula totalValue con computeTotalValue(items), o sea con los mismos numeros que vinieron del navegador. El precio nunca se vuelve a mirar en el momento del envio ni se contrasta contra lo publicado. Las unicas guardas son ownerUid vacio e items.length === 0.\\n\\nMEDIDO EN VIVO EN DEV: el vendedor publica Angel of the Ruins a TCG $2.40, visible en la grilla de /@vendedor. Se sembro un carrito con price: 0.01 para esa misma carta y se envio el pedido por la interfaz normal, sin tocar nada mas. La escritura a Firestore, capturada en la red, deja items[0].price = 0.01 y totalValue = 0.01 con status pending, bajo users/<uid del vendedor>/buyRequests/. El cajon del carrito mostro TOTAL $0.01 con toda naturalidad, el envio salio, el carrito se limpio y el visitante recibio el aviso de exito. Cero errores de consola. El pedido quedo a 1/240 del precio publicado.\\n\\nLO QUE LO AMPLIFICA A CRITICA: fulfillRequest DESCUENTA esas cartas de la coleccion del vendedor, y el propio dialogo de la app lo dice (\"Esto descontara estas cartas de tu coleccion\"). El vendedor no esta mirando un presupuesto: esta viendo una transaccion de inventario cuyo precio eligio la contraparte, y el unico numero que tiene a la vista para decidir si acepta es el que le mandaron.\\n\\nQUE NO ES ESTE HALLAZGO: NO es el bug de TASK-298, que si esta arreglado. Se verifico en la misma corrida: al agregar la carta por el camino normal, el carrito guarda price: 2.4 (el del vendedor) y el retail de Card Kingdom queda aparte en ckReferencePrice: 0.49, sin pisar nada. Esa mitad aguanto. Lo que queda vivo es la ARQUITECTURA del arreglo: el precio se captura una vez al agregar y despues nadie lo vuelve a mirar.\\n\\nNO HACE FALTA UN ATACANTE PARA QUE DUELA: cualquier divergencia entre el precio capturado al agregar y el precio vigente al enviar produce el mismo resultado silencioso, y ese caso ocurre solo — basta con que el vendedor cambie el precio mientras el carrito espera hasta SIETE DIAS en el navegador del comprador.\\n\\nLIMITE DE LO DEMOSTRADO, declarado por el atacante: se demuestra manipulando el localStorage del propio navegador, que es el canal autorizado de la corrida. NO se probo si las reglas de Firestore podrian rechazar la escritura por otro motivo: eso es seguridad ofensiva y necesita otra autorizacion. Lo que esta medido es que el CLIENTE no valida nada y que la escritura con el precio ajeno SE COMPLETO: el documento existe.\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/evidencia/03-02-cajon-total.png, 03-04-tras-enviar.png y 03-precio-writes.json (el cuerpo completo de la escritura a Firestore con price: 0.01 y totalValue: 0.01). Script: ola-3/scripts/03-precio.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, sembrar un carrito con un precio distinto del publicado, enviar el pedido por la interfaz normal y registrar el documento que queda en users/<uid>/buyRequests, incluidos items[].price y totalValue.",
+    "AC2: en el momento del envio, el precio de cada linea se resuelve contra lo que el VENDEDOR tiene publicado, no contra lo que viene del carrito. El precio del navegador del comprador nunca llega verbatim al documento.",
+    "AC3: totalValue se calcula sobre los precios resueltos del vendedor, no sobre los items recibidos.",
+    "AC4: si el precio publicado cambio respecto del capturado al agregar, el comprador lo ve ANTES de enviar, con el numero nuevo. El caso ocurre solo: el carrito vive hasta siete dias.",
+    "AC5: si una carta ya no esta publicada o no tiene precio resoluble al enviar, el pedido no se persiste en silencio con un numero inventado.",
+    "AC6: prueba de regresion (tests-after) que siembra un carrito con un precio manipulado, envia el pedido y asevera que el documento persistido lleva el precio del vendedor. Debe fallar contra el codigo actual.",
+    "AC7 (mata-mutantes): revertir la resolucion de precio en submitBuyRequest deja la prueba del AC6 en rojo.",
+    "AC8: UAT contra el entorno desplegado repitiendo la secuencia del AC1, verificando el documento resultante en la bandeja del vendedor."
+  ],
+  "status": "todo",
+  "priority": "critical",
+  "labels": [
+    "buy-request",
+    "prices",
+    "cart",
+    "integrity",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

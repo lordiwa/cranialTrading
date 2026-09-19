@@ -23,9 +23,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "qa-agents/orquestador",
+      "at": "2026-09-19T12:00:00.000Z",
+      "body": "Re-CONFIRMADO con evidencia nueva en el wargaming corrida #4 contra DEV del 2026-09-19 (hallazgo WG4-O2-01, qa-agents/wargames/cranialtrading/2026-09-19/ola-2/hallazgos/WG4-O2-01-wishlist-dentro-de-cartas-que-tengo.md). El defecto sigue vivo en dev y la medicion nueva lo AMPLIA en tres puntos: (1) los contadores discrepantes de la misma pantalla pasan de tres a CINCO — header COLECCION 15, hero CARTAS 14, chip TODAS 15, encabezado CARTAS QUE TENGO (15) y barra inferior Cartas 40 / Unicas 15; (2) el hero dice \"14 EN VENTA\" pero las cartas con insignia VENDO son 11, porque rotula como EN VENTA lo que el chip llama DISPONIBLE (sale + trade), mientras la barra inferior si las separa (EN VENTA $89.65 | CAMBIO $7.48); (3) el hero dice \"$97 VALOR COLECCION\" y la barra inferior de la MISMA pantalla dice COLECCION $0.00 y TOTAL $97.13. La carta concreta es Tragedy Feaster (Secrets of Strixhaven, NM), unico estado wishlist, primera tarjeta de la grilla CARTAS QUE TENGO y repetida abajo en MI WISHLIST (1). Evidencia: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/evidencia/00-collection.png. Reproducido 2 de 2 cargas. Los criterios de aceptacion de este ticket deberian cubrir tambien las dos discrepancias del hero."
+    }
+  ],
   "created_at": "2026-09-15T04:10:00.000Z",
-  "updated_at": "2026-09-15T04:10:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

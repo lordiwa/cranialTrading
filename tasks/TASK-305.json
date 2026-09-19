@@ -1,0 +1,32 @@
+{
+  "key": "TASK-305",
+  "title": "Un carrito guardado sin items[] deja el perfil publico entero en negro: el visitante pierde la vitrina completa y no tiene salida",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents). Hallazgo WG4-O3A-01, veredicto ROTURA REAL. Reporte completo: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/hallazgos/WG4-O3A-01-carrito-malformado-tumba-la-vitrina.md\\n\\nPATH AFECTADO: UC-21A path 21A.12 y flujo de excepcion 5c, con dano colateral sobre UC-20 path 20.1 (el escaparate publico del vendedor).\\n\\nLA DEFINICION DECLARA ESTE PATH COMO SUPERVIVIBLE: UC-21A excepcion 5c dice, literal, \"condicion: el almacenamiento del navegador esta corrupto - recuperacion: arranca con un carrito vacio sin avisar; LA PANTALLA NO SE ROMPE\".\\n\\nQUE PASA EN REALIDAD: si bajo la clave cranial_exchange_carts_v2 hay un carrito que PARSEA como JSON valido pero cuyo objeto no trae la propiedad items, la vista /@usuario no se pinta. Queda una pagina en negro con el pie como unico contenido: 94 caracteres de texto en todo el body, contra 1.760 en una carga sana. Desaparecen la grilla, el encabezado del vendedor, los contadores EN VENTA / EN CAMBIO, la barra de filtros y hasta la cabecera con Iniciar / Registrar. No hay mensaje de error ni boton de reintento: la unica salida es limpiar el almacenamiento del navegador a mano.\\n\\nTres TypeError sin capturar: Cannot read properties of undefined (reading 'length') x2, y Cannot read properties of undefined (reading 'map').\\n\\nCAUSA, VERIFICADA EN EL CODIGO por el Orquestador:\\n- src/stores/exchangeCart.ts, _load(): el try/catch solo protege contra un JSON que NO parsea. El JSON sintacticamente valido entra al estado sin una sola validacion de forma; el 'as ExchangeCartStorage' es una asercion de TypeScript que no existe en tiempo de ejecucion. El comentario dice \"Corrupted data - start fresh\", pero solo arranca limpio el caso que revienta el parser.\\n- src/views/UserProfileView.vue:99-103: cartItemCount llama a getCartItemCount() que hace cart.items.length, y cartItemIds hace cart.items.map(...). Ninguno de los dos computed tolera un carrito sin items, y como los consume el setup de la vista, el throw se lleva puesto el arbol entero y no solo el carrito.\\n\\nCONTRAPRUEBA EN LA MISMA CORRIDA: con el valor 'no-es-json{{{' bajo la misma clave la pagina carga PERFECTA (1.760 caracteres, grilla visible). Confirma que el problema no es \"almacenamiento corrupto\" en general sino la AUSENCIA DE VALIDACION DE FORMA.\\n\\nVARIANTE HERMANA, mismo origen: con items presente pero valiendo la cadena \"hola\", la pagina si se pinta pero la insignia del carrito flotante muestra 4 (el .length de la cadena) y la consola tira TypeError: e.items.map is not a function. El visitante ve un carrito con 4 cartas que no existen.\\n\\nALCANCE HONESTO DE LA EXPLOTABILIDAD, declarado por el atacante: hoy la propia app NUNCA escribe un carrito sin items (addItem() siempre inicializa items: []). El estado hay que traerlo de afuera del camino normal. El caso realista no es un atacante: es un CAMBIO DE FORMA del documento guardado bajo esa clave entre dos versiones del cliente. Y eso ya paso en este producto: la clave roto una vez (cranial_exchange_carts a _v2, TASK-298), y la rotacion fue justamente la manera de no tener que leer datos viejos. La proxima vez que el esquema cambie, el mismo _load() sin validacion vuelve a ser el camino.\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-3/evidencia/02-D-sin-items.png, 02-E-items-string-cajon.png y 02-storage.json (casos D-sin-items con hayGrilla:false y textLen:94, contra C-no-json con hayGrilla:true y textLen:1760 como control). Script: ola-3/scripts/02-storage.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, sembrar bajo cranial_exchange_carts_v2 un carrito sin items y registrar que /@usuario queda en negro, el largo del innerText del body y los errores de consola.",
+    "AC2: _load() de src/stores/exchangeCart.ts valida la FORMA de lo que lee, no solo que parsee. Un carrito sin items, con items de tipo equivocado o con campos ausentes se descarta y se arranca limpio.",
+    "AC3: los computed de src/views/UserProfileView.vue que consumen el carrito toleran un carrito malformado sin tirar; la vitrina publica se pinta igual.",
+    "AC4: la variante hermana queda cubierta — con items valiendo una cadena, la insignia del carrito no muestra el .length de la cadena.",
+    "AC5: el estado invalido no deja la pantalla muerta: o se limpia en silencio como manda la excepcion 5c de UC-21A, o hay un aviso con salida. Nunca una pagina en negro sin boton.",
+    "AC6: prueba de regresion (tests-after) que siembra cada una de las variantes malformadas y asevera que la vitrina publica sigue renderizando.",
+    "AC7 (mata-mutantes): revertir la validacion de forma en _load() deja la prueba del AC6 en rojo.",
+    "AC8: UAT contra el entorno desplegado repitiendo la siembra del AC1."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "cart",
+    "public-profile",
+    "robustness",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

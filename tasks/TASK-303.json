@@ -1,0 +1,30 @@
+{
+  "key": "TASK-303",
+  "title": "El spec e2e de datos de ajustes envuelve sus aserciones en if isVisible() y pasa en verde sin ejercer nada: verde vacio sobre un flujo que no existe",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents). Agravante del hallazgo WG4-O2-02, triado como ROTURA REAL propia (defecto del test, no del producto). Reporte: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/hallazgos/WG4-O2-02-exportar-coleccion-no-existe.md\\n\\nPATH AFECTADO: la cobertura declarada de UC-10. No es un bug de la aplicacion: es un bug del arnes de pruebas.\\n\\nQUE PASA, VERIFICADO EN EL CODIGO por el Orquestador: e2e/specs/settings/settings-data.spec.ts:9 abre if (await settingsPage.data.exportMoxfieldButton.isVisible()) { ... } y la linea 18 hace lo mismo con exportManaboxButton. Los locators apuntan a getByRole('button', { name: /moxfield/i }) y /manabox/i. Como esos botones NO EXISTEN en la aplicacion (ver TASK-302), la condicion es falsa, el cuerpo no corre y el test pasa en verde sin ejercer una sola asercion.\\n\\nEl mismo patron aparece en las lineas 26 y 33 del mismo spec (resendVerificationButton, restartTourButton): ahi los controles si existen hoy, pero el envoltorio hace que el dia que desaparezcan el test siga verde. Es el mismo mecanismo, latente.\\n\\nPOR QUE ES GRAVE: la documentacion del producto declara UC-10 como con_e2e. El equipo cree que el flujo esta probado, nadie va a mirar, y el flujo directamente no existe. Un test condicional sobre la existencia de su propio sujeto no puede fallar nunca: no es una prueba, es una declaracion de intenciones que consume tiempo de CI.\\n\\nALCANCE PEDIDO: este ticket NO es solo arreglar este spec. Es (a) arreglar este spec y (b) barrer el resto de la suite e2e buscando el mismo patron, porque el hallazgo sugiere que no es un caso aislado.\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/evidencia/06-settings.png (la ruta sin el control que el test dice pulsar). Script del ataque: ola-2/scripts/06-export-y-precios.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): correr e2e/specs/settings/settings-data.spec.ts tal como esta y registrar que pasa en verde, junto con el conteo de aserciones realmente ejecutadas.",
+    "AC2: las aserciones de exportacion dejan de estar envueltas en if isVisible(). O el test afirma que el control existe y falla hoy, o el test se elimina junto con la declaracion de cobertura de UC-10 — pero no se queda pasando en verde sin ejercer nada.",
+    "AC3: los otros dos envoltorios condicionales del mismo spec (resendVerificationButton linea 26, restartTourButton linea 33) quedan resueltos con el mismo criterio.",
+    "AC4: barrido de toda la suite e2e buscando el patron if (await <locator>.isVisible()) alrededor de aserciones; el resultado se registra en el ticket, con la lista de specs afectados, aunque su correccion se difiera a otro ticket.",
+    "AC5: la cobertura declarada de UC-10 en la documentacion queda alineada con lo que el spec realmente ejerce.",
+    "AC6 (mata-mutantes): tras el arreglo, la suite en su estado ACTUAL de producto (sin botones de exportacion) queda en ROJO para UC-10, o el caso desaparece de la suite. Un verde en este punto reproduce el defecto."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "e2e",
+    "test-quality",
+    "verde-vacio",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

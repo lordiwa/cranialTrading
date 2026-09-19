@@ -1,0 +1,31 @@
+{
+  "key": "TASK-302",
+  "title": "Exportar la coleccion completa no existe en ninguna ruta de la aplicacion, aunque los documentos del producto lo declaran como funcionalidad cubierta",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents). Hallazgo WG4-O2-02, veredicto ROTURA REAL (hueco de funcionalidad declarada). Reporte completo: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/hallazgos/WG4-O2-02-exportar-coleccion-no-existe.md\\n\\nPATH AFECTADO: UC-10 completo, paths 10.1 a 10.5 (exportar la coleccion). Rutas candidatas /settings y /collection.\\n\\nQUE SE MIDIO, CON SESION, EN DEV. Sobre el DOM renderizado, buscando /export|exportar|moxfield|manabox|csv|descargar/i:\\n\\n- /settings: la expresion no aparece ni una vez en todo el innerText del documento (bodyHasWord: false) y el barrido de button, a, label, h1, h2, h3, [role=button] devuelve CERO coincidencias. Las secciones reales son VERIFICACION DE EMAIL, CAMBIAR CONTRASENA, INFORMACION DE CUENTA, Idioma, Tour guiado y ZONA DE PELIGRO. No hay seccion de datos.\\n- /collection: identico resultado, bodyHasWord: false, cero controles.\\n\\nCONFIRMADO EN EL CODIGO por el Orquestador: src/views/SettingsView.vue no contiene ninguna ocurrencia de export/exportar/csv/descargar. Lo unico que exporta en la aplicacion es POR MAZO y POR CARPETA (botones EXPORTAR y CSV en src/views/DeckView.vue y src/views/BinderView.vue). src/composables/useCollectionImport.ts existe, pero es IMPORTACION: se puede meter la coleccion y no se puede sacar.\\n\\nIMPACTO: el coleccionista no puede sacar su inventario de la plataforma. No hay copia de seguridad, no hay migracion a Moxfield o Manabox, no hay forma de llevar la lista a una tienda. Para una aplicacion cuyo criterio de exito declarado es mover colecciones de mas de 50.000 cartas, es una puerta cerrada sobre el dato mas valioso del usuario.\\n\\nAGRAVANTE SEPARADO: el spec e2e que dice cubrir esto pasa en verde sin probar nada. Eso va en su propio ticket, TASK-303, porque el defecto es del test y no del producto.\\n\\nNOTA DE TRIAJE: los documentos de definicion del SUT se contradicen entre si sobre la ruta (/settings contra /collection) y sobre la cobertura (con_e2e contra sin_e2e). Esa contradiccion es un defecto de la documentacion y se corrige en el repo qa-agents; no bloquea este ticket, porque NINGUNA de las dos rutas tiene el control.\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-2/evidencia/06-settings.png y 06-collection-sin-export.png. Script: ola-2/scripts/06-export-y-precios.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo, recorrer /settings y /collection con sesion y registrar que no existe ningun control de exportacion en el DOM.",
+    "AC2: decision de producto registrada en el ticket antes de implementar — se implementa la exportacion de la coleccion completa, o se retira UC-10 del alcance declarado. Un ticket que se cierra sin resolver esta disyuntiva deja la contradiccion viva.",
+    "AC3 (si se implementa): existe un control de exportacion visible y alcanzable en la ruta que se decida, y el archivo descargado contiene TODAS las cartas de la coleccion con cantidades y condiciones, legible por una herramienta externa.",
+    "AC4 (si se implementa): el conteo de filas del archivo coincide con el conteo que declara el encabezado de la coleccion, y el escape de comas, comillas y acentos mantiene el archivo parseable.",
+    "AC5 (si se implementa): coleccion vacia produce un archivo vacio valido o un aviso, nunca un archivo corrupto ni un error sin mensaje.",
+    "AC6: prueba de regresion (tests-after) sin envoltorio condicional: si el control no existe, la prueba FALLA. No se admite un if isVisible() alrededor de las aserciones (ver TASK-303).",
+    "AC7: UAT contra el entorno desplegado descargando el archivo y abriendolo con la herramienta externa declarada."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "collection",
+    "export",
+    "gap",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

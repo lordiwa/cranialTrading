@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T08:30:00.000Z",
+  "generated_at": "2026-09-19T12:00:00.000Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1680,6 +1680,42 @@
       "title": "El boton AGREGAR del modal de alta se ofrece habilitado sin ninguna carta elegida y al pulsarlo no hace ni dice nada",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-301",
+      "title": "Reset de contrasena: con un oobCode invalido se pinta el formulario completo, el aviso dura 4 segundos y el usuario queda sin salida",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-302",
+      "title": "Exportar la coleccion completa no existe en ninguna ruta de la aplicacion, aunque los documentos del producto lo declaran como funcionalidad cubierta",
+      "status": "todo",
+      "priority": "medium"
+    },
+    {
+      "key": "TASK-303",
+      "title": "El spec e2e de datos de ajustes envuelve sus aserciones en if isVisible() y pasa en verde sin ejercer nada: verde vacio sobre un flujo que no existe",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-304",
+      "title": "El comprador ve precios de referencia que el vendedor no ve: la coleccion del dueno y el indice publico no estan en paridad",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-305",
+      "title": "Un carrito guardado sin items[] deja el perfil publico entero en negro: el visitante pierde la vitrina completa y no tiene salida",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-306",
+      "title": "El precio del pedido lo fija el COMPRADOR: submitBuyRequest persiste los items verbatim desde el navegador del visitante y el vendedor descuenta inventario contra ese numero",
+      "status": "todo",
+      "priority": "critical"
     }
   ]
 }

@@ -1,0 +1,31 @@
+{
+  "key": "TASK-301",
+  "title": "Reset de contrasena: con un oobCode invalido se pinta el formulario completo, el aviso dura 4 segundos y el usuario queda sin salida",
+  "description": "ORIGEN: paso 4 (triaje) del wargaming adversarial corrida #4 contra DEV del 2026-09-19 (repo qa-agents). Hallazgo WG4-O1-01, veredicto ROTURA REAL. Reporte completo: qa-agents/wargames/cranialtrading/2026-09-19/ola-1/hallazgos/WG4-O1-01-reset-password-oobcode-invalido-pinta-formulario-usable.md\\n\\nPATH AFECTADO: UC-03 paths 03.5 y 03.6 (recuperar la contrasena). Ruta /reset-password.\\n\\nQUE SE MIDIO, SIN SESION, EN DEV (cranial-trading-dev.web.app). Se abrio /reset-password?oobCode=CODIGO_FALSO_WG4:\\n\\n- se renderiza el formulario NUEVA CONTRASENA completo, con los dos campos y el medidor de fortaleza funcionando (llego a decir \"Muy fuerte\")\\n- el boton RESTABLECER esta habilitado (isDisabled() === false)\\n- al cargar la pagina NO se emite ninguna peticion a identitytoolkit: el codigo no se valida nunca antes del envio\\n- al pulsar RESTABLECER sale un toast \"Enlace expirado o invalido\" que dura 4000 ms; despues el formulario queda identico, con los campos llenos y el boton habilitado\\n- no queda estado de error persistente ni enlace a /forgot-password; el unico enlace es \"Volver al login\"\\n\\nLA ASIMETRIA ES EL DEFECTO: SIN el parametro oobCode la misma pantalla SI da el estado correcto (tarjeta \"Enlace invalido\" + explicacion + enlace \"Solicitar nuevo enlace\"). Con un codigo basura el usuario recibe MENOS ayuda que sin codigo. Y el caso con codigo basura es el frecuente: es lo que encuentra quien reusa un correo viejo o copia mal el enlace.\\n\\nCAUSA, LEIDA EN EL CODIGO (verificada por el Orquestador en develop): src/views/ResetPasswordView.vue:34-41 — onMounted solo comprueba la PRESENCIA del parametro (if (oobCode) code.value = oobCode; else invalidCode.value = true). No hay ninguna llamada a verifyPasswordResetCode en todo src/ (grep: cero resultados). Y en handleReset, cuando resetPassword devuelve falso no se toca invalidCode, asi que la rama del template que contiene \"Solicitar nuevo enlace\" (ResetPasswordView.vue:78, v-if=invalidCode) es INALCANZABLE por esta via.\\n\\nLA DEFINICION LO PROHIBE EXPLICITAMENTE: UC-03 path 03.5 dice \"Estado de error claro. NO un formulario que parezca usable y falle al enviar\", y el path 03.6 exige \"error explicito y accionable (pedi otro enlace)\".\\n\\nEVIDENCIA: qa-agents/wargames/cranialtrading/2026-09-19/ola-1/evidencia/uc03-06a-form-con-code-falso.png, uc03-06b-tras-submit-code-falso.png y recon-reset-sin-code.png (el contraste). Script: ola-1/scripts/01-uc03-recuperar.mjs",
+  "acceptance_criteria": [
+    "AC1 (control negativo obligatorio, ANTES de tocar nada): en un entorno no productivo abrir /reset-password?oobCode=<basura>, registrar que el formulario se pinta, que el boton RESTABLECER esta habilitado, que no hay peticion a identitytoolkit al montar, y que tras el envio no queda estado de error persistente.",
+    "AC2: el codigo se valida AL MONTAR la vista (verifyPasswordResetCode o equivalente). Con un oobCode invalido o vencido NO se pinta el formulario de contrasena nueva.",
+    "AC3: con un oobCode invalido o vencido se muestra el MISMO estado de error persistente que ya existe para el caso sin oobCode, incluido el enlace \"Solicitar nuevo enlace\" hacia /forgot-password.",
+    "AC4: no se envia accounts:resetPassword al backend con un codigo que ya se sabe invalido.",
+    "AC5: prueba de regresion (tests-after) que cubre el caso oobCode invalido y asevera el estado de error persistente y la presencia del enlace de escape.",
+    "AC6 (mata-mutantes): revertir el arreglo en su punto real (la validacion del codigo en onMounted) deja la prueba del AC5 en rojo.",
+    "AC7: UAT contra el entorno desplegado repitiendo la secuencia del AC1, incluida la comparacion con el caso sin oobCode."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "auth",
+    "reset-password",
+    "usability",
+    "wargaming"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-19T12:00:00.000Z",
+  "jira_key": null,
+  "verification_tier": "tests-after"
+}

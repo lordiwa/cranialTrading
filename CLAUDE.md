@@ -28,58 +28,82 @@ favor de la instrucción del entorno sin avisar, y la sesión entera trabajó si
 
 Cranial Trading is a Magic: The Gathering trading platform built with Vue 3 (Composition API), TypeScript, Vite, and Firebase. Users can manage card collections, create decks, find trading matches, and message other traders.
 
-## MANDATORY: TDD Development Workflow
+## MANDATORY: Use-Case-First Development Workflow
 
-**Every feature, fix, change, or refactor MUST follow this process. No exceptions.**
+**TDD IS ELIMINATED FROM THIS PROJECT.** It is not "optional", not "when it fits" — the
+RED/GREEN/REFACTOR gate that used to live in this section is gone, and no agent may
+reintroduce it. It was removed because it manufactured a large volume of tests that did not
+work: green suites that asserted nothing, and a process gate that measured compliance with
+a ritual instead of measuring the product.
 
-### 1. Plan
-- Understand the request and identify affected files
-- Break down the work into testable units (pure functions, store logic, component behavior)
-- Identify which test types are needed (unit, integration, E2E)
-- Present the plan to the user before writing any code
+This project follows hivemind v0.23.0 policy. **The gates run the other way around: they are
+no longer process gates before the code, they are evidence gates after it.**
 
-### 2. Write Tests First (RED)
-- Write failing unit tests for all new/changed business logic BEFORE implementation
-- For bug fixes: write a regression test that reproduces the bug first
-- For pure functions and store logic: unit tests in `tests/unit/`
-- For Firebase operations: integration tests in `tests/integration/`
-- Run `npm run test:unit` to confirm tests fail (RED phase)
+### 1. Use cases FIRST (MANDATORY — this is the only gate before code)
+Before implementing anything, define the use cases of the change, with **every path**:
 
-### 3. Implement (GREEN)
-- Write the minimum code to make all tests pass
-- Run `npm run test:unit` after each meaningful change
-- Do not move on until all tests are green
+- **Happy path** — the actor does what the feature is for, and it works.
+- **Alternative paths** — the same goal reached another way, or with different valid inputs.
+- **Exception paths** — the actor does what should NOT work: empty, missing, duplicated,
+  out of range, without a session, without permission, twice in a row, interrupted halfway.
 
-### 4. Refactor
-- Clean up the implementation while keeping tests green
-- Extract helpers, improve naming, simplify logic
-- Run `npm run test:unit` to confirm nothing broke
+Each path declares its **postcondition**: *if the actor does X in Y, the system ends in Z*.
+A path without a declared end state is not a path, it is a wish.
 
-### 5. QA Against Plan
-- Review the original plan and verify every requirement is met
-- Run `npm run test:unit:coverage` to check coverage on changed files
-- Changed business logic files should have 85%+ coverage
-- Run `npx vite build` to verify the build still succeeds
+### 2. Human approval (MANDATORY)
+The use cases go to Mato and **wait**. Implementation does not start on un-approved use
+cases. This is the gate that replaced TDD: approval of WHAT is being built, not of HOW it
+gets tested.
 
-### 6. Done
-- All tests pass, coverage is adequate, build succeeds
-- Summarize what was done and what was tested
+### 3. Free development
+With the use cases approved, implement however is best for the problem. No mandated test
+ordering, no mandated coverage ritual, no "write the failing test first". Judgement over
+ceremony: run the build, run what is already there, keep it working.
 
-### When to Skip TDD
-- Pure UI/styling changes with no logic (CSS, template-only edits)
-- Config file changes (tailwind, vite, eslint)
-- Documentation-only changes
+### 4. Tests AFTER (tests-after, never test-first)
+Once the thing exists and does what the approved use cases say, write the tests that lock
+the behavior down — unit for pure functions and store logic, integration for Firebase
+operations. Tests are written **after** implementation, against real observed behavior.
+For a bug fix the regression test is still mandatory, but it is written against the
+reproduced defect, not imagined before it.
+
+### 5. Wargaming at the end (Wrecker)
+When the work is done, the adversarial pass runs: the **Wrecker** team attacks the approved
+use cases, path by path, trying to prove the happy path does not hold. The Wrecker is
+external and out of context on purpose — the author cannot test their own app.
+
+### 6. E2E after the wargaming, and UAT if asked
+**E2E specs enter as tests-after, but only AFTER the wargaming has run.** Writing E2E before
+the attack locks in what the author imagined; writing them after locks in what the attack
+actually found. UAT with Mato runs at the end when it is requested.
+
+### Residual TDD surfaces NOT yet cleaned (as of 2026-09-19)
+
+This section is the policy, but three files under `.claude/` still carry the old rule and
+could not be edited here — that directory needs Mato's explicit approval. **Until they are
+fixed, this policy does not fully govern the agents that actually run**, the same way a
+stale plugin makes a repo's new rules inert:
+
+1. `.claude/agents/project-context.md` — the briefing injected into every agent. Its
+   "Testing conventions" line still says *"write a failing test before any new behavior
+   lands"*. **This is the one that matters most:** an agent reads the briefing, so the
+   contradiction wins in practice.
+2. `.claude/skills/tdd/SKILL.md` — a user-invocable skill that still drives red/green/refactor
+   and claims to implement "the mandatory TDD process defined in CLAUDE.md". That process no
+   longer exists. It should be deleted.
+3. `.claude/skills/optimize-seo/SKILL.md:180` — "Follow TDD where applicable".
+
+Do not treat the new policy as fully applied until those three are resolved.
 
 ### Quick Reference
-| Change type | Test first? | Test type |
-|-------------|------------|-----------|
-| New pure function | Always | Unit |
-| Bug fix | Always (regression test) | Unit |
-| Store algorithm | Always | Unit |
-| Firebase CRUD | Yes | Integration |
-| New Vue component | No | E2E only |
-| Refactor | Write characterization tests first | Unit |
-| UI/styling only | No | None |
+| Change type | Before code | After code |
+|-------------|-------------|------------|
+| New feature | Use cases with all paths + Mato's approval | Unit/integration tests-after → wargaming → E2E |
+| Bug fix | The reproduced defect | Regression test that reproduces it |
+| Store algorithm | Use cases with all paths | Unit tests-after |
+| Firebase CRUD | Use cases with all paths | Integration tests-after |
+| Refactor | Statement of the behavior being preserved | Characterization tests-after |
+| UI/styling only, config, docs | Nothing | Nothing |
 
 ---
 
@@ -161,7 +185,7 @@ npm run type-check  # Verify TypeScript types
 
 ```bash
 npm run test:unit          # Run unit tests (fast, no Firebase)
-npm run test:unit:watch    # Watch mode for TDD
+npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # Unit tests with coverage report
 npm run test:integration   # Integration tests (requires .env.local)
 npm run e2e                # Playwright E2E tests
@@ -172,7 +196,9 @@ npm run e2e                # Playwright E2E tests
 - Use Vitest globals (describe/it/expect) — do not import them
 - Use test fixtures from `tests/unit/helpers/fixtures.ts`
 - Never import real Firebase in unit tests — mock it
-- New pure functions should be TDD'd: write failing test first
+- **Tests are written AFTER the implementation, never before it.** A new pure function is
+  implemented first, then locked with a unit test against what it actually does. E2E specs
+  wait until the wargaming has run (see the use-case workflow above).
 - Run `npm run test:unit` before committing
 
 ### E2E: Three-Level Policy (MANDATORY)
@@ -388,7 +414,7 @@ Auto-dismiss after 4 seconds.
 
 ## Multi-Agent Development (agentic-framework)
 
-All multi-agent work runs through the **agentic-framework plugin agents only**: `agentic-framework:orchestrator` (plans and delegates), `agentic-framework:developer` (TDD implementation), `agentic-framework:researcher` (read-only research, writes training skills), `agentic-framework:reviewer` (fresh-context review). Do not define or use project-local agents. The workflow loop and RESUME-FIRST session contract live in the routing block at the end of this file.
+All multi-agent work runs through the **agentic-framework plugin agents only**: `agentic-framework:orchestrator` (plans and delegates), `agentic-framework:developer` (implementation, tests-after), `agentic-framework:researcher` (read-only research, writes training skills), `agentic-framework:reviewer` (fresh-context review). Do not define or use project-local agents. The workflow loop and RESUME-FIRST session contract live in the routing block at the end of this file.
 
 ### Tickets
 
@@ -485,7 +511,7 @@ Tickets live in the **local task store** at `tasks/` (TASK-NNN.json + index.json
 | i18n-check | Verify all i18n keys exist in en.json, es.json, and pt.json locale files | `.claude/skills/i18n-check/SKILL.md` |
 | optimize-seo | Run an SEO audit via the agentic-framework researcher agent, categorize findings, and generate an actionable implementation plan with optional fix execution | `.claude/skills/optimize-seo/SKILL.md` |
 | pr | Create a pull request with standard format from current branch to develop or main | `.claude/skills/pr/SKILL.md` |
-| tdd | Walk through the TDD workflow (red/green/refactor) for a given task | `.claude/skills/tdd/SKILL.md` |
+| ~~tdd~~ | **DEPRECATED — do not invoke.** Contradicts the use-case-first workflow above; pending deletion, which needs Mato's approval because it touches `.claude/` | `.claude/skills/tdd/SKILL.md` |
 
 ## Knowledge Graph (graphify)
 
@@ -533,13 +559,15 @@ proceed to RESUME-FIRST.
 ### Workflow loop (every unit of work)
 
 1. Read the next `status: todo` ticket and extract acceptance criteria.
-2. Plan: decompose into research / tests / implementation / review.
+2. Plan: decompose into research / use cases / implementation / review.
 3. Research (if needed): spawn the `researcher` for any unknown stack.
-4. Tests first: the `developer` writes failing tests that encode the criteria
-   before any implementation lands.
-5. Implement: the same `developer` makes the new tests pass without breaking
-   existing ones.
+4. Use cases: define every path (happy, alternative, exception) with its declared
+   postcondition, and **wait for Mato's approval** before any implementation lands.
+   No failing tests are written up front — TDD is eliminated (see the workflow above).
+5. Implement: the `developer` builds the approved use cases freely, then adds the
+   tests-after that lock the behavior down without breaking existing ones.
 6. Review: spawn the `reviewer` in a fresh context; block on any HIGH finding.
+   Wargaming with the Wrecker runs at the end; E2E specs land only after it.
 7. Update the ticket on a green review, then pause or end the session bundle
    via the lifecycle operations in `state/README.md`.
 

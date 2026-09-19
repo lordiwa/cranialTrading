@@ -5,20 +5,32 @@
 | Command                      | Description                          |
 |------------------------------|--------------------------------------|
 | `npm run test:unit`          | Run unit tests (fast, no Firebase)   |
-| `npm run test:unit:watch`    | Watch mode for TDD                   |
+| `npm run test:unit:watch`    | Watch mode                           |
 | `npm run test:unit:coverage` | Unit tests with coverage report      |
 | `npm run test:integration`   | Integration tests (requires .env.local) |
 | `npm run e2e`                | Playwright E2E tests                 |
 
-## TDD Workflow
+## Tests-After Workflow (TDD is eliminated)
 
-Follow the **Red - Green - Refactor** cycle:
+**There is no Red-Green-Refactor cycle in this project anymore.** The TDD section that lived
+here was removed: the gate measured compliance with a ritual instead of measuring the
+product, and it manufactured a large volume of tests that did not work.
 
-1. **Red** -- Write a failing test that describes the behavior you want. Run it and confirm it fails.
-2. **Green** -- Write the minimum code needed to make the test pass. No more, no less.
-3. **Refactor** -- Clean up the implementation while keeping the test green. Remove duplication, improve naming, simplify logic.
+The order is now:
 
-Repeat for each small unit of behavior. Commit after each green + refactor step.
+1. **Use cases first** -- define every path (happy, alternative, exception) with its declared
+   postcondition, and get them approved by Mato. This is the only gate before code.
+2. **Implement freely** -- build it the way the problem calls for. No mandated test ordering.
+3. **Tests after** -- once the behavior exists and matches the approved use cases, write the
+   unit/integration tests that lock it down, against what the code actually does.
+4. **Wargaming** -- the Wrecker attacks the approved use cases at the end, from outside the
+   author's context.
+5. **E2E after the wargaming** -- E2E specs are tests-after too, and they wait until the
+   attack has run, so they lock what the attack found rather than what the author imagined.
+   UAT with Mato closes the loop when it is requested.
+
+For a bug fix the regression test is still mandatory, but it is written against the
+**reproduced** defect -- never imagined before reproducing it.
 
 ## When to Write Which Test Type
 

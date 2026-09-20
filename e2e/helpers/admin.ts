@@ -183,6 +183,18 @@ export type TestAdmin = {
    * with that email (e.g. registration failed before this ran).
    */
   getUidByEmail(email: string): Promise<string | null>;
+  /**
+   * TASK-301. Generates a REAL, valid password-reset link for `email` via the
+   * Admin SDK (no email delivery needed — the same value Firebase would put
+   * in the reset email's link). The returned URL points at Firebase's own
+   * hosted action handler, not this app; callers must extract its `oobCode`
+   * query param and drive THIS app's own `/reset-password?oobCode=...` route
+   * with it (see ResetPasswordPage.gotoWithLink). This function only ever
+   * calls generatePasswordResetLink — nothing in this module calls
+   * confirmPasswordReset, so the account's real password is never touched by
+   * generating or verifying this link.
+   */
+  generatePasswordResetLink(email: string): Promise<string>;
 };
 
 let cached: TestAdmin | null | undefined;
@@ -644,6 +656,11 @@ async function build(): Promise<TestAdmin | null> {
     }
   };
 
+  // TASK-301. See the TestAdmin.generatePasswordResetLink doc comment.
+  const generatePasswordResetLink = async (email: string): Promise<string> => {
+    return getAuth(app).generatePasswordResetLink(email);
+  };
+
   return {
     uid,
     db,
@@ -653,5 +670,6 @@ async function build(): Promise<TestAdmin | null> {
     restoreQuantities,
     deleteAccount,
     getUidByEmail,
+    generatePasswordResetLink,
   };
 }

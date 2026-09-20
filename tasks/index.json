@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T02:29:29.560Z",
+  "generated_at": "2026-09-20T02:48:15.652Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1744,13 +1744,13 @@
     {
       "key": "TASK-311",
       "title": "Market: la pestana STAPLES no muestra ningun precio — cero tokens monetarios en toda la tabla, y la columna de precio no existe",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {
       "key": "TASK-312",
       "title": "Market: la tabla de movimientos de precio repite filas identicas — 3 duplicados medidos sobre 30 filas, y el ranking esconde cartas reales",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {
@@ -1762,13 +1762,13 @@
     {
       "key": "TASK-314",
       "title": "Market: con la fuente de precios caida no se muestra ningun aviso — 0 toasts, sin fecha de actualizacion, y el unico texto en pantalla le echa la culpa a la coleccion del usuario",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {
       "key": "TASK-315",
       "title": "Market: un mismo texto para tres causas distintas — con la cartera vacia dice que ninguna carta coincide, en vez de decir que no hay cartas",
-      "status": "todo",
+      "status": "in_review",
       "priority": "medium"
     },
     {

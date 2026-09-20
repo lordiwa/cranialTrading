@@ -11,7 +11,7 @@
     "AC6: prueba de regresion (tests-after) que cumple dos pedidos de la misma carta en paralelo y asevera el decremento total exacto. Debe fallar contra el codigo actual.",
     "AC7 (mata-mutantes): volver a la escritura absoluta deja la prueba del AC6 en rojo."
   ],
-  "status": "todo",
+  "status": "in_review",
   "priority": "high",
   "labels": [
     "buy-request",
@@ -25,9 +25,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "reviewer",
+      "at": "2026-09-20T02:09:39.992Z",
+      "body": "[REVISION EN CONTEXTO FRESCO — BLOCK] commit 5bc2261\n\nCONTEXTO DE LA REVISION: el commit 5bc2261 aparecio en el arbol SIN hand-off y SIN entrada en el subagent-log (codigo de procedencia anonima). Se mando a hivemind:reviewer en contexto fresco, briefeado para juzgarlo SOLO contra los AC y contra lo que el diff realmente hace, sin darle por bueno ningun razonamiento de autor (no habia). El reviewer reprodujo independientemente el gate local: 2456/2456 tests verdes y vue-tsc verde.\n\nVEREDICTO: BLOCK. NO pusheable tal cual. NO es para rehacer de cero: el enfoque es correcto (runTransaction con relectura, insufficient como accion de primera clase, guarda de vuelo unico) y los dos defectos medidos SI quedan cerrados en el codigo. Lo que bloquea son dos regresiones nuevas.\n\nAC POR AC (TASK-316):\n- AC1 (control negativo): NO EVIDENCIADO.\n- AC2 (decremento atomico): CUMPLIDO EN EL CALL-SITE. buyRequests.ts:232-277 — runTransaction con tx.get fresco del pedido y de CADA carta, plan calculado DENTRO de la tx, escritura en la misma tx. La cantidad escrita sigue siendo absoluta pero calculada sobre relectura dentro de una transaccion serializable, que es exactamente la opcion \"runTransaction con relectura\" que el AC permite. collectionStore.getCardById desaparecio del path (import eliminado). El reviewer verifico el CALL-SITE, no el helper — este proyecto tiene la leccion literal de que un helper con cobertura total no prueba que alguien lo llame.\n- AC3 (rechazo de ya-cumplido): CUMPLIDO. Guarda local (:222-224) mas relectura en tx (:240-242), toast alreadyFulfilled.\n- AC4 (todo-o-nada): CUMPLIDO bajo la lectura \"atomico ante fallos, parcial-informado ante insuficiencias\". Con shortfalls SI comitea las lineas suficientes y marca fulfilled. Eso es lo que 307-AC4 sanciona, pero tensiona con la letra de UC-21B.11, que admite la lectura estricta. LO ADJUDICA EL HUMANO EN EL WARGAMING (L-2).\n- AC5 (guarda de vuelo unico): CUMPLIDO. SavedMatchesView.vue:684-688 (Set armado en el mismo tick, liberado en finally:715) mas :disabled en BuyRequestCard.vue:122 con prop fulfilling.\n- AC6 (regresion concurrente): PARCIAL. Hay unit test con simulador de optimistic-concurrency (10-2-3=5), fiel a la garantia que importa, pero es un MOCK escrito por el mismo autor anonimo. NO existe spec e2e de dos pestanas en qa-agents.\n- AC7 (mata-mutantes): PLAUSIBLE, NO EJECUTADO.\n\n[FINDING-HIGH: R-1] El fix de atomicidad DESINCRONIZA card_index, public_cards y el estado local en CADA cumplimiento. El path viejo iba por collectionStore.updateCard/deleteCard, que (verificado en src/stores/collection.ts:2015-2016 y :2465) mantienen syncIndexLocal + queueCardIndexDelta — el indice del que el grid de coleccion se construye, la familia de bugs central de este proyecto — mas syncCardToPublic/removeCardFromPublic y el snapshot de Pinia. El path nuevo escribe users/{uid}/cards CRUDO con tx.update/tx.delete y no toca NADA de eso; SavedMatchesView tampoco recarga la coleccion despues. Escenario confirmado: el vendedor cumple un pedido que agota una carta -> tx.delete -> la carta sigue listada en la vitrina publica PARA SIEMPRE, card_index sigue mostrandola en su propio grid, y public_cards.quantity (el numero contra el que valida el AC5 de TASK-307) queda congelado en el valor pre-venta. Hay regresion MEDIBLE: TASK-317 registro que con el codigo VIEJO el borrado SI desaparecia de la vitrina (\"Angel of the Ruins SI desaparecio\"). Esto NO es alcance de TASK-317 — 317 es el hueco preexistente del indice derivado ante cambios de CANTIDAD; esto es una regresion NUEVA sobre lo que el path viejo si sincronizaba, y agranda el agujero de 317 en vez de dejarlo igual. CONFIRMADO por lectura. ARREGLO: tras el commit de la tx, ejecutar por cada paso la misma post-sincronizacion que updateCard/deleteCard hacen (syncIndexLocal + queueCardIndexDelta + syncCardToPublic/removeCardFromPublic + patch del estado local), best-effort FUERA de la transaccion.\n\n[FINDING-HIGH: R-3] Mismo hallazgo de registro que en TASK-307: sin hand-off, sin casos de uso aprobados registrados, sin wargaming, sin evidencia de AC1, y sin spec e2e de dos pestanas siquiera escrito.\n\nMEDIUM y LOW: ver el comentario equivalente en TASK-307 (M-1, M-2, M-3, M-5, M-6, L-1). L-2 es propio de este ticket: la tension semantica 316-AC4 vs 307-AC4 la ratifica el humano en el wargaming."
+    }
+  ],
   "created_at": "2026-09-19T17:29:02.867Z",
-  "updated_at": "2026-09-19T17:29:02.867Z",
+  "updated_at": "2026-09-20T02:09:39.992Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

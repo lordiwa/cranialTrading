@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T19:15:22.929Z",
+  "generated_at": "2026-09-20T02:18:25.916Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1684,7 +1684,7 @@
     {
       "key": "TASK-301",
       "title": "Reset de contrasena: con un oobCode invalido se pinta el formulario completo, el aviso dura 4 segundos y el usuario queda sin salida",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {
@@ -1720,7 +1720,7 @@
     {
       "key": "TASK-307",
       "title": "fulfillRequest: cumplir un pedido por mas unidades de las que hay BORRA la carta entera de la coleccion y reporta exito completo sin informar nada faltante",
-      "status": "todo",
+      "status": "in_review",
       "priority": "critical"
     },
     {
@@ -1774,7 +1774,7 @@
     {
       "key": "TASK-316",
       "title": "fulfillRequest no es atomico: cumplir dos pedidos de la misma carta desde dos pestanas descuenta 3 de 5 unidades — la segunda escritura absoluta pisa a la primera",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {

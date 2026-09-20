@@ -5,6 +5,7 @@ import { useHead, useSeoMeta } from '@unhead/vue';
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firestore';
 import { resolveUsernameToUid } from '../services/userLookup';
+import { preloadSetMappings } from '../services/mtgjson';
 import { useToastStore } from '../stores/toast';
 import { useAuthStore } from '../stores/auth';
 import { useConfirmStore } from '../stores/confirm';
@@ -91,6 +92,36 @@ const {
   resetFilters,
 } = usePublicProfileIndex(userId, {
   onError: () => toastStore.show(t('profile.messages.loadCardsError'), 'error'),
+});
+
+// TASK-304 — the owner's /collection view preloads MTGJSON set mappings in
+// parallel batches (useCollectionTotals -> preloadSetMappings, mounted via
+// CollectionTotalsPanel) before any single card asks for its own price; this
+// public profile did not, so each CollectionGridCard here fetched its own
+// set mapping lazily and one at a time (getCardPrices' own fallback path).
+// That loading-order asymmetry, not a data asymmetry, is what made the same
+// card show different CK/TCG/buylist values on /collection vs /@usuario —
+// see artifacts/TASK-304-AC1-evidencia.md. `useCollectionTotals` itself is
+// NOT reused here: it also runs autoFixCard (which writes to the VIEWER's
+// own collectionStore) and CK/TCG total math, neither of which applies to a
+// profile the viewer does not own, so only the one function this view
+// actually needs — preloadSetMappings — is called directly.
+//
+// Deferred the same way CollectionView defers its own preload (TASK-153):
+// competing with the grid's first paint is the exact problem that ticket
+// measured and fixed by batching + delaying, not by preloading eagerly. A
+// public profile is bounded to whatever page(s) are actually loaded (60
+// cards per page — DEFAULT_PAGE_SIZE in usePublicProfileIndex.ts) rather
+// than the owner's whole collection, so the worst case here is one batch of
+// up to 60 distinct sets — well below the 300+ sequential downloads
+// TASK-153 measured against an unbounded collection — run through the SAME
+// 5-at-a-time parallel batching preloadSetMappings already does.
+const PUBLIC_PROFILE_PRELOAD_DELAY_MS = 3000;
+watch(cards, (list) => {
+  if (list.length === 0) return;
+  const uniqueSetCodes = [...new Set(list.map(c => c.setCode).filter(Boolean))] as string[];
+  if (uniqueSetCodes.length === 0) return;
+  setTimeout(() => { void preloadSetMappings(uniqueSetCodes); }, PUBLIC_PROFILE_PRELOAD_DELAY_MS);
 });
 
 // Cart mode: show cart buttons for anonymous users (not logged in, not own profile)

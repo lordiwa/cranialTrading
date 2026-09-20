@@ -79,8 +79,42 @@ const MTGJSON_API = 'https://mtgjson.com/api/v5'
 let priceDataCache: Record<string, MTGJSONPriceFormats> | null = null
 let scryfallToUuidMap = new Map<string, string>()
 let dbInstance: IDBDatabase | null = null
-const failedSets = new Set<string>()
+
+// TASK-304 — `failedSets` used to be a single Set that conflated two very
+// different situations: "MTGJSON genuinely does not publish this set" (a
+// permanent fact, safe to skip for the rest of the session) and "the fetch
+// for this set failed this time" (a transient network/CDN hiccup). Because
+// both landed in the same Set with no expiry, a set that failed ONCE was
+// skipped for the rest of the session even if the failure was momentary —
+// measured as the root cause of the owner/public-profile price divergence:
+// whichever view happened to hit the transient failure first was frozen out
+// of that set's prices for good, while the other view (which never tried, or
+// tried after the CDN recovered) kept them. Split in two:
+// - unknownSets: isKnownMtgjsonSet() said the set has no MTGJSON file. This
+//   is a fact about MTGJSON's catalog, not about network conditions, so it
+//   stays permanent for the session (retrying would only regenerate a 404).
+// - failedSetCooldowns: a fetch attempt failed (network error, non-OK
+//   response, etc). Skipped until the cooldown elapses, then eligible again.
+const unknownSets = new Set<string>()
+const failedSetCooldowns = new Map<string, number>() // set code -> retry-eligible-at timestamp
+const FAILED_SET_RETRY_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
 const loadedSets = new Set<string>()
+
+/**
+ * Is `upper` (an already-uppercased set code) currently something callers
+ * should skip re-fetching? True for a permanently-unknown set, or for a
+ * transient failure still inside its cooldown window. A cooldown that has
+ * elapsed is cleared here (not just ignored) so it does not leak memory
+ * across a long session.
+ */
+function isSetSkippable(upper: string): boolean {
+  if (unknownSets.has(upper)) return true
+  const retryAt = failedSetCooldowns.get(upper)
+  if (retryAt === undefined) return false
+  if (Date.now() < retryAt) return true
+  failedSetCooldowns.delete(upper)
+  return false
+}
 
 // TASK-174: in-flight-promise dedup, mirroring ensureSetListLoaded's
 // setListLoadPromise pattern below. Without these, concurrent callers
@@ -494,7 +528,7 @@ export async function fetchSetMapping(setCode: string): Promise<void> {
   // 404 + CORS console spam. When the SetList is unavailable (validSetCodes
   // empty), isKnownMtgjsonSet returns true and we fall back to fetching.
   if (!isKnownMtgjsonSet(setCode, validSetCodes)) {
-    failedSets.add(upper)
+    unknownSets.add(upper)
     return
   }
 
@@ -533,8 +567,8 @@ export async function fetchSetMapping(setCode: string): Promise<void> {
       loadedSets.add(upper)
       console.info(`Loaded ${count} cards from ${setCode}`)
     } catch (error) {
-      console.warn(`[MTGJSON] Set ${setCode} failed (will skip for this session):`, error)
-      failedSets.add(upper)
+      console.warn(`[MTGJSON] Set ${setCode} failed (will retry after cooldown):`, error)
+      failedSetCooldowns.set(upper, Date.now() + FAILED_SET_RETRY_COOLDOWN_MS)
     } finally {
       // Clear regardless of outcome — on success loadedSets now short-
       // circuits future calls above; on failure this MUST clear so a later
@@ -562,7 +596,7 @@ export async function getCardPrices(scryfallId: string, setCode?: string): Promi
     }
 
     // If we don't have the mapping for this card, fetch the set data
-    if (!scryfallToUuidMap.has(scryfallId) && setCode && !failedSets.has(setCode.toUpperCase())) {
+    if (!scryfallToUuidMap.has(scryfallId) && setCode && !isSetSkippable(setCode.toUpperCase())) {
       // Load the valid-set list once so fetchSetMapping can pre-filter 404s.
       await ensureSetListLoaded()
       await fetchSetMapping(setCode)
@@ -628,7 +662,7 @@ export async function preloadSetMappings(setCodes: string[]): Promise<void> {
   // Filter out already-loaded and failed sets
   const needed = setCodes.filter(sc => {
     const upper = sc.toUpperCase()
-    return !failedSets.has(upper) && !loadedSets.has(upper)
+    return !isSetSkippable(upper) && !loadedSets.has(upper)
   })
   if (needed.length === 0) return
 

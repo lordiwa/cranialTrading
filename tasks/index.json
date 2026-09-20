@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T02:18:25.916Z",
+  "generated_at": "2026-09-20T02:29:29.560Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1696,7 +1696,7 @@
     {
       "key": "TASK-303",
       "title": "El spec e2e de datos de ajustes envuelve sus aserciones en if isVisible() y pasa en verde sin ejercer nada: verde vacio sobre un flujo que no existe",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {

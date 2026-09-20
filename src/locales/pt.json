@@ -1315,6 +1315,8 @@
       "fulfilledPartial": "Pronto — não havia estoque suficiente para {count} carta(s) deste pedido",
       "fulfillError": "Não foi possível concluir a venda",
       "alreadyFulfilled": "Este pedido já havia sido marcado como vendido",
+      "shortfallTitle": "Estoque insuficiente",
+      "shortfallLine": "pediram {requested}, havia {available}",
       "deleteTitle": "Excluir pedido?",
       "deleteMessage": "Este pedido de compra será removido."
     },

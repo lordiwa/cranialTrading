@@ -1315,6 +1315,8 @@
       "fulfilledPartial": "Listo — no había stock suficiente para {count} carta(s) de este pedido",
       "fulfillError": "No se pudo completar la venta",
       "alreadyFulfilled": "Este pedido ya había sido marcado como vendido",
+      "shortfallTitle": "Stock insuficiente",
+      "shortfallLine": "pedían {requested}, había {available}",
       "deleteTitle": "¿Borrar solicitud?",
       "deleteMessage": "Esta solicitud de compra se eliminará."
     },

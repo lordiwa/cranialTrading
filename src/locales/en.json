@@ -1315,6 +1315,8 @@
       "fulfilledPartial": "Done — {count} card(s) in this order didn't have enough stock",
       "fulfillError": "Could not complete the sale",
       "alreadyFulfilled": "This request was already marked as sold",
+      "shortfallTitle": "Not enough stock",
+      "shortfallLine": "requested {requested}, had {available}",
       "deleteTitle": "Delete request?",
       "deleteMessage": "This buy request will be removed."
     },

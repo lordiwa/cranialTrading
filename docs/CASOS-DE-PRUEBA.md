@@ -255,6 +255,13 @@ regresión pasaría inadvertida.**
 
 **UC-10 — Exportar la colección** · `settings/settings-data.spec.ts`
 - Happy path: `/settings` → gestión de datos → CSV de Moxfield o de Manabox → se descarga.
+- **REFUTADO** (WG4-O2-02, wargaming corrida #4): el botón de exportación no existe en la
+  aplicación — confirmado en el código, `SettingsView.vue` no tiene ninguna sección de
+  exportación (TASK-302). Los dos tests que decían cubrir este happy path envolvían su única
+  acción en `if (await ...isVisible())`: con el botón ausente el cuerpo nunca corría y el test
+  pasaba en VERDE sin ejercer nada. → **SIN E2E** desde TASK-303 (2026-09-20): ambos tests
+  quedan `test.fixme()` con referencia a TASK-302, que decide si la exportación se implementa
+  o se retira del alcance declarado.
 
 ### 3.4 Búsqueda de cartas (Scryfall)
 

@@ -91,7 +91,12 @@ export class SettingsPage {
     this.data = {
       exportMoxfieldButton: page.getByRole('button', { name: /moxfield/i }),
       exportManaboxButton: page.getByRole('button', { name: /manabox/i }),
-      resendVerificationButton: page.getByRole('button', { name: /resend|reenviar/i }),
+      // TASK-303: the app's actual copy for this button is "SEND EMAIL" / "ENVIAR EMAIL"
+      // (settings.sections.emailVerification.sendEmail), never "resend"/"reenviar" — the old
+      // regex here never matched anything on the Settings page. Keeping /resend|reenviar/i in
+      // the alternation too so this locator stays correct if the copy is ever changed to match
+      // the property name.
+      resendVerificationButton: page.getByRole('button', { name: /send email|enviar email|resend|reenviar/i }),
       restartTourButton: page.getByRole('button', { name: /tour|guía/i }),
       clearDataButton: page.getByRole('button', { name: /delete|eliminar|clear|borrar/i }).last(),
     };

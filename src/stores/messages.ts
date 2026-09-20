@@ -178,6 +178,13 @@ export const useMessagesStore = defineStore('messages', () => {
                         unreadCount: 0,
                     } as unknown as Conversation;
                 })
+                // TASK-313 AC3: el conteo de "conversaciones activas" y el estado vacío
+                // solo deben contar conversaciones con al menos un mensaje real.
+                // `lastMessage` arranca en '' al crear el documento y sendMessage() lo
+                // llena recién con el primer mensaje enviado (nunca con contenido vacío,
+                // sendMessage rechaza content.trim() === ''), así que es un proxy exacto
+                // y barato (sin queries extra por conversación) de "tiene >=1 mensaje".
+                .filter(conv => conv.lastMessage !== '')
                 .sort((a, b) => (b.lastMessageTime?.getTime() ?? 0) - (a.lastMessageTime?.getTime() ?? 0));
 
             // unreadCount real por conversación (best-effort, no bloquea la lista si una falla)
@@ -319,6 +326,7 @@ export const useMessagesStore = defineStore('messages', () => {
         currentMessages,
         loading,
         loadError,
+        getConversationId,
         createConversation,
         sendMessage,
         loadConversations,

@@ -10,7 +10,6 @@ import { useContactsStore } from '../../stores/contacts'
 import { type MatchCard as MatchCardType, type SimpleMatch } from '../../stores/matches'
 import { useToastStore } from '../../stores/toast'
 import { isDisplayableImageUrl } from '../../utils/cardImageUrl'
-import { useMessagesStore } from '../../stores/messages'
 import { useI18n } from '../../composables/useI18n'
 import { getAvatarUrlForUser } from '../../utils/avatar'
 import { type CardPrices, formatPrice, getCardPrices } from '../../services/mtgjson'
@@ -36,7 +35,6 @@ const showChatModal = ref(false)
 const contactSaving = ref(false)
 const contactsStore = useContactsStore()
 const toastStore = useToastStore()
-const messagesStore = useMessagesStore()
 
 // Live CK/TCG/BL prices for match cards
 const matchPrices = shallowRef<Map<string, CardPrices | null>>(new Map())
@@ -153,21 +151,22 @@ const copyEmailToClipboard = async () => {
 }
 
 // MENSAJE - Abrir chat con el usuario
-const handleOpenChat = async () => {
+// TASK-313 (Regla 6, mismo defecto que ChatModal.vue): esto llamaba a
+// messagesStore.createConversation() ACÁ, antes de abrir el modal — o sea que
+// el botón "Mensaje" persistía la conversación en Firestore aunque el usuario
+// cerrara el chat sin escribir nada. ChatModal ya calcula su propio id de
+// conversación (determinístico, sin escribir) al abrir y recién persiste en el
+// primer envío real (ver ChatModal.vue FIX 6), así que este llamador solo
+// necesita abrir el modal — no crear nada por su cuenta.
+const handleOpenChat = () => {
   const otherUserId = props.match.otherUserId
-  const otherUsername = props.match.otherUsername
 
   if (!otherUserId) {
     toastStore.show(t('messages.errors.createError'), 'error')
     return
   }
 
-  // Crear conversación si no existe
-  const conversationId = await messagesStore.createConversation(otherUserId, otherUsername)
-
-  if (conversationId) {
-    showChatModal.value = true
-  }
+  showChatModal.value = true
 }
 
 // CONTACTO - Guardar contacto

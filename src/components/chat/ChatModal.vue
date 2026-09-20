@@ -41,32 +41,35 @@ const sortedMessages = computed(() => {
 });
 
 // ✅ FIX 2: CAMBIO - Inicializar conversación UNA SOLA VEZ (no en watch)
-const initializeConversation = async () => {
+// ✅ FIX 6 (TASK-313): esto YA NO persiste nada. Antes llamaba a
+// messagesStore.createConversation() acá mismo, o sea al ABRIR el modal — eso
+// escribía el documento de conversación en Firestore aunque el usuario cerrara
+// sin escribir ni enviar un mensaje (WG4-O3B2-04). El id de conversación es
+// determinístico (mismo par de usuarios -> mismo id, ver getConversationId),
+// así que se puede calcular localmente sin tocar Firestore. La escritura real
+// se difiere a handleSendMessage, en el primer envío (ver FIX 6 ahí abajo).
+// El listener de mensajes se puede abrir igual: es una subcolección y
+// Firestore la deja leer aunque el documento padre todavía no exista
+// (confirmado contra firestore.rules: conversations/{id}/messages solo pide
+// request.auth != null, no depende de resource.data del padre).
+const initializeConversation = () => {
   if (!authStore.user || !props.otherUserId || conversationId.value) {
     // Ya inicializada o datos incompletos
     return;
   }
 
-  try {
-    const convId = await messagesStore.createConversation(
-        props.otherUserId,
-        props.otherUsername
-    );
-
-    if (!convId) {
-      toastStore.show(t('messages.errors.createError'), 'error');
-      return;
-    }
-
-    conversationId.value = convId;
-    isConversationReady.value = true;
-
-    // Cargar mensajes con listener
-    messagesStore.loadConversationMessages(convId);
-  } catch (error) {
-    console.error('Error inicializando conversación:', error);
-    toastStore.show(t('messages.errors.listenError'), 'error');
+  if (authStore.user.id === props.otherUserId) {
+    toastStore.show(t('messages.errors.selfChat'), 'error');
+    return;
   }
+
+  const convId = messagesStore.getConversationId(authStore.user.id, props.otherUserId);
+
+  conversationId.value = convId;
+  isConversationReady.value = true;
+
+  // Cargar mensajes con listener (no crea nada si la conversación no existe aún)
+  messagesStore.loadConversationMessages(convId);
 };
 
 const handleSendMessage = async () => {
@@ -75,8 +78,23 @@ const handleSendMessage = async () => {
 
   isSending.value = true;
 
+  // ✅ FIX 6 (TASK-313): el documento de conversación se crea recién ACÁ, en el
+  // primer envío real — createConversation es create-if-missing (getDoc + setDoc
+  // solo si no existe), así que reabrir y reenviar (caso alternativo UC-19.3) no
+  // duplica el documento: el segundo envío lo encuentra y solo agrega el mensaje.
+  const convId = await messagesStore.createConversation(
+      props.otherUserId,
+      props.otherUsername
+  );
+
+  if (!convId) {
+    // createConversation ya mostró el toast de error correspondiente
+    isSending.value = false;
+    return;
+  }
+
   const success = await messagesStore.sendMessage(
-      conversationId.value,
+      convId,
       props.otherUserId,
       messageInput.value
   );
@@ -116,9 +134,9 @@ const handleClose = () => {
 // ✅ FIX 2: watch simplificado - solo abre si show es true y aún no inicializado
 watch(
     () => props.show,
-    async (newVal) => {
+    (newVal) => {
       if (newVal && !isConversationReady.value) {
-        await initializeConversation();
+        initializeConversation();
       }
     },
     { immediate: true }

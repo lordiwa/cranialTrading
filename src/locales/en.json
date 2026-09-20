@@ -2257,11 +2257,13 @@
         "rank": "#",
         "card": "Card",
         "percentDecks": "% Decks",
-        "avgCopies": "Avg Copies"
+        "avgCopies": "Avg Copies",
+        "price": "Price"
       },
       "empty": "No staples data available yet. Data updates every 12 hours.",
       "formatLabel": "Format",
-      "categoryLabel": "Category"
+      "categoryLabel": "Category",
+      "noPrice": "No price"
     },
     "search": "Search cards…",
     "sort": {
@@ -2285,6 +2287,7 @@
       "up": "{count} up",
       "down": "{count} down",
       "empty": "None of your cards match current price movers. Load your collection and check back later.",
+      "emptyCollection": "Your collection has no cards yet. Add cards to your collection to track their price impact.",
       "sortImpact": "$ Impact",
       "sortPercent": "% Change",
       "sortPrice": "Price",
@@ -2317,10 +2320,12 @@
     },
     "wishlist": {
       "totalChange": "Wishlist impact",
+      "totalValue": "Total value",
       "affected": "{count} cards tracked",
       "up": "{count} up",
       "down": "{count} down",
       "empty": "None of your wishlist cards match current price movers.",
+      "emptyCollection": "Your wishlist has no cards yet. Add cards to your wishlist to track their price impact.",
       "sortImpact": "$ Impact",
       "sortPercent": "% Change",
       "sortPrice": "Price",
@@ -2363,7 +2368,8 @@
     },
     "errors": {
       "loadMovers": "Failed to load price movers",
-      "loadStaples": "Failed to load format staples"
+      "loadStaples": "Failed to load format staples",
+      "dataUnavailable": "Price data isn't available right now. Please try again later."
     }
   },
   "binders": {

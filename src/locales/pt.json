@@ -2257,11 +2257,13 @@
         "rank": "#",
         "card": "Carta",
         "percentDecks": "% Decks",
-        "avgCopies": "Cópias Méd."
+        "avgCopies": "Cópias Méd.",
+        "price": "Preço"
       },
       "empty": "Sem dados de staples ainda. Atualiza a cada 12 horas.",
       "formatLabel": "Formato",
-      "categoryLabel": "Categoria"
+      "categoryLabel": "Categoria",
+      "noPrice": "Sem preço"
     },
     "search": "Buscar cartas…",
     "sort": {
@@ -2285,6 +2287,7 @@
       "up": "{count} subiram",
       "down": "{count} caíram",
       "empty": "Nenhuma das suas cartas corresponde aos movimentos de preço atuais.",
+      "emptyCollection": "Você ainda não tem cartas na sua coleção. Adicione cartas à sua coleção para ver o impacto no preço.",
       "sortImpact": "$ Impacto",
       "sortPercent": "% Variação",
       "sortPrice": "Preço",
@@ -2317,10 +2320,12 @@
     },
     "wishlist": {
       "totalChange": "Impacto nos desejados",
+      "totalValue": "Valor total",
       "affected": "{count} cartas rastreadas",
       "up": "{count} subiram",
       "down": "{count} caíram",
       "empty": "Nenhuma das suas cartas desejadas corresponde aos movimentos atuais.",
+      "emptyCollection": "Você ainda não tem cartas na sua lista de desejos. Adicione cartas à sua lista de desejos para ver o impacto no preço.",
       "sortImpact": "$ Impacto",
       "sortPercent": "% Variação",
       "sortPrice": "Preço",
@@ -2363,7 +2368,8 @@
     },
     "errors": {
       "loadMovers": "Erro ao carregar movimentos de preço",
-      "loadStaples": "Erro ao carregar staples do formato"
+      "loadStaples": "Erro ao carregar staples do formato",
+      "dataUnavailable": "Os dados de preço não estão disponíveis no momento. Tente novamente mais tarde."
     }
   },
   "binders": {

@@ -2257,11 +2257,13 @@
         "rank": "#",
         "card": "Carta",
         "percentDecks": "% Mazos",
-        "avgCopies": "Copias Prom."
+        "avgCopies": "Copias Prom.",
+        "price": "Precio"
       },
       "empty": "No hay datos de staples aún. Se actualizan cada 12 horas.",
       "formatLabel": "Formato",
-      "categoryLabel": "Categoría"
+      "categoryLabel": "Categoría",
+      "noPrice": "Sin precio"
     },
     "search": "Buscar cartas…",
     "sort": {
@@ -2285,6 +2287,7 @@
       "up": "{count} subieron",
       "down": "{count} bajaron",
       "empty": "Ninguna de tus cartas coincide con los movimientos de precio actuales.",
+      "emptyCollection": "Todavía no tenés cartas en tu colección. Agregá cartas a tu colección para ver su impacto de precio.",
       "sortImpact": "$ Impacto",
       "sortPercent": "% Cambio",
       "sortPrice": "Precio",
@@ -2317,10 +2320,12 @@
     },
     "wishlist": {
       "totalChange": "Impacto en deseados",
+      "totalValue": "Valor total",
       "affected": "{count} cartas rastreadas",
       "up": "{count} subieron",
       "down": "{count} bajaron",
       "empty": "Ninguna de tus cartas deseadas coincide con los movimientos actuales.",
+      "emptyCollection": "Todavía no tenés cartas en tu lista de deseados. Agregá cartas a tus deseados para ver su impacto de precio.",
       "sortImpact": "$ Impacto",
       "sortPercent": "% Cambio",
       "sortPrice": "Precio",
@@ -2363,7 +2368,8 @@
     },
     "errors": {
       "loadMovers": "Error al cargar movimientos de precio",
-      "loadStaples": "Error al cargar staples del formato"
+      "loadStaples": "Error al cargar staples del formato",
+      "dataUnavailable": "Los datos de precio no están disponibles en este momento. Intentá de nuevo más tarde."
     }
   },
   "binders": {

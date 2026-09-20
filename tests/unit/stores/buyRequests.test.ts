@@ -137,7 +137,25 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/services/firebase', () => ({ db: {} }))
 vi.mock('@/services/firestore', () => ({ db: {} }))
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ user: { id: 'owner-id' } }),
+  useAuthStore: () => ({ user: { id: 'owner-id', username: 'seller', email: 'seller@example.com', location: 'Montevideo', avatarUrl: null } }),
+}))
+
+// TASK-307/316 review R-1: fulfillRequest post-sincroniza card_index (Cloud
+// Function) y public_cards (services/publicCards) DESPUES de que la
+// transaccion comitea — ver stores/buyRequests.ts's syncFulfilledCardsPostCommit.
+// Mockeados aca para poder aserter que se llaman con los argumentos
+// correctos sin depender de la implementacion real de ninguno de los dos
+// (mismo patron que tests/unit/stores/collection.deleteCardFallback.test.ts).
+const mockApplyCardIndexDelta = vi.fn().mockResolvedValue({ applied: 1, skipped: 0, skippedIds: [], fallbackUsed: 0 })
+vi.mock('@/services/cloudFunctions', () => ({
+  applyCardIndexDelta: (...args: unknown[]) => mockApplyCardIndexDelta(...args),
+}))
+
+const mockSyncCardToPublic = vi.fn().mockResolvedValue(undefined)
+const mockRemoveCardFromPublic = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/services/publicCards', () => ({
+  syncCardToPublic: (...args: unknown[]) => mockSyncCardToPublic(...args),
+  removeCardFromPublic: (...args: unknown[]) => mockRemoveCardFromPublic(...args),
 }))
 
 import { doc, setDoc, updateDoc } from 'firebase/firestore'
@@ -333,5 +351,96 @@ describe('useBuyRequestsStore — fulfillRequest (SCRUM-70.3 / TASK-307 / TASK-3
     expect(resB.ok).toBe(true)
     const cardSnap = await mockGetDoc({ path: 'users/owner-id/cards/c1' })
     expect((cardSnap.data() as { quantity: number }).quantity).toBe(5) // 10 - 2 - 3, exacto
+  })
+
+  it('TASK-307/316 review R-1 (caso de uso 1): un update parcial post-sincroniza card_index y public_cards con la cantidad nueva — previene que la vitrina y el grid del vendedor queden con la cantidad vieja para siempre', async () => {
+    seedDoc('users/owner-id/cards/c1', {
+      quantity: 10, status: 'sale', public: true, name: 'Angel of the Ruins',
+      scryfallId: 'scry-angel', price: 2, edition: 'BRO', condition: 'NM', foil: false, image: 'img.png',
+    })
+    seedBuyRequest('req-1', { status: 'pending', items: [item({ cardId: 'c1', quantity: 3 })] })
+    const store = useBuyRequestsStore()
+    store.buyRequests.push({
+      id: 'req-1', buyerName: 'Rafa', totalValue: 0, status: 'pending', createdAt: new Date(),
+      items: [item({ cardId: 'c1', quantity: 3 })],
+    })
+
+    const res = await store.fulfillRequest('req-1')
+
+    expect(res.ok).toBe(true)
+    expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'c1', action: 'update' }])
+    expect(mockSyncCardToPublic).toHaveBeenCalledTimes(1)
+    const [publicCard] = mockSyncCardToPublic.mock.calls[0] as [{ quantity: number }]
+    expect(publicCard.quantity).toBe(7) // 10 - 3 — la vitrina ve la cantidad nueva, nunca la vieja
+    expect(mockRemoveCardFromPublic).not.toHaveBeenCalled()
+  })
+
+  it('TASK-307/316 review R-1 (caso de uso 2): agotar una carta post-sincroniza su borrado en card_index y public_cards — previene que una carta agotada siga listada en la vitrina para siempre', async () => {
+    seedDoc('users/owner-id/cards/c1', {
+      quantity: 3, status: 'sale', public: true, name: 'Angel of the Ruins',
+      scryfallId: 'scry-angel', price: 2, edition: 'BRO', condition: 'NM', foil: false, image: 'img.png',
+    })
+    seedBuyRequest('req-1', { status: 'pending', items: [item({ cardId: 'c1', quantity: 3 })] })
+    const store = useBuyRequestsStore()
+    store.buyRequests.push({
+      id: 'req-1', buyerName: 'Rafa', totalValue: 0, status: 'pending', createdAt: new Date(),
+      items: [item({ cardId: 'c1', quantity: 3 })],
+    })
+
+    const res = await store.fulfillRequest('req-1')
+
+    expect(res.ok).toBe(true)
+    expect(mockApplyCardIndexDelta).toHaveBeenCalledWith([{ cardId: 'c1', action: 'delete' }])
+    expect(mockRemoveCardFromPublic).toHaveBeenCalledWith('c1', 'owner-id')
+    expect(mockSyncCardToPublic).not.toHaveBeenCalled()
+  })
+
+  it('TASK-307/316 review R-1 (caso de uso 3): si la post-sincronizacion falla (Cloud Function caida), el descuento ya comiteado NO se revierte y fulfillRequest no rompe — se resuelve ok igual', async () => {
+    mockApplyCardIndexDelta.mockRejectedValueOnce(new Error('cloud function down'))
+    seedCard('c1', 10)
+    seedBuyRequest('req-1', { status: 'pending', items: [item({ cardId: 'c1', quantity: 3 })] })
+    const store = useBuyRequestsStore()
+    store.buyRequests.push({
+      id: 'req-1', buyerName: 'Rafa', totalValue: 0, status: 'pending', createdAt: new Date(),
+      items: [item({ cardId: 'c1', quantity: 3 })],
+    })
+
+    const res = await store.fulfillRequest('req-1')
+
+    expect(res.ok).toBe(true) // el fallo de post-sync no tira ni revierte la respuesta de exito
+    const cardSnap = await mockGetDoc({ path: 'users/owner-id/cards/c1' })
+    expect((cardSnap.data() as { quantity: number }).quantity).toBe(7) // el decremento ya comiteado sigue en pie
+  })
+
+  it('TASK-307/316 review M-3: dos lineas del MISMO cardId (6 y 6) sobre stock 10 se tratan como una sola linea de 12 — nunca "se descuentan 6 habiendo vendido 12" con exito completo', async () => {
+    seedCard('c1', 10)
+    seedBuyRequest('req-1', { status: 'pending', items: [item({ cardId: 'c1', quantity: 6 }), item({ cardId: 'c1', quantity: 6 })] })
+    const store = useBuyRequestsStore()
+    store.buyRequests.push({
+      id: 'req-1', buyerName: 'Rafa', totalValue: 0, status: 'pending', createdAt: new Date(),
+      items: [item({ cardId: 'c1', quantity: 6 }), item({ cardId: 'c1', quantity: 6 })],
+    })
+
+    const res = await store.fulfillRequest('req-1')
+
+    expect(res.ok).toBe(true)
+    expect(res.shortfalls).toEqual([{ cardId: 'c1', requested: 12, available: 10 }])
+    const cardSnap = await mockGetDoc({ path: 'users/owner-id/cards/c1' })
+    expect((cardSnap.data() as { quantity: number }).quantity).toBe(10) // intacta — nunca se descontaron 6
+  })
+
+  it('TASK-307/316 review M-5: los shortfalls quedan persistidos en el doc del pedido, no solo en el valor de retorno — sobreviven a un refresh de pagina', async () => {
+    seedCard('c1', 1)
+    seedBuyRequest('req-1', { status: 'pending', items: [item({ cardId: 'c1', quantity: 2 })] })
+    const store = useBuyRequestsStore()
+    store.buyRequests.push({
+      id: 'req-1', buyerName: 'Rafa', totalValue: 0, status: 'pending', createdAt: new Date(),
+      items: [item({ cardId: 'c1', quantity: 2 })],
+    })
+
+    await store.fulfillRequest('req-1')
+
+    const requestSnap = await mockGetDoc({ path: 'users/owner-id/buyRequests/req-1' })
+    expect((requestSnap.data() as { shortfalls: unknown }).shortfalls).toEqual([{ cardId: 'c1', requested: 2, available: 1 }])
   })
 })

@@ -1,4 +1,5 @@
 import type { ExchangeCartItem } from './exchangeCart'
+import type { FulfillmentShortfall } from '../utils/buyRequest'
 
 export type BuyRequestStatus = 'pending' | 'seen' | 'fulfilled'
 
@@ -22,4 +23,13 @@ export interface BuyRequest {
   totalValue: number
   status: BuyRequestStatus
   createdAt: Date
+  /**
+   * TASK-307/316 review M-5: constancia persistida de lo que NO se pudo
+   * cumplir, escrita en la MISMA transaccion que marca `fulfilled`. Antes
+   * `shortfalls` solo vivia en el valor de retorno de fulfillRequest y en un
+   * toast de 4 segundos — el vendedor que refrescaba la pagina perdia la
+   * unica prueba de que el pedido fue parcial. Ausente en pedidos anteriores
+   * a este fix, o cuando no faltó nada.
+   */
+  shortfalls?: FulfillmentShortfall[]
 }

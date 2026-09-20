@@ -113,7 +113,16 @@ export const resolvePublishedPrices = (
       && (published.status === 'sale' || published.status === 'trade')
       && published.price > 0
       && published.quantity > 0
-    if (!sellable || !published) {
+    // TASK-307/316 review R-2: `item.quantity` viene del carrito del
+    // comprador (localStorage, editable a mano) — antes solo se acotaba por
+    // ARRIBA (`Math.min(item.quantity, published.quantity)`, ver mas abajo),
+    // nunca por ABAJO. Una cantidad negativa o NaN pasaba intacta a
+    // `resolved` y submitBuyRequest la persistia verbatim en el doc del
+    // pedido — el mismo tipo de dano que TASK-306 ya cerro para el precio.
+    // Rechazar la linea entera como `unavailable`, igual que un precio no
+    // vendible, en vez de intentar "arreglarla" en silencio.
+    const validQuantity = Number.isInteger(item.quantity) && item.quantity > 0
+    if (!sellable || !published || !validQuantity) {
       unavailable.push({ cardId: item.cardId, name: item.name })
       continue
     }
@@ -167,6 +176,19 @@ export const planFulfillment = (
   items.map(item => {
     const card = getCard(item.cardId)
     if (!card) return { cardId: item.cardId, action: 'missing', requested: item.quantity }
+    // TASK-307/316 review R-2: `items` viene de un doc de Firestore que
+    // cualquier cliente anonimo puede escribir a mano (firestore.rules:180
+    // solo valida status=='pending') — una cantidad negativa, NaN o no
+    // entera nunca debe llegar a `card.quantity - item.quantity`. Sin este
+    // chequeo, `quantity: -100` sobre un stock de 10 evaluaba
+    // `-100 > 10` como falso y calculaba `newQuantity = 10 - (-100) = 110`:
+    // inventario INFLADO con exito completo, con la autoridad de escritura
+    // del propio vendedor. Tratarla como 'insufficient' (nunca se tira) para
+    // que el vendedor vea el aviso de cumplimiento parcial en vez de un
+    // exito silencioso que le infla o corrompe el stock.
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      return { cardId: item.cardId, action: 'insufficient', available: card.quantity, requested: item.quantity }
+    }
     if (item.quantity > card.quantity) {
       return { cardId: item.cardId, action: 'insufficient', available: card.quantity, requested: item.quantity }
     }
@@ -174,6 +196,26 @@ export const planFulfillment = (
     if (newQuantity <= 0) return { cardId: item.cardId, action: 'delete' }
     return { cardId: item.cardId, action: 'update', newQuantity }
   })
+
+/**
+ * TASK-307/316 review M-3: colapsa lineas duplicadas del MISMO cardId en una
+ * sola, sumando sus cantidades. Firestore rules solo validan status=='pending'
+ * (firestore.rules:180), asi que un doc de buyRequest artesanal puede traer
+ * dos lineas del mismo cardId. Sin este colapso, planFulfillment planificaba
+ * dos pasos independientes contra la MISMA lectura fresca (10 -> 4 dos veces,
+ * last-write-wins dentro de la transaccion) — se descontaban 6 unidades
+ * habiendo "vendido" 12, con exito completo. Llamar ANTES de planFulfillment
+ * hace que el pedido real (12 sobre 10 -> insufficient, con shortfall) se vea
+ * como una sola linea en vez de dos independientes.
+ */
+export const dedupeItemsByCardId = <T extends Pick<ExchangeCartItem, 'cardId' | 'quantity'>>(items: T[]): T[] => {
+  const byId = new Map<string, T>()
+  for (const item of items) {
+    const existing = byId.get(item.cardId)
+    byId.set(item.cardId, existing ? { ...existing, quantity: existing.quantity + item.quantity } : item)
+  }
+  return [...byId.values()]
+}
 
 /** TASK-307 AC3: extrae del plan las lineas que no se pudieron cumplir enteras, con la cantidad que faltó. */
 export const shortfallsOf = (plan: FulfillAction[]): FulfillmentShortfall[] =>

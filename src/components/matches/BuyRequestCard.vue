@@ -33,6 +33,11 @@ const STATUS_CLASSES: Record<BuyRequest['status'], string> = {
 }
 
 const avatarInitial = computed(() => (props.request.buyerName || '?').charAt(0).toUpperCase())
+
+// TASK-307/316 review M-5: constancia persistida de lo que faltó, leída de
+// request.shortfalls (el doc), no de un toast que ya se fue.
+const shortfallItemName = (cardId: string): string =>
+  props.request.items.find(i => i.cardId === cardId)?.name ?? cardId
 </script>
 
 <template>
@@ -103,6 +108,19 @@ const avatarInitial = computed(() => (props.request.buyerName || '?').charAt(0).
         </span>
       </li>
     </ul>
+
+    <!-- Shortfalls persistidos (TASK-307/316 review M-5): constancia que sobrevive a un refresh -->
+    <div
+        v-if="request.shortfalls && request.shortfalls.length > 0"
+        class="px-4 pb-3 -mt-1"
+    >
+      <p class="text-tiny text-warning font-bold uppercase tracking-wide mb-1">{{ t('matches.buyRequests.shortfallTitle') }}</p>
+      <ul class="text-tiny text-silver-50 space-y-0.5">
+        <li v-for="s in request.shortfalls" :key="s.cardId">
+          {{ shortfallItemName(s.cardId) }} — {{ t('matches.buyRequests.shortfallLine', { requested: s.requested, available: s.available }) }}
+        </li>
+      </ul>
+    </div>
 
     <!-- Footer: total + actions -->
     <div class="px-4 py-3 border-t border-line flex flex-wrap items-center justify-between gap-3">

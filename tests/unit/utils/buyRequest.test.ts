@@ -148,6 +148,24 @@ describe('planFulfillment (TASK-307 — antes solo distinguia missing/delete/upd
     expect(plan).toEqual([{ cardId: 'c1', action: 'insufficient', available: 1, requested: 2 }])
   })
 
+  it('TASK-307/316 review R-2: una cantidad negativa es "insufficient", nunca infla el stock — previene que un doc de buyRequest artesanal (quantity: -100) calcule newQuantity = quantity - (-100) y aumente el inventario del vendedor con exito completo', () => {
+    const getCard = (id: string) => (id === 'c1' ? { id: 'c1', quantity: 10 } : undefined)
+    const plan = planFulfillment([item({ cardId: 'c1', quantity: -100 })], getCard as any)
+    expect(plan).toEqual([{ cardId: 'c1', action: 'insufficient', available: 10, requested: -100 }])
+  })
+
+  it('TASK-307/316 review R-2: una cantidad NaN es "insufficient", nunca escribe NaN en el documento de la carta', () => {
+    const getCard = (id: string) => (id === 'c1' ? { id: 'c1', quantity: 10 } : undefined)
+    const plan = planFulfillment([item({ cardId: 'c1', quantity: NaN })], getCard as any)
+    expect(plan).toEqual([{ cardId: 'c1', action: 'insufficient', available: 10, requested: NaN }])
+  })
+
+  it('TASK-307/316 review R-2: una cantidad no entera (2.5) es "insufficient" — previene descontar una fraccion que nunca se vendio', () => {
+    const getCard = (id: string) => (id === 'c1' ? { id: 'c1', quantity: 10 } : undefined)
+    const plan = planFulfillment([item({ cardId: 'c1', quantity: 2.5 })], getCard as any)
+    expect(plan).toEqual([{ cardId: 'c1', action: 'insufficient', available: 10, requested: 2.5 }])
+  })
+
   it('maneja varios items a la vez, cada uno con su propia accion', () => {
     const cards: Record<string, any> = { c1: { id: 'c1', quantity: 1 }, c2: { id: 'c2', quantity: 10 }, c4: { id: 'c4', quantity: 1 } }
     const getCard = (id: string) => cards[id]
@@ -170,7 +188,7 @@ describe('planFulfillment (TASK-307 — antes solo distinguia missing/delete/upd
 })
 
 describe('shortfallsOf (TASK-307 AC3)', () => {
-  it('extrae missing e insufficient con su cantidad, ignora update/delete', () => {
+  it('extrae missing e insufficient con su cantidad, ignora update/delete — previene perder la cantidad que faltó cuando se reporta el shortfall al vendedor (M-6)', () => {
     const plan = planFulfillment(
       [item({ cardId: 'c1', quantity: 1 }), item({ cardId: 'c2', quantity: 5 }), item({ cardId: 'gone', quantity: 2 })],
       (id: string) => ({ c1: { quantity: 1 }, c2: { quantity: 2 } } as Record<string, { quantity: number }>)[id],

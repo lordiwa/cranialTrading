@@ -6,6 +6,8 @@ import { useAuthStore } from './auth'
 import {
   buildBuyRequestId,
   computeTotalValue,
+  dedupeItemsByCardId,
+  type FulfillAction,
   type FulfillmentShortfall,
   planFulfillment,
   type PriceResolutionResult,
@@ -14,6 +16,10 @@ import {
   shortfallsOf,
 } from '../utils/buyRequest'
 import { logSanitizedError } from '../utils/logSanitizedError'
+import { removeCardFromPublic, syncCardToPublic } from '../services/publicCards'
+import { isPossiblyPublicCard } from '../utils/publicSyncFilter'
+import type { CardIndexDeltaMutation } from '../services/cloudFunctions'
+import type { Card } from '../types/card'
 import type { ExchangeCartItem } from '../types/exchangeCart'
 import type { BuyerContact, BuyRequest, BuyRequestStatus } from '../types/buyRequest'
 
@@ -30,6 +36,103 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
   const loading = ref(false)
 
   const authStore = useAuthStore()
+
+  /**
+   * TASK-307/316 review R-1: lazy wrapper alrededor de la Cloud Function
+   * applyCardIndexDelta — mismo shape y misma razon que el wrapper de
+   * stores/collection.ts (TASK-232): un import estatico haria que importar
+   * este store corriera de entrada `getFunctions(getApp())` (el top-level de
+   * cloudFunctions.ts), lo que tira "No Firebase App '[DEFAULT]'" en
+   * cualquier test que importe este store sin mockear firebase/app.
+   */
+  const applyCardIndexDelta = async (mutations: CardIndexDeltaMutation[]) => {
+    const { applyCardIndexDelta: call } = await import('../services/cloudFunctions')
+    const response = await call(mutations)
+    if (response.skipped > 0) {
+      console.warn(`[IndexSync] applyCardIndexDelta could not resolve ${response.skipped} mutation(s) post-fulfillRequest — card_index left stale/unindexed for: ${response.skippedIds.join(', ')}`)
+    }
+    return response
+  }
+
+  /**
+   * TASK-307/316 review R-1 (HIGH-1): fulfillRequest (mas abajo) escribe
+   * users/{uid}/cards CRUDO via tx.update/tx.delete, dentro de una
+   * runTransaction — no pasa por collectionStore.updateCard/deleteCard, que
+   * son quienes normalmente mantienen el card_index (syncIndexLocal +
+   * queueCardIndexDelta, ver stores/collection.ts:2015-2016) y la vitrina
+   * publica (syncCardToPublic/removeCardFromPublic, ver
+   * stores/collection.ts:2037 y :2465). Sin este paso, una carta agotada por
+   * un cumplimiento quedaba listada en la vitrina publica para siempre y el
+   * card_index nunca se enteraba del cambio — un agujero NUEVO, mas grande
+   * que el que TASK-317 ya tiene documentado para cambios de cantidad.
+   *
+   * Corre DESPUES de que la transaccion ya comiteo, a proposito NUNCA
+   * dentro de ella: una transaccion de Firestore no admite invocar una
+   * Cloud Function (applyCardIndexDelta) ni escribir en otra coleccion raiz
+   * (public_cards) sin romper su propia atomicidad — esa atomicidad es
+   * exactamente lo que TASK-316 vino a cerrar, y no se vuelve a arriesgar
+   * aca.
+   *
+   * Best-effort, AWAITED pero con catch individual por escritura: bajo
+   * condiciones normales corre antes de que fulfillRequest devuelva, asi que
+   * el llamador ya ve las tres fuentes (users/cards, card_index,
+   * public_cards) en paridad (casos de uso 1/2). Si algo falla (Cloud
+   * Function caida, red), se loguea y se sigue — el decremento YA comiteado
+   * nunca se revierte y el fallo nunca rompe la pantalla del vendedor (caso
+   * de uso 3). Decision explicita: no se reintenta ni se encola — mismo
+   * criterio que cada otro call site de applyCardIndexDelta en este
+   * proyecto ("best-effort... not retried", ver stores/collection.ts), y el
+   * proximo mutation/rebuild natural de esa carta se auto-corrige, igual que
+   * el residual que TASK-232 ya documenta para su propio best-effort.
+   */
+  const syncFulfilledCardsPostCommit = async (
+    plan: FulfillAction[],
+    cardDataByCardId: Map<string, Record<string, unknown>>,
+  ): Promise<void> => {
+    if (!authStore.user) return
+    const uid = authStore.user.id
+
+    const updateSteps = plan.filter((s): s is Extract<FulfillAction, { action: 'update' }> => s.action === 'update')
+    const deleteSteps = plan.filter((s): s is Extract<FulfillAction, { action: 'delete' }> => s.action === 'delete')
+    if (updateSteps.length === 0 && deleteSteps.length === 0) return
+
+    const mutations: CardIndexDeltaMutation[] = [
+      ...updateSteps.map(s => ({ cardId: s.cardId, action: 'update' as const })),
+      ...deleteSteps.map(s => ({ cardId: s.cardId, action: 'delete' as const })),
+    ]
+    try {
+      await applyCardIndexDelta(mutations)
+    } catch (err) {
+      logSanitizedError(`[IndexSync] applyCardIndexDelta failed post-fulfillRequest — card_index left stale for: ${mutations.map(m => m.cardId).join(', ')}`, err, 'error')
+    }
+
+    const username = authStore.user.username || authStore.user.email?.split('@')[0] || 'Unknown' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- empty string should fallback
+    const location = authStore.user.location
+    const avatarUrl = authStore.user.avatarUrl
+
+    await Promise.all([
+      ...updateSteps.map(async (step) => {
+        const data = cardDataByCardId.get(step.cardId)
+        if (!data) return
+        const fullCard = { ...data, id: step.cardId, quantity: step.newQuantity } as Card
+        if (!isPossiblyPublicCard(fullCard)) return
+        try {
+          await syncCardToPublic(fullCard, uid, username, location, avatarUrl)
+        } catch (err) {
+          logSanitizedError(`[PublicSync] syncCardToPublic failed post-fulfillRequest for card ${step.cardId}`, err)
+        }
+      }),
+      ...deleteSteps.map(async (step) => {
+        const data = cardDataByCardId.get(step.cardId)
+        if (data && !isPossiblyPublicCard({ ...data, id: step.cardId, quantity: 0 } as Card)) return
+        try {
+          await removeCardFromPublic(step.cardId, uid)
+        } catch (err) {
+          logSanitizedError(`[PublicSync] removeCardFromPublic failed post-fulfillRequest for card ${step.cardId}`, err)
+        }
+      }),
+    ])
+  }
 
   /** Pendientes (no vistos ni cumplidos) — para el badge de la pestaña. */
   const pendingCount = computed(() => buyRequests.value.filter(r => r.status === 'pending').length)
@@ -147,6 +250,9 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
             totalValue: (data.totalValue as number) ?? 0,
             status: (data.status as BuyRequestStatus) ?? 'pending',
             createdAt: toDate(data.createdAt),
+            // TASK-307/316 review M-5: constancia persistida de lo que faltó,
+            // leida del doc — sobrevive a un refresh, a diferencia del toast.
+            shortfalls: data.shortfalls as FulfillmentShortfall[] | undefined,
           }
         })
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -232,14 +338,18 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
       const outcome = await runTransaction(db, async (tx) => {
         const requestSnap = await tx.get(requestRef)
         if (!requestSnap.exists()) {
-          return { notFound: true, alreadyFulfilled: false, shortfalls: [] as FulfillmentShortfall[] }
+          return { notFound: true, alreadyFulfilled: false, shortfalls: [] as FulfillmentShortfall[], plan: [] as FulfillAction[], cardDataByCardId: new Map<string, Record<string, unknown>>() }
         }
         const requestData = requestSnap.data() as { status?: BuyRequestStatus; items?: ExchangeCartItem[] }
         if (requestData.status === 'fulfilled') {
-          return { notFound: false, alreadyFulfilled: true, shortfalls: [] as FulfillmentShortfall[] }
+          return { notFound: false, alreadyFulfilled: true, shortfalls: [] as FulfillmentShortfall[], plan: [] as FulfillAction[], cardDataByCardId: new Map<string, Record<string, unknown>>() }
         }
 
-        const items = requestData.items ?? []
+        // TASK-307/316 review M-3: colapsar lineas duplicadas del MISMO
+        // cardId ANTES de planificar — ver dedupeItemsByCardId (utils/
+        // buyRequest.ts) para el hallazgo completo (last-write-wins dentro
+        // de la transaccion con dos tx.update independientes).
+        const items = dedupeItemsByCardId(requestData.items ?? [])
         // TASK-316 AC2: lectura fresca de CADA carta, dentro de la misma
         // transaccion — nunca collectionStore.getCardById (el snapshot local
         // de esta pestaña). Se indexa por cardId con Maps (no por posicion de
@@ -248,11 +358,20 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
         const cardRefByCardId = new Map(items.map(item => [item.cardId, doc(db, 'users', uid, 'cards', item.cardId)] as const))
         const cardSnaps = await Promise.all([...cardRefByCardId.values()].map(ref => tx.get(ref)))
         const quantityByCardId = new Map<string, number>()
+        // TASK-307/316 review R-1: guarda tambien el doc COMPLETO de cada
+        // carta leida (no solo su `quantity`) — syncFulfilledCardsPostCommit
+        // lo necesita DESPUES del commit para reconstruir el Card completo
+        // que syncCardToPublic exige (name/scryfallId/price/status/... —
+        // ver services/publicCards.ts's buildPublicCardDoc). Nunca se anota
+        // NADA de esto en Firestore: vive solo en memoria para el resto de
+        // este intento de la transaccion.
+        const cardDataByCardId = new Map<string, Record<string, unknown>>()
         ;[...cardRefByCardId.keys()].forEach((cardId, i) => {
           const snap = cardSnaps[i]
           if (snap?.exists()) {
-            const data = snap.data() as { quantity?: number }
-            quantityByCardId.set(cardId, data.quantity ?? 0)
+            const data = snap.data() as Record<string, unknown>
+            quantityByCardId.set(cardId, (data.quantity as number | undefined) ?? 0)
+            cardDataByCardId.set(cardId, data)
           }
         })
 
@@ -271,9 +390,14 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
           }
           // 'missing' / 'insufficient' → no se escribe nada para esa linea.
         }
-        tx.update(requestRef, { status: 'fulfilled' as BuyRequestStatus })
+        const shortfalls = shortfallsOf(plan)
+        // TASK-307/316 review M-5: `shortfalls` persistido en el MISMO
+        // commit que marca `fulfilled` — antes solo vivia en el valor de
+        // retorno y en un toast de 4 segundos; un refresh del vendedor
+        // perdia la unica constancia de que el pedido fue parcial.
+        tx.update(requestRef, { status: 'fulfilled' as BuyRequestStatus, shortfalls })
 
-        return { notFound: false, alreadyFulfilled: false, shortfalls: shortfallsOf(plan) }
+        return { notFound: false, alreadyFulfilled: false, shortfalls, plan, cardDataByCardId }
       })
 
       if (outcome.notFound) return { ok: false, missing: [], shortfalls: [] }
@@ -282,7 +406,21 @@ export const useBuyRequestsStore = defineStore('buyRequests', () => {
         return { ok: false, missing: [], shortfalls: [], alreadyFulfilled: true }
       }
 
+      // TASK-307/316 review R-1 (caso de uso 3): la transaccion ya comiteo —
+      // este paso corre AFUERA de ella a proposito (ver
+      // syncFulfilledCardsPostCommit) y nunca debe tirar: un fallo aca no
+      // debe revertir el descuento ya comiteado ni romper la respuesta de
+      // exito al vendedor. syncFulfilledCardsPostCommit ya atrapa cada una
+      // de sus propias escrituras — este catch es solo un cinturon de
+      // seguridad adicional contra un error inesperado en este mismo call site.
+      try {
+        await syncFulfilledCardsPostCommit(outcome.plan, outcome.cardDataByCardId)
+      } catch (postSyncErr) {
+        logSanitizedError('[IndexSync/PublicSync] syncFulfilledCardsPostCommit failed unexpectedly post-fulfillRequest — card_index/public_cards may be stale', postSyncErr, 'error')
+      }
+
       target.status = 'fulfilled'
+      target.shortfalls = outcome.shortfalls
       return { ok: true, missing: outcome.shortfalls.map(s => s.cardId), shortfalls: outcome.shortfalls }
     } catch (err) {
       logSanitizedError('fulfillRequest error', err)

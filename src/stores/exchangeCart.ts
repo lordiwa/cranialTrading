@@ -52,7 +52,13 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
           let changed = false
           for (const cart of Object.values(state.carts)) {
             for (const item of cart.items) {
-              const bounded = Math.min(Math.max(1, item.quantity), item.maxQuantity)
+              // TASK-307/316 review R-2: Math.max(1, NaN) === NaN — el clamp
+              // era transparente a un item.quantity corrupto (NaN) escrito a
+              // mano en localStorage, dejandolo pasar intacto. Nunca es la
+              // barrera real (esto es localStorage del atacante; la barrera
+              // es resolvePublishedPrices/planFulfillment del lado del
+              // servidor), pero tampoco debe fingir que clampeo algo que no clampeo.
+              const bounded = Number.isFinite(item.quantity) ? Math.min(Math.max(1, item.quantity), item.maxQuantity) : 1
               if (bounded !== item.quantity) {
                 item.quantity = bounded
                 changed = true
@@ -167,7 +173,9 @@ export const useExchangeCartStore = defineStore('exchangeCart', () => {
     const item = _findItem(username, scryfallId, cardId)
     if (!item) return
 
-    item.quantity = Math.min(Math.max(1, quantity), item.maxQuantity)
+    // TASK-307/316 review R-2: mismo guard NaN-transparente que _load() —
+    // ver ese comentario para el detalle.
+    item.quantity = Number.isFinite(quantity) ? Math.min(Math.max(1, quantity), item.maxQuantity) : 1
     _persist()
   }
 

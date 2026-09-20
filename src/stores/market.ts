@@ -60,12 +60,37 @@ export const useMarketStore = defineStore('market', () => {
     const wishlistEditionFilter = ref('')
     const wishlistDirection = ref<'all' | 'winners' | 'losers'>('all')
 
+    /**
+     * TASK-312: composite key used to detect a duplicate row — WITHOUT the
+     * rank column, since rank is only the row's screen position (moversFrom +
+     * idx in MarketView.vue), never a field on the stored PriceMover. MEASURED
+     * on dev: two rows differing ONLY by rank ("Web | Unlimited Edition |
+     * $14.92 | $32.33 | +116.7%" at positions 8 and 9) — the same printing
+     * appearing twice in the raw Firestore array.
+     */
+    function moverKey(m: PriceMover): string {
+        return `${m.name}|${m.setName}|${m.pastPrice}|${m.presentPrice}|${m.percentChange}`
+    }
+
     // Computed — Movers pipeline
     const currentMovers = computed(() => {
         if (!movers.value) return []
-        return moversDirection.value === 'winners'
+        const raw = moversDirection.value === 'winners'
             ? movers.value.winners
             : movers.value.losers
+        // Dedupe by content, not by array position — two DIFFERENT real
+        // printings that happen to share name+edition+prices are not
+        // collapsed (their key would only collide if every one of those
+        // fields matches too), only true duplicate entries are.
+        const seen = new Set<string>()
+        const deduped: PriceMover[] = []
+        for (const m of raw) {
+            const key = moverKey(m)
+            if (seen.has(key)) continue
+            seen.add(key)
+            deduped.push(m)
+        }
+        return deduped
     })
 
     const availableSets = computed(() => {
@@ -137,6 +162,22 @@ export const useMarketStore = defineStore('market', () => {
         const start = (staplesPage.value - 1) * PAGE_SIZE
         return filteredStaples.value.slice(start, start + PAGE_SIZE)
     })
+
+    /**
+     * TASK-311: the staples document (`market_data/staples/formats/*`) never
+     * carried a price field — MEASURED on dev, zero monetary tokens in the
+     * whole STAPLES tab. There's no price to add to that document without a
+     * new Cloud Function pipeline (out of scope here), so the price is
+     * instead joined at read time from the SAME `market_data/movers` dataset
+     * the rest of /market already uses, by card name (staples carry no
+     * edition to match on) — the identical fallback the portfolio pipeline
+     * already uses for a name with no edition match (see `buildImpacts`).
+     * Returns null when no match exists so callers show "no price", never
+     * $0/NaN from a match that was never found.
+     */
+    function stapleMoverMatch(name: string): PriceMover | null {
+        return moverLookup.value.get(name.toLowerCase())?.[0] ?? null
+    }
 
     // Computed — Portfolio pipeline (mover lookup + cross-reference)
     const moverLookup = computed(() => {
@@ -291,12 +332,45 @@ export const useMarketStore = defineStore('market', () => {
             affectedCards: impacts.length,
             gainers: impacts.filter(p => p.adjustedImpact > 0).length,
             losers: impacts.filter(p => p.adjustedImpact < 0).length,
+            // TASK-315 AC4: wishlist never showed a total value, unlike
+            // portfolioSummary above — UC-22.3 asks for it on both.
+            totalValue: Math.round(impacts.reduce((s, p) => s + p.adjustedCurrentPrice * p.card.quantity, 0) * 100) / 100,
         }
     })
 
     const wishlistAvailableEditions = computed(() => {
         const editions = new Set(wishlistImpacts.value.map(p => p.card.edition))
         return [...editions].sort((a, b) => a.localeCompare(b))
+    })
+
+    /**
+     * TASK-314/TASK-315 (atomic — 314-AC5 and 315-AC3 are the same
+     * requirement from opposite sides): one place that decides WHY a
+     * portfolio/wishlist tab has nothing to show, instead of the single
+     * "none of your cards match" text that used to cover all three causes.
+     * - 'dataUnavailable': the price source failed or returned nothing —
+     *   MEASURED on dev as 0 toasts and this same collection-blaming text.
+     *   Never blames the user's collection.
+     * - 'emptyCollection': the user genuinely has no relevant cards yet.
+     * - 'noMatches': they have cards, prices loaded, none matched — the one
+     *   case where "none of your cards match" is actually true.
+     */
+    const portfolioViewState = computed((): 'dataUnavailable' | 'emptyCollection' | 'noMatches' | 'ready' => {
+        if (!movers.value) return 'dataUnavailable'
+        const collectionStore = useCollectionStore()
+        const owned = collectionStore.cards.filter(c => c.status !== 'wishlist')
+        if (owned.length === 0) return 'emptyCollection'
+        if (paginatedPortfolio.value.length === 0) return 'noMatches'
+        return 'ready'
+    })
+
+    const wishlistViewState = computed((): 'dataUnavailable' | 'emptyCollection' | 'noMatches' | 'ready' => {
+        if (!movers.value) return 'dataUnavailable'
+        const collectionStore = useCollectionStore()
+        const wished = collectionStore.cards.filter(c => c.status === 'wishlist')
+        if (wished.length === 0) return 'emptyCollection'
+        if (paginatedWishlist.value.length === 0) return 'noMatches'
+        return 'ready'
     })
 
     // Reset page to 1 when filters/search/sort/direction change
@@ -428,6 +502,7 @@ export const useMarketStore = defineStore('market', () => {
         filteredStaples,
         totalStaplesPages,
         paginatedStaples,
+        stapleMoverMatch,
 
         // Portfolio computed
         moverLookup,
@@ -438,6 +513,7 @@ export const useMarketStore = defineStore('market', () => {
         paginatedPortfolio,
         portfolioSummary,
         portfolioAvailableEditions,
+        portfolioViewState,
 
         // Wishlist computed
         wishlistImpacts,
@@ -447,6 +523,7 @@ export const useMarketStore = defineStore('market', () => {
         paginatedWishlist,
         wishlistSummary,
         wishlistAvailableEditions,
+        wishlistViewState,
 
         // Actions
         loadStaples,

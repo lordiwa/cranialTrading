@@ -225,6 +225,15 @@ function handleFormatChange(val: string) {
   void marketStore.loadStaples(val as FormatKey)
 }
 
+function staplePriceLabel(staple: { name: string }): string {
+  const match = marketStore.stapleMoverMatch(staple.name)
+  const price = match?.presentPrice
+  if (typeof price !== 'number' || !Number.isFinite(price)) {
+    return t('market.staples.noPrice')
+  }
+  return formatPrice(price)
+}
+
 function ensurePortfolioData() {
   if (!marketStore.movers) void marketStore.loadMovers()
   if (authStore.user && !collectionStore.cards.length) void collectionStore.loadCollection()
@@ -237,6 +246,9 @@ onMounted(() => {
     void marketStore.loadMovers()
   } else if (marketStore.activeTab === 'staples') {
     void marketStore.loadStaples()
+    // TASK-311: staples prices are joined from the movers dataset, so the
+    // staples tab needs it loaded too, not just the movers/portfolio/wishlist tabs.
+    if (!marketStore.movers) void marketStore.loadMovers()
   } else if (marketStore.activeTab === 'portfolio' || marketStore.activeTab === 'wishlist') {
     ensurePortfolioData()
   }
@@ -250,8 +262,9 @@ onUnmounted(() => {
 watch(() => marketStore.activeTab, (tab) => {
   if (tab === 'movers' && !marketStore.movers) {
     void marketStore.loadMovers()
-  } else if (tab === 'staples' && !marketStore.staples) {
-    void marketStore.loadStaples()
+  } else if (tab === 'staples') {
+    if (!marketStore.staples) void marketStore.loadStaples()
+    if (!marketStore.movers) void marketStore.loadMovers()
   } else if (tab === 'portfolio' || tab === 'wishlist') {
     ensurePortfolioData()
   }
@@ -441,8 +454,20 @@ watch(() => marketStore.activeTab, (tab) => {
           <BaseLoader />
         </div>
 
-        <!-- Empty state -->
-        <div v-else-if="marketStore.paginatedPortfolio.length === 0" class="py-12 text-center">
+        <!-- Price source unreachable — TASK-314: distinct from, and never blames, the collection -->
+        <div v-else-if="marketStore.portfolioViewState === 'dataUnavailable'" class="py-12 text-center">
+          <SvgIcon name="fire" size="large" class="text-silver-30 mx-auto mb-3" />
+          <p class="text-small text-silver-50">{{ t('market.errors.dataUnavailable') }}</p>
+        </div>
+
+        <!-- Collection has no relevant cards yet — TASK-315: distinct from "none match" -->
+        <div v-else-if="marketStore.portfolioViewState === 'emptyCollection'" class="py-12 text-center">
+          <SvgIcon name="fire" size="large" class="text-silver-30 mx-auto mb-3" />
+          <p class="text-small text-silver-50">{{ t('market.portfolio.emptyCollection') }}</p>
+        </div>
+
+        <!-- Cards exist and prices loaded, none matched -->
+        <div v-else-if="marketStore.portfolioViewState === 'noMatches'" class="py-12 text-center">
           <SvgIcon name="fire" size="large" class="text-silver-30 mx-auto mb-3" />
           <p class="text-small text-silver-50">{{ t('market.portfolio.empty') }}</p>
         </div>
@@ -571,6 +596,7 @@ watch(() => marketStore.activeTab, (tab) => {
             :affected-cards="marketStore.wishlistSummary.affectedCards"
             :gainers="marketStore.wishlistSummary.gainers"
             :losers="marketStore.wishlistSummary.losers"
+            :total-value="marketStore.wishlistSummary.totalValue"
             key-prefix="market.wishlist"
         />
 
@@ -663,8 +689,20 @@ watch(() => marketStore.activeTab, (tab) => {
           <BaseLoader />
         </div>
 
-        <!-- Empty state -->
-        <div v-else-if="marketStore.paginatedWishlist.length === 0" class="py-12 text-center">
+        <!-- Price source unreachable — TASK-314: distinct from, and never blames, the collection -->
+        <div v-else-if="marketStore.wishlistViewState === 'dataUnavailable'" class="py-12 text-center">
+          <SvgIcon name="fire" size="large" class="text-silver-30 mx-auto mb-3" />
+          <p class="text-small text-silver-50">{{ t('market.errors.dataUnavailable') }}</p>
+        </div>
+
+        <!-- Wishlist has no cards yet — TASK-315: distinct from "none match" -->
+        <div v-else-if="marketStore.wishlistViewState === 'emptyCollection'" class="py-12 text-center">
+          <SvgIcon name="fire" size="large" class="text-silver-30 mx-auto mb-3" />
+          <p class="text-small text-silver-50">{{ t('market.wishlist.emptyCollection') }}</p>
+        </div>
+
+        <!-- Wishlist cards exist and prices loaded, none matched -->
+        <div v-else-if="marketStore.wishlistViewState === 'noMatches'" class="py-12 text-center">
           <SvgIcon name="fire" size="large" class="text-silver-30 mx-auto mb-3" />
           <p class="text-small text-silver-50">{{ t('market.wishlist.empty') }}</p>
         </div>
@@ -920,6 +958,7 @@ watch(() => marketStore.activeTab, (tab) => {
           </span>
           <div class="flex items-center gap-2">
             <button
+                data-testid="movers-prev-page"
                 :disabled="marketStore.moversPage === 1"
                 @click="marketStore.moversPage--"
                 class="px-2 py-1 text-small rounded-sm transition-fast"
@@ -931,6 +970,7 @@ watch(() => marketStore.activeTab, (tab) => {
               {{ t('market.pagination.page', { current: marketStore.moversPage, total: marketStore.totalMoversPages }) }}
             </span>
             <button
+                data-testid="movers-next-page"
                 :disabled="marketStore.moversPage === marketStore.totalMoversPages"
                 @click="marketStore.moversPage++"
                 class="px-2 py-1 text-small rounded-sm transition-fast"
@@ -1015,6 +1055,7 @@ watch(() => marketStore.activeTab, (tab) => {
               <th class="py-2 px-2 text-left">{{ t('market.staples.table.card') }}</th>
               <th class="py-2 px-2 text-right">{{ t('market.staples.table.percentDecks') }}</th>
               <th class="py-2 px-2 text-right">{{ t('market.staples.table.avgCopies') }}</th>
+              <th class="py-2 px-2 text-right">{{ t('market.staples.table.price') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -1027,6 +1068,7 @@ watch(() => marketStore.activeTab, (tab) => {
               <td class="py-2.5 px-2 text-silver font-medium">{{ staple.name }}</td>
               <td class="py-2.5 px-2 text-right text-neon font-medium">{{ staple.percentDecks.toFixed(1) }}%</td>
               <td class="py-2.5 px-2 text-right text-silver-50">{{ staple.avgCopies.toFixed(1) }}</td>
+              <td class="py-2.5 px-2 text-right text-silver font-medium">{{ staplePriceLabel(staple) }}</td>
             </tr>
           </tbody>
         </table>
@@ -1059,9 +1101,12 @@ watch(() => marketStore.activeTab, (tab) => {
           </div>
         </div>
 
-        <!-- Last updated -->
-        <p v-if="marketStore.staples?.updatedAt" class="text-tiny text-silver-30 mt-4">
-          {{ t('market.lastUpdated', { date: formatUpdatedAt(marketStore.staples.updatedAt) }) }}
+        <!-- Last updated — TASK-311 AC4: the price column shown above is
+             joined from the movers dataset, so the date must be the PRICE
+             data's own updatedAt, never staples.updatedAt (deck-inclusion
+             stats, a different dataset that can be older or newer). -->
+        <p v-if="marketStore.movers?.updatedAt" class="text-tiny text-silver-30 mt-4">
+          {{ t('market.lastUpdated', { date: formatUpdatedAt(marketStore.movers.updatedAt) }) }}
         </p>
       </div>
     </div>

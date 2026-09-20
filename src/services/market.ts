@@ -58,26 +58,27 @@ export interface PortfolioImpact {
 
 // Service functions
 
+/**
+ * TASK-314: this used to catch-and-return-null on ANY error, including a
+ * genuinely failed read (network down, Firestore unreachable, permission
+ * denied) — indistinguishable from "the document legitimately doesn't
+ * exist yet". That swallowed the failure before `stores/market.ts`'s own
+ * try/catch (which shows an error toast) ever saw it: MEASURED on dev,
+ * intercepting Firestore reads, 2 aborted requests and 0 toasts shown to
+ * the user. Only "document doesn't exist" is a normal null; a thrown
+ * error now propagates to the caller, which is the one that can tell the
+ * user about it.
+ */
 export async function getFormatStaples(format: FormatKey): Promise<FormatStaples | null> {
-    try {
-        const ref = doc(db, 'market_data', 'staples', 'formats', format)
-        const snap = await getDoc(ref)
-        if (!snap.exists()) return null
-        return snap.data() as FormatStaples
-    } catch (error) {
-        console.error('Error fetching format staples:', error)
-        return null
-    }
+    const ref = doc(db, 'market_data', 'staples', 'formats', format)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) return null
+    return snap.data() as FormatStaples
 }
 
 export async function getPriceMovers(type: MoverType): Promise<PriceMovers | null> {
-    try {
-        const ref = doc(db, 'market_data', 'movers', 'types', type)
-        const snap = await getDoc(ref)
-        if (!snap.exists()) return null
-        return snap.data() as PriceMovers
-    } catch (error) {
-        console.error('Error fetching price movers:', error)
-        return null
-    }
+    const ref = doc(db, 'market_data', 'movers', 'types', type)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) return null
+    return snap.data() as PriceMovers
 }

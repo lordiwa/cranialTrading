@@ -103,6 +103,13 @@ export const buildOriginalDistribution = (
 // destination-identity quantity that ISN'T part of sourceCards (case: destination
 // already had its own stock, e.g. LP x2 for sale before the move) is added on top so a
 // merge into an existing row doesn't clobber what was already there.
+// TASK-318 M1: within a status, creates/updates are emitted BEFORE deletes.
+// Applying deletes first meant that if the delete of the old row succeeded
+// but the create/update of the new one then failed (e.g. Firestore write
+// timeout), the cards and their deck/binder allocations were gone with
+// nothing left to point at — worse than "at worst the previous state
+// intact" (case 8). Non-destructive ops first means a failure at the delete
+// step (applied last) leaves both rows alive; a caller can always retry.
 export const computeStatusOperations = (
   newDistribution: StatusDistribution,
   identity: CardIdentity,
@@ -136,11 +143,10 @@ export const computeStatusOperations = (
     for (const m of destMatches) if (m.id !== canonical?.id) toDelete.set(m.id, m)
     for (const s of sourceRows) if (s.id !== canonical?.id) toDelete.set(s.id, s)
 
-    for (const d of toDelete.values()) {
-      ops.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
-    }
-
     if (target <= 0) {
+      for (const d of toDelete.values()) {
+        ops.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
+      }
       if (canonical) ops.push({ type: 'delete', status, cardId: canonical.id, quantity: 0 })
       continue
     }
@@ -150,10 +156,15 @@ export const computeStatusOperations = (
       if (canonical.quantity !== target || needsEditionFix) {
         ops.push({ type: 'update', status, cardId: canonical.id, quantity: target })
       }
-      continue
+    } else {
+      ops.push({ type: 'create', status, quantity: target })
     }
 
-    ops.push({ type: 'create', status, quantity: target })
+    // M1: deletes last — by the time these run, the target row already
+    // holds the full merged quantity (create/update above already applied).
+    for (const d of toDelete.values()) {
+      ops.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
+    }
   }
   return ops
 }

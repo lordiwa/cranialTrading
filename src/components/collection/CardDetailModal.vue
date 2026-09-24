@@ -332,6 +332,19 @@ const showPublicOption = computed(() => {
 // superseded it, so a stale response can never clobber whatever is current.
 let initOpenToken = 0
 
+// TASK-318 H1: rows this modal session has already created/updated onto the
+// NEW identity (idsByStatus from a PREVIOUS handleSave attempt in this same
+// open — the modal stays open on a partial failure, retried by the same
+// SAVE click). Without tracking this, a retry's "pre-existing destination
+// stock" math (see computeStatusOperations' destOnlyQty in cardSaveDiff.ts)
+// cannot tell "genuinely separate stock" from "the row THIS save already
+// half-created" and double-counts it (Rockalanche NM x5 -> LP: attempt 1
+// creates LP x5 but its delete of NM fails; attempt 2 would otherwise read
+// LP x5 as pre-existing destination stock and add the modal's own 5 on top
+// -> LP x10, reported as success). Reset whenever the modal opens for a
+// (possibly different) card so it never leaks across cards.
+const migratedCardIds = new Set<string>()
+
 // Applies a related-cards list (memory-only, then later memory+server
 // merged) to relatedCards/statusDistribution/deckAllocations/
 // binderAllocations. Factored out so initializeForm can apply the
@@ -379,6 +392,10 @@ const applyRelatedCards = (list: Card[]) => {
 const initializeForm = async () => {
   if (!props.card) return
   const myOpenToken = ++initOpenToken
+  // TASK-318 H1: a fresh open (even of the same card) starts a new save
+  // session — any previously "migrated" ids from an earlier open no longer
+  // describe what THIS session's own save is doing.
+  migratedCardIds.clear()
 
   // Get fresh card data from store (props.card might be stale reference)
   const freshCard = collectionStore.cards.find(c => c.id === props.card?.id) ?? props.card
@@ -550,8 +567,21 @@ const applyStatusOperations = async (
       const deleted = await collectionStore.deleteCard(op.cardId, fallbackCard)
       if (deleted) {
         anySucceeded = true
+        // TASK-318 M1 fallout: M1 now emits create/update BEFORE delete
+        // within a status, so a delete op can run AFTER a create/update for
+        // a DIFFERENT row of the SAME status already set idsByStatus[status]
+        // to the row that's actually surviving (e.g. update the destination
+        // row, then delete the now-folded-away source row of the same
+        // status). Blindly nulling on every successful delete clobbered
+        // that just-set id back to null — only null it when this delete
+        // targeted the row idsByStatus is CURRENTLY tracking for this
+        // status; deleting some other (already-superseded) row must not
+        // erase it.
         // eslint-disable-next-line security/detect-object-injection
-        idsByStatus[op.status] = null
+        if (idsByStatus[op.status] === op.cardId) {
+          // eslint-disable-next-line security/detect-object-injection
+          idsByStatus[op.status] = null
+        }
       } else {
         // TASK-281 AC1: deleteCard resolved false — no Firestore write
         // happened, so the row this status pointed at is still there.
@@ -617,6 +647,30 @@ const buildOriginalBinderSlotsForRelated = (savedRelatedCards: Card[]): Map<stri
   return buildOriginalBinderSlots(savedRelatedCards.map(c => c.id), allocsByCardId)
 }
 
+// TASK-318 M2: add a Map of per-deck/binder allocation slots on top of the
+// modal's own (edited-or-not) target state. Used to fold a pre-existing
+// destination row's OWN allocations into the target so they survive a merge
+// instead of being wiped by it — see the M2 comment in handleSave.
+const addDeckSlots = (base: Readonly<Record<string, DeckSlot>>, extra: ReadonlyMap<string, DeckSlot>): Record<string, DeckSlot> => {
+  const result: Record<string, DeckSlot> = { ...base }
+  for (const [deckId, slot] of extra) {
+    // eslint-disable-next-line security/detect-object-injection
+    const cur = result[deckId] ?? { mb: 0, sb: 0 }
+    // eslint-disable-next-line security/detect-object-injection
+    result[deckId] = { mb: cur.mb + slot.mb, sb: cur.sb + slot.sb }
+  }
+  return result
+}
+
+const addBinderSlots = (base: Readonly<Record<string, number>>, extra: ReadonlyMap<string, number>): Record<string, number> => {
+  const result: Record<string, number> = { ...base }
+  for (const [binderId, qty] of extra) {
+    // eslint-disable-next-line security/detect-object-injection
+    result[binderId] = (result[binderId] ?? 0) + qty
+  }
+  return result
+}
+
 // Save changes
 const handleSave = async () => {
   if (isLoading.value) return
@@ -677,17 +731,76 @@ const handleSave = async () => {
     const serverCardsForIdentity = await collectionStore.fetchServerCardsByPrint(
       identity.scryfallId, identity.condition, identity.foil,
     )
-    const existingCardsForSave = mergeServerCards(collectionStore.cards, serverCardsForIdentity)
+
+    // TASK-318 M3: an identity change can leave a stray row of the OLD
+    // identity that exists ONLY on the server (the exact TASK-280 gap, now
+    // against the identity the modal is moving AWAY from instead of the one
+    // it's editing — a slow/failed initial load, or a write from elsewhere,
+    // between open and save). Re-read the old identity too whenever it
+    // changed so that row is folded into the diff instead of surviving next
+    // to the new one.
+    const oldIdentityServerCards = identityChanged
+      ? await collectionStore.fetchServerCardsByPrint(
+          savedCard.scryfallId, savedCard.condition, savedCard.foil,
+        )
+      : []
+    const existingCardsForSave = mergeServerCards(
+      mergeServerCards(collectionStore.cards, serverCardsForIdentity),
+      oldIdentityServerCards,
+    )
+
+    // TASK-318 H1/M3: the "source" the diff folds away is not just what the
+    // modal showed at open (savedRelatedCards) — it's every row belonging to
+    // this card's OLD identity, including ones only the server knows about
+    // (M3), PLUS any row THIS modal session already migrated onto the NEW
+    // identity in an earlier, partially-failed save attempt (H1: without
+    // this, a retry's "pre-existing destination stock" math in
+    // computeStatusOperations cannot tell a genuinely separate row from the
+    // row THIS save already half-created, and double-counts it).
+    const isOldPrint = (c: Card) =>
+      c.scryfallId === savedCard.scryfallId &&
+      c.condition === savedCard.condition &&
+      c.foil === savedCard.foil
+    const sourceCardsForDiff = Array.from(new Map([
+      ...savedRelatedCards,
+      ...existingCardsForSave.filter(isOldPrint),
+      ...existingCardsForSave.filter(c => migratedCardIds.has(c.id)),
+    ].map(c => [c.id, c] as const)).values())
+
+    // TASK-318 M2: rows already sitting at the NEW identity that are NOT
+    // part of sourceCardsForDiff (case 4's "LP x2 already for sale") have
+    // their OWN deck/binder allocations — allocations the modal never
+    // loaded (it only ever loaded savedRelatedCards' allocations, filtered
+    // by the OLD identity at open). Folding such a row into the canonical
+    // destination without accounting for its allocations wiped them.
+    const isNewPrint = (c: Card) =>
+      c.scryfallId === identity.scryfallId &&
+      c.condition === identity.condition &&
+      c.foil === identity.foil
+    const sourceIdsForDiff = new Set(sourceCardsForDiff.map(c => c.id))
+    const destinationOnlyCards = existingCardsForSave.filter(c => isNewPrint(c) && !sourceIdsForDiff.has(c.id))
 
     const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
 
-    // SCRUM-35 D2: snapshot per-deck (mb, sb) totals BEFORE any mutation. We sum
-    // across ALL related cards (owned + wishlist) since they share identity. This is
-    // the original truth that the diff compares against.
-    const originalSlots = buildOriginalSlotsForRelated(savedRelatedCards)
+    // SCRUM-35 D2 / TASK-318 M2: snapshot per-deck (mb, sb) totals BEFORE any
+    // mutation, across BOTH the source rows AND any pre-existing destination
+    // rows about to be merged into them, so `orig` reflects the FULL truth —
+    // not just what the modal happened to load at open.
+    const allocSourceCards = [...sourceCardsForDiff, ...destinationOnlyCards]
+    const originalSlots = buildOriginalSlotsForRelated(allocSourceCards)
 
     // SCRUM-40 (QA gap): snapshot per-binder totals BEFORE mutation, same shape as deck slots.
-    const originalBinderSlots = buildOriginalBinderSlotsForRelated(savedRelatedCards)
+    const originalBinderSlots = buildOriginalBinderSlotsForRelated(allocSourceCards)
+
+    // TASK-318 M2: the modal's own deckAllocations/binderAllocations state
+    // was seeded ONLY from sourceCards' allocations at open — a destination
+    // row of a DIFFERENT identity was never loaded into it at all. Add that
+    // row's own allocations on top so an untouched target still equals the
+    // full merged original, instead of the merge silently dropping them.
+    const destOnlyDeckSlots = buildOriginalSlotsForRelated(destinationOnlyCards)
+    const destOnlyBinderSlots = buildOriginalBinderSlotsForRelated(destinationOnlyCards)
+    const targetDeckSlots = addDeckSlots(deckAllocations.value, destOnlyDeckSlots)
+    const targetBinderSlots = addBinderSlots(binderAllocations.value, destOnlyBinderSlots)
 
     // TASK-281: none of the writes below reject on failure — deleteCard/
     // updateCard/deallocateCard resolve to false, addCard to null,
@@ -710,13 +823,23 @@ const handleSave = async () => {
 
     // STEP 2: apply status diff. Strict identity per (scryfallId, edition, condition, foil)
     // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
-    // TASK-318: savedRelatedCards passed as `sourceCards` so a condition/foil/print
-    // change folds the OLD-identity rows into the diff instead of leaving them behind.
-    const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave, savedRelatedCards)
+    // TASK-318: sourceCardsForDiff (not just savedRelatedCards) passed as `sourceCards` so a
+    // condition/foil/print change folds the OLD-identity rows into the diff instead of
+    // leaving them behind — including server-only strays (M3) and this session's own
+    // already-migrated rows from a prior partial-failure retry (H1).
+    const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave, sourceCardsForDiff)
     const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed } =
       await applyStatusOperations(ops, cardData, existingCardsForSave)
     if (step2Succeeded) anySucceeded = true
     if (step2Failed) anyFailed = true
+
+    // TASK-318 H1: record every id this attempt actually wrote to at the NEW
+    // identity — success or partial-success alike — so a RETRY (the modal
+    // stays open on anyFailed below) knows these rows are its OWN prior work,
+    // not separate pre-existing destination stock to add on top of.
+    for (const id of Object.values(idsByStatus)) {
+      if (id) migratedCardIds.add(id)
+    }
 
     // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
     // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as
@@ -729,14 +852,19 @@ const handleSave = async () => {
       idsByStatus.trade ??
       idsByStatus.wishlist ??
       null
+    // TASK-318: includes destinationOnlyCards too — a pre-existing row at the
+    // new identity (M2's merge target) must also get deallocated-from as
+    // part of the "move everything onto ownedCardId" pass, same as any
+    // source row.
     const relatedCardIdsAfterStep2 = Array.from(new Set([
-      ...savedRelatedCards.map(c => c.id),
+      ...sourceCardsForDiff.map(c => c.id),
+      ...destinationOnlyCards.map(c => c.id),
       ...Object.values(idsByStatus).filter((v): v is string => !!v),
     ]))
     const slotOps = computeDeckSlotOps({
       decks: allDecks.value.map(d => ({ deckId: d.id })),
       originalSlots,
-      targetSlots: deckAllocations.value,
+      targetSlots: targetDeckSlots,
       relatedCardIds: relatedCardIdsAfterStep2,
       ownedCardId,
       identityChanged,
@@ -764,7 +892,7 @@ const handleSave = async () => {
     const binderSlotOps = computeBinderSlotOps({
       binders: allBinders.value.map(b => ({ binderId: b.id })),
       originalSlots: originalBinderSlots,
-      targetSlots: binderAllocations.value,
+      targetSlots: targetBinderSlots,
       relatedCardIds: relatedCardIdsAfterStep2,
       ownedCardId,
       identityChanged,
@@ -829,6 +957,7 @@ const handleClose = () => {
   // could briefly render leftover state from whichever card was open before
   // the next initializeForm's synchronous memory snapshot lands.
   initOpenToken++
+  migratedCardIds.clear()
   availablePrints.value = []
   selectedPrint.value = null
   relatedCards.value = []

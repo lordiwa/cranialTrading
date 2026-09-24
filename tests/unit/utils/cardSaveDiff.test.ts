@@ -398,9 +398,11 @@ describe('computeStatusOperations — TASK-318 identity-change migration', () =>
       [nmRow, existingLp],
       [nmRow],
     )
+    // M1: update before delete — a failed create/update after a successful
+    // delete would strand the cards with nothing to point at (case 8).
     expect(ops).toEqual([
-      { type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 },
       { type: 'update', status: 'sale', cardId: 'existing-lp', quantity: 7 },
+      { type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 },
     ])
   })
 
@@ -412,9 +414,10 @@ describe('computeStatusOperations — TASK-318 identity-change migration', () =>
       [nmRow],
       [nmRow],
     )
+    // M1: create before delete, same reasoning as above.
     expect(ops).toEqual([
-      { type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 },
       { type: 'create', status: 'sale', quantity: 3 },
+      { type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 },
     ])
   })
 

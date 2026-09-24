@@ -94,6 +94,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import CardDetailModal from '@/components/collection/CardDetailModal.vue'
 import { useCollectionStore } from '@/stores/collection'
+import { useDecksStore } from '@/stores/decks'
 import { makeCard } from '../helpers/fixtures'
 
 const fakeTimestamp = (ms: number) => ({ toDate: () => new Date(ms) })
@@ -334,6 +335,144 @@ describe('CardDetailModal — TASK-280 save must check Firestore before creating
     // The server read for B is still pending — but the DOM must already
     // reflect B's OWN memory-known state, never A's leftover numbers.
     expect(qtyText('qty-row-collection')).toBe('7')
+
+    wrapper.unmount()
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// TASK-318 review findings (H1, M2): the pure-function tests in
+// cardSaveDiff.test.ts / deckSlotDiff.test.ts / binderSlotDiff.test.ts only
+// ever exercise a single clean save — neither a RETRY after a partial
+// failure (H1) nor a merge into an ALREADY-EXISTING destination row that
+// itself carries allocations (M2) is reachable from those pure calls alone,
+// because both bugs live in how handleSave WIRES its inputs together across
+// two calls / two card rows. These need the real component + real
+// decks/collection store wiring.
+// ────────────────────────────────────────────────────────────────────────────
+
+async function setCondition(value: string) {
+  const select = document.querySelector('#detail-condition') as HTMLSelectElement
+  select.value = value
+  select.dispatchEvent(new Event('change'))
+  await nextTick()
+}
+
+describe('CardDetailModal — TASK-318 identity-change retry and merge-allocation regressions', () => {
+  it('H1 regression: retrying SAVE after a partial failure does not double the already-migrated stock', async () => {
+    mockGetDocs.mockResolvedValue({
+      empty: false,
+      docs: [
+        docWith('nm-row', {
+          scryfallId: 'sf-h1', name: 'Rockalanche', edition: 'Set', setCode: 'SET',
+          quantity: 5, condition: 'NM', foil: false, price: 1, image: '', status: 'sale', public: false,
+          createdAt: fakeTimestamp(1000), updatedAt: fakeTimestamp(1000),
+        }),
+      ],
+    })
+
+    const collectionStore = useCollectionStore()
+    const card = makeCard({
+      id: 'nm-row', scryfallId: 'sf-h1', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 5,
+    })
+    collectionStore.cards = [card] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
+    await flushPromises()
+    expect(qtyText('qty-row-sale')).toBe('5')
+
+    await setCondition('LP')
+
+    // First attempt: the delete of the old (NM) row fails; the create of
+    // the new (LP) row still succeeds — computeStatusOperations' M1 reorder
+    // (create/update before delete) means the create is not blocked by the
+    // delete failure.
+    mockDeleteDoc.mockRejectedValueOnce(new Error('simulated delete failure'))
+
+    const saveButton = findButtonByText('common.actions.save')
+    expect(saveButton).toBeTruthy()
+    saveButton!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300)) // see HIGH-1 test above: first dynamic import compile delay
+    await flushPromises()
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1) // LP row created
+    expect(mockDeleteDoc).toHaveBeenCalledTimes(1) // NM delete attempted, failed
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+
+    // Retry: same SAVE click, nothing else changed. The modal never
+    // refreshed relatedCards after the partial failure — sourceCards is
+    // still [nm-row] going into this second attempt.
+    saveButton!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    // The regression this test locks: before the H1 fix, this retry read
+    // the LP row created by attempt 1 as SEPARATE pre-existing destination
+    // stock and added the modal's own 5 on top of it — an update to
+    // quantity 10, reported as a clean success. It must instead converge:
+    // delete the NM row (retried, now succeeds) and leave the LP row's
+    // quantity exactly as attempt 1 already set it.
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+    expect(mockDeleteDoc).toHaveBeenCalledTimes(2)
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('M2 regression: merging into an existing destination row preserves that row\'s OWN deck allocation instead of wiping it', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+
+    const collectionStore = useCollectionStore()
+    const nmCard = makeCard({
+      id: 'nm-row', scryfallId: 'sf-m2', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 3,
+    })
+    const existingLpCard = makeCard({
+      id: 'existing-lp', scryfallId: 'sf-m2', edition: 'Set', setCode: 'SET',
+      condition: 'LP', foil: false, status: 'sale', quantity: 2,
+    })
+    collectionStore.cards = [nmCard, existingLpCard] as any
+
+    // Both rows are independently allocated to the SAME deck slot — this is
+    // the exact shared-deck scenario the review flagged: NM x3 + LP x2 both
+    // in the mainboard of Deck1, total 5, before any save.
+    const decksStore = useDecksStore()
+    decksStore.decks = [{
+      id: 'D1', userId: 'test-user-id', name: 'Deck1', format: 'standard',
+      description: '', colors: [], thumbnail: '',
+      allocations: [
+        { cardId: 'nm-row', quantity: 3, isInSideboard: false, addedAt: new Date() },
+        { cardId: 'existing-lp', quantity: 2, isInSideboard: false, addedAt: new Date() },
+      ],
+      wishlist: [],
+      stats: { totalCards: 5, ownedCards: 5, totalPrice: 0, avgPrice: 0, sideboardCards: 0, wishlistCards: 0, completionPercentage: 100 },
+      isPublic: false, createdAt: new Date(), updatedAt: new Date(),
+    }] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmCard }, attachTo: document.body })
+    await flushPromises()
+    expect(qtyText('qty-row-sale')).toBe('3')
+
+    await setCondition('LP')
+
+    const saveButton = findButtonByText('common.actions.save')
+    expect(saveButton).toBeTruthy()
+    saveButton!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    // The regression this test locks: before the M2 fix, the modal's own
+    // deckAllocations state only ever knew about the NM row's 3 (loaded at
+    // open, filtered by the OLD identity) — merging into the pre-existing
+    // LP row deallocated BOTH rows and reallocated only that 3, dropping
+    // the LP row's own 2. The deck must end at the FULL merged total, 5.
+    const deck = decksStore.decks.find(d => d.id === 'D1')
+    expect(deck?.allocations).toHaveLength(1)
+    expect(deck?.allocations[0]).toMatchObject({ cardId: 'existing-lp', quantity: 5, isInSideboard: false })
 
     wrapper.unmount()
   })

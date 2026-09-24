@@ -655,6 +655,17 @@ const handleSave = async () => {
       foil: cardData.foil,
     }
 
+    // TASK-318: true when the user changed print/condition/foil in the modal —
+    // savedCard's OWN identity (not just cardData) no longer matches the target
+    // identity. computeStatusOperations needs savedRelatedCards as its "source"
+    // rows to fold away (see cardSaveDiff.ts); the deck/binder slot diffs need
+    // this flag to force-migrate allocations whose QUANTITY didn't change but
+    // whose card id did (see deckSlotDiff.ts / binderSlotDiff.ts).
+    const identityChanged =
+      identity.scryfallId !== savedCard.scryfallId ||
+      identity.condition !== savedCard.condition ||
+      identity.foil !== savedCard.foil
+
     // TASK-280 AC1: merge a fresh server read into collectionStore.cards
     // before computing the create/update/delete diff. Without this,
     // computeStatusOperations decides purely from memory — the exact gap
@@ -699,7 +710,9 @@ const handleSave = async () => {
 
     // STEP 2: apply status diff. Strict identity per (scryfallId, edition, condition, foil)
     // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
-    const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave)
+    // TASK-318: savedRelatedCards passed as `sourceCards` so a condition/foil/print
+    // change folds the OLD-identity rows into the diff instead of leaving them behind.
+    const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave, savedRelatedCards)
     const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed } =
       await applyStatusOperations(ops, cardData, existingCardsForSave)
     if (step2Succeeded) anySucceeded = true
@@ -726,6 +739,7 @@ const handleSave = async () => {
       targetSlots: deckAllocations.value,
       relatedCardIds: relatedCardIdsAfterStep2,
       ownedCardId,
+      identityChanged,
     })
     for (const op of slotOps) {
       if (op.type === 'deallocate') {
@@ -753,6 +767,7 @@ const handleSave = async () => {
       targetSlots: binderAllocations.value,
       relatedCardIds: relatedCardIdsAfterStep2,
       ownedCardId,
+      identityChanged,
     })
     for (const op of binderSlotOps) {
       if (op.type === 'deallocate') {

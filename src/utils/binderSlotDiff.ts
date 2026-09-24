@@ -30,6 +30,10 @@ interface ComputeArgs {
   targetSlots: Readonly<Record<string, number>>
   relatedCardIds: readonly string[]
   ownedCardId: string | null
+  // TASK-318: see the matching flag on computeDeckSlotOps (deckSlotDiff.ts) —
+  // same problem, same fix: a binder allocation whose quantity didn't change
+  // still needs to move off a cardId that the identity change deleted.
+  identityChanged?: boolean
 }
 
 export const computeBinderSlotOps = ({
@@ -38,13 +42,15 @@ export const computeBinderSlotOps = ({
   targetSlots,
   relatedCardIds,
   ownedCardId,
+  identityChanged = false,
 }: ComputeArgs): BinderSlotOp[] => {
   const ops: BinderSlotOp[] = []
   for (const { binderId } of binders) {
     // eslint-disable-next-line security/detect-object-injection
     const target = targetSlots[binderId] ?? 0
     const orig = originalSlots.get(binderId) ?? 0
-    if (target === orig) continue
+    const mustMigrate = identityChanged && (orig > 0 || target > 0)
+    if (target === orig && !mustMigrate) continue
 
     if (orig > 0) {
       for (const cardId of relatedCardIds) {

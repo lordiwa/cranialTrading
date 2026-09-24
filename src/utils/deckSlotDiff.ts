@@ -36,6 +36,15 @@ interface ComputeArgs {
   targetSlots: Readonly<Record<string, DeckSlot>>
   relatedCardIds: readonly string[]
   ownedCardId: string | null
+  // TASK-318: when the card's identity (scryfallId/condition/foil) changed on
+  // save, the allocation stays correct in QUANTITY but stale in CARD ID — it
+  // still points at the row that just got deleted/replaced. Without this flag,
+  // a board whose target === original (the user didn't touch allocations,
+  // only the condition dropdown) emits no ops at all, so the deck/binder keeps
+  // referencing a dangling cardId. When true, every board with orig>0 or
+  // target>0 is force-migrated (deallocate the old id(s), reallocate onto
+  // ownedCardId) even if the quantity itself didn't change.
+  identityChanged?: boolean
 }
 
 const ZERO: DeckSlot = { mb: 0, sb: 0 }
@@ -46,6 +55,7 @@ export const computeDeckSlotOps = ({
   targetSlots,
   relatedCardIds,
   ownedCardId,
+  identityChanged = false,
 }: ComputeArgs): DeckSlotOp[] => {
   const ops: DeckSlotOp[] = []
   for (const { deckId } of decks) {
@@ -56,7 +66,8 @@ export const computeDeckSlotOps = ({
     for (const board of ['mb', 'sb'] as const) {
       const targetQty = target[board]
       const origQty = orig[board]
-      if (targetQty === origQty) continue
+      const mustMigrate = identityChanged && (origQty > 0 || targetQty > 0)
+      if (targetQty === origQty && !mustMigrate) continue
 
       const isInSideboard = board === 'sb'
 

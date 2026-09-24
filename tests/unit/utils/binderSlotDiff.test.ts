@@ -138,4 +138,22 @@ describe('computeBinderSlotOps — diff per binder', () => {
     const deallocCardIds = ops.filter(o => o.type === 'deallocate').map(o => o.cardId)
     expect(deallocCardIds).toEqual(['owned-1', 'wish-1', 'legacy-dupe'])
   })
+
+  // TASK-318 AC5 regression: same failure mode as deckSlotDiff — an identity
+  // change with an unchanged binder allocation quantity used to emit no ops,
+  // leaving the binder pointing at the row the identity-change deleted.
+  it('identityChanged=true migrates an unchanged allocation onto the new cardId (was a no-op before TASK-318)', () => {
+    const ops = computeBinderSlotOps({
+      binders: [{ binderId: 'B1' }],
+      originalSlots: new Map([['B1', 4]]),
+      targetSlots: { B1: 4 },
+      relatedCardIds: ['old-card-id'],
+      ownedCardId: 'new-card-id',
+      identityChanged: true,
+    })
+    expect(ops).toEqual<BinderSlotOp[]>([
+      { type: 'deallocate', binderId: 'B1', cardId: 'old-card-id' },
+      { type: 'allocate', binderId: 'B1', cardId: 'new-card-id', quantity: 4 },
+    ])
+  })
 })

@@ -344,6 +344,109 @@ describe('computeStatusOperations — self-healing consolidation (SCRUM-35 D)', 
 })
 
 // ────────────────────────────────────────────────────────────────────────────
+// TASK-318: changing condition/foil/print in CardDetailModal must MOVE the
+// existing rows to the new identity, never leave the old identity's rows
+// behind while creating new ones (silent stock duplication). `sourceCards`
+// (4th param) is what the modal was actually editing (the OLD identity);
+// `identity`/`existingCards` describe the NEW (target) identity.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('computeStatusOperations — TASK-318 identity-change migration', () => {
+  it('regression (WG-CRANIAL-LIVE-001): NM x5 -> LP with no existing LP row deletes the NM row instead of leaving it behind', () => {
+    const nmRow: Card = makeCard({ id: 'nm-row', status: 'sale', condition: 'NM', quantity: 5 })
+    const ops = computeStatusOperations(
+      { collection: 0, sale: 5, trade: 0, wishlist: 0 },
+      ident({ condition: 'LP' }),
+      [nmRow],
+      [nmRow],
+    )
+    expect(ops).toContainEqual({ type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 })
+    expect(ops).toContainEqual({ type: 'create', status: 'sale', quantity: 5 })
+    expect(ops).toHaveLength(2)
+  })
+
+  it('changing foil (non-foil -> foil) deletes the non-foil row and creates the foil one — no duplicate', () => {
+    const regRow: Card = makeCard({ id: 'reg-row', status: 'collection', foil: false, quantity: 3 })
+    const ops = computeStatusOperations(
+      { collection: 3, sale: 0, trade: 0, wishlist: 0 },
+      ident({ foil: true }),
+      [regRow],
+      [regRow],
+    )
+    expect(ops).toContainEqual({ type: 'delete', status: 'collection', cardId: 'reg-row', quantity: 0 })
+    expect(ops).toContainEqual({ type: 'create', status: 'collection', quantity: 3 })
+  })
+
+  it('changing the printing (scryfallId/edition) deletes the old-print row and creates the new-print one — no duplicate', () => {
+    const oldPrint: Card = makeCard({ id: 'old-print', scryfallId: 'sid-old', edition: 'Old Set', status: 'collection', quantity: 2 })
+    const ops = computeStatusOperations(
+      { collection: 2, sale: 0, trade: 0, wishlist: 0 },
+      ident({ scryfallId: 'sid-new', edition: 'New Set' }),
+      [oldPrint],
+      [oldPrint],
+    )
+    expect(ops).toContainEqual({ type: 'delete', status: 'collection', cardId: 'old-print', quantity: 0 })
+    expect(ops).toContainEqual({ type: 'create', status: 'collection', quantity: 2 })
+  })
+
+  it('destination already exists (NM x5 -> LP when LP x2 already for sale): merges into ONE LP row (x7), deletes the NM row', () => {
+    const nmRow: Card = makeCard({ id: 'nm-row', status: 'sale', condition: 'NM', quantity: 5 })
+    const existingLp: Card = makeCard({ id: 'existing-lp', status: 'sale', condition: 'LP', quantity: 2 })
+    const ops = computeStatusOperations(
+      { collection: 0, sale: 5, trade: 0, wishlist: 0 },
+      ident({ condition: 'LP' }),
+      [nmRow, existingLp],
+      [nmRow],
+    )
+    expect(ops).toEqual([
+      { type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 },
+      { type: 'update', status: 'sale', cardId: 'existing-lp', quantity: 7 },
+    ])
+  })
+
+  it('condition change + quantity change together (NM x5 -> LP x3): only LP x3 survives, no leftover NM', () => {
+    const nmRow: Card = makeCard({ id: 'nm-row', status: 'sale', condition: 'NM', quantity: 5 })
+    const ops = computeStatusOperations(
+      { collection: 0, sale: 3, trade: 0, wishlist: 0 },
+      ident({ condition: 'LP' }),
+      [nmRow],
+      [nmRow],
+    )
+    expect(ops).toEqual([
+      { type: 'delete', status: 'sale', cardId: 'nm-row', quantity: 0 },
+      { type: 'create', status: 'sale', quantity: 3 },
+    ])
+  })
+
+  it('card split across statuses (NM x3 sale + NM x2 trade -> LP): both NM rows deleted, LP created per status with the same split', () => {
+    const nmSale: Card = makeCard({ id: 'nm-sale', status: 'sale', condition: 'NM', quantity: 3 })
+    const nmTrade: Card = makeCard({ id: 'nm-trade', status: 'trade', condition: 'NM', quantity: 2 })
+    const ops = computeStatusOperations(
+      { collection: 0, sale: 3, trade: 2, wishlist: 0 },
+      ident({ condition: 'LP' }),
+      [nmSale, nmTrade],
+      [nmSale, nmTrade],
+    )
+    expect(ops).toContainEqual({ type: 'delete', status: 'sale', cardId: 'nm-sale', quantity: 0 })
+    expect(ops).toContainEqual({ type: 'delete', status: 'trade', cardId: 'nm-trade', quantity: 0 })
+    expect(ops).toContainEqual({ type: 'create', status: 'sale', quantity: 3 })
+    expect(ops).toContainEqual({ type: 'create', status: 'trade', quantity: 2 })
+    expect(ops).toHaveLength(4)
+  })
+
+  it('saving without any identity/quantity change is a true no-op (sourceCards === destination rows)', () => {
+    const row: Card = makeCard({ id: 'row-1', status: 'sale', condition: 'NM', quantity: 5 })
+    const ops = computeStatusOperations(
+      { collection: 0, sale: 5, trade: 0, wishlist: 0 },
+      ident({ condition: 'NM' }),
+      [row],
+      [row],
+    )
+    expect(ops).toEqual([])
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
 // TASK-280: mergeServerCards — fold a fresh server read into the (possibly
 // stale) in-memory list BEFORE computeStatusOperations decides create vs
 // update. Regression for the production duplicate-card incident.

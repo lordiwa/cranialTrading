@@ -161,4 +161,35 @@ describe('computeDeckSlotOps — diff per (deck, board)', () => {
     })
     expect(ops).toEqual([])
   })
+
+  // TASK-318 AC5 regression: a condition/foil/print change with UNCHANGED deck
+  // allocations previously emitted NO ops at all (targetQty === origQty short-
+  // circuited the loop), leaving the deck pointing at the deleted old-identity
+  // cardId. identityChanged forces the migrate-in-place even when qty is stable.
+  it('identityChanged=true migrates an unchanged allocation onto the new cardId (was a no-op before TASK-318)', () => {
+    const ops = computeDeckSlotOps({
+      decks: [{ deckId: 'D1' }],
+      originalSlots: new Map([['D1', slot(2, 0)]]),
+      targetSlots: { D1: slot(2, 0) },
+      relatedCardIds: ['old-card-id'],
+      ownedCardId: 'new-card-id',
+      identityChanged: true,
+    })
+    expect(ops).toEqual<DeckSlotOp[]>([
+      { type: 'deallocate', deckId: 'D1', cardId: 'old-card-id', isInSideboard: false },
+      { type: 'allocate', deckId: 'D1', cardId: 'new-card-id', quantity: 2, isInSideboard: false },
+    ])
+  })
+
+  it('identityChanged=true is a true no-op when the deck has no allocation for this card at all', () => {
+    const ops = computeDeckSlotOps({
+      decks: [{ deckId: 'D1' }],
+      originalSlots: new Map(),
+      targetSlots: { D1: slot(0, 0) },
+      relatedCardIds: ['old-card-id'],
+      ownedCardId: 'new-card-id',
+      identityChanged: true,
+    })
+    expect(ops).toEqual([])
+  })
 })

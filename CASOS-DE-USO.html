@@ -120,15 +120,15 @@
 <header class="top">
   <div class="wrap">
     <h1>Casos de uso de Cranial Trading, ordenados por criticidad</h1>
-    <p class="sub">Los 28 casos de uso de la plataforma, clasificados en <b style="color:var(--red)">CRUCIAL</b>, <b style="color:var(--gold)">MEDIO</b> y <b style="color:var(--silver-50)">TRIVIAL</b>. Cada caso lista su <b style="color:var(--neon)">happy path</b> (lo que el actor hace cuando todo sale bien) y sus <b style="color:var(--gold)">paths secundarios</b> (caminos alternativos, validaciones y fallas). Recopilado de la documentación existente del proyecto, no de una lectura nueva del código.</p>
+    <p class="sub">Los 25 casos de uso de la plataforma, clasificados en <b style="color:var(--red)">CRUCIAL</b>, <b style="color:var(--gold)">MEDIO</b> y <b style="color:var(--silver-50)">TRIVIAL</b>. Cada caso lista su <b style="color:var(--neon)">happy path</b> (lo que el actor hace cuando todo sale bien) y sus <b style="color:var(--gold)">paths secundarios</b> (caminos alternativos, validaciones y fallas). Recopilado de la documentación existente del proyecto, no de una lectura nueva del código. <b>Alta de usuarios, cambio de clave y recuperación de contraseña quedan fuera</b>: son Firebase Auth, no la app — se prueban las funciones de la app con las <a href="#cuentas-qa">cuentas QA existentes</a>.</p>
     <div class="meta">
       <span class="pill">Versión <b>1.59.14</b></span>
       <span class="pill">Rama <b>develop</b></span>
       <span class="pill">Commit base <b>49973ae</b></span>
       <span class="pill">Fecha <b>2026-09-24</b></span>
-      <span class="pill">Casos de uso <b>28</b></span>
-      <span class="pill">Crucial <b>12</b></span>
-      <span class="pill">Medio <b>11</b></span>
+      <span class="pill">Casos de uso <b>25</b></span>
+      <span class="pill">Crucial <b>11</b></span>
+      <span class="pill">Medio <b>9</b></span>
       <span class="pill">Trivial <b>5</b></span>
     </div>
   </div>
@@ -140,8 +140,8 @@
       <li><a href="#metodo">Método</a></li>
       <li><a href="#criterio">Criterio de criticidad</a></li>
       <li><a href="#indice">Índice</a></li>
-      <li><a href="#crucial">CRUCIAL (12)</a></li>
-      <li><a href="#medio">MEDIO (11)</a></li>
+      <li><a href="#crucial">CRUCIAL (11)</a></li>
+      <li><a href="#medio">MEDIO (9)</a></li>
       <li><a href="#trivial">TRIVIAL (5)</a></li>
       <li><a href="#fuentes">Fuentes</a></li>
       <li><a href="#cuentas-qa">Cuentas QA</a></li>
@@ -160,7 +160,7 @@
     <div class="box">
       <h4 style="color:var(--neon)">Viene de la documentación del proyecto</h4>
       <ul>
-        <li>Los 27 casos UC-01…UC-27, con sus happy paths y secundarios, salen de <code>docs/CASOS-DE-PRUEBA.md</code> (recopilado el 2026-09-15, medido contra disco) y de <code>docs/CASOS-DE-USO.html</code> (2026-08-08).</li>
+        <li>Los casos UC-02, UC-05…UC-27, con sus happy paths y secundarios, salen de <code>docs/CASOS-DE-PRUEBA.md</code> (recopilado el 2026-09-15, medido contra disco) y de <code>docs/CASOS-DE-USO.html</code> (2026-08-08). <b>UC-01, UC-03 y UC-04 fueron retirados</b> por la decisión de Mato del 2026-09-24 (ver el recuadro de abajo); sus números no se reutilizan.</li>
         <li>La prioridad de negocio 1–4 la definió el dueño del producto el 2026-08-08 y está registrada en los dos documentos.</li>
         <li>Los defectos citados salen de tickets reales de <code>tasks/</code>, con su número.</li>
       </ul>
@@ -176,6 +176,12 @@
 
   <div class="note warn">
     <p><b>Un caso listado no significa que funcione.</b> Este proyecto fue atacado por wargaming cuatro veces y el resultado repetido fue que la cobertura declarada era en buena parte falsa: de 26 specs E2E, uno solo quedó limpio tras verificarlo 1:1. Donde un caso está refutado por un ataque, se dice acá con la etiqueta <span class="tag roto">refutado</span> y el ticket. El resto de las marcas: <span class="tag e2e">E2E</span> hay test automatizado, <span class="tag smoke">@smoke</span> además corre en el gate rápido contra producción, <span class="tag none">sin E2E</span> no hay test y una regresión pasaría inadvertida.</p>
+  </div>
+
+  <div class="note stop">
+    <p><b>Lo que este documento dejó de cubrir a propósito: alta de usuarios, cambio de clave y recuperación de contraseña.</b> Decisión de Mato, 2026-09-24. Eso lo resuelve <b>Firebase Auth</b>, no el código de esta aplicación: probarlo es probar el proveedor de identidad, no el producto. Los tres casos que lo describían —<b>UC-01 Registrarse</b>, <b>UC-03 Recuperar la contraseña</b> y <b>UC-04 Cambiar la contraseña con sesión activa</b>— fueron eliminados de este documento, junto con su fila en el índice y su recuento de banda.</p>
+    <p><b>Lo que se hace en su lugar:</b> <b>usar las cuentas QA existentes para probar las funciones de la app</b>. No se crean usuarios, no se cambia ni se recupera ninguna clave: se entra con una de las seis identidades de la sección <a href="#cuentas-qa">Cuentas QA</a> —todas con la misma contraseña, ya escrita ahí— y se ejercitan los casos que sí son de la aplicación: colección, búsqueda, vitrina pública, pedidos de compra, market, mazos, binders, matches y mensajería.</p>
+    <p>Sigue existiendo <b>UC-02 Iniciar sesión</b>, y sigue siendo CRUCIAL: no es alta de cuenta, es la puerta por la que se entra con esas cuentas QA. Sin eso no se alcanza ningún otro caso.</p>
   </div>
 
   <div class="note stop">
@@ -205,7 +211,7 @@
         <tr>
           <td class="trigger"><b>3. ¿Es puerta de entrada de todo lo demás?</b></td>
           <td class="result">Si el caso falla, ningún otro caso es alcanzable.</td>
-          <td class="result">UC-01 y UC-02 (registro y login) → CRUCIAL. UC-06 (agregar una carta) también: sin colección no hay nada que vender, filtrar ni publicar.</td>
+          <td class="result">UC-02 (iniciar sesión con una cuenta QA) → CRUCIAL. UC-06 (agregar una carta) también: sin colección no hay nada que vender, filtrar ni publicar.</td>
         </tr>
       </tbody>
     </table>
@@ -219,13 +225,12 @@
 <!-- ============================= ÍNDICE ============================= -->
 <section id="indice">
   <h2><span class="num">02</span>Índice completo</h2>
-  <p class="lede">Los 28 casos, con su banda y su actor.</p>
+  <p class="lede">Los 25 casos, con su banda y su actor. Alta de usuarios, cambio de clave y recuperación de contraseña no están: son Firebase Auth.</p>
   <div class="scroll">
     <table>
       <thead><tr><th>Banda</th><th>Caso</th><th>Actor</th><th>Área</th></tr></thead>
       <tbody>
-        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-01 Registrarse</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
-        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-02 Iniciar sesión</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-02 Iniciar sesión (con una cuenta QA)</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
         <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-05 Buscar desde la landing</td><td class="result">Coleccionista</td><td class="result">Búsqueda</td></tr>
         <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-06 Agregar una carta</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
         <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-07 Editar y borrar una carta</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
@@ -237,8 +242,6 @@
         <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-22 Market: staples, movimientos, cartera</td><td class="result">Coleccionista</td><td class="result">Precios</td></tr>
         <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-28 Cumplir un pedido de compra</td><td class="result">Vendedor</td><td class="result">Comercial</td></tr>
 
-        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-03 Recuperar contraseña</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
-        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-04 Cambiar contraseña con sesión</td><td class="result">Coleccionista</td><td class="result">Acceso</td></tr>
         <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-12 Crear y borrar un mazo</td><td class="result">Coleccionista</td><td class="result">Mazos</td></tr>
         <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-13 Editar el contenido de un mazo</td><td class="result">Coleccionista</td><td class="result">Mazos</td></tr>
         <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-14 Importar un mazo desde Moxfield</td><td class="result">Coleccionista</td><td class="result">Mazos</td></tr>
@@ -262,38 +265,16 @@
 <!-- ============================= CRUCIAL ============================= -->
 <section id="crucial">
   <div class="band band-crucial">
-    <h2><span class="num">◆</span>CRUCIAL <span class="count">12 casos</span></h2>
+    <h2><span class="num">◆</span>CRUCIAL <span class="count">11 casos</span></h2>
     <p class="why">Si uno de estos falla, el producto no cumple su promesa: o no se puede entrar, o no se puede cargar la colección, o no se puede buscar precio, o se pierde inventario y dinero. Son los flujos 1, 2 y 3 de la prioridad del dueño del producto, más el acceso y el único flujo comercial real. <b>Toda regresión acá bloquea un despliegue.</b></p>
   </div>
 
   <div class="uc crucial">
-    <div class="uc-head"><span class="uc-id">UC-01</span><p class="uc-title">Registrarse</p><span class="uc-actor">Visitante</span></div>
-    <p class="pre"><b>Precondición:</b> sin sesión. <b>Postcondición:</b> cuenta creada en Firebase Auth, username reservado en una colección dedicada, correo de verificación enviado.</p>
+    <div class="uc-head"><span class="uc-id">UC-02</span><p class="uc-title">Iniciar sesión con una cuenta QA</p><span class="uc-actor">Visitante</span></div>
+    <p class="pre"><b>Precondición:</b> una de las seis <a href="#cuentas-qa">cuentas QA</a> existentes — <b>no se crea ninguna cuenta</b>. <b>Postcondición:</b> sesión activa y el usuario en <code>/inicio</code>.</p>
     <span class="lbl happy">Happy path</span>
     <ol class="happy">
-      <li>Entra a <code>/register</code> y completa correo, username, contraseña y confirmación.</li>
-      <li>El sistema valida que ni el correo ni el username estén tomados, y <b>reserva el username</b> antes de crear nada.</li>
-      <li>Crea la cuenta y dispara el correo de verificación.</li>
-      <li>Aterriza en la pantalla "verificá tu correo".</li>
-    </ol>
-    <span class="lbl alt">Paths secundarios</span>
-    <ul class="sec">
-      <li>Campos vacíos → <span class="out">el botón de registro queda deshabilitado.</span></li>
-      <li>Formato de correo inválido → <span class="out">error de validación, no se envía.</span></li>
-      <li>Correo ya registrado → <span class="out">bloquea el alta.</span></li>
-      <li>Username ya tomado → <span class="out">bloquea el alta; la reserva es lo que lo garantiza.</span></li>
-      <li>"Volver a login" → <span class="out">regresa sin dejar cuenta a medio crear.</span></li>
-      <li>En viewport móvil, el aviso de la regla de username se corta → <span class="out">el usuario nunca lee la regla (TASK-296, cerrado).</span></li>
-    </ul>
-    <div class="cov"><span class="tag e2e">E2E</span> <code>auth/register.spec.ts</code> (6 tests). El happy path está marcado <code>@nightly-skip</code>: crea una cuenta real de Firebase Auth y, hasta TASK-271, no se limpiaba sola.</div>
-  </div>
-
-  <div class="uc crucial">
-    <div class="uc-head"><span class="uc-id">UC-02</span><p class="uc-title">Iniciar sesión</p><span class="uc-actor">Visitante</span></div>
-    <p class="pre"><b>Precondición:</b> cuenta existente. <b>Postcondición:</b> sesión activa y el usuario en <code>/inicio</code>.</p>
-    <span class="lbl happy">Happy path</span>
-    <ol class="happy">
-      <li>Entra a <code>/login</code> e introduce credenciales.</li>
+      <li>Entra a <code>/login</code> e introduce las credenciales de una cuenta QA (por ejemplo <code>qa@cranialtrading.com</code> / <code>Open$1234!</code>).</li>
       <li>Toast de éxito.</li>
       <li><b>Redirige a <code>/inicio</code></b>, la landing autenticada — no al hub de matches.</li>
     </ol>
@@ -510,7 +491,7 @@
 
   <div class="uc crucial">
     <div class="uc-head"><span class="uc-id">UC-28</span><p class="uc-title">Cumplir un pedido de compra</p><span class="uc-actor">Vendedor</span></div>
-    <p class="pre"><b>Caso nuevo, no estaba en UC-01…UC-27.</b> Existe en el código (<code>fulfillRequest</code>, <code>planFulfillment</code>). <b>Postcondición:</b> el inventario del vendedor baja en las unidades vendidas, el índice público y la vitrina lo reflejan, y el pedido queda resuelto.</p>
+    <p class="pre"><b>Caso nuevo, no estaba en la numeración original UC-01…UC-27.</b> Existe en el código (<code>fulfillRequest</code>, <code>planFulfillment</code>). <b>Postcondición:</b> el inventario del vendedor baja en las unidades vendidas, el índice público y la vitrina lo reflejan, y el pedido queda resuelto.</p>
     <span class="lbl happy">Happy path</span>
     <ol class="happy">
       <li>El vendedor abre la pestaña SOLICITUDES y elige un pedido pendiente.</li>
@@ -535,46 +516,8 @@
 <!-- ============================= MEDIO ============================= -->
 <section id="medio">
   <div class="band band-medio">
-    <h2><span class="num">◆</span>MEDIO <span class="count">11 casos</span></h2>
-    <p class="why">Funcionalidad completa y visible, pero su falla no impide usar el producto para lo que el dueño declaró que importa. Mazos y binders son el flujo Nº4 de la prioridad; matches está declarado explícitamente <b>no prioritario</b>; la mensajería cierra el trato pero el trato se cierra igual fuera de la plataforma; recuperar contraseña y ajustes son mantenimiento de cuenta. <b>Una regresión acá se arregla, no bloquea.</b></p>
-  </div>
-
-  <div class="uc medio">
-    <div class="uc-head"><span class="uc-id">UC-03</span><p class="uc-title">Recuperar la contraseña</p><span class="uc-actor">Visitante</span></div>
-    <p class="pre"><b>Postcondición:</b> contraseña cambiada y el usuario puede volver a entrar.</p>
-    <span class="lbl happy">Happy path</span>
-    <ol class="happy">
-      <li>En login elige "olvidé mi contraseña" e introduce su correo.</li>
-      <li>Confirmación de envío.</li>
-      <li>Abre el enlace del correo y llega a <code>/reset-password</code> con su <code>oobCode</code>.</li>
-      <li>Escribe contraseña nueva y confirmación.</li>
-    </ol>
-    <span class="lbl alt">Paths secundarios</span>
-    <ul class="sec">
-      <li>Correo vacío → <span class="out">validación.</span></li>
-      <li>Las contraseñas no coinciden → <span class="out">rechaza.</span></li>
-      <li><code>oobCode</code> inválido o vencido → <span class="out">pantalla de error. Antes de TASK-301 se pintaba el formulario completo, el aviso duraba 4 segundos y el usuario quedaba sin salida.</span></li>
-      <li>"Volver a login" → <span class="out">regresa.</span></li>
-    </ul>
-    <div class="cov"><span class="tag e2e">E2E</span> <code>auth/forgot-password.spec.ts</code> (5). Los cuatro secundarios tienen test; <b>el happy path completo no</b>, porque depende de leer un correo real.</div>
-  </div>
-
-  <div class="uc medio">
-    <div class="uc-head"><span class="uc-id">UC-04</span><p class="uc-title">Cambiar la contraseña con sesión activa</p><span class="uc-actor">Coleccionista</span></div>
-    <p class="pre"><b>Postcondición:</b> credencial actualizada, sesión conservada.</p>
-    <span class="lbl happy">Happy path</span>
-    <ol class="happy">
-      <li>Entra a <code>/settings</code>.</li>
-      <li>Introduce contraseña actual, nueva y confirmación.</li>
-      <li>Toast de éxito.</li>
-    </ol>
-    <span class="lbl alt">Paths secundarios</span>
-    <ul class="sec">
-      <li>La confirmación no coincide → <span class="out">validación, no envía.</span></li>
-      <li>El correo está sin verificar → <span class="out">puede reenviar la verificación desde la misma pantalla.</span></li>
-      <li>Cambia el correo → <span class="out">usa <code>verifyBeforeUpdateEmail</code> y <b>revoca los tokens de sesión</b>. <b>Sin E2E.</b></span></li>
-    </ul>
-    <div class="cov"><span class="tag e2e">E2E</span> <code>settings/settings-profile.spec.ts</code> (6), <code>settings/settings-data.spec.ts</code> (4).</div>
+    <h2><span class="num">◆</span>MEDIO <span class="count">9 casos</span></h2>
+    <p class="why">Funcionalidad completa y visible, pero su falla no impide usar el producto para lo que el dueño declaró que importa. Mazos y binders son el flujo Nº4 de la prioridad; matches está declarado explícitamente <b>no prioritario</b>; la mensajería cierra el trato pero el trato se cierra igual fuera de la plataforma; los ajustes son mantenimiento de cuenta. <b>Una regresión acá se arregla, no bloquea.</b></p>
   </div>
 
   <div class="uc medio">
@@ -865,7 +808,7 @@
     <table>
       <thead><tr><th>Archivo</th><th>Qué aportó</th></tr></thead>
       <tbody>
-        <tr><td class="trigger"><code>docs/CASOS-DE-PRUEBA.md</code></td><td class="result">Fuente principal: los 27 casos con happy paths y secundarios, medidos contra disco el 2026-09-15 sobre la versión 1.59.13.</td></tr>
+        <tr><td class="trigger"><code>docs/CASOS-DE-PRUEBA.md</code></td><td class="result">Fuente principal: los 27 casos originales con happy paths y secundarios, medidos contra disco el 2026-09-15 sobre la versión 1.59.13. De ahí se retiraron UC-01, UC-03 y UC-04 (Firebase Auth, decisión de Mato del 2026-09-24).</td></tr>
         <tr><td class="trigger"><code>docs/CASOS-DE-USO.html</code></td><td class="result">Versión anterior de los casos (2026-08-08, v1.55.1), actores, mapa de rutas y la prioridad de negocio del dueño del producto.</td></tr>
         <tr><td class="trigger"><code>docs/RESULTADOS-WARGAMING.html</code></td><td class="result">Los refutados del wargaming #1 y el catálogo de 14 mecanismos de "verde vacío".</td></tr>
         <tr><td class="trigger"><code>tasks/TASK-*.json</code></td><td class="result">Los defectos nombrados uno por uno, con su número y su estado real al 2026-09-24.</td></tr>
@@ -884,18 +827,18 @@
 <!-- ============================= CUENTAS QA ============================= -->
 <section id="cuentas-qa">
   <h2><span class="num">04</span>Cuentas QA</h2>
-  <p class="lede">Con qué identidades se ejercitan los casos de arriba. <b>Son seis, y son las únicas.</b> Dictadas por Mato el 2026-09-24. Todas comparten la misma contraseña: <code>Open$1234!</code>. Cualquier otra cuenta que aparezca en un documento, un script o una corrida vieja (<code>qa_mtg</code>, <code>qa_wg_a1</code>, <code>qa_wg_a2</code>, la familia <code>qa_wg4_*</code>) queda <b>fuera de esta lista</b>: no se usa, no se documenta, no se cita.</p>
+  <p class="lede">Con qué identidades se ejercitan los casos de arriba. <b>Son seis, y son las únicas.</b> Dictadas por Mato el 2026-09-24. Se listan con el <b>email completo</b>, que es lo que se escribe en <code>/login</code>. Todas comparten la misma contraseña: <code>Open$1234!</code>. <b>No se crea ninguna cuenta nueva y no se cambia ni se recupera ninguna clave</b> — eso es Firebase Auth, no la app: se usan estas cuentas existentes para probar las funciones de la aplicación. Cualquier otra cuenta que aparezca en un documento, un script o una corrida vieja (<code>qa_mtg</code>, <code>qa_wg_a1</code>, <code>qa_wg_a2</code>, la familia <code>qa_wg4_*</code>) queda <b>fuera de esta lista</b>: no se usa, no se documenta, no se cita.</p>
 
   <h3>Las seis cuentas QA</h3>
   <div class="scroll">
     <table>
-      <thead><tr><th>#</th><th>Cuenta</th><th>Contraseña</th></tr></thead>
+      <thead><tr><th>#</th><th>Cuenta (email completo)</th><th>Contraseña</th></tr></thead>
       <tbody>
-        <tr><td class="trigger">1</td><td class="trigger"><code>qa6</code></td><td class="result"><code>Open$1234!</code></td></tr>
-        <tr><td class="trigger">2</td><td class="trigger"><code>qa5</code></td><td class="result"><code>Open$1234!</code></td></tr>
-        <tr><td class="trigger">3</td><td class="trigger"><code>qa4</code></td><td class="result"><code>Open$1234!</code></td></tr>
-        <tr><td class="trigger">4</td><td class="trigger"><code>qa3</code></td><td class="result"><code>Open$1234!</code></td></tr>
-        <tr><td class="trigger">5</td><td class="trigger"><code>qa2</code></td><td class="result"><code>Open$1234!</code></td></tr>
+        <tr><td class="trigger">1</td><td class="trigger"><code>qa6@cranialtrading.com</code></td><td class="result"><code>Open$1234!</code></td></tr>
+        <tr><td class="trigger">2</td><td class="trigger"><code>qa5@cranialtrading.com</code></td><td class="result"><code>Open$1234!</code></td></tr>
+        <tr><td class="trigger">3</td><td class="trigger"><code>qa4@cranialtrading.com</code></td><td class="result"><code>Open$1234!</code></td></tr>
+        <tr><td class="trigger">4</td><td class="trigger"><code>qa3@cranialtrading.com</code></td><td class="result"><code>Open$1234!</code></td></tr>
+        <tr><td class="trigger">5</td><td class="trigger"><code>qa2@cranialtrading.com</code></td><td class="result"><code>Open$1234!</code></td></tr>
         <tr><td class="trigger">6</td><td class="trigger"><code>qa@cranialtrading.com</code></td><td class="result"><code>Open$1234!</code></td></tr>
       </tbody>
     </table>
@@ -918,7 +861,7 @@
 
 <footer>
   <div class="wrap">
-    Cranial Trading · Casos de uso por criticidad · 28 casos (12 crucial, 11 medio, 5 trivial) · v1.59.14 · rama <code>develop</code> · 2026-09-24
+    Cranial Trading · Casos de uso por criticidad · 25 casos (11 crucial, 9 medio, 5 trivial) · sin alta de usuarios, cambio de clave ni recuperación de contraseña · v1.59.14 · rama <code>develop</code> · 2026-09-24
   </div>
 </footer>
 

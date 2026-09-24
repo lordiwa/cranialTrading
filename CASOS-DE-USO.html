@@ -144,6 +144,7 @@
       <li><a href="#medio">MEDIO (11)</a></li>
       <li><a href="#trivial">TRIVIAL (5)</a></li>
       <li><a href="#fuentes">Fuentes</a></li>
+      <li><a href="#cuentas-qa">Cuentas QA</a></li>
     </ul>
   </div>
 </nav>
@@ -877,6 +878,79 @@
 
   <div class="note warn">
     <p><b>Qué NO hay acá.</b> Este documento no re-midió la aplicación: no se corrió la suite, no se ejecutó nada contra dev ni contra producción, no se tocó un solo dato. Es una reorganización por criticidad de lo que el proyecto ya tenía escrito, más un caso de uso nuevo leído del código. El estado real de cada caso hay que verificarlo corriendo, no leyendo — que es exactamente la lección que este proyecto aprendió cuatro veces.</p>
+  </div>
+</section>
+
+<!-- ============================= CUENTAS QA ============================= -->
+<section id="cuentas-qa">
+  <h2><span class="num">04</span>Cuentas QA</h2>
+  <p class="lede">Con qué identidades se ejercitan los casos de arriba. Tres cuentas nombradas y una familia de cuentas descartables. Ninguna contraseña vive en este documento ni en ningún archivo versionado: todas salen de variables de entorno, en archivos <code>.env.*</code> gitignorados.</p>
+
+  <div class="note stop">
+    <p><b>Acá no hay contraseñas, y no se agregan.</b> Este documento se commitea. Las credenciales se leen de variables de entorno en tiempo de ejecución y los archivos que las contienen están fuera de git por la regla <code>.env.*</code> del <code>.gitignore</code>. Si alguna vez hace falta una contraseña para reproducir un caso, se pide el archivo <code>.env</code>, no se copia el valor acá.</p>
+  </div>
+
+  <h3>Las tres cuentas nombradas</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Cuenta</th><th>Entorno y para qué</th><th>Credenciales</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="trigger"><code>qa_mtg</code><br><code>qa@cranialtrading.com</code></td>
+          <td class="result">
+            <b>DEV.</b> Es la única cuenta que quedó en dev tras el vaciado de TASK-267, y es con la que <b>autentica toda la suite E2E</b> (<code>e2e/auth.setup.ts</code>). uid <code>90PkdmyFKrVm1RLDXjInJdlYXy73</code>.<br>
+            El literal <code>qa_mtg</code> está <b>hardcodeado</b> en <code>e2e/specs/user-profile/user-profile.spec.ts:32-33</code> (<code>PUBLIC_PROFILE_USERNAME</code> / <code>OWN_PROFILE_USERNAME</code>): recrear la cuenta con cualquier otro nombre de usuario rompe ese spec de entrada.<br>
+            Es además el sujeto del sensor del nightly, que exige más de 1000 cartas públicas en su <code>public_card_index</code>.
+          </td>
+          <td class="result"><code>TEST_USER_A_EMAIL</code><br><code>TEST_USER_A_PASSWORD</code><br>en <code>.env.local</code></td>
+        </tr>
+        <tr>
+          <td class="trigger"><code>qa_wg_a1</code><br><code>qa_wg_a1@cranialtrading.com</code></td>
+          <td class="result">
+            <b>PRODUCCIÓN.</b> No es una cuenta provista: la <b>creó el ataque de registro</b> del wargaming del 2026-09-15 y quedó viva, con su reserva <code>usernames/qa_wg_a1</code>. uid <code>l313krxz…</code>.
+          </td>
+          <td class="result">En <code>.env.wargaming.prod</code> del repo <code>qa-agents</code> (gitignorado). Ese archivo también aporta <code>QA_BASE_URL</code> y <code>QA_PROJECT_ID</code>, que es por qué no se borró.</td>
+        </tr>
+        <tr>
+          <td class="trigger"><code>qa_wg_a2</code><br><code>qa_wg_a2@cranialtrading.com</code></td>
+          <td class="result">
+            <b>PRODUCCIÓN.</b> Mismo origen y misma corrida que <code>qa_wg_a1</code>, con su reserva <code>usernames/qa_wg_a2</code>. uid <code>2cD8djRX…</code>.
+          </td>
+          <td class="result">Ídem <code>qa_wg_a1</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <p><b>Las dos <code>qa_wg_a*</code> son residuo, no infraestructura, y siguen en producción a propósito.</b> No se borraron en la limpieza de aquella corrida porque sus uid <b>no se pueden resolver desde el <code>.env</code></b>, y la guarda del script de borrado exige exactamente eso: que el uid a borrar salga del entorno y no esté escrito a mano. Escribirlos a mano habría sido saltear la guarda que impide borrar la cuenta equivocada en producción. Sacarlas necesita una autorización y un encargo aparte — está anotado desde el 2026-09-15 y sigue sin resolverse.</p>
+  </div>
+
+  <div class="note stop">
+    <p><b>No borrar <code>/usernames/qa</code>.</b> Es una segunda entrada de índice, huérfana a propósito, que apunta al mismo uid que <code>qa_mtg</code>. Se conserva viva como <b>evidencia</b> del defecto que investiga TASK-268 (<code>releaseUsername</code> fabrica huérfanos de <code>/usernames</code>). Borrarla tapa la evidencia antes de arreglar la causa.</p>
+  </div>
+
+  <h3>Las cuentas dinámicas <code>qa_wg4_*</code></h3>
+  <p class="pre">La corrida #4 del wargaming (2026-09-19, contra <b>dev</b>) no usa una cuenta fija: <b>registra una cuenta descartable por caso de ataque</b>, con un nombre que declara qué caso estaba atacando y, cuando el caso lo pedía, un timestamp para garantizar unicidad.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Forma del nombre</th><th>Qué significa</th></tr></thead>
+      <tbody>
+        <tr><td class="trigger"><code>qa_wg4_&lt;caso&gt;</code></td><td class="result">Cuenta por caso de ataque: <code>qa_wg4_base</code>, <code>qa_wg4_oob</code>, <code>qa_wg4_rb_orphan</code>, <code>qa_wg4_retry</code>, <code>qa_wg4_otro</code>.</td></tr>
+        <tr><td class="trigger"><code>qa_wg4_&lt;caso&gt;_&lt;timestamp&gt;</code></td><td class="result">Cuando el caso exigía un nombre nunca usado: p. ej. <code>qa_wg4_inexistente_1758240000000</code>. También <code>qa_wg4_dbl_</code>, <code>qa_wg4_taken_</code>, <code>qa_wg4_upper_</code>, <code>qa_wg4_fmt_</code>, <code>qa_wg4_acent</code> — el sufijo nombra la validación que se estaba atacando (duplicado, ya tomado, mayúsculas, formato, acentos).</td></tr>
+        <tr><td class="trigger"><code>qa_wg4b3…</code></td><td class="result">Relanzamiento de la ola 3-B: <code>qa_wg4b3</code>, <code>qa_wg4b3_4b3a</code>. Esta última es la cuenta recién registrada —y por lo tanto con colección vacía— con la que se midieron los hallazgos de <code>/market</code> de TASK-311 y TASK-315.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <p><b>Son efímeras por nombre pero no por vida: nadie las borra.</b> Medido el 2026-09-19 al reparar <code>public_cards</code>: dev había quedado con <b>10 cuentas</b>, casi todas basura de los wargames, más dos con username de solo guiones bajos (<code>___</code> y <code>____</code>). El wargaming ensucia dev igual que lo hacía la suite E2E antes de que TASK-271 le pusiera teardown a <code>register.spec.ts</code>. Consecuencia práctica: <b>una cuenta <code>qa_wg4_*</code> viva no prueba que una corrida esté en curso</b>, y contar cuentas en Auth de dev no es contar usuarios.</p>
+    <p>Si alguna vez se limpian, van todas menos <code>qa_mtg</code> — y después hay que correr el procedimiento de reparación de <code>public_cards</code> e índice que documenta <code>CLAUDE.md</code>, porque el sensor del nightly mide sobre <code>qa_mtg</code> y no tolera quedar por debajo de 1000.</p>
+  </div>
+
+  <div class="note">
+    <p><b>Procedencia de esta sección.</b> <code>qa_mtg</code>: <code>CLAUDE.md</code> (TASK-290) y <code>e2e/auth.setup.ts</code>, con el literal verificado contra <code>user-profile.spec.ts:32-33</code>. <code>qa_wg_a1</code> / <code>qa_wg_a2</code>: repo <code>qa-agents</code>, <code>wargames/cranialtrading/2026-09-15/00-terreno.md</code> y <code>docs/sut/cranialtrading/SUPERFICIE-DE-ATAQUE.md</code>. Las <code>qa_wg4_*</code>: la corrida del 2026-09-19 y la medición anotada ese día en el bundle de sesión. Los nombres de variable de entorno se leyeron de los archivos; <b>ningún valor</b>.</p>
+    <p><b>Un dato medido que conviene saber:</b> en este árbol de trabajo <b>no existe <code>.env.local</code></b> — sólo <code>.env.development</code>. Con lo cual <code>e2e/auth.setup.ts</code> acá tira <i>«Missing TEST_USER_A_EMAIL or TEST_USER_A_PASSWORD»</i> antes de abrir el navegador. No es un defecto del proyecto: es que este checkout no tiene el archivo de credenciales, que por diseño no viaja en git.</p>
   </div>
 </section>
 

@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cranial Trading — Casos de uso por criticidad</title>
+<style>
+  :root{
+    --bg:#000; --surface-1:#0b0b0b; --surface-2:#121212; --surface-3:#1a1a1a;
+    --silver:#EEEEEE; --silver-50:#8a8a8a; --silver-30:#5c5c5c;
+    --neon:#5AC168; --rust:#8B2E1F; --gold:#C9A227; --red:#d98d7d;
+    --line:#232323; --line-strong:#333;
+    --mono:"SF Mono",SFMono-Regular,ui-monospace,"Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--silver);
+    font-family:"Open Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+    font-size:15px; line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1140px;margin:0 auto;padding:0 24px}
+
+  header.top{border-bottom:1px solid var(--line);padding:56px 0 40px;background:linear-gradient(180deg,#0d0d0d,#000)}
+  header.top h1{margin:0;font-size:clamp(28px,4vw,42px);line-height:1.15;letter-spacing:-.02em}
+  header.top .sub{color:var(--silver-50);margin-top:12px;max-width:74ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+  .pill{border:1px solid var(--line-strong);border-radius:999px;padding:5px 13px;font-size:12px;color:var(--silver-50)}
+  .pill b{color:var(--neon);font-weight:600}
+
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0}
+  nav.toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+  nav.toc a{color:var(--silver-50);text-decoration:none;font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+  nav.toc a:hover{color:var(--neon);border-color:var(--line-strong)}
+
+  section{padding:52px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:26px;margin:0 0 6px;letter-spacing:-.01em;scroll-margin-top:64px}
+  h2 .num{font-family:var(--mono);font-size:15px;margin-right:10px;color:var(--neon)}
+  .lede{color:var(--silver-50);margin:0 0 28px;max-width:80ch}
+  h3{font-size:16px;margin:32px 0 10px}
+
+  /* Bandas de criticidad */
+  .band{border-radius:14px;padding:22px 24px;margin:0 0 26px;border:1px solid var(--line-strong);background:var(--surface-1)}
+  .band h2{margin:0 0 4px}
+  .band .why{color:var(--silver-50);font-size:14px;margin:10px 0 0;max-width:82ch}
+  .band-crucial{border-left:6px solid var(--rust)}
+  .band-crucial h2 .num{color:var(--red)}
+  .band-medio{border-left:6px solid var(--gold)}
+  .band-medio h2 .num{color:var(--gold)}
+  .band-trivial{border-left:6px solid var(--line-strong)}
+  .band-trivial h2 .num{color:var(--silver-30)}
+  .count{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-radius:999px;padding:3px 11px;color:var(--silver-50);margin-left:10px;vertical-align:middle}
+
+  .uc{background:var(--surface-1);border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0}
+  .uc.crucial{border-left:4px solid var(--rust)}
+  .uc.medio{border-left:4px solid var(--gold)}
+  .uc.trivial{border-left:4px solid var(--line-strong)}
+  .uc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px}
+  .uc-id{font-family:var(--mono);font-size:12px;color:var(--neon);border:1px solid var(--neon);border-radius:5px;padding:2px 8px;flex-shrink:0}
+  .uc-title{font-weight:700;font-size:16.5px;margin:0;flex:1;min-width:220px}
+  .uc-actor{font-size:12px;color:var(--silver-50);font-family:var(--mono)}
+  .pre{font-size:13px;color:var(--silver-50);margin:0 0 6px}
+  .pre b{color:var(--silver);font-weight:600}
+
+  .lbl{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--silver-30);margin:18px 0 8px;font-weight:700}
+  .lbl.happy{color:var(--neon)}
+  .lbl.alt{color:var(--gold)}
+
+  ol.happy{margin:0;padding-left:0;list-style:none;counter-reset:s}
+  ol.happy li{counter-increment:s;position:relative;padding:5px 0 5px 34px;font-size:14px}
+  ol.happy li::before{content:counter(s);position:absolute;left:0;top:6px;width:21px;height:21px;border-radius:50%;background:var(--surface-3);color:var(--neon);font-family:var(--mono);font-size:11px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line-strong)}
+
+  ul.sec{margin:0;padding-left:0;list-style:none}
+  ul.sec li{position:relative;padding:5px 0 5px 24px;font-size:14px;color:var(--silver)}
+  ul.sec li::before{content:"↳";position:absolute;left:2px;top:5px;color:var(--gold);font-family:var(--mono);font-size:13px}
+  ul.sec li .out{color:var(--silver-50)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}
+  th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--silver-30);border-bottom:1px solid var(--line-strong);padding:8px 10px;font-weight:700}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.trigger{color:var(--silver);width:34%}
+  td.result{color:var(--silver-50)}
+  .scroll{overflow-x:auto}
+
+  code{font-family:var(--mono);font-size:12.5px;background:var(--surface-3);border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--silver)}
+  .cov{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line-strong);font-size:12.5px;color:var(--silver-50)}
+  .cov b{color:var(--silver);font-weight:600}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:4px;margin-right:5px}
+  .tag.e2e{background:rgba(90,193,104,.13);color:var(--neon);border:1px solid rgba(90,193,104,.35)}
+  .tag.none{background:rgba(139,46,31,.16);color:var(--red);border:1px solid rgba(139,46,31,.5)}
+  .tag.smoke{background:rgba(201,162,39,.13);color:var(--gold);border:1px solid rgba(201,162,39,.35)}
+  .tag.roto{background:rgba(139,46,31,.28);color:#f0b5a8;border:1px solid rgba(139,46,31,.7)}
+
+  .note{border-left:3px solid var(--neon);background:var(--surface-1);padding:16px 20px;border-radius:0 8px 8px 0;margin:22px 0;font-size:14px}
+  .note.warn{border-left-color:var(--gold)}
+  .note.stop{border-left-color:var(--rust)}
+  .note b{color:var(--silver)}
+  .note p{margin:0 0 8px}.note p:last-child{margin:0}
+
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .box{background:var(--surface-1);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .box h4{margin:0 0 8px;font-size:14px}
+  .box ul{margin:0;padding-left:18px;color:var(--silver-50);font-size:13.5px}
+  .box li{margin:4px 0}
+
+  footer{padding:44px 0 72px;color:var(--silver-30);font-size:12.5px}
+  a{color:var(--neon)}
+
+  @media print{
+    body{background:#fff;color:#111}
+    nav.toc{display:none}
+    .uc,.box,.note,.band{break-inside:avoid;background:#fff;border-color:#ccc}
+    section{border-color:#ddd}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>Casos de uso de Cranial Trading, ordenados por criticidad</h1>
+    <p class="sub">Los 28 casos de uso de la plataforma, clasificados en <b style="color:var(--red)">CRUCIAL</b>, <b style="color:var(--gold)">MEDIO</b> y <b style="color:var(--silver-50)">TRIVIAL</b>. Cada caso lista su <b style="color:var(--neon)">happy path</b> (lo que el actor hace cuando todo sale bien) y sus <b style="color:var(--gold)">paths secundarios</b> (caminos alternativos, validaciones y fallas). Recopilado de la documentación existente del proyecto, no de una lectura nueva del código.</p>
+    <div class="meta">
+      <span class="pill">Versión <b>1.59.14</b></span>
+      <span class="pill">Rama <b>develop</b></span>
+      <span class="pill">Commit base <b>49973ae</b></span>
+      <span class="pill">Fecha <b>2026-09-24</b></span>
+      <span class="pill">Casos de uso <b>28</b></span>
+      <span class="pill">Crucial <b>12</b></span>
+      <span class="pill">Medio <b>11</b></span>
+      <span class="pill">Trivial <b>5</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <ul>
+      <li><a href="#metodo">Método</a></li>
+      <li><a href="#criterio">Criterio de criticidad</a></li>
+      <li><a href="#indice">Índice</a></li>
+      <li><a href="#crucial">CRUCIAL (12)</a></li>
+      <li><a href="#medio">MEDIO (11)</a></li>
+      <li><a href="#trivial">TRIVIAL (5)</a></li>
+      <li><a href="#fuentes">Fuentes</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<!-- ============================= MÉTODO ============================= -->
+<section id="metodo">
+  <h2><span class="num">00</span>Método, y qué peso tiene cada cosa de este documento</h2>
+  <p class="lede">Importa separar lo que está medido de lo que es criterio, porque no valen lo mismo.</p>
+
+  <div class="grid2">
+    <div class="box">
+      <h4 style="color:var(--neon)">Viene de la documentación del proyecto</h4>
+      <ul>
+        <li>Los 27 casos UC-01…UC-27, con sus happy paths y secundarios, salen de <code>docs/CASOS-DE-PRUEBA.md</code> (recopilado el 2026-09-15, medido contra disco) y de <code>docs/CASOS-DE-USO.html</code> (2026-08-08).</li>
+        <li>La prioridad de negocio 1–4 la definió el dueño del producto el 2026-08-08 y está registrada en los dos documentos.</li>
+        <li>Los defectos citados salen de tickets reales de <code>tasks/</code>, con su número.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h4 style="color:var(--gold)">Es criterio de este documento, no un hecho medido</h4>
+      <ul>
+        <li><b>La clasificación CRUCIAL / MEDIO / TRIVIAL.</b> Nadie la había escrito antes. Se derivó de la prioridad de negocio declarada más las reglas de la sección siguiente.</li>
+        <li><b>UC-28</b> (cumplir un pedido) no existe en los documentos anteriores: se agregó acá porque el código lo tiene (<code>fulfillRequest</code> en <code>src/stores/buyRequests.ts</code>) y cinco tickets abiertos lo atacan.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <p><b>Un caso listado no significa que funcione.</b> Este proyecto fue atacado por wargaming cuatro veces y el resultado repetido fue que la cobertura declarada era en buena parte falsa: de 26 specs E2E, uno solo quedó limpio tras verificarlo 1:1. Donde un caso está refutado por un ataque, se dice acá con la etiqueta <span class="tag roto">refutado</span> y el ticket. El resto de las marcas: <span class="tag e2e">E2E</span> hay test automatizado, <span class="tag smoke">@smoke</span> además corre en el gate rápido contra producción, <span class="tag none">sin E2E</span> no hay test y una regresión pasaría inadvertida.</p>
+  </div>
+
+  <div class="note stop">
+    <p><b>La ruta <code>docs/sut/</code> que pedía el encargo no existe en este repositorio.</b> Se verificó con <code>find</code>: no hay ningún directorio <code>sut</code>. La documentación de casos de uso vive directamente en <code>docs/</code>, y de ahí salió este documento. Si <code>docs/sut/</code> debía existir, hay un hueco previo que este documento no cierra.</p>
+  </div>
+</section>
+
+<!-- ============================= CRITERIO ============================= -->
+<section id="criterio">
+  <h2><span class="num">01</span>Cómo se decidió qué es crucial</h2>
+  <p class="lede">Tres reglas, en este orden. La primera manda sobre las otras dos.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Regla</th><th>Qué dice</th><th>Qué casos arrastra</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="trigger"><b>1. La prioridad del dueño del producto</b></td>
+          <td class="result">Los cuatro flujos de negocio que Mato ordenó el 2026-08-08. Es la única jerarquía del proyecto que no sale del código: el código dice qué hace el sistema, no qué importa.</td>
+          <td class="result">Flujos 1, 2 y 3 → CRUCIAL. Flujo 4 (mazos y binders) → MEDIO.</td>
+        </tr>
+        <tr>
+          <td class="trigger"><b>2. Si falla, ¿se pierde plata o datos?</b></td>
+          <td class="result">Un caso que mueve inventario, dinero o borra documentos es crucial aunque no esté en la lista del dueño. Un caso que sólo muestra información no lo es.</td>
+          <td class="result">UC-21 (pedido de compra) y UC-28 (cumplirlo) → CRUCIAL, pese a no estar en la lista de 2026-08-08.</td>
+        </tr>
+        <tr>
+          <td class="trigger"><b>3. ¿Es puerta de entrada de todo lo demás?</b></td>
+          <td class="result">Si el caso falla, ningún otro caso es alcanzable.</td>
+          <td class="result">UC-01 y UC-02 (registro y login) → CRUCIAL. UC-06 (agregar una carta) también: sin colección no hay nada que vender, filtrar ni publicar.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><b>Matches quedó en MEDIO a propósito.</b> Es una funcionalidad grande y visible —tres casos, 16 tests E2E— pero el dueño del producto la declaró explícitamente <b>no prioritaria</b>, y la clasificación respeta esa decisión antes que el tamaño de la superficie. No es un descuido.</p>
+  </div>
+</section>
+
+<!-- ============================= ÍNDICE ============================= -->
+<section id="indice">
+  <h2><span class="num">02</span>Índice completo</h2>
+  <p class="lede">Los 28 casos, con su banda y su actor.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Banda</th><th>Caso</th><th>Actor</th><th>Área</th></tr></thead>
+      <tbody>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-01 Registrarse</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-02 Iniciar sesión</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-05 Buscar desde la landing</td><td class="result">Coleccionista</td><td class="result">Búsqueda</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-06 Agregar una carta</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-07 Editar y borrar una carta</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-08 Operación masiva</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-09 Filtrar, ordenar y cambiar de vista</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-11 Buscar en el catálogo</td><td class="result">Coleccionista</td><td class="result">Búsqueda</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-20 Explorar un perfil público</td><td class="result">Visitante</td><td class="result">Vitrina</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-21 Carrito y pedido de compra</td><td class="result">Visitante</td><td class="result">Comercial</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-22 Market: staples, movimientos, cartera</td><td class="result">Coleccionista</td><td class="result">Precios</td></tr>
+        <tr><td class="trigger" style="color:var(--red)"><b>CRUCIAL</b></td><td class="trigger">UC-28 Cumplir un pedido de compra</td><td class="result">Vendedor</td><td class="result">Comercial</td></tr>
+
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-03 Recuperar contraseña</td><td class="result">Visitante</td><td class="result">Acceso</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-04 Cambiar contraseña con sesión</td><td class="result">Coleccionista</td><td class="result">Acceso</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-12 Crear y borrar un mazo</td><td class="result">Coleccionista</td><td class="result">Mazos</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-13 Editar el contenido de un mazo</td><td class="result">Coleccionista</td><td class="result">Mazos</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-14 Importar un mazo desde Moxfield</td><td class="result">Coleccionista</td><td class="result">Mazos</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-15 Crear, llenar y publicar un binder</td><td class="result">Coleccionista</td><td class="result">Binders</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-16 Calcular matches</td><td class="result">Tradeador</td><td class="result">Matches</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-17 Gestionar un match hasta el contacto</td><td class="result">Tradeador</td><td class="result">Matches</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-19 Conversar con otro tradeador</td><td class="result">Tradeador</td><td class="result">Mensajería</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-23 Gestionar perfil y datos</td><td class="result">Coleccionista</td><td class="result">Ajustes</td></tr>
+        <tr><td class="trigger" style="color:var(--gold)"><b>MEDIO</b></td><td class="trigger">UC-27 Navegar entre secciones</td><td class="result">Todos</td><td class="result">Transversal</td></tr>
+
+        <tr><td class="trigger" style="color:var(--silver-50)"><b>TRIVIAL</b></td><td class="trigger">UC-10 Exportar la colección</td><td class="result">Coleccionista</td><td class="result">Colección</td></tr>
+        <tr><td class="trigger" style="color:var(--silver-50)"><b>TRIVIAL</b></td><td class="trigger">UC-18 Administrar contactos guardados</td><td class="result">Tradeador</td><td class="result">Matches</td></tr>
+        <tr><td class="trigger" style="color:var(--silver-50)"><b>TRIVIAL</b></td><td class="trigger">UC-24 Cambiar de idioma</td><td class="result">Todos</td><td class="result">Transversal</td></tr>
+        <tr><td class="trigger" style="color:var(--silver-50)"><b>TRIVIAL</b></td><td class="trigger">UC-25 Recibir avisos del sistema</td><td class="result">Todos</td><td class="result">Transversal</td></tr>
+        <tr><td class="trigger" style="color:var(--silver-50)"><b>TRIVIAL</b></td><td class="trigger">UC-26 Consultar ayuda y textos legales</td><td class="result">Visitante</td><td class="result">Contenido</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================= CRUCIAL ============================= -->
+<section id="crucial">
+  <div class="band band-crucial">
+    <h2><span class="num">◆</span>CRUCIAL <span class="count">12 casos</span></h2>
+    <p class="why">Si uno de estos falla, el producto no cumple su promesa: o no se puede entrar, o no se puede cargar la colección, o no se puede buscar precio, o se pierde inventario y dinero. Son los flujos 1, 2 y 3 de la prioridad del dueño del producto, más el acceso y el único flujo comercial real. <b>Toda regresión acá bloquea un despliegue.</b></p>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-01</span><p class="uc-title">Registrarse</p><span class="uc-actor">Visitante</span></div>
+    <p class="pre"><b>Precondición:</b> sin sesión. <b>Postcondición:</b> cuenta creada en Firebase Auth, username reservado en una colección dedicada, correo de verificación enviado.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/register</code> y completa correo, username, contraseña y confirmación.</li>
+      <li>El sistema valida que ni el correo ni el username estén tomados, y <b>reserva el username</b> antes de crear nada.</li>
+      <li>Crea la cuenta y dispara el correo de verificación.</li>
+      <li>Aterriza en la pantalla "verificá tu correo".</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Campos vacíos → <span class="out">el botón de registro queda deshabilitado.</span></li>
+      <li>Formato de correo inválido → <span class="out">error de validación, no se envía.</span></li>
+      <li>Correo ya registrado → <span class="out">bloquea el alta.</span></li>
+      <li>Username ya tomado → <span class="out">bloquea el alta; la reserva es lo que lo garantiza.</span></li>
+      <li>"Volver a login" → <span class="out">regresa sin dejar cuenta a medio crear.</span></li>
+      <li>En viewport móvil, el aviso de la regla de username se corta → <span class="out">el usuario nunca lee la regla (TASK-296, cerrado).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>auth/register.spec.ts</code> (6 tests). El happy path está marcado <code>@nightly-skip</code>: crea una cuenta real de Firebase Auth y, hasta TASK-271, no se limpiaba sola.</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-02</span><p class="uc-title">Iniciar sesión</p><span class="uc-actor">Visitante</span></div>
+    <p class="pre"><b>Precondición:</b> cuenta existente. <b>Postcondición:</b> sesión activa y el usuario en <code>/inicio</code>.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/login</code> e introduce credenciales.</li>
+      <li>Toast de éxito.</li>
+      <li><b>Redirige a <code>/inicio</code></b>, la landing autenticada — no al hub de matches.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Credenciales inválidas → <span class="out">toast de error y permanece en la pantalla.</span></li>
+      <li>Campos vacíos → <span class="out">botón deshabilitado.</span></li>
+      <li>Ya tiene sesión y entra a <code>/login</code> → <span class="out"><code>requiresGuest</code> lo expulsa a la landing.</span></li>
+      <li>Auth todavía resolviendo y el usuario navega → <span class="out">el guard cancela la redirección diferida en vez de pisar la navegación.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag smoke">@smoke</span> <code>auth/login.spec.ts</code> (4 tests, 1 de ellos es el gate contra producción).</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-05</span><p class="uc-title">Buscar una carta desde la landing</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº1.</b> <b>Precondición:</b> sesión activa. <b>Postcondición:</b> el usuario llega a <code>/search</code> con su término en <code>?q=</code>.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Tras el login aterriza en <code>/inicio</code>.</li>
+      <li>Enfoca el buscador, con el mouse o con la tecla <code>/</code>.</li>
+      <li>Escribe: aparecen sugerencias con debounce.</li>
+      <li>Elige una sugerencia o envía el término.</li>
+      <li>Navega a <code>/search?q=&lt;término&gt;</code>.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Pulsa <code>/</code> mientras escribe en otro campo → <span class="out">el atajo NO roba la pulsación: se ignora dentro de <code>input</code>, <code>textarea</code> y editables.</span></li>
+      <li>Envía vacío → <span class="out">va igual a <code>/search</code> sin término.</span></li>
+      <li>Usa los atajos rápidos → <span class="out">enlaces directos a colección, mazos, binders y wishlist.</span></li>
+      <li>Carrusel de anuncios → <span class="out">se sirve desde el bundle, sin lectura de Firestore.</span></li>
+      <li>Diseño deliberado: <b>sin contadores en la landing</b> → <span class="out">cada contador costaría al menos una lectura de Firestore.</span></li>
+    </ul>
+    <div class="cov"><span class="tag none">sin E2E</span> <b>Es la puerta de entrada del flujo Nº1 y no tiene spec propio.</b> Sólo el smoke de login asevera la redirección. Su buscador ya se reportó roto una vez en dev.</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-06</span><p class="uc-title">Agregar una carta a la colección</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Precondición:</b> sesión activa. <b>Postcondición:</b> un documento en <code>users/{uid}/cards</code>, reflejado en <code>card_index</code> y en la grilla.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Abre el modal de agregar carta.</li>
+      <li>Busca por nombre contra Scryfall.</li>
+      <li>Elige la impresión concreta: edición, foil, idioma.</li>
+      <li>Fija cantidad, condición (M/NM/LP/MP/HP/PO) y estado (colección / venta / cambio / wishlist).</li>
+      <li>Guarda: la carta aparece en la grilla.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Cancela → <span class="out">no se crea nada.</span></li>
+      <li>Clic fuera del modal → <span class="out"><b>NO cierra</b>, es deliberado (<code>closeOnClickOutside="false"</code>) para no perder lo tipeado.</span></li>
+      <li>Ningún resultado tiene precio → <span class="out">se muestran todos; si al menos uno tiene precio, se ocultan los sin precio.</span></li>
+      <li>Guarda como wishlist → <span class="out">aparece en NECESITO, no en la grilla de posesión.</span></li>
+      <li>Carta de doble cara → <span class="out">persiste con <code>card_faces</code> y muestra el botón de girar.</span></li>
+      <li>Pulsa AGREGAR sin elegir ninguna carta → <span class="out">el botón se ofrecía habilitado y no hacía ni decía nada (TASK-300, cerrado).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>collection/collection-crud.spec.ts</code>, <code>preferences/preferences-crud.spec.ts</code>.</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-07</span><p class="uc-title">Editar y borrar una carta</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº3.</b> <b>Postcondición:</b> el cambio persiste en Firestore y sobrevive a una recarga.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Toca una carta de la grilla: se abre el modal de detalle.</li>
+      <li>Edita cantidad, condición, estado o visibilidad pública.</li>
+      <li>Guarda.</li>
+      <li><b>El cambio persiste tras recargar la página.</b></li>
+      <li>Para borrar: botón ELIMINAR con confirmación explícita.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Cancela en el diálogo de confirmación → <span class="out">la carta queda intacta.</span></li>
+      <li>La carta está asignada a mazos → <span class="out">las asignaciones se recalculan al cambiar la cantidad.</span></li>
+      <li>Escribe justo después de guardar → <span class="out">parche optimista más refresco diferido con token de generación, para que una respuesta vieja no pise una nueva.</span></li>
+      <li>Cambia el estado desde el menú contextual → <span class="out">es el único camino: el swipe se eliminó del proyecto (TASK-251).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag roto">refutado</span> Mutación M1 del wargaming #1: con <code>updateCard</code> devolviendo <code>true</code> sin persistir nada, el test seguía en VERDE 2/2. → <b>TASK-146, abierto.</b></div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-08</span><p class="uc-title">Operar sobre muchas cartas a la vez</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº3.</b> <b>Postcondición:</b> todas las cartas seleccionadas quedan con el nuevo estado, o borradas.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Activa la selección múltiple y marca varias cartas.</li>
+      <li>Elige la acción masiva: cambiar estado o borrar.</li>
+      <li>Confirma.</li>
+      <li>La grilla refleja el cambio en todas.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Cancela el borrado masivo → <span class="out">no se borra nada. <b>Sin E2E.</b></span></li>
+      <li>Selección enorme → <span class="out">las escrituras se parten en lotes por el tope de 10 MiB de <code>writeBatch</code>.</span></li>
+      <li>Mueve de venta a colección → <span class="out"><code>applyStatusOperations</code> recorre el orden de estados con <code>collection</code> ANTES que <code>sale</code>: emite CREATE primero y DELETE después, y el create dispara la reescritura del índice. El orden no es inocuo.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag roto">refutado</span> Mutación M2 más dos tests sin un solo <code>expect</code>. → TASK-147 (cerrado), <b>TASK-205 / 206 / 207 abiertos.</b></div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-09</span><p class="uc-title">Filtrar, ordenar y cambiar de vista la colección</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº2.</b> <b>Postcondición:</b> la vista filtrada queda reflejada en la URL y sobrevive a compartir el enlace o recargar.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Usa los chips de estado: todas / colección / disponible / NECESITO.</li>
+      <li>Afina con el buscador local por nombre.</li>
+      <li>Ordena.</li>
+      <li>Alterna entre grilla visual y vista de texto con columnas.</li>
+      <li><b>Los filtros quedan sincronizados en la URL</b> (<code>useCollectionFilterUrl</code>) y sobreviven a recargar o compartir el enlace.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Vuelve a "ALL" → <span class="out">restablece la vista completa.</span></li>
+      <li>Carta de doble cara → <span class="out">el botón de girar alterna caras sin salir de la grilla.</span></li>
+      <li>Entra con parámetros legacy <code>?deck=</code>, <code>?binder=</code>, <code>?from=decks</code> → <span class="out">se redirigen a las vistas nuevas; son contratos con URLs ya guardadas.</span></li>
+      <li>La lista crece al paginar (<code>useCollectionPagination</code>, server-side) → <span class="out">el scroll no se resetea.</span></li>
+      <li>Una carta en wishlist → <span class="out">se contaba y dibujaba dentro de CARTAS QUE TENGO, y la misma pantalla mostraba 14, 15 y 40 (TASK-294, abierto).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag roto">refutado</span> <code>collection-filters.spec.ts</code> (4) y <code>collection-views.spec.ts</code> (4). El test del buscador escribía en el buscador del HEADER y nunca filtró nada. → <b>TASK-154, abierto.</b></div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-11</span><p class="uc-title">Buscar en el catálogo de Scryfall</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº1.</b> <b>Postcondición:</b> grilla de resultados, y desde ahí el modal de alta a la colección.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Escribe el nombre de la carta: aparecen sugerencias mientras tipea.</li>
+      <li>Elige una sugerencia o pulsa Enter.</li>
+      <li>Aparece la grilla de resultados.</li>
+      <li>Afina con filtros avanzados: color, tipo, rareza, CMC, formato.</li>
+      <li>Toca un resultado: se abre el modal para agregarla a la colección.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Sin resultados → <span class="out">estado vacío explicativo, no una grilla en blanco.</span></li>
+      <li>Ya tiene la carta → <span class="out">insignia con la cantidad que posee.</span></li>
+      <li>Llega por enlace profundo del header y busca de nuevo → <span class="out"><code>?q=</code> se sincroniza al término más reciente.</span></li>
+      <li>Teclea rápido → <span class="out">debounce más guarda de carrera: una respuesta vieja no pisa a una nueva.</span></li>
+      <li>Scryfall no responde → <span class="out">degradación. <b>Sin E2E.</b></span></li>
+      <li>Trampa conocida del proyecto: <b>hay CINCO superficies de autocompletado independientes</b> → <span class="out">toda corrección de carrera o debounce debe aplicarse a las cinco.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag smoke">@smoke</span> <code>search/search.spec.ts</code> (9 tests). El de "seleccionar sugerencia del autocompletado" es flake conocido: depende de que una sugerencia viva de Scryfall tenga precio.</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-20</span><p class="uc-title">Explorar un perfil público</p><span class="uc-actor">Visitante o Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº2.</b> <b>Precondición:</b> ninguna — es la única ruta autenticable que también sirve a visitantes. <b>Postcondición:</b> el visitante ve la vitrina del vendedor y puede filtrarla.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/@usuario</code>.</li>
+      <li>Ve username, ubicación y avatar.</li>
+      <li>Recorre las cartas públicas del vendedor (índice público, <code>usePublicProfileIndex</code>).</li>
+      <li>Filtra por nombre y por chips de tipo y color.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Username inexistente → <span class="out">estado "usuario no encontrado".</span></li>
+      <li>Visitante sin sesión → <span class="out"><b>NO ve los botones de interés ni de contacto.</b></span></li>
+      <li>Es su propio perfil → <span class="out">UI distinta, con opciones de edición.</span></li>
+      <li>Hueco declarado (KNOWN GAP): no hay chip "other" → <span class="out">con los siete chips puestos las cartas sin categoría se ven; al deseleccionar UNO desaparecen sin que nada lo diga.</span></li>
+      <li>Una búsqueda larga → <span class="out">tumba la colección, REINTENTAR no la levanta y el buscador desaparece (TASK-292, abierto).</span></li>
+      <li>Hay un carrito guardado sin <code>items[]</code> → <span class="out">el perfil entero queda en negro y el visitante pierde la vitrina completa, sin salida (TASK-305, abierto).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag roto">refutado</span> <code>user-profile/user-profile.spec.ts</code> (6). Aserciones tautológicas, un logout que no desloguea, el perfil equivocado. → <b>TASK-157, abierto.</b> Uno de estos tests es además el sensor del nightly (piso de 1000 entradas del índice público).</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-21</span><p class="uc-title">Armar un carrito y enviar un pedido de compra</p><span class="uc-actor">Visitante o Tradeador</span></div>
+    <p class="pre"><b>El único flujo que toca a alguien sin cuenta y el único que se parece a una transacción comercial.</b> <b>Postcondición:</b> un <code>BuyRequest</code> en estado <code>pending</code> bajo el dueño del perfil, con los datos de contacto del comprador.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>En un perfil público agrega cartas al carrito, con la cantidad acotada por el stock publicado.</li>
+      <li>El carrito se guarda en el navegador, indexado por el usuario dueño del perfil y con fecha de expiración.</li>
+      <li>Envía el pedido dejando <b>nombre, teléfono y correo</b>.</li>
+      <li>Se persiste un <code>BuyRequest</code> bajo el dueño del perfil, en estado <code>pending</code>.</li>
+      <li>El dueño lo ve en su pestaña de pedidos, con el contacto y el total.</li>
+      <li>Al abrirlo pasa a <code>seen</code>; puede borrarlo cuando lo resuelve.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Pide más de lo disponible → <span class="out">acotado por <code>maxQuantity</code>.</span></li>
+      <li>El carrito expira → <span class="out">se descarta por <code>expiresAt</code>.</span></li>
+      <li>Carritos en varios perfiles → <span class="out">se guardan por separado, indexados por username.</span></li>
+      <li>El dueño ya vendió esas cartas → <span class="out">el pedido conserva el estado del momento del envío: <b>NO hay reserva de stock.</b></span></li>
+      <li>El botón de enviar aparece deshabilitado → <span class="out">sin decir qué falta (TASK-295, abierto).</span></li>
+      <li>El precio → <span class="out">lo fijaba el COMPRADOR: <code>submitBuyRequest</code> persistía los items verbatim desde el navegador del visitante (TASK-306, abierto). Y el carrito pisaba el precio del vendedor con el retail de Card Kingdom (TASK-298, cerrado).</span></li>
+      <li>Envía una vez → <span class="out">dejaba DOS solicitudes idénticas en la bandeja del vendedor (TASK-291, cerrado).</span></li>
+      <li>Abre la pestaña SOLICITUDES → <span class="out">marca TODAS como vistas sin abrir ninguna (TASK-293, abierto).</span></li>
+    </ul>
+    <div class="cov"><span class="tag none">sin E2E</span> <b>CERO pruebas automatizadas.</b> Es el flujo comercial del producto y no tiene ni una. Todo lo que se sabe de él salió de wargaming, y produjo ocho tickets.</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-22</span><p class="uc-title">Market: staples, movimientos de precio e impacto en cartera</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº1</b> — "buscar cartas para revisar precios" es lo primero de la lista. <b>Postcondición:</b> el usuario ve qué se mueve y cuánto varió su cartera.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/market</code>.</li>
+      <li><b>Staples:</b> elige formato y categoría y ve las cartas de referencia con su precio.</li>
+      <li><b>Movimientos:</b> alterna ganadoras y perdedoras, filtra por formato y por tipo de precio.</li>
+      <li><b>Impacto en cartera:</b> ve la variación total y qué cartas suyas la explican, ordenable por impacto absoluto o porcentual.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Busca una carta puntual → <span class="out">autocompletado por nombre.</span></li>
+      <li>Posee cartas de la lista → <span class="out">se resaltan con su variación en dinero.</span></li>
+      <li>Una carta sin precio → <span class="out">debe degradar sin romper el total. <b>Sin E2E.</b></span></li>
+      <li>La fuente de precios está caída → <span class="out">no se mostraba ningún aviso: 0 toasts, sin fecha de actualización, y el único texto en pantalla culpaba a la colección del usuario (TASK-314, en revisión).</span></li>
+      <li>Cartera vacía → <span class="out">decía "ninguna carta coincide" en vez de "no hay cartas": un mismo texto para tres causas distintas (TASK-315, en revisión).</span></li>
+      <li>La tabla de movimientos → <span class="out">repetía filas idénticas, 3 duplicados sobre 30, y el ranking escondía cartas reales (TASK-312, en revisión).</span></li>
+      <li>La pestaña STAPLES → <span class="out">no mostraba ningún precio: cero tokens monetarios en toda la tabla, la columna no existía (TASK-311, en revisión).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>market/format-staples.spec.ts</code> (3), <code>market/price-movers.spec.ts</code> (5), <code>market/portfolio-impact.spec.ts</code> (3). Card Kingdom es la fuente primaria de precios de todo el sistema.</div>
+  </div>
+
+  <div class="uc crucial">
+    <div class="uc-head"><span class="uc-id">UC-28</span><p class="uc-title">Cumplir un pedido de compra</p><span class="uc-actor">Vendedor</span></div>
+    <p class="pre"><b>Caso nuevo, no estaba en UC-01…UC-27.</b> Existe en el código (<code>fulfillRequest</code>, <code>planFulfillment</code>). <b>Postcondición:</b> el inventario del vendedor baja en las unidades vendidas, el índice público y la vitrina lo reflejan, y el pedido queda resuelto.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>El vendedor abre la pestaña SOLICITUDES y elige un pedido pendiente.</li>
+      <li>Revisa items, contacto del comprador y total.</li>
+      <li>Marca el pedido como cumplido.</li>
+      <li>Se descuenta la cantidad de cada carta de su colección.</li>
+      <li>El índice público y el perfil público reflejan el stock nuevo.</li>
+      <li>El pedido queda resuelto y puede borrarlo.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>El pedido pide más unidades de las que hay → <span class="out">debe informar el faltante. Antes de TASK-307 <b>borraba la carta entera</b> de la colección y reportaba éxito completo.</span></li>
+      <li>Cumple dos pedidos de la misma carta desde dos pestañas → <span class="out">no era atómico: descontaba 3 de 5 unidades porque la segunda escritura absoluta pisaba a la primera (TASK-316, en revisión).</span></li>
+      <li>Después de cumplir, el comprador mira la vitrina → <span class="out">el decremento no se propagaba al índice público: seguía ofreciendo x12 con 7 en stock, y el carrito heredaba ese <code>maxQuantity</code> (TASK-317, abierto).</span></li>
+      <li>Cantidad negativa en el pedido → <span class="out"><code>firestore.rules</code> dejaba a un anónimo mandar <code>-100</code>, y el plan calculaba 10−(−100)=110, inflando el inventario del vendedor con éxito completo. Hallazgo de revisión sobre TASK-307/316.</span></li>
+      <li>El pedido queda sin cumplir → <span class="out">se puede borrar sin tocar inventario.</span></li>
+    </ul>
+    <div class="cov"><span class="tag none">sin E2E</span> Cinco tickets abiertos o en revisión lo atacan: TASK-306, 307, 316, 317 y el hallazgo de reglas de Firestore. <b>Es el caso que mueve inventario real y no tiene ninguna prueba de extremo a extremo.</b></div>
+  </div>
+</section>
+
+<!-- ============================= MEDIO ============================= -->
+<section id="medio">
+  <div class="band band-medio">
+    <h2><span class="num">◆</span>MEDIO <span class="count">11 casos</span></h2>
+    <p class="why">Funcionalidad completa y visible, pero su falla no impide usar el producto para lo que el dueño declaró que importa. Mazos y binders son el flujo Nº4 de la prioridad; matches está declarado explícitamente <b>no prioritario</b>; la mensajería cierra el trato pero el trato se cierra igual fuera de la plataforma; recuperar contraseña y ajustes son mantenimiento de cuenta. <b>Una regresión acá se arregla, no bloquea.</b></p>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-03</span><p class="uc-title">Recuperar la contraseña</p><span class="uc-actor">Visitante</span></div>
+    <p class="pre"><b>Postcondición:</b> contraseña cambiada y el usuario puede volver a entrar.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>En login elige "olvidé mi contraseña" e introduce su correo.</li>
+      <li>Confirmación de envío.</li>
+      <li>Abre el enlace del correo y llega a <code>/reset-password</code> con su <code>oobCode</code>.</li>
+      <li>Escribe contraseña nueva y confirmación.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Correo vacío → <span class="out">validación.</span></li>
+      <li>Las contraseñas no coinciden → <span class="out">rechaza.</span></li>
+      <li><code>oobCode</code> inválido o vencido → <span class="out">pantalla de error. Antes de TASK-301 se pintaba el formulario completo, el aviso duraba 4 segundos y el usuario quedaba sin salida.</span></li>
+      <li>"Volver a login" → <span class="out">regresa.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>auth/forgot-password.spec.ts</code> (5). Los cuatro secundarios tienen test; <b>el happy path completo no</b>, porque depende de leer un correo real.</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-04</span><p class="uc-title">Cambiar la contraseña con sesión activa</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Postcondición:</b> credencial actualizada, sesión conservada.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/settings</code>.</li>
+      <li>Introduce contraseña actual, nueva y confirmación.</li>
+      <li>Toast de éxito.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>La confirmación no coincide → <span class="out">validación, no envía.</span></li>
+      <li>El correo está sin verificar → <span class="out">puede reenviar la verificación desde la misma pantalla.</span></li>
+      <li>Cambia el correo → <span class="out">usa <code>verifyBeforeUpdateEmail</code> y <b>revoca los tokens de sesión</b>. <b>Sin E2E.</b></span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>settings/settings-profile.spec.ts</code> (6), <code>settings/settings-data.spec.ts</code> (4).</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-12</span><p class="uc-title">Crear y borrar un mazo</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº4.</b> <b>Postcondición:</b> el mazo existe en la lista; al borrarlo, las cartas siguen en la colección.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Abre el modal de creación.</li>
+      <li>Pone nombre y formato: <code>vintage</code>, <code>modern</code>, <code>commander</code>, <code>standard</code> o <code>custom</code>.</li>
+      <li>Guarda: aparece en la lista.</li>
+      <li>Para borrarlo, confirmación explícita.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Nombre vacío → <span class="out">impide guardar.</span></li>
+      <li>Borra un mazo con cartas asignadas → <span class="out"><b>se liberan las asignaciones; las cartas siguen en la colección.</b> Un mazo asigna, no duplica.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>decks/deck-crud.spec.ts</code> (5). El test de creación borra su propio mazo al final (TASK-240).</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-13</span><p class="uc-title">Editar el contenido de un mazo</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº4.</b> <b>Postcondición:</b> las asignaciones y las estadísticas del mazo reflejan el contenido.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Abre el mazo: aparece el editor con sus estadísticas.</li>
+      <li>Agrega cartas desde la colección al mainboard.</li>
+      <li>Mueve cartas entre mainboard y sideboard.</li>
+      <li>Ajusta cantidades: asignaciones y stats se actualizan.</li>
+      <li>Consulta la curva de maná y la distribución de tipos.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Asigna más copias de las que posee → <span class="out"><b>error de sobreasignación, se rechaza.</b> Es el path secundario central: un mazo asigna cartas que ya están en la colección, no las duplica.</span></li>
+      <li>Exporta el mazo → <span class="out">a CSV o al portapapeles.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag roto">refutado</span> <code>decks/deck-editor.spec.ts</code> (5): <b>4 de los 5 tests son cáscaras.</b> → TASK-159, abierto. Además "add card from collection to mainboard" crea un mazo y nunca lo borra (medido: decks 1 → 2 en una corrida).</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-14</span><p class="uc-title">Importar un mazo desde Moxfield</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Postcondición:</b> el contenido del mazo remoto queda asignado en el mazo local.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Pega la URL de Moxfield.</li>
+      <li>Ve el progreso de la importación.</li>
+      <li>El contenido importado aparece en el mazo.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>URL inválida → <span class="out">error, no importa nada.</span></li>
+      <li>Pega sólo el ID en vez de la URL → <span class="out"><b>también funciona.</b></span></li>
+      <li>Importación muy grande → <span class="out">corre en Cloud Function con asignaciones compactas; techo de ~35.000 por binder, por el límite de 1 MB por documento de Firestore.</span></li>
+      <li>El mismo flujo lo comparten mazos y binders → <span class="out">un solo composable, <code>useCollectionImport</code>.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>decks/deck-import.spec.ts</code> (3).</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-15</span><p class="uc-title">Crear, llenar y publicar un binder</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Prioridad de negocio Nº4.</b> <b>Postcondición:</b> el binder existe y, si se marcó público, su contenido queda visible en el perfil público.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Crea el binder con un nombre.</li>
+      <li>Asigna cartas desde la colección, o importa una lista.</li>
+      <li><b>Lo marca público y/o en venta.</b></li>
+      <li>Queda visible en su perfil público.</li>
+      <li>Lo exporta a CSV o al portapapeles.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Nombre vacío → <span class="out">impide guardar.</span></li>
+      <li>Cancela → <span class="out">no crea nada.</span></li>
+      <li>Borra → <span class="out">confirmación explícita.</span></li>
+      <li>Usa el mismo editor que los mazos → <span class="out"><code>DeckEditorGrid</code> en <code>binder-mode</code>. Todo cambio de handler va en pareja mazo/binder.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>binders/binders.spec.ts</code> (4). <b>Publicar y marcar en venta: sin E2E</b> — justo el paso que conecta el binder con la vitrina pública.</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-16</span><p class="uc-title">Calcular matches</p><span class="uc-actor">Tradeador</span></div>
+    <p class="pre"><b>Declarado no prioritario por el dueño del producto.</b> <b>Precondición:</b> tener cartas en <code>sale</code>, <code>trade</code> o <code>wishlist</code>. <b>Postcondición:</b> matches nuevos listados, cada uno emparejando una carta propia con una ajena.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/saved-matches</code>.</li>
+      <li>Pulsa "actualizar": sincroniza y recalcula con barra de progreso.</li>
+      <li>Los matches aparecen en la pestaña "Nuevos".</li>
+      <li>Cada uno indica <code>VENDO</code> o <code>BUSCO</code> y empareja una carta propia con una ajena.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Sin coincidencias → <span class="out">mensaje de guía, no una lista vacía.</span></li>
+      <li>Dispara "actualizar" dos veces → <span class="out"><b>guarda de vuelo único</b>: no se lanzan dos recálculos en paralelo.</span></li>
+      <li>Un mismo usuario produce varias coincidencias → <span class="out">se agrupan y deduplican, se conserva la más reciente.</span></li>
+      <li>Ya lo había descartado → <span class="out">no reaparece. <b>Descartar no es lo mismo que bloquear.</b></span></li>
+      <li>No publicó nada → <span class="out">encuentra ACTUALIZAR deshabilitado, cinco ceros sin contexto y un cartel que le dice que espere, cuando el bloqueo es suyo (TASK-308, abierto).</span></li>
+      <li>Montar la pantalla → <span class="out"><code>cleanExpiredMatches</code> BORRA documentos con <code>writeBatch</code> y un catch silencioso. Medido y confirmado por dos lecturas independientes. Causa abierta en TASK-265; por eso esta pantalla perdió su etiqueta <code>@smoke</code>.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>matches/match-calculation.spec.ts</code> (3). <b>Sin cobertura en el gate contra producción</b>, a propósito y con costo aceptado.</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-17</span><p class="uc-title">Gestionar un match hasta el contacto</p><span class="uc-actor">Tradeador</span></div>
+    <p class="pre"><b>Postcondición:</b> el match queda en Guardados, Eliminados o con el otro usuario bloqueado; el trato se cierra fuera de la plataforma.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Abre el detalle del match: comparación de cartas y datos del otro usuario.</li>
+      <li>Pulsa ME INTERESA.</li>
+      <li>El match pasa a "Guardados" en estado activo.</li>
+      <li>Abre el chat con el otro tradeador.</li>
+      <li>Cierran el trato fuera de la plataforma.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Descarta → <span class="out">va a "Eliminados".</span></li>
+      <li>Comparte → <span class="out">toast de confirmación.</span></li>
+      <li>Bloquea → <span class="out">el otro usuario entra en la lista de bloqueados.</span></li>
+      <li>Navega entre pestañas (Nuevos / Guardados / Eliminados / Contactos) → <span class="out">cada una renderiza su contenido.</span></li>
+      <li>Tres clics rápidos en ME INTERESA → <span class="out">no hay guarda de vuelo único: crea tres matches distintos en Firestore y manda tres notificaciones (TASK-309, abierto).</span></li>
+      <li>Las pestañas no son conjuntos disjuntos → <span class="out">Guardados es un subconjunto de Enviados y muestra como guardado lo que el usuario nunca guardó (TASK-310, abierto).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>matches/match-management.spec.ts</code> (7).</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-19</span><p class="uc-title">Conversar con otro tradeador</p><span class="uc-actor">Tradeador</span></div>
+    <p class="pre"><b>Postcondición:</b> el mensaje queda en el hilo y la conversación aparece en la lista de ambos.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/messages</code>: lista de conversaciones con vista previa del último mensaje y marca de tiempo.</li>
+      <li>Selecciona una conversación.</li>
+      <li>Escribe y envía.</li>
+      <li>El mensaje aparece en el hilo.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>En escritorio → <span class="out">split-pane: la lista sigue visible, no es un modal.</span></li>
+      <li>En móvil → <span class="out">la conversación tapa la lista y el botón de volver la recupera.</span></li>
+      <li>Filtra por username → <span class="out">acota la lista.</span></li>
+      <li>Filtro sin coincidencias → <span class="out">estado vacío.</span></li>
+      <li>Abre CONTACTAR y cierra sin escribir → <span class="out">persistía una conversación vacía e imborrable y el encabezado la contaba como "1 conversaciones activas". Arreglado en <code>ea88955</code>: la conversación se crea al primer envío, nunca al abrir (TASK-313).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag smoke">@smoke</span> <code>messages/messages.spec.ts</code> (7). <b>Dos tests se auto-omiten</b> porque la cuenta de CI no tiene conversaciones: se reportan como omitidos, NO como cubiertos.</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-23</span><p class="uc-title">Gestionar el perfil y los datos de la cuenta</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Postcondición:</b> los datos públicos del usuario quedan actualizados y su username sigue siendo único.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Entra a <code>/settings</code>.</li>
+      <li>Revisa y edita username, ubicación y avatar.</li>
+      <li>En gestión de datos: reenvía la verificación de correo o reinicia el tour guiado.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Reinicia el tour → <span class="out">la guía vuelve a aparecer.</span></li>
+      <li>Elige un username ya tomado → <span class="out">debe rechazarlo. Se apoya en una colección dedicada (<code>/usernames</code>) y su regla de Firestore. <b>Sin E2E.</b></span></li>
+      <li>Gotcha operativo → <span class="out"><b>el CI despliega sólo hosting; las reglas de Firestore van a mano</b>, y omitirlas ya rompió el registro una vez.</span></li>
+      <li>Huérfanos de <code>/usernames</code> → <span class="out"><code>releaseUsername</code> los genera por diseño declarado; reproducible 2 de 2. En producción, un huérfano llegó a servir el perfil de OTRA persona (TASK-268).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>settings/settings-profile.spec.ts</code>, <code>settings/settings-data.spec.ts</code>.</div>
+  </div>
+
+  <div class="uc medio">
+    <div class="uc-head"><span class="uc-id">UC-27</span><p class="uc-title">Navegar entre secciones</p><span class="uc-actor">Todos</span></div>
+    <p class="pre"><b>Transversal.</b> <b>Postcondición:</b> cada sección renderiza su contenido y las URLs viejas siguen resolviendo.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Usa el header en escritorio o la barra inferior en móvil.</li>
+      <li>Cada sección renderiza su contenido.</li>
+      <li>Las URLs viejas siguen funcionando por redirección.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Ruta inexistente → <span class="out">404.</span></li>
+      <li>Ruta autenticada sin sesión → <span class="out">el guard redirige a login.</span></li>
+      <li>Se desplegó una versión nueva con la pestaña abierta → <span class="out">recarga única del chunk, con protección contra bucle. Aplica a toda ruta perezosa salvo <code>/login</code>, que se importa estáticamente a propósito.</span></li>
+      <li>La navegación entre las tres vistas (colección, mazos, binders) → <span class="out">es por <code>&lt;RouterLink&gt;</code>, nunca por estado interno. No hay <code>viewMode</code> compartido.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag smoke">@smoke</span> <span class="tag roto">refutado</span> <code>smoke/navigation.spec.ts</code> (4, 2 de ellos en el gate contra producción). El test del logo es un verde vacío. → <b>TASK-150, abierto.</b></div>
+  </div>
+</section>
+
+<!-- ============================= TRIVIAL ============================= -->
+<section id="trivial">
+  <div class="band band-trivial">
+    <h2><span class="num">◆</span>TRIVIAL <span class="count">5 casos</span></h2>
+    <p class="why">Conveniencia, contenido estático o soporte de interfaz. Si fallan, el usuario sigue pudiendo coleccionar, buscar precios, publicar y vender. <b>No justifican bloquear nada ni gastar presupuesto de ataque</b> — salvo UC-10, que es trivial por una razón distinta y peor: no existe.</p>
+  </div>
+
+  <div class="uc trivial">
+    <div class="uc-head"><span class="uc-id">UC-10</span><p class="uc-title">Exportar la colección completa</p><span class="uc-actor">Coleccionista</span></div>
+    <p class="pre"><b>Postcondición declarada:</b> un archivo CSV descargado. <b>Postcondición real:</b> ninguna — la funcionalidad no existe.</p>
+    <span class="lbl happy">Happy path (declarado, no implementado)</span>
+    <ol class="happy">
+      <li>Entra a <code>/settings</code>, sección de gestión de datos.</li>
+      <li>Elige el formato: CSV de Moxfield o de Manabox.</li>
+      <li>El archivo se descarga.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>No hay. <span class="out">No hay nada que recorrer.</span></li>
+    </ul>
+    <div class="cov"><span class="tag roto">refutado</span> <span class="tag none">sin E2E</span> <b>El botón de exportación no existe en la aplicación</b>, confirmado en el código: <code>SettingsView.vue</code> no tiene ninguna sección de exportación (WG4-O2-02, TASK-302). Los dos tests que decían cubrir este happy path envolvían su única acción en <code>if (await ...isVisible())</code>: con el botón ausente el cuerpo nunca corría y el test pasaba en VERDE sin ejercer nada. Desde TASK-303 quedan en <code>test.fixme()</code>. <b>TASK-302 decide si se implementa o se retira del alcance declarado.</b></div>
+  </div>
+
+  <div class="uc trivial">
+    <div class="uc-head"><span class="uc-id">UC-18</span><p class="uc-title">Administrar contactos guardados</p><span class="uc-actor">Tradeador</span></div>
+    <p class="pre"><b>Postcondición:</b> la lista de contactos refleja lo guardado, y desde ahí se llega al chat o al perfil.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Abre la pestaña Contactos dentro del hub de matches.</li>
+      <li>Ve la lista de contactos guardados.</li>
+      <li>Desde una tarjeta abre el chat o visita el perfil público.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Sin contactos → <span class="out">estado vacío.</span></li>
+      <li>Borra un contacto → <span class="out">confirmación y desaparece.</span></li>
+      <li>Cancela el borrado → <span class="out">queda intacto.</span></li>
+      <li>Entra por <code>/contacts</code> → <span class="out">redirige a la pestaña del hub.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>contacts/contacts.spec.ts</code> (6). Bien cubierto para lo poco que pesa.</div>
+  </div>
+
+  <div class="uc trivial">
+    <div class="uc-head"><span class="uc-id">UC-24</span><p class="uc-title">Cambiar de idioma</p><span class="uc-actor">Todos</span></div>
+    <p class="pre"><b>Postcondición:</b> la interfaz queda en el idioma elegido y la preferencia sobrevive a recargar y al login.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li><b>El idioma por defecto es español.</b></li>
+      <li>Elige inglés o portugués.</li>
+      <li>La interfaz se actualiza al instante, sin recargar.</li>
+      <li>La preferencia sobrevive a recargar la página.</li>
+      <li>Y sobrevive al login, hacia las pantallas autenticadas.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Regla dura del proyecto → <span class="out"><code>en.json</code> ↔ <code>es.json</code> ↔ <code>pt.json</code> se editan siempre juntos. Una clave que exista en uno solo es un defecto.</span></li>
+      <li>Hueco transversal → <span class="out"><b>la suite E2E nunca corre en español</b>, que es justamente el idioma por defecto y el de los usuarios objetivo. TASK-162, abierto.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>i18n/i18n.spec.ts</code> (5).</div>
+  </div>
+
+  <div class="uc trivial">
+    <div class="uc-head"><span class="uc-id">UC-25</span><p class="uc-title">Recibir avisos del sistema</p><span class="uc-actor">Todos</span></div>
+    <p class="pre"><b>Soporte de interfaz.</b> <b>Postcondición:</b> el usuario se entera del resultado de su acción.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Completa una acción con éxito: aparece un toast de éxito.</li>
+      <li><b>El toast se auto-descarta a los 4 segundos.</b></li>
+      <li>La campana del header abre el panel de notificaciones.</li>
+      <li>La insignia refleja los no leídos; marcar como leído la actualiza.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>Acción fallida → <span class="out">toast de error.</span></li>
+      <li>Varios toasts seguidos → <span class="out">el último queda visible.</span></li>
+      <li>Clic fuera del panel → <span class="out">se cierra.</span></li>
+      <li>Regla dura → <span class="out"><b>nunca dos diálogos de confirmación en paralelo</b>: el segundo espera a que el primero termine su animación (<code>pendingResult</code> + <code>onAfterLeave</code>).</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <code>notifications/toasts-and-notifications.spec.ts</code> (8).</div>
+  </div>
+
+  <div class="uc trivial">
+    <div class="uc-head"><span class="uc-id">UC-26</span><p class="uc-title">Consultar ayuda y textos legales</p><span class="uc-actor">Visitante</span></div>
+    <p class="pre"><b>Contenido estático.</b> <b>Postcondición:</b> el visitante lee lo que buscaba y puede volver.</p>
+    <span class="lbl happy">Happy path</span>
+    <ol class="happy">
+      <li>Sin sesión accede a FAQ, términos, privacidad, cookies y guías (condiciones de las cartas, cómo intercambiar).</li>
+      <li>En el FAQ despliega y repliega preguntas.</li>
+      <li>El logo lo devuelve al punto de entrada.</li>
+    </ol>
+    <span class="lbl alt">Paths secundarios</span>
+    <ul class="sec">
+      <li>No hay paths secundarios documentados. <span class="out">Son páginas de lectura.</span></li>
+    </ul>
+    <div class="cov"><span class="tag e2e">E2E</span> <span class="tag roto">refutado</span> <code>help/help-legal.spec.ts</code> (5). El test "FAQ page loads" tiene <b>cero <code>expect()</code></b>, todo su cuerpo dentro de un <code>if isVisible()</code>, y su selector agarra el botón de búsqueda del ENCABEZADO en vez de un FAQ: un verde vacío que un día se volvió rojo vacío. Documentado en TASK-264 como control positivo, <b>deliberadamente NO listado como flake conocido</b> para no legitimarlo.</div>
+  </div>
+</section>
+
+<!-- ============================= FUENTES ============================= -->
+<section id="fuentes">
+  <h2><span class="num">03</span>Fuentes</h2>
+  <p class="lede">Todo lo de arriba sale de estos archivos del repositorio. Ninguna cifra se inventó y ninguna se copió sin nombrar su origen.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Archivo</th><th>Qué aportó</th></tr></thead>
+      <tbody>
+        <tr><td class="trigger"><code>docs/CASOS-DE-PRUEBA.md</code></td><td class="result">Fuente principal: los 27 casos con happy paths y secundarios, medidos contra disco el 2026-09-15 sobre la versión 1.59.13.</td></tr>
+        <tr><td class="trigger"><code>docs/CASOS-DE-USO.html</code></td><td class="result">Versión anterior de los casos (2026-08-08, v1.55.1), actores, mapa de rutas y la prioridad de negocio del dueño del producto.</td></tr>
+        <tr><td class="trigger"><code>docs/RESULTADOS-WARGAMING.html</code></td><td class="result">Los refutados del wargaming #1 y el catálogo de 14 mecanismos de "verde vacío".</td></tr>
+        <tr><td class="trigger"><code>tasks/TASK-*.json</code></td><td class="result">Los defectos nombrados uno por uno, con su número y su estado real al 2026-09-24.</td></tr>
+        <tr><td class="trigger"><code>CLAUDE.md</code></td><td class="result">Reglas duras del producto: modales que no cierran al clic afuera, los tres locales juntos, el filtro de precios, la política de E2E de tres niveles.</td></tr>
+        <tr><td class="trigger"><code>src/stores/buyRequests.ts</code>, <code>src/utils/buyRequest.ts</code></td><td class="result">UC-28, que no estaba documentado en ningún lado: <code>fulfillRequest</code>, <code>planFulfillment</code>, <code>shortfallsOf</code>.</td></tr>
+        <tr><td class="trigger"><code>src/router/index.ts</code></td><td class="result">Rutas, guards y redirecciones legacy citadas en los casos.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <p><b>Qué NO hay acá.</b> Este documento no re-midió la aplicación: no se corrió la suite, no se ejecutó nada contra dev ni contra producción, no se tocó un solo dato. Es una reorganización por criticidad de lo que el proyecto ya tenía escrito, más un caso de uso nuevo leído del código. El estado real de cada caso hay que verificarlo corriendo, no leyendo — que es exactamente la lección que este proyecto aprendió cuatro veces.</p>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    Cranial Trading · Casos de uso por criticidad · 28 casos (12 crucial, 11 medio, 5 trivial) · v1.59.14 · rama <code>develop</code> · 2026-09-24
+  </div>
+</footer>
+
+</body>
+</html>
